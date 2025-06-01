@@ -24,11 +24,14 @@ swift Examples/StandaloneDemo.swift
 ### 📱 BasicUsage.swift
 Shows basic usage patterns for NDKSwift models and simple operations. Good starting point for understanding the core concepts.
 
-### 🚀 NostrDemo.swift
-A more comprehensive console application that demonstrates real-world usage patterns (requires compilation).
+### 🚀 NostrDemoMain.swift
+A comprehensive console application that demonstrates real-world usage patterns. This is a compiled executable that shows all major NDKSwift features.
 
-### 🧪 SimpleDemo.swift
-A minimal demo showing key functionality in a simple format.
+### 🧪 SimpleDemoMain.swift
+A minimal demo showing key functionality in a simple format. This is a compiled executable for quick testing.
+
+### 💾 FileCacheDemo.swift
+Comprehensive demonstration of the file-based cache adapter, showing persistent storage, querying, profile management, and performance testing.
 
 ## Running the Examples
 
@@ -36,24 +39,39 @@ A minimal demo showing key functionality in a simple format.
 The easiest way to see NDKSwift in action:
 
 ```bash
-# Run the comprehensive API demo
+# Run the standalone API demo (no compilation needed)
 swift Examples/StandaloneDemo.swift
 
 # Or run the full test suite to see everything working
 swift test
 ```
 
-### For Development
-To build and run the examples as part of development:
+### Building and Running Compiled Examples
+To build and run the compiled examples:
 
 ```bash
-# Build NDKSwift first
+# Navigate to Examples directory
+cd Examples
+
+# Build the examples
 swift build
 
-# Run tests to verify functionality
-swift test
+# Run SimpleDemo
+./.build/debug/SimpleDemo
 
-# Check the test results to see current status
+# Run NostrDemo (comprehensive demo)
+./.build/debug/NostrDemo
+
+# Run FileCacheDemo (cache demonstration)
+./.build/debug/FileCacheDemo
+```
+
+### Alternative: Run from Root Directory
+```bash
+# From NDKSwift root directory
+swift run --package-path Examples SimpleDemo
+swift run --package-path Examples NostrDemo
+swift run --package-path Examples FileCacheDemo
 ```
 
 ## What You'll See

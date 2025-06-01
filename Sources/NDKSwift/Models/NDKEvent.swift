@@ -217,12 +217,33 @@ public final class NDKEvent: Codable, Equatable, Hashable {
     
     /// Check if this event is replaceable
     public var isReplaceable: Bool {
-        return kind >= 10000 && kind < 20000
+        // Kind 0 (metadata) and kind 3 (contacts) are replaceable
+        // Also kinds 10000-19999 are replaceable
+        return kind == 0 || kind == 3 || (kind >= 10000 && kind < 20000)
     }
     
     /// Check if this event is parameterized replaceable
     public var isParameterizedReplaceable: Bool {
         return kind >= 30000 && kind < 40000
+    }
+    
+    /// Get the tag address for replaceable events
+    public var tagAddress: String {
+        if isParameterizedReplaceable {
+            // Parameterized replaceable events
+            let dTag = tags.first(where: { $0.count >= 2 && $0[0] == "d" })?[1] ?? ""
+            return "\(kind):\(pubkey):\(dTag)"
+        } else if isReplaceable {
+            // Regular replaceable events
+            return "\(kind):\(pubkey)"
+        } else {
+            return id ?? ""
+        }
+    }
+    
+    /// Get the value of a tag by name
+    public func tagValue(_ name: String) -> String? {
+        return tag(withName: name)?.count ?? 0 > 1 ? tag(withName: name)?[1] : nil
     }
 }
 

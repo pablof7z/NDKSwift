@@ -56,6 +56,52 @@ for await event in subscription {
 }
 ```
 
+## Caching
+
+NDKSwift includes an adapter-based caching system with multiple storage backends:
+
+### In-Memory Cache
+Fast, temporary storage that's lost when the app terminates:
+
+```swift
+let cache = NDKInMemoryCache()
+ndk.cacheAdapter = cache
+```
+
+### File Cache
+Persistent JSON-based storage that survives app restarts:
+
+```swift
+let fileCache = try NDKFileCache(path: "my-app-cache")
+ndk.cacheAdapter = fileCache
+```
+
+Features:
+- Human-readable JSON files for easy debugging
+- Thread-safe operations with concurrent reads
+- In-memory indexes for fast queries
+- Automatic handling of replaceable events (metadata, contacts)
+- Support for unpublished events and profiles
+- NIP-05 caching with expiration
+- Encrypted event storage
+- Performance: ~650ms to cache 100 events, ~16ms to query them
+
+Example usage:
+```swift
+// Initialize with file cache
+let cache = try NDKFileCache(path: "nostr-cache")
+let ndk = NDK(
+    relayUrls: ["wss://relay.damus.io"],
+    cacheAdapter: cache
+)
+
+// Events are automatically cached as they arrive
+let subscription = ndk.subscribe(filters: [NDKFilter(kinds: [1])])
+
+// Query cached events later
+let cachedEvents = await cache.query(subscription: subscription)
+```
+
 ## Requirements
 
 - iOS 15.0+ / macOS 12.0+ / tvOS 15.0+ / watchOS 8.0+

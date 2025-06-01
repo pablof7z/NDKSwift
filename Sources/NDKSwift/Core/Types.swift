@@ -32,6 +32,7 @@ public enum EventKind {
     public static let repost = 6
     public static let reaction = 7
     public static let badgeAward = 8
+    public static let image = 20
     public static let channelCreation = 40
     public static let channelMetadata = 41
     public static let channelMessage = 42
@@ -59,6 +60,41 @@ public enum EventKind {
 
 /// Tag structure
 public typealias Tag = [String]
+
+/// Imeta tag representation
+public struct NDKImetaTag {
+    public var url: String?
+    public var blurhash: String?
+    public var dim: String?
+    public var alt: String?
+    public var m: String?
+    public var x: String?
+    public var size: String?
+    public var fallback: [String]?
+    public var additionalFields: [String: String] = [:]
+    
+    public init(
+        url: String? = nil,
+        blurhash: String? = nil,
+        dim: String? = nil,
+        alt: String? = nil,
+        m: String? = nil,
+        x: String? = nil,
+        size: String? = nil,
+        fallback: [String]? = nil,
+        additionalFields: [String: String] = [:]
+    ) {
+        self.url = url
+        self.blurhash = blurhash
+        self.dim = dim
+        self.alt = alt
+        self.m = m
+        self.x = x
+        self.size = size
+        self.fallback = fallback
+        self.additionalFields = additionalFields
+    }
+}
 
 /// NDK Error types
 public enum NDKError: Error, LocalizedError, Equatable {

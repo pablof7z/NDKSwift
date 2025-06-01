@@ -39,7 +39,8 @@ public struct NDKFilter: Codable, Equatable {
         pubkeys: [PublicKey]? = nil,
         since: Timestamp? = nil,
         until: Timestamp? = nil,
-        limit: Int? = nil
+        limit: Int? = nil,
+        tags: [String: Set<String>]? = nil
     ) {
         self.ids = ids
         self.authors = authors
@@ -49,6 +50,13 @@ public struct NDKFilter: Codable, Equatable {
         self.since = since
         self.until = until
         self.limit = limit
+        
+        // Convert tags to tagFilters format
+        if let tags = tags {
+            for (tagName, values) in tags {
+                self.tagFilters["#\(tagName)"] = Array(values)
+            }
+        }
     }
     
     // MARK: - Tag Filters
@@ -61,6 +69,18 @@ public struct NDKFilter: Codable, Equatable {
     /// Get tag filter values
     public func tagFilter(_ tagName: String) -> [String]? {
         return tagFilters["#\(tagName)"]
+    }
+    
+    /// Get all tag filters as a dictionary
+    public var tags: [String: Set<String>]? {
+        guard !tagFilters.isEmpty else { return nil }
+        var result: [String: Set<String>] = [:]
+        for (key, values) in tagFilters {
+            // Remove the # prefix
+            let tagName = String(key.dropFirst())
+            result[tagName] = Set(values)
+        }
+        return result
     }
     
     // MARK: - Codable

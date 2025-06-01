@@ -11,20 +11,35 @@ let package = Package(
         .watchOS(.v8)
     ],
     dependencies: [
-        .package(path: "..") // NDKSwift package
+        .package(name: "NDKSwift", path: "..") // NDKSwift package
     ],
     targets: [
         .executableTarget(
             name: "SimpleDemo",
-            dependencies: ["NDKSwift"],
+            dependencies: [
+                .product(name: "NDKSwift", package: "NDKSwift")
+            ],
             path: ".",
-            sources: ["SimpleDemo.swift"]
+            exclude: ["StandaloneDemo.swift", "BasicUsage.swift", "SimpleDemo.swift", "NostrDemo.swift", "README.md", "FileCacheDemo.swift"],
+            sources: ["SimpleDemoMain.swift"]
         ),
         .executableTarget(
             name: "NostrDemo",
-            dependencies: ["NDKSwift"],
+            dependencies: [
+                .product(name: "NDKSwift", package: "NDKSwift")
+            ],
             path: ".",
-            sources: ["NostrDemo.swift"]
+            exclude: ["StandaloneDemo.swift", "BasicUsage.swift", "SimpleDemo.swift", "NostrDemo.swift", "README.md", "FileCacheDemo.swift"],
+            sources: ["NostrDemoMain.swift"]
+        ),
+        .executableTarget(
+            name: "FileCacheDemo",
+            dependencies: [
+                .product(name: "NDKSwift", package: "NDKSwift")
+            ],
+            path: ".",
+            exclude: ["StandaloneDemo.swift", "BasicUsage.swift", "SimpleDemo.swift", "NostrDemo.swift", "README.md", "SimpleDemoMain.swift", "NostrDemoMain.swift"],
+            sources: ["FileCacheDemo.swift"]
         )
     ]
 )
