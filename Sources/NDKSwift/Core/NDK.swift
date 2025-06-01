@@ -10,8 +10,8 @@ public final class NDK {
     
     /// Active user (derived from signer)
     public var activeUser: NDKUser? {
-        guard let pubkey = try? signer?.pubkey else { return nil }
-        return NDKUser(pubkey: pubkey)
+        // This will need to be async or cached
+        return nil
     }
     
     /// Relay pool
@@ -229,13 +229,3 @@ public class NDKSubscription {
     }
 }
 
-/// Signer protocol placeholder (to be properly implemented)
-public protocol NDKSigner {
-    var pubkey: PublicKey { get throws }
-    func sign(_ event: NDKEvent) async throws -> Signature
-}
-
-/// Cache adapter protocol placeholder (to be properly implemented)
-public protocol NDKCacheAdapter {
-    // TODO: Define cache methods
-}
