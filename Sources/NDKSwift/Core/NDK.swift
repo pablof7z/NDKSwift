@@ -86,7 +86,7 @@ public final class NDK {
             
             // Generate ID if needed
             if event.id == nil {
-                try event.generateID()
+                _ = try event.generateID()
             }
             
             // Sign the event
@@ -106,17 +106,18 @@ public final class NDK {
     /// Subscribe to events matching the given filters
     public func subscribe(
         filters: [NDKFilter],
-        relays: Set<NDKRelay>? = nil,
-        subId: String? = nil
+        options: NDKSubscriptionOptions = NDKSubscriptionOptions()
     ) -> NDKSubscription {
+        var subscriptionOptions = options
+        subscriptionOptions.relays = subscriptionOptions.relays ?? Set(relays)
+        
         let subscription = NDKSubscription(
-            ndk: self,
             filters: filters,
-            relays: relays,
-            subId: subId
+            options: subscriptionOptions,
+            ndk: self
         )
         
-        // TODO: Register with subscription manager
+        subscription.start()
         
         return subscription
     }
@@ -126,16 +127,16 @@ public final class NDK {
         filters: [NDKFilter],
         relays: Set<NDKRelay>? = nil
     ) async throws -> Set<NDKEvent> {
-        // Create a subscription that closes on EOSE
-        let subscription = subscribe(
-            filters: filters,
-            relays: relays
-        )
-        subscription.closeOnEose = true
+        var options = NDKSubscriptionOptions()
+        options.closeOnEose = true
+        options.relays = relays
         
-        // TODO: Implement event fetching
-        // For now, return empty set
-        return []
+        let subscription = subscribe(filters: filters, options: options)
+        
+        // Wait for EOSE using the new callback-based approach
+        await subscription.waitForEOSE()
+        
+        return Set(subscription.events)
     }
     
     /// Fetch a single event by ID
@@ -162,7 +163,7 @@ public final class NDK {
     }
 }
 
-// MARK: - Placeholder classes (to be implemented)
+// MARK: - Relay Pool Implementation
 
 class NDKRelayPool {
     private var relaysByUrl: [RelayURL: NDKRelay] = [:]
@@ -205,27 +206,67 @@ class NDKRelayPool {
     }
 }
 
+// MARK: - Event Repository Implementation
+
 class NDKEventRepository {
-    // TODO: Implement event storage and retrieval
+    private var events: [EventID: NDKEvent] = [:]
+    private let queue = DispatchQueue(label: "com.ndkswift.eventrepository", attributes: .concurrent)
+    
+    func addEvent(_ event: NDKEvent) {
+        guard let eventId = event.id else { return }
+        
+        queue.async(flags: .barrier) { [weak self] in
+            self?.events[eventId] = event
+        }
+    }
+    
+    func getEvent(_ eventId: EventID) -> NDKEvent? {
+        return queue.sync {
+            return events[eventId]
+        }
+    }
+    
+    func getAllEvents() -> [NDKEvent] {
+        return queue.sync {
+            return Array(events.values)
+        }
+    }
+    
+    func clear() {
+        queue.async(flags: .barrier) { [weak self] in
+            self?.events.removeAll()
+        }
+    }
 }
+
+// MARK: - Subscription Manager Implementation
 
 class NDKSubscriptionManager {
-    // TODO: Implement subscription management
-}
-
-/// Subscription placeholder (to be properly implemented)
-public class NDKSubscription {
-    public let id: String
-    public let filters: [NDKFilter]
-    public let relays: Set<NDKRelay>?
-    public weak var ndk: NDK?
-    public var closeOnEose: Bool = false
+    private var activeSubscriptions: [String: NDKSubscription] = [:]
+    private let queue = DispatchQueue(label: "com.ndkswift.subscriptionmanager", attributes: .concurrent)
     
-    init(ndk: NDK, filters: [NDKFilter], relays: Set<NDKRelay>?, subId: String?) {
-        self.id = subId ?? UUID().uuidString
-        self.ndk = ndk
-        self.filters = filters
-        self.relays = relays
+    func addSubscription(_ subscription: NDKSubscription) {
+        queue.async(flags: .barrier) { [weak self] in
+            self?.activeSubscriptions[subscription.id] = subscription
+        }
+    }
+    
+    func removeSubscription(_ subscriptionId: String) {
+        queue.async(flags: .barrier) { [weak self] in
+            self?.activeSubscriptions.removeValue(forKey: subscriptionId)
+        }
+    }
+    
+    func getSubscription(_ subscriptionId: String) -> NDKSubscription? {
+        return queue.sync {
+            return activeSubscriptions[subscriptionId]
+        }
+    }
+    
+    func getAllSubscriptions() -> [NDKSubscription] {
+        return queue.sync {
+            return Array(activeSubscriptions.values)
+        }
     }
 }
 

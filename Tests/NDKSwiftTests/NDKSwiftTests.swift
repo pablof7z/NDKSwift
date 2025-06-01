@@ -74,11 +74,11 @@ final class NDKSwiftTests: XCTestCase {
         
         XCTAssertNotNil(subscription.id)
         XCTAssertEqual(subscription.filters.count, 2)
-        XCTAssertFalse(subscription.closeOnEose)
+        XCTAssertFalse(subscription.options.closeOnEose)
         XCTAssertTrue(subscription.ndk === ndk)
         
-        // Test with custom sub ID
-        let customSub = ndk.subscribe(filters: filters, subId: "custom-id")
+        // Test with custom sub ID using NDKSubscription directly
+        let customSub = NDKSubscription(id: "custom-id", filters: filters, ndk: ndk)
         XCTAssertEqual(customSub.id, "custom-id")
     }
     

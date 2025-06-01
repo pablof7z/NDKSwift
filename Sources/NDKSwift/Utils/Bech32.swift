@@ -91,7 +91,7 @@ public enum Bech32 {
         let maxAcc = (1 << (fromBits + toBits - 1)) - 1
         
         for value in data {
-            if value >= (1 << fromBits) {
+            if Int(value) >= (1 << fromBits) {
                 throw Bech32Error.invalidData
             }
             acc = ((acc << fromBits) | Int(value)) & maxAcc

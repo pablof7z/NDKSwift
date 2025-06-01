@@ -103,17 +103,15 @@ final class NDKRelayTests: XCTestCase {
         let ndk = NDK()
         
         let sub1 = NDKSubscription(
-            ndk: ndk,
+            id: "sub1",
             filters: [NDKFilter(kinds: [1])],
-            relays: nil,
-            subId: "sub1"
+            ndk: ndk
         )
         
         let sub2 = NDKSubscription(
-            ndk: ndk,
+            id: "sub2",
             filters: [NDKFilter(kinds: [2])],
-            relays: nil,
-            subId: "sub2"
+            ndk: ndk
         )
         
         // Add subscriptions

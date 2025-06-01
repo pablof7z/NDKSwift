@@ -37,13 +37,13 @@ final class NDKInMemoryCacheTests: XCTestCase {
         await cache.setEvent(event3, filters: [], relay: nil)
         
         // Query by author and kind
-        let subscription1 = NDKSubscription(ndk: ndk, filters: [filter1], relays: nil, subId: nil)
+        let subscription1 = NDKSubscription(filters: [filter1], ndk: ndk)
         let results1 = await cache.query(subscription: subscription1)
         XCTAssertEqual(results1.count, 1)
         XCTAssertEqual(results1.first?.id, "event1")
         
         // Query by kind only
-        let subscription2 = NDKSubscription(ndk: ndk, filters: [filter2], relays: nil, subId: nil)
+        let subscription2 = NDKSubscription(filters: [filter2], ndk: ndk)
         let results2 = await cache.query(subscription: subscription2)
         XCTAssertEqual(results2.count, 2)
         XCTAssertTrue(results2.contains { $0.id == "event1" })
@@ -51,7 +51,7 @@ final class NDKInMemoryCacheTests: XCTestCase {
         
         // Query with no matches
         let filter3 = NDKFilter(kinds: [999])
-        let subscription3 = NDKSubscription(ndk: ndk, filters: [filter3], relays: nil, subId: nil)
+        let subscription3 = NDKSubscription(filters: [filter3], ndk: ndk)
         let results3 = await cache.query(subscription: subscription3)
         XCTAssertEqual(results3.count, 0)
     }
@@ -172,7 +172,7 @@ final class NDKInMemoryCacheTests: XCTestCase {
         
         // Query with broad filter (no constraints)
         let broadFilter = NDKFilter()
-        let subscription = NDKSubscription(ndk: ndk, filters: [broadFilter], relays: nil, subId: nil)
+        let subscription = NDKSubscription(filters: [broadFilter], ndk: ndk)
         let results = await cache.query(subscription: subscription)
         
         XCTAssertEqual(results.count, 5)
@@ -247,19 +247,19 @@ final class NDKInMemoryCacheTests: XCTestCase {
             NDKFilter(authors: ["alice"], kinds: [1]),
             NDKFilter(authors: ["bob"], kinds: [3])
         ]
-        let sub1 = NDKSubscription(ndk: ndk, filters: filters, relays: nil, subId: nil)
+        let sub1 = NDKSubscription(filters: filters, ndk: ndk)
         let results1 = await cache.query(subscription: sub1)
         XCTAssertEqual(results1.count, 3) // Alice's 2 kind:1 posts + Bob's contacts
         
         // Test 2: Time-based filter
         let filter2 = NDKFilter(since: 1500, until: 2500)
-        let sub2 = NDKSubscription(ndk: ndk, filters: [filter2], relays: nil, subId: nil)
+        let sub2 = NDKSubscription(filters: [filter2], ndk: ndk)
         let results2 = await cache.query(subscription: sub2)
         XCTAssertEqual(results2.count, 3) // Events at 1500, 2000, 2500
         
         // Test 3: Specific IDs
         let filter3 = NDKFilter(ids: ["1", "3", "5"])
-        let sub3 = NDKSubscription(ndk: ndk, filters: [filter3], relays: nil, subId: nil)
+        let sub3 = NDKSubscription(filters: [filter3], ndk: ndk)
         let results3 = await cache.query(subscription: sub3)
         XCTAssertEqual(results3.count, 3)
         XCTAssertTrue(results3.allSatisfy { ["1", "3", "5"].contains($0.id ?? "") })

@@ -22,9 +22,13 @@ final class Bech32Tests: XCTestCase {
     func testNpubEncoding() throws {
         let pubkey = "d0a1ffb8761b974cec4a3be8cbcb2e96a7090dcf465ffeac839aa4ca20c9a59e"
         print("Testing npub encoding for pubkey: \(pubkey)")
-        let data = Foundation.Data(hex: pubkey)
+        
+        guard let data = Data(hexString: pubkey) else {
+            XCTFail("Failed to create data from hex string")
+            return
+        }
         print("Data count: \(data.count)")
-        print("Data hex: \(data.toHexString())")
+        print("Data hex: \(data.hexString)")
         
         let npub = try Bech32.npub(from: pubkey)
         
@@ -67,12 +71,12 @@ final class Bech32Tests: XCTestCase {
             }
         }
         
-        // Test invalid checksum
-        XCTAssertThrowsError(try Bech32.decode("test1wrongchecksum")) { error in
+        // Test invalid checksum (using valid characters but wrong checksum)
+        XCTAssertThrowsError(try Bech32.decode("test1qqqsyqcyq5rqwzqfpg9scrgwpuccg6ks")) { error in
             if case Bech32.Bech32Error.invalidChecksum = error {
                 // Success
             } else {
-                XCTFail("Expected invalid checksum error")
+                XCTFail("Expected invalid checksum error, got: \(error)")
             }
         }
         

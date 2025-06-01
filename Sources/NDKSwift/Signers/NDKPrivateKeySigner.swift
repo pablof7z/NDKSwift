@@ -39,7 +39,7 @@ public final class NDKPrivateKeySigner: NDKSigner {
     public func sign(_ event: NDKEvent) async throws -> Signature {
         // Ensure event has an ID
         if event.id == nil {
-            try event.generateID()
+            _ = try event.generateID()
         }
         
         guard let eventId = event.id,

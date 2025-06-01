@@ -72,8 +72,8 @@ public final class NDKRelay: Hashable, Equatable {
     /// Reference to NDK instance
     public weak var ndk: NDK?
     
-    /// WebSocket connection (placeholder for now)
-    private var webSocket: Any?
+    /// WebSocket connection
+    private var connection: NDKRelayConnection?
     
     /// Reconnection timer
     private var reconnectTimer: Timer?
@@ -104,20 +104,13 @@ public final class NDKRelay: Hashable, Equatable {
         updateConnectionState(.connecting)
         stats.connectionAttempts += 1
         
-        // TODO: Implement actual WebSocket connection
-        // For now, simulate connection
-        try await Task.sleep(nanoseconds: 100_000_000) // 0.1 seconds
-        
-        stats.connectedAt = Date()
-        stats.successfulConnections += 1
-        reconnectDelay = 1.0 // Reset delay on successful connection
-        
-        updateConnectionState(.connected)
-        
-        // Fetch relay information
-        Task {
-            await fetchRelayInformation()
+        guard let url = URL(string: normalizedURL) else {
+            throw NDKError.relayConnectionFailed("Invalid URL: \(normalizedURL)")
         }
+        
+        connection = NDKRelayConnection(url: url)
+        connection?.delegate = self
+        connection?.connect()
     }
     
     /// Disconnect from the relay
@@ -132,7 +125,8 @@ public final class NDKRelay: Hashable, Equatable {
         reconnectTimer?.invalidate()
         reconnectTimer = nil
         
-        // TODO: Close WebSocket connection
+        connection?.disconnect()
+        connection = nil
         
         updateConnectionState(.disconnected)
     }
@@ -182,11 +176,11 @@ public final class NDKRelay: Hashable, Equatable {
     
     /// Send a message to the relay
     public func send(_ message: String) async throws {
-        guard connectionState == .connected else {
+        guard connectionState == .connected, let connection = connection else {
             throw NDKError.relayConnectionFailed("Not connected to relay")
         }
         
-        // TODO: Send message through WebSocket
+        try await connection.send(message)
         stats.messagesSent += 1
         stats.bytesSent += message.count
     }
@@ -245,6 +239,83 @@ public final class NDKRelay: Hashable, Equatable {
         
         return normalized.lowercased()
     }
+}
+
+// MARK: - NDKRelayConnectionDelegate
+
+extension NDKRelay: NDKRelayConnectionDelegate {
+    public func relayConnectionDidConnect(_ connection: NDKRelayConnection) {
+        stats.connectedAt = Date()
+        stats.successfulConnections += 1
+        reconnectDelay = 1.0 // Reset delay on successful connection
+        
+        updateConnectionState(.connected)
+        
+        // Fetch relay information
+        Task {
+            await fetchRelayInformation()
+        }
+    }
+    
+    public func relayConnectionDidDisconnect(_ connection: NDKRelayConnection, error: Error?) {
+        if let error = error {
+            handleConnectionFailure(error)
+        } else {
+            updateConnectionState(.disconnected)
+        }
+    }
+    
+    public func relayConnection(_ connection: NDKRelayConnection, didReceiveMessage message: NostrMessage) {
+        handleNostrMessage(message)
+    }
+    
+    private func handleNostrMessage(_ message: NostrMessage) {
+        stats.messagesReceived += 1
+        
+        switch message {
+        case .event(let subscriptionId, let event):
+            if let subId = subscriptionId, let subscription = subscriptions[subId] {
+                subscription.handleEvent(event, fromRelay: self)
+            }
+            
+        case .eose(let subscriptionId):
+            if let subscription = subscriptions[subscriptionId] {
+                subscription.handleEOSE(fromRelay: self)
+            }
+            
+        case .ok(let eventId, let accepted, let errorMessage):
+            // Handle event publishing confirmation
+            handleOKMessage(eventId: eventId, accepted: accepted, message: errorMessage)
+            
+        case .notice(let noticeMessage):
+            print("Notice from \(url): \(noticeMessage)")
+            
+        case .auth(let challenge):
+            // Handle authentication challenge
+            handleAuthChallenge(challenge)
+            
+        default:
+            // Handle other message types as needed
+            break
+        }
+    }
+    
+    private func handleOKMessage(eventId: EventID, accepted: Bool, message: String?) {
+        // Update cache to remove from unpublished events if accepted
+        if accepted, let cache = ndk?.cacheAdapter {
+            Task {
+                await cache.removeUnpublishedEvent(eventId, from: url)
+            }
+        }
+    }
+    
+    private func handleAuthChallenge(_ challenge: String) {
+        // TODO: Implement NIP-42 authentication
+        print("Auth challenge from \(url): \(challenge)")
+    }
+}
+
+extension NDKRelay {
     
     // MARK: - Hashable & Equatable
     
