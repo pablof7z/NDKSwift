@@ -138,7 +138,7 @@ public final class NDKSubscription {
     
     /// Close the subscription
     public func close() {
-        guard isActive && !isClosed else { return }
+        guard !isClosed else { return }
         
         isClosed = true
         isActive = false
@@ -228,6 +228,8 @@ public final class NDKSubscription {
     
     /// Handle an event received from a relay
     public func handleEvent(_ event: NDKEvent, fromRelay relay: NDKRelay?) {
+        guard !isClosed else { return }
+        
         guard let eventId = event.id, !receivedEventIds.contains(eventId) else {
             return // Deduplicate
         }

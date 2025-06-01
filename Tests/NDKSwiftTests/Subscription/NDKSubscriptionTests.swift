@@ -177,8 +177,9 @@ final class NDKSubscriptionTests: XCTestCase {
     }
     
     func testSubscriptionMerging() {
-        let filter1 = NDKFilter(authors: ["alice"], kinds: [1])
-        let filter2 = NDKFilter(authors: ["bob"], kinds: [1])
+        // Test merging subscriptions with compatible filters (same kinds)
+        let filter1 = NDKFilter(kinds: [1])
+        let filter2 = NDKFilter(kinds: [1], limit: 10)
         
         let subscription1 = NDKSubscription(filters: [filter1])
         let subscription2 = NDKSubscription(filters: [filter2])
