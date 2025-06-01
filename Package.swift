@@ -18,7 +18,6 @@ let package = Package(
             targets: ["NDKSwift"]),
     ],
     dependencies: [
-        .package(url: "https://github.com/stephencelis/SQLite.swift.git", from: "0.14.0"),
         .package(url: "https://github.com/krzyzanowskim/CryptoSwift.git", from: "1.8.0"),
     ],
     targets: [
@@ -27,7 +26,6 @@ let package = Package(
         .target(
             name: "NDKSwift",
             dependencies: [
-                .product(name: "SQLite", package: "SQLite.swift"),
                 .product(name: "CryptoSwift", package: "CryptoSwift"),
             ]),
         .testTarget(
