@@ -12,6 +12,7 @@ NDKSwift is a Swift implementation of the Nostr Development Kit, providing a com
 - **Offline-First**: Components react to event arrival without loading states
 - **Caching**: Adapter-based caching system with SQLite implementation
 - **Subscription Grouping**: Intelligent merging of similar subscriptions for efficiency
+- **Blossom Support**: Full implementation of BUD-01 through BUD-04 for decentralized file storage
 
 ### Architecture
 - Built with Swift's modern concurrency (async/await, actors)
@@ -100,6 +101,36 @@ let subscription = ndk.subscribe(filters: [NDKFilter(kinds: [1])])
 
 // Query cached events later
 let cachedEvents = await cache.query(subscription: subscription)
+```
+
+## Blossom Support
+
+NDKSwift includes full support for the Blossom protocol (BUD-01 through BUD-04) for decentralized file storage:
+
+```swift
+// Upload a file to Blossom servers
+let imageData = // ... your image data
+let blobs = try await ndk.uploadToBlossom(
+    data: imageData,
+    mimeType: "image/jpeg"
+)
+
+// Create an image event with Blossom
+let imageEvent = try await NDKEvent.createImageEvent(
+    imageData: imageData,
+    mimeType: "image/jpeg",
+    caption: "Beautiful sunset 🌅",
+    ndk: ndk
+)
+
+// Use the Blossom client directly
+let client = ndk.blossomClient
+let blob = try await client.uploadWithAuth(
+    data: data,
+    mimeType: "application/pdf",
+    to: "https://blossom.primal.net",
+    signer: signer
+)
 ```
 
 ## Requirements

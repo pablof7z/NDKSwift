@@ -14,18 +14,22 @@ final class NDKRelayTests: XCTestCase {
     }
     
     func testRelayURLNormalization() {
-        // Test various URL formats
+        // Test various URL formats - now with trailing slashes
         let relay1 = NDKRelay(url: "relay.example.com")
-        XCTAssertEqual(relay1.normalizedURL, "wss://relay.example.com")
+        XCTAssertEqual(relay1.normalizedURL, "wss://relay.example.com/")
         
         let relay2 = NDKRelay(url: "wss://relay.example.com/")
-        XCTAssertEqual(relay2.normalizedURL, "wss://relay.example.com")
+        XCTAssertEqual(relay2.normalizedURL, "wss://relay.example.com/")
         
         let relay3 = NDKRelay(url: "ws://relay.example.com")
-        XCTAssertEqual(relay3.normalizedURL, "ws://relay.example.com")
+        XCTAssertEqual(relay3.normalizedURL, "ws://relay.example.com/")
         
         let relay4 = NDKRelay(url: "WSS://RELAY.EXAMPLE.COM/")
-        XCTAssertEqual(relay4.normalizedURL, "wss://relay.example.com")
+        XCTAssertEqual(relay4.normalizedURL, "wss://relay.example.com/")
+        
+        // Test www removal
+        let relay5 = NDKRelay(url: "wss://www.relay.example.com")
+        XCTAssertEqual(relay5.normalizedURL, "wss://relay.example.com/")
     }
     
     func testRelayConnectionStates() async throws {

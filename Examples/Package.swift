@@ -40,6 +40,15 @@ let package = Package(
             path: ".",
             exclude: ["StandaloneDemo.swift", "BasicUsage.swift", "SimpleDemo.swift", "NostrDemo.swift", "README.md", "SimpleDemoMain.swift", "NostrDemoMain.swift"],
             sources: ["FileCacheDemo.swift"]
+        ),
+        .executableTarget(
+            name: "iOSNostrAppDemo",
+            dependencies: [
+                .product(name: "NDKSwift", package: "NDKSwift")
+            ],
+            path: ".",
+            exclude: ["StandaloneDemo.swift", "BasicUsage.swift", "SimpleDemo.swift", "NostrDemo.swift", "README.md", "SimpleDemoMain.swift", "NostrDemoMain.swift", "FileCacheDemo.swift"],
+            sources: ["iOSNostrAppDemo.swift"]
         )
     ]
 )

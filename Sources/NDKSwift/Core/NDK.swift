@@ -194,16 +194,21 @@ public class NDKRelayPool {
     private var relaysByUrl: [RelayURL: NDKRelay] = [:]
     
     func addRelay(_ url: RelayURL) -> NDKRelay {
-        if let existing = relaysByUrl[url] {
+        // Normalize the URL before storing
+        let normalizedUrl = URLNormalizer.tryNormalizeRelayUrl(url) ?? url
+        
+        if let existing = relaysByUrl[normalizedUrl] {
             return existing
         }
-        let relay = NDKRelay(url: url)
-        relaysByUrl[url] = relay
+        let relay = NDKRelay(url: normalizedUrl)
+        relaysByUrl[normalizedUrl] = relay
         return relay
     }
     
     func removeRelay(_ url: RelayURL) {
-        relaysByUrl.removeValue(forKey: url)
+        // Normalize the URL before removing
+        let normalizedUrl = URLNormalizer.tryNormalizeRelayUrl(url) ?? url
+        relaysByUrl.removeValue(forKey: normalizedUrl)
     }
     
     var relays: [NDKRelay] {

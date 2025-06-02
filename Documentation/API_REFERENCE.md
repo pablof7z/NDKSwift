@@ -9,6 +9,7 @@
 - [Caching](#caching)
 - [Utilities](#utilities)
 - [Wallet System](#wallet-system)
+- [Blossom Support](#blossom-support)
 
 ## Core Classes
 
@@ -515,6 +516,137 @@ extension Timestamp {
 }
 ```
 
+## Blossom Support
+
+### BlossomClient
+Client for interacting with Blossom servers for decentralized file storage.
+
+```swift
+public actor BlossomClient {
+    // Initialization
+    public init(urlSession: URLSession = .shared)
+    
+    // Server Discovery (BUD-01)
+    public func discoverServer(_ serverURL: String) async throws -> BlossomServerDescriptor
+    
+    // Upload (BUD-02)
+    public func upload(
+        data: Data,
+        mimeType: String? = nil,
+        to serverURL: String,
+        auth: BlossomAuth
+    ) async throws -> BlossomBlob
+    
+    // List (BUD-03)
+    public func list(
+        from serverURL: String,
+        auth: BlossomAuth,
+        since: Date? = nil,
+        until: Date? = nil
+    ) async throws -> [BlossomBlob]
+    
+    // Delete (BUD-04)
+    public func delete(
+        sha256: String,
+        from serverURL: String,
+        auth: BlossomAuth
+    ) async throws
+    
+    // Download
+    public func download(
+        sha256: String,
+        from serverURL: String
+    ) async throws -> Data
+    
+    // Convenience methods with automatic auth
+    public func uploadWithAuth(
+        data: Data,
+        mimeType: String? = nil,
+        to serverURL: String,
+        signer: NDKSigner,
+        expiration: Date? = nil
+    ) async throws -> BlossomBlob
+}
+```
+
+### BlossomBlob
+Represents a file stored on a Blossom server.
+
+```swift
+public struct BlossomBlob: Codable, Sendable {
+    public let sha256: String
+    public let url: String
+    public let size: Int64
+    public let type: String?
+    public let uploaded: Date
+}
+```
+
+### BlossomAuth
+Authorization for Blossom operations.
+
+```swift
+public struct BlossomAuth {
+    // Create authorization events
+    public static func createUploadAuth(
+        sha256: String,
+        size: Int64,
+        mimeType: String? = nil,
+        signer: NDKSigner,
+        expiration: Date? = nil
+    ) async throws -> BlossomAuth
+    
+    public static func createDeleteAuth(
+        sha256: String,
+        signer: NDKSigner,
+        reason: String? = nil
+    ) async throws -> BlossomAuth
+    
+    public static func createListAuth(
+        signer: NDKSigner,
+        since: Date? = nil,
+        until: Date? = nil
+    ) async throws -> BlossomAuth
+}
+```
+
+### NDK Blossom Extensions
+
+```swift
+extension NDK {
+    // Get Blossom client
+    public var blossomClient: BlossomClient { get }
+    
+    // Upload to multiple Blossom servers
+    public func uploadToBlossom(
+        data: Data,
+        mimeType: String? = nil,
+        servers: [String]? = nil,
+        expiration: Date? = nil
+    ) async throws -> [BlossomBlob]
+}
+
+extension NDKEvent {
+    // Create file metadata event (NIP-94)
+    public static func createFileMetadata(
+        blobs: [BlossomBlob],
+        description: String? = nil,
+        signer: NDKSigner
+    ) async throws -> NDKEvent
+    
+    // Create image event with Blossom upload
+    public static func createImageEvent(
+        imageData: Data,
+        mimeType: String,
+        caption: String? = nil,
+        ndk: NDK
+    ) async throws -> NDKEvent
+    
+    // Extract Blossom URLs from file metadata
+    public func extractBlossomURLs() -> [(url: String, sha256: String)]
+}
+```
+
 ## Error Types
 
 ### NDKError
@@ -533,6 +665,26 @@ public enum NDKError: LocalizedError {
     case cacheError(String)
     case invalidEvent(String)
     case walletError(String)
+    
+    public var errorDescription: String? { get }
+}
+```
+
+### BlossomError
+Errors specific to Blossom operations.
+
+```swift
+public enum BlossomError: LocalizedError {
+    case invalidURL
+    case invalidResponse
+    case unauthorized
+    case serverError(Int, String?)
+    case fileTooLarge
+    case unsupportedMimeType
+    case blobNotFound
+    case uploadFailed(String)
+    case networkError(Error)
+    case invalidSHA256
     
     public var errorDescription: String? { get }
 }

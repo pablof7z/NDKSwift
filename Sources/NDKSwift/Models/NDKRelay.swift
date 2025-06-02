@@ -225,19 +225,8 @@ public final class NDKRelay: Hashable, Equatable {
     
     /// Get normalized relay URL
     public var normalizedURL: String {
-        var normalized = url
-        
-        // Ensure wss:// or ws:// prefix
-        if !normalized.lowercased().hasPrefix("ws://") && !normalized.lowercased().hasPrefix("wss://") {
-            normalized = "wss://\(normalized)"
-        }
-        
-        // Remove trailing slash
-        if normalized.hasSuffix("/") {
-            normalized = String(normalized.dropLast())
-        }
-        
-        return normalized.lowercased()
+        // Use the URLNormalizer for consistent normalization
+        return URLNormalizer.tryNormalizeRelayUrl(url) ?? url
     }
 }
 

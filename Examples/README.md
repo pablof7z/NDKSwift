@@ -33,6 +33,15 @@ A minimal demo showing key functionality in a simple format. This is a compiled 
 ### 💾 FileCacheDemo.swift
 Comprehensive demonstration of the file-based cache adapter, showing persistent storage, querying, profile management, and performance testing.
 
+### 🌸 BlossomDemo.swift
+Complete demonstration of Blossom protocol support including:
+- File upload to Blossom servers
+- Server discovery (BUD-01)
+- Upload with authorization (BUD-02)
+- List and delete operations (BUD-03, BUD-04)
+- Integration with Nostr events (NIP-94 file metadata)
+- Image event creation with automatic Blossom upload
+
 ## Running the Examples
 
 ### Quick Start
