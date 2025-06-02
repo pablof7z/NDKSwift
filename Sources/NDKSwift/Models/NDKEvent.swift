@@ -276,6 +276,16 @@ public final class NDKEvent: Codable, Equatable, Hashable {
     public func tagValue(_ name: String) -> String? {
         return tag(withName: name)?.count ?? 0 > 1 ? tag(withName: name)?[1] : nil
     }
+    
+    // MARK: - Serialization
+    
+    /// Serialize event to JSON string
+    public func serialize() throws -> String {
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
+        let data = try encoder.encode(self)
+        return String(data: data, encoding: .utf8)!
+    }
 }
 
 // MARK: - Character extension for hex validation
