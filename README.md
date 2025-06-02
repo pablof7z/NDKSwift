@@ -107,6 +107,13 @@ let cachedEvents = await cache.query(subscription: subscription)
 - iOS 15.0+ / macOS 12.0+ / tvOS 15.0+ / watchOS 8.0+
 - Swift 5.9+
 
+## Documentation
+
+- [API Reference](Documentation/API_REFERENCE.md) - Complete API documentation for all NDKSwift classes and protocols
+- [iOS App Tutorial](Documentation/IOS_APP_TUTORIAL.md) - Step-by-step guide to building a Nostr iOS app
+- [Advanced Usage Guide](Documentation/ADVANCED_USAGE.md) - Advanced patterns and best practices
+- [Examples](Examples/README.md) - Working example applications
+
 ## License
 
 Same as ndk-core
