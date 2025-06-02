@@ -25,7 +25,7 @@ NDKSwift is a Swift implementation of the Nostr Development Kit, providing a com
 
 ```swift
 dependencies: [
-    .package(url: "https://github.com/yourusername/NDKSwift.git", from: "0.1.0")
+    .package(url: "https://github.com/pablof7z/NDKSwift.git", from: "0.1.0")
 ]
 ```
 
