@@ -49,6 +49,11 @@ public final class NDKEvent: Codable, Equatable, Hashable {
         self.content = content
     }
     
+    /// Convenience initializer for creating events that will be signed later
+    public convenience init(content: String = "", tags: [Tag] = []) {
+        self.init(pubkey: "", createdAt: Timestamp(Date().timeIntervalSince1970), kind: 0, tags: tags, content: content)
+    }
+    
     // MARK: - Codable
     
     private enum CodingKeys: String, CodingKey {
@@ -191,6 +196,32 @@ public final class NDKEvent: Codable, Equatable, Hashable {
     
     public func hash(into hasher: inout Hasher) {
         hasher.combine(id)
+    }
+    
+    // MARK: - Signing
+    
+    /// Sign this event using the NDK instance's signer
+    public func sign() async throws {
+        guard let ndk = ndk else {
+            throw NDKError.custom("NDK instance not set")
+        }
+        
+        guard let signer = ndk.signer else {
+            throw NDKError.signingFailed
+        }
+        
+        // Set pubkey from signer if not already set
+        if pubkey.isEmpty {
+            pubkey = try await signer.pubkey
+        }
+        
+        // Generate ID if not already set
+        if id == nil {
+            _ = try generateID()
+        }
+        
+        // Sign the event
+        sig = try await signer.sign(self)
     }
     
     // MARK: - Convenience

@@ -143,6 +143,68 @@ public final class NDKUser: Equatable, Hashable {
     public func hash(into hasher: inout Hasher) {
         hasher.combine(pubkey)
     }
+    
+    // MARK: - Payments
+    
+    /// Pay this user using the configured wallet
+    /// - Parameters:
+    ///   - amount: Amount in satoshis
+    ///   - comment: Optional comment for the payment
+    ///   - tags: Optional additional tags
+    /// - Returns: Payment confirmation
+    public func pay(amount: Int64, comment: String? = nil, tags: [[String]]? = nil) async throws -> NDKPaymentConfirmation {
+        guard let ndk = ndk else {
+            throw NDKError.custom("NDK instance not set")
+        }
+        
+        guard let paymentRouter = ndk.paymentRouter else {
+            throw NDKError.walletNotConfigured
+        }
+        
+        let request = NDKPaymentRequest(
+            recipient: self,
+            amount: amount,
+            comment: comment,
+            tags: tags
+        )
+        
+        return try await paymentRouter.pay(request)
+    }
+    
+    /// Get available payment methods for this user
+    /// - Returns: Set of payment methods this user supports
+    public func getPaymentMethods() async throws -> Set<NDKPaymentMethod> {
+        guard let ndk = ndk else {
+            throw NDKError.custom("NDK instance not set")
+        }
+        
+        var methods = Set<NDKPaymentMethod>()
+        
+        // Check for Lightning support (NIP-57)
+        if let profile = try? await fetchProfile() {
+            if profile.lud06 != nil || profile.lud16 != nil {
+                methods.insert(.lightning)
+            }
+        }
+        
+        // Check for Cashu mint list (NIP-61)
+        let mintListFilter = NDKFilter(
+            authors: [pubkey],
+            kinds: [EventKind.cashuMintList]
+        )
+        
+        if let mintListEvent = try? await ndk.fetchEvent(mintListFilter) {
+            // Check if user has valid mints
+            let mintTags = mintListEvent.tags.filter { $0.first == "mint" }
+            if !mintTags.isEmpty {
+                methods.insert(.nutzap)
+            }
+        }
+        
+        // TODO: Check for NWC support when implemented
+        
+        return methods
+    }
 }
 
 /// User profile metadata (kind 0)

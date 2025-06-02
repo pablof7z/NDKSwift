@@ -26,6 +26,20 @@ public final class NDK {
     /// Whether debug mode is enabled
     public var debugMode: Bool = false
     
+    /// Payment router for handling zaps and payments
+    public var paymentRouter: NDKPaymentRouter?
+    
+    /// Wallet configuration
+    public var walletConfig: NDKWalletConfig? {
+        didSet {
+            if let config = walletConfig {
+                paymentRouter = NDKPaymentRouter(ndk: self, walletConfig: config)
+            } else {
+                paymentRouter = nil
+            }
+        }
+    }
+    
     // MARK: - Initialization
     
     public init(
@@ -71,6 +85,11 @@ public final class NDK {
     /// Disconnect from all relays
     public func disconnect() async {
         await relayPool.disconnectAll()
+    }
+    
+    /// Get pool of relays
+    public var pool: NDKRelayPool {
+        return relayPool
     }
     
     // MARK: - Event Publishing
@@ -146,6 +165,12 @@ public final class NDK {
         return events.first
     }
     
+    /// Fetch a single event matching the filter
+    public func fetchEvent(_ filter: NDKFilter, relays: Set<NDKRelay>? = nil) async throws -> NDKEvent? {
+        let events = try await fetchEvents(filters: [filter], relays: relays)
+        return events.first
+    }
+    
     // MARK: - User Management
     
     /// Get a user by public key
@@ -165,7 +190,7 @@ public final class NDK {
 
 // MARK: - Relay Pool Implementation
 
-class NDKRelayPool {
+public class NDKRelayPool {
     private var relaysByUrl: [RelayURL: NDKRelay] = [:]
     
     func addRelay(_ url: RelayURL) -> NDKRelay {
@@ -183,6 +208,11 @@ class NDKRelayPool {
     
     var relays: [NDKRelay] {
         return Array(relaysByUrl.values)
+    }
+    
+    /// Get currently connected relays
+    public func connectedRelays() -> [NDKRelay] {
+        return relays.filter { $0.connectionState == .connected }
     }
     
     func connectAll() async {

@@ -56,6 +56,16 @@ public enum EventKind {
     public static let badgeDefinition = 30009
     public static let longFormContent = 30023
     public static let applicationSpecificData = 30078
+    // Cashu/NIP-60 kinds
+    public static let cashuReserve = 7373
+    public static let cashuQuote = 7374
+    public static let cashuToken = 7375
+    public static let cashuWalletTx = 7376
+    public static let cashuWallet = 17375
+    public static let cashuWalletBackup = 375
+    // NIP-61
+    public static let nutzap = 9321
+    public static let cashuMintList = 10019
 }
 
 /// Tag structure
@@ -112,6 +122,10 @@ public enum NDKError: Error, LocalizedError, Equatable {
     case cancelled
     case notImplemented
     case custom(String)
+    case validation(String)
+    case walletNotConfigured
+    case insufficientBalance
+    case invalidPaymentRequest
     
     public var errorDescription: String? {
         switch self {
@@ -143,6 +157,14 @@ public enum NDKError: Error, LocalizedError, Equatable {
             return "Feature not implemented"
         case .custom(let message):
             return message
+        case .validation(let message):
+            return "Validation error: \(message)"
+        case .walletNotConfigured:
+            return "Wallet not configured"
+        case .insufficientBalance:
+            return "Insufficient balance"
+        case .invalidPaymentRequest:
+            return "Invalid payment request"
         }
     }
 }
