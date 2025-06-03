@@ -7,6 +7,7 @@ import Combine
 class NostrViewModel: ObservableObject {
     @Published var nsec: String = ""
     @Published var npub: String = ""
+    @Published var pubkey: String = ""
     @Published var isPublishing: Bool = false
     @Published var statusMessage: String = ""
     @Published var isError: Bool = false
@@ -16,6 +17,7 @@ class NostrViewModel: ObservableObject {
     @Published var authUrl: String = ""
     @Published var connectedRelays: [RelayInfo] = []
     @Published var showingAddRelay = false
+    @Published var accountCreated = false
     
     private var ndk: NDK?
     private var signer: NDKSigner?
@@ -44,30 +46,44 @@ class NostrViewModel: ObservableObject {
     }
     
     func createAccount() {
-        do {
-            // Create signer with new keys
-            let privateKeySigner = try NDKPrivateKeySigner.generate()
-            signer = privateKeySigner
-            
-            // Set signer on NDK
-            ndk?.signer = signer
-            
-            // Get keys in bech32 format
-            nsec = try privateKeySigner.nsec
-            npub = try privateKeySigner.npub
-            
-            isConnectedViaBunker = false
-            statusMessage = "Account created successfully!"
-            isError = false
-        } catch {
-            statusMessage = "Failed to create account: \(error.localizedDescription)"
-            isError = true
-            return
-        }
-        
-        // Connect to relays
         Task {
-            await connectToRelays()
+            await MainActor.run {
+                statusMessage = "Creating account..."
+                isError = false
+            }
+            
+            do {
+                // Create signer with new keys
+                let privateKeySigner = try NDKPrivateKeySigner.generate()
+                signer = privateKeySigner
+                
+                // Set signer on NDK
+                ndk?.signer = signer
+                
+                // Get keys in bech32 format
+                let nsecValue = try privateKeySigner.nsec
+                let npubValue = try privateKeySigner.npub
+                let pubkeyValue = try await privateKeySigner.pubkey
+                
+                await MainActor.run {
+                    nsec = nsecValue
+                    npub = npubValue
+                    pubkey = pubkeyValue
+                    isConnectedViaBunker = false
+                    statusMessage = "Account created successfully!"
+                    isError = false
+                    accountCreated = true
+                }
+                
+                // Connect to relays
+                await connectToRelays()
+                
+            } catch {
+                await MainActor.run {
+                    statusMessage = "Failed to create account: \(error.localizedDescription)"
+                    isError = true
+                }
+            }
         }
     }
     
@@ -78,40 +94,50 @@ class NostrViewModel: ObservableObject {
             return
         }
         
-        do {
-            // Validate nsec format
-            guard nsecString.hasPrefix("nsec1") else {
-                statusMessage = "Invalid nsec format. Must start with 'nsec1'"
-                isError = true
-                return
-            }
-            
-            // Create private key signer from nsec
-            
-            // Create private key signer from the decoded data
-            let privateKeySigner = try NDKPrivateKeySigner(nsec: nsecString)
-            signer = privateKeySigner
-            
-            // Set signer on NDK
-            ndk?.signer = signer
-            
-            // Get keys in bech32 format
-            nsec = try privateKeySigner.nsec
-            npub = try privateKeySigner.npub
-            
-            isConnectedViaBunker = false
-            statusMessage = "Logged in successfully!"
-            isError = false
-            
-        } catch {
-            statusMessage = "Failed to login with nsec: \(error.localizedDescription)"
+        // Validate nsec format
+        guard nsecString.hasPrefix("nsec1") else {
+            statusMessage = "Invalid nsec format. Must start with 'nsec1'"
             isError = true
             return
         }
         
-        // Connect to relays
         Task {
-            await connectToRelays()
+            await MainActor.run {
+                statusMessage = "Processing login..."
+                isError = false
+            }
+            
+            do {
+                // Create private key signer from nsec
+                let privateKeySigner = try NDKPrivateKeySigner(nsec: nsecString)
+                signer = privateKeySigner
+                
+                // Set signer on NDK
+                ndk?.signer = signer
+                
+                // Get keys in bech32 format
+                let nsecValue = try privateKeySigner.nsec
+                let npubValue = try privateKeySigner.npub
+                let pubkeyValue = try await privateKeySigner.pubkey
+                
+                await MainActor.run {
+                    nsec = nsecString  // Use the original input nsec instead of re-encoding
+                    npub = npubValue
+                    pubkey = pubkeyValue
+                    isConnectedViaBunker = false
+                    statusMessage = "Logged in successfully!"
+                    isError = false
+                }
+                
+                // Connect to relays
+                await connectToRelays()
+                
+            } catch {
+                await MainActor.run {
+                    statusMessage = "Failed to login with nsec: \(error.localizedDescription)"
+                    isError = true
+                }
+            }
         }
     }
     
@@ -170,6 +196,7 @@ class NostrViewModel: ObservableObject {
                 
                 // Get public key
                 npub = user.npub
+                pubkey = user.pubkey
                 
                 await MainActor.run {
                     isConnectedViaBunker = true
@@ -214,12 +241,12 @@ class NostrViewModel: ObservableObject {
                 
                 try await ndk.publish(event)
                 
-                // Get the bech32 encoding of the event
-                let eventBech32 = try event.encode()
+                // Get the nevent1 encoding of the event (including relay info)
+                let nevent = try event.encode(includeRelays: true)
                 
                 await MainActor.run {
                     isPublishing = false
-                    statusMessage = "Message published successfully!\nEvent: \(eventBech32)"
+                    statusMessage = "Message published successfully!\nEvent ID: \(nevent)"
                     isError = false
                 }
             } catch {
