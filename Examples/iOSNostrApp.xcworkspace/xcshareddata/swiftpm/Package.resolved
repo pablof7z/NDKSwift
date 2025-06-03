@@ -1,0 +1,24 @@
+{
+  "originHash" : "4bbea0d3b72726fa4bd0f2e2af7ec8b45cdc1d533cb0a1a8a6dfdc1e577aac17",
+  "pins" : [
+    {
+      "identity" : "cryptoswift",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/krzyzanowskim/CryptoSwift.git",
+      "state" : {
+        "revision" : "729e01bc9b9dab466ac85f21fb9ee2bc1c61b258",
+        "version" : "1.8.4"
+      }
+    },
+    {
+      "identity" : "ndkswift",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/pablof7z/NDKSwift",
+      "state" : {
+        "branch" : "master",
+        "revision" : "7bad71c6f132d412cb4e38df709333846af8c96d"
+      }
+    }
+  ],
+  "version" : 3
+}

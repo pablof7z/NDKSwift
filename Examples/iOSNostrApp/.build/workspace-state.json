@@ -1,0 +1,41 @@
+{
+  "object" : {
+    "artifacts" : [
+
+    ],
+    "dependencies" : [
+      {
+        "basedOn" : null,
+        "packageRef" : {
+          "identity" : "cryptoswift",
+          "kind" : "remoteSourceControl",
+          "location" : "https://github.com/krzyzanowskim/CryptoSwift.git",
+          "name" : "CryptoSwift"
+        },
+        "state" : {
+          "checkoutState" : {
+            "revision" : "729e01bc9b9dab466ac85f21fb9ee2bc1c61b258",
+            "version" : "1.8.4"
+          },
+          "name" : "sourceControlCheckout"
+        },
+        "subpath" : "CryptoSwift"
+      },
+      {
+        "basedOn" : null,
+        "packageRef" : {
+          "identity" : "ndkswift",
+          "kind" : "fileSystem",
+          "location" : "/Users/pablofernandez/src/NDKSwift",
+          "name" : "NDKSwift"
+        },
+        "state" : {
+          "name" : "fileSystem",
+          "path" : "/Users/pablofernandez/src/NDKSwift"
+        },
+        "subpath" : "ndkswift"
+      }
+    ]
+  },
+  "version" : 6
+}

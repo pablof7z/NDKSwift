@@ -1,0 +1,4 @@
+module NDKSwift {
+    header "/Users/pablofernandez/src/NDKSwift/Examples/iOSNostrApp/.build/arm64-apple-macosx/debug/NDKSwift.build/NDKSwift-Swift.h"
+    requires objc
+}
