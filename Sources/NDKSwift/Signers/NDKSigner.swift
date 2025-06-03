@@ -8,6 +8,9 @@ public protocol NDKSigner {
     /// Sign an event
     func sign(_ event: NDKEvent) async throws -> Signature
     
+    /// Sign an event in place (mutating)
+    func sign(event: inout NDKEvent) async throws
+    
     /// Block until the signer is ready (e.g., user has unlocked it)
     func blockUntilReady() async throws
     
@@ -40,6 +43,15 @@ public extension NDKSigner {
     func user() async throws -> NDKUser {
         let pubkey = try await self.pubkey
         return NDKUser(pubkey: pubkey)
+    }
+    
+    func sign(event: inout NDKEvent) async throws {
+        let signature = try await sign(event)
+        event.sig = signature
+    }
+    
+    func blockUntilReady() async throws {
+        // Default implementation does nothing
     }
 }
 

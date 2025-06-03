@@ -125,7 +125,10 @@ public enum NDKError: Error, LocalizedError, Equatable {
     case validation(String)
     case walletNotConfigured
     case insufficientBalance
+    case powGenerationFailed
     case invalidPaymentRequest
+    case signerError(String)
+    case invalidEvent(String)
     
     public var errorDescription: String? {
         switch self {
@@ -163,8 +166,14 @@ public enum NDKError: Error, LocalizedError, Equatable {
             return "Wallet not configured"
         case .insufficientBalance:
             return "Insufficient balance"
+        case .powGenerationFailed:
+            return "Failed to generate proof of work"
         case .invalidPaymentRequest:
             return "Invalid payment request"
+        case .signerError(let message):
+            return "Signer error: \(message)"
+        case .invalidEvent(let message):
+            return "Invalid event: \(message)"
         }
     }
 }

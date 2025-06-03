@@ -51,6 +51,9 @@ public struct NDKContactEntry {
 /// Provides contact management with petnames and relay hints
 public class NDKContactList: NDKList {
     
+    /// Contact list kind (3)
+    public static let kind = 3
+    
     /// Initialize a new contact list
     public override convenience init(ndk: NDK? = nil) {
         self.init(ndk: ndk, kind: 3)

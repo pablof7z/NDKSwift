@@ -28,6 +28,7 @@ public final class NDKPrivateKeySigner: NDKSigner {
         return try NDKPrivateKeySigner(privateKey: privateKey)
     }
     
+    
     // MARK: - NDKSigner Protocol
     
     public var pubkey: PublicKey {
@@ -91,5 +92,20 @@ public final class NDKPrivateKeySigner: NDKSigner {
         get throws {
             return try Bech32.npub(from: _pubkey)
         }
+    }
+    
+    /// Get the private key (for testing purposes)
+    public var privateKeyValue: PrivateKey {
+        return privateKey
+    }
+    
+    /// Serialize the signer to a payload string
+    public func toPayload() -> String {
+        let payload: [String: Any] = [
+            "type": "privatekey",
+            "privateKey": privateKey
+        ]
+        let data = try! JSONSerialization.data(withJSONObject: payload)
+        return String(data: data, encoding: .utf8)!
     }
 }

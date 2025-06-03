@@ -9,4 +9,4 @@ DerivedData/
 .netrc
 Examples/.build
 Examples/build
-*.resolved
+*.resolvedndk

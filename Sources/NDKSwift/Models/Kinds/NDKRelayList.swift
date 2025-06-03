@@ -48,9 +48,12 @@ public struct NDKRelayListEntry {
 /// Provides read/write relay separation and relay set integration
 public class NDKRelayList: NDKList {
     
+    /// The kind for relay lists (NIP-65)
+    public static let kind: Kind = 10002
+    
     /// Initialize a new relay list
     public override convenience init(ndk: NDK? = nil) {
-        self.init(ndk: ndk, kind: 10002)
+        self.init(ndk: ndk, kind: NDKRelayList.kind)
     }
     
     /// Create an NDKRelayList from an existing NDKEvent

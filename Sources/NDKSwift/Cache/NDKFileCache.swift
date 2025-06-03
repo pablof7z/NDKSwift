@@ -7,7 +7,7 @@ public final class NDKFileCache: NDKCacheAdapter {
     public var locking: Bool = false
     public var ready: Bool = true
     
-    private let cacheDirectory: URL
+    internal let cacheDirectory: URL
     private let eventsDirectory: URL
     private let profilesDirectory: URL
     private let unpublishedDirectory: URL
@@ -21,8 +21,13 @@ public final class NDKFileCache: NDKCacheAdapter {
     private var nip05Cache: [String: (pubkey: String, relays: [String], cachedAt: Date)] = [:]
     private var relayStatusCache: [String: NDKRelayConnectionState] = [:]
     
+    // Outbox support
+    internal var unpublishedEventIndex: [String: UnpublishedEventRecord] = [:]
+    internal var outboxItemIndex: [String: NDKOutboxItem] = [:]
+    internal var relayHealthCache: [String: RelayHealthMetrics] = [:]
+    
     // Thread safety
-    private let queue = DispatchQueue(label: "com.ndkswift.filecache", attributes: .concurrent)
+    internal let queue = DispatchQueue(label: "com.ndkswift.filecache", attributes: .concurrent)
     
     private struct EventIndexEntry {
         let id: String
@@ -57,6 +62,9 @@ public final class NDKFileCache: NDKCacheAdapter {
         try FileManager.default.createDirectory(at: profilesDirectory, withIntermediateDirectories: true)
         try FileManager.default.createDirectory(at: unpublishedDirectory, withIntermediateDirectories: true)
         try FileManager.default.createDirectory(at: decryptedDirectory, withIntermediateDirectories: true)
+        
+        // Initialize outbox directories
+        try initializeOutboxDirectories()
         
         // Load indexes
         try loadIndexes()

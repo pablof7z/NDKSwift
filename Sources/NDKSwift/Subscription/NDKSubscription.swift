@@ -74,13 +74,13 @@ public final class NDKSubscription {
     private var timeoutTimer: Timer?
     
     /// Event callbacks
-    private var eventCallbacks: [(NDKEvent) -> Void] = []
+    internal var eventCallbacks: [(NDKEvent) -> Void] = []
     
     /// EOSE callbacks
-    private var eoseCallbacks: [() -> Void] = []
+    internal var eoseCallbacks: [() -> Void] = []
     
     /// Error callbacks
-    private var errorCallbacks: [(Error) -> Void] = []
+    internal var errorCallbacks: [(Error) -> Void] = []
     
     public init(
         id: String = UUID().uuidString,

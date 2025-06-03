@@ -19,6 +19,9 @@ public final class NDKUser: Equatable, Hashable {
         return profile?.nip05
     }
     
+    /// NIP-46 relay URLs (for remote signing)
+    public var nip46Urls: [String]?
+    
     /// Display name (from profile)
     public var displayName: String? {
         return profile?.displayName ?? profile?.name
@@ -46,9 +49,42 @@ public final class NDKUser: Equatable, Hashable {
     }
     
     /// Create user from NIP-05 identifier
-    public static func fromNip05(_ nip05: String, ndk: NDK) async throws -> NDKUser? {
-        // TODO: Implement NIP-05 lookup
-        return nil
+    public static func fromNip05(_ nip05: String, ndk: NDK) async throws -> NDKUser {
+        // Parse NIP-05 identifier (user@domain)
+        let parts = nip05.split(separator: "@")
+        guard parts.count == 2 else {
+            throw NDKError.validation("Invalid NIP-05 format")
+        }
+        
+        let name = String(parts[0])
+        let domain = String(parts[1])
+        
+        // Build the well-known URL
+        let urlString = "https://\(domain)/.well-known/nostr.json?name=\(name)"
+        guard let url = URL(string: urlString) else {
+            throw NDKError.validation("Invalid NIP-05 URL")
+        }
+        
+        // Fetch the data
+        let (data, _) = try await URLSession.shared.data(from: url)
+        
+        // Parse JSON response
+        guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let names = json["names"] as? [String: String],
+              let pubkey = names[name] else {
+            throw NDKError.validation("NIP-05 verification failed")
+        }
+        
+        let user = NDKUser(pubkey: pubkey)
+        user.ndk = ndk
+        
+        // Check for NIP-46 relays
+        if let nip46 = json["nip46"] as? [String: Any],
+           let relays = nip46[pubkey] as? [String] {
+            user.nip46Urls = relays
+        }
+        
+        return user
     }
     
     // MARK: - Profile Management

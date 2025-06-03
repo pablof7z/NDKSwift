@@ -15,7 +15,7 @@ public final class NDK {
     }
     
     /// Relay pool
-    private let relayPool: NDKRelayPool
+    internal let relayPool: NDKRelayPool
     
     /// Event repository
     private let eventRepository: NDKEventRepository
@@ -39,6 +39,26 @@ public final class NDK {
             }
         }
     }
+    
+    // MARK: - Outbox Model Support
+    
+    /// Outbox configuration
+    public var outboxConfig: NDKOutboxConfig = .default
+    
+    /// Outbox tracker (lazy)
+    internal var _outboxTracker: NDKOutboxTracker?
+    
+    /// Relay ranker (lazy)
+    internal var _relayRanker: NDKRelayRanker?
+    
+    /// Relay selector (lazy)
+    internal var _relaySelector: NDKRelaySelector?
+    
+    /// Publishing strategy (lazy)
+    internal var _publishingStrategy: NDKPublishingStrategy?
+    
+    /// Fetching strategy (lazy)
+    internal var _fetchingStrategy: NDKFetchingStrategy?
     
     // MARK: - Initialization
     
@@ -125,10 +145,78 @@ public final class NDK {
         // Publish to relays
         let publishedRelays = await relayPool.publishEvent(event)
         
+        // Update event's relay publish statuses
+        for relay in publishedRelays {
+            event.updatePublishStatus(relay: relay.url, status: .succeeded)
+        }
+        
+        // Also mark failed relays
+        let allRelays = relayPool.connectedRelays()
+        for relay in allRelays {
+            if !publishedRelays.contains(relay) {
+                event.updatePublishStatus(relay: relay.url, status: .failed(.connectionFailed))
+            }
+        }
+        
         if debugMode {
             let noteId = (try? Bech32.note(from: event.id ?? "")) ?? event.id ?? "unknown"
             let relayUrls = publishedRelays.map { $0.url }.joined(separator: ", ")
             print("📝 Published note \(noteId) to \(publishedRelays.count) relay(s): \(relayUrls)")
+        }
+        
+        return publishedRelays
+    }
+    
+    /// Publish an event to specific relays by URL
+    public func publish(event: NDKEvent, to relayUrls: Set<String>) async throws -> Set<NDKRelay> {
+        // Sign the event if needed
+        if event.sig == nil {
+            event.ndk = self
+            try await event.sign()
+        }
+        
+        // Create temporary relays for the URLs
+        var targetRelays: Set<NDKRelay> = []
+        for url in relayUrls {
+            let normalizedUrl = URLNormalizer.tryNormalizeRelayUrl(url) ?? url
+            let relay = NDKRelay(url: normalizedUrl)
+            targetRelays.insert(relay)
+        }
+        
+        // Connect to relays that aren't already connected
+        await withTaskGroup(of: Void.self) { group in
+            for relay in targetRelays {
+                group.addTask {
+                    if relay.connectionState != .connected {
+                        try? await relay.connect()
+                    }
+                }
+            }
+        }
+        
+        // Publish to the specific relays
+        var publishedRelays: Set<NDKRelay> = []
+        
+        await withTaskGroup(of: NDKRelay?.self) { group in
+            for relay in targetRelays {
+                group.addTask {
+                    do {
+                        let eventMessage = NostrMessage.event(subscriptionId: nil, event: event)
+                        try await relay.send(eventMessage.serialize())
+                        event.updatePublishStatus(relay: relay.url, status: .succeeded)
+                        return relay
+                    } catch {
+                        event.updatePublishStatus(relay: relay.url, status: .failed(.connectionFailed))
+                        return nil
+                    }
+                }
+            }
+            
+            for await result in group {
+                if let relay = result {
+                    publishedRelays.insert(relay)
+                }
+            }
         }
         
         return publishedRelays
@@ -192,6 +280,9 @@ public final class NDK {
     
     /// Process an event received from a relay (called by relay connections)
     internal func processEvent(_ event: NDKEvent, from relay: NDKRelay) {
+        // Mark event as seen on this relay
+        event.markSeenOn(relay: relay.url)
+        
         Task {
             await subscriptionManager.processEvent(event, from: relay)
         }
@@ -229,7 +320,7 @@ public final class NDK {
 // MARK: - Relay Pool Implementation
 
 public class NDKRelayPool {
-    private var relaysByUrl: [RelayURL: NDKRelay] = [:]
+    internal var relaysByUrl: [RelayURL: NDKRelay] = [:]
     
     func addRelay(_ url: RelayURL) -> NDKRelay {
         // Normalize the URL before storing

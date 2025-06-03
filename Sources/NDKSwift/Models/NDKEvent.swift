@@ -35,8 +35,55 @@ public final class NDKEvent: Codable, Equatable, Hashable {
         self.relay = relay
     }
     
+    /// Tracks which relays this event has been seen on
+    public private(set) var seenOnRelays: Set<String> = []
+    
+    /// Tracks publish status for each relay
+    public private(set) var relayPublishStatuses: [String: RelayPublishStatus] = [:]
+    
     /// Custom properties for extension
     private var customProperties: [String: Any] = [:]
+    
+    // MARK: - Relay Tracking Methods
+    
+    /// Mark event as seen on a relay
+    public func markSeenOn(relay: String) {
+        seenOnRelays.insert(relay)
+    }
+    
+    /// Update publish status for a relay
+    public func updatePublishStatus(relay: String, status: RelayPublishStatus) {
+        relayPublishStatuses[relay] = status
+    }
+    
+    /// Get all relays where this event was successfully published
+    public var successfullyPublishedRelays: [String] {
+        relayPublishStatuses.compactMap { relay, status in
+            switch status {
+            case .succeeded:
+                return relay
+            default:
+                return nil
+            }
+        }
+    }
+    
+    /// Get all relays where publishing failed
+    public var failedPublishRelays: [String] {
+        relayPublishStatuses.compactMap { relay, status in
+            switch status {
+            case .failed:
+                return relay
+            default:
+                return nil
+            }
+        }
+    }
+    
+    /// Check if event was published to at least one relay
+    public var wasPublished: Bool {
+        !successfullyPublishedRelays.isEmpty
+    }
     
     // MARK: - Initialization
     
@@ -284,12 +331,39 @@ public final class NDKEvent: Codable, Equatable, Hashable {
     
     // MARK: - Serialization
     
+    /// Returns the raw event as a dictionary compatible with Nostr protocol
+    /// This matches the rawEvent() method from @ndk/ndk-core
+    public func rawEvent() -> [String: Any] {
+        var result: [String: Any] = [
+            "created_at": createdAt,
+            "content": content,
+            "tags": tags,
+            "kind": kind,
+            "pubkey": pubkey
+        ]
+        
+        if let id = id {
+            result["id"] = id
+        }
+        
+        if let sig = sig {
+            result["sig"] = sig
+        }
+        
+        return result
+    }
+    
     /// Serialize event to JSON string
     public func serialize() throws -> String {
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
         let data = try encoder.encode(self)
         return String(data: data, encoding: .utf8)!
+    }
+    
+    /// Alias for serialize() - serialize event to JSON string
+    public func toJSON() throws -> String {
+        return try serialize()
     }
     
     // MARK: - NIP-19 Encoding
@@ -334,7 +408,7 @@ public final class NDKEvent: Codable, Equatable, Hashable {
                 kind: kind
             )
         } else {
-            // Simple note encoding
+            // Simple note encoding nsec1rfwvk7tvws2hy0sf25wu96qhefr9c0xrlvllymwe6new8e59lgdsz23vuj
             return try Bech32.note(from: eventId)
         }
     }
