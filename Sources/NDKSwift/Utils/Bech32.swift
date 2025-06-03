@@ -179,9 +179,18 @@ public extension Bech32 {
     
     /// Encode a private key to nsec format
     static func nsec(from privateKey: PrivateKey) throws -> String {
-        guard privateKey.count == 64, let data = Data(hexString: privateKey), data.count == 32 else {
+        guard privateKey.count == 64 else {
             throw Bech32Error.invalidData
         }
+        
+        guard let data = Data(hexString: privateKey) else {
+            throw Bech32Error.invalidData
+        }
+        
+        guard data.count == 32 else {
+            throw Bech32Error.invalidData
+        }
+        
         return try encode(hrp: "nsec", data: Array(data))
     }
     
