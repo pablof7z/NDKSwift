@@ -121,17 +121,13 @@ public final class NDK {
     public func publish(_ event: NDKEvent) async throws -> Set<NDKRelay> {
         // Sign event if not already signed
         if event.sig == nil {
-            guard let signer = signer else {
+            guard signer != nil else {
                 throw NDKError.signingFailed
             }
             
-            // Generate ID if needed
-            if event.id == nil {
-                _ = try event.generateID()
-            }
-            
-            // Sign the event
-            event.sig = try await signer.sign(event)
+            // Set NDK instance and sign (this will also generate content tags)
+            event.ndk = self
+            try await event.sign()
         }
         
         // Validate event

@@ -103,7 +103,7 @@ public final class NDKEvent: Codable, Equatable, Hashable {
     
     /// Convenience initializer for creating events that will be signed later
     public convenience init(content: String = "", tags: [Tag] = []) {
-        self.init(pubkey: "", createdAt: Timestamp(Date().timeIntervalSince1970), kind: 0, tags: tags, content: content)
+        self.init(pubkey: "", createdAt: Timestamp(Date().timeIntervalSince1970), kind: 1, tags: tags, content: content)
     }
     
     // MARK: - Codable
@@ -226,6 +226,22 @@ public final class NDKEvent: Codable, Equatable, Hashable {
         addTag(tag)
     }
     
+    /// Generate content tags from the event's content
+    /// This scans for hashtags, nostr entities (npub, note, etc.) and adds appropriate tags
+    public func generateContentTags() {
+        let contentTag = ContentTagger.generateContentTags(from: content, existingTags: tags)
+        self.content = contentTag.content
+        self.tags = contentTag.tags
+    }
+    
+    /// Convenience method to set content and generate tags automatically
+    public func setContent(_ newContent: String, generateTags: Bool = true) {
+        self.content = newContent
+        if generateTags {
+            generateContentTags()
+        }
+    }
+    
     /// Get all referenced event IDs
     public var referencedEventIds: [EventID] {
         return tags(withName: "e").compactMap { $0.count > 1 ? $0[1] : nil }
@@ -266,6 +282,9 @@ public final class NDKEvent: Codable, Equatable, Hashable {
         if pubkey.isEmpty {
             pubkey = try await signer.pubkey
         }
+        
+        // Generate content tags before signing
+        generateContentTags()
         
         // Generate ID if not already set
         if id == nil {
