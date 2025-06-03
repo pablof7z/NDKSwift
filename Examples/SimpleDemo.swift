@@ -123,6 +123,14 @@ func runSimpleDemo() async {
     
     print("✅ User: \(user.displayName ?? "Unknown")")
     print("✅ Short pubkey: \(user.shortPubkey)")
+    print("✅ npub: \(user.npub)")
+    
+    // Test creating user from npub
+    if let userFromNpub = NDKUser(npub: user.npub) {
+        print("✅ Created user from npub: \(userFromNpub.pubkey == user.pubkey ? "✅ Match" : "❌ No match")")
+    } else {
+        print("❌ Failed to create user from npub")
+    }
     
     print("\n🎉 Demo completed successfully!")
     print("==========================================")

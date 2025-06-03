@@ -6,11 +6,12 @@ This guide covers advanced patterns, best practices, and real-world examples for
 1. [Advanced Relay Management](#advanced-relay-management)
 2. [Subscription Optimization](#subscription-optimization)
 3. [Cache Strategies](#cache-strategies)
-4. [Custom Event Types](#custom-event-types)
-5. [Payment Integration](#payment-integration)
-6. [Performance Optimization](#performance-optimization)
-7. [Security Best Practices](#security-best-practices)
-8. [Testing Strategies](#testing-strategies)
+4. [NIP-19 Identifiers](#nip-19-identifiers)
+5. [Custom Event Types](#custom-event-types)
+6. [Payment Integration](#payment-integration)
+7. [Performance Optimization](#performance-optimization)
+8. [Security Best Practices](#security-best-practices)
+9. [Testing Strategies](#testing-strategies)
 
 ## Advanced Relay Management
 
@@ -144,6 +145,67 @@ class OutboxModel {
 ```
 
 ## Subscription Optimization
+
+### Advanced Subscription Management
+
+NDKSwift includes a sophisticated subscription management system that automatically optimizes subscription performance:
+
+```swift
+// The subscription manager is automatically used when creating subscriptions
+let subscription = ndk.subscribe(
+    filters: [NDKFilter(kinds: [1], authors: ["pubkey1"])],
+    options: NDKSubscriptionOptions(
+        closeOnEose: false,
+        cacheStrategy: .cacheFirst,
+        relays: nil, // Use all available relays
+        limit: 100
+    )
+)
+
+// Get subscription manager statistics
+let stats = await ndk.getSubscriptionStats()
+print("Active subscriptions: \(stats.activeSubscriptions)")
+print("Requests saved through grouping: \(stats.requestsSaved)")
+print("Events deduplicated: \(stats.eventsDeduped)")
+print("Average group size: \(stats.averageGroupSize)")
+```
+
+**Key Features:**
+- **Automatic Grouping**: Similar subscriptions are intelligently grouped to reduce relay requests
+- **Filter Merging**: Compatible filters are merged for efficient querying
+- **Event Deduplication**: Prevents duplicate events using timestamp tracking (5-minute deduplication window)
+- **Smart EOSE Handling**: Dynamic timeout handling when 50% of relays respond or no recent events
+- **Cache Strategies**: Multiple cache usage patterns for optimal performance
+
+### Cache Strategies
+
+Configure how subscriptions interact with caches:
+
+```swift
+// Cache-only: Only query cache, don't hit relays
+let cacheOnlySubscription = ndk.subscribe(
+    filters: [filter],
+    options: NDKSubscriptionOptions(cacheStrategy: .cacheOnly)
+)
+
+// Cache-first: Try cache first, then relays if needed
+let cacheFirstSubscription = ndk.subscribe(
+    filters: [filter],
+    options: NDKSubscriptionOptions(cacheStrategy: .cacheFirst)
+)
+
+// Parallel: Query cache and relays simultaneously
+let parallelSubscription = ndk.subscribe(
+    filters: [filter],
+    options: NDKSubscriptionOptions(cacheStrategy: .parallel)
+)
+
+// Relay-only: Skip cache entirely
+let relayOnlySubscription = ndk.subscribe(
+    filters: [filter],
+    options: NDKSubscriptionOptions(cacheStrategy: .relayOnly)
+)
+```
 
 ### Subscription Batching
 
@@ -340,6 +402,172 @@ extension NDKFileCache {
         
         // Save new event
         try await saveEvent(event)
+    }
+}
+```
+
+## NIP-19 Identifiers
+
+NDKSwift provides comprehensive support for NIP-19 bech32-encoded identifiers, making it easy to work with human-readable Nostr identifiers.
+
+### User Management with npub
+
+```swift
+// Create user from hex pubkey
+let user1 = NDKUser(pubkey: "fa984bd7dbb282f07e16e7ae87b26a2a7b9b90b7246a44771f0cf5ae58018f52")
+print(user1.npub) 
+// Output: "npub1l2vyh47mk2p0qlsku7hg0vn29faehy9hy34ygaclpn66ukqp3afqutajft"
+
+// Create user from npub
+let user2 = NDKUser(npub: "npub1l2vyh47mk2p0qlsku7hg0vn29faehy9hy34ygaclpn66ukqp3afqutajft")
+print(user2?.pubkey)
+// Output: "fa984bd7dbb282f07e16e7ae87b26a2a7b9b90b7246a44771f0cf5ae58018f52"
+
+// Round-trip verification
+assert(user1.pubkey == user2?.pubkey) // ✅ Passes
+```
+
+### Event Encoding with Context
+
+```swift
+// Simple note encoding
+let event = NDKEvent(...)
+try event.generateID()
+
+// Simple note (note1...)
+let noteId = try event.encode()
+// Output: "note1abc123..." 
+
+// Event with metadata (nevent1...)
+let neventId = try event.encode(includeRelays: true)
+// Output: "nevent1..." with relay hints and author
+
+// For replaceable/addressable events, automatically uses naddr1
+let replaceableEvent = NDKEvent(kind: 30023, ...) // Long-form content
+let naddrId = try replaceableEvent.encode()
+// Output: "naddr1..." with identifier, kind, and author
+```
+
+### Working with Different Identifier Types
+
+```swift
+// Public keys
+let npub = try Bech32.npub(from: pubkey)
+let decodedPubkey = try Bech32.pubkey(from: npub)
+
+// Private keys (for secure storage)
+let nsec = try Bech32.nsec(from: privateKey)
+let decodedPrivateKey = try Bech32.privateKey(from: nsec)
+
+// Simple event references
+let note = try Bech32.note(from: eventId)
+let decodedEventId = try Bech32.eventId(from: note)
+
+// Complex event references with metadata
+let nevent = try Bech32.nevent(
+    eventId: eventId,
+    relays: ["wss://relay.damus.io", "wss://nos.lol"],
+    author: authorPubkey,
+    kind: 1
+)
+
+// Addressable/parameterized replaceable events
+let naddr = try Bech32.naddr(
+    identifier: "my-article",
+    kind: 30023,
+    author: authorPubkey,
+    relays: ["wss://relay.damus.io"]
+)
+```
+
+### User Interface Integration
+
+```swift
+class UserProfileView: UIView {
+    @IBOutlet weak var npubLabel: UILabel!
+    @IBOutlet weak var copyButton: UIButton!
+    
+    func configure(with user: NDKUser) {
+        // Display user-friendly npub
+        npubLabel.text = user.npub
+        
+        copyButton.addAction(UIAction { _ in
+            UIPasteboard.general.string = user.npub
+            // Show success feedback
+        }, for: .touchUpInside)
+    }
+}
+
+// QR Code generation for sharing
+func generateQRCode(for user: NDKUser) -> UIImage? {
+    let qrCode = QRCodeGenerator()
+    return qrCode.generate(from: user.npub)
+}
+```
+
+### URL Scheme Integration
+
+```swift
+// Handle nostr: URLs
+func handleNostrURL(_ url: URL) throws -> NostrEntity {
+    guard url.scheme == "nostr" else {
+        throw URLError.invalidScheme
+    }
+    
+    let identifier = url.host ?? String(url.absoluteString.dropFirst(6)) // Remove "nostr:"
+    
+    // Detect identifier type and decode
+    if identifier.hasPrefix("npub") {
+        let pubkey = try Bech32.pubkey(from: identifier)
+        return .user(NDKUser(pubkey: pubkey))
+    } else if identifier.hasPrefix("note") {
+        let eventId = try Bech32.eventId(from: identifier)
+        return .event(eventId)
+    } else if identifier.hasPrefix("nevent") {
+        // Parse nevent for full event context
+        return try parseNevent(identifier)
+    } else if identifier.hasPrefix("naddr") {
+        // Parse naddr for addressable events
+        return try parseNaddr(identifier)
+    }
+    
+    throw URLError.unsupportedIdentifier
+}
+
+enum NostrEntity {
+    case user(NDKUser)
+    case event(String)
+    case addressableEvent(kind: Int, author: String, identifier: String)
+}
+```
+
+### Best Practices for NIP-19
+
+1. **Always use npub for user displays** - More user-friendly than hex pubkeys
+2. **Include relay hints in nevent** - Helps with event discovery
+3. **Use appropriate encoding type** - note for simple references, nevent for rich context
+4. **Validate identifiers** - Handle encoding/decoding errors gracefully
+5. **Support URL schemes** - Enable deep linking with nostr: URLs
+
+```swift
+// Example: Safe identifier handling
+func safelyDecodeNpub(_ npub: String) -> NDKUser? {
+    do {
+        return NDKUser(npub: npub)
+    } catch {
+        print("Invalid npub: \(error)")
+        return nil
+    }
+}
+
+// Example: Rich event sharing
+func shareEvent(_ event: NDKEvent, includeContext: Bool = true) throws -> String {
+    if includeContext {
+        // Include relay hints and author for better discoverability
+        return try event.encode(includeRelays: true)
+    } else {
+        // Simple note reference
+        return try Bech32.note(from: event.id ?? "")
     }
 }
 ```

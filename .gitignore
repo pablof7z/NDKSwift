@@ -8,4 +8,5 @@ DerivedData/
 .swiftpm/xcode/package.xcworkspace/contents.xcworkspacedata
 .netrc
 Examples/.build
+Examples/build
 *.resolved

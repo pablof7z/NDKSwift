@@ -37,8 +37,12 @@ public final class NDKUser: Equatable, Hashable {
     
     /// Create user from npub
     public convenience init?(npub: String) {
-        // TODO: Implement npub decoding
-        return nil
+        do {
+            let pubkey = try Bech32.pubkey(from: npub)
+            self.init(pubkey: pubkey)
+        } catch {
+            return nil
+        }
     }
     
     /// Create user from NIP-05 identifier
@@ -122,8 +126,12 @@ public final class NDKUser: Equatable, Hashable {
     
     /// Get npub representation
     public var npub: String {
-        // TODO: Implement bech32 encoding
-        return "npub1..."
+        do {
+            return try Bech32.npub(from: pubkey)
+        } catch {
+            // Fallback to placeholder if encoding fails
+            return "npub1..."
+        }
     }
     
     /// Get shortened public key for display

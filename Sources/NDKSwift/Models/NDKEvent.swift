@@ -30,6 +30,11 @@ public final class NDKEvent: Codable, Equatable, Hashable {
     /// Relay that this event was received from
     public private(set) var relay: NDKRelay?
     
+    /// Internal method to set relay (called by relay when processing events)
+    internal func setRelay(_ relay: NDKRelay) {
+        self.relay = relay
+    }
+    
     /// Custom properties for extension
     private var customProperties: [String: Any] = [:]
     
@@ -285,6 +290,79 @@ public final class NDKEvent: Codable, Equatable, Hashable {
         encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
         let data = try encoder.encode(self)
         return String(data: data, encoding: .utf8)!
+    }
+    
+    // MARK: - NIP-19 Encoding
+    
+    /// Encode this event to bech32 format according to NIP-19
+    /// Returns note1 for simple events, nevent1 for events with metadata, naddr1 for replaceable events
+    public func encode(includeRelays: Bool = false) throws -> String {
+        guard let eventId = id else {
+            throw NDKError.invalidEventID
+        }
+        
+        // For parameterized replaceable events, use naddr encoding
+        if isParameterizedReplaceable {
+            let identifier = tagValue("d") ?? ""
+            let relays = includeRelays ? getRelayHints() : nil
+            return try Bech32.naddr(
+                identifier: identifier,
+                kind: kind,
+                author: pubkey,
+                relays: relays
+            )
+        }
+        
+        // For other replaceable events, use naddr encoding with empty identifier
+        if isReplaceable {
+            let relays = includeRelays ? getRelayHints() : nil
+            return try Bech32.naddr(
+                identifier: "",
+                kind: kind,
+                author: pubkey,
+                relays: relays
+            )
+        }
+        
+        // For non-replaceable events, decide between note and nevent
+        if includeRelays || hasMetadataWorthyOfNevent() {
+            let relays = includeRelays ? getRelayHints() : nil
+            return try Bech32.nevent(
+                eventId: eventId,
+                relays: relays,
+                author: pubkey,
+                kind: kind
+            )
+        } else {
+            // Simple note encoding
+            return try Bech32.note(from: eventId)
+        }
+    }
+    
+    /// Get relay hints for this event
+    private func getRelayHints() -> [String]? {
+        var relays: [String] = []
+        
+        // Add relay where this event was received from
+        if let relay = relay {
+            relays.append(relay.url)
+        }
+        
+        // Add relays from NDK instance if available
+        if let ndk = ndk {
+            let ndkRelays = ndk.relays.prefix(3).map { $0.url }
+            relays.append(contentsOf: ndkRelays)
+        }
+        
+        // Remove duplicates and limit to 3 relays (as recommended by NIP-19)
+        let uniqueRelays = Array(Set(relays)).prefix(3)
+        return uniqueRelays.isEmpty ? nil : Array(uniqueRelays)
+    }
+    
+    /// Check if this event has metadata that makes nevent encoding worthwhile
+    private func hasMetadataWorthyOfNevent() -> Bool {
+        // Use nevent if the event has non-standard kind or has important tags
+        return kind != EventKind.textNote || !referencedEventIds.isEmpty || !referencedPubkeys.isEmpty
     }
 }
 

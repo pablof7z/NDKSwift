@@ -191,7 +191,107 @@ public final class NDKRelay: Hashable, Equatable {
         stats.bytesReceived += message.count
         stats.lastMessageAt = Date()
         
-        // TODO: Parse and route message to appropriate handlers
+        // Parse and route message
+        do {
+            let nostrMessage = try NostrMessage.parse(from: message)
+            routeMessage(nostrMessage)
+        } catch {
+            // Log parsing error but don't crash
+            if ndk?.debugMode == true {
+                print("⚠️ Failed to parse message from \(url): \(error)")
+            }
+        }
+    }
+    
+    /// Route parsed message to appropriate handlers
+    private func routeMessage(_ message: NostrMessage) {
+        switch message {
+        case .event(let subscriptionId, let event):
+            handleEventMessage(event, subscriptionId: subscriptionId)
+            
+        case .eose(let subscriptionId):
+            handleEOSEMessage(subscriptionId: subscriptionId)
+            
+        case .ok(let eventId, let accepted, let message):
+            handleOKMessage(eventId: eventId, accepted: accepted, message: message)
+            
+        case .notice(let message):
+            handleNoticeMessage(message)
+            
+        case .auth(let challenge):
+            handleAuthMessage(challenge: challenge)
+            
+        case .count(let subscriptionId, let count):
+            handleCountMessage(subscriptionId: subscriptionId, count: count)
+            
+        case .req, .close:
+            // These are client->relay messages, shouldn't receive them
+            break
+        }
+    }
+    
+    /// Handle EVENT message
+    private func handleEventMessage(_ event: NDKEvent, subscriptionId: String?) {
+        // Set relay reference on event
+        event.setRelay(self)
+        
+        // Route to subscription manager via NDK
+        ndk?.processEvent(event, from: self)
+        
+        // Also notify local subscriptions for backward compatibility
+        if let subscriptionId = subscriptionId,
+           let subscription = subscriptions[subscriptionId] {
+            subscription.handleEvent(event, fromRelay: self)
+        }
+    }
+    
+    /// Handle EOSE message
+    private func handleEOSEMessage(subscriptionId: String) {
+        // Route to subscription manager via NDK
+        ndk?.processEOSE(subscriptionId: subscriptionId, from: self)
+        
+        // Also notify local subscription for backward compatibility
+        if let subscription = subscriptions[subscriptionId] {
+            subscription.handleEOSE(fromRelay: self)
+        }
+    }
+    
+    /// Handle OK message (publish result)
+    private func handleOKMessage(eventId: EventID, accepted: Bool, message: String?) {
+        if ndk?.debugMode == true {
+            let status = accepted ? "✅ Accepted" : "❌ Rejected"
+            let msg = message.map { ": \($0)" } ?? ""
+            print("\(status) event \(eventId) at \(url)\(msg)")
+        }
+        
+        // TODO: Notify event publisher about result
+    }
+    
+    /// Handle NOTICE message
+    private func handleNoticeMessage(_ message: String) {
+        if ndk?.debugMode == true {
+            print("📢 Notice from \(url): \(message)")
+        }
+        
+        // TODO: Emit notice event for listeners
+    }
+    
+    /// Handle AUTH message
+    private func handleAuthMessage(challenge: String) {
+        if ndk?.debugMode == true {
+            print("🔐 Auth challenge from \(url): \(challenge)")
+        }
+        
+        // TODO: Handle NIP-42 authentication
+    }
+    
+    /// Handle COUNT message
+    private func handleCountMessage(subscriptionId: String, count: Int) {
+        if ndk?.debugMode == true {
+            print("🔢 Count for subscription \(subscriptionId): \(count)")
+        }
+        
+        // TODO: Handle NIP-45 count results
     }
     
     // MARK: - State Management
@@ -289,14 +389,6 @@ extension NDKRelay: NDKRelayConnectionDelegate {
         }
     }
     
-    private func handleOKMessage(eventId: EventID, accepted: Bool, message: String?) {
-        // Update cache to remove from unpublished events if accepted
-        if accepted, let cache = ndk?.cacheAdapter {
-            Task {
-                await cache.removeUnpublishedEvent(eventId, from: url)
-            }
-        }
-    }
     
     private func handleAuthChallenge(_ challenge: String) {
         // TODO: Implement NIP-42 authentication

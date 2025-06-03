@@ -10,9 +10,11 @@ NDKSwift is a Swift implementation of the Nostr Development Kit, providing a com
 - **Relay Management**: Automatic connection handling with quadratic backoff, relay pools, and blacklisting
 - **Smart Publishing**: Automatic relay selection based on user preferences and Outbox model
 - **Offline-First**: Components react to event arrival without loading states
-- **Caching**: Adapter-based caching system with SQLite implementation
-- **Subscription Grouping**: Intelligent merging of similar subscriptions for efficiency
+- **Caching**: Adapter-based caching system with in-memory and file-based implementations
+- **Advanced Subscription Management**: Intelligent grouping, merging, and EOSE handling for optimal performance
+- **NIP-19 Support**: Comprehensive bech32 encoding/decoding for user-friendly identifiers (npub, note, nevent, naddr)
 - **Blossom Support**: Full implementation of BUD-01 through BUD-04 for decentralized file storage
+- **Payment Integration**: Support for Lightning zaps and Cashu-based payments
 
 ### Architecture
 - Built with Swift's modern concurrency (async/await, actors)
@@ -56,6 +58,52 @@ for await event in subscription {
     print("Received event: \(event)")
 }
 ```
+
+## Key Features
+
+### NIP-19 Identifiers
+
+Work with user-friendly bech32-encoded identifiers:
+
+```swift
+// Create user from npub
+let user = NDKUser(npub: "npub1l2vyh47mk2p0qlsku7hg0vn29faehy9hy34ygaclpn66ukqp3afqutajft")
+
+// Get npub from user
+print(user.npub) // Automatically encodes to bech32
+
+// Event encoding with context
+let noteId = try event.encode() // Simple note1...
+let richEventId = try event.encode(includeRelays: true) // nevent1... with relay hints
+```
+
+### Advanced Subscription Management
+
+Intelligent subscription optimization automatically improves performance:
+
+```swift
+// Subscriptions are automatically grouped and optimized
+let subscription = ndk.subscribe(
+    filters: [NDKFilter(kinds: [1], authors: ["pubkey"])],
+    options: NDKSubscriptionOptions(
+        cacheStrategy: .cacheFirst, // Try cache first, then relays
+        closeOnEose: false,
+        limit: 100
+    )
+)
+
+// Get performance statistics
+let stats = await ndk.getSubscriptionStats()
+print("Requests saved through grouping: \(stats.requestsSaved)")
+print("Events deduplicated: \(stats.eventsDeduped)")
+```
+
+Features:
+- **Automatic Grouping**: Similar subscriptions are merged to reduce relay load
+- **Event Deduplication**: Prevents duplicate events with 5-minute deduplication window  
+- **Smart EOSE Handling**: Dynamic timeouts based on relay responses
+- **Cache Strategies**: Multiple cache integration patterns (cache-first, parallel, etc.)
+- **Performance Metrics**: Comprehensive statistics for monitoring
 
 ## Caching
 

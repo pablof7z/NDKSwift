@@ -6,6 +6,7 @@
 - [Signers](#signers)
 - [Relay Management](#relay-management)
 - [Subscriptions](#subscriptions)
+- [Subscription Management](#subscription-management)
 - [Caching](#caching)
 - [Utilities](#utilities)
 - [Wallet System](#wallet-system)
@@ -17,73 +18,117 @@
 The main entry point for all NDKSwift functionality.
 
 ```swift
-public class NDK {
+public final class NDK {
     // Properties
     public var signer: NDKSigner?
     public var cacheAdapter: NDKCacheAdapter?
-    public private(set) var relayPool: NDKRelayPool
+    public var activeUser: NDKUser?
+    public var debugMode: Bool
+    public var paymentRouter: NDKPaymentRouter?
+    public var walletConfig: NDKWalletConfig?
+    
+    // Relay Management
+    public var relays: [NDKRelay] { get }
+    public var pool: NDKRelayPool { get }
     
     // Initialization
     public init(
-        relayUrls: [String] = [],
+        relayUrls: [RelayURL] = [],
         signer: NDKSigner? = nil,
         cacheAdapter: NDKCacheAdapter? = nil
     )
     
     // Connection Management
-    public func connect() async throws
+    public func connect() async
     public func disconnect() async
+    public func addRelay(_ url: RelayURL) -> NDKRelay
+    public func removeRelay(_ url: RelayURL)
     
-    // Subscription
+    // Subscription with Advanced Management
     public func subscribe(
         filters: [NDKFilter],
-        closeOnEOSE: Bool = false
+        options: NDKSubscriptionOptions = NDKSubscriptionOptions()
     ) -> NDKSubscription
     
+    public func fetchEvents(
+        filters: [NDKFilter],
+        relays: Set<NDKRelay>? = nil
+    ) async throws -> Set<NDKEvent>
+    
+    public func fetchEvent(_ id: EventID, relays: Set<NDKRelay>? = nil) async throws -> NDKEvent?
+    public func fetchEvent(_ filter: NDKFilter, relays: Set<NDKRelay>? = nil) async throws -> NDKEvent?
+    
     // Publishing
-    public func publish(_ event: NDKEvent) async throws
+    public func publish(_ event: NDKEvent) async throws -> Set<NDKRelay>
     
     // User Management
-    public func getUser(npub: String) -> NDKUser
-    public func getUser(pubkey: String) -> NDKUser
+    public func getUser(_ pubkey: PublicKey) -> NDKUser
+    public func getUser(npub: String) -> NDKUser?
+    
+    // Subscription Manager
+    public func getSubscriptionStats() async -> NDKSubscriptionManager.SubscriptionStats
 }
 ```
 
 ## Models
 
 ### NDKEvent
-Represents a Nostr event with all required fields and validation.
+Represents a Nostr event with all required fields, validation, and NIP-19 encoding support.
 
 ```swift
-public struct NDKEvent: Codable, Identifiable, Sendable {
+public final class NDKEvent: Codable, Equatable, Hashable {
     // Properties
-    public let id: String
-    public let pubkey: String
-    public let createdAt: Timestamp
-    public let kind: EventKind
-    public var tags: [[String]]
-    public let content: String
-    public let sig: String?
+    public var id: EventID?
+    public var pubkey: PublicKey
+    public var createdAt: Timestamp
+    public var kind: Kind
+    public var tags: [Tag]
+    public var content: String
+    public var sig: Signature?
+    
+    // References
+    public weak var ndk: NDK?
+    public private(set) var relay: NDKRelay?
     
     // Initialization
     public init(
-        pubkey: String,
-        createdAt: Timestamp,
-        kind: EventKind,
-        tags: [[String]] = [],
-        content: String
+        pubkey: PublicKey,
+        createdAt: Timestamp = Timestamp(Date().timeIntervalSince1970),
+        kind: Kind,
+        tags: [Tag] = [],
+        content: String = ""
     )
     
-    // Methods
-    public mutating func sign(with signer: NDKSigner) async throws
-    public func verify() -> Bool
+    public convenience init(content: String = "", tags: [Tag] = [])
+    
+    // ID and Signing
+    public func generateID() throws -> EventID
+    public func validate() throws
+    public func sign() async throws
     public func serialize() throws -> String
     
     // Tag Helpers
-    public func tagValue(for tagName: String) -> String?
-    public func tagValues(for tagName: String) -> [String]
-    public mutating func addTag(_ tag: [String])
-    public mutating func removeTag(name: String, value: String? = nil)
+    public func tags(withName name: String) -> [Tag]
+    public func tag(withName name: String) -> Tag?
+    public func addTag(_ tag: Tag)
+    public func tag(user: NDKUser, marker: String? = nil)
+    public func tag(event: NDKEvent, marker: String? = nil, relay: String? = nil)
+    public func tagValue(_ name: String) -> String?
+    
+    // References
+    public var referencedEventIds: [EventID] { get }
+    public var referencedPubkeys: [PublicKey] { get }
+    
+    // Event Properties
+    public var isReply: Bool { get }
+    public var replyEventId: EventID? { get }
+    public var isEphemeral: Bool { get }
+    public var isReplaceable: Bool { get }
+    public var isParameterizedReplaceable: Bool { get }
+    public var tagAddress: String { get }
+    
+    // NIP-19 Encoding
+    public func encode(includeRelays: Bool = false) throws -> String
 }
 ```
 
@@ -120,34 +165,61 @@ public struct NDKFilter: Codable, Sendable {
 ```
 
 ### NDKUser
-Represents a Nostr user with profile information.
+Represents a Nostr user with profile information and NIP-19 encoding support.
 
 ```swift
-public class NDKUser: ObservableObject {
+public final class NDKUser: Equatable, Hashable {
     // Properties
-    @Published public var profile: UserProfile?
-    public let pubkey: String
-    public var npub: String { get }
+    public let pubkey: PublicKey
+    public weak var ndk: NDK?
+    public private(set) var profile: NDKUserProfile?
+    public private(set) var relayList: [NDKRelayInfo] = []
+    
+    // Computed Properties
+    public var npub: String { get }  // Bech32 encoded public key
+    public var displayName: String? { get }
+    public var name: String? { get }
+    public var nip05: String? { get }
+    public var shortPubkey: String { get }  // Truncated pubkey for display
     
     // Initialization
-    public init(pubkey: String)
-    public init(npub: String) throws
+    public init(pubkey: PublicKey)
+    public convenience init?(npub: String)  // Creates user from npub
     
     // Profile Management
-    public func fetchProfile() async throws
-    public func updateProfile(_ profile: UserProfile) async throws
+    public func fetchProfile() async throws -> NDKUserProfile?
+    public func updateProfile(_ profile: NDKUserProfile)
+    public func fetchRelayList() async throws -> [NDKRelayInfo]
     
-    // Nested Types
-    public struct UserProfile: Codable {
-        public var name: String?
-        public var displayName: String?
-        public var about: String?
-        public var picture: String?
-        public var banner: String?
-        public var nip05: String?
-        public var lud06: String?
-        public var lud16: String?
-    }
+    // Following/Followers
+    public func follows() async throws -> Set<NDKUser>
+    public func follows(_ user: NDKUser) async throws -> Bool
+    
+    // Payments
+    public func pay(amount: Int64, comment: String? = nil, tags: [[String]]? = nil) async throws -> NDKPaymentConfirmation
+    public func getPaymentMethods() async throws -> Set<NDKPaymentMethod>
+    
+    // Static Methods
+    public static func fromNip05(_ nip05: String, ndk: NDK) async throws -> NDKUser?
+}
+
+// User profile metadata (kind 0)
+public struct NDKUserProfile: Codable {
+    public var name: String?
+    public var displayName: String?
+    public var about: String?
+    public var picture: String?
+    public var banner: String?
+    public var nip05: String?
+    public var lud16: String?
+    public var lud06: String?
+    public var website: String?
+    
+    public init(name: String? = nil, displayName: String? = nil, about: String? = nil, picture: String? = nil, banner: String? = nil, nip05: String? = nil, lud16: String? = nil, lud06: String? = nil, website: String? = nil)
+    
+    // Additional fields support
+    public func additionalField(_ key: String) -> String?
+    public mutating func setAdditionalField(_ key: String, value: String?)
 }
 ```
 
@@ -230,28 +302,128 @@ public actor NDKRelayPool {
 
 ## Subscriptions
 
-### NDKSubscription
-Manages event subscriptions with filtering and streaming.
+## Subscription Management
+
+### NDKSubscriptionManager
+Advanced subscription management with intelligent grouping, merging, and coordination.
 
 ```swift
-public class NDKSubscription: ObservableObject {
+public actor NDKSubscriptionManager {
+    // Subscription States
+    public enum SubscriptionState {
+        case pending
+        case grouping
+        case executing
+        case active
+        case closed
+    }
+    
+    // Cache Usage Strategies
+    public enum CacheUsage {
+        case onlyCache      // Cache only, no relays
+        case cacheFirst     // Cache then relays if needed
+        case parallel       // Cache + relays simultaneously
+        case onlyRelay      // Skip cache entirely
+    }
+    
+    // Statistics
+    public struct SubscriptionStats {
+        public var totalSubscriptions: Int
+        public var activeSubscriptions: Int
+        public var groupedSubscriptions: Int
+        public var requestsSaved: Int
+        public var eventsDeduped: Int
+        public var averageGroupSize: Double
+    }
+    
+    // Initialization
+    public init(ndk: NDK)
+    
+    // Subscription Management
+    public func addSubscription(_ subscription: NDKSubscription)
+    public func removeSubscription(_ subscriptionId: String)
+    
+    // Event Processing
+    public func processEvent(_ event: NDKEvent, from relay: NDKRelay)
+    public func processEOSE(subscriptionId: String, from relay: NDKRelay)
+    
+    // Statistics
+    public func getStats() -> SubscriptionStats
+}
+```
+
+**Key Features:**
+- **Intelligent Grouping**: Similar subscriptions are automatically grouped to reduce relay load
+- **Filter Merging**: Compatible filters are merged for efficient querying
+- **Event Deduplication**: Prevents duplicate events across subscriptions using timestamp tracking
+- **EOSE Handling**: Smart End-of-Stored-Events handling with dynamic timeouts
+- **Cache Integration**: Multiple cache strategies for optimal performance
+- **Performance Metrics**: Comprehensive statistics for monitoring and optimization
+
+### NDKSubscription
+Manages event subscriptions with filtering, streaming, and advanced options.
+
+```swift
+public final class NDKSubscription {
     // Properties
     public let id: String
     public let filters: [NDKFilter]
-    @Published public var events: [NDKEvent] = []
+    public let options: NDKSubscriptionOptions
+    public weak var ndk: NDK?
+    
+    // State
+    public var events: [NDKEvent] { get }
     public var isActive: Bool { get }
+    public var isClosed: Bool { get }
+    
+    // Initialization
+    public init(
+        filters: [NDKFilter],
+        options: NDKSubscriptionOptions = NDKSubscriptionOptions(),
+        ndk: NDK? = nil
+    )
     
     // Callbacks
     public func onEvent(_ callback: @escaping (NDKEvent) -> Void)
     public func onEOSE(_ callback: @escaping () -> Void)
+    public func onEOSE(fromRelay relay: NDKRelay, _ callback: @escaping () -> Void)
     public func onClosed(_ callback: @escaping () -> Void)
+    public func onError(_ callback: @escaping (Error) -> Void)
     
-    // Async Streaming
-    public func eventStream() -> AsyncStream<NDKEvent>
+    // Async Operations
+    public func waitForEOSE() async
     
     // Control
-    public func start() async
-    public func close() async
+    public func start()
+    public func close()
+    
+    // Internal Event Handling
+    internal func handleEvent(_ event: NDKEvent, fromRelay relay: NDKRelay?)
+    internal func handleEOSE(fromRelay relay: NDKRelay? = nil)
+    internal func handleError(_ error: Error)
+}
+
+// Subscription configuration options
+public struct NDKSubscriptionOptions {
+    public var closeOnEose: Bool
+    public var cacheStrategy: NDKCacheStrategy
+    public var relays: Set<NDKRelay>?
+    public var limit: Int?
+    
+    public init(
+        closeOnEose: Bool = false,
+        cacheStrategy: NDKCacheStrategy = .cacheFirst,
+        relays: Set<NDKRelay>? = nil,
+        limit: Int? = nil
+    )
+}
+
+// Cache strategies for subscriptions
+public enum NDKCacheStrategy {
+    case cacheOnly      // Only query cache
+    case cacheFirst     // Cache first, then relays
+    case parallel       // Query cache and relays simultaneously
+    case relayOnly      // Skip cache, only query relays
 }
 ```
 
@@ -302,23 +474,71 @@ public actor NDKFileCache: NDKCacheAdapter {
 ## Utilities
 
 ### Bech32
-Utilities for encoding/decoding Nostr identifiers.
+Utilities for encoding/decoding Nostr identifiers according to NIP-19.
 
 ```swift
 public enum Bech32 {
-    // Encoding
-    public static func npub(from pubkey: String) throws -> String
-    public static func nsec(from privateKey: String) throws -> String
-    public static func note(from eventId: String) throws -> String
-    public static func nevent(from event: NDKEvent) throws -> String
-    public static func nprofile(from user: NDKUser) throws -> String
+    // Error Types
+    public enum Bech32Error: Error, LocalizedError {
+        case invalidCharacter(Character)
+        case invalidChecksum
+        case invalidLength
+        case invalidHRP
+        case invalidData
+        case invalidPadding
+    }
     
-    // Decoding
-    public static func pubkey(from npub: String) throws -> String
-    public static func privateKey(from nsec: String) throws -> String
-    public static func eventId(from note: String) throws -> String
-    public static func decode(_ bech32String: String) throws -> (hrp: String, data: Data)
+    // Core Encoding/Decoding
+    public static func encode(hrp: String, data: [UInt8]) throws -> String
+    public static func decode(_ bech32: String) throws -> (hrp: String, data: [UInt8])
+    
+    // Nostr-specific Encoding
+    public static func npub(from pubkey: PublicKey) throws -> String
+    public static func nsec(from privateKey: PrivateKey) throws -> String
+    public static func note(from eventId: EventID) throws -> String
+    
+    // Advanced Event Encoding
+    public static func nevent(
+        eventId: EventID,
+        relays: [String]? = nil,
+        author: PublicKey? = nil,
+        kind: Int? = nil
+    ) throws -> String
+    
+    public static func naddr(
+        identifier: String,
+        kind: Int,
+        author: PublicKey,
+        relays: [String]? = nil
+    ) throws -> String
+    
+    // Nostr-specific Decoding
+    public static func pubkey(from npub: String) throws -> PublicKey
+    public static func privateKey(from nsec: String) throws -> PrivateKey
+    public static func eventId(from note: String) throws -> EventID
 }
+```
+
+**NIP-19 Support:**
+- `npub`: Public keys (user identifiers)
+- `nsec`: Private keys (for secure storage)
+- `note`: Event identifiers
+- `nevent`: Events with metadata (relays, author, kind)
+- `naddr`: Addressable events (parameterized replaceable events)
+
+**Usage Examples:**
+```swift
+// Encode public key to npub
+let npub = try Bech32.npub(from: "fa984bd7dbb282f07e16e7ae87b26a2a7b9b90b7246a44771f0cf5ae58018f52")
+// Result: "npub1l2vyh47mk2p0qlsku7hg0vn29faehy9hy34ygaclpn66ukqp3afqutajft"
+
+// Decode npub back to public key
+let pubkey = try Bech32.pubkey(from: npub)
+// Result: "fa984bd7dbb282f07e16e7ae87b26a2a7b9b90b7246a44771f0cf5ae58018f52"
+
+// Create user from npub
+let user = NDKUser(npub: "npub1l2vyh47mk2p0qlsku7hg0vn29faehy9hy34ygaclpn66ukqp3afqutajft")
+print(user?.npub) // Automatically encoded
 ```
 
 ### Crypto

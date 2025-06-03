@@ -21,7 +21,7 @@ public final class NDK {
     private let eventRepository: NDKEventRepository
     
     /// Subscription manager
-    private let subscriptionManager: NDKSubscriptionManager
+    private var subscriptionManager: NDKSubscriptionManager!
     
     /// Whether debug mode is enabled
     public var debugMode: Bool = false
@@ -51,7 +51,9 @@ public final class NDK {
         self.cacheAdapter = cacheAdapter
         self.relayPool = NDKRelayPool()
         self.eventRepository = NDKEventRepository()
-        self.subscriptionManager = NDKSubscriptionManager()
+        
+        // Initialize subscription manager after all properties are set
+        self.subscriptionManager = NDKSubscriptionManager(ndk: self)
         
         // Add initial relays
         for url in relayUrls {
@@ -115,9 +117,21 @@ public final class NDK {
         // Validate event
         try event.validate()
         
-        // TODO: Implement relay selection and publishing
-        // For now, return empty set
-        return []
+        // Store in cache if available
+        if let cache = cacheAdapter {
+            await cache.setEvent(event, filters: [], relay: nil)
+        }
+        
+        // Publish to relays
+        let publishedRelays = await relayPool.publishEvent(event)
+        
+        if debugMode {
+            let noteId = (try? Bech32.note(from: event.id ?? "")) ?? event.id ?? "unknown"
+            let relayUrls = publishedRelays.map { $0.url }.joined(separator: ", ")
+            print("📝 Published note \(noteId) to \(publishedRelays.count) relay(s): \(relayUrls)")
+        }
+        
+        return publishedRelays
     }
     
     // MARK: - Subscriptions
@@ -136,7 +150,10 @@ public final class NDK {
             ndk: self
         )
         
-        subscription.start()
+        // Use advanced subscription manager for optimized handling
+        Task {
+            await subscriptionManager.addSubscription(subscription)
+        }
         
         return subscription
     }
@@ -169,6 +186,27 @@ public final class NDK {
     public func fetchEvent(_ filter: NDKFilter, relays: Set<NDKRelay>? = nil) async throws -> NDKEvent? {
         let events = try await fetchEvents(filters: [filter], relays: relays)
         return events.first
+    }
+    
+    // MARK: - Subscription Manager Integration
+    
+    /// Process an event received from a relay (called by relay connections)
+    internal func processEvent(_ event: NDKEvent, from relay: NDKRelay) {
+        Task {
+            await subscriptionManager.processEvent(event, from: relay)
+        }
+    }
+    
+    /// Process EOSE received from a relay (called by relay connections)
+    internal func processEOSE(subscriptionId: String, from relay: NDKRelay) {
+        Task {
+            await subscriptionManager.processEOSE(subscriptionId: subscriptionId, from: relay)
+        }
+    }
+    
+    /// Get subscription manager statistics
+    public func getSubscriptionStats() async -> NDKSubscriptionManager.SubscriptionStats {
+        return await subscriptionManager.getStats()
     }
     
     // MARK: - User Management
@@ -239,6 +277,35 @@ public class NDKRelayPool {
             }
         }
     }
+    
+    /// Publish an event to all connected relays
+    func publishEvent(_ event: NDKEvent) async -> Set<NDKRelay> {
+        let connectedRelays = self.connectedRelays()
+        var publishedRelays: Set<NDKRelay> = []
+        
+        await withTaskGroup(of: NDKRelay?.self) { group in
+            for relay in connectedRelays {
+                group.addTask {
+                    do {
+                        let eventMessage = NostrMessage.event(subscriptionId: nil, event: event)
+                        try await relay.send(eventMessage.serialize())
+                        return relay
+                    } catch {
+                        // Failed to send to this relay
+                        return nil
+                    }
+                }
+            }
+            
+            for await result in group {
+                if let relay = result {
+                    publishedRelays.insert(relay)
+                }
+            }
+        }
+        
+        return publishedRelays
+    }
 }
 
 // MARK: - Event Repository Implementation
@@ -274,34 +341,4 @@ class NDKEventRepository {
     }
 }
 
-// MARK: - Subscription Manager Implementation
-
-class NDKSubscriptionManager {
-    private var activeSubscriptions: [String: NDKSubscription] = [:]
-    private let queue = DispatchQueue(label: "com.ndkswift.subscriptionmanager", attributes: .concurrent)
-    
-    func addSubscription(_ subscription: NDKSubscription) {
-        queue.async(flags: .barrier) { [weak self] in
-            self?.activeSubscriptions[subscription.id] = subscription
-        }
-    }
-    
-    func removeSubscription(_ subscriptionId: String) {
-        queue.async(flags: .barrier) { [weak self] in
-            self?.activeSubscriptions.removeValue(forKey: subscriptionId)
-        }
-    }
-    
-    func getSubscription(_ subscriptionId: String) -> NDKSubscription? {
-        return queue.sync {
-            return activeSubscriptions[subscriptionId]
-        }
-    }
-    
-    func getAllSubscriptions() -> [NDKSubscription] {
-        return queue.sync {
-            return Array(activeSubscriptions.values)
-        }
-    }
-}
 

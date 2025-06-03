@@ -210,5 +210,94 @@ public extension Bech32 {
         }
         return Data(data).hexString
     }
+    
+    /// Encode event with optional metadata to nevent format
+    static func nevent(
+        eventId: EventID,
+        relays: [String]? = nil,
+        author: PublicKey? = nil,
+        kind: Int? = nil
+    ) throws -> String {
+        guard eventId.count == 64, let eventData = Data(hexString: eventId), eventData.count == 32 else {
+            throw Bech32Error.invalidData
+        }
+        
+        var tlvData: [UInt8] = []
+        
+        // Type 0: Event ID (32 bytes)
+        tlvData.append(0)
+        tlvData.append(32)
+        tlvData.append(contentsOf: eventData)
+        
+        // Type 1: Relay hints (optional)
+        if let relays = relays {
+            for relay in relays {
+                let relayData = Array(relay.utf8)
+                tlvData.append(1)
+                tlvData.append(UInt8(relayData.count))
+                tlvData.append(contentsOf: relayData)
+            }
+        }
+        
+        // Type 2: Author (optional)
+        if let author = author, author.count == 64, let authorData = Data(hexString: author), authorData.count == 32 {
+            tlvData.append(2)
+            tlvData.append(32)
+            tlvData.append(contentsOf: authorData)
+        }
+        
+        // Type 3: Kind (optional)
+        if let kind = kind {
+            let kindBytes = withUnsafeBytes(of: UInt32(kind).bigEndian) { Array($0) }
+            tlvData.append(3)
+            tlvData.append(UInt8(kindBytes.count))
+            tlvData.append(contentsOf: kindBytes)
+        }
+        
+        return try encode(hrp: "nevent", data: tlvData)
+    }
+    
+    /// Encode addressable event to naddr format
+    static func naddr(
+        identifier: String,
+        kind: Int,
+        author: PublicKey,
+        relays: [String]? = nil
+    ) throws -> String {
+        guard author.count == 64, let authorData = Data(hexString: author), authorData.count == 32 else {
+            throw Bech32Error.invalidData
+        }
+        
+        var tlvData: [UInt8] = []
+        
+        // Type 0: Identifier
+        let identifierData = Array(identifier.utf8)
+        tlvData.append(0)
+        tlvData.append(UInt8(identifierData.count))
+        tlvData.append(contentsOf: identifierData)
+        
+        // Type 1: Relay hints (optional)
+        if let relays = relays {
+            for relay in relays {
+                let relayData = Array(relay.utf8)
+                tlvData.append(1)
+                tlvData.append(UInt8(relayData.count))
+                tlvData.append(contentsOf: relayData)
+            }
+        }
+        
+        // Type 2: Author (required)
+        tlvData.append(2)
+        tlvData.append(32)
+        tlvData.append(contentsOf: authorData)
+        
+        // Type 3: Kind (required)
+        let kindBytes = withUnsafeBytes(of: UInt32(kind).bigEndian) { Array($0) }
+        tlvData.append(3)
+        tlvData.append(UInt8(kindBytes.count))
+        tlvData.append(contentsOf: kindBytes)
+        
+        return try encode(hrp: "naddr", data: tlvData)
+    }
 }
 
