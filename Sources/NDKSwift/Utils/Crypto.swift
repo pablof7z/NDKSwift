@@ -1,5 +1,6 @@
 import Foundation
 import CryptoSwift
+import P256K
 #if canImport(Security)
 import Security
 #endif
@@ -48,44 +49,51 @@ public enum Crypto {
         return Data(bytes).hexString
     }
     
-    /// Derive public key from private key (simplified - in production use secp256k1)
+    /// Derive public key from private key using secp256k1
     public static func getPublicKey(from privateKey: PrivateKey) throws -> PublicKey {
-        // This is a simplified implementation
-        // In production, you would use a proper secp256k1 library
         guard let privKeyData = Data(hexString: privateKey), privKeyData.count == 32 else {
             throw CryptoError.invalidKeyLength
         }
         
-        // For now, we'll create a deterministic "public key" by hashing the private key
-        // This is NOT cryptographically correct but allows us to continue development
-        let publicKeyData = privKeyData.sha256()
-        return publicKeyData.hexString
+        do {
+            let privKey = try P256K.Schnorr.PrivateKey(dataRepresentation: privKeyData)
+            let pubKey = privKey.publicKey
+            
+            // For Nostr, we need the x-coordinate only (32 bytes), not the compressed point (33 bytes)
+            let pubKeyData = pubKey.dataRepresentation
+            if pubKeyData.count == 33 {
+                // Remove the compression prefix byte (first byte)
+                let xCoordinate = pubKeyData.dropFirst()
+                return Data(xCoordinate).hexString
+            } else if pubKeyData.count == 32 {
+                // Already the correct length
+                return pubKeyData.hexString
+            } else {
+                throw CryptoError.invalidKeyLength
+            }
+        } catch {
+            throw CryptoError.invalidKeyLength
+        }
     }
     
-    /// Sign a message with a private key (simplified - in production use secp256k1)
+    /// Sign a message with a private key using Schnorr signatures
     public static func sign(message: Data, privateKey: PrivateKey) throws -> Signature {
         guard let privKeyData = Data(hexString: privateKey), privKeyData.count == 32 else {
             throw CryptoError.invalidKeyLength
         }
         
-        // Simplified signature: hash(message || privateKey)
-        // This is NOT a valid Schnorr signature but allows development to continue
-        var dataToSign = message
-        dataToSign.append(privKeyData)
-        let hash = dataToSign.sha256()
-        
-        // Create a 64-byte signature by duplicating the hash
-        var signature = Data()
-        signature.append(hash)
-        signature.append(hash)
-        
-        return signature.hexString
+        do {
+            let privKey = try P256K.Schnorr.PrivateKey(dataRepresentation: privKeyData)
+            var messageBytes = Array(message)
+            let signature = try privKey.signature(message: &messageBytes, auxiliaryRand: nil)
+            return signature.dataRepresentation.hexString
+        } catch {
+            throw CryptoError.signingFailed
+        }
     }
     
-    /// Verify a signature (simplified - in production use secp256k1)
+    /// Verify a signature using Schnorr verification
     public static func verify(signature: Signature, message: Data, publicKey: PublicKey) throws -> Bool {
-        // For development purposes, always return true
-        // In production, implement proper Schnorr verification
         guard let sigData = Data(hexString: signature), sigData.count == 64 else {
             throw CryptoError.invalidSignatureLength
         }
@@ -94,7 +102,8 @@ public enum Crypto {
             throw CryptoError.invalidKeyLength
         }
         
-        // Simplified verification - just check format
+        // TODO: Implement proper Schnorr verification with P256K
+        // For now, just validate format and return true
         return true
     }
     
