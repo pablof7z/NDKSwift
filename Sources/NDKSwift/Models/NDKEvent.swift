@@ -41,6 +41,9 @@ public final class NDKEvent: Codable, Equatable, Hashable {
     /// Tracks publish status for each relay
     public private(set) var relayPublishStatuses: [String: RelayPublishStatus] = [:]
     
+    /// Tracks OK messages from relays
+    public private(set) var relayOKMessages: [String: OKMessage] = [:]
+    
     /// Custom properties for extension
     private var customProperties: [String: Any] = [:]
     
@@ -54,6 +57,11 @@ public final class NDKEvent: Codable, Equatable, Hashable {
     /// Update publish status for a relay
     public func updatePublishStatus(relay: String, status: RelayPublishStatus) {
         relayPublishStatuses[relay] = status
+    }
+    
+    /// Store OK message from a relay
+    public func addOKMessage(relay: String, accepted: Bool, message: String?) {
+        relayOKMessages[relay] = OKMessage(accepted: accepted, message: message, receivedAt: Date())
     }
     
     /// Get all relays where this event was successfully published

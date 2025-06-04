@@ -8,7 +8,8 @@ NDKSwift is a Swift implementation of the Nostr Development Kit, providing a com
 - **Abstract Signers**: Support for multiple signer types (nsec-based, NIP-46, read-only npub mode)
 - **Multi-User Sessions**: Active user management and seamless switching between accounts
 - **Relay Management**: Automatic connection handling with quadratic backoff, relay pools, and blacklisting
-- **Smart Publishing**: Automatic relay selection based on user preferences and Outbox model
+- **Smart Publishing**: Automatic relay selection based on user preferences and Outbox model with retry logic
+- **Subscription Tracking**: Automatic replay of subscriptions when relays reconnect, with intelligent filter merging
 - **Offline-First**: Components react to event arrival without loading states
 - **Caching**: Adapter-based caching system with in-memory and file-based implementations
 - **Advanced Subscription Management**: Intelligent grouping, merging, and EOSE handling for optimal performance
@@ -61,6 +62,34 @@ for await event in subscription {
 
 ## Key Features
 
+### Manual Relay Control
+
+NDKSwift provides fine-grained control over relay connections:
+
+```swift
+// Add relays without connecting
+let relay1 = ndk.addRelay("wss://relay.damus.io")
+let relay2 = ndk.addRelay("wss://nos.lol")
+
+// Connect individually
+try await relay1.connect()
+
+// Monitor connection state
+relay1.observeConnectionState { state in
+    print("Relay state: \(state)")
+}
+
+// Track event publishing status
+let event = NDKEvent(content: "Hello!")
+try await event.sign()
+let published = try await ndk.publish(event)
+
+// Check OK messages from relays
+for (relay, okMsg) in event.relayOKMessages {
+    print("\(relay): \(okMsg.accepted ? "✅" : "❌") \(okMsg.message ?? "")")
+}
+```
+
 ### NIP-19 Identifiers
 
 Work with user-friendly bech32-encoded identifiers:
@@ -104,6 +133,35 @@ Features:
 - **Smart EOSE Handling**: Dynamic timeouts based on relay responses
 - **Cache Strategies**: Multiple cache integration patterns (cache-first, parallel, etc.)
 - **Performance Metrics**: Comprehensive statistics for monitoring
+- **Relay Reconnection Support**: Subscriptions automatically resume when relays reconnect
+- **Filter Merging**: Intelligent merging of filters at the relay level to minimize bandwidth
+- **CloseOnEose Isolation**: Subscriptions with closeOnEose never mix with persistent subscriptions
+
+### Subscription Tracking & Relay Reconnection
+
+NDKSwift automatically handles relay disconnections and reconnections, ensuring your subscriptions continue working seamlessly:
+
+```swift
+// Create a subscription - it will automatically resume if the relay disconnects
+let subscription = ndk.subscribe(
+    filters: [NDKFilter(kinds: [1], authors: ["pubkey"])],
+    options: NDKSubscriptionOptions()
+)
+
+// The subscription will:
+// 1. Queue if relay is offline
+// 2. Execute when relay connects
+// 3. Resume automatically after reconnection
+// 4. Merge with similar subscriptions for efficiency
+
+subscription.start()
+```
+
+Key benefits:
+- **Zero subscription loss**: Subscriptions are tracked and replayed after reconnection
+- **Intelligent filter merging**: Multiple subscriptions with similar filters are combined into single relay requests
+- **Bandwidth optimization**: Reduces redundant subscriptions and network traffic
+- **Proper closeOnEose handling**: Temporary subscriptions are never mixed with persistent ones
 
 ## Caching
 
@@ -190,6 +248,7 @@ let blob = try await client.uploadWithAuth(
 
 - [API Reference](Documentation/API_REFERENCE.md) - Complete API documentation for all NDKSwift classes and protocols
 - [iOS App Tutorial](Documentation/IOS_APP_TUTORIAL.md) - Step-by-step guide to building a Nostr iOS app
+- [Manual Relay Control](Documentation/MANUAL_RELAY_CONTROL.md) - Guide to manual relay connection management
 - [Advanced Usage Guide](Documentation/ADVANCED_USAGE.md) - Advanced patterns and best practices
 - [Examples](Examples/README.md) - Working example applications
 

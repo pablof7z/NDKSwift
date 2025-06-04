@@ -1,0 +1,132 @@
+appId: com.example.iOSNostrApp
+---
+# Test manual relay connection control and publish tracking
+
+- launchApp
+
+# Create account first
+- tapOn: "Create Account"
+- waitForAnimationToEnd
+
+# Wait for account creation
+- waitForText: "Your Account"
+  timeout: 5000
+
+# Initial state - should show relays but disconnected
+- assertVisible: "Connected Relays"
+- assertVisible: "wss://relay.damus.io"
+- assertVisible: "wss://nos.lol"
+
+# All relays should be disconnected initially
+- assertVisible: 
+    text: "Disconnected"
+    index: 0
+- assertVisible:
+    text: "Disconnected"
+    index: 1
+
+# Test publishing with no connected relays
+- tapOn: "Publish Message"
+- inputText: "Test message with no relays connected"
+- tapOn: "Publish to Nostr"
+
+# Should show error about no relays
+- waitForText: "Event created but not published to any relays yet"
+  timeout: 3000
+
+# Check publish status section appears
+- assertVisible: "Publish Status"
+- assertVisible: "⚪ Not connected"
+
+# Connect to first relay
+- tapOn:
+    text: "Connect"
+    index: 0
+
+# Wait for connection
+- waitForText: "Connected"
+  timeout: 5000
+- assertVisible: "Connected to: wss://relay.damus.io"
+
+# Publish another message with one relay connected
+- clearText
+- inputText: "Test message with one relay"
+- tapOn: "Publish to Nostr"
+
+# Should show success
+- waitForText: "Event sent to 1 relay(s)"
+  timeout: 3000
+
+# Wait for OK message
+- runFlow:
+    when:
+      visible: "✅ Accepted"
+    commands:
+      - assertVisible: "✅ Accepted"
+    timeout: 5000
+
+# Connect to second relay
+- tapOn:
+    text: "Connect"
+    index: 1
+
+# Wait for second connection
+- waitForText: "Connected to: wss://nos.lol"
+  timeout: 5000
+
+# Publish with two relays
+- clearText
+- inputText: "Test message with two relays"
+- tapOn: "Publish to Nostr"
+
+# Should show published to 2 relays
+- waitForText: "Event sent to 2 relay(s)"
+  timeout: 3000
+
+# Check publish status shows both relays
+- assertVisible: "Publish Status"
+- runFlow:
+    when:
+      visible:
+        text: "✅"
+        index: 0
+    commands:
+      - assertVisible:
+          text: "✅"
+          index: 0
+    timeout: 5000
+
+# Disconnect one relay
+- tapOn:
+    text: "Disconnect"
+    index: 0
+
+- waitForText: "Disconnected from: wss://relay.damus.io"
+  timeout: 3000
+
+# Add a new relay
+- tapOn: "Add Relay"
+- waitForText: "Add New Relay"
+- inputText: "wss://relay.nostr.band"
+- tapOn:
+    text: "Add"
+    below: "Add New Relay"
+
+# Should show the new relay as disconnected
+- assertVisible: "wss://relay.nostr.band"
+- assertVisible:
+    text: "Disconnected"
+    belowText: "wss://relay.nostr.band"
+
+# Remove a relay
+- tapOn:
+    id: "trash"
+    belowText: "wss://relay.nostr.band"
+
+- waitForText: "Relay removed: wss://relay.nostr.band"
+  timeout: 3000
+
+# Final state check
+- assertVisible: "wss://relay.damus.io"
+- assertVisible: "wss://nos.lol"
+- assertNotVisible: "wss://relay.nostr.band"

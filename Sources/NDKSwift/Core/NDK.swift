@@ -20,6 +20,9 @@ public final class NDK {
     /// Event repository
     private let eventRepository: NDKEventRepository
     
+    /// Published events tracking (for OK message handling)
+    private var publishedEvents: [EventID: NDKEvent] = [:]
+    
     /// Subscription manager
     private var subscriptionManager: NDKSubscriptionManager!
     
@@ -86,7 +89,19 @@ public final class NDK {
     /// Add a relay to the pool
     @discardableResult
     public func addRelay(_ url: RelayURL) -> NDKRelay {
-        return relayPool.addRelay(url)
+        let relay = relayPool.addRelay(url)
+        relay.ndk = self
+        
+        // Set up connection state observer to publish queued events
+        relay.observeConnectionState { [weak self] state in
+            if case .connected = state {
+                Task {
+                    await self?.publishQueuedEvents(for: relay)
+                }
+            }
+        }
+        
+        return relay
     }
     
     /// Remove a relay from the pool
@@ -138,7 +153,15 @@ public final class NDK {
             await cache.setEvent(event, filters: [], relay: nil)
         }
         
-        // Publish to relays
+        // Track this event for OK message handling
+        if let eventId = event.id {
+            publishedEvents[eventId] = event
+        }
+        
+        // Get all relays we want to publish to
+        let targetRelays = relayPool.relays
+        
+        // Publish to connected relays
         let publishedRelays = await relayPool.publishEvent(event)
         
         // Update event's relay publish statuses
@@ -146,18 +169,32 @@ public final class NDK {
             event.updatePublishStatus(relay: relay.url, status: .succeeded)
         }
         
-        // Also mark failed relays
-        let allRelays = relayPool.connectedRelays()
-        for relay in allRelays {
-            if !publishedRelays.contains(relay) {
-                event.updatePublishStatus(relay: relay.url, status: .failed(.connectionFailed))
+        // Find relays that weren't connected or failed
+        let unpublishedRelayUrls = targetRelays
+            .filter { !publishedRelays.contains($0) }
+            .map { $0.url }
+        
+        // Store unpublished event for later retry when relays connect
+        if !unpublishedRelayUrls.isEmpty, let cache = cacheAdapter {
+            await cache.addUnpublishedEvent(event, relayUrls: unpublishedRelayUrls)
+            
+            // Mark these relays as pending
+            for relayUrl in unpublishedRelayUrls {
+                event.updatePublishStatus(relay: relayUrl, status: .pending)
             }
         }
         
         if debugMode {
             let noteId = (try? Bech32.note(from: event.id ?? "")) ?? event.id ?? "unknown"
-            let relayUrls = publishedRelays.map { $0.url }.joined(separator: ", ")
-            print("📝 Published note \(noteId) to \(publishedRelays.count) relay(s): \(relayUrls)")
+            if publishedRelays.isEmpty {
+                print("📝 Event \(noteId) created but not published to any relays. Will retry when relays connect.")
+            } else {
+                let relayUrls = publishedRelays.map { $0.url }.joined(separator: ", ")
+                print("📝 Published note \(noteId) to \(publishedRelays.count) relay(s): \(relayUrls)")
+                if !unpublishedRelayUrls.isEmpty {
+                    print("📝 Queued for \(unpublishedRelayUrls.count) disconnected relay(s)")
+                }
+            }
         }
         
         return publishedRelays
@@ -171,12 +208,19 @@ public final class NDK {
             try await event.sign()
         }
         
-        // Create temporary relays for the URLs
+        // Use relays from the pool or add them if needed
         var targetRelays: Set<NDKRelay> = []
         for url in relayUrls {
             let normalizedUrl = URLNormalizer.tryNormalizeRelayUrl(url) ?? url
-            let relay = NDKRelay(url: normalizedUrl)
-            targetRelays.insert(relay)
+            
+            // Check if relay is already in the pool
+            if let existingRelay = relayPool.relaysByUrl[normalizedUrl] {
+                targetRelays.insert(existingRelay)
+            } else {
+                // Add relay to pool
+                let relay = addRelay(normalizedUrl)
+                targetRelays.insert(relay)
+            }
         }
         
         // Connect to relays that aren't already connected
@@ -296,6 +340,23 @@ public final class NDK {
         return await subscriptionManager.getStats()
     }
     
+    /// Process OK message from relay (called by relay connections)
+    internal func processOKMessage(eventId: EventID, accepted: Bool, message: String?, from relay: NDKRelay) {
+        // Find the event in our published events
+        if let event = publishedEvents[eventId] {
+            // Store the OK message
+            event.addOKMessage(relay: relay.url, accepted: accepted, message: message)
+            
+            // Update publish status based on OK response
+            if accepted {
+                event.updatePublishStatus(relay: relay.url, status: .succeeded)
+            } else {
+                let reason = message ?? "Rejected by relay"
+                event.updatePublishStatus(relay: relay.url, status: .failed(.custom(reason)))
+            }
+        }
+    }
+    
     // MARK: - User Management
     
     /// Get a user by public key
@@ -310,6 +371,52 @@ public final class NDK {
         guard let user = NDKUser(npub: npub) else { return nil }
         user.ndk = self
         return user
+    }
+    
+    // MARK: - Queued Events
+    
+    /// Publish events that were queued while relay was disconnected
+    private func publishQueuedEvents(for relay: NDKRelay) async {
+        guard let cache = cacheAdapter else { return }
+        
+        let queuedEvents = await cache.getUnpublishedEvents(for: relay.url)
+        
+        if !queuedEvents.isEmpty && debugMode {
+            print("📤 Publishing \(queuedEvents.count) queued event(s) to \(relay.url)")
+        }
+        
+        for event in queuedEvents {
+            do {
+                // Re-track for OK message handling
+                if let eventId = event.id {
+                    publishedEvents[eventId] = event
+                }
+                
+                // Send the event
+                let eventMessage = NostrMessage.event(subscriptionId: nil, event: event)
+                try await relay.send(eventMessage.serialize())
+                
+                // Update status
+                event.updatePublishStatus(relay: relay.url, status: .succeeded)
+                
+                // Remove from unpublished queue
+                if let eventId = event.id {
+                    await cache.removeUnpublishedEvent(eventId, from: relay.url)
+                }
+                
+                if debugMode {
+                    let noteId = (try? Bech32.note(from: event.id ?? "")) ?? event.id ?? "unknown"
+                    print("✅ Published queued note \(noteId) to \(relay.url)")
+                }
+            } catch {
+                // Update status to failed
+                event.updatePublishStatus(relay: relay.url, status: .failed(.custom(error.localizedDescription)))
+                
+                if debugMode {
+                    print("❌ Failed to publish queued event to \(relay.url): \(error)")
+                }
+            }
+        }
     }
 }
 
