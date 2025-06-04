@@ -76,9 +76,9 @@ public actor NDKBunkerSigner: NDKSigner, @unchecked Sendable {
         
         switch connectionType {
         case .bunker(let token):
-            parseBunkerUrl(token)
+            self.parseBunkerUrl(token)
         case .nostrConnect(let relay, let options):
-            initNostrConnect(relay: relay, options: options)
+            self.initNostrConnect(relay: relay, options: options)
         case .nip05:
             break // Will be handled in connect()
         }
@@ -279,7 +279,7 @@ public actor NDKBunkerSigner: NDKSigner, @unchecked Sendable {
         
         // Listen for events
         subscription?.onEvent { [weak self] event in
-            Task {
+            Task { [weak self] in
                 print("[BunkerSigner] Received event: kind=\(event.kind), from=\(event.pubkey)")
                 await self?.handleIncomingEvent(event)
             }
@@ -329,7 +329,7 @@ public actor NDKBunkerSigner: NDKSigner, @unchecked Sendable {
                         method: "connect",
                         params: params
                     ) { [weak self] response in
-                        Task {
+                        Task { [weak self] in
                             print("[BunkerSigner] Received response from bunker: result=\(response.result), error=\(response.error ?? "nil")")
                             await self?.handleConnectResponse(response)
                         }
@@ -542,7 +542,10 @@ public actor NDKBunkerSigner: NDKSigner, @unchecked Sendable {
     }
     
     deinit {
-        disconnect()
+        // Clean up synchronously
+        subscription = nil
+        rpcClient = nil
+        isConnected = false
     }
 }
 
@@ -699,7 +702,7 @@ public actor NDKNostrRPC {
         let id = UUID().uuidString.prefix(8).lowercased()
         
         return try await withCheckedThrowingContinuation { continuation in
-            pendingRequests[id] = continuation
+            self.pendingRequests[id] = continuation
             
             Task {
                 do {
@@ -710,12 +713,10 @@ public actor NDKNostrRPC {
                     // Set a timeout
                     Task {
                         try await Task.sleep(nanoseconds: 30_000_000_000) // 30 seconds
-                        if pendingRequests.removeValue(forKey: id) != nil {
-                            continuation.resume(throwing: NDKError.timeout)
-                        }
+                        await self.handleTimeout(id: id, continuation: continuation)
                     }
                 } catch {
-                    pendingRequests.removeValue(forKey: id)
+                    self.pendingRequests.removeValue(forKey: id)
                     continuation.resume(throwing: error)
                 }
             }
@@ -724,15 +725,19 @@ public actor NDKNostrRPC {
     
     private func waitForResponse(id: String) async throws -> NDKRPCResponse {
         return try await withCheckedThrowingContinuation { continuation in
-            pendingRequests[id] = continuation
+            self.pendingRequests[id] = continuation
             
             // Set a timeout
             Task {
                 try await Task.sleep(nanoseconds: 30_000_000_000) // 30 seconds
-                if pendingRequests.removeValue(forKey: id) != nil {
-                    continuation.resume(throwing: NDKError.timeout)
-                }
+                await self.handleTimeout(id: id, continuation: continuation)
             }
+        }
+    }
+    
+    private func handleTimeout(id: String, continuation: CheckedContinuation<NDKRPCResponse, Error>) {
+        if pendingRequests.removeValue(forKey: id) != nil {
+            continuation.resume(throwing: NDKError.timeout)
         }
     }
 }
