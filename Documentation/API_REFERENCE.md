@@ -129,6 +129,9 @@ public final class NDKEvent: Codable, Equatable, Hashable {
     
     // NIP-19 Encoding
     public func encode(includeRelays: Bool = false) throws -> String
+    
+    // Event Reactions
+    public func react(content: String, publish: Bool = true) async throws -> NDKEvent
 }
 ```
 

@@ -393,6 +393,48 @@ public final class NDKEvent: Codable, Equatable, Hashable {
         return try serialize()
     }
     
+    // MARK: - Event Reactions
+    
+    /// React to this event with the given content (usually an emoji)
+    /// @param content The reaction content (e.g., "+", "-", "❤️", "🤙", "⚡", etc.)
+    /// @param publish Whether to automatically publish the reaction event
+    /// @returns The reaction event
+    public func react(content: String, publish: Bool = true) async throws -> NDKEvent {
+        guard let ndk = ndk else {
+            throw NDKError.custom("NDK instance not set")
+        }
+        
+        guard ndk.signer != nil else {
+            throw NDKError.signingFailed
+        }
+        
+        // Create the reaction event
+        let reactionEvent = NDKEvent(
+            pubkey: "",  // Will be set by signer
+            kind: EventKind.reaction,
+            tags: [],
+            content: content
+        )
+        
+        reactionEvent.ndk = ndk
+        
+        // Tag this event
+        reactionEvent.tag(event: self)
+        
+        // Also tag the author of the event being reacted to
+        reactionEvent.tag(user: NDKUser(pubkey: pubkey))
+        
+        // Sign the reaction event
+        try await reactionEvent.sign()
+        
+        // Publish if requested
+        if publish {
+            try await ndk.publish(reactionEvent)
+        }
+        
+        return reactionEvent
+    }
+    
     // MARK: - NIP-19 Encoding
     
     /// Encode this event to bech32 format according to NIP-19
