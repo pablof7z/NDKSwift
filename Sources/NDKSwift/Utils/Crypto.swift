@@ -1,6 +1,6 @@
 import Foundation
 import CryptoSwift
-import secp256k1
+import P256K
 #if canImport(Security)
 import Security
 #endif
@@ -56,8 +56,8 @@ public enum Crypto {
         }
         
         // For Schnorr signatures in Nostr, we need the x-only public key (32 bytes)
-        let privKey = try secp256k1.Schnorr.PrivateKey(dataRepresentation: privKeyData)
-        let xonlyPubKey = privKey.xonly
+        let privKey = try P256K.Schnorr.PrivateKey(dataRepresentation: privKeyData)
+        let xonlyPubKey = privKey.publicKey.xonly
         return Data(xonlyPubKey.bytes).hexString
     }
     
@@ -67,7 +67,7 @@ public enum Crypto {
             throw CryptoError.invalidKeyLength
         }
         
-        let privKey = try secp256k1.Schnorr.PrivateKey(dataRepresentation: privKeyData)
+        let privKey = try P256K.Schnorr.PrivateKey(dataRepresentation: privKeyData)
         
         // For Nostr, we sign the message directly (it's already the event ID hash)
         // We pass nil for auxiliaryRand to use the default BIP340 nonce function
@@ -87,8 +87,8 @@ public enum Crypto {
             throw CryptoError.invalidKeyLength
         }
         
-        let xonlyKey = secp256k1.Schnorr.XonlyKey(dataRepresentation: pubKeyData)
-        let schnorrSig = try secp256k1.Schnorr.SchnorrSignature(dataRepresentation: sigData)
+        let xonlyKey = P256K.Schnorr.XonlyKey(dataRepresentation: pubKeyData)
+        let schnorrSig = try P256K.Schnorr.SchnorrSignature(dataRepresentation: sigData)
         
         var messageBytes = Array(message)
         return xonlyKey.isValid(schnorrSig, for: &messageBytes)

@@ -93,6 +93,11 @@ public actor NDKSignatureVerificationSampler {
         return (totalVerifications, failedVerifications, blacklistedRelays.count)
     }
     
+    /// Set the signature verification delegate
+    public func setDelegate(_ delegate: NDKSignatureVerificationDelegate?) {
+        self.delegate = delegate
+    }
+    
     // MARK: - Private Methods
     
     /// Determine if we should verify an event based on sampling
