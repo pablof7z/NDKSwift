@@ -492,7 +492,7 @@ public final class NDK {
     
     /// Set the signature verification delegate
     public func setSignatureVerificationDelegate(_ delegate: NDKSignatureVerificationDelegate) async {
-        await signatureVerificationSampler.delegate = delegate
+        await signatureVerificationSampler.setDelegate(delegate)
     }
 }
 

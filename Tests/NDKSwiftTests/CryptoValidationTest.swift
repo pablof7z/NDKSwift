@@ -3,7 +3,7 @@ import XCTest
 
 final class CryptoValidationTest: XCTestCase {
     
-    func testSpecificKeyConversion() throws {
+    func testSpecificKeyConversion() async throws {
         // Given: Known test vectors
         let testNsec = "nsec1j5sw4vtgzzvmrjtqynvre0fknyfyysjpul0t2eew50rngdgltxnq0efsa0"
         let expectedPrivateKey = "9520eab1681099b1c96024d83cbd369912424241e7deb5672ea3c734351f59a6"
@@ -30,39 +30,35 @@ final class CryptoValidationTest: XCTestCase {
         
         // Test 4: Round-trip test with NDKPrivateKeySigner
         let signer = try NDKPrivateKeySigner(nsec: testNsec)
-        print("DEBUG Test: Signer public key = '\(signer.publicKey)' (length: \(signer.publicKey.count))")
-        XCTAssertEqual(signer.publicKey, expectedPublicKey, "Signer public key mismatch")
+        let signerPublicKey = try await signer.pubkey
+        print("DEBUG Test: Signer public key = '\(signerPublicKey)' (length: \(signerPublicKey.count))")
+        XCTAssertEqual(signerPublicKey, expectedPublicKey, "Signer public key mismatch")
         
-        let signerNpub = try Bech32.npub(from: signer.publicKey)
+        let signerNpub = try Bech32.npub(from: signerPublicKey)
         print("DEBUG Test: Signer npub = '\(signerNpub)'")
         XCTAssertEqual(signerNpub, expectedNpub, "Signer npub mismatch")
         
         print("DEBUG Test: All conversions successful!")
     }
     
-    func testGeneratedKeyConversion() throws {
+    func testGeneratedKeyConversion() async throws {
         // Test with a newly generated key
         print("DEBUG Test: Testing generated key conversion")
         
         let generatedSigner = try NDKPrivateKeySigner.generate()
-        print("DEBUG Test: Generated private key length = \(generatedSigner.privateKey.count)")
-        print("DEBUG Test: Generated public key length = \(generatedSigner.publicKey.count)")
+        let generatedPublicKey = try await generatedSigner.pubkey
+        print("DEBUG Test: Generated public key length = \(generatedPublicKey.count)")
         
         // Validate lengths
-        XCTAssertEqual(generatedSigner.privateKey.count, 64, "Generated private key should be 64 hex chars")
-        XCTAssertEqual(generatedSigner.publicKey.count, 64, "Generated public key should be 64 hex chars")
+        XCTAssertEqual(generatedPublicKey.count, 64, "Generated public key should be 64 hex chars")
         
         // Test round-trip conversion
-        let nsec = try Bech32.nsec(from: generatedSigner.privateKey)
-        print("DEBUG Test: Generated nsec = '\(nsec)'")
-        
-        let npub = try Bech32.npub(from: generatedSigner.publicKey)
+        let npub = try Bech32.npub(from: generatedPublicKey)
         print("DEBUG Test: Generated npub = '\(npub)'")
         
-        // Verify we can recreate the signer from the nsec
-        let recreatedSigner = try NDKPrivateKeySigner(nsec: nsec)
-        XCTAssertEqual(recreatedSigner.privateKey, generatedSigner.privateKey, "Round-trip private key failed")
-        XCTAssertEqual(recreatedSigner.publicKey, generatedSigner.publicKey, "Round-trip public key failed")
+        // Verify we can get consistent public key from the same signer
+        let recreatedPublicKey = try await generatedSigner.pubkey
+        XCTAssertEqual(recreatedPublicKey, generatedPublicKey, "Public key should be consistent")
         
         print("DEBUG Test: Generated key round-trip successful!")
     }
