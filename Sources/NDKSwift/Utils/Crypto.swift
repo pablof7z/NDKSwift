@@ -55,12 +55,10 @@ public enum Crypto {
             throw CryptoError.invalidKeyLength
         }
         
-        // TODO: Implement proper secp256k1 public key derivation
-        // For now, return a placeholder that passes validation
-        // This is temporary until we figure out the correct secp256k1.swift API
-        var pubKeyBytes = privKeyData
-        pubKeyBytes[0] = pubKeyBytes[0] ^ 0xFF // Simple transformation for testing
-        return pubKeyBytes.hexString
+        // For Schnorr signatures in Nostr, we need the x-only public key (32 bytes)
+        let privKey = try secp256k1.Schnorr.PrivateKey(dataRepresentation: privKeyData)
+        let xonlyPubKey = privKey.xonly
+        return Data(xonlyPubKey.bytes).hexString
     }
     
     /// Sign a message with a private key using Schnorr signatures
@@ -69,11 +67,14 @@ public enum Crypto {
             throw CryptoError.invalidKeyLength
         }
         
-        // TODO: Implement proper Schnorr signing with secp256k1.swift
-        // For now, return a placeholder signature for testing
-        let hash = message.sha256()
-        let sig = (hash + hash).hexString // 64 bytes
-        return sig
+        let privKey = try secp256k1.Schnorr.PrivateKey(dataRepresentation: privKeyData)
+        
+        // For Nostr, we sign the message directly (it's already the event ID hash)
+        // We pass nil for auxiliaryRand to use the default BIP340 nonce function
+        var messageBytes = Array(message)
+        let signature = try privKey.signature(message: &messageBytes, auxiliaryRand: nil)
+        
+        return signature.dataRepresentation.hexString
     }
     
     /// Verify a signature using Schnorr verification
@@ -86,9 +87,11 @@ public enum Crypto {
             throw CryptoError.invalidKeyLength
         }
         
-        // TODO: Implement proper Schnorr verification with P256K
-        // For now, just validate format and return true
-        return true
+        let xonlyKey = secp256k1.Schnorr.XonlyKey(dataRepresentation: pubKeyData)
+        let schnorrSig = try secp256k1.Schnorr.SchnorrSignature(dataRepresentation: sigData)
+        
+        var messageBytes = Array(message)
+        return xonlyKey.isValid(schnorrSig, for: &messageBytes)
     }
     
     /// SHA256 hash
