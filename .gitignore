@@ -10,3 +10,4 @@ DerivedData/
 Examples/.build
 Examples/build
 *.resolvedndk
+.repomix-output.txt

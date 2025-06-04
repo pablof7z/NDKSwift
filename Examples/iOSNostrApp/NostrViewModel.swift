@@ -18,6 +18,8 @@ class NostrViewModel: ObservableObject {
     @Published var connectedRelays: [RelayInfo] = []
     @Published var showingAddRelay = false
     @Published var accountCreated = false
+    @Published var lastPublishedEvent: NDKEvent?
+    @Published var publishedEventRelayStatuses: [(relay: String, status: String, okMessage: String?)] = []
     
     private var ndk: NDK?
     private var signer: NDKSigner?
@@ -42,7 +44,15 @@ class NostrViewModel: ObservableObject {
     }
     
     private func setupNDK() {
-        ndk = NDK()
+        // Set up file cache for persistent storage and queued events
+        do {
+            let cache = try NDKFileCache(path: "NostrCache")
+            ndk = NDK(cacheAdapter: cache)
+        } catch {
+            print("[ViewModel] Failed to create file cache: \(error)")
+            ndk = NDK()
+        }
+        ndk?.debugMode = true // Enable debug mode to see queued event messages
     }
     
     func createAccount() {
@@ -144,30 +154,25 @@ class NostrViewModel: ObservableObject {
     private func connectToRelays() async {
         guard let ndk = ndk else { return }
         
-        do {
-            // Add default relays
-            for relayUrl in defaultRelays {
-                try await ndk.addRelay(relayUrl)
-            }
-            
-            // Connect to relays
-            try await ndk.connect()
-            
-            await MainActor.run {
-                statusMessage = "Connected to relays"
-                isError = false
-                updateRelayStatus()
-            }
-        } catch {
-            await MainActor.run {
-                statusMessage = "Failed to connect: \(error.localizedDescription)"
-                isError = true
-            }
+        // Add default relays but don't connect yet
+        for relayUrl in defaultRelays {
+            _ = ndk.addRelay(relayUrl)
+        }
+        
+        await MainActor.run {
+            statusMessage = "Relays added. Use Connect button to connect."
+            isError = false
+            updateRelayStatus()
         }
     }
     
     func connectWithBunker(_ bunkerUrl: String) {
-        guard let ndk = ndk else { return }
+        guard let ndk = ndk else {
+            print("[ViewModel] ERROR: NDK not initialized")
+            return
+        }
+        
+        print("[ViewModel] Starting bunker connection with URL: \(bunkerUrl)")
         
         isBunkerConnecting = true
         statusMessage = "Connecting to bunker..."
@@ -176,11 +181,14 @@ class NostrViewModel: ObservableObject {
         Task {
             do {
                 // Create bunker signer
+                print("[ViewModel] Creating bunker signer...")
                 let bunker = NDKBunkerSigner.bunker(ndk: ndk, connectionToken: bunkerUrl)
                 self.bunkerSigner = bunker
                 
                 // Listen for auth URLs
+                print("[ViewModel] Setting up auth URL listener...")
                 authUrlCancellable = await bunker.authUrlPublisher.sink { [weak self] authUrl in
+                    print("[ViewModel] Received auth URL: \(authUrl)")
                     Task { @MainActor in
                         self?.authUrl = authUrl
                         self?.showingAuthUrl = true
@@ -188,7 +196,9 @@ class NostrViewModel: ObservableObject {
                 }
                 
                 // Connect to bunker
+                print("[ViewModel] Attempting to connect to bunker...")
                 let user = try await bunker.connect()
+                print("[ViewModel] Successfully connected! User pubkey: \(user.pubkey)")
                 
                 // Set as signer
                 ndk.signer = bunker
@@ -206,9 +216,11 @@ class NostrViewModel: ObservableObject {
                 }
                 
                 // Connect to relays
+                print("[ViewModel] Connecting to relays for normal operations...")
                 await connectToRelays()
                 
             } catch {
+                print("[ViewModel] Bunker connection failed: \(error)")
                 await MainActor.run {
                     isBunkerConnecting = false
                     statusMessage = "Bunker connection failed: \(error.localizedDescription)"
@@ -225,6 +237,7 @@ class NostrViewModel: ObservableObject {
             await MainActor.run {
                 isPublishing = true
                 statusMessage = ""
+                publishedEventRelayStatuses = []
             }
             
             do {
@@ -232,23 +245,44 @@ class NostrViewModel: ObservableObject {
                 let event = NDKEvent(content: content)
                 event.ndk = ndk  // Set the NDK instance
                 
-                // Sign and publish
+                // Sign the event
                 try await event.sign()
+                
+                // Store the event for tracking
+                await MainActor.run {
+                    lastPublishedEvent = event
+                }
                 
                 // Log raw event to console
                 let rawEventData = event.rawEvent()
                 print("Publishing raw event:", rawEventData)
                 
-                try await ndk.publish(event)
+                // Publish the event
+                let publishedRelays = try await ndk.publish(event)
                 
-                // Get the nevent1 encoding of the event (including relay info)
-                let nevent = try event.encode(includeRelays: true)
-                
+                // Update relay statuses
                 await MainActor.run {
                     isPublishing = false
-                    statusMessage = "Message published successfully!\nEvent ID: \(nevent)"
-                    isError = false
+                    updatePublishStatuses(for: event)
+                    
+                    let totalRelays = ndk.relays.count
+                    let queuedRelays = totalRelays - publishedRelays.count
+                    
+                    if publishedRelays.isEmpty {
+                        statusMessage = "Event created but not published to any relays. Will be published when relays connect."
+                        isError = false // Not an error, just queued
+                    } else if queuedRelays > 0 {
+                        statusMessage = "Event published to \(publishedRelays.count) relay(s), queued for \(queuedRelays) disconnected relay(s)"
+                        isError = false
+                    } else {
+                        statusMessage = "Event published to all \(publishedRelays.count) relay(s)"
+                        isError = false
+                    }
                 }
+                
+                // Start monitoring for OK messages
+                startMonitoringPublishStatus(for: event)
+                
             } catch {
                 await MainActor.run {
                     isPublishing = false
@@ -289,22 +323,11 @@ class NostrViewModel: ObservableObject {
     func addRelay(_ url: String) {
         guard let ndk = ndk, !url.isEmpty else { return }
         
-        Task {
-            do {
-                try await ndk.addRelay(url)
-                
-                await MainActor.run {
-                    statusMessage = "Relay added: \(url)"
-                    isError = false
-                    updateRelayStatus()
-                }
-            } catch {
-                await MainActor.run {
-                    statusMessage = "Failed to add relay: \(error.localizedDescription)"
-                    isError = true
-                }
-            }
-        }
+        _ = ndk.addRelay(url)
+        
+        statusMessage = "Relay added: \(url)"
+        isError = false
+        updateRelayStatus()
     }
     
     func removeRelay(_ url: String) {
@@ -314,6 +337,118 @@ class NostrViewModel: ObservableObject {
         updateRelayStatus()
         statusMessage = "Relay removed: \(url)"
         isError = false
+    }
+    
+    func connectRelay(_ url: String) {
+        guard let ndk = ndk else { return }
+        
+        Task {
+            do {
+                // Find the relay
+                if let relay = ndk.relays.first(where: { $0.url == url }) {
+                    try await relay.connect()
+                    
+                    await MainActor.run {
+                        statusMessage = "Connected to: \(url)"
+                        isError = false
+                        updateRelayStatus()
+                    }
+                }
+            } catch {
+                await MainActor.run {
+                    statusMessage = "Failed to connect: \(error.localizedDescription)"
+                    isError = true
+                }
+            }
+        }
+    }
+    
+    func disconnectRelay(_ url: String) {
+        guard let ndk = ndk else { return }
+        
+        Task {
+            // Find the relay
+            if let relay = ndk.relays.first(where: { $0.url == url }) {
+                await relay.disconnect()
+                
+                await MainActor.run {
+                    statusMessage = "Disconnected from: \(url)"
+                    isError = false
+                    updateRelayStatus()
+                }
+            }
+        }
+    }
+    
+    // MARK: - Publish Status Monitoring
+    
+    private func updatePublishStatuses(for event: NDKEvent) {
+        var statuses: [(relay: String, status: String, okMessage: String?)] = []
+        
+        // Add all relays with their current status
+        for relay in ndk?.relays ?? [] {
+            let relayUrl = relay.url
+            var statusText = ""
+            var okMessage: String?
+            
+            // Check publish status
+            if let publishStatus = event.relayPublishStatuses[relayUrl] {
+                switch publishStatus {
+                case .pending:
+                    statusText = "⏳ Queued (waiting for connection)"
+                case .succeeded:
+                    statusText = "✅ Published"
+                case .failed(let reason):
+                    switch reason {
+                    case .connectionFailed:
+                        statusText = "❌ Not connected"
+                    case .custom(let message):
+                        statusText = "❌ \(message)"
+                    default:
+                        statusText = "❌ Failed"
+                    }
+                case .inProgress:
+                    statusText = "🔄 Publishing..."
+                case .rateLimited:
+                    statusText = "⚠️ Rate limited"
+                case .retrying(let attempt):
+                    statusText = "🔁 Retrying (\(attempt))"
+                }
+            } else if relay.connectionState != .connected {
+                statusText = "⚪ Not connected"
+            } else {
+                statusText = "⏳ Waiting..."
+            }
+            
+            // Check for OK message
+            if let ok = event.relayOKMessages[relayUrl] {
+                if ok.accepted {
+                    statusText = "✅ Accepted"
+                } else {
+                    statusText = "❌ Rejected"
+                }
+                okMessage = ok.message
+            }
+            
+            statuses.append((relay: relayUrl, status: statusText, okMessage: okMessage))
+        }
+        
+        publishedEventRelayStatuses = statuses
+    }
+    
+    private func startMonitoringPublishStatus(for event: NDKEvent) {
+        // Monitor for 10 seconds for OK messages
+        Task {
+            for _ in 0..<20 { // 20 * 0.5 = 10 seconds
+                try? await Task.sleep(nanoseconds: 500_000_000) // 0.5 seconds
+                
+                await MainActor.run {
+                    if lastPublishedEvent?.id == event.id {
+                        updatePublishStatuses(for: event)
+                    }
+                }
+            }
+        }
     }
 }
 

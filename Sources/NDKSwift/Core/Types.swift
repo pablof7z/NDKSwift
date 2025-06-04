@@ -106,6 +106,13 @@ public struct NDKImetaTag {
     }
 }
 
+/// OK message from relay
+public struct OKMessage: Equatable {
+    public let accepted: Bool
+    public let message: String?
+    public let receivedAt: Date
+}
+
 /// NDK Error types
 public enum NDKError: Error, LocalizedError, Equatable {
     case invalidPublicKey

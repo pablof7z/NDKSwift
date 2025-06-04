@@ -138,9 +138,41 @@ struct ContentView: View {
     @ViewBuilder
     private var bunkerConnectionStatus: some View {
         if viewModel.isBunkerConnecting {
-            HStack {
-                ProgressView()
-                Text("Connecting to bunker...")
+            VStack(spacing: 10) {
+                HStack {
+                    ProgressView()
+                    Text("Connecting to bunker...")
+                }
+                
+                // Show more detailed status
+                if !viewModel.statusMessage.isEmpty {
+                    Text(viewModel.statusMessage)
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                        .multilineTextAlignment(.center)
+                }
+                
+                // Show relay connection status
+                if !viewModel.connectedRelays.isEmpty {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Relay Status:")
+                            .font(.caption2)
+                            .foregroundColor(.secondary)
+                        ForEach(viewModel.connectedRelays.prefix(3)) { relay in
+                            HStack {
+                                Circle()
+                                    .fill(relay.statusColor)
+                                    .frame(width: 6, height: 6)
+                                Text(relay.url)
+                                    .font(.caption2)
+                                    .lineLimit(1)
+                                    .truncationMode(.middle)
+                                    .foregroundColor(.secondary)
+                            }
+                        }
+                    }
+                    .padding(.horizontal)
+                }
             }
             .padding()
         }
@@ -151,6 +183,9 @@ struct ContentView: View {
             accountInfoSection
             messageComposer
             relayStatusSection
+            if viewModel.lastPublishedEvent != nil {
+                publishStatusSection
+            }
             statusMessages
             Spacer()
         }
@@ -250,16 +285,62 @@ struct ContentView: View {
             }
             
             if viewModel.connectedRelays.isEmpty {
-                Text("No relays connected")
+                Text("No relays added")
                     .font(.caption)
                     .foregroundColor(.secondary)
             } else {
                 ForEach(viewModel.connectedRelays) { relay in
-                    RelayRowView(relay: relay) {
-                        viewModel.removeRelay(relay.url)
+                    RelayRowView(
+                        relay: relay,
+                        onRemove: {
+                            viewModel.removeRelay(relay.url)
+                        },
+                        onConnect: {
+                            viewModel.connectRelay(relay.url)
+                        },
+                        onDisconnect: {
+                            viewModel.disconnectRelay(relay.url)
+                        }
+                    )
+                }
+            }
+        }
+        .padding()
+        .background(Color.gray.opacity(0.1))
+        .cornerRadius(10)
+    }
+    
+    private var publishStatusSection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("Publish Status")
+                .font(.headline)
+            
+            ScrollView {
+                VStack(alignment: .leading, spacing: 4) {
+                    ForEach(viewModel.publishedEventRelayStatuses, id: \.relay) { status in
+                        HStack {
+                            Text(status.relay)
+                                .font(.caption)
+                                .lineLimit(1)
+                                .truncationMode(.middle)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                            
+                            Text(status.status)
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                            
+                            if let okMessage = status.okMessage {
+                                Text("(\(okMessage))")
+                                    .font(.caption2)
+                                    .foregroundColor(.secondary)
+                                    .lineLimit(1)
+                                    .truncationMode(.tail)
+                            }
+                        }
                     }
                 }
             }
+            .frame(maxHeight: 100)
         }
         .padding()
         .background(Color.gray.opacity(0.1))
@@ -420,6 +501,8 @@ struct ContentView: View {
 struct RelayRowView: View {
     let relay: RelayInfo
     let onRemove: () -> Void
+    let onConnect: () -> Void
+    let onDisconnect: () -> Void
     
     var body: some View {
         HStack {
@@ -448,10 +531,31 @@ struct RelayRowView: View {
             
             Spacer()
             
-            Button(action: onRemove) {
-                Image(systemName: "trash")
-                    .foregroundColor(.red)
-                    .font(.caption)
+            HStack(spacing: 8) {
+                // Connect/Disconnect button
+                if relay.connectionState == .connected {
+                    Button(action: onDisconnect) {
+                        Text("Disconnect")
+                            .font(.caption)
+                            .foregroundColor(.orange)
+                    }
+                } else if relay.connectionState == .connecting {
+                    ProgressView()
+                        .scaleEffect(0.7)
+                } else {
+                    Button(action: onConnect) {
+                        Text("Connect")
+                            .font(.caption)
+                            .foregroundColor(.blue)
+                    }
+                }
+                
+                // Remove button
+                Button(action: onRemove) {
+                    Image(systemName: "trash")
+                        .foregroundColor(.red)
+                        .font(.caption)
+                }
             }
         }
         .padding(.vertical, 4)
@@ -470,9 +574,16 @@ struct RelayRowView: View {
             connectedAt: Date(),
             messagesSent: 42,
             messagesReceived: 123
-        )
-    ) {
-        // Preview action
-    }
+        ),
+        onRemove: {
+            // Preview action
+        },
+        onConnect: {
+            // Preview action
+        },
+        onDisconnect: {
+            // Preview action
+        }
+    )
     .padding()
 }

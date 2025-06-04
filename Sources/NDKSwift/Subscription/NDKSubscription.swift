@@ -146,15 +146,11 @@ public final class NDKSubscription {
         timeoutTimer?.invalidate()
         timeoutTimer = nil
         
-        // Close on all active relays
-        for relay in activeRelays {
-            Task {
-                do {
-                    let closeMessage = NostrMessage.close(subscriptionId: id)
-                    try await relay.send(closeMessage.serialize())
-                } catch {
-                    // Ignore errors when closing
-                }
+        // Close on all active relays using subscription manager
+        Task {
+            for relay in activeRelays {
+                await relay.subscriptionManager.removeSubscription(id)
+                relay.removeSubscription(self)
             }
         }
         
@@ -192,34 +188,12 @@ public final class NDKSubscription {
         
         let relaysToUse = options.relays ?? Set(ndk.relays)
         
-        for relay in relaysToUse {
-            if relay.isConnected {
-                sendSubscription(to: relay)
-            } else {
-                // Wait for connection
-                relay.observeConnectionState { [weak self] state in
-                    if case .connected = state {
-                        self?.sendSubscription(to: relay)
-                    }
-                }
-            }
-        }
-    }
-    
-    private func sendSubscription(to relay: NDKRelay) {
-        guard isActive && !isClosed else { return }
-        
-        activeRelays.insert(relay)
-        relay.addSubscription(self)
-        
         Task {
-            do {
-                let reqMessage = NostrMessage.req(subscriptionId: id, filters: filters)
-                try await relay.send(reqMessage.serialize())
-            } catch {
-                await MainActor.run {
-                    self.handleError(error)
-                }
+            for relay in relaysToUse {
+                // Use the relay's subscription manager which handles connection state
+                let _ = await relay.subscriptionManager.addSubscription(self, filters: filters)
+                activeRelays.insert(relay)
+                relay.addSubscription(self)
             }
         }
     }

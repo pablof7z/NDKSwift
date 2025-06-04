@@ -304,7 +304,7 @@ public actor NDKPublishingStrategy {
     
     private func getOrConnectRelay(url: String) async -> NDKRelay? {
         // First check if already connected
-        if let relay = await ndk.relayPool.relay(for: url) {
+        if let relay = ndk.relayPool.relay(for: url) {
             return relay
         }
         
@@ -503,6 +503,7 @@ public enum PublishFailureReason: Equatable, Codable {
     case invalid(String)
     case maxRetriesExceeded
     case powGenerationFailed
+    case custom(String)
     
     enum CodingKeys: String, CodingKey {
         case type
@@ -524,6 +525,9 @@ public enum PublishFailureReason: Equatable, Codable {
             try container.encode("maxRetriesExceeded", forKey: .type)
         case .powGenerationFailed:
             try container.encode("powGenerationFailed", forKey: .type)
+        case .custom(let message):
+            try container.encode("custom", forKey: .type)
+            try container.encode(message, forKey: .message)
         }
     }
     
@@ -543,6 +547,9 @@ public enum PublishFailureReason: Equatable, Codable {
             self = .maxRetriesExceeded
         case "powGenerationFailed":
             self = .powGenerationFailed
+        case "custom":
+            let message = try container.decode(String.self, forKey: .message)
+            self = .custom(message)
         default:
             self = .connectionFailed
         }

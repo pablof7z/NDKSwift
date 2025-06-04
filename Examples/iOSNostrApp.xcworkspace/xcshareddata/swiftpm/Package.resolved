@@ -1,5 +1,5 @@
 {
-  "originHash" : "4bbea0d3b72726fa4bd0f2e2af7ec8b45cdc1d533cb0a1a8a6dfdc1e577aac17",
+  "originHash" : "0f73926db7b2c7b1dfc429f6b511cf7e8104d14b9e6cd90eb58865f279ccf680",
   "pins" : [
     {
       "identity" : "cryptoswift",
@@ -11,12 +11,12 @@
       }
     },
     {
-      "identity" : "ndkswift",
+      "identity" : "secp256k1.swift",
       "kind" : "remoteSourceControl",
-      "location" : "https://github.com/pablof7z/NDKSwift",
+      "location" : "https://github.com/GigaBitcoin/secp256k1.swift.git",
       "state" : {
-        "branch" : "master",
-        "revision" : "7bad71c6f132d412cb4e38df709333846af8c96d"
+        "revision" : "8c62aba8a3011c9bcea232e5ee007fb0b34a15e2",
+        "version" : "0.21.1"
       }
     }
   ],

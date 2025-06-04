@@ -1,0 +1,8 @@
+Analyze how the typescript reference implementation of NDK in ./ndk/ implements what the user is requesting. Come up with a comprehensive plan of how to implement this same functionality, while trying to remain idiomatic within a Swift library in NDKSwift.
+
+Implement comphrehensive testing, build NDKSwift and run it until it works.
+
+The user will provide a task ID, which you should use to provide regular updates via the mcp tool `publish_task_status_update`. Frequent and transparent communication is fundamental.
+
+Functionality to implement:
+$ARGUMENTS
