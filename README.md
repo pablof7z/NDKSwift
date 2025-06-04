@@ -209,6 +209,27 @@ let subscription = ndk.subscribe(filters: [NDKFilter(kinds: [1])])
 let cachedEvents = await cache.query(subscription: subscription)
 ```
 
+## Event Reactions
+
+React to events with emoji or other content:
+
+```swift
+// React to an event with an emoji
+let reaction = try await event.react(content: "❤️")
+
+// React without auto-publishing 
+let reaction = try await event.react(content: "+", publish: false)
+// ... do something with the reaction
+try await ndk.publish(reaction)
+
+// Common reactions
+try await event.react(content: "+")     // Like
+try await event.react(content: "-")     // Dislike  
+try await event.react(content: "🤙")    // Shaka
+try await event.react(content: "⚡")    // Zap
+try await event.react(content: "🔥")    // Fire
+```
+
 ## Blossom Support
 
 NDKSwift includes full support for the Blossom protocol (BUD-01 through BUD-04) for decentralized file storage:

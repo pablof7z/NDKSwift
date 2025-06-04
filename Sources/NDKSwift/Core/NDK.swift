@@ -95,7 +95,7 @@ public final class NDK {
         // Set up connection state observer to publish queued events
         relay.observeConnectionState { [weak self] state in
             if case .connected = state {
-                Task {
+                Task { [weak self] in
                     await self?.publishQueuedEvents(for: relay)
                 }
             }

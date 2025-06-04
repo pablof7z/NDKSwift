@@ -7,11 +7,12 @@ This guide covers advanced patterns, best practices, and real-world examples for
 2. [Subscription Optimization](#subscription-optimization)
 3. [Cache Strategies](#cache-strategies)
 4. [NIP-19 Identifiers](#nip-19-identifiers)
-5. [Custom Event Types](#custom-event-types)
-6. [Payment Integration](#payment-integration)
-7. [Performance Optimization](#performance-optimization)
-8. [Security Best Practices](#security-best-practices)
-9. [Testing Strategies](#testing-strategies)
+5. [Event Reactions](#event-reactions)
+6. [Custom Event Types](#custom-event-types)
+7. [Payment Integration](#payment-integration)
+8. [Performance Optimization](#performance-optimization)
+9. [Security Best Practices](#security-best-practices)
+10. [Testing Strategies](#testing-strategies)
 
 ## Advanced Relay Management
 
@@ -571,6 +572,200 @@ func shareEvent(_ event: NDKEvent, includeContext: Bool = true) throws -> String
     }
 }
 ```
+
+## Event Reactions
+
+### Basic Reactions
+
+React to events with emojis or simple content:
+
+```swift
+// Basic reactions
+let event = // ... some event
+let reaction = try await event.react(content: "❤️")
+
+// Common reaction types
+try await event.react(content: "+")     // Like (NIP-25)
+try await event.react(content: "-")     // Dislike
+try await event.react(content: "🤙")    // Shaka/Cool
+try await event.react(content: "⚡")    // Lightning/Zap hint
+try await event.react(content: "🔥")    // Fire/Hot
+try await event.react(content: "💯")    // Perfect/100
+```
+
+### Reaction Analytics
+
+Track and analyze reactions on your events:
+
+```swift
+class ReactionTracker {
+    private var ndk: NDK
+    private var reactions: [EventID: [NDKEvent]] = [:]
+    
+    func trackReactions(for event: NDKEvent) async {
+        let filter = NDKFilter(
+            kinds: [EventKind.reaction],
+            tags: ["e": [event.id ?? ""]]
+        )
+        
+        let subscription = ndk.subscribe(filters: [filter])
+        
+        for await reaction in subscription {
+            reactions[event.id ?? "", default: []].append(reaction)
+            
+            // Notify UI of new reaction
+            NotificationCenter.default.post(
+                name: .newReaction,
+                object: nil,
+                userInfo: [
+                    "event": event,
+                    "reaction": reaction
+                ]
+            )
+        }
+    }
+    
+    func getReactionCounts(for eventId: EventID) -> [String: Int] {
+        guard let eventReactions = reactions[eventId] else {
+            return [:]
+        }
+        
+        return eventReactions.reduce(into: [:]) { counts, reaction in
+            let content = reaction.content
+            counts[content, default: 0] += 1
+        }
+    }
+    
+    func getMostPopularReaction(for eventId: EventID) -> String? {
+        let counts = getReactionCounts(for: eventId)
+        return counts.max(by: { $0.value < $1.value })?.key
+    }
+}
+```
+
+### Custom Reaction UI
+
+Build interactive reaction interfaces:
+
+```swift
+class ReactionButton: UIButton {
+    var event: NDKEvent?
+    var reactionContent: String = "❤️"
+    var hasReacted: Bool = false
+    
+    override func awakeFromNib() {
+        super.awakeFromNib()
+        addTarget(self, action: #selector(handleTap), for: .touchUpInside)
+        updateAppearance()
+    }
+    
+    @objc private func handleTap() {
+        guard let event = event else { return }
+        
+        Task {
+            do {
+                if hasReacted {
+                    // TODO: Implement reaction removal (delete event)
+                    print("Remove reaction not yet implemented")
+                } else {
+                    // Add reaction
+                    let reaction = try await event.react(content: reactionContent)
+                    hasReacted = true
+                    
+                    DispatchQueue.main.async {
+                        self.updateAppearance()
+                        // Haptic feedback
+                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                    }
+                }
+            } catch {
+                print("Failed to react: \(error)")
+            }
+        }
+    }
+    
+    private func updateAppearance() {
+        let config = UIButton.Configuration.filled()
+        configuration = config
+        
+        if hasReacted {
+            configuration?.baseBackgroundColor = .systemPink
+            configuration?.baseForegroundColor = .white
+        } else {
+            configuration?.baseBackgroundColor = .systemGray6
+            configuration?.baseForegroundColor = .label
+        }
+        
+        configuration?.title = reactionContent
+    }
+}
+```
+
+### Reaction Notifications
+
+Handle incoming reactions in real-time:
+
+```swift
+class ReactionNotificationHandler {
+    func startListening(for user: NDKUser) {
+        let filter = NDKFilter(
+            kinds: [EventKind.reaction],
+            tags: ["p": [user.pubkey]]
+        )
+        
+        let subscription = ndk.subscribe(filters: [filter])
+        
+        Task {
+            for await reaction in subscription {
+                // Find the original event being reacted to
+                guard let eventTag = reaction.tags.first(where: { $0[0] == "e" }),
+                      eventTag.count > 1 else {
+                    continue
+                }
+                
+                let originalEventId = eventTag[1]
+                
+                // Fetch the original event if needed
+                let originalEvent = await fetchEvent(id: originalEventId)
+                
+                // Show notification
+                showReactionNotification(
+                    from: NDKUser(pubkey: reaction.pubkey),
+                    reaction: reaction.content,
+                    on: originalEvent
+                )
+            }
+        }
+    }
+    
+    private func showReactionNotification(
+        from user: NDKUser,
+        reaction: String,
+        on event: NDKEvent?
+    ) {
+        let content = UNMutableNotificationContent()
+        content.title = "New Reaction"
+        content.body = "\(user.displayName ?? user.npub) reacted \(reaction) to your post"
+        content.sound = .default
+        
+        let request = UNNotificationRequest(
+            identifier: UUID().uuidString,
+            content: content,
+            trigger: nil
+        )
+        
+        UNUserNotificationCenter.current().add(request)
+    }
+}
+```
+
+### Best Practices for Reactions
+
+1. **Use standard reaction content** - Stick to common emojis and "+" / "-" for better compatibility
+2. **Batch reaction queries** - Use filters to fetch all reactions for multiple events at once
+3. **Cache reaction state** - Store user's own reactions locally for instant UI updates
+4. **Handle duplicates** - Check if user already reacted before sending new reaction
+5. **Respect rate limits** - Don't spam reactions; implement cooldowns if needed
 
 ## Custom Event Types
 
