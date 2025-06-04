@@ -16,6 +16,7 @@ NDKSwift is a Swift implementation of the Nostr Development Kit, providing a com
 - **NIP-19 Support**: Comprehensive bech32 encoding/decoding for user-friendly identifiers (npub, note, nevent, naddr)
 - **Blossom Support**: Full implementation of BUD-01 through BUD-04 for decentralized file storage
 - **Payment Integration**: Support for Lightning zaps and Cashu-based payments
+- **Signature Verification Sampling**: Optimize performance with statistical signature verification while maintaining security
 
 ### Architecture
 - Built with Swift's modern concurrency (async/await, actors)
@@ -136,6 +137,34 @@ Features:
 - **Relay Reconnection Support**: Subscriptions automatically resume when relays reconnect
 - **Filter Merging**: Intelligent merging of filters at the relay level to minimize bandwidth
 - **CloseOnEose Isolation**: Subscriptions with closeOnEose never mix with persistent subscriptions
+
+### Signature Verification Sampling
+
+NDKSwift implements intelligent signature verification sampling for improved performance without compromising security:
+
+```swift
+// Configure signature verification sampling
+let config = NDKSignatureVerificationConfig(
+    initialValidationRatio: 1.0,    // Start with 100% verification
+    lowestValidationRatio: 0.1,     // Drop to 10% for trusted relays
+    autoBlacklistInvalidRelays: true // Auto-blacklist malicious relays
+)
+
+let ndk = NDK(signatureVerificationConfig: config)
+
+// Monitor for invalid signatures
+await ndk.setSignatureVerificationDelegate(delegate)
+```
+
+Features:
+- **Performance Optimization**: Verify only a sample of signatures based on relay trust
+- **Zero-Tolerance Security**: A single invalid signature marks a relay as malicious
+- **Adaptive Trust**: Validation ratio decreases as relays prove trustworthy
+- **Signature Caching**: Already-verified events aren't re-verified
+- **Evil Relay Detection**: Automatic blacklisting of relays sending invalid signatures
+- **Statistics Tracking**: Monitor verification performance and relay behavior
+
+See [Signature Verification Documentation](Documentation/SIGNATURE_VERIFICATION_SAMPLING.md) for details.
 
 ### Subscription Tracking & Relay Reconnection
 

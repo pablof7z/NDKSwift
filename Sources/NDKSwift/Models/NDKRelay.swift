@@ -47,6 +47,9 @@ public struct NDKRelayStats {
     public var latency: TimeInterval?
     public var connectionAttempts: Int = 0
     public var successfulConnections: Int = 0
+    
+    /// Signature verification statistics
+    public var signatureStats: NDKRelaySignatureStats = NDKRelaySignatureStats()
 }
 
 /// Represents a Nostr relay
@@ -86,6 +89,9 @@ public final class NDKRelay: Hashable, Equatable {
     
     /// Subscription manager for this relay
     public lazy var subscriptionManager = NDKRelaySubscriptionManager(relay: self)
+    
+    /// Thread-safe access to statistics
+    private let statsLock = NSLock()
     
     // MARK: - Initialization
     
@@ -415,6 +421,22 @@ extension NDKRelay: NDKRelayConnectionDelegate {
 }
 
 extension NDKRelay {
+    
+    // MARK: - Signature Statistics
+    
+    /// Update signature verification statistics in a thread-safe manner
+    public func updateSignatureStats(_ update: (inout NDKRelaySignatureStats) -> Void) {
+        statsLock.lock()
+        defer { statsLock.unlock() }
+        update(&stats.signatureStats)
+    }
+    
+    /// Get a copy of the current signature statistics
+    public func getSignatureStats() -> NDKRelaySignatureStats {
+        statsLock.lock()
+        defer { statsLock.unlock() }
+        return stats.signatureStats
+    }
     
     // MARK: - Hashable & Equatable
     

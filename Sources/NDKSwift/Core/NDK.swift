@@ -29,6 +29,15 @@ public final class NDK {
     /// Whether debug mode is enabled
     public var debugMode: Bool = false
     
+    /// Signature verification configuration
+    public var signatureVerificationConfig: NDKSignatureVerificationConfig
+    
+    /// Signature verification sampler
+    internal let signatureVerificationSampler: NDKSignatureVerificationSampler
+    
+    /// Signature verification delegate
+    public weak var signatureVerificationDelegate: NDKSignatureVerificationDelegate?
+    
     /// Payment router for handling zaps and payments
     public var paymentRouter: NDKPaymentRouter?
     
@@ -68,12 +77,15 @@ public final class NDK {
     public init(
         relayUrls: [RelayURL] = [],
         signer: NDKSigner? = nil,
-        cacheAdapter: NDKCacheAdapter? = nil
+        cacheAdapter: NDKCacheAdapter? = nil,
+        signatureVerificationConfig: NDKSignatureVerificationConfig = .default
     ) {
         self.signer = signer
         self.cacheAdapter = cacheAdapter
         self.relayPool = NDKRelayPool()
         self.eventRepository = NDKEventRepository()
+        self.signatureVerificationConfig = signatureVerificationConfig
+        self.signatureVerificationSampler = NDKSignatureVerificationSampler(config: signatureVerificationConfig)
         
         // Initialize subscription manager after all properties are set
         self.subscriptionManager = NDKSubscriptionManager(ndk: self)
@@ -324,6 +336,43 @@ public final class NDK {
         event.markSeenOn(relay: relay.url)
         
         Task {
+            // Get current stats
+            var currentStats = relay.getSignatureStats()
+            
+            // Verify signature with sampling
+            let verificationResult = await signatureVerificationSampler.verifyEvent(
+                event,
+                from: relay,
+                stats: &currentStats
+            )
+            
+            // Update stats back to relay
+            relay.updateSignatureStats { stats in
+                stats = currentStats
+            }
+            
+            switch verificationResult {
+            case .invalid:
+                // Invalid signature - don't process this event
+                if debugMode {
+                    print("❌ Event \(event.id ?? "unknown") from \(relay.url) has invalid signature")
+                }
+                return
+            case .valid:
+                if debugMode {
+                    print("✅ Event \(event.id ?? "unknown") signature verified from \(relay.url)")
+                }
+            case .cached:
+                // Already verified
+                break
+            case .skipped:
+                // Skipped due to sampling
+                if debugMode {
+                    print("⏭️ Event \(event.id ?? "unknown") signature verification skipped (sampling) from \(relay.url)")
+                }
+            }
+            
+            // Process the event
             await subscriptionManager.processEvent(event, from: relay)
         }
     }
@@ -417,6 +466,33 @@ public final class NDK {
                 }
             }
         }
+    }
+    
+    // MARK: - Signature Verification
+    
+    /// Get signature verification statistics
+    public func getSignatureVerificationStats() async -> (totalVerifications: Int, failedVerifications: Int, blacklistedRelays: Int) {
+        return await signatureVerificationSampler.getStats()
+    }
+    
+    /// Check if a relay is blacklisted
+    public func isRelayBlacklisted(_ relay: NDKRelay) async -> Bool {
+        return await signatureVerificationSampler.isBlacklisted(relay: relay)
+    }
+    
+    /// Get all blacklisted relay URLs
+    public func getBlacklistedRelays() async -> Set<String> {
+        return await signatureVerificationSampler.getBlacklistedRelays()
+    }
+    
+    /// Clear the signature verification cache
+    public func clearSignatureCache() async {
+        await signatureVerificationSampler.clearCache()
+    }
+    
+    /// Set the signature verification delegate
+    public func setSignatureVerificationDelegate(_ delegate: NDKSignatureVerificationDelegate) async {
+        await signatureVerificationSampler.delegate = delegate
     }
 }
 
