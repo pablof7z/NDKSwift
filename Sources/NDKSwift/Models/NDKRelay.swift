@@ -84,6 +84,9 @@ public final class NDKRelay: Hashable, Equatable {
     /// Maximum reconnection delay
     private let maxReconnectDelay: TimeInterval = 300.0 // 5 minutes
     
+    /// Subscription manager for this relay
+    public lazy var subscriptionManager = NDKRelaySubscriptionManager(relay: self)
+    
     // MARK: - Initialization
     
     public init(url: RelayURL) {
@@ -264,7 +267,8 @@ public final class NDKRelay: Hashable, Equatable {
             print("\(status) event \(eventId) at \(url)\(msg)")
         }
         
-        // TODO: Notify event publisher about result
+        // Notify NDK about OK message
+        ndk?.processOKMessage(eventId: eventId, accepted: accepted, message: message, from: self)
     }
     
     /// Handle NOTICE message
@@ -340,9 +344,11 @@ extension NDKRelay: NDKRelayConnectionDelegate {
         
         updateConnectionState(.connected)
         
-        // Fetch relay information
+        // Fetch relay information and replay subscriptions
         Task {
             await fetchRelayInformation()
+            // Replay any waiting subscriptions
+            await subscriptionManager.executePendingSubscriptions()
         }
     }
     
@@ -363,11 +369,23 @@ extension NDKRelay: NDKRelayConnectionDelegate {
         
         switch message {
         case .event(let subscriptionId, let event):
+            // Route through subscription manager first
+            Task {
+                await subscriptionManager.handleEvent(event, relaySubscriptionId: subscriptionId)
+            }
+            
+            // Also handle legacy subscriptions for backward compatibility
             if let subId = subscriptionId, let subscription = subscriptions[subId] {
                 subscription.handleEvent(event, fromRelay: self)
             }
             
         case .eose(let subscriptionId):
+            // Route through subscription manager
+            Task {
+                await subscriptionManager.handleEOSE(relaySubscriptionId: subscriptionId)
+            }
+            
+            // Also handle legacy subscriptions
             if let subscription = subscriptions[subscriptionId] {
                 subscription.handleEOSE(fromRelay: self)
             }

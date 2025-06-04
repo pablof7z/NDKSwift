@@ -138,7 +138,7 @@ public actor NDKRelaySelector {
         config: CombinationConfig = .default
     ) async -> RelayToPubkeysMap {
         var relayToPubkeys = RelayToPubkeysMap()
-        let connectedRelays = await ndk.relayPool.connectedRelays()
+        let connectedRelays = ndk.relayPool.connectedRelays()
         
         // Track how many relays each pubkey has been assigned to
         var pubkeyRelayCount: [String: Int] = [:]
@@ -300,7 +300,7 @@ public actor NDKRelaySelector {
         guard neededCount > 0 else { return [] }
         
         // Get default relays from pool
-        let poolRelays = await ndk.relayPool.relays
+        let poolRelays = ndk.relayPool.relays
             .filter { !excludeRelays.contains($0.url) }
             .prefix(neededCount)
             .map { $0.url }

@@ -85,37 +85,51 @@ public actor NDKBunkerSigner: NDKSigner, @unchecked Sendable {
     }
     
     private func parseBunkerUrl(_ urlString: String) {
+        print("[BunkerSigner] Parsing bunker URL: \(urlString)")
+        
         guard let url = URL(string: urlString),
-              url.scheme == "bunker" else { return }
+              url.scheme == "bunker" else {
+            print("[BunkerSigner] ERROR: Invalid URL scheme or format")
+            return
+        }
         
         // Extract bunker pubkey from hostname or path
         if let host = url.host {
             self.bunkerPubkey = host
+            print("[BunkerSigner] Extracted bunker pubkey from host: \(host)")
         } else {
             // Handle bunker://pubkey format
             let path = url.path
             if path.hasPrefix("//") {
                 self.bunkerPubkey = String(path.dropFirst(2))
+                print("[BunkerSigner] Extracted bunker pubkey from path: \(self.bunkerPubkey ?? "nil")")
             }
         }
         
         // Parse query parameters
         if let components = URLComponents(url: url, resolvingAgainstBaseURL: false) {
+            print("[BunkerSigner] Query items: \(components.queryItems?.map { "\($0.name)=\($0.value ?? "nil")" }.joined(separator: ", ") ?? "none")")
+            
             for item in components.queryItems ?? [] {
                 switch item.name {
                 case "pubkey":
                     self.userPubkey = item.value
+                    print("[BunkerSigner] Found user pubkey: \(item.value ?? "nil")")
                 case "relay":
                     if let relay = item.value {
                         self.relayUrls.append(relay)
+                        print("[BunkerSigner] Added relay: \(relay)")
                     }
                 case "secret":
                     self.secret = item.value
+                    print("[BunkerSigner] Found secret: \(item.value != nil ? "***" : "nil")")
                 default:
-                    break
+                    print("[BunkerSigner] Unknown parameter: \(item.name)=\(item.value ?? "nil")")
                 }
             }
         }
+        
+        print("[BunkerSigner] Parse complete - bunkerPubkey: \(bunkerPubkey ?? "nil"), userPubkey: \(userPubkey ?? "nil"), relays: \(relayUrls), hasSecret: \(secret != nil)")
     }
     
     private func initNostrConnect(relay: String, options: NostrConnectOptions?) {
@@ -165,55 +179,118 @@ public actor NDKBunkerSigner: NDKSigner, @unchecked Sendable {
     
     /// Connect and authenticate with the bunker
     public func connect() async throws -> NDKUser {
+        print("[BunkerSigner] Starting connection process...")
+        
         if isConnected, let pubkey = userPubkey {
+            print("[BunkerSigner] Already connected with pubkey: \(pubkey)")
             return NDKUser(pubkey: pubkey)
         }
         
         // Handle NIP-05 flow
         if case .nip05(let nip05) = connectionType {
+            print("[BunkerSigner] Using NIP-05 flow for: \(nip05)")
             let user = try await NDKUser.fromNip05(nip05, ndk: ndk)
             self.userPubkey = user.pubkey
             if let nip46Urls = user.nip46Urls {
                 self.relayUrls = nip46Urls
+                print("[BunkerSigner] Found NIP-46 relays from NIP-05: \(nip46Urls)")
             }
             if bunkerPubkey == nil {
                 self.bunkerPubkey = user.pubkey
             }
         }
         
+        print("[BunkerSigner] Using relays: \(relayUrls)")
+        
+        // Ensure relays are added and connected
+        if !relayUrls.isEmpty {
+            print("[BunkerSigner] Adding and connecting to bunker relays...")
+            for relayUrl in relayUrls {
+                let relay = ndk.addRelay(relayUrl)
+                print("[BunkerSigner] Added relay: \(relayUrl), current state: \(relay.connectionState)")
+                
+                // Connect to the relay if not already connected
+                if relay.connectionState != .connected {
+                    print("[BunkerSigner] Connecting to relay: \(relayUrl)")
+                    do {
+                        try await relay.connect()
+                        print("[BunkerSigner] Successfully connected to relay: \(relayUrl)")
+                    } catch {
+                        print("[BunkerSigner] Failed to connect to relay \(relayUrl): \(error)")
+                    }
+                }
+            }
+            
+            // Wait a bit for connections to stabilize
+            try await Task.sleep(nanoseconds: 500_000_000) // 0.5 seconds
+        } else {
+            print("[BunkerSigner] WARNING: No relays specified for bunker connection!")
+        }
+        
         // Initialize RPC client
+        print("[BunkerSigner] Initializing RPC client with relays: \(relayUrls)")
         let rpcClient = NDKNostrRPC(ndk: ndk, localSigner: localSigner, relayUrls: relayUrls)
         self.rpcClient = rpcClient
         
         // Start listening for responses
+        print("[BunkerSigner] Starting to listen for responses...")
         try await startListening()
         
         // Handle different connection flows
         switch connectionType {
         case .nostrConnect:
+            print("[BunkerSigner] Using nostrConnect flow")
             return try await connectNostrConnect()
         default:
+            print("[BunkerSigner] Using bunker flow")
             return try await connectBunker()
         }
     }
     
     private func startListening() async throws {
-        guard subscription == nil else { return }
+        guard subscription == nil else {
+            print("[BunkerSigner] Already listening for responses")
+            return
+        }
         
         let localPubkey = try await localSigner.pubkey
+        print("[BunkerSigner] Setting up listener for local pubkey: \(localPubkey)")
+        
         let filter = NDKFilter(
             kinds: [24133], // NostrConnect kind
             tags: ["p": [localPubkey]]
         )
         
-        subscription = ndk.subscribe(filters: [filter])
+        print("[BunkerSigner] Creating subscription with filter: kinds=[\(filter.kinds?.map { String($0) }.joined(separator: ",") ?? "")], p=\(localPubkey)")
+        
+        // Create subscription with specific relays if available
+        if !relayUrls.isEmpty {
+            var options = NDKSubscriptionOptions()
+            let relayObjects = relayUrls.compactMap { url in
+                ndk.relays.first { $0.url == url }
+            }
+            options.relays = Set(relayObjects)
+            subscription = ndk.subscribe(filters: [filter], options: options)
+            print("[BunkerSigner] Subscription created for specific relays: \(relayUrls)")
+        } else {
+            subscription = ndk.subscribe(filters: [filter])
+            print("[BunkerSigner] Subscription created for all relays")
+        }
         
         // Listen for events
         subscription?.onEvent { [weak self] event in
             Task {
+                print("[BunkerSigner] Received event: kind=\(event.kind), from=\(event.pubkey)")
                 await self?.handleIncomingEvent(event)
             }
         }
+        
+        subscription?.onEOSE { 
+            print("[BunkerSigner] EOSE received from relay")
+        }
+        
+        subscription?.start()
+        print("[BunkerSigner] Subscription started")
     }
     
     private func connectNostrConnect() async throws -> NDKUser {
@@ -229,26 +306,36 @@ public actor NDKBunkerSigner: NDKSigner, @unchecked Sendable {
     
     private func connectBunker() async throws -> NDKUser {
         guard let bunkerPubkey = bunkerPubkey else {
+            print("[BunkerSigner] ERROR: Bunker pubkey not set!")
             throw NDKError.signerError("Bunker pubkey not set")
         }
         
+        print("[BunkerSigner] Connecting to bunker with pubkey: \(bunkerPubkey)")
+        
         let params = [userPubkey ?? "", secret ?? ""].filter { !$0.isEmpty }
+        let maskedParams = params.enumerated().map { index, param in
+            index == 1 && !param.isEmpty ? "***" : param
+        }
+        print("[BunkerSigner] Connect params: \(maskedParams)")
         
         return try await withCheckedThrowingContinuation { continuation in
             self.connectionContinuation = continuation
             
             Task {
                 do {
+                    print("[BunkerSigner] Sending connect request to bunker...")
                     try await rpcClient?.sendRequest(
                         to: bunkerPubkey,
                         method: "connect",
                         params: params
                     ) { [weak self] response in
                         Task {
+                            print("[BunkerSigner] Received response from bunker: result=\(response.result), error=\(response.error ?? "nil")")
                             await self?.handleConnectResponse(response)
                         }
                     }
                 } catch {
+                    print("[BunkerSigner] ERROR: Failed to send connect request: \(error)")
                     continuation.resume(throwing: error)
                 }
             }
@@ -260,7 +347,7 @@ public actor NDKBunkerSigner: NDKSigner, @unchecked Sendable {
             guard let rpcClient = rpcClient else { return }
             let parsed = try await rpcClient.parseEvent(event)
             
-            if let request = parsed as? NDKRPCRequest {
+            if parsed is NDKRPCRequest {
                 // Handle incoming requests (not implemented in this basic version)
             } else if let response = parsed as? NDKRPCResponse {
                 await handleResponse(response)
@@ -542,6 +629,8 @@ public actor NDKNostrRPC {
     
     func sendRequest(to pubkey: String, method: String, params: [String], handler: ((NDKRPCResponse) -> Void)? = nil) async throws {
         let id = UUID().uuidString.prefix(8).lowercased()
+        print("[RPC] Creating request - id: \(id), method: \(method), to: \(pubkey)")
+        
         let request: [String: Any] = [
             "id": id,
             "method": method,
@@ -550,9 +639,11 @@ public actor NDKNostrRPC {
         
         let requestData = try JSONSerialization.data(withJSONObject: request)
         let requestString = String(data: requestData, encoding: .utf8) ?? ""
+        print("[RPC] Request JSON: \(requestString)")
         
         let remoteUser = NDKUser(pubkey: pubkey)
         let encryptedContent = try await localSigner.encrypt(recipient: remoteUser, value: requestString, scheme: encryptionScheme)
+        print("[RPC] Encrypted content using scheme: \(encryptionScheme)")
         
         let localPubkey = try await localSigner.pubkey
         var event = NDKEvent(
@@ -564,17 +655,40 @@ public actor NDKNostrRPC {
         )
         
         try await localSigner.sign(event: &event)
+        print("[RPC] Created and signed event - id: \(event.id ?? "nil")")
         
         // Publish to specific relays if available
         if !relayUrls.isEmpty {
-            try await ndk.publish(event: event, to: Set(relayUrls))
+            print("[RPC] Publishing to specific relays: \(relayUrls)")
+            let publishedRelays = try await ndk.publish(event: event, to: Set(relayUrls))
+            print("[RPC] Published to relays: \(publishedRelays.map { $0.url })")
+            
+            if publishedRelays.isEmpty {
+                print("[RPC] WARNING: Failed to publish to any relay!")
+                // Try direct send as fallback
+                for url in relayUrls {
+                    if let relay = ndk.relays.first(where: { $0.url == url }) {
+                        print("[RPC] Attempting direct send to \(url)")
+                        do {
+                            let eventMessage = NostrMessage.event(subscriptionId: nil, event: event)
+                            try await relay.send(eventMessage.serialize())
+                            print("[RPC] Direct send successful to \(url)")
+                        } catch {
+                            print("[RPC] Direct send failed to \(url): \(error)")
+                        }
+                    }
+                }
+            }
         } else {
-            _ = try await ndk.publish(event)
+            print("[RPC] Publishing to all connected relays")
+            let publishedRelays = try await ndk.publish(event)
+            print("[RPC] Published to relays: \(publishedRelays.map { $0.url })")
         }
         
         // If handler provided, call it when response arrives
         if let handler = handler {
             Task {
+                print("[RPC] Waiting for response with id: \(id)")
                 let response = try await waitForResponse(id: id)
                 handler(response)
             }
