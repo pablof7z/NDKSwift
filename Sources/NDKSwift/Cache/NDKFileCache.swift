@@ -6,29 +6,29 @@ public final class NDKFileCache: NDKCacheAdapter {
     // Protocol requirements
     public var locking: Bool = false
     public var ready: Bool = true
-    
-    internal let cacheDirectory: URL
+
+    let cacheDirectory: URL
     private let eventsDirectory: URL
     private let profilesDirectory: URL
     private let unpublishedDirectory: URL
     private let decryptedDirectory: URL
     private let metadataFile: URL
-    
+
     // In-memory indexes for fast lookups
     private var eventIndex: [String: EventIndexEntry] = [:]
     private var profileIndex: [String: Date] = [:]
     private var tagIndex: [String: Set<String>] = [:] // tag:value -> Set of event IDs
     private var nip05Cache: [String: (pubkey: String, relays: [String], cachedAt: Date)] = [:]
     private var relayStatusCache: [String: NDKRelayConnectionState] = [:]
-    
+
     // Outbox support
-    internal var unpublishedEventIndex: [String: UnpublishedEventRecord] = [:]
-    internal var outboxItemIndex: [String: NDKOutboxItem] = [:]
-    internal var relayHealthCache: [String: RelayHealthMetrics] = [:]
-    
+    var unpublishedEventIndex: [String: UnpublishedEventRecord] = [:]
+    var outboxItemIndex: [String: NDKOutboxItem] = [:]
+    var relayHealthCache: [String: RelayHealthMetrics] = [:]
+
     // Thread safety
-    internal let queue = DispatchQueue(label: "com.ndkswift.filecache", attributes: .concurrent)
-    
+    let queue = DispatchQueue(label: "com.ndkswift.filecache", attributes: .concurrent)
+
     private struct EventIndexEntry {
         let id: String
         let pubkey: String
@@ -37,50 +37,50 @@ public final class NDKFileCache: NDKCacheAdapter {
         let tags: [[String]]
         let replaceableId: String?
     }
-    
+
     private struct CacheMetadata: Codable {
         var version: Int = 1
-        var lastUpdated: Date = Date()
+        var lastUpdated: Date = .init()
         var eventCount: Int = 0
         var profileCount: Int = 0
     }
-    
+
     public init(path: String = "ndk-file-cache") throws {
         // Get documents directory
         let documentsPath = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first!
         self.cacheDirectory = documentsPath.appendingPathComponent(path)
-        
+
         // Create subdirectories
         self.eventsDirectory = cacheDirectory.appendingPathComponent("events")
         self.profilesDirectory = cacheDirectory.appendingPathComponent("profiles")
         self.unpublishedDirectory = cacheDirectory.appendingPathComponent("unpublished")
         self.decryptedDirectory = cacheDirectory.appendingPathComponent("decrypted")
         self.metadataFile = cacheDirectory.appendingPathComponent("metadata.json")
-        
+
         // Create directories if they don't exist
         try FileManager.default.createDirectory(at: eventsDirectory, withIntermediateDirectories: true)
         try FileManager.default.createDirectory(at: profilesDirectory, withIntermediateDirectories: true)
         try FileManager.default.createDirectory(at: unpublishedDirectory, withIntermediateDirectories: true)
         try FileManager.default.createDirectory(at: decryptedDirectory, withIntermediateDirectories: true)
-        
+
         // Initialize outbox directories
         try initializeOutboxDirectories()
-        
+
         // Load indexes
         try loadIndexes()
     }
-    
+
     private func loadIndexes() throws {
         // Load event index
         let eventFiles = try FileManager.default.contentsOfDirectory(at: eventsDirectory, includingPropertiesForKeys: nil)
-        
+
         for file in eventFiles where file.pathExtension == "json" {
             if let data = try? Data(contentsOf: file),
                let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-               let event = NDKEvent.fromJSON(json) {
-                
+               let event = NDKEvent.fromJSON(json)
+            {
                 guard let eventId = event.id else { continue }
-                
+
                 let indexEntry = EventIndexEntry(
                     id: eventId,
                     pubkey: event.pubkey,
@@ -89,9 +89,9 @@ public final class NDKFileCache: NDKCacheAdapter {
                     tags: event.tags,
                     replaceableId: event.isReplaceable ? event.tagAddress : nil
                 )
-                
+
                 eventIndex[eventId] = indexEntry
-                
+
                 // Build tag index
                 for tag in event.tags where tag.count >= 2 && tag[0].count == 1 {
                     let key = "\(tag[0]):\(tag[1])"
@@ -102,10 +102,10 @@ public final class NDKFileCache: NDKCacheAdapter {
                 }
             }
         }
-        
+
         // Load profile index
         let profileFiles = try FileManager.default.contentsOfDirectory(at: profilesDirectory, includingPropertiesForKeys: nil)
-        
+
         for file in profileFiles where file.pathExtension == "json" {
             let pubkey = file.deletingPathExtension().lastPathComponent
             let attributes = try FileManager.default.attributesOfItem(atPath: file.path)
@@ -114,14 +114,14 @@ public final class NDKFileCache: NDKCacheAdapter {
             }
         }
     }
-    
+
     // MARK: - NDKCacheAdapter Protocol
-    
+
     public func query(subscription: NDKSubscription) async -> [NDKEvent] {
         return queue.sync { [self] in
             var results: [NDKEvent] = []
             var seenIds = Set<String>()
-            
+
             for filter in subscription.filters {
                 let matchingEvents = queryWithFilterSync(filter, subscription: subscription)
                 for event in matchingEvents {
@@ -132,19 +132,19 @@ public final class NDKFileCache: NDKCacheAdapter {
                     }
                 }
             }
-            
+
             return results
         }
     }
-    
-    private func queryWithFilterSync(_ filter: NDKFilter, subscription: NDKSubscription) -> [NDKEvent] {
+
+    private func queryWithFilterSync(_ filter: NDKFilter, subscription _: NDKSubscription) -> [NDKEvent] {
         var matchingIds = Set<String>()
-        
+
         // Start with all events if no specific filters
         if filter.ids == nil && filter.authors == nil && filter.kinds == nil && filter.tags == nil {
             matchingIds = Set(eventIndex.keys)
         }
-        
+
         // Filter by IDs
         if let ids = filter.ids {
             let idSet = Set(ids)
@@ -154,38 +154,38 @@ public final class NDKFileCache: NDKCacheAdapter {
                 matchingIds = matchingIds.intersection(idSet)
             }
         }
-        
+
         // Filter by authors
         if let authors = filter.authors {
             let authorEvents = eventIndex.values
                 .filter { authors.contains($0.pubkey) }
                 .map { $0.id }
-            
+
             if matchingIds.isEmpty {
                 matchingIds = Set(authorEvents)
             } else {
                 matchingIds = matchingIds.intersection(Set(authorEvents))
             }
         }
-        
+
         // Filter by kinds
         if let kinds = filter.kinds {
             let kindValues = Set(kinds)
             let kindEvents = eventIndex.values
                 .filter { kindValues.contains($0.kind) }
                 .map { $0.id }
-            
+
             if matchingIds.isEmpty {
                 matchingIds = Set(kindEvents)
             } else {
                 matchingIds = matchingIds.intersection(Set(kindEvents))
             }
         }
-        
+
         // Filter by tags
         if let tags = filter.tags {
             var tagMatchingIds = Set<String>()
-            
+
             for (tagName, tagValues) in tags {
                 if tagName.count == 1 {
                     for value in tagValues {
@@ -196,7 +196,7 @@ public final class NDKFileCache: NDKCacheAdapter {
                     }
                 }
             }
-            
+
             if !tagMatchingIds.isEmpty {
                 if matchingIds.isEmpty {
                     matchingIds = tagMatchingIds
@@ -205,13 +205,13 @@ public final class NDKFileCache: NDKCacheAdapter {
                 }
             }
         }
-        
+
         // Apply time filters and load events
         var events: [NDKEvent] = []
-        
+
         for id in matchingIds {
             guard let indexEntry = eventIndex[id] else { continue }
-            
+
             // Check time constraints
             if let since = filter.since, indexEntry.createdAt < since {
                 continue
@@ -219,67 +219,69 @@ public final class NDKFileCache: NDKCacheAdapter {
             if let until = filter.until, indexEntry.createdAt > until {
                 continue
             }
-            
+
             // Load event from file
             let eventFile = eventsDirectory.appendingPathComponent("\(id).json")
             if let data = try? Data(contentsOf: eventFile),
                let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-               let event = NDKEvent.fromJSON(json) {
-                
+               let event = NDKEvent.fromJSON(json)
+            {
                 // Double-check the event matches the filter
                 if filter.matches(event: event) {
                     events.append(event)
                 }
             }
         }
-        
+
         // Sort by created_at descending
         events.sort { $0.createdAt > $1.createdAt }
-        
+
         // Apply limit
         if let limit = filter.limit {
             events = Array(events.prefix(limit))
         }
-        
+
         return events
     }
-    
-    public func setEvent(_ event: NDKEvent, filters: [NDKFilter], relay: NDKRelay?) async {
+
+    public func setEvent(_ event: NDKEvent, filters _: [NDKFilter], relay _: NDKRelay?) async {
         await withCheckedContinuation { continuation in
             queue.async(flags: .barrier) {
                 let referenceId = event.isReplaceable ? event.tagAddress : event.id
-                
+
                 // Check if we already have a newer version
                 if event.isReplaceable {
                     if let existingEntry = self.eventIndex.values.first(where: { $0.replaceableId == referenceId }),
-                       existingEntry.createdAt >= event.createdAt {
+                       existingEntry.createdAt >= event.createdAt
+                    {
                         continuation.resume()
                         return
                     }
-                    
+
                     // Remove old replaceable event
                     if let oldEntry = self.eventIndex.values.first(where: { $0.replaceableId == referenceId }) {
                         self.removeEventSync(oldEntry.id)
                     }
                 }
-                
+
                 // Generate ID if needed
                 if event.id == nil {
                     _ = try? event.generateID()
                 }
-                
+
                 guard let eventId = event.id else {
                     continuation.resume()
                     return
                 }
-                
+
                 // Save event to file
                 let eventFile = self.eventsDirectory.appendingPathComponent("\(eventId).json")
                 if let json = event.toJSON(),
-                   let data = try? JSONSerialization.data(withJSONObject: json) {
+                   let data = try? JSONSerialization.data(withJSONObject: json)
+                {
                     try? data.write(to: eventFile)
                 }
-                
+
                 // Update index
                 let indexEntry = EventIndexEntry(
                     id: eventId,
@@ -290,7 +292,7 @@ public final class NDKFileCache: NDKCacheAdapter {
                     replaceableId: event.isReplaceable ? event.tagAddress : nil
                 )
                 self.eventIndex[eventId] = indexEntry
-                
+
                 // Update tag index
                 for tag in event.tags where tag.count >= 2 && tag[0].count == 1 {
                     let key = "\(tag[0]):\(tag[1])"
@@ -299,7 +301,7 @@ public final class NDKFileCache: NDKCacheAdapter {
                     }
                     self.tagIndex[key]?.insert(eventId)
                 }
-                
+
                 // Handle special event kinds
                 if event.kind == EventKind.deletion {
                     let eventIdsToDelete = event.tags
@@ -313,17 +315,17 @@ public final class NDKFileCache: NDKCacheAdapter {
                         self.saveProfileSync(pubkey: event.pubkey, profile: profile)
                     }
                 }
-                
+
                 continuation.resume()
             }
         }
     }
-    
+
     private func removeEventSync(_ eventId: String) {
         // Remove from indexes
         if let entry = eventIndex[eventId] {
             eventIndex.removeValue(forKey: eventId)
-            
+
             // Remove from tag index
             for tag in entry.tags where tag.count >= 2 && tag[0].count == 1 {
                 let key = "\(tag[0]):\(tag[1])"
@@ -333,20 +335,21 @@ public final class NDKFileCache: NDKCacheAdapter {
                 }
             }
         }
-        
+
         // Remove file
         let eventFile = eventsDirectory.appendingPathComponent("\(eventId).json")
         try? FileManager.default.removeItem(at: eventFile)
     }
-    
+
     public func fetchProfile(pubkey: String) async -> NDKUserProfile? {
         let profileFile = profilesDirectory.appendingPathComponent("\(pubkey).json")
-        
+
         guard let data = try? Data(contentsOf: profileFile),
-              let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+              let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
+        else {
             return nil
         }
-        
+
         return NDKUserProfile(
             name: json["name"] as? String,
             displayName: json["displayName"] as? String,
@@ -359,7 +362,7 @@ public final class NDKFileCache: NDKCacheAdapter {
             website: json["website"] as? String
         )
     }
-    
+
     public func saveProfile(pubkey: String, profile: NDKUserProfile) async {
         await withCheckedContinuation { continuation in
             queue.async(flags: .barrier) {
@@ -368,10 +371,10 @@ public final class NDKFileCache: NDKCacheAdapter {
             }
         }
     }
-    
+
     private func saveProfileSync(pubkey: String, profile: NDKUserProfile) {
         let profileFile = profilesDirectory.appendingPathComponent("\(pubkey).json")
-        
+
         var json: [String: Any] = [:]
         if let name = profile.name { json["name"] = name }
         if let displayName = profile.displayName { json["displayName"] = displayName }
@@ -382,31 +385,31 @@ public final class NDKFileCache: NDKCacheAdapter {
         if let lud16 = profile.lud16 { json["lud16"] = lud16 }
         if let lud06 = profile.lud06 { json["lud06"] = lud06 }
         if let website = profile.website { json["website"] = website }
-        
+
         if let data = try? JSONSerialization.data(withJSONObject: json) {
             try? data.write(to: profileFile)
             profileIndex[pubkey] = Date()
         }
     }
-    
+
     public func addUnpublishedEvent(_ event: NDKEvent, relayUrls: [String]) async {
         guard let eventId = event.id else { return }
         let unpublishedFile = unpublishedDirectory.appendingPathComponent("\(eventId).json")
-        
+
         let json: [String: Any] = [
             "event": event.toJSON() ?? [:],
             "relays": relayUrls,
-            "lastTryAt": Date().timeIntervalSince1970
+            "lastTryAt": Date().timeIntervalSince1970,
         ]
-        
+
         if let data = try? JSONSerialization.data(withJSONObject: json) {
             try? data.write(to: unpublishedFile)
         }
     }
-    
+
     public func getUnpublishedEvents() async -> [(event: NDKEvent, relays: [String], lastTryAt: Date)] {
         var results: [(event: NDKEvent, relays: [String], lastTryAt: Date)] = []
-        
+
         if let files = try? FileManager.default.contentsOfDirectory(at: unpublishedDirectory, includingPropertiesForKeys: nil) {
             for file in files where file.pathExtension == "json" {
                 if let data = try? Data(contentsOf: file),
@@ -414,8 +417,8 @@ public final class NDKFileCache: NDKCacheAdapter {
                    let eventJson = json["event"] as? [String: Any],
                    let event = NDKEvent.fromJSON(eventJson),
                    let relays = json["relays"] as? [String],
-                   let lastTryTimestamp = json["lastTryAt"] as? TimeInterval {
-                    
+                   let lastTryTimestamp = json["lastTryAt"] as? TimeInterval
+                {
                     results.append((
                         event: event,
                         relays: relays,
@@ -424,15 +427,15 @@ public final class NDKFileCache: NDKCacheAdapter {
                 }
             }
         }
-        
+
         return results
     }
-    
+
     public func discardUnpublishedEvent(_ eventId: String) async {
         let unpublishedFile = unpublishedDirectory.appendingPathComponent("\(eventId).json")
         try? FileManager.default.removeItem(at: unpublishedFile)
     }
-    
+
     public func clear() async {
         await withCheckedContinuation { continuation in
             queue.async(flags: .barrier) {
@@ -441,80 +444,83 @@ public final class NDKFileCache: NDKCacheAdapter {
                 try? FileManager.default.removeItem(at: self.profilesDirectory)
                 try? FileManager.default.removeItem(at: self.unpublishedDirectory)
                 try? FileManager.default.removeItem(at: self.decryptedDirectory)
-                
+
                 // Recreate directories
                 try? FileManager.default.createDirectory(at: self.eventsDirectory, withIntermediateDirectories: true)
                 try? FileManager.default.createDirectory(at: self.profilesDirectory, withIntermediateDirectories: true)
                 try? FileManager.default.createDirectory(at: self.unpublishedDirectory, withIntermediateDirectories: true)
                 try? FileManager.default.createDirectory(at: self.decryptedDirectory, withIntermediateDirectories: true)
-                
+
                 // Clear indexes
                 self.eventIndex.removeAll()
                 self.profileIndex.removeAll()
                 self.tagIndex.removeAll()
-                
+
                 continuation.resume()
             }
         }
     }
-    
+
     // MARK: - Additional Methods
-    
+
     public func getDecryptedEvent(eventId: String) async -> NDKEvent? {
         let decryptedFile = decryptedDirectory.appendingPathComponent("\(eventId).json")
-        
+
         guard let data = try? Data(contentsOf: decryptedFile),
               let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-              let event = NDKEvent.fromJSON(json) else {
+              let event = NDKEvent.fromJSON(json)
+        else {
             return nil
         }
-        
+
         return event
     }
-    
+
     public func addDecryptedEvent(_ event: NDKEvent) async {
         guard let eventId = event.id else { return }
         let decryptedFile = decryptedDirectory.appendingPathComponent("\(eventId).json")
-        
+
         if let json = event.toJSON(),
-           let data = try? JSONSerialization.data(withJSONObject: json) {
+           let data = try? JSONSerialization.data(withJSONObject: json)
+        {
             try? data.write(to: decryptedFile)
         }
     }
-    
+
     // MARK: - Additional Protocol Methods
-    
+
     public func loadNip05(_ nip05: String) async -> (pubkey: PublicKey, relays: [String])? {
         return queue.sync {
             if let cached = nip05Cache[nip05],
-               Date().timeIntervalSince(cached.cachedAt) < 3600 { // Cache for 1 hour
+               Date().timeIntervalSince(cached.cachedAt) < 3600
+            { // Cache for 1 hour
                 return (pubkey: cached.pubkey, relays: cached.relays)
             }
             return nil
         }
     }
-    
+
     public func saveNip05(_ nip05: String, pubkey: PublicKey, relays: [String]) async {
         queue.async(flags: .barrier) {
             self.nip05Cache[nip05] = (pubkey: pubkey, relays: relays, cachedAt: Date())
         }
     }
-    
+
     public func updateRelayStatus(_ url: RelayURL, status: NDKRelayConnectionState) async {
         queue.async(flags: .barrier) {
             self.relayStatusCache[url] = status
         }
     }
-    
+
     public func getRelayStatus(_ url: RelayURL) async -> NDKRelayConnectionState? {
         return queue.sync {
             relayStatusCache[url]
         }
     }
-    
+
     public func getUnpublishedEvents(for relayUrl: RelayURL) async -> [NDKEvent] {
         var results: [NDKEvent] = []
-        
+
         if let files = try? FileManager.default.contentsOfDirectory(at: unpublishedDirectory, includingPropertiesForKeys: nil) {
             for file in files where file.pathExtension == "json" {
                 if let data = try? Data(contentsOf: file),
@@ -522,25 +528,26 @@ public final class NDKFileCache: NDKCacheAdapter {
                    let eventJson = json["event"] as? [String: Any],
                    let event = NDKEvent.fromJSON(eventJson),
                    let relays = json["relays"] as? [String],
-                   relays.contains(relayUrl) {
+                   relays.contains(relayUrl)
+                {
                     results.append(event)
                 }
             }
         }
-        
+
         return results
     }
-    
+
     public func removeUnpublishedEvent(_ eventId: EventID, from relayUrl: RelayURL) async {
         let unpublishedFile = unpublishedDirectory.appendingPathComponent("\(eventId).json")
-        
+
         // Read the file to check if we should remove it entirely or just update the relay list
         if let data = try? Data(contentsOf: unpublishedFile),
            let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-           var relays = json["relays"] as? [String] {
-            
+           var relays = json["relays"] as? [String]
+        {
             relays.removeAll { $0 == relayUrl }
-            
+
             if relays.isEmpty {
                 // Remove the file entirely if no relays left
                 try? FileManager.default.removeItem(at: unpublishedFile)
@@ -548,7 +555,7 @@ public final class NDKFileCache: NDKCacheAdapter {
                 // Update the file with remaining relays
                 var updatedJson = json
                 updatedJson["relays"] = relays
-                
+
                 if let updatedData = try? JSONSerialization.data(withJSONObject: updatedJson) {
                     try? updatedData.write(to: unpublishedFile)
                 }
@@ -568,30 +575,31 @@ extension NDKEvent {
             "kind": kind,
             "content": content,
             "tags": tags,
-            "sig": sig ?? ""
+            "sig": sig ?? "",
         ]
     }
-    
+
     static func fromJSON(_ json: [String: Any]) -> NDKEvent? {
         guard let pubkey = json["pubkey"] as? String,
               let createdAt = json["created_at"] as? Int,
               let kindValue = json["kind"] as? Int,
               let content = json["content"] as? String,
-              let tags = json["tags"] as? [[String]] else {
+              let tags = json["tags"] as? [[String]]
+        else {
             return nil
         }
-        
+
         let event = NDKEvent(
             pubkey: pubkey,
             createdAt: Timestamp(createdAt),
             kind: Kind(kindValue),
             content: content
         )
-        
+
         event.id = json["id"] as? String ?? ""
         event.sig = json["sig"] as? String
         event.tags = tags
-        
+
         return event
     }
 }
@@ -601,13 +609,14 @@ extension NDKEvent {
 extension NDKUserProfile {
     static func fromMetadataEvent(_ event: NDKEvent) -> NDKUserProfile? {
         guard event.kind == EventKind.metadata else { return nil }
-        
+
         do {
             guard let data = event.content.data(using: .utf8),
-                  let json = try JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+                  let json = try JSONSerialization.jsonObject(with: data) as? [String: Any]
+            else {
                 return nil
             }
-            
+
             return NDKUserProfile(
                 name: json["name"] as? String,
                 displayName: json["display_name"] as? String,

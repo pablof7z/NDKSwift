@@ -1,8 +1,5 @@
 #!/usr/bin/env swift
 
-// Standalone NDKSwift Demo - demonstrates functionality without requiring compilation
-// This shows the key APIs and patterns for using NDKSwift
-
 import Foundation
 
 print("🚀 NDKSwift Standalone Demo")
@@ -199,7 +196,7 @@ print("// Run tests with: swift test")
 print("")
 print("Test suites:")
 print("• Bech32Tests: 9/9 tests ✅")
-print("• NDKEventTests: 8/8 tests ✅") 
+print("• NDKEventTests: 8/8 tests ✅")
 print("• NDKFilterTests: 9/9 tests ✅")
 print("• NDKSubscriptionTests: 16/16 tests ✅")
 print("• NDKUserTests: 8/8 tests ✅")

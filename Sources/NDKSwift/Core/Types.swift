@@ -82,7 +82,7 @@ public struct NDKImetaTag {
     public var size: String?
     public var fallback: [String]?
     public var additionalFields: [String: String] = [:]
-    
+
     public init(
         url: String? = nil,
         blurhash: String? = nil,
@@ -136,7 +136,7 @@ public enum NDKError: Error, LocalizedError, Equatable {
     case invalidPaymentRequest
     case signerError(String)
     case invalidEvent(String)
-    
+
     public var errorDescription: String? {
         switch self {
         case .invalidPublicKey:
@@ -153,11 +153,11 @@ public enum NDKError: Error, LocalizedError, Equatable {
             return "Failed to verify signature"
         case .invalidFilter:
             return "Invalid filter configuration"
-        case .relayConnectionFailed(let message):
+        case let .relayConnectionFailed(message):
             return "Relay connection failed: \(message)"
-        case .subscriptionFailed(let message):
+        case let .subscriptionFailed(message):
             return "Subscription failed: \(message)"
-        case .cacheFailed(let message):
+        case let .cacheFailed(message):
             return "Cache operation failed: \(message)"
         case .timeout:
             return "Operation timed out"
@@ -165,9 +165,9 @@ public enum NDKError: Error, LocalizedError, Equatable {
             return "Operation was cancelled"
         case .notImplemented:
             return "Feature not implemented"
-        case .custom(let message):
+        case let .custom(message):
             return message
-        case .validation(let message):
+        case let .validation(message):
             return "Validation error: \(message)"
         case .walletNotConfigured:
             return "Wallet not configured"
@@ -177,9 +177,9 @@ public enum NDKError: Error, LocalizedError, Equatable {
             return "Failed to generate proof of work"
         case .invalidPaymentRequest:
             return "Invalid payment request"
-        case .signerError(let message):
+        case let .signerError(message):
             return "Signer error: \(message)"
-        case .invalidEvent(let message):
+        case let .invalidEvent(message):
             return "Invalid event: \(message)"
         }
     }

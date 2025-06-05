@@ -9,7 +9,7 @@ public struct BlossomServer: Codable, Sendable {
     public let description: String?
     public let supportedMimeTypes: [String]?
     public let maxFileSize: Int64?
-    
+
     public init(
         url: String,
         name: String? = nil,
@@ -32,7 +32,7 @@ public struct BlossomBlob: Codable, Sendable {
     public let size: Int64
     public let type: String?
     public let uploaded: Date
-    
+
     public init(
         sha256: String,
         url: String,
@@ -55,7 +55,7 @@ public struct BlossomUploadDescriptor: Codable {
     public let size: Int64
     public let type: String?
     public let uploaded: Int64
-    
+
     enum CodingKeys: String, CodingKey {
         case url
         case sha256
@@ -68,7 +68,7 @@ public struct BlossomUploadDescriptor: Codable {
 /// List response for BUD-03
 public struct BlossomListResponse: Codable {
     public let blobs: [BlossomListItem]
-    
+
     public struct BlossomListItem: Codable {
         public let sha256: String
         public let size: Int64
@@ -80,11 +80,11 @@ public struct BlossomListResponse: Codable {
 /// Authorization for Blossom operations
 public struct BlossomAuth {
     public let event: NDKEvent
-    
+
     public init(event: NDKEvent) {
         self.event = event
     }
-    
+
     /// Create authorization event for upload
     public static func createUploadAuth(
         sha256: String,
@@ -96,17 +96,17 @@ public struct BlossomAuth {
         var tags: [[String]] = [
             ["t", "upload"],
             ["x", sha256],
-            ["size", String(size)]
+            ["size", String(size)],
         ]
-        
+
         if let mimeType = mimeType {
             tags.append(["type", mimeType])
         }
-        
+
         if let expiration = expiration {
             tags.append(["expiration", String(Int(expiration.timeIntervalSince1970))])
         }
-        
+
         let pubkey = try await signer.pubkey
         var event = NDKEvent(
             pubkey: pubkey,
@@ -115,14 +115,14 @@ public struct BlossomAuth {
             tags: tags,
             content: "Authorize upload"
         )
-        
+
         // Generate ID and sign
         _ = try event.generateID()
         event.sig = try await signer.sign(event)
-        
+
         return BlossomAuth(event: event)
     }
-    
+
     /// Create authorization event for delete
     public static func createDeleteAuth(
         sha256: String,
@@ -131,9 +131,9 @@ public struct BlossomAuth {
     ) async throws -> BlossomAuth {
         var tags: [[String]] = [
             ["t", "delete"],
-            ["x", sha256]
+            ["x", sha256],
         ]
-        
+
         let pubkey = try await signer.pubkey
         var event = NDKEvent(
             pubkey: pubkey,
@@ -142,14 +142,14 @@ public struct BlossomAuth {
             tags: tags,
             content: reason ?? "Delete blob"
         )
-        
+
         // Generate ID and sign
         _ = try event.generateID()
         event.sig = try await signer.sign(event)
-        
+
         return BlossomAuth(event: event)
     }
-    
+
     /// Create authorization event for list
     public static func createListAuth(
         signer: NDKSigner,
@@ -157,17 +157,17 @@ public struct BlossomAuth {
         until: Date? = nil
     ) async throws -> BlossomAuth {
         var tags: [[String]] = [
-            ["t", "list"]
+            ["t", "list"],
         ]
-        
+
         if let since = since {
             tags.append(["since", String(Int(since.timeIntervalSince1970))])
         }
-        
+
         if let until = until {
             tags.append(["until", String(Int(until.timeIntervalSince1970))])
         }
-        
+
         let pubkey = try await signer.pubkey
         var event = NDKEvent(
             pubkey: pubkey,
@@ -176,14 +176,14 @@ public struct BlossomAuth {
             tags: tags,
             content: "List blobs"
         )
-        
+
         // Generate ID and sign
         _ = try event.generateID()
         event.sig = try await signer.sign(event)
-        
+
         return BlossomAuth(event: event)
     }
-    
+
     /// Get base64-encoded authorization header value
     public func authorizationHeaderValue() throws -> String {
         let eventJSON = try event.serialize()
@@ -204,7 +204,7 @@ public enum BlossomError: LocalizedError {
     case uploadFailed(String)
     case networkError(Error)
     case invalidSHA256
-    
+
     public var errorDescription: String? {
         switch self {
         case .invalidURL:
@@ -213,7 +213,7 @@ public enum BlossomError: LocalizedError {
             return "Invalid response from Blossom server"
         case .unauthorized:
             return "Unauthorized - invalid or expired authorization"
-        case .serverError(let code, let message):
+        case let .serverError(code, message):
             return "Server error \(code): \(message ?? "Unknown error")"
         case .fileTooLarge:
             return "File exceeds maximum size limit"
@@ -221,9 +221,9 @@ public enum BlossomError: LocalizedError {
             return "File type not supported by this server"
         case .blobNotFound:
             return "Blob not found on server"
-        case .uploadFailed(let message):
+        case let .uploadFailed(message):
             return "Upload failed: \(message)"
-        case .networkError(let error):
+        case let .networkError(error):
             return "Network error: \(error.localizedDescription)"
         case .invalidSHA256:
             return "Invalid SHA256 hash"
@@ -242,7 +242,7 @@ public struct BlossomServerDescriptor: Codable {
     public let listUrl: String?
     public let deleteUrl: String?
     public let mirrorUrl: String?
-    
+
     enum CodingKeys: String, CodingKey {
         case name
         case description

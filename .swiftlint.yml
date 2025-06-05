@@ -56,7 +56,7 @@ excluded:
   - fastlane
   - vendor
   - DerivedData
-  - **/generated/**
+  - "generated/**"
 
 # Analyzer rules - helps find deeper issues
 analyzer_rules:

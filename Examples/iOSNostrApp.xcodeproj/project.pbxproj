@@ -346,7 +346,7 @@
 /* Begin XCLocalSwiftPackageReference section */
 		270C749F2DEDFF540087D858 /* XCLocalSwiftPackageReference "../../NDKSwift" */ = {
 			isa = XCLocalSwiftPackageReference;
-			relativePath = ../../NDKSwift;
+			relativePath = ..;
 		};
 /* End XCLocalSwiftPackageReference section */
 

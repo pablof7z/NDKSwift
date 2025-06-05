@@ -1,5 +1,5 @@
-import SwiftUI
 import NDKSwift
+import SwiftUI
 
 struct ContentView: View {
     @StateObject private var viewModel = NostrViewModel()
@@ -12,7 +12,7 @@ struct ContentView: View {
     @State private var showingRelaySheet = false
     @State private var showingNsecInput = false
     @State private var nsecInput = ""
-    
+
     var body: some View {
         NavigationView {
             VStack(spacing: 20) {
@@ -23,14 +23,6 @@ struct ContentView: View {
                 }
             }
             .navigationTitle("Nostr App")
-            .alert("Your Private Key", isPresented: $viewModel.accountCreated) {
-                Button("Copy", action: {
-                    UIPasteboard.general.string = viewModel.nsec
-                })
-                Button("OK", role: .cancel) {}
-            } message: {
-                Text("Keep this secret and secure!\n\n\(viewModel.nsec)")
-            }
             .sheet(isPresented: $showingBunkerInput) {
                 bunkerInputView
             }
@@ -55,36 +47,36 @@ struct ContentView: View {
             }
         }
     }
-    
+
     private var loginView: some View {
         VStack(spacing: 20) {
             Text("Welcome to Nostr")
                 .font(.largeTitle)
                 .fontWeight(.bold)
-            
+
             Text("Create an account or login")
                 .font(.headline)
                 .foregroundColor(.secondary)
-            
+
             createAccountButton
-            
+
             Text("OR")
                 .font(.headline)
                 .foregroundColor(.secondary)
-            
+
             loginWithNsecButton
-            
+
             Text("OR")
                 .font(.headline)
                 .foregroundColor(.secondary)
-            
+
             bunkerLoginButton
-            
+
             bunkerConnectionStatus
-            
+
             // Show status messages on login screen too
             statusMessages
-            
+
             // Debug info for login screen
             if !viewModel.nsec.isEmpty {
                 Text("DEBUG: nsec exists - should show main view!")
@@ -95,7 +87,7 @@ struct ContentView: View {
         }
         .padding()
     }
-    
+
     private var createAccountButton: some View {
         Button(action: {
             viewModel.createAccount()
@@ -108,7 +100,7 @@ struct ContentView: View {
                 .cornerRadius(10)
         }
     }
-    
+
     private var loginWithNsecButton: some View {
         Button(action: {
             showingNsecInput = true
@@ -121,7 +113,7 @@ struct ContentView: View {
                 .cornerRadius(10)
         }
     }
-    
+
     private var bunkerLoginButton: some View {
         Button(action: {
             showingBunkerInput = true
@@ -134,7 +126,7 @@ struct ContentView: View {
                 .cornerRadius(10)
         }
     }
-    
+
     @ViewBuilder
     private var bunkerConnectionStatus: some View {
         if viewModel.isBunkerConnecting {
@@ -143,7 +135,7 @@ struct ContentView: View {
                     ProgressView()
                     Text("Connecting to bunker...")
                 }
-                
+
                 // Show more detailed status
                 if !viewModel.statusMessage.isEmpty {
                     Text(viewModel.statusMessage)
@@ -151,7 +143,7 @@ struct ContentView: View {
                         .foregroundColor(.secondary)
                         .multilineTextAlignment(.center)
                 }
-                
+
                 // Show relay connection status
                 if !viewModel.connectedRelays.isEmpty {
                     VStack(alignment: .leading, spacing: 4) {
@@ -177,10 +169,11 @@ struct ContentView: View {
             .padding()
         }
     }
-    
+
     private var mainView: some View {
         VStack(alignment: .leading, spacing: 20) {
             accountInfoSection
+            subscriptionSection
             messageComposer
             relayStatusSection
             if viewModel.lastPublishedEvent != nil {
@@ -190,12 +183,12 @@ struct ContentView: View {
             Spacer()
         }
     }
-    
+
     private var accountInfoSection: some View {
         VStack(alignment: .leading, spacing: 10) {
             Text("Your Account")
                 .font(.headline)
-            
+
             HStack {
                 Text("Public Key (npub):")
                     .font(.caption)
@@ -209,7 +202,7 @@ struct ContentView: View {
                         UIPasteboard.general.string = viewModel.npub
                     }
             }
-            
+
             HStack {
                 Text("Public Key (hex):")
                     .font(.caption)
@@ -223,7 +216,7 @@ struct ContentView: View {
                         UIPasteboard.general.string = viewModel.pubkey
                     }
             }
-            
+
             if viewModel.isConnectedViaBunker {
                 Text("Connected via Bunker")
                     .font(.caption)
@@ -240,12 +233,60 @@ struct ContentView: View {
         .background(Color.gray.opacity(0.1))
         .cornerRadius(10)
     }
+
+    private var subscriptionSection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack {
+                Text("Event Subscription")
+                    .font(.headline)
+                Spacer()
+                if viewModel.hasActiveSubscription {
+                    Button("Stop") {
+                        viewModel.stopKind1Subscription()
+                    }
+                    .font(.caption)
+                    .foregroundColor(.red)
+                } else {
+                    Button("Start") {
+                        viewModel.startKind1Subscription()
+                    }
+                    .font(.caption)
+                    .foregroundColor(.blue)
+                }
+            }
+            
+            HStack {
+                Image(systemName: "doc.text")
+                    .foregroundColor(.blue)
+                Text("Kind 1 (Text Notes) Events:")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+                Text("\(viewModel.kind1EventCount)")
+                    .font(.headline)
+                    .foregroundColor(.blue)
+                Spacer()
+                if viewModel.isSubscribing {
+                    ProgressView()
+                        .scaleEffect(0.7)
+                }
+            }
+            
+            if viewModel.kind1EventCount > 0 {
+                Text("Receiving real-time text notes from connected relays")
+                    .font(.caption2)
+                    .foregroundColor(.green)
+            }
+        }
+        .padding()
+        .background(Color.blue.opacity(0.1))
+        .cornerRadius(10)
+    }
     
     private var messageComposer: some View {
         VStack(alignment: .leading, spacing: 10) {
             Text("Publish Message")
                 .font(.headline)
-            
+
             TextEditor(text: $messageText)
                 .frame(height: 100)
                 .padding(4)
@@ -253,7 +294,7 @@ struct ContentView: View {
                     RoundedRectangle(cornerRadius: 8)
                         .stroke(Color.gray.opacity(0.3))
                 )
-            
+
             Button(action: {
                 viewModel.publishMessage(messageText)
                 messageText = ""
@@ -270,7 +311,7 @@ struct ContentView: View {
         }
         .padding()
     }
-    
+
     private var relayStatusSection: some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack {
@@ -283,7 +324,7 @@ struct ContentView: View {
                 .font(.caption)
                 .foregroundColor(.blue)
             }
-            
+
             if viewModel.connectedRelays.isEmpty {
                 Text("No relays added")
                     .font(.caption)
@@ -309,12 +350,12 @@ struct ContentView: View {
         .background(Color.gray.opacity(0.1))
         .cornerRadius(10)
     }
-    
+
     private var publishStatusSection: some View {
         VStack(alignment: .leading, spacing: 10) {
             Text("Publish Status")
                 .font(.headline)
-            
+
             ScrollView {
                 VStack(alignment: .leading, spacing: 4) {
                     ForEach(viewModel.publishedEventRelayStatuses, id: \.relay) { status in
@@ -324,11 +365,11 @@ struct ContentView: View {
                                 .lineLimit(1)
                                 .truncationMode(.middle)
                                 .frame(maxWidth: .infinity, alignment: .leading)
-                            
+
                             Text(status.status)
                                 .font(.caption)
                                 .foregroundColor(.secondary)
-                            
+
                             if let okMessage = status.okMessage {
                                 Text("(\(okMessage))")
                                     .font(.caption2)
@@ -346,7 +387,7 @@ struct ContentView: View {
         .background(Color.gray.opacity(0.1))
         .cornerRadius(10)
     }
-    
+
     @ViewBuilder
     private var statusMessages: some View {
         if viewModel.isPublishing {
@@ -356,7 +397,7 @@ struct ContentView: View {
             }
             .padding()
         }
-        
+
         if !viewModel.statusMessage.isEmpty {
             Text(viewModel.statusMessage)
                 .font(.caption)
@@ -364,23 +405,23 @@ struct ContentView: View {
                 .padding()
         }
     }
-    
+
     private var bunkerInputView: some View {
         NavigationView {
             VStack(spacing: 20) {
                 Text("Enter Bunker URL")
                     .font(.headline)
-                
+
                 Text("Paste your bunker:// connection string")
                     .font(.caption)
                     .foregroundColor(.secondary)
-                
+
                 TextField("bunker://...", text: $bunkerUrl)
                     .textFieldStyle(RoundedBorderTextFieldStyle())
                     .autocapitalization(.none)
                     .disableAutocorrection(true)
                     .padding()
-                
+
                 VStack(alignment: .leading, spacing: 4) {
                     Text("Example:")
                         .font(.caption)
@@ -391,7 +432,7 @@ struct ContentView: View {
                         .lineLimit(nil)
                 }
                 .padding(.horizontal)
-                
+
                 Spacer()
             }
             .navigationTitle("Bunker Login")
@@ -408,23 +449,23 @@ struct ContentView: View {
             )
         }
     }
-    
+
     private var nsecInputView: some View {
         NavigationView {
             VStack(spacing: 20) {
                 Text("Enter Your Private Key")
                     .font(.headline)
-                
+
                 Text("Paste your nsec private key to login")
                     .font(.caption)
                     .foregroundColor(.secondary)
-                
+
                 SecureField("nsec1...", text: $nsecInput)
                     .textFieldStyle(RoundedBorderTextFieldStyle())
                     .autocapitalization(.none)
                     .disableAutocorrection(true)
                     .padding()
-                
+
                 VStack(alignment: .leading, spacing: 8) {
                     Text("Security Notice:")
                         .font(.caption)
@@ -441,7 +482,7 @@ struct ContentView: View {
                         .foregroundColor(.secondary)
                 }
                 .padding(.horizontal)
-                
+
                 Spacer()
             }
             .navigationTitle("Login with nsec")
@@ -460,23 +501,23 @@ struct ContentView: View {
             )
         }
     }
-    
+
     private var relaySheetView: some View {
         NavigationView {
             VStack(spacing: 20) {
                 Text("Add New Relay")
                     .font(.headline)
-                
+
                 Text("Enter the WebSocket URL of the relay")
                     .font(.caption)
                     .foregroundColor(.secondary)
-                
+
                 TextField("wss://relay.example.com", text: $newRelayUrl)
                     .textFieldStyle(RoundedBorderTextFieldStyle())
                     .autocapitalization(.none)
                     .disableAutocorrection(true)
                     .padding()
-                
+
                 Spacer()
             }
             .navigationTitle("Add Relay")
@@ -503,7 +544,7 @@ struct RelayRowView: View {
     let onRemove: () -> Void
     let onConnect: () -> Void
     let onDisconnect: () -> Void
-    
+
     var body: some View {
         HStack {
             VStack(alignment: .leading, spacing: 2) {
@@ -511,16 +552,16 @@ struct RelayRowView: View {
                     .font(.caption)
                     .lineLimit(1)
                     .truncationMode(.middle)
-                
+
                 HStack {
                     Circle()
                         .fill(relay.statusColor)
                         .frame(width: 8, height: 8)
-                    
+
                     Text(relay.statusText)
                         .font(.caption2)
                         .foregroundColor(.secondary)
-                    
+
                     if relay.connectionState == .connected {
                         Text("↑\(relay.messagesSent) ↓\(relay.messagesReceived)")
                             .font(.caption2)
@@ -528,9 +569,9 @@ struct RelayRowView: View {
                     }
                 }
             }
-            
+
             Spacer()
-            
+
             HStack(spacing: 8) {
                 // Connect/Disconnect button
                 if relay.connectionState == .connected {
@@ -549,7 +590,7 @@ struct RelayRowView: View {
                             .foregroundColor(.blue)
                     }
                 }
-                
+
                 // Remove button
                 Button(action: onRemove) {
                     Image(systemName: "trash")
