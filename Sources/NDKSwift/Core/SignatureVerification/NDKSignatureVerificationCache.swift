@@ -5,17 +5,17 @@ import Foundation
 actor NDKSignatureVerificationCache {
     /// Cache of verified signatures: eventId -> signature
     private var verifiedSignatures: [EventID: Signature] = [:]
-    
+
     /// Maximum number of signatures to cache
     private let maxCacheSize: Int
-    
+
     /// Order of insertion for LRU eviction
     private var insertionOrder: [EventID] = []
-    
+
     public init(maxCacheSize: Int = 10000) {
         self.maxCacheSize = maxCacheSize
     }
-    
+
     /// Check if an event signature has been verified
     /// - Parameters:
     ///   - eventId: The event ID to check
@@ -27,7 +27,7 @@ actor NDKSignatureVerificationCache {
         }
         return cachedSignature == signature
     }
-    
+
     /// Add a verified signature to the cache
     /// - Parameters:
     ///   - eventId: The event ID
@@ -40,11 +40,11 @@ actor NDKSignatureVerificationCache {
             insertionOrder.append(eventId)
             return
         }
-        
+
         // Add new signature
         verifiedSignatures[eventId] = signature
         insertionOrder.append(eventId)
-        
+
         // Evict oldest if cache is full
         if insertionOrder.count > maxCacheSize {
             if let oldestEventId = insertionOrder.first {
@@ -53,13 +53,13 @@ actor NDKSignatureVerificationCache {
             }
         }
     }
-    
+
     /// Clear the entire cache
     public func clear() {
         verifiedSignatures.removeAll()
         insertionOrder.removeAll()
     }
-    
+
     /// Get cache statistics
     public func getStats() -> (cacheSize: Int, hitRate: Double) {
         let cacheSize = verifiedSignatures.count

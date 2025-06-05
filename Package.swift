@@ -9,13 +9,14 @@ let package = Package(
         .iOS(.v15),
         .macOS(.v12),
         .tvOS(.v15),
-        .watchOS(.v8)
+        .watchOS(.v8),
     ],
     products: [
         // Products define the executables and libraries a package produces, making them visible to other packages.
         .library(
             name: "NDKSwift",
-            targets: ["NDKSwift"]),
+            targets: ["NDKSwift"]
+        ),
     ],
     dependencies: [
         .package(url: "https://github.com/krzyzanowskim/CryptoSwift.git", from: "1.8.0"),
@@ -29,9 +30,11 @@ let package = Package(
             dependencies: [
                 .product(name: "CryptoSwift", package: "CryptoSwift"),
                 .product(name: "P256K", package: "secp256k1.swift"),
-            ]),
+            ]
+        ),
         .testTarget(
             name: "NDKSwiftTests",
-            dependencies: ["NDKSwift"]),
+            dependencies: ["NDKSwift"]
+        ),
     ]
 )

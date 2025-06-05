@@ -8,21 +8,21 @@ public final class NDKInMemoryCache: NDKCacheAdapter {
     private var nip05Cache: [String: (pubkey: PublicKey, relays: [String])] = [:]
     private var relayStatus: [RelayURL: NDKRelayConnectionState] = [:]
     private var unpublishedEvents: [RelayURL: Set<EventID>] = [:]
-    
+
     private let queue = DispatchQueue(label: "com.ndkswift.inmemorycache", attributes: .concurrent)
-    
+
     public var locking: Bool { true }
     public var ready: Bool { true }
-    
+
     public init() {}
-    
+
     // MARK: - Event Management
-    
+
     public func query(subscription: NDKSubscription) async -> [NDKEvent] {
         return await withCheckedContinuation { continuation in
             queue.async {
                 var results = Set<NDKEvent>()
-                
+
                 for filter in subscription.filters {
                     // Get all events that match this filter
                     let filterKey = self.filterKey(from: filter)
@@ -33,7 +33,7 @@ public final class NDKInMemoryCache: NDKCacheAdapter {
                             }
                         }
                     }
-                    
+
                     // Also check all events if filter is broad
                     if self.isBroadFilter(filter) {
                         for event in self.events.values {
@@ -43,20 +43,20 @@ public final class NDKInMemoryCache: NDKCacheAdapter {
                         }
                     }
                 }
-                
+
                 continuation.resume(returning: Array(results))
             }
         }
     }
-    
-    public func setEvent(_ event: NDKEvent, filters: [NDKFilter], relay: NDKRelay?) async {
+
+    public func setEvent(_ event: NDKEvent, filters: [NDKFilter], relay _: NDKRelay?) async {
         guard let eventId = event.id else { return }
-        
+
         await withCheckedContinuation { continuation in
             queue.async(flags: .barrier) {
                 // Store the event
                 self.events[eventId] = event
-                
+
                 // Index by filters
                 for filter in filters {
                     let key = self.filterKey(from: filter)
@@ -65,17 +65,17 @@ public final class NDKInMemoryCache: NDKCacheAdapter {
                     }
                     self.eventsByFilter[key]?.insert(eventId)
                 }
-                
+
                 // Index by common queries
                 self.indexEvent(event)
-                
+
                 continuation.resume()
             }
         }
     }
-    
+
     // MARK: - Profile Management
-    
+
     public func fetchProfile(pubkey: PublicKey) async -> NDKUserProfile? {
         return await withCheckedContinuation { continuation in
             queue.async {
@@ -87,7 +87,7 @@ public final class NDKInMemoryCache: NDKCacheAdapter {
             }
         }
     }
-    
+
     public func saveProfile(pubkey: PublicKey, profile: NDKUserProfile) async {
         await withCheckedContinuation { continuation in
             queue.async(flags: .barrier) {
@@ -100,9 +100,9 @@ public final class NDKInMemoryCache: NDKCacheAdapter {
             }
         }
     }
-    
+
     // MARK: - NIP-05 Management
-    
+
     public func loadNip05(_ nip05: String) async -> (pubkey: PublicKey, relays: [String])? {
         return await withCheckedContinuation { continuation in
             queue.async {
@@ -110,7 +110,7 @@ public final class NDKInMemoryCache: NDKCacheAdapter {
             }
         }
     }
-    
+
     public func saveNip05(_ nip05: String, pubkey: PublicKey, relays: [String]) async {
         await withCheckedContinuation { continuation in
             queue.async(flags: .barrier) {
@@ -119,9 +119,9 @@ public final class NDKInMemoryCache: NDKCacheAdapter {
             }
         }
     }
-    
+
     // MARK: - Relay Status
-    
+
     public func updateRelayStatus(_ url: RelayURL, status: NDKRelayConnectionState) async {
         await withCheckedContinuation { continuation in
             queue.async(flags: .barrier) {
@@ -130,7 +130,7 @@ public final class NDKInMemoryCache: NDKCacheAdapter {
             }
         }
     }
-    
+
     public func getRelayStatus(_ url: RelayURL) async -> NDKRelayConnectionState? {
         return await withCheckedContinuation { continuation in
             queue.async {
@@ -138,12 +138,12 @@ public final class NDKInMemoryCache: NDKCacheAdapter {
             }
         }
     }
-    
+
     // MARK: - Unpublished Events
-    
+
     public func addUnpublishedEvent(_ event: NDKEvent, relayUrls: [RelayURL]) async {
         guard let eventId = event.id else { return }
-        
+
         await withCheckedContinuation { continuation in
             queue.async(flags: .barrier) {
                 for url in relayUrls {
@@ -152,15 +152,15 @@ public final class NDKInMemoryCache: NDKCacheAdapter {
                     }
                     self.unpublishedEvents[url]?.insert(eventId)
                 }
-                
+
                 // Also store the event itself
                 self.events[eventId] = event
-                
+
                 continuation.resume()
             }
         }
     }
-    
+
     public func getUnpublishedEvents(for relayUrl: RelayURL) async -> [NDKEvent] {
         return await withCheckedContinuation { continuation in
             queue.async {
@@ -168,13 +168,13 @@ public final class NDKInMemoryCache: NDKCacheAdapter {
                     continuation.resume(returning: [])
                     return
                 }
-                
+
                 let events = eventIds.compactMap { self.events[$0] }
                 continuation.resume(returning: events)
             }
         }
     }
-    
+
     public func removeUnpublishedEvent(_ eventId: EventID, from relayUrl: RelayURL) async {
         await withCheckedContinuation { continuation in
             queue.async(flags: .barrier) {
@@ -183,12 +183,12 @@ public final class NDKInMemoryCache: NDKCacheAdapter {
             }
         }
     }
-    
+
     // MARK: - Private Helpers
-    
+
     private func filterKey(from filter: NDKFilter) -> String {
         var parts: [String] = []
-        
+
         if let kinds = filter.kinds {
             parts.append("kinds:\(kinds.sorted().map(String.init).joined(separator: ","))")
         }
@@ -198,24 +198,24 @@ public final class NDKInMemoryCache: NDKCacheAdapter {
         if let ids = filter.ids {
             parts.append("ids:\(ids.sorted().joined(separator: ","))")
         }
-        
+
         return parts.joined(separator: "|")
     }
-    
+
     private func isBroadFilter(_ filter: NDKFilter) -> Bool {
         return filter.ids == nil && filter.authors == nil && filter.kinds == nil
     }
-    
+
     private func indexEvent(_ event: NDKEvent) {
         guard let eventId = event.id else { return }
-        
+
         // Index by author
         let authorKey = "authors:\(event.pubkey)"
         if eventsByFilter[authorKey] == nil {
             eventsByFilter[authorKey] = []
         }
         eventsByFilter[authorKey]?.insert(eventId)
-        
+
         // Index by kind
         let kindKey = "kinds:\(event.kind)"
         if eventsByFilter[kindKey] == nil {
@@ -223,9 +223,9 @@ public final class NDKInMemoryCache: NDKCacheAdapter {
         }
         eventsByFilter[kindKey]?.insert(eventId)
     }
-    
+
     // MARK: - Cache Management
-    
+
     /// Clear all cached data
     public func clear() async {
         await withCheckedContinuation { continuation in
@@ -240,7 +240,7 @@ public final class NDKInMemoryCache: NDKCacheAdapter {
             }
         }
     }
-    
+
     /// Get cache statistics
     public func statistics() async -> (events: Int, profiles: Int, nip05: Int) {
         return await withCheckedContinuation { continuation in
