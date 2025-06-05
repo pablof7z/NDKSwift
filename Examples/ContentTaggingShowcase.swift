@@ -20,7 +20,7 @@ let hashtagContent = "This is a post about #bitcoin, #lightning, and #nostr"
 print("   Content: \(hashtagContent)")
 print("   Expected tags:")
 print("     - [\"t\", \"bitcoin\"]")
-print("     - [\"t\", \"lightning\"]") 
+print("     - [\"t\", \"lightning\"]")
 print("     - [\"t\", \"nostr\"]")
 
 // Mixed content example

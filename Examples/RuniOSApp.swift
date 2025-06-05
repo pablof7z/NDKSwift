@@ -1,7 +1,7 @@
 #!/usr/bin/env swift
 
-import Foundation
 import AppKit
+import Foundation
 
 // This is a macOS wrapper to demonstrate the iOS functionality
 // Since we can't directly run iOS SwiftUI in the command line,

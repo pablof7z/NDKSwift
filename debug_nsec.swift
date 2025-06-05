@@ -12,7 +12,7 @@ print("Has nsec1 prefix: \(nsecInput.hasPrefix("nsec1"))")
 // Check for invalid characters
 let validChars = "qpzry9x8gf2tvdw0s3jn54khce6mua7l"
 for char in nsecInput {
-    if char != "n" && char != "s" && char != "e" && char != "c" && char != "1" && !validChars.contains(char) {
+    if char != "n", char != "s", char != "e", char != "c", char != "1", !validChars.contains(char) {
         print("Invalid character found: \(char)")
     }
 }

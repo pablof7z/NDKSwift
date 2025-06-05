@@ -4,43 +4,43 @@ import Foundation
 public final class NDK {
     /// Active signer for this NDK instance
     public var signer: NDKSigner?
-    
+
     /// Cache adapter for storing events
     public var cacheAdapter: NDKCacheAdapter?
-    
+
     /// Active user (derived from signer)
     public var activeUser: NDKUser? {
         // This will need to be async or cached
         return nil
     }
-    
+
     /// Relay pool
-    internal let relayPool: NDKRelayPool
-    
+    let relayPool: NDKRelayPool
+
     /// Event repository
     private let eventRepository: NDKEventRepository
-    
+
     /// Published events tracking (for OK message handling)
     private var publishedEvents: [EventID: NDKEvent] = [:]
-    
+
     /// Subscription manager
     private var subscriptionManager: NDKSubscriptionManager!
-    
+
     /// Whether debug mode is enabled
     public var debugMode: Bool = false
-    
+
     /// Signature verification configuration
     public var signatureVerificationConfig: NDKSignatureVerificationConfig
-    
+
     /// Signature verification sampler
-    internal let signatureVerificationSampler: NDKSignatureVerificationSampler
-    
+    let signatureVerificationSampler: NDKSignatureVerificationSampler
+
     /// Signature verification delegate
     public weak var signatureVerificationDelegate: NDKSignatureVerificationDelegate?
-    
+
     /// Payment router for handling zaps and payments
     public var paymentRouter: NDKPaymentRouter?
-    
+
     /// Wallet configuration
     public var walletConfig: NDKWalletConfig? {
         didSet {
@@ -51,40 +51,40 @@ public final class NDK {
             }
         }
     }
-    
+
     // MARK: - Outbox Model Support
-    
+
     /// Outbox configuration
     public var outboxConfig: NDKOutboxConfig = .default
-    
+
     /// Outbox tracker (lazy)
-    internal var _outboxTracker: NDKOutboxTracker?
-    
+    var _outboxTracker: NDKOutboxTracker?
+
     /// Relay ranker (lazy)
-    internal var _relayRanker: NDKRelayRanker?
-    
+    var _relayRanker: NDKRelayRanker?
+
     /// Relay selector (lazy)
-    internal var _relaySelector: NDKRelaySelector?
-    
+    var _relaySelector: NDKRelaySelector?
+
     /// Publishing strategy (lazy)
-    internal var _publishingStrategy: NDKPublishingStrategy?
-    
+    var _publishingStrategy: NDKPublishingStrategy?
+
     /// Fetching strategy (lazy)
-    internal var _fetchingStrategy: NDKFetchingStrategy?
-    
+    var _fetchingStrategy: NDKFetchingStrategy?
+
     // MARK: - Subscription Tracking
-    
+
     /// Subscription tracker for monitoring and debugging
     public let subscriptionTracker: NDKSubscriptionTracker
-    
+
     /// Configuration for subscription tracking
     public struct SubscriptionTrackingConfig {
         /// Whether to track closed subscriptions for debugging
         public var trackClosedSubscriptions: Bool
-        
+
         /// Maximum number of closed subscriptions to remember
         public var maxClosedSubscriptions: Int
-        
+
         public init(
             trackClosedSubscriptions: Bool = false,
             maxClosedSubscriptions: Int = 100
@@ -92,12 +92,12 @@ public final class NDK {
             self.trackClosedSubscriptions = trackClosedSubscriptions
             self.maxClosedSubscriptions = maxClosedSubscriptions
         }
-        
+
         public static let `default` = SubscriptionTrackingConfig()
     }
-    
+
     // MARK: - Initialization
-    
+
     public init(
         relayUrls: [RelayURL] = [],
         signer: NDKSigner? = nil,
@@ -115,24 +115,24 @@ public final class NDK {
             trackClosedSubscriptions: subscriptionTrackingConfig.trackClosedSubscriptions,
             maxClosedSubscriptions: subscriptionTrackingConfig.maxClosedSubscriptions
         )
-        
+
         // Initialize subscription manager after all properties are set
         self.subscriptionManager = NDKSubscriptionManager(ndk: self)
-        
+
         // Add initial relays
         for url in relayUrls {
             addRelay(url)
         }
     }
-    
+
     // MARK: - Relay Management
-    
+
     /// Add a relay to the pool
     @discardableResult
     public func addRelay(_ url: RelayURL) -> NDKRelay {
         let relay = relayPool.addRelay(url)
         relay.ndk = self
-        
+
         // Set up connection state observer to publish queued events
         relay.observeConnectionState { [weak self] state in
             if case .connected = state {
@@ -141,37 +141,37 @@ public final class NDK {
                 }
             }
         }
-        
+
         return relay
     }
-    
+
     /// Remove a relay from the pool
     public func removeRelay(_ url: RelayURL) {
         relayPool.removeRelay(url)
     }
-    
+
     /// Get all relays
     public var relays: [NDKRelay] {
         return relayPool.relays
     }
-    
+
     /// Connect to all relays
     public func connect() async {
         await relayPool.connectAll()
     }
-    
+
     /// Disconnect from all relays
     public func disconnect() async {
         await relayPool.disconnectAll()
     }
-    
+
     /// Get pool of relays
     public var pool: NDKRelayPool {
         return relayPool
     }
-    
+
     // MARK: - Event Publishing
-    
+
     /// Publish an event
     @discardableResult
     public func publish(_ event: NDKEvent) async throws -> Set<NDKRelay> {
@@ -180,51 +180,51 @@ public final class NDK {
             guard signer != nil else {
                 throw NDKError.signingFailed
             }
-            
+
             // Set NDK instance and sign (this will also generate content tags)
             event.ndk = self
             try await event.sign()
         }
-        
+
         // Validate event
         try event.validate()
-        
+
         // Store in cache if available
         if let cache = cacheAdapter {
             await cache.setEvent(event, filters: [], relay: nil)
         }
-        
+
         // Track this event for OK message handling
         if let eventId = event.id {
             publishedEvents[eventId] = event
         }
-        
+
         // Get all relays we want to publish to
         let targetRelays = relayPool.relays
-        
+
         // Publish to connected relays
         let publishedRelays = await relayPool.publishEvent(event)
-        
+
         // Update event's relay publish statuses
         for relay in publishedRelays {
             event.updatePublishStatus(relay: relay.url, status: .succeeded)
         }
-        
+
         // Find relays that weren't connected or failed
         let unpublishedRelayUrls = targetRelays
             .filter { !publishedRelays.contains($0) }
             .map { $0.url }
-        
+
         // Store unpublished event for later retry when relays connect
         if !unpublishedRelayUrls.isEmpty, let cache = cacheAdapter {
             await cache.addUnpublishedEvent(event, relayUrls: unpublishedRelayUrls)
-            
+
             // Mark these relays as pending
             for relayUrl in unpublishedRelayUrls {
                 event.updatePublishStatus(relay: relayUrl, status: .pending)
             }
         }
-        
+
         if debugMode {
             let noteId = (try? Bech32.note(from: event.id ?? "")) ?? event.id ?? "unknown"
             if publishedRelays.isEmpty {
@@ -237,10 +237,10 @@ public final class NDK {
                 }
             }
         }
-        
+
         return publishedRelays
     }
-    
+
     /// Publish an event to specific relays by URL
     public func publish(event: NDKEvent, to relayUrls: Set<String>) async throws -> Set<NDKRelay> {
         // Sign the event if needed
@@ -248,12 +248,12 @@ public final class NDK {
             event.ndk = self
             try await event.sign()
         }
-        
+
         // Use relays from the pool or add them if needed
         var targetRelays: Set<NDKRelay> = []
         for url in relayUrls {
             let normalizedUrl = URLNormalizer.tryNormalizeRelayUrl(url) ?? url
-            
+
             // Check if relay is already in the pool
             if let existingRelay = relayPool.relaysByUrl[normalizedUrl] {
                 targetRelays.insert(existingRelay)
@@ -263,7 +263,7 @@ public final class NDK {
                 targetRelays.insert(relay)
             }
         }
-        
+
         // Connect to relays that aren't already connected
         await withTaskGroup(of: Void.self) { group in
             for relay in targetRelays {
@@ -274,10 +274,10 @@ public final class NDK {
                 }
             }
         }
-        
+
         // Publish to the specific relays
         var publishedRelays: Set<NDKRelay> = []
-        
+
         await withTaskGroup(of: NDKRelay?.self) { group in
             for relay in targetRelays {
                 group.addTask {
@@ -292,19 +292,19 @@ public final class NDK {
                     }
                 }
             }
-            
+
             for await result in group {
                 if let relay = result {
                     publishedRelays.insert(relay)
                 }
             }
         }
-        
+
         return publishedRelays
     }
-    
+
     // MARK: - Subscriptions
-    
+
     /// Subscribe to events matching the given filters
     public func subscribe(
         filters: [NDKFilter],
@@ -312,21 +312,21 @@ public final class NDK {
     ) -> NDKSubscription {
         var subscriptionOptions = options
         subscriptionOptions.relays = subscriptionOptions.relays ?? Set(relays)
-        
+
         let subscription = NDKSubscription(
             filters: filters,
             options: subscriptionOptions,
             ndk: self
         )
-        
+
         // Use advanced subscription manager for optimized handling
         Task {
             await subscriptionManager.addSubscription(subscription)
         }
-        
+
         return subscription
     }
-    
+
     /// Fetch events matching the given filters
     public func fetchEvents(
         filters: [NDKFilter],
@@ -335,51 +335,51 @@ public final class NDK {
         var options = NDKSubscriptionOptions()
         options.closeOnEose = true
         options.relays = relays
-        
+
         let subscription = subscribe(filters: filters, options: options)
-        
+
         // Wait for EOSE using the new callback-based approach
         await subscription.waitForEOSE()
-        
+
         return Set(subscription.events)
     }
-    
+
     /// Fetch a single event by ID
     public func fetchEvent(_ id: EventID, relays: Set<NDKRelay>? = nil) async throws -> NDKEvent? {
         let filter = NDKFilter(ids: [id])
         let events = try await fetchEvents(filters: [filter], relays: relays)
         return events.first
     }
-    
+
     /// Fetch a single event matching the filter
     public func fetchEvent(_ filter: NDKFilter, relays: Set<NDKRelay>? = nil) async throws -> NDKEvent? {
         let events = try await fetchEvents(filters: [filter], relays: relays)
         return events.first
     }
-    
+
     // MARK: - Subscription Manager Integration
-    
+
     /// Process an event received from a relay (called by relay connections)
-    internal func processEvent(_ event: NDKEvent, from relay: NDKRelay) {
+    func processEvent(_ event: NDKEvent, from relay: NDKRelay) {
         // Mark event as seen on this relay
         event.markSeenOn(relay: relay.url)
-        
+
         Task {
             // Get current stats
             var currentStats = relay.getSignatureStats()
-            
+
             // Verify signature with sampling
             let verificationResult = await signatureVerificationSampler.verifyEvent(
                 event,
                 from: relay,
                 stats: &currentStats
             )
-            
+
             // Update stats back to relay
             relay.updateSignatureStats { stats in
                 stats = currentStats
             }
-            
+
             switch verificationResult {
             case .invalid:
                 // Invalid signature - don't process this event
@@ -400,31 +400,31 @@ public final class NDK {
                     print("⏭️ Event \(event.id ?? "unknown") signature verification skipped (sampling) from \(relay.url)")
                 }
             }
-            
+
             // Process the event
             await subscriptionManager.processEvent(event, from: relay)
         }
     }
-    
+
     /// Process EOSE received from a relay (called by relay connections)
-    internal func processEOSE(subscriptionId: String, from relay: NDKRelay) {
+    func processEOSE(subscriptionId: String, from relay: NDKRelay) {
         Task {
             await subscriptionManager.processEOSE(subscriptionId: subscriptionId, from: relay)
         }
     }
-    
+
     /// Get subscription manager statistics
     public func getSubscriptionStats() async -> NDKSubscriptionManager.SubscriptionStats {
         return await subscriptionManager.getStats()
     }
-    
+
     /// Process OK message from relay (called by relay connections)
-    internal func processOKMessage(eventId: EventID, accepted: Bool, message: String?, from relay: NDKRelay) {
+    func processOKMessage(eventId: EventID, accepted: Bool, message: String?, from relay: NDKRelay) {
         // Find the event in our published events
         if let event = publishedEvents[eventId] {
             // Store the OK message
             event.addOKMessage(relay: relay.url, accepted: accepted, message: message)
-            
+
             // Update publish status based on OK response
             if accepted {
                 event.updatePublishStatus(relay: relay.url, status: .succeeded)
@@ -434,54 +434,54 @@ public final class NDK {
             }
         }
     }
-    
+
     // MARK: - User Management
-    
+
     /// Get a user by public key
     public func getUser(_ pubkey: PublicKey) -> NDKUser {
         let user = NDKUser(pubkey: pubkey)
         user.ndk = self
         return user
     }
-    
+
     /// Get a user from npub
     public func getUser(npub: String) -> NDKUser? {
         guard let user = NDKUser(npub: npub) else { return nil }
         user.ndk = self
         return user
     }
-    
+
     // MARK: - Queued Events
-    
+
     /// Publish events that were queued while relay was disconnected
     private func publishQueuedEvents(for relay: NDKRelay) async {
         guard let cache = cacheAdapter else { return }
-        
+
         let queuedEvents = await cache.getUnpublishedEvents(for: relay.url)
-        
-        if !queuedEvents.isEmpty && debugMode {
+
+        if !queuedEvents.isEmpty, debugMode {
             print("📤 Publishing \(queuedEvents.count) queued event(s) to \(relay.url)")
         }
-        
+
         for event in queuedEvents {
             do {
                 // Re-track for OK message handling
                 if let eventId = event.id {
                     publishedEvents[eventId] = event
                 }
-                
+
                 // Send the event
                 let eventMessage = NostrMessage.event(subscriptionId: nil, event: event)
                 try await relay.send(eventMessage.serialize())
-                
+
                 // Update status
                 event.updatePublishStatus(relay: relay.url, status: .succeeded)
-                
+
                 // Remove from unpublished queue
                 if let eventId = event.id {
                     await cache.removeUnpublishedEvent(eventId, from: relay.url)
                 }
-                
+
                 if debugMode {
                     let noteId = (try? Bech32.note(from: event.id ?? "")) ?? event.id ?? "unknown"
                     print("✅ Published queued note \(noteId) to \(relay.url)")
@@ -489,36 +489,36 @@ public final class NDK {
             } catch {
                 // Update status to failed
                 event.updatePublishStatus(relay: relay.url, status: .failed(.custom(error.localizedDescription)))
-                
+
                 if debugMode {
                     print("❌ Failed to publish queued event to \(relay.url): \(error)")
                 }
             }
         }
     }
-    
+
     // MARK: - Signature Verification
-    
+
     /// Get signature verification statistics
     public func getSignatureVerificationStats() async -> (totalVerifications: Int, failedVerifications: Int, blacklistedRelays: Int) {
         return await signatureVerificationSampler.getStats()
     }
-    
+
     /// Check if a relay is blacklisted
     public func isRelayBlacklisted(_ relay: NDKRelay) async -> Bool {
         return await signatureVerificationSampler.isBlacklisted(relay: relay)
     }
-    
+
     /// Get all blacklisted relay URLs
     public func getBlacklistedRelays() async -> Set<String> {
         return await signatureVerificationSampler.getBlacklistedRelays()
     }
-    
+
     /// Clear the signature verification cache
     public func clearSignatureCache() async {
         await signatureVerificationSampler.clearCache()
     }
-    
+
     /// Set the signature verification delegate
     public func setSignatureVerificationDelegate(_ delegate: NDKSignatureVerificationDelegate) async {
         await signatureVerificationSampler.setDelegate(delegate)
@@ -528,12 +528,12 @@ public final class NDK {
 // MARK: - Relay Pool Implementation
 
 public class NDKRelayPool {
-    internal var relaysByUrl: [RelayURL: NDKRelay] = [:]
-    
+    var relaysByUrl: [RelayURL: NDKRelay] = [:]
+
     func addRelay(_ url: RelayURL) -> NDKRelay {
         // Normalize the URL before storing
         let normalizedUrl = URLNormalizer.tryNormalizeRelayUrl(url) ?? url
-        
+
         if let existing = relaysByUrl[normalizedUrl] {
             return existing
         }
@@ -541,22 +541,22 @@ public class NDKRelayPool {
         relaysByUrl[normalizedUrl] = relay
         return relay
     }
-    
+
     func removeRelay(_ url: RelayURL) {
         // Normalize the URL before removing
         let normalizedUrl = URLNormalizer.tryNormalizeRelayUrl(url) ?? url
         relaysByUrl.removeValue(forKey: normalizedUrl)
     }
-    
+
     var relays: [NDKRelay] {
         return Array(relaysByUrl.values)
     }
-    
+
     /// Get currently connected relays
     public func connectedRelays() -> [NDKRelay] {
         return relays.filter { $0.connectionState == .connected }
     }
-    
+
     func connectAll() async {
         await withTaskGroup(of: Void.self) { group in
             for relay in relays {
@@ -566,7 +566,7 @@ public class NDKRelayPool {
             }
         }
     }
-    
+
     func disconnectAll() async {
         await withTaskGroup(of: Void.self) { group in
             for relay in relays {
@@ -576,12 +576,12 @@ public class NDKRelayPool {
             }
         }
     }
-    
+
     /// Publish an event to all connected relays
     func publishEvent(_ event: NDKEvent) async -> Set<NDKRelay> {
         let connectedRelays = self.connectedRelays()
         var publishedRelays: Set<NDKRelay> = []
-        
+
         await withTaskGroup(of: NDKRelay?.self) { group in
             for relay in connectedRelays {
                 group.addTask {
@@ -595,14 +595,14 @@ public class NDKRelayPool {
                     }
                 }
             }
-            
+
             for await result in group {
                 if let relay = result {
                     publishedRelays.insert(relay)
                 }
             }
         }
-        
+
         return publishedRelays
     }
 }
@@ -612,32 +612,30 @@ public class NDKRelayPool {
 class NDKEventRepository {
     private var events: [EventID: NDKEvent] = [:]
     private let queue = DispatchQueue(label: "com.ndkswift.eventrepository", attributes: .concurrent)
-    
+
     func addEvent(_ event: NDKEvent) {
         guard let eventId = event.id else { return }
-        
+
         queue.async(flags: .barrier) { [weak self] in
             self?.events[eventId] = event
         }
     }
-    
+
     func getEvent(_ eventId: EventID) -> NDKEvent? {
         return queue.sync {
-            return events[eventId]
+            events[eventId]
         }
     }
-    
+
     func getAllEvents() -> [NDKEvent] {
         return queue.sync {
-            return Array(events.values)
+            Array(events.values)
         }
     }
-    
+
     func clear() {
         queue.async(flags: .barrier) { [weak self] in
             self?.events.removeAll()
         }
     }
 }
-
-

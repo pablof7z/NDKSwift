@@ -51,7 +51,7 @@ print(examples)
 
 print("Key Features:")
 print("• Automatically chooses correct encoding type (note1/nevent1/naddr1)")
-print("• Follows NIP-19 specification exactly") 
+print("• Follows NIP-19 specification exactly")
 print("• Supports relay hints for better event discovery")
 print("• Handles replaceable and parameterized replaceable events")
 print("• Compatible with ndk-core's event.encode() API")

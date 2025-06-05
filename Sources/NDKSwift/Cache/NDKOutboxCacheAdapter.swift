@@ -3,44 +3,44 @@ import Foundation
 /// Extended cache adapter protocol with comprehensive outbox support
 public protocol NDKOutboxCacheAdapter: NDKCacheAdapter {
     // MARK: - Unpublished Event Management
-    
+
     /// Store an unpublished event with detailed relay status
     func storeUnpublishedEvent(
         _ event: NDKEvent,
         targetRelays: Set<String>,
         publishConfig: OutboxPublishConfig?
     ) async
-    
+
     /// Get all unpublished events with their status
     func getAllUnpublishedEvents() async -> [UnpublishedEventRecord]
-    
+
     /// Update the status of an unpublished event for a specific relay
     func updateUnpublishedEventStatus(
         eventId: String,
         relayURL: String,
         status: RelayPublishStatus
     ) async
-    
+
     /// Mark an unpublished event as globally succeeded
     func markEventAsPublished(eventId: String) async
-    
+
     /// Get unpublished events that need retry
     func getEventsForRetry(olderThan: TimeInterval) async -> [UnpublishedEventRecord]
-    
+
     /// Clean up old published events
     func cleanupPublishedEvents(olderThan: TimeInterval) async
-    
+
     // MARK: - Outbox Relay Information
-    
+
     /// Store relay information for a user
     func storeOutboxItem(_ item: NDKOutboxItem) async
-    
+
     /// Get relay information for a user
     func getOutboxItem(for pubkey: String) async -> NDKOutboxItem?
-    
+
     /// Store relay health metrics
     func updateRelayHealth(url: String, health: RelayHealthMetrics) async
-    
+
     /// Get relay health metrics
     func getRelayHealth(url: String) async -> RelayHealthMetrics?
 }
@@ -54,7 +54,7 @@ public struct UnpublishedEventRecord: Codable {
     public let lastAttemptAt: Date?
     public let publishConfig: StoredPublishConfig?
     public let overallStatus: PublishStatus
-    
+
     public init(
         event: NDKEvent,
         targetRelays: Set<String>,
@@ -72,17 +72,17 @@ public struct UnpublishedEventRecord: Codable {
         self.publishConfig = publishConfig
         self.overallStatus = overallStatus
     }
-    
+
     /// Check if this event should be retried
     public func shouldRetry(after interval: TimeInterval) -> Bool {
         guard overallStatus == .pending || overallStatus == .inProgress else {
             return false
         }
-        
+
         guard let lastAttempt = lastAttemptAt else {
             return true // Never attempted
         }
-        
+
         return Date().timeIntervalSince(lastAttempt) > interval
     }
 }
@@ -93,7 +93,7 @@ public struct StoredPublishConfig: Codable {
     public let maxRetries: Int
     public let enablePow: Bool
     public let maxPowDifficulty: Int?
-    
+
     public init(from config: OutboxPublishConfig) {
         self.minSuccessfulRelays = config.minSuccessfulRelays
         self.maxRetries = config.maxRetries
@@ -112,7 +112,7 @@ public struct RelayHealthMetrics: Codable {
     public let totalRequests: Int
     public let successfulRequests: Int
     public let updatedAt: Date
-    
+
     public init(
         url: String,
         successRate: Double,
@@ -136,23 +136,23 @@ public struct RelayHealthMetrics: Codable {
 
 // MARK: - Default Implementation Extensions
 
-extension NDKOutboxCacheAdapter {
+public extension NDKOutboxCacheAdapter {
     /// Default implementation that converts to legacy format
-    public func addUnpublishedEvent(_ event: NDKEvent, relayUrls: [RelayURL]) async {
+    func addUnpublishedEvent(_ event: NDKEvent, relayUrls: [RelayURL]) async {
         let targetRelays = Set(relayUrls)
         await storeUnpublishedEvent(event, targetRelays: targetRelays, publishConfig: nil)
     }
-    
+
     /// Default implementation that filters by relay
-    public func getUnpublishedEvents(for relayUrl: RelayURL) async -> [NDKEvent] {
+    func getUnpublishedEvents(for relayUrl: RelayURL) async -> [NDKEvent] {
         let allEvents = await getAllUnpublishedEvents()
         return allEvents
             .filter { $0.targetRelays.contains(relayUrl) }
             .map { $0.event }
     }
-    
+
     /// Default implementation that updates status
-    public func removeUnpublishedEvent(_ eventId: EventID, from relayUrl: RelayURL) async {
+    func removeUnpublishedEvent(_ eventId: EventID, from relayUrl: RelayURL) async {
         await updateUnpublishedEventStatus(
             eventId: eventId,
             relayURL: relayUrl,
