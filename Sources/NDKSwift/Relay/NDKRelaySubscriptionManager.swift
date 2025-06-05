@@ -188,6 +188,16 @@ public actor NDKRelaySubscriptionManager {
         // Notify all subscriptions in this group
         for subscription in relaySub.subscriptions {
             subscription.handleEOSE(fromRelay: relay)
+            
+            // Track EOSE received
+            if let ndk = relay?.ndk {
+                Task {
+                    await ndk.subscriptionTracker.trackEoseReceived(
+                        subscriptionId: subscription.id,
+                        relayUrl: relay?.url ?? ""
+                    )
+                }
+            }
         }
         
         // Close if all subscriptions want closeOnEose
@@ -203,12 +213,26 @@ public actor NDKRelaySubscriptionManager {
     
     /// Handle event for routing to appropriate subscriptions
     public func handleEvent(_ event: NDKEvent, relaySubscriptionId: String?) {
+        guard let eventId = event.id else { return }
+        
         // If we have a specific relay subscription ID, route only to those subscriptions
         if let relaySubId = relaySubscriptionId,
            let relaySub = relaySubscriptions[relaySubId] {
             for subscription in relaySub.subscriptions {
                 if subscription.filters.contains(where: { $0.matches(event: event) }) {
                     subscription.handleEvent(event, fromRelay: relay)
+                    
+                    // Track event received
+                    if let ndk = relay?.ndk {
+                        Task {
+                            await ndk.subscriptionTracker.trackEventReceived(
+                                subscriptionId: subscription.id,
+                                eventId: eventId,
+                                relayUrl: relay?.url ?? "",
+                                isUnique: true // NDKSubscriptionManager handles deduplication
+                            )
+                        }
+                    }
                 }
             }
         } else {
@@ -218,6 +242,18 @@ public actor NDKRelaySubscriptionManager {
                     for subscription in relaySub.subscriptions {
                         if subscription.filters.contains(where: { $0.matches(event: event) }) {
                             subscription.handleEvent(event, fromRelay: relay)
+                            
+                            // Track event received
+                            if let ndk = relay?.ndk {
+                                Task {
+                                    await ndk.subscriptionTracker.trackEventReceived(
+                                        subscriptionId: subscription.id,
+                                        eventId: eventId,
+                                        relayUrl: relay?.url ?? "",
+                                        isUnique: true // NDKSubscriptionManager handles deduplication
+                                    )
+                                }
+                            }
                         }
                     }
                 }
@@ -306,6 +342,17 @@ public actor NDKRelaySubscriptionManager {
             // Register subscription with relay
             for subscription in relaySub.subscriptions {
                 relay.addSubscription(subscription)
+                
+                // Track subscription sent to relay with actual filters
+                if let ndk = relay.ndk {
+                    for filter in relaySub.mergedFilters {
+                        await ndk.subscriptionTracker.trackSubscriptionSentToRelay(
+                            subscriptionId: subscription.id,
+                            relayUrl: relay.url,
+                            appliedFilter: filter
+                        )
+                    }
+                }
             }
         } catch {
             // Handle error

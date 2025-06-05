@@ -285,4 +285,25 @@ public struct NDKFilter: Codable, Equatable {
         
         return merged
     }
+    
+    /// Returns a dictionary representation of the filter
+    public var dictionary: [String: Any] {
+        var dict: [String: Any] = [:]
+        
+        if let ids = ids { dict["ids"] = ids }
+        if let authors = authors { dict["authors"] = authors }
+        if let kinds = kinds { dict["kinds"] = kinds }
+        if let events = events { dict["#e"] = events }
+        if let pubkeys = pubkeys { dict["#p"] = pubkeys }
+        if let since = since { dict["since"] = since }
+        if let until = until { dict["until"] = until }
+        if let limit = limit { dict["limit"] = limit }
+        
+        // Add generic tag filters
+        for (key, values) in tagFilters {
+            dict[key] = values
+        }
+        
+        return dict
+    }
 }

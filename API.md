@@ -9,8 +9,13 @@ The main entry point for interacting with Nostr.
 
 ```swift
 class NDK {
-    // Initialize with optional signer and cache
-    init(signer: NDKSigner? = nil, cacheAdapter: NDKCacheAdapter? = nil)
+    // Initialize with optional signer, cache, and tracking configuration
+    init(
+        signer: NDKSigner? = nil, 
+        cacheAdapter: NDKCacheAdapter? = nil,
+        signatureVerificationConfig: NDKSignatureVerificationConfig = .default,
+        subscriptionTrackingConfig: SubscriptionTrackingConfig = .default
+    )
     
     // Relay management
     func addRelay(_ url: String) throws -> NDKRelay
@@ -31,6 +36,9 @@ class NDK {
     
     // Signature verification
     var signatureVerificationConfig: NDKSignatureVerificationConfig?
+    
+    // Subscription tracking
+    let subscriptionTracker: NDKSubscriptionTracker
 }
 ```
 
@@ -414,6 +422,42 @@ print("User name: \(user.profile?.name ?? "Unknown")")
 ```
 
 ## Advanced Features
+
+### Subscription Tracking
+Monitor and debug subscription behavior across relays.
+
+```swift
+// Enable tracking with history
+let ndk = NDK(
+    subscriptionTrackingConfig: NDK.SubscriptionTrackingConfig(
+        trackClosedSubscriptions: true,
+        maxClosedSubscriptions: 100
+    )
+)
+
+// Query metrics
+let activeCount = await ndk.subscriptionTracker.activeSubscriptionCount()
+let uniqueEvents = await ndk.subscriptionTracker.totalUniqueEventsReceived()
+
+// Get detailed subscription information
+if let detail = await ndk.subscriptionTracker.getSubscriptionDetail(subscription.id) {
+    print("Unique events: \(detail.metrics.totalUniqueEvents)")
+    print("Active relays: \(detail.metrics.activeRelayCount)")
+    
+    // Check relay-specific performance
+    for (relayUrl, metrics) in detail.relayMetrics {
+        print("\(relayUrl): \(metrics.eventsReceived) events")
+    }
+}
+
+// Get global statistics
+let stats = await ndk.subscriptionTracker.getStatistics()
+print("Active subscriptions: \(stats.activeSubscriptions)")
+print("Average events per subscription: \(stats.averageEventsPerSubscription)")
+
+// Export all tracking data
+let data = await ndk.subscriptionTracker.exportTrackingData()
+```
 
 ### Signature Verification Sampling
 ```swift
