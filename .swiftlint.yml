@@ -1,0 +1,68 @@
+# SwiftLint Configuration File
+# See full documentation at: https://realm.github.io/SwiftLint/
+
+# Customizable rules
+line_length:
+  warning: 120 # Warning when lines exceed 120 characters
+  error: 150 # Error when lines exceed 150 characters
+  ignores_comments: true # Don't count comments toward line length
+  ignores_urls: true # Don't count URLs toward line length
+
+# Common naming rules
+identifier_name:
+  min_length: 
+    warning: 2 # Warn when identifiers are shorter than 2 characters
+  excluded:
+    - id # Allow common short names
+    - i
+    - j
+    - k
+    - x
+    - y
+    - z
+    - to
+    - URL
+    - vm
+
+# Force unwrap rules
+force_cast: warning # Warn when force casting is used (as!)
+force_try: warning # Warn when force try is used (try!)
+force_unwrapping: warning # Warn when force unwrapping is used (variable!)
+
+# Disabled rules
+disabled_rules:
+  - trailing_whitespace # Allow trailing whitespace
+  - todo # Allow TODO comments
+
+# Opt-in rules (these are disabled by default)
+opt_in_rules:
+  - empty_count # Prefer isEmpty over count == 0
+  - empty_string # Prefer isEmpty over string == ""
+  - closure_spacing # Consistent spacing in closures
+  - fatal_error_message # Require message string in fatalError
+  - implicitly_unwrapped_optional # Discourage implicitly unwrapped optionals
+  - multiline_parameters # Consistent formatting for multiline parameters
+  - vertical_parameter_alignment_on_call # Consistent parameter alignment
+  - redundant_nil_coalescing # Warn on redundant nil coalescing (???)
+  - unused_import # Warn on unused imports
+  - sorted_imports # Keep imports alphabetically sorted
+  - unneeded_parentheses_in_closure_argument # Remove unneeded parentheses
+
+# Excluded files/paths
+excluded:
+  - Pods
+  - Carthage
+  - .build
+  - fastlane
+  - vendor
+  - DerivedData
+  - **/generated/**
+
+# Analyzer rules - helps find deeper issues
+analyzer_rules:
+  - unused_declaration
+  - unused_import
+
+# Warning vs error thresholds for rule violations
+warning_threshold: 15 # Turns warnings into errors when there are this many warnings
+

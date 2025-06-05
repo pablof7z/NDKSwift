@@ -9,7 +9,7 @@ NDKSwift is a Swift implementation of the Nostr Development Kit, providing a com
 - **Multi-User Sessions**: Active user management and seamless switching between accounts
 - **Relay Management**: Automatic connection handling with quadratic backoff, relay pools, and blacklisting
 - **Smart Publishing**: Automatic relay selection based on user preferences and Outbox model with retry logic
-- **Subscription Tracking**: Automatic replay of subscriptions when relays reconnect, with intelligent filter merging
+- **Subscription Tracking**: Comprehensive monitoring and debugging of subscription behavior across relays with detailed metrics
 - **Offline-First**: Components react to event arrival without loading states
 - **Caching**: Adapter-based caching system with in-memory and file-based implementations
 - **Advanced Subscription Management**: Intelligent grouping, merging, and EOSE handling for optimal performance
@@ -166,31 +166,53 @@ Features:
 
 See [Signature Verification Documentation](Documentation/SIGNATURE_VERIFICATION_SAMPLING.md) for details.
 
-### Subscription Tracking & Relay Reconnection
+### Subscription Tracking & Monitoring
 
-NDKSwift automatically handles relay disconnections and reconnections, ensuring your subscriptions continue working seamlessly:
+NDKSwift provides comprehensive subscription tracking for monitoring and debugging:
 
 ```swift
-// Create a subscription - it will automatically resume if the relay disconnects
+// Enable subscription tracking with history
+let ndk = NDK(
+    subscriptionTrackingConfig: NDK.SubscriptionTrackingConfig(
+        trackClosedSubscriptions: true,
+        maxClosedSubscriptions: 100
+    )
+)
+
+// Create a subscription - automatically tracked
 let subscription = ndk.subscribe(
     filters: [NDKFilter(kinds: [1], authors: ["pubkey"])],
     options: NDKSubscriptionOptions()
 )
 
-// The subscription will:
-// 1. Queue if relay is offline
-// 2. Execute when relay connects
-// 3. Resume automatically after reconnection
-// 4. Merge with similar subscriptions for efficiency
+// Query tracking metrics
+let activeCount = await ndk.subscriptionTracker.activeSubscriptionCount()
+let uniqueEvents = await ndk.subscriptionTracker.totalUniqueEventsReceived()
 
-subscription.start()
+// Get detailed subscription information
+if let detail = await ndk.subscriptionTracker.getSubscriptionDetail(subscription.id) {
+    print("Unique events: \(detail.metrics.totalUniqueEvents)")
+    print("Active relays: \(detail.metrics.activeRelayCount)")
+    
+    // Check relay-specific performance
+    for (relayUrl, metrics) in detail.relayMetrics {
+        print("\(relayUrl): \(metrics.eventsReceived) events")
+        print("EOSE received: \(metrics.eoseReceived)")
+    }
+}
+
+// Export all tracking data for analysis
+let trackingData = await ndk.subscriptionTracker.exportTrackingData()
 ```
 
-Key benefits:
-- **Zero subscription loss**: Subscriptions are tracked and replayed after reconnection
-- **Intelligent filter merging**: Multiple subscriptions with similar filters are combined into single relay requests
-- **Bandwidth optimization**: Reduces redundant subscriptions and network traffic
-- **Proper closeOnEose handling**: Temporary subscriptions are never mixed with persistent ones
+Key features:
+- **Real-time Metrics**: Monitor active subscriptions, event counts, and relay performance
+- **Relay-level Detail**: See exactly which filters were sent to each relay
+- **Historical Tracking**: Optional closed subscription history for debugging
+- **Performance Analysis**: Compare relay performance and identify bottlenecks
+- **Export Capability**: Export all tracking data for external analysis
+
+See [Subscription Tracking Documentation](Documentation/SUBSCRIPTION_TRACKING.md) for details.
 
 ## Caching
 

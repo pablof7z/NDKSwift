@@ -151,12 +151,21 @@ public actor NDKSubscriptionManager {
     
     /// Add a subscription to be managed
     public func addSubscription(_ subscription: NDKSubscription) {
-        guard ndk != nil else { return }
+        guard let ndk = ndk else { return }
         
         activeSubscriptions[subscription.id] = subscription
         subscriptionStates[subscription.id] = .pending
         stats.totalSubscriptions += 1
         stats.activeSubscriptions += 1
+        
+        // Track subscription creation
+        Task {
+            await ndk.subscriptionTracker.trackSubscription(
+                subscription,
+                filter: subscription.filters.first ?? NDKFilter(),
+                relayUrls: subscription.options.relays?.map { $0.url } ?? ndk.relays.map { $0.url }
+            )
+        }
         
         // Determine execution strategy
         if shouldGroupSubscription(subscription) {
@@ -172,6 +181,13 @@ public actor NDKSubscriptionManager {
         subscriptionStates.removeValue(forKey: subscriptionId)
         eoseTracking.removeValue(forKey: subscriptionId)
         stats.activeSubscriptions = max(0, stats.activeSubscriptions - 1)
+        
+        // Track subscription closure
+        if let ndk = ndk {
+            Task {
+                await ndk.subscriptionTracker.closeSubscription(subscriptionId)
+            }
+        }
     }
     
     /// Process an event from a relay
@@ -180,7 +196,9 @@ public actor NDKSubscriptionManager {
         
         // Check deduplication
         let now = Timestamp(Date().timeIntervalSince1970)
-        if eventDeduplication[eventId] != nil {
+        let isUnique = eventDeduplication[eventId] == nil
+        
+        if !isUnique {
             // Already seen this event
             stats.eventsDeduped += 1
             return
@@ -192,6 +210,18 @@ public actor NDKSubscriptionManager {
         for (subscriptionId, subscription) in activeSubscriptions {
             if subscription.filters.contains(where: { $0.matches(event: event) }) {
                 subscription.handleEvent(event, fromRelay: relay)
+                
+                // Track event received
+                if let ndk = ndk {
+                    Task {
+                        await ndk.subscriptionTracker.trackEventReceived(
+                            subscriptionId: subscriptionId,
+                            eventId: eventId,
+                            relayUrl: relay.url,
+                            isUnique: isUnique
+                        )
+                    }
+                }
                 
                 // Update EOSE tracking
                 if var tracker = eoseTracking[subscriptionId] {
@@ -209,6 +239,16 @@ public actor NDKSubscriptionManager {
         
         tracker.recordEose(from: relay)
         eoseTracking[subscriptionId] = tracker
+        
+        // Track EOSE received
+        if let ndk = ndk {
+            Task {
+                await ndk.subscriptionTracker.trackEoseReceived(
+                    subscriptionId: subscriptionId,
+                    relayUrl: relay.url
+                )
+            }
+        }
         
         // Check if we should emit EOSE for this subscription
         if tracker.eosedRelays.count == tracker.targetRelays.count || tracker.shouldTimeout {
@@ -459,6 +499,17 @@ public actor NDKSubscriptionManager {
         do {
             let reqMessage = NostrMessage.req(subscriptionId: subscriptionId, filters: filters)
             try await relay.send(reqMessage.serialize())
+            
+            // Track subscription sent to relay
+            if let ndk = ndk {
+                for filter in filters {
+                    await ndk.subscriptionTracker.trackSubscriptionSentToRelay(
+                        subscriptionId: subscriptionId,
+                        relayUrl: relay.url,
+                        appliedFilter: filter
+                    )
+                }
+            }
         } catch {
             // Handle relay error
             for subscription in activeSubscriptions.values {

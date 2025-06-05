@@ -7,6 +7,7 @@
 - [Relay Management](#relay-management)
 - [Subscriptions](#subscriptions)
 - [Subscription Management](#subscription-management)
+- [Subscription Tracking](#subscription-tracking)
 - [Caching](#caching)
 - [Utilities](#utilities)
 - [Wallet System](#wallet-system)
@@ -31,11 +32,16 @@ public final class NDK {
     public var relays: [NDKRelay] { get }
     public var pool: NDKRelayPool { get }
     
+    // Subscription Tracking
+    public let subscriptionTracker: NDKSubscriptionTracker
+    
     // Initialization
     public init(
         relayUrls: [RelayURL] = [],
         signer: NDKSigner? = nil,
-        cacheAdapter: NDKCacheAdapter? = nil
+        cacheAdapter: NDKCacheAdapter? = nil,
+        signatureVerificationConfig: NDKSignatureVerificationConfig = .default,
+        subscriptionTrackingConfig: SubscriptionTrackingConfig = .default
     )
     
     // Connection Management
@@ -362,6 +368,184 @@ public actor NDKSubscriptionManager {
 - **EOSE Handling**: Smart End-of-Stored-Events handling with dynamic timeouts
 - **Cache Integration**: Multiple cache strategies for optimal performance
 - **Performance Metrics**: Comprehensive statistics for monitoring and optimization
+
+## Subscription Tracking
+
+### NDKSubscriptionTracker
+Comprehensive subscription tracking system for monitoring and debugging subscription behavior across relays.
+
+```swift
+public actor NDKSubscriptionTracker {
+    // Initialization
+    public init(
+        trackClosedSubscriptions: Bool = false,
+        maxClosedSubscriptions: Int = 100
+    )
+    
+    // Subscription Lifecycle Tracking
+    public func trackSubscription(
+        _ subscription: NDKSubscription,
+        filter: NDKFilter,
+        relayUrls: [String]
+    )
+    
+    public func trackSubscriptionSentToRelay(
+        subscriptionId: String,
+        relayUrl: String,
+        appliedFilter: NDKFilter
+    )
+    
+    public func trackEventReceived(
+        subscriptionId: String,
+        eventId: String,
+        relayUrl: String,
+        isUnique: Bool
+    )
+    
+    public func trackEoseReceived(
+        subscriptionId: String,
+        relayUrl: String
+    )
+    
+    public func closeSubscription(_ subscriptionId: String)
+    
+    // Query Methods
+    public func activeSubscriptionCount() -> Int
+    public func totalUniqueEventsReceived() -> Int
+    public func getSubscriptionDetail(_ subscriptionId: String) -> NDKSubscriptionDetail?
+    public func getAllActiveSubscriptions() -> [NDKSubscriptionDetail]
+    public func getSubscriptionMetrics(_ subscriptionId: String) -> NDKSubscriptionMetrics?
+    public func getRelayMetrics(
+        subscriptionId: String,
+        relayUrl: String
+    ) -> NDKRelaySubscriptionMetrics?
+    public func getAllRelayMetrics(
+        subscriptionId: String
+    ) -> [String: NDKRelaySubscriptionMetrics]?
+    public func getClosedSubscriptions() -> [NDKClosedSubscription]
+    public func getStatistics() -> NDKSubscriptionStatistics
+    
+    // Utility Methods
+    public func clearClosedSubscriptionHistory()
+    public func exportTrackingData() -> [String: Any]
+}
+```
+
+### NDK.SubscriptionTrackingConfig
+Configuration for subscription tracking behavior.
+
+```swift
+public struct SubscriptionTrackingConfig {
+    public var trackClosedSubscriptions: Bool
+    public var maxClosedSubscriptions: Int
+    
+    public init(
+        trackClosedSubscriptions: Bool = false,
+        maxClosedSubscriptions: Int = 100
+    )
+    
+    public static let `default` = SubscriptionTrackingConfig()
+}
+```
+
+### NDKSubscriptionMetrics
+Overall metrics for a subscription across all relays.
+
+```swift
+public struct NDKSubscriptionMetrics {
+    public let subscriptionId: String
+    public var totalUniqueEvents: Int
+    public var totalEvents: Int
+    public var activeRelayCount: Int
+    public let startTime: Date
+    public var endTime: Date?
+    public var duration: TimeInterval? { get }
+    public var isActive: Bool { get }
+}
+```
+
+### NDKRelaySubscriptionMetrics
+Tracks subscription details at the relay level.
+
+```swift
+public struct NDKRelaySubscriptionMetrics {
+    public let relayUrl: String
+    public let appliedFilter: NDKFilter
+    public var eventsReceived: Int
+    public var eoseReceived: Bool
+    public let subscriptionTime: Date
+    public var eoseTime: Date?
+    public var timeToEose: TimeInterval? { get }
+}
+```
+
+### NDKSubscriptionDetail
+Complete details for a subscription including relay-level metrics.
+
+```swift
+public struct NDKSubscriptionDetail {
+    public let subscriptionId: String
+    public let originalFilter: NDKFilter
+    public var metrics: NDKSubscriptionMetrics
+    public var relayMetrics: [String: NDKRelaySubscriptionMetrics]
+    public var relayUrls: [String] { get }
+}
+```
+
+### NDKClosedSubscription
+Represents a completed subscription for historical tracking.
+
+```swift
+public struct NDKClosedSubscription {
+    public let subscriptionId: String
+    public let filter: NDKFilter
+    public let relays: [String]
+    public let uniqueEventCount: Int
+    public let totalEventCount: Int
+    public let duration: TimeInterval
+    public let startTime: Date
+    public let endTime: Date
+    public var eventsPerSecond: Double { get }
+}
+```
+
+### NDKSubscriptionStatistics
+Overall statistics for all subscriptions in the NDK instance.
+
+```swift
+public struct NDKSubscriptionStatistics {
+    public var activeSubscriptions: Int
+    public var totalSubscriptions: Int
+    public var totalUniqueEvents: Int
+    public var totalEvents: Int
+    public var closedSubscriptionsTracked: Int
+    public var averageEventsPerSubscription: Double { get }
+}
+```
+
+**Key Features:**
+- **Real-time Metrics**: Track active subscriptions, event counts, and relay performance
+- **Relay-level Detail**: See exactly which filters were sent to each relay and their event counts
+- **Historical Tracking**: Optional closed subscription history for debugging
+- **Performance Analysis**: Compare relay performance and identify bottlenecks
+- **Export Capability**: Export all tracking data for external analysis
+- **Thread-safe**: Actor-based implementation ensures safe concurrent access
+
+**Usage Example:**
+```swift
+// Enable tracking
+let ndk = NDK(
+    subscriptionTrackingConfig: NDK.SubscriptionTrackingConfig(
+        trackClosedSubscriptions: true,
+        maxClosedSubscriptions: 100
+    )
+)
+
+// Access metrics
+let count = await ndk.subscriptionTracker.activeSubscriptionCount()
+let detail = await ndk.subscriptionTracker.getSubscriptionDetail(subscription.id)
+let stats = await ndk.subscriptionTracker.getStatistics()
+```
 
 ### NDKSubscription
 Manages event subscriptions with filtering, streaming, and advanced options.

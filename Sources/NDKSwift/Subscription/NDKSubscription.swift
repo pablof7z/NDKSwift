@@ -1,5 +1,32 @@
 import Foundation
 
+/// Actor for managing subscription state in a thread-safe manner
+actor SubscriptionState {
+    private var activeRelays: Set<NDKRelay> = []
+    
+    func addRelay(_ relay: NDKRelay) {
+        activeRelays.insert(relay)
+    }
+    
+    func getAllRelays() -> Set<NDKRelay> {
+        activeRelays
+    }
+    
+    func removeAllRelays() -> Set<NDKRelay> {
+        let relays = activeRelays
+        activeRelays.removeAll()
+        return relays
+    }
+    
+    func contains(_ relay: NDKRelay) -> Bool {
+        activeRelays.contains(relay)
+    }
+    
+    var count: Int {
+        activeRelays.count
+    }
+}
+
 /// Subscription options
 public struct NDKSubscriptionOptions {
     /// Whether to close the subscription on EOSE
@@ -64,8 +91,8 @@ public final class NDKSubscription {
     /// Whether the subscription is closed
     public private(set) var isClosed: Bool = false
     
-    /// Relays this subscription is active on
-    private var activeRelays: Set<NDKRelay> = []
+    /// Thread-safe relay state management
+    private let relayState = SubscriptionState()
     
     /// Event deduplication
     private var receivedEventIds: Set<EventID> = []
@@ -148,13 +175,12 @@ public final class NDKSubscription {
         
         // Close on all active relays using subscription manager
         Task {
-            for relay in activeRelays {
+            let relays = await relayState.removeAllRelays()
+            for relay in relays {
                 await relay.subscriptionManager.removeSubscription(id)
                 relay.removeSubscription(self)
             }
         }
-        
-        activeRelays.removeAll()
         eventCallbacks.removeAll()
         eoseCallbacks.removeAll()
         errorCallbacks.removeAll()
@@ -192,7 +218,7 @@ public final class NDKSubscription {
             for relay in relaysToUse {
                 // Use the relay's subscription manager which handles connection state
                 let _ = await relay.subscriptionManager.addSubscription(self, filters: filters)
-                activeRelays.insert(relay)
+                await relayState.addRelay(relay)
                 relay.addSubscription(self)
             }
         }

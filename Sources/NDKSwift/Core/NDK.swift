@@ -72,13 +72,38 @@ public final class NDK {
     /// Fetching strategy (lazy)
     internal var _fetchingStrategy: NDKFetchingStrategy?
     
+    // MARK: - Subscription Tracking
+    
+    /// Subscription tracker for monitoring and debugging
+    public let subscriptionTracker: NDKSubscriptionTracker
+    
+    /// Configuration for subscription tracking
+    public struct SubscriptionTrackingConfig {
+        /// Whether to track closed subscriptions for debugging
+        public var trackClosedSubscriptions: Bool
+        
+        /// Maximum number of closed subscriptions to remember
+        public var maxClosedSubscriptions: Int
+        
+        public init(
+            trackClosedSubscriptions: Bool = false,
+            maxClosedSubscriptions: Int = 100
+        ) {
+            self.trackClosedSubscriptions = trackClosedSubscriptions
+            self.maxClosedSubscriptions = maxClosedSubscriptions
+        }
+        
+        public static let `default` = SubscriptionTrackingConfig()
+    }
+    
     // MARK: - Initialization
     
     public init(
         relayUrls: [RelayURL] = [],
         signer: NDKSigner? = nil,
         cacheAdapter: NDKCacheAdapter? = nil,
-        signatureVerificationConfig: NDKSignatureVerificationConfig = .default
+        signatureVerificationConfig: NDKSignatureVerificationConfig = .default,
+        subscriptionTrackingConfig: SubscriptionTrackingConfig = .default
     ) {
         self.signer = signer
         self.cacheAdapter = cacheAdapter
@@ -86,6 +111,10 @@ public final class NDK {
         self.eventRepository = NDKEventRepository()
         self.signatureVerificationConfig = signatureVerificationConfig
         self.signatureVerificationSampler = NDKSignatureVerificationSampler(config: signatureVerificationConfig)
+        self.subscriptionTracker = NDKSubscriptionTracker(
+            trackClosedSubscriptions: subscriptionTrackingConfig.trackClosedSubscriptions,
+            maxClosedSubscriptions: subscriptionTrackingConfig.maxClosedSubscriptions
+        )
         
         // Initialize subscription manager after all properties are set
         self.subscriptionManager = NDKSubscriptionManager(ndk: self)
