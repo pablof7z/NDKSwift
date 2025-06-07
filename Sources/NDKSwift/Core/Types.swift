@@ -136,6 +136,7 @@ public enum NDKError: Error, LocalizedError, Equatable {
     case invalidPaymentRequest
     case signerError(String)
     case invalidEvent(String)
+    case invalidInput(String)
 
     public var errorDescription: String? {
         switch self {
@@ -181,6 +182,8 @@ public enum NDKError: Error, LocalizedError, Equatable {
             return "Signer error: \(message)"
         case let .invalidEvent(message):
             return "Invalid event: \(message)"
+        case let .invalidInput(message):
+            return "Invalid input: \(message)"
         }
     }
 }

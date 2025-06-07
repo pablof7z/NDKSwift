@@ -92,10 +92,20 @@ public final class NDKUser: Equatable, Hashable {
     // MARK: - Profile Management
 
     /// Fetch user's profile
+    /// - Parameter forceRefresh: If true, bypasses cache and fetches fresh data from relays
+    /// - Returns: The user's profile, or nil if not found
     @discardableResult
-    public func fetchProfile() async throws -> NDKUserProfile? {
+    public func fetchProfile(forceRefresh: Bool = false) async throws -> NDKUserProfile? {
         guard let ndk = ndk else {
             throw NDKError.custom("NDK instance not set")
+        }
+
+        // Check cache first unless force refresh is requested
+        if !forceRefresh {
+            if let cached = await ndk.cacheAdapter?.fetchProfile(pubkey: pubkey) {
+                self.profile = cached
+                return cached
+            }
         }
 
         // Create filter for kind 0 events
@@ -105,8 +115,23 @@ public final class NDKUser: Equatable, Hashable {
             limit: 1
         )
 
-        // TODO: Implement subscription and fetch
-        // For now, return nil
+        // Fetch the profile event
+        if let event = try await ndk.fetchEvent(filter) {
+            // Parse the profile from the event content
+            guard let profileData = event.content.data(using: .utf8),
+                  let profile = try? JSONDecoder().decode(NDKUserProfile.self, from: profileData) else {
+                throw NDKError.validation("Invalid profile data")
+            }
+            
+            // Update our local profile
+            self.profile = profile
+            
+            // Save to cache
+            await ndk.cacheAdapter?.saveProfile(pubkey: pubkey, profile: profile)
+            
+            return profile
+        }
+        
         return nil
     }
 

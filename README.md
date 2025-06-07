@@ -214,6 +214,41 @@ Key features:
 
 See [Subscription Tracking Documentation](Documentation/SUBSCRIPTION_TRACKING.md) for details.
 
+### Profile Fetching
+
+NDKSwift provides an ergonomic system for fetching user profiles with intelligent caching and automatic batching:
+
+```swift
+// Fetch a single profile
+let user = ndk.getUser("pubkey_hex")
+if let profile = try await user.fetchProfile() {
+    print("Name: \(profile.name ?? "Unknown")")
+    print("About: \(profile.about ?? "")")
+}
+
+// Fetch multiple profiles efficiently (automatically batched)
+let pubkeys = ["pubkey1", "pubkey2", "pubkey3"]
+let profiles = try await ndk.profileManager.fetchProfiles(for: pubkeys)
+
+// Configure profile caching
+let ndk = NDK(
+    profileConfig: NDKProfileConfig(
+        cacheSize: 1000,        // Keep 1000 profiles in memory
+        staleAfter: 3600,       // Consider stale after 1 hour
+        batchRequests: true,    // Auto-batch requests
+        maxBatchSize: 100       // Max profiles per request
+    )
+)
+```
+
+Features:
+- **Smart Caching**: LRU cache prevents redundant fetches
+- **Automatic Batching**: Multiple requests are grouped into single subscriptions
+- **Configurable Staleness**: Control when profiles are considered outdated
+- **Force Refresh**: Bypass cache when needed with `forceRefresh: true`
+
+See [Profile Fetching Documentation](Documentation/PROFILE_FETCHING.md) for details.
+
 ## Caching
 
 NDKSwift includes an adapter-based caching system with multiple storage backends:
