@@ -2,14 +2,14 @@
 import XCTest
 
 final class NsecVerificationTest: XCTestCase {
-    func testNsecToPubkeyConversion() {
+    func testNsecToPubkeyConversion() async throws {
         let nsecInput = "nsec1pnfm84sp6ed974zj7qsqqcn692hgnf9s48jk8x0psagucv6yy3ys5qqx7c"
         let expectedPubkey = "2bfe63136e95ef81b137bd814405dfcaeeabd4bab04388f2167318001fb71473"
 
         do {
             let signer = try NDKPrivateKeySigner(nsec: nsecInput)
-            let actualPubkey = try signer.pubkey
-            let npub = try signer.npub
+            let actualPubkey = try await signer.pubkey
+            let npub = try await signer.npub
 
             print("✅ Input nsec: \(nsecInput)")
             print("✅ Expected pubkey: \(expectedPubkey)")

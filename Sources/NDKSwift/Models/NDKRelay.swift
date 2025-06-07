@@ -182,6 +182,13 @@ public final class NDKRelay: Hashable, Equatable {
         defer { subscriptionsLock.unlock() }
         subscriptions.removeValue(forKey: subscription.id)
     }
+    
+    /// Remove a subscription by ID from this relay (safer for async contexts)
+    public func removeSubscription(byId subscriptionId: String) {
+        subscriptionsLock.lock()
+        defer { subscriptionsLock.unlock() }
+        subscriptions.removeValue(forKey: subscriptionId)
+    }
 
     /// Get all active subscriptions
     public var activeSubscriptions: [NDKSubscription] {

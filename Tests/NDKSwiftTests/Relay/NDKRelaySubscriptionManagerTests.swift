@@ -15,12 +15,12 @@ final class NDKRelaySubscriptionManagerTests: XCTestCase {
     func testFilterMergingWithSameKinds() async {
         // Create two subscriptions with same kinds but different authors
         let sub1 = NDKSubscription(
-            filters: [NDKFilter(kinds: [0, 1], authors: ["author1"])],
+            filters: [NDKFilter(authors: ["author1"], kinds: [0, 1])],
             options: NDKSubscriptionOptions()
         )
 
         let sub2 = NDKSubscription(
-            filters: [NDKFilter(kinds: [0, 1], authors: ["author2"])],
+            filters: [NDKFilter(authors: ["author2"], kinds: [0, 1])],
             options: NDKSubscriptionOptions()
         )
 
@@ -34,8 +34,8 @@ final class NDKRelaySubscriptionManagerTests: XCTestCase {
 
     func testFilterMergingPreservesAllAuthors() async {
         // Create subscriptions with different authors
-        let filters1 = [NDKFilter(kinds: [1], authors: ["alice", "bob"])]
-        let filters2 = [NDKFilter(kinds: [1], authors: ["charlie", "david"])]
+        let filters1 = [NDKFilter(authors: ["alice", "bob"], kinds: [1])]
+        let filters2 = [NDKFilter(authors: ["charlie", "david"], kinds: [1])]
 
         let sub1 = NDKSubscription(filters: filters1)
         let sub2 = NDKSubscription(filters: filters2)
@@ -126,7 +126,7 @@ final class NDKRelaySubscriptionManagerTests: XCTestCase {
             options: NDKSubscriptionOptions()
         )
 
-        let relaySubId = await subscriptionManager.addSubscription(sub, filters: sub.filters)
+        _ = await subscriptionManager.addSubscription(sub, filters: sub.filters)
 
         // Get active subscriptions - should be empty since relay not connected
         let activeIds = await subscriptionManager.getActiveSubscriptionIds()
@@ -201,12 +201,12 @@ final class NDKRelaySubscriptionManagerTests: XCTestCase {
         let expectation = XCTestExpectation(description: "Event received")
 
         let sub1 = NDKSubscription(
-            filters: [NDKFilter(kinds: [1], authors: ["alice"])],
+            filters: [NDKFilter(authors: ["alice"], kinds: [1])],
             options: NDKSubscriptionOptions()
         )
 
         let sub2 = NDKSubscription(
-            filters: [NDKFilter(kinds: [1], authors: ["bob"])],
+            filters: [NDKFilter(authors: ["bob"], kinds: [1])],
             options: NDKSubscriptionOptions()
         )
 
@@ -236,13 +236,13 @@ final class NDKRelaySubscriptionManagerTests: XCTestCase {
     func testRemoveSubscriptionUpdatesFilters() async {
         let sub1 = NDKSubscription(
             id: "sub1",
-            filters: [NDKFilter(kinds: [1], authors: ["alice"])],
+            filters: [NDKFilter(authors: ["alice"], kinds: [1])],
             options: NDKSubscriptionOptions()
         )
 
         let sub2 = NDKSubscription(
             id: "sub2",
-            filters: [NDKFilter(kinds: [1], authors: ["bob"])],
+            filters: [NDKFilter(authors: ["bob"], kinds: [1])],
             options: NDKSubscriptionOptions()
         )
 
@@ -253,7 +253,7 @@ final class NDKRelaySubscriptionManagerTests: XCTestCase {
         await subscriptionManager.removeSubscription("sub1")
 
         // Create event from alice - should not be received
-        let aliceEvent = NDKEvent(kind: 1, content: "Hello", pubkey: "alice")
+        let aliceEvent = NDKEvent(pubkey: "alice", createdAt: Timestamp(Date().timeIntervalSince1970), kind: 1, tags: [], content: "Hello")
 
         var aliceEventReceived = false
         sub1.onEvent { _ in
@@ -268,7 +268,7 @@ final class NDKRelaySubscriptionManagerTests: XCTestCase {
         XCTAssertFalse(aliceEventReceived, "Removed subscription should not receive events")
 
         // Create event from bob - should be received
-        let bobEvent = NDKEvent(kind: 1, content: "Hello", pubkey: "bob")
+        let bobEvent = NDKEvent(pubkey: "bob", createdAt: Timestamp(Date().timeIntervalSince1970), kind: 1, tags: [], content: "Hello")
 
         let bobExpectation = XCTestExpectation(description: "Bob event received")
         sub2.onEvent { _ in
@@ -283,13 +283,13 @@ final class NDKRelaySubscriptionManagerTests: XCTestCase {
     // MARK: - Fingerprint Tests
 
     func testFingerprintGeneration() {
-        let filter1 = NDKFilter(kinds: [1, 3, 0], authors: ["alice"])
+        let filter1 = NDKFilter(authors: ["alice"], kinds: [1, 3, 0])
         let fingerprint1 = NDKRelaySubscriptionManager.FilterFingerprint(
             filters: [filter1],
             closeOnEose: false
         )
 
-        let filter2 = NDKFilter(kinds: [0, 1, 3], authors: ["bob"]) // Different order
+        let filter2 = NDKFilter(authors: ["bob"], kinds: [0, 1, 3]) // Different order
         let fingerprint2 = NDKRelaySubscriptionManager.FilterFingerprint(
             filters: [filter2],
             closeOnEose: false
