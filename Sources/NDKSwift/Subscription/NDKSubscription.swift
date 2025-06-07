@@ -200,11 +200,13 @@ public final class NDKSubscription {
         timeoutTimer = nil
 
         // Close on all active relays using subscription manager
+        // Capture id before Task to avoid accessing self in async context
+        let subscriptionId = id
         Task {
             let relays = await relayState.removeAllRelays()
             for relay in relays {
-                await relay.subscriptionManager.removeSubscription(id)
-                relay.removeSubscription(self)
+                await relay.subscriptionManager.removeSubscription(subscriptionId)
+                relay.removeSubscription(byId: subscriptionId)
             }
         }
         

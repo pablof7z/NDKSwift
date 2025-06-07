@@ -29,7 +29,7 @@ final class BasicOutboxTest: XCTestCase {
     func testRelaySelection() async throws {
         let ndk = NDK()
         let tracker = NDKOutboxTracker(ndk: ndk)
-        let ranker = NDKRelayRanker()
+        let ranker = NDKRelayRanker(ndk: ndk, tracker: tracker)
         let selector = NDKRelaySelector(
             ndk: ndk,
             tracker: tracker,
@@ -37,7 +37,7 @@ final class BasicOutboxTest: XCTestCase {
         )
 
         // Create a test event
-        let event = NDKEvent(ndk: ndk)
+        let event = NDKEvent()
         event.kind = 1
         event.content = "Test message"
         event.pubkey = "test-pubkey"
