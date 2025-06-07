@@ -424,9 +424,37 @@ subscription.start()
 let user = ndk.user(withPubkey: "pubkey...")
 try await user.fetchProfile()
 print("User name: \(user.profile?.name ?? "Unknown")")
+
+// Fetch event by ID or bech32
+let event1 = try await ndk.fetchEvent("5c83da77af1dec6d7289834998ad7aafbd9e2191396d75ec3cc27f5a77226f36")
+let event2 = try await ndk.fetchEvent("note1tjpatmavrmkx6u5fsdyc44m647w7uxg3jmt4akpucfl6wuex7umqk7y5ph")
+let event3 = try await ndk.fetchEvent("nevent1qqstjpatmavrmkx6u5fsdyc44m647w7uxg3jmt4akpucfl6wuex7umgpz3mhxue69uhhyetvv9ujuerpd46hxtnfduq36amnwvaz7tmjv4kxz7fwd46hg6tw09mkzmrvv46zucm0d5hs0dqul7")
+let event4 = try await ndk.fetchEvent("naddr1qq9rzd3exgenjv34xqmr2wfekgenjdp5qy2hwumn8ghj7un9d3shjtnyv9kh2uewd9hj7qpqgegazpzx8n5z5zq7jz6gute3cvsqn0athf5dlctusn8tr74vxsqn428x3")
 ```
 
 ## Advanced Features
+
+### Event Fetching with Bech32 Support
+
+The `fetchEvent` method supports multiple identifier formats:
+
+```swift
+// Fetch by hex event ID
+let event1 = try await ndk.fetchEvent("5c83da77af1dec6d7289834998ad7aafbd9e2191396d75ec3cc27f5a77226f36")
+
+// Fetch by note ID (NIP-19)
+let event2 = try await ndk.fetchEvent("note1tjpatmavrmkx6u5fsdyc44m647w7uxg3jmt4akpucfl6wuex7umqk7y5ph")
+
+// Fetch by nevent (includes relay hints and metadata)
+let event3 = try await ndk.fetchEvent("nevent1qqstjpatmavrmkx6u5fsdyc44m647w7uxg3jmt4akpucfl6wuex7umgpz3mhxue69uhhyetvv9ujuerpd46hxtnfduq36amnwvaz7tmjv4kxz7fwd46hg6tw09mkzmrvv46zucm0d5hs0dqul7")
+
+// Fetch replaceable event by naddr (includes author, kind, and identifier)
+let event4 = try await ndk.fetchEvent("naddr1qq9rzd3exgenjv34xqmr2wfekgenjdp5qy2hwumn8ghj7un9d3shjtnyv9kh2uewd9hj7qpqgegazpzx8n5z5zq7jz6gute3cvsqn0athf5dlctusn8tr74vxsqn428x3")
+
+// Specify relays to query
+let relays = Set([relay1, relay2])
+let event5 = try await ndk.fetchEvent("note1...", relays: relays)
+```
 
 ### Subscription Tracking
 Monitor and debug subscription behavior across relays.

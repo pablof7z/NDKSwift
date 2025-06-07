@@ -15,7 +15,7 @@ final class NDKSubscriptionThreadSafetyTests: XCTestCase {
 
         // Run multiple iterations to increase chances of hitting race condition
         for iteration in 0 ..< 50 {
-            let filters = [NDKFilter(kinds: [1], authors: ["test\(iteration)"])]
+            let filters = [NDKFilter(authors: ["test\(iteration)"], kinds: [1])]
             let subscription = NDKSubscription(filters: filters, ndk: ndk)
 
             // Create concurrent tasks
@@ -32,8 +32,8 @@ final class NDKSubscriptionThreadSafetyTests: XCTestCase {
             }
 
             // Wait for both tasks to complete
-            await startTask.value
-            await closeTask.value
+            _ = try? await startTask.value
+            _ = try? await closeTask.value
         }
 
         // If we reach here without crashing, the test passes
@@ -59,7 +59,7 @@ final class NDKSubscriptionThreadSafetyTests: XCTestCase {
         await withTaskGroup(of: Void.self) { group in
             for i in 0 ..< 10 {
                 group.addTask {
-                    let filters = [NDKFilter(kinds: [1], authors: ["user\(i)"])]
+                    let filters = [NDKFilter(authors: ["user\(i)"], kinds: [1])]
                     let subscription = NDKSubscription(filters: filters, ndk: ndk)
 
                     // Start and immediately close

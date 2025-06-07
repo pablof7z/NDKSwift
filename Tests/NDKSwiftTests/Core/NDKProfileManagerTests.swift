@@ -195,42 +195,6 @@ final class NDKProfileManagerTests: XCTestCase {
     }
 }
 
-// MARK: - Mock Cache for Testing
-
-private class MockCache: NDKCacheAdapter {
-    var events: [EventID: NDKEvent] = [:]
-    var profiles: [PublicKey: NDKUserProfile] = [:]
-    var mockEvents: [NDKEvent] = []
-    
-    func setEvent(_ event: NDKEvent, filters: [NDKFilter], relay: NDKRelay?) async {
-        if let id = event.id {
-            events[id] = event
-        }
-    }
-    
-    func queryEvents(filters: [NDKFilter]) async -> AsyncThrowingStream<NDKEvent, Error> {
-        AsyncThrowingStream { continuation in
-            for event in mockEvents {
-                if filters.contains(where: { $0.matches(event: event) }) {
-                    continuation.yield(event)
-                }
-            }
-            continuation.finish()
-        }
-    }
-    
-    func fetchProfile(pubkey: PublicKey) async -> NDKUserProfile? {
-        return profiles[pubkey]
-    }
-    
-    func saveProfile(_ profile: NDKUserProfile, for pubkey: PublicKey) async {
-        profiles[pubkey] = profile
-    }
-    
-    func addUnpublishedEvent(_ event: NDKEvent, relayUrls: [RelayURL]) async {}
-    func getUnpublishedEvents(for relayUrl: RelayURL) async -> [NDKEvent] { [] }
-    func removeUnpublishedEvent(_ eventId: EventID, from relayUrl: RelayURL) async {}
-}
 
 private extension Data {
     var string: String {

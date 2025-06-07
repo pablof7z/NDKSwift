@@ -323,8 +323,8 @@ public final class NDK {
             ndk: self
         )
 
-        // Use advanced subscription manager for optimized handling
-        Task {
+        // Store the subscription immediately in a sync manner to avoid race conditions
+        subscription.registrationTask = Task {
             await subscriptionManager.addSubscription(subscription)
         }
 
@@ -341,6 +341,14 @@ public final class NDK {
         options.relays = relays
 
         let subscription = subscribe(filters: filters, options: options)
+        
+        // Wait for registration to complete before starting
+        if let registrationTask = subscription.registrationTask {
+            await registrationTask.value
+        }
+        
+        // Start the subscription
+        subscription.start()
 
         // Wait for EOSE using the new callback-based approach
         await subscription.waitForEOSE()

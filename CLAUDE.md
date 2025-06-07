@@ -139,3 +139,7 @@ swift package generate-xcodeproj
 ## Claude's Responsibilities
 
 - You are also in charge of keeping the documentation and tutorial information highly in line with implementation and best practices
+
+UUIDs are stupid and should never be used in the context of nostr.
+
+- Unless otherwise specified, backward compatibility is not necessary

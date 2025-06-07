@@ -26,11 +26,7 @@ extension NDKFileCache: NDKOutboxCacheAdapter {
                     .appendingPathComponent("\(eventId).json")
 
                 do {
-                    let encoder = JSONEncoder()
-                    encoder.dateEncodingStrategy = .iso8601
-                    let data = try encoder.encode(record)
-                    try data.write(to: filePath)
-
+                    try FileManager.default.saveCodable(record, to: filePath)
                     // Update index
                     self.unpublishedEventIndex[eventId] = record
                 } catch {
@@ -85,11 +81,7 @@ extension NDKFileCache: NDKOutboxCacheAdapter {
                     .appendingPathComponent("\(eventId).json")
 
                 do {
-                    let encoder = JSONEncoder()
-                    encoder.dateEncodingStrategy = .iso8601
-                    let data = try encoder.encode(updatedRecord)
-                    try data.write(to: filePath)
-
+                    try FileManager.default.saveCodable(updatedRecord, to: filePath)
                     // Update index
                     self.unpublishedEventIndex[eventId] = updatedRecord
                 } catch {
@@ -161,11 +153,7 @@ extension NDKFileCache: NDKOutboxCacheAdapter {
                     .appendingPathComponent("\(item.pubkey).json")
 
                 do {
-                    let encoder = JSONEncoder()
-                    encoder.dateEncodingStrategy = .iso8601
-                    let data = try encoder.encode(item)
-                    try data.write(to: filePath)
-
+                    try FileManager.default.saveCodable(item, to: filePath)
                     // Update index
                     self.outboxItemIndex[item.pubkey] = item
                 } catch {
@@ -197,10 +185,7 @@ extension NDKFileCache: NDKOutboxCacheAdapter {
                     .appendingPathComponent("\(fileName).json")
 
                 do {
-                    let encoder = JSONEncoder()
-                    encoder.dateEncodingStrategy = .iso8601
-                    let data = try encoder.encode(health)
-                    try data.write(to: filePath)
+                    try FileManager.default.saveCodable(health, to: filePath)
                 } catch {
                     print("Failed to store relay health: \(error)")
                 }
@@ -287,55 +272,32 @@ extension NDKFileCache {
 
     private func loadOutboxData() {
         // Load unpublished events
-        if let files = try? FileManager.default.contentsOfDirectory(
-            at: outboxDirectory,
-            includingPropertiesForKeys: nil
-        ) {
-            let decoder = JSONDecoder()
-            decoder.dateDecodingStrategy = .iso8601
-
-            for file in files where file.pathExtension == "json" {
-                if let data = try? Data(contentsOf: file),
-                   let record = try? decoder.decode(UnpublishedEventRecord.self, from: data),
-                   let eventId = record.event.id
-                {
-                    unpublishedEventIndex[eventId] = record
-                }
+        let unpublishedRecords = FileManager.default.loadAllCodable(
+            UnpublishedEventRecord.self,
+            fromDirectory: outboxDirectory
+        )
+        for record in unpublishedRecords {
+            if let eventId = record.event.id {
+                unpublishedEventIndex[eventId] = record
             }
         }
 
         // Load outbox items
-        if let files = try? FileManager.default.contentsOfDirectory(
-            at: outboxRelayDirectory,
-            includingPropertiesForKeys: nil
-        ) {
-            let decoder = JSONDecoder()
-            decoder.dateDecodingStrategy = .iso8601
-
-            for file in files where file.pathExtension == "json" {
-                if let data = try? Data(contentsOf: file),
-                   let item = try? decoder.decode(NDKOutboxItem.self, from: data)
-                {
-                    outboxItemIndex[item.pubkey] = item
-                }
-            }
+        let outboxItems = FileManager.default.loadAllCodableWithFilenames(
+            NDKOutboxItem.self,
+            fromDirectory: outboxRelayDirectory
+        )
+        for (_, item) in outboxItems {
+            outboxItemIndex[item.pubkey] = item
         }
 
         // Load relay health
-        if let files = try? FileManager.default.contentsOfDirectory(
-            at: relayHealthDirectory,
-            includingPropertiesForKeys: nil
-        ) {
-            let decoder = JSONDecoder()
-            decoder.dateDecodingStrategy = .iso8601
-
-            for file in files where file.pathExtension == "json" {
-                if let data = try? Data(contentsOf: file),
-                   let health = try? decoder.decode(RelayHealthMetrics.self, from: data)
-                {
-                    relayHealthCache[health.url] = health
-                }
-            }
+        let healthMetrics = FileManager.default.loadAllCodable(
+            RelayHealthMetrics.self,
+            fromDirectory: relayHealthDirectory
+        )
+        for health in healthMetrics {
+            relayHealthCache[health.url] = health
         }
     }
 }

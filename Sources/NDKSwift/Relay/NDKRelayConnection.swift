@@ -132,6 +132,12 @@ public final class NDKRelayConnection {
             throw NDKError.relayConnectionFailed("Not connected")
         }
 
+        #if DEBUG
+        if json.hasPrefix("[\"REQ\"") {
+            print("🔌 \(url): \(json)")
+        }
+        #endif
+
         #if os(iOS) || os(macOS) || os(watchOS) || os(tvOS)
             guard let task = webSocketTask else {
                 throw NDKError.relayConnectionFailed("No WebSocket task")
@@ -178,15 +184,35 @@ public final class NDKRelayConnection {
     #endif
 
     private func handleReceivedMessage(_ json: String) {
+        #if DEBUG
+        print("📥 RECEIVED MESSAGE FROM RELAY \(url):")
+        print("   JSON: \(json)")
+        #endif
+        
         do {
             let message = try NostrMessage.parse(from: json)
+            
+            #if DEBUG
+            switch message {
+            case .eose(let subscriptionId):
+                print("🏁 RECEIVED EOSE from \(url) for subscription: \(subscriptionId)")
+            case .event(let subscriptionId, _):
+                print("📋 RECEIVED EVENT from \(url) for subscription: \(subscriptionId ?? "nil")")
+            case .notice(let notice):
+                print("📢 RECEIVED NOTICE from \(url): \(notice)")
+            default:
+                print("📝 RECEIVED \(type(of: message)) from \(url)")
+            }
+            #endif
+            
             DispatchQueue.main.async { [weak self] in
                 guard let self = self else { return }
                 self.delegate?.relayConnection(self, didReceiveMessage: message)
             }
         } catch {
             // Log parsing error but continue
-            print("Failed to parse message: \(error)")
+            print("❌ Failed to parse message from \(url): \(error)")
+            print("   Raw JSON: \(json)")
         }
     }
 

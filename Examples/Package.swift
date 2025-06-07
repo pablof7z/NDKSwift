@@ -74,8 +74,17 @@ let package = Package(
                 .product(name: "NDKSwift", package: "NDKSwift"),
             ],
             path: ".",
-            exclude: ["StandaloneDemo.swift", "BasicUsage.swift", "SimpleDemo.swift", "NostrDemo.swift", "README.md", "SimpleDemoMain.swift", "NostrDemoMain.swift", "FileCacheDemo.swift", "iOSNostrAppDemo.swift", "PaymentDemo.swift", "EncodeDemo.swift", "BlossomDemo.swift", "RuniOSApp.swift", "BunkerDemo.swift", "TestBunker.swift", "iOSBunkerDemo.swift", "TestBunkerParsing.swift"],
+            exclude: ["StandaloneDemo.swift", "BasicUsage.swift", "SimpleDemo.swift", "NostrDemo.swift", "README.md", "SimpleDemoMain.swift", "NostrDemoMain.swift", "FileCacheDemo.swift", "iOSNostrAppDemo.swift", "PaymentDemo.swift", "EncodeDemo.swift", "BlossomDemo.swift", "RuniOSApp.swift", "BunkerDemo.swift", "TestBunker.swift", "iOSBunkerDemo.swift", "TestBunkerParsing.swift", "FetchEventCLI.swift"],
             sources: ["TestiOSBunker.swift"]
+        ),
+        .executableTarget(
+            name: "FetchEventCLI",
+            dependencies: [
+                .product(name: "NDKSwift", package: "NDKSwift"),
+            ],
+            path: ".",
+            exclude: ["StandaloneDemo.swift", "BasicUsage.swift", "SimpleDemo.swift", "NostrDemo.swift", "README.md", "SimpleDemoMain.swift", "NostrDemoMain.swift", "FileCacheDemo.swift", "iOSNostrAppDemo.swift", "PaymentDemo.swift", "EncodeDemo.swift", "BlossomDemo.swift", "RuniOSApp.swift", "BunkerDemo.swift", "TestBunker.swift", "iOSBunkerDemo.swift", "TestBunkerParsing.swift", "TestiOSBunker.swift"],
+            sources: ["FetchEventCLI.swift"]
         ),
     ]
 )

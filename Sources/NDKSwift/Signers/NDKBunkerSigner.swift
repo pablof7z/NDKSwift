@@ -1,6 +1,66 @@
 import Combine
 import Foundation
 
+/// Helper struct for parsing bunker URLs
+struct BunkerURLParser {
+    let urlString: String
+    
+    func parse() -> (bunkerPubkey: String?, userPubkey: String?, relays: [String], secret: String?) {
+        print("[BunkerSigner] Parsing bunker URL: \(urlString)")
+        
+        guard let url = URL(string: urlString),
+              url.scheme == "bunker"
+        else {
+            print("[BunkerSigner] ERROR: Invalid URL scheme or format")
+            return (nil, nil, [], nil)
+        }
+        
+        var bunkerPubkey: String?
+        var userPubkey: String?
+        var relays: [String] = []
+        var secret: String?
+        
+        // Extract bunker pubkey from hostname or path
+        if let host = url.host {
+            bunkerPubkey = host
+            print("[BunkerSigner] Extracted bunker pubkey from host: \(host)")
+        } else {
+            // Handle bunker://pubkey format
+            let path = url.path
+            if path.hasPrefix("//") {
+                bunkerPubkey = String(path.dropFirst(2))
+                print("[BunkerSigner] Extracted bunker pubkey from path: \(bunkerPubkey ?? "nil")")
+            }
+        }
+        
+        // Parse query parameters
+        if let components = URLComponents(url: url, resolvingAgainstBaseURL: false) {
+            print("[BunkerSigner] Query items: \(components.queryItems?.map { "\($0.name)=\($0.value ?? "nil")" }.joined(separator: ", ") ?? "none")")
+            
+            for item in components.queryItems ?? [] {
+                switch item.name {
+                case "pubkey":
+                    userPubkey = item.value
+                    print("[BunkerSigner] Found user pubkey: \(item.value ?? "nil")")
+                case "relay":
+                    if let relay = item.value {
+                        relays.append(relay)
+                        print("[BunkerSigner] Added relay: \(relay)")
+                    }
+                case "secret":
+                    secret = item.value
+                    print("[BunkerSigner] Found secret: \(item.value != nil ? "***" : "nil")")
+                default:
+                    print("[BunkerSigner] Unknown parameter: \(item.name)=\(item.value ?? "nil")")
+                }
+            }
+        }
+        
+        print("[BunkerSigner] Parse complete - bunkerPubkey: \(bunkerPubkey ?? "nil"), userPubkey: \(userPubkey ?? "nil"), relays: \(relays), hasSecret: \(secret != nil)")
+        return (bunkerPubkey, userPubkey, relays, secret)
+    }
+}
+
 /// NIP-46 remote signer implementation supporting both bunker:// and nostrconnect:// flows
 public actor NDKBunkerSigner: NDKSigner, @unchecked Sendable {
     private let ndk: NDK
@@ -74,63 +134,25 @@ public actor NDKBunkerSigner: NDKSigner, @unchecked Sendable {
         self.localSigner = localSigner
         self.relayUrls = []
 
-        switch connectionType {
-        case let .bunker(token):
-            self.parseBunkerUrl(token)
-        case let .nostrConnect(relay, options):
-            self.initNostrConnect(relay: relay, options: options)
-        case .nip05:
-            break // Will be handled in connect()
+        Task { @MainActor in
+            switch connectionType {
+            case let .bunker(token):
+                await self.parseBunkerUrl(token)
+            case let .nostrConnect(relay, options):
+                await self.initNostrConnect(relay: relay, options: options)
+            case .nip05:
+                break // Will be handled in connect()
+            }
         }
     }
 
     private func parseBunkerUrl(_ urlString: String) {
-        print("[BunkerSigner] Parsing bunker URL: \(urlString)")
-
-        guard let url = URL(string: urlString),
-              url.scheme == "bunker"
-        else {
-            print("[BunkerSigner] ERROR: Invalid URL scheme or format")
-            return
-        }
-
-        // Extract bunker pubkey from hostname or path
-        if let host = url.host {
-            self.bunkerPubkey = host
-            print("[BunkerSigner] Extracted bunker pubkey from host: \(host)")
-        } else {
-            // Handle bunker://pubkey format
-            let path = url.path
-            if path.hasPrefix("//") {
-                self.bunkerPubkey = String(path.dropFirst(2))
-                print("[BunkerSigner] Extracted bunker pubkey from path: \(self.bunkerPubkey ?? "nil")")
-            }
-        }
-
-        // Parse query parameters
-        if let components = URLComponents(url: url, resolvingAgainstBaseURL: false) {
-            print("[BunkerSigner] Query items: \(components.queryItems?.map { "\($0.name)=\($0.value ?? "nil")" }.joined(separator: ", ") ?? "none")")
-
-            for item in components.queryItems ?? [] {
-                switch item.name {
-                case "pubkey":
-                    self.userPubkey = item.value
-                    print("[BunkerSigner] Found user pubkey: \(item.value ?? "nil")")
-                case "relay":
-                    if let relay = item.value {
-                        self.relayUrls.append(relay)
-                        print("[BunkerSigner] Added relay: \(relay)")
-                    }
-                case "secret":
-                    self.secret = item.value
-                    print("[BunkerSigner] Found secret: \(item.value != nil ? "***" : "nil")")
-                default:
-                    print("[BunkerSigner] Unknown parameter: \(item.name)=\(item.value ?? "nil")")
-                }
-            }
-        }
-
-        print("[BunkerSigner] Parse complete - bunkerPubkey: \(bunkerPubkey ?? "nil"), userPubkey: \(userPubkey ?? "nil"), relays: \(relayUrls), hasSecret: \(secret != nil)")
+        let parser = BunkerURLParser(urlString: urlString)
+        let (bunkerPubkey, userPubkey, relays, secret) = parser.parse()
+        self.bunkerPubkey = bunkerPubkey
+        self.userPubkey = userPubkey
+        self.relayUrls = relays
+        self.secret = secret
     }
 
     private func initNostrConnect(relay: String, options: NostrConnectOptions?) {
@@ -414,7 +436,7 @@ public actor NDKBunkerSigner: NDKSigner, @unchecked Sendable {
         }
     }
 
-    public func sign(_ event: NDKEvent) async throws -> Signature {
+    private func performSign(_ event: NDKEvent) async throws -> Signature {
         guard let bunkerPubkey = bunkerPubkey else {
             throw NDKError.signerError("Not connected")
         }
@@ -439,29 +461,12 @@ public actor NDKBunkerSigner: NDKSigner, @unchecked Sendable {
         return sig
     }
 
+    public func sign(_ event: NDKEvent) async throws -> Signature {
+        return try await performSign(event)
+    }
+
     public func sign(event: inout NDKEvent) async throws {
-        guard let bunkerPubkey = bunkerPubkey else {
-            throw NDKError.signerError("Not connected")
-        }
-
-        let eventJson = try event.serialize()
-
-        let response = try await rpcClient?.sendRequest(
-            to: bunkerPubkey,
-            method: "sign_event",
-            params: [eventJson]
-        )
-
-        guard let response = response,
-              response.error == nil,
-              let resultData = response.result.data(using: String.Encoding.utf8),
-              let json = try? JSONSerialization.jsonObject(with: resultData) as? [String: Any],
-              let sig = json["sig"] as? String
-        else {
-            throw NDKError.signerError("Failed to sign event")
-        }
-
-        event.sig = sig
+        event.sig = try await performSign(event)
     }
 
     public func getPublicKey() async throws -> String {
@@ -488,48 +493,34 @@ public actor NDKBunkerSigner: NDKSigner, @unchecked Sendable {
         return response.result
     }
 
-    public func encrypt(recipient: NDKUser, value: String, scheme: NDKEncryptionScheme) async throws -> String {
+    private func performCrypto(method: String, params: [String], errorMessage: String) async throws -> String {
         guard let bunkerPubkey = bunkerPubkey else {
             throw NDKError.signerError("Not connected")
         }
 
-        let method = scheme == .nip04 ? "nip04_encrypt" : "nip44_encrypt"
-
         let response = try await rpcClient?.sendRequest(
             to: bunkerPubkey,
             method: method,
-            params: [recipient.pubkey, value]
+            params: params
         )
 
         guard let response = response,
               response.error == nil
         else {
-            throw NDKError.signerError("Failed to encrypt")
+            throw NDKError.signerError(errorMessage)
         }
 
         return response.result
     }
 
+    public func encrypt(recipient: NDKUser, value: String, scheme: NDKEncryptionScheme) async throws -> String {
+        let method = scheme == .nip04 ? "nip04_encrypt" : "nip44_encrypt"
+        return try await performCrypto(method: method, params: [recipient.pubkey, value], errorMessage: "Failed to encrypt")
+    }
+
     public func decrypt(sender: NDKUser, value: String, scheme: NDKEncryptionScheme) async throws -> String {
-        guard let bunkerPubkey = bunkerPubkey else {
-            throw NDKError.signerError("Not connected")
-        }
-
         let method = scheme == .nip04 ? "nip04_decrypt" : "nip44_decrypt"
-
-        let response = try await rpcClient?.sendRequest(
-            to: bunkerPubkey,
-            method: method,
-            params: [sender.pubkey, value]
-        )
-
-        guard let response = response,
-              response.error == nil
-        else {
-            throw NDKError.signerError("Failed to decrypt")
-        }
-
-        return response.result
+        return try await performCrypto(method: method, params: [sender.pubkey, value], errorMessage: "Failed to decrypt")
     }
 
     public func user() async throws -> NDKUser {
@@ -552,200 +543,5 @@ public actor NDKBunkerSigner: NDKSigner, @unchecked Sendable {
         subscription = nil
         rpcClient = nil
         isConnected = false
-    }
-}
-
-// MARK: - RPC Types
-
-public struct NDKRPCRequest {
-    let id: String
-    let pubkey: String
-    let method: String
-    let params: [String]
-    let event: NDKEvent
-}
-
-public struct NDKRPCResponse {
-    let id: String
-    let result: String
-    let error: String?
-    let event: NDKEvent
-}
-
-// MARK: - Nostr RPC Client
-
-public actor NDKNostrRPC {
-    private let ndk: NDK
-    private let localSigner: NDKPrivateKeySigner
-    private let relayUrls: [String]
-    private var encryptionScheme: NDKEncryptionScheme = .nip04
-    private var pendingRequests: [String: CheckedContinuation<NDKRPCResponse, Error>] = [:]
-
-    init(ndk: NDK, localSigner: NDKPrivateKeySigner, relayUrls: [String]) {
-        self.ndk = ndk
-        self.localSigner = localSigner
-        self.relayUrls = relayUrls
-    }
-
-    func parseEvent(_ event: NDKEvent) async throws -> Any {
-        let remoteUser = NDKUser(pubkey: event.pubkey)
-
-        var decryptedContent: String
-        do {
-            decryptedContent = try await localSigner.decrypt(sender: remoteUser, value: event.content, scheme: encryptionScheme)
-        } catch {
-            // Try other encryption scheme
-            let otherScheme: NDKEncryptionScheme = encryptionScheme == .nip04 ? .nip44 : .nip04
-            decryptedContent = try await localSigner.decrypt(sender: remoteUser, value: event.content, scheme: otherScheme)
-            encryptionScheme = otherScheme
-        }
-
-        guard let data = decryptedContent.data(using: .utf8),
-              let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
-        else {
-            throw NDKError.invalidEvent("Failed to parse RPC content")
-        }
-
-        let id = json["id"] as? String ?? ""
-
-        if let method = json["method"] as? String,
-           let params = json["params"] as? [String]
-        {
-            return NDKRPCRequest(
-                id: id,
-                pubkey: event.pubkey,
-                method: method,
-                params: params,
-                event: event
-            )
-        } else {
-            let result = json["result"] as? String ?? ""
-            let error = json["error"] as? String
-
-            let response = NDKRPCResponse(
-                id: id,
-                result: result,
-                error: error,
-                event: event
-            )
-
-            // Resume any waiting continuation
-            if let continuation = pendingRequests.removeValue(forKey: id) {
-                continuation.resume(returning: response)
-            }
-
-            return response
-        }
-    }
-
-    func sendRequest(to pubkey: String, method: String, params: [String], handler: ((NDKRPCResponse) -> Void)? = nil) async throws {
-        let id = UUID().uuidString.prefix(8).lowercased()
-        print("[RPC] Creating request - id: \(id), method: \(method), to: \(pubkey)")
-
-        let request: [String: Any] = [
-            "id": id,
-            "method": method,
-            "params": params,
-        ]
-
-        let requestData = try JSONSerialization.data(withJSONObject: request)
-        let requestString = String(data: requestData, encoding: .utf8) ?? ""
-        print("[RPC] Request JSON: \(requestString)")
-
-        let remoteUser = NDKUser(pubkey: pubkey)
-        let encryptedContent = try await localSigner.encrypt(recipient: remoteUser, value: requestString, scheme: encryptionScheme)
-        print("[RPC] Encrypted content using scheme: \(encryptionScheme)")
-
-        let localPubkey = try await localSigner.pubkey
-        var event = NDKEvent(
-            pubkey: localPubkey,
-            createdAt: Timestamp(Date().timeIntervalSince1970),
-            kind: 24133,
-            tags: [["p", pubkey]],
-            content: encryptedContent
-        )
-
-        try await localSigner.sign(event: &event)
-        print("[RPC] Created and signed event - id: \(event.id ?? "nil")")
-
-        // Publish to specific relays if available
-        if !relayUrls.isEmpty {
-            print("[RPC] Publishing to specific relays: \(relayUrls)")
-            let publishedRelays = try await ndk.publish(event: event, to: Set(relayUrls))
-            print("[RPC] Published to relays: \(publishedRelays.map { $0.url })")
-
-            if publishedRelays.isEmpty {
-                print("[RPC] WARNING: Failed to publish to any relay!")
-                // Try direct send as fallback
-                for url in relayUrls {
-                    if let relay = ndk.relays.first(where: { $0.url == url }) {
-                        print("[RPC] Attempting direct send to \(url)")
-                        do {
-                            let eventMessage = NostrMessage.event(subscriptionId: nil, event: event)
-                            try await relay.send(eventMessage.serialize())
-                            print("[RPC] Direct send successful to \(url)")
-                        } catch {
-                            print("[RPC] Direct send failed to \(url): \(error)")
-                        }
-                    }
-                }
-            }
-        } else {
-            print("[RPC] Publishing to all connected relays")
-            let publishedRelays = try await ndk.publish(event)
-            print("[RPC] Published to relays: \(publishedRelays.map { $0.url })")
-        }
-
-        // If handler provided, call it when response arrives
-        if let handler = handler {
-            Task {
-                print("[RPC] Waiting for response with id: \(id)")
-                let response = try await waitForResponse(id: id)
-                handler(response)
-            }
-        }
-    }
-
-    func sendRequest(to pubkey: String, method: String, params: [String]) async throws -> NDKRPCResponse {
-        let id = UUID().uuidString.prefix(8).lowercased()
-
-        return try await withCheckedThrowingContinuation { continuation in
-            self.pendingRequests[id] = continuation
-
-            Task {
-                do {
-                    try await sendRequest(to: pubkey, method: method, params: params) { _ in
-                        // Response is handled in parseEvent
-                    }
-
-                    // Set a timeout
-                    Task {
-                        try await Task.sleep(nanoseconds: 30_000_000_000) // 30 seconds
-                        await self.handleTimeout(id: id, continuation: continuation)
-                    }
-                } catch {
-                    self.pendingRequests.removeValue(forKey: id)
-                    continuation.resume(throwing: error)
-                }
-            }
-        }
-    }
-
-    private func waitForResponse(id: String) async throws -> NDKRPCResponse {
-        return try await withCheckedThrowingContinuation { continuation in
-            self.pendingRequests[id] = continuation
-
-            // Set a timeout
-            Task {
-                try await Task.sleep(nanoseconds: 30_000_000_000) // 30 seconds
-                await self.handleTimeout(id: id, continuation: continuation)
-            }
-        }
-    }
-
-    private func handleTimeout(id: String, continuation: CheckedContinuation<NDKRPCResponse, Error>) {
-        if pendingRequests.removeValue(forKey: id) != nil {
-            continuation.resume(throwing: NDKError.timeout)
-        }
     }
 }

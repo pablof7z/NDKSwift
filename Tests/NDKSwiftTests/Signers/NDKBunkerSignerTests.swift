@@ -34,8 +34,9 @@ final class NDKBunkerSignerTests: XCTestCase {
         // Wait for async URI generation
         try await Task.sleep(nanoseconds: 200_000_000) // 0.2 seconds
 
-        XCTAssertNotNil(signer.nostrConnectUri)
-        if let uri = signer.nostrConnectUri {
+        let uri = await signer.nostrConnectUri
+        XCTAssertNotNil(uri)
+        if let uri = uri {
             XCTAssertTrue(uri.hasPrefix("nostrconnect://"))
             XCTAssertTrue(uri.contains("relay=wss%3A%2F%2Frelay.example.com"))
             XCTAssertTrue(uri.contains("name=Test%20App"))
@@ -50,7 +51,7 @@ final class NDKBunkerSignerTests: XCTestCase {
         var receivedAuthUrl: String?
         let expectation = XCTestExpectation(description: "Auth URL received")
 
-        let cancellable = signer.authUrlPublisher.sink { authUrl in
+        let cancellable = await signer.authUrlPublisher.sink { authUrl in
             receivedAuthUrl = authUrl
             expectation.fulfill()
         }
@@ -67,7 +68,7 @@ final class NDKBunkerSignerTests: XCTestCase {
 
         let ndk = NDK()
         let localSigner = try NDKPrivateKeySigner.generate()
-        let signer = NDKBunkerSigner.bunker(ndk: ndk, connectionToken: "bunker://mock", localSigner: localSigner)
+        _ = NDKBunkerSigner.bunker(ndk: ndk, connectionToken: "bunker://mock", localSigner: localSigner)
 
         // Test would require mocking the bunker responses
         // This is a placeholder for the test structure
@@ -76,9 +77,9 @@ final class NDKBunkerSignerTests: XCTestCase {
     func testEventSigning() async throws {
         // Similar to encryption test, this would require mocking
         let ndk = NDK()
-        let signer = NDKBunkerSigner.bunker(ndk: ndk, connectionToken: "bunker://mock")
+        _ = NDKBunkerSigner.bunker(ndk: ndk, connectionToken: "bunker://mock")
 
-        let event = NDKEvent(
+        _ = NDKEvent(
             pubkey: "test",
             createdAt: Timestamp(Date().timeIntervalSince1970),
             kind: EventKind.textNote,
@@ -94,7 +95,7 @@ final class NDKBunkerSignerTests: XCTestCase {
         let signer = NDKBunkerSigner.bunker(ndk: ndk, connectionToken: "bunker://test?relay=wss://relay.test.com")
 
         // Test disconnect
-        signer.disconnect()
+        await signer.disconnect()
 
         // Verify cleanup (would need to expose state for testing)
     }
@@ -102,10 +103,10 @@ final class NDKBunkerSignerTests: XCTestCase {
     func testRPCMessageParsing() async throws {
         let ndk = NDK()
         let localSigner = try NDKPrivateKeySigner.generate()
-        let rpcClient = NDKNostrRPC(ndk: ndk, localSigner: localSigner, relayUrls: ["wss://relay.test.com"])
+        _ = NDKNostrRPC(ndk: ndk, localSigner: localSigner, relayUrls: ["wss://relay.test.com"])
 
         // Create a test event with encrypted content
-        let testEvent = NDKEvent(
+        _ = NDKEvent(
             pubkey: "test",
             createdAt: Timestamp(Date().timeIntervalSince1970),
             kind: 24133,

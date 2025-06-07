@@ -3,162 +3,200 @@ import XCTest
 
 final class NostrIdentifierTests: XCTestCase {
     
-    // MARK: - Hex Event ID Tests
+    // MARK: - Valid Identifier Test Cases
     
-    func testCreateFilterFromHexEventId() throws {
-        let hexId = "5c83da77af1dec6d7289834998ad7aafbd9e2191396d75ec3cc27f5a77226f36"
-        
-        let filter = try NostrIdentifier.createFilter(from: hexId)
-        
-        XCTAssertEqual(filter.ids?.count, 1)
-        XCTAssertEqual(filter.ids?.first, hexId)
-        XCTAssertNil(filter.authors)
-        XCTAssertNil(filter.kinds)
-        XCTAssertNil(filter.tags)
-    }
-    
-    func testCreateFilterFromInvalidHexEventId() {
-        // Too short
-        XCTAssertThrowsError(try NostrIdentifier.createFilter(from: "5c83da77")) { error in
-            guard case NDKError.invalidInput = error else {
-                XCTFail("Expected invalidInput error")
-                return
-            }
+    func testValidIdentifiers() throws {
+        struct ValidTestCase {
+            let name: String
+            let identifier: String
+            let setupIdentifier: () throws -> String
+            let expectedFilter: (NDKFilter) -> Bool
         }
         
-        // Too long
-        XCTAssertThrowsError(try NostrIdentifier.createFilter(from: "5c83da77af1dec6d7289834998ad7aafbd9e2191396d75ec3cc27f5a77226f3600")) { error in
-            guard case NDKError.invalidInput = error else {
-                XCTFail("Expected invalidInput error")
-                return
-            }
-        }
-    }
-    
-    // MARK: - Note Bech32 Tests
-    
-    func testCreateFilterFromNoteBech32() throws {
-        // Create a note bech32 string
-        let eventId = "5c83da77af1dec6d7289834998ad7aafbd9e2191396d75ec3cc27f5a77226f36"
-        let noteBech32 = try Bech32.note(from: eventId)
-        
-        let filter = try NostrIdentifier.createFilter(from: noteBech32)
-        
-        XCTAssertEqual(filter.ids?.count, 1)
-        XCTAssertEqual(filter.ids?.first, eventId)
-        XCTAssertNil(filter.authors)
-        XCTAssertNil(filter.kinds)
-        XCTAssertNil(filter.tags)
-    }
-    
-    // MARK: - Nevent Bech32 Tests
-    
-    func testCreateFilterFromNeventBech32() throws {
-        // Create a nevent bech32 string
         let eventId = "5c83da77af1dec6d7289834998ad7aafbd9e2191396d75ec3cc27f5a77226f36"
         let author = "3bf0c63fcb93463407af97a5e5ee64fa883d107ef9e558472c4eb9aaaefa459d"
-        let neventBech32 = try Bech32.nevent(
-            eventId: eventId,
-            relays: ["wss://relay.damus.io"],
-            author: author,
-            kind: 1
-        )
         
-        let filter = try NostrIdentifier.createFilter(from: neventBech32)
+        let testCases = [
+            ValidTestCase(
+                name: "Hex Event ID",
+                identifier: eventId,
+                setupIdentifier: { eventId },
+                expectedFilter: { filter in
+                    filter.ids?.count == 1 &&
+                    filter.ids?.first == eventId &&
+                    filter.authors == nil &&
+                    filter.kinds == nil
+                }
+            ),
+            ValidTestCase(
+                name: "Note Bech32",
+                identifier: "",
+                setupIdentifier: { try Bech32.note(from: eventId) },
+                expectedFilter: { filter in
+                    filter.ids?.count == 1 &&
+                    filter.ids?.first == eventId &&
+                    filter.authors == nil &&
+                    filter.kinds == nil
+                }
+            ),
+            ValidTestCase(
+                name: "Nevent Bech32",
+                identifier: "",
+                setupIdentifier: {
+                    try Bech32.nevent(
+                        eventId: eventId,
+                        relays: ["wss://relay.damus.io"],
+                        author: author,
+                        kind: 1
+                    )
+                },
+                expectedFilter: { filter in
+                    filter.ids?.count == 1 &&
+                    filter.ids?.first == eventId &&
+                    filter.authors == nil &&
+                    filter.kinds == nil
+                }
+            ),
+            ValidTestCase(
+                name: "Naddr Bech32",
+                identifier: "",
+                setupIdentifier: {
+                    try Bech32.naddr(
+                        identifier: "1234",
+                        kind: 30023,
+                        author: author,
+                        relays: ["wss://relay.damus.io"]
+                    )
+                },
+                expectedFilter: { filter in
+                    filter.ids == nil &&
+                    filter.authors?.count == 1 &&
+                    filter.authors?.first == author &&
+                    filter.kinds?.count == 1 &&
+                    filter.kinds?.first == 30023 &&
+                    filter.tagFilter("d") == ["1234"]
+                }
+            ),
+            ValidTestCase(
+                name: "Naddr with empty identifier",
+                identifier: "",
+                setupIdentifier: {
+                    try Bech32.naddr(
+                        identifier: "",
+                        kind: 30023,
+                        author: author
+                    )
+                },
+                expectedFilter: { filter in
+                    filter.ids == nil &&
+                    filter.authors?.count == 1 &&
+                    filter.authors?.first == author &&
+                    filter.kinds?.count == 1 &&
+                    filter.kinds?.first == 30023 &&
+                    filter.tagFilter("d") == [""]
+                }
+            )
+        ]
         
-        XCTAssertEqual(filter.ids?.count, 1)
-        XCTAssertEqual(filter.ids?.first, eventId)
-        // Note: Current implementation doesn't use author/kind from nevent
-        XCTAssertNil(filter.authors)
-        XCTAssertNil(filter.kinds)
-        XCTAssertNil(filter.tags)
-    }
-    
-    // MARK: - Naddr Bech32 Tests
-    
-    func testCreateFilterFromNaddrBech32() throws {
-        // Create an naddr bech32 string
-        let identifier = "1234"
-        let kind = 30023
-        let author = "3bf0c63fcb93463407af97a5e5ee64fa883d107ef9e558472c4eb9aaaefa459d"
-        let naddrBech32 = try Bech32.naddr(
-            identifier: identifier,
-            kind: kind,
-            author: author,
-            relays: ["wss://relay.damus.io"]
-        )
-        
-        let filter = try NostrIdentifier.createFilter(from: naddrBech32)
-        
-        XCTAssertNil(filter.ids)
-        XCTAssertEqual(filter.authors?.count, 1)
-        XCTAssertEqual(filter.authors?.first, author)
-        XCTAssertEqual(filter.kinds?.count, 1)
-        XCTAssertEqual(filter.kinds?.first, kind)
-        XCTAssertEqual(filter.tagFilter("d"), [identifier])
-    }
-    
-    func testCreateFilterFromNaddrWithEmptyIdentifier() throws {
-        // Create an naddr bech32 string with empty identifier
-        let identifier = ""
-        let kind = 30023
-        let author = "3bf0c63fcb93463407af97a5e5ee64fa883d107ef9e558472c4eb9aaaefa459d"
-        let naddrBech32 = try Bech32.naddr(
-            identifier: identifier,
-            kind: kind,
-            author: author
-        )
-        
-        let filter = try NostrIdentifier.createFilter(from: naddrBech32)
-        
-        XCTAssertNil(filter.ids)
-        XCTAssertEqual(filter.authors?.count, 1)
-        XCTAssertEqual(filter.authors?.first, author)
-        XCTAssertEqual(filter.kinds?.count, 1)
-        XCTAssertEqual(filter.kinds?.first, kind)
-        XCTAssertEqual(filter.tagFilter("d"), [""])
-    }
-    
-    // MARK: - Invalid Bech32 Tests
-    
-    func testCreateFilterFromInvalidBech32() {
-        // Invalid bech32 string
-        XCTAssertThrowsError(try NostrIdentifier.createFilter(from: "invalid1bech32")) { error in
-            // Should throw some error when trying to decode
-            XCTAssertNotNil(error)
+        for testCase in testCases {
+            let identifier = try testCase.setupIdentifier()
+            let filter = try NostrIdentifier.createFilter(from: identifier)
+            
+            XCTAssertTrue(
+                testCase.expectedFilter(filter),
+                "Test case '\(testCase.name)' failed: filter does not match expected properties"
+            )
         }
     }
     
-    func testCreateFilterFromUnsupportedBech32Type() throws {
-        // Create an npub (which is not supported for event fetching)
+    // MARK: - Invalid Identifier Test Cases
+    
+    func testInvalidIdentifiers() {
+        let invalidIdentifierTestCases: [TestCase<String, NDKError>] = [
+            TestCase(
+                "Empty string",
+                input: "",
+                expected: NDKError.invalidInput("Identifier cannot be empty")
+            ),
+            TestCase(
+                "Whitespace only",
+                input: "   ",
+                expected: NDKError.invalidInput("Identifier cannot be empty")
+            ),
+            TestCase(
+                "Hex too short",
+                input: "5c83da77",
+                expected: NDKError.invalidInput("Invalid hex event ID: must be 64 characters")
+            ),
+            TestCase(
+                "Hex too long",
+                input: "5c83da77af1dec6d7289834998ad7aafbd9e2191396d75ec3cc27f5a77226f3600",
+                expected: NDKError.invalidInput("Invalid hex event ID: must be 64 characters")
+            )
+        ]
+        
+        runParameterizedErrorTest(testCases: invalidIdentifierTestCases) { identifier in
+            _ = try NostrIdentifier.createFilter(from: identifier)
+        }
+    }
+    
+    // MARK: - Unsupported Bech32 Types
+    
+    func testUnsupportedBech32Types() throws {
+        struct UnsupportedTestCase {
+            let name: String
+            let createBech32: () throws -> String
+        }
+        
         let pubkey = "3bf0c63fcb93463407af97a5e5ee64fa883d107ef9e558472c4eb9aaaefa459d"
-        let npubBech32 = try Bech32.npub(from: pubkey)
         
-        XCTAssertThrowsError(try NostrIdentifier.createFilter(from: npubBech32)) { error in
-            guard case NDKError.invalidInput(let message) = error else {
-                XCTFail("Expected invalidInput error")
-                return
+        let testCases = [
+            UnsupportedTestCase(
+                name: "npub",
+                createBech32: { try Bech32.npub(from: pubkey) }
+            ),
+            UnsupportedTestCase(
+                name: "nsec",
+                createBech32: { try Bech32.nsec(from: pubkey) }
+            )
+        ]
+        
+        for testCase in testCases {
+            let bech32 = try testCase.createBech32()
+            
+            XCTAssertThrowsError(
+                try NostrIdentifier.createFilter(from: bech32),
+                "Test case '\(testCase.name)' should throw error"
+            ) { error in
+                guard case NDKError.invalidInput(let message) = error else {
+                    XCTFail("Expected invalidInput error for \(testCase.name)")
+                    return
+                }
+                XCTAssertTrue(
+                    message.contains("Unsupported bech32 type"),
+                    "Error message should mention unsupported bech32 type for \(testCase.name)"
+                )
             }
-            XCTAssertTrue(message.contains("Unsupported bech32 type"))
         }
     }
     
-    // MARK: - Edge Cases
+    // MARK: - Invalid Bech32 Strings
     
-    func testCreateFilterFromEmptyString() {
-        XCTAssertThrowsError(try NostrIdentifier.createFilter(from: "")) { error in
-            guard case NDKError.invalidInput = error else {
-                XCTFail("Expected invalidInput error")
-                return
-            }
-        }
-    }
-    
-    func testCreateFilterFromWhitespace() {
-        XCTAssertThrowsError(try NostrIdentifier.createFilter(from: "   ")) { error in
-            guard case NDKError.invalidInput = error else {
-                XCTFail("Expected invalidInput error")
-                return
+    func testInvalidBech32Strings() {
+        let invalidBech32TestCases = [
+            "invalid1bech32",
+            "note1invalid",
+            "nevent1toolong" + String(repeating: "a", count: 1000),
+            "naddr1!@#$%^&*()",
+            "1234567890"
+        ]
+        
+        for invalidString in invalidBech32TestCases {
+            XCTAssertThrowsError(
+                try NostrIdentifier.createFilter(from: invalidString),
+                "Should throw error for invalid bech32: \(invalidString)"
+            ) { error in
+                XCTAssertNotNil(error, "Error should not be nil for: \(invalidString)")
             }
         }
     }

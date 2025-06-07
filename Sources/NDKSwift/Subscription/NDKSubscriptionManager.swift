@@ -478,42 +478,11 @@ public actor NDKSubscriptionManager {
     private func executeRelayQueries(_ plan: ExecutionPlan) async {
         guard ndk != nil else { return }
 
-        // Create a single subscription ID for the group
-        let groupSubscriptionId = plan.subscriptions.first?.id ?? UUID().uuidString
-
+        // Send subscription to each relay using their subscription managers
         for relay in plan.relaySet {
-            await sendSubscriptionToRelay(
-                relay: relay,
-                subscriptionId: groupSubscriptionId,
-                filters: plan.mergedFilters
-            )
-        }
-    }
-
-    private func sendSubscriptionToRelay(relay: NDKRelay, subscriptionId: String, filters: [NDKFilter]) async {
-        guard relay.isConnected else {
-            // TODO: Wait for connection
-            return
-        }
-
-        do {
-            let reqMessage = NostrMessage.req(subscriptionId: subscriptionId, filters: filters)
-            try await relay.send(reqMessage.serialize())
-
-            // Track subscription sent to relay
-            if let ndk = ndk {
-                for filter in filters {
-                    await ndk.subscriptionTracker.trackSubscriptionSentToRelay(
-                        subscriptionId: subscriptionId,
-                        relayUrl: relay.url,
-                        appliedFilter: filter
-                    )
-                }
-            }
-        } catch {
-            // Handle relay error
-            for subscription in activeSubscriptions.values {
-                subscription.handleError(error)
+            for subscription in plan.subscriptions {
+                // Register with relay's subscription manager
+                await relay.subscriptionManager.addSubscription(subscription, filters: plan.mergedFilters)
             }
         }
     }

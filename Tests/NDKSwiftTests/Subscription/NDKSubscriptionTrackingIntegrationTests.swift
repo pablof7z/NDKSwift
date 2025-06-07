@@ -106,9 +106,11 @@ final class NDKSubscriptionTrackingIntegrationTests: XCTestCase {
     func testClosedSubscriptionHistory() async throws {
         // Create and close multiple subscriptions
         for i in 1 ... 5 {
+            var options = NDKSubscriptionOptions()
+            options.closeOnEose = true
             let sub = ndk.subscribe(
                 filters: [NDKFilter(kinds: [i])],
-                options: NDKSubscriptionOptions(closeOnEose: true)
+                options: options
             )
 
             // Simulate some activity
@@ -240,23 +242,4 @@ final class NDKSubscriptionTrackingIntegrationTests: XCTestCase {
 }
 
 // MARK: - Mock Relay for Testing
-
-private class MockRelay: NDKRelay {
-    var isConnectedMock: Bool = true
-
-    override var isConnected: Bool {
-        return isConnectedMock
-    }
-
-    override func connect() async throws {
-        isConnectedMock = true
-    }
-
-    override func disconnect() async {
-        isConnectedMock = false
-    }
-
-    override func send(_: String) async throws {
-        // Mock implementation
-    }
-}
+// Using MockRelay from TestUtilities/MockObjects.swift
