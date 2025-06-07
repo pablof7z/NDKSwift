@@ -189,6 +189,7 @@ public enum NostrMessage {
             throw NDKError.custom("Failed to serialize message")
         }
 
+
         return json
     }
 

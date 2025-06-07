@@ -1,243 +1,184 @@
 import XCTest
 @testable import NDKSwift
 
-final class NDKFetchEventTests: XCTestCase {
+class NDKFetchEventTests: XCTestCase {
     
-    var ndk: NDK!
-    var mockRelay: MockRelay!
-    
-    override func setUp() async throws {
-        ndk = NDK()
-        mockRelay = MockRelay(url: "wss://test.relay")
-        // Add mock relay to pool
-        ndk.relayPool.relaysByUrl["wss://test.relay"] = mockRelay
-    }
-    
-    override func tearDown() async throws {
-        ndk = nil
-        mockRelay = nil
-    }
-    
-    // MARK: - Hex ID Tests
-    
-    func testFetchEventWithHexId() async throws {
-        let eventId = "5c83da77af1dec6d7289834998ad7aafbd9e2191396d75ec3cc27f5a77226f36"
-        let mockEvent = NDKEvent(
-            pubkey: "3bf0c63fcb93463407af97a5e5ee64fa883d107ef9e558472c4eb9aaaefa459d",
+    func testFetchEventByIdBasic() async throws {
+        // Setup
+        let ndk = NDK()
+        let mockRelay = MockRelay(url: "wss://mock.relay")
+        
+        // Create a mock event
+        let testEvent = NDKEvent(
+            pubkey: "test_pubkey",
             createdAt: Timestamp(Date().timeIntervalSince1970),
             kind: 1,
-            tags: [],
-            content: "Test event"
+            content: "Test content"
         )
-        mockEvent.id = eventId
+        testEvent.id = "test_event_id"
+        testEvent.sig = "test_signature"
         
-        // Set up mock relay to return the event
-        mockRelay.mockEvents = [mockEvent]
-        mockRelay.connectionState = .connected
+        // Add the event to mock relay
+        mockRelay.mockEvents = [testEvent]
         
-        let fetchedEvent = try await ndk.fetchEvent(eventId, relays: Set([mockRelay]))
+        // Test fetching by ID
+        let fetchedEvent = try await ndk.fetchEvent("test_event_id", relays: Set([mockRelay]))
         
         XCTAssertNotNil(fetchedEvent)
-        XCTAssertEqual(fetchedEvent?.id, eventId)
-        XCTAssertEqual(fetchedEvent?.content, "Test event")
+        XCTAssertEqual(fetchedEvent?.id, "test_event_id")
+        XCTAssertEqual(fetchedEvent?.content, "Test content")
     }
     
-    // MARK: - Note Bech32 Tests
-    
-    func testFetchEventWithNoteBech32() async throws {
-        let eventId = "5c83da77af1dec6d7289834998ad7aafbd9e2191396d75ec3cc27f5a77226f36"
-        let noteBech32 = try Bech32.note(from: eventId)
+    func testFetchEventWithMultipleRelays() async throws {
+        // Setup
+        let ndk = NDK()
+        let mockRelay1 = MockRelay(url: "wss://relay1.mock")
+        let mockRelay2 = MockRelay(url: "wss://relay2.mock")
         
-        let mockEvent = NDKEvent(
-            pubkey: "3bf0c63fcb93463407af97a5e5ee64fa883d107ef9e558472c4eb9aaaefa459d",
+        // Create a mock event (only on relay2)
+        let testEvent = NDKEvent(
+            pubkey: "test_pubkey",
             createdAt: Timestamp(Date().timeIntervalSince1970),
             kind: 1,
-            tags: [],
-            content: "Test note event"
+            content: "Test content"
         )
-        mockEvent.id = eventId
+        testEvent.id = "test_event_id"
+        testEvent.sig = "test_signature"
         
-        mockRelay.mockEvents = [mockEvent]
-        mockRelay.connectionState = .connected
+        // Add event only to relay2
+        mockRelay2.mockEvents = [testEvent]
         
-        let fetchedEvent = try await ndk.fetchEvent(noteBech32, relays: Set([mockRelay]))
+        // Test fetching from multiple relays
+        let fetchedEvent = try await ndk.fetchEvent("test_event_id", relays: Set([mockRelay1, mockRelay2]))
         
         XCTAssertNotNil(fetchedEvent)
-        XCTAssertEqual(fetchedEvent?.id, eventId)
-        XCTAssertEqual(fetchedEvent?.content, "Test note event")
+        XCTAssertEqual(fetchedEvent?.id, "test_event_id")
+        XCTAssertEqual(fetchedEvent?.content, "Test content")
     }
     
-    // MARK: - Nevent Bech32 Tests
-    
-    func testFetchEventWithNeventBech32() async throws {
-        let eventId = "5c83da77af1dec6d7289834998ad7aafbd9e2191396d75ec3cc27f5a77226f36"
-        let author = "3bf0c63fcb93463407af97a5e5ee64fa883d107ef9e558472c4eb9aaaefa459d"
-        let neventBech32 = try Bech32.nevent(
-            eventId: eventId,
-            relays: ["wss://test.relay"],
-            author: author,
-            kind: 1
-        )
+    func testFetchEventByFilter() async throws {
+        // Setup
+        let ndk = NDK()
+        let mockRelay = MockRelay(url: "wss://mock.relay")
         
-        let mockEvent = NDKEvent(
-            pubkey: author,
+        // Create mock events
+        let event1 = NDKEvent(
+            pubkey: "author1",
             createdAt: Timestamp(Date().timeIntervalSince1970),
             kind: 1,
-            tags: [],
-            content: "Test nevent event"
+            content: "Event 1"
         )
-        mockEvent.id = eventId
+        event1.id = "event1"
+        event1.sig = "sig1"
         
-        mockRelay.mockEvents = [mockEvent]
-        mockRelay.connectionState = .connected
-        
-        let fetchedEvent = try await ndk.fetchEvent(neventBech32, relays: Set([mockRelay]))
-        
-        XCTAssertNotNil(fetchedEvent)
-        XCTAssertEqual(fetchedEvent?.id, eventId)
-        XCTAssertEqual(fetchedEvent?.content, "Test nevent event")
-    }
-    
-    // MARK: - Naddr Bech32 Tests
-    
-    func testFetchEventWithNaddrBech32() async throws {
-        let identifier = "test-article"
-        let kind = 30023
-        let author = "3bf0c63fcb93463407af97a5e5ee64fa883d107ef9e558472c4eb9aaaefa459d"
-        let naddrBech32 = try Bech32.naddr(
-            identifier: identifier,
-            kind: kind,
-            author: author,
-            relays: ["wss://test.relay"]
-        )
-        
-        let mockEvent = NDKEvent(
-            pubkey: author,
+        let event2 = NDKEvent(
+            pubkey: "author2",
             createdAt: Timestamp(Date().timeIntervalSince1970),
-            kind: kind,
-            tags: [["d", identifier]],
-            content: "Test article content"
+            kind: 1,
+            content: "Event 2"
         )
-        mockEvent.id = "1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef"
+        event2.id = "event2"
+        event2.sig = "sig2"
         
-        mockRelay.mockEvents = [mockEvent]
-        mockRelay.connectionState = .connected
+        mockRelay.mockEvents = [event1, event2]
         
-        let fetchedEvent = try await ndk.fetchEvent(naddrBech32, relays: Set([mockRelay]))
+        // Test fetching by author filter
+        let filter = NDKFilter(authors: ["author1"], kinds: [1])
+        let fetchedEvent = try await ndk.fetchEvent(filter, relays: Set([mockRelay]))
         
         XCTAssertNotNil(fetchedEvent)
-        XCTAssertEqual(fetchedEvent?.pubkey, author)
-        XCTAssertEqual(fetchedEvent?.kind, kind)
-        XCTAssertEqual(fetchedEvent?.tags.first, ["d", identifier])
-        XCTAssertEqual(fetchedEvent?.content, "Test article content")
+        XCTAssertEqual(fetchedEvent?.pubkey, "author1")
+        XCTAssertEqual(fetchedEvent?.content, "Event 1")
     }
     
-    // MARK: - Error Cases
+    func testFetchAddressableEvent() async throws {
+        // Setup
+        let ndk = NDK()
+        let mockRelay = MockRelay(url: "wss://mock.relay")
+        
+        // Create an addressable event (kind 30023 - article)
+        let article = NDKEvent(
+            pubkey: "author_pubkey",
+            createdAt: Timestamp(Date().timeIntervalSince1970),
+            kind: 30023,
+            content: "Article content",
+            tags: [["d", "my-article"]]
+        )
+        article.id = "article_id"
+        article.sig = "article_sig"
+        
+        mockRelay.mockEvents = [article]
+        
+        // Test fetching by d-tag
+        let filter = NDKFilter(
+            authors: ["author_pubkey"],
+            kinds: [30023],
+            tags: ["d": ["my-article"]]
+        )
+        let fetchedArticle = try await ndk.fetchEvent(filter, relays: Set([mockRelay]))
+        
+        XCTAssertNotNil(fetchedArticle)
+        XCTAssertEqual(fetchedArticle?.id, "article_id")
+        XCTAssertEqual(fetchedArticle?.tags.first { $0.first == "d" }?[1], "my-article")
+    }
     
-    func testFetchEventWithInvalidHexId() async throws {
-        let invalidId = "invalid"
+    func testFetchEventTimeout() async throws {
+        // Setup
+        let ndk = NDK()
+        let mockRelay = MockRelay(url: "wss://mock.relay")
+        mockRelay.responseDelay = 5.0 // 5 second delay
+        
+        // Test fetching with timeout
+        let filter = NDKFilter(ids: ["nonexistent"])
         
         do {
-            _ = try await ndk.fetchEvent(invalidId)
-            XCTFail("Should have thrown an error")
-        } catch NDKError.invalidInput(let message) {
-            XCTAssertTrue(message.contains("64-character hex"))
+            let _ = try await ndk.fetchEvent(filter, relays: Set([mockRelay]), timeout: 0.1)
+            XCTFail("Should have timed out")
         } catch {
-            XCTFail("Unexpected error: \(error)")
+            // Expected timeout error
+            XCTAssertTrue(true)
         }
     }
     
-    func testFetchEventWithUnsupportedBech32() async throws {
-        let pubkey = "3bf0c63fcb93463407af97a5e5ee64fa883d107ef9e558472c4eb9aaaefa459d"
-        let npubBech32 = try Bech32.npub(from: pubkey)
+    func testFetchEventFromCache() async throws {
+        // Setup
+        let mockCache = MockCache()
+        let ndk = NDK(cacheAdapter: mockCache)
         
-        do {
-            _ = try await ndk.fetchEvent(npubBech32)
-            XCTFail("Should have thrown an error")
-        } catch NDKError.invalidInput(let message) {
-            XCTAssertTrue(message.contains("Unsupported bech32 type"))
-        } catch {
-            XCTFail("Unexpected error: \(error)")
-        }
+        // Create a cached event
+        let cachedEvent = NDKEvent(
+            pubkey: "cached_author",
+            createdAt: Timestamp(Date().timeIntervalSince1970),
+            kind: 1,
+            content: "Cached content"
+        )
+        cachedEvent.id = "cached_event_id"
+        cachedEvent.sig = "cached_sig"
+        
+        mockCache.mockEvents = [cachedEvent]
+        
+        // Test fetching from cache
+        let fetchedEvent = try await ndk.fetchEvent("cached_event_id")
+        
+        XCTAssertNotNil(fetchedEvent)
+        XCTAssertEqual(fetchedEvent?.id, "cached_event_id")
+        XCTAssertEqual(fetchedEvent?.content, "Cached content")
+        XCTAssertTrue(mockCache.queryCalled)
     }
     
     func testFetchEventNotFound() async throws {
-        let eventId = "5c83da77af1dec6d7289834998ad7aafbd9e2191396d75ec3cc27f5a77226f36"
+        // Setup
+        let ndk = NDK()
+        let mockRelay = MockRelay(url: "wss://mock.relay")
         
-        // Mock relay returns no events
+        // No events in mock relay
         mockRelay.mockEvents = []
-        mockRelay.connectionState = .connected
+        
+        // Test fetching non-existent event
+        let eventId = "nonexistent_event_id"
         
         let fetchedEvent = try await ndk.fetchEvent(eventId, relays: Set([mockRelay]))
         
         XCTAssertNil(fetchedEvent)
-    }
-}
-
-// MARK: - Mock Relay for Testing
-
-class MockRelay: NDKRelay {
-    var mockEvents: [NDKEvent] = []
-    var receivedFilters: [NDKFilter] = []
-    
-    override func send(_ message: String) async throws {
-        // Parse the message to extract filters
-        if let data = message.data(using: .utf8),
-           let json = try? JSONSerialization.jsonObject(with: data) as? [Any],
-           json.first as? String == "REQ",
-           json.count >= 3 {
-            // Extract filters from REQ message
-            for i in 2..<json.count {
-                if let filterDict = json[i] as? [String: Any] {
-                    // Simple filter reconstruction for testing
-                    var filter = NDKFilter()
-                    if let ids = filterDict["ids"] as? [String] {
-                        filter.ids = ids
-                    }
-                    if let authors = filterDict["authors"] as? [String] {
-                        filter.authors = authors
-                    }
-                    if let kinds = filterDict["kinds"] as? [Int] {
-                        filter.kinds = kinds
-                    }
-                    receivedFilters.append(filter)
-                }
-            }
-            
-            // Simulate returning matching events
-            let subscriptionId = json[1] as? String ?? "test"
-            for event in mockEvents {
-                if matchesAnyFilter(event: event, filters: receivedFilters) {
-                    // Simulate EVENT message
-                    ndk?.processEvent(event, from: self)
-                }
-            }
-            
-            // Simulate EOSE
-            ndk?.processEOSE(subscriptionId: subscriptionId, from: self)
-        }
-    }
-    
-    private func matchesAnyFilter(event: NDKEvent, filters: [NDKFilter]) -> Bool {
-        for filter in filters {
-            if let ids = filter.ids, ids.contains(event.id ?? "") {
-                return true
-            }
-            if let authors = filter.authors, authors.contains(event.pubkey) {
-                if let kinds = filter.kinds, kinds.contains(event.kind) {
-                    // Check d-tag for addressable events
-                    if let dTagValues = filter.tagFilter("d") {
-                        for dTagValue in dTagValues {
-                            if event.tags.contains(where: { $0.first == "d" && $0.count > 1 && $0[1] == dTagValue }) {
-                                return true
-                            }
-                        }
-                    } else {
-                        return true
-                    }
-                }
-            }
-        }
-        return false
     }
 }

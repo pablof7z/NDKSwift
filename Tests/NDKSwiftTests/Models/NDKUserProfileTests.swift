@@ -30,8 +30,7 @@ final class NDKUserProfileTests: XCTestCase {
         )
         
         // Mock event
-        let event = NDKEvent(kind: EventKind.metadata)
-        event.pubkey = pubkey
+        let event = NDKEvent(pubkey: pubkey, kind: EventKind.metadata)
         event.content = try JSONEncoder().encode(profile).string
         event.id = "test_event_id"
         event.sig = "test_sig"
@@ -66,7 +65,7 @@ final class NDKUserProfileTests: XCTestCase {
         )
         
         // Pre-populate cache
-        await mockCache.saveProfile(cachedProfile, for: pubkey)
+        await mockCache.saveProfile(pubkey: pubkey, profile: cachedProfile)
         
         // Test - should return from cache without network call
         let fetchedProfile = try await user.fetchProfile()
@@ -85,11 +84,10 @@ final class NDKUserProfileTests: XCTestCase {
         let user = ndk.getUser(pubkey)
         
         let cachedProfile = NDKUserProfile(name: "Cached User")
-        await mockCache.saveProfile(cachedProfile, for: pubkey)
+        await mockCache.saveProfile(pubkey: pubkey, profile: cachedProfile)
         
         let freshProfile = NDKUserProfile(name: "Fresh User")
-        let event = NDKEvent(kind: EventKind.metadata)
-        event.pubkey = pubkey
+        let event = NDKEvent(pubkey: pubkey, kind: EventKind.metadata)
         event.content = try JSONEncoder().encode(freshProfile).string
         event.id = "test_event_id"
         event.sig = "test_sig"
@@ -221,56 +219,6 @@ final class NDKUserProfileTests: XCTestCase {
     }
 }
 
-// MARK: - Mock Cache
-
-private class MockCache: NDKCacheAdapter {
-    var events: [EventID: NDKEvent] = [:]
-    var profiles: [PublicKey: NDKUserProfile] = [:]
-    var mockEvents: [NDKEvent] = []
-    var unpublishedEvents: [RelayURL: [NDKEvent]] = [:]
-    
-    func setEvent(_ event: NDKEvent, filters: [NDKFilter], relay: NDKRelay?) async {
-        if let id = event.id {
-            events[id] = event
-        }
-    }
-    
-    func queryEvents(filters: [NDKFilter]) async -> AsyncThrowingStream<NDKEvent, Error> {
-        AsyncThrowingStream { continuation in
-            for event in mockEvents {
-                if filters.contains(where: { $0.matches(event: event) }) {
-                    continuation.yield(event)
-                }
-            }
-            continuation.finish()
-        }
-    }
-    
-    func fetchProfile(pubkey: PublicKey) async -> NDKUserProfile? {
-        return profiles[pubkey]
-    }
-    
-    func saveProfile(_ profile: NDKUserProfile, for pubkey: PublicKey) async {
-        profiles[pubkey] = profile
-    }
-    
-    func addUnpublishedEvent(_ event: NDKEvent, relayUrls: [RelayURL]) async {
-        for url in relayUrls {
-            if unpublishedEvents[url] == nil {
-                unpublishedEvents[url] = []
-            }
-            unpublishedEvents[url]?.append(event)
-        }
-    }
-    
-    func getUnpublishedEvents(for relayUrl: RelayURL) async -> [NDKEvent] {
-        return unpublishedEvents[relayUrl] ?? []
-    }
-    
-    func removeUnpublishedEvent(_ eventId: EventID, from relayUrl: RelayURL) async {
-        unpublishedEvents[relayUrl]?.removeAll { $0.id == eventId }
-    }
-}
 
 // MARK: - Extensions
 

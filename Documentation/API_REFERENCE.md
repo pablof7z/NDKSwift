@@ -61,7 +61,7 @@ public final class NDK {
         relays: Set<NDKRelay>? = nil
     ) async throws -> Set<NDKEvent>
     
-    public func fetchEvent(_ id: EventID, relays: Set<NDKRelay>? = nil) async throws -> NDKEvent?
+    public func fetchEvent(_ idOrBech32: String, relays: Set<NDKRelay>? = nil) async throws -> NDKEvent?
     public func fetchEvent(_ filter: NDKFilter, relays: Set<NDKRelay>? = nil) async throws -> NDKEvent?
     
     // Publishing
@@ -74,6 +74,49 @@ public final class NDK {
     // Subscription Manager
     public func getSubscriptionStats() async -> NDKSubscriptionManager.SubscriptionStats
 }
+```
+
+## Event Fetching
+
+### Fetching Single Events
+
+The `fetchEvent` method supports multiple identifier formats for maximum flexibility:
+
+```swift
+// Fetch by hex event ID (64 character hex string)
+let event1 = try await ndk.fetchEvent("5c83da77af1dec6d7289834998ad7aafbd9e2191396d75ec3cc27f5a77226f36")
+
+// Fetch by note ID (NIP-19 bech32 format starting with 'note1')
+let event2 = try await ndk.fetchEvent("note1tjpatmavrmkx6u5fsdyc44m647w7uxg3jmt4akpucfl6wuex7umqk7y5ph")
+
+// Fetch by nevent (NIP-19 format that includes relay hints and metadata)
+let event3 = try await ndk.fetchEvent("nevent1qqstjpatmavrmkx6u5fsdyc44m647w7uxg3jmt4akpucfl6wuex7umgpz3mhxue69uhhyetvv9ujuerpd46hxtnfduq36amnwvaz7tmjv4kxz7fwd46hg6tw09mkzmrvv46zucm0d5hs0dqul7")
+
+// Fetch replaceable event by naddr (NIP-19 format for parameterized replaceable events)
+// naddr includes: author pubkey, kind, and identifier (d tag)
+let event4 = try await ndk.fetchEvent("naddr1qq9rzd3exgenjv34xqmr2wfekgenjdp5qy2hwumn8ghj7un9d3shjtnyv9kh2uewd9hj7qpqgegazpzx8n5z5zq7jz6gute3cvsqn0athf5dlctusn8tr74vxsqn428x3")
+
+// Specify specific relays to query
+let relays = Set([relay1, relay2])
+let event5 = try await ndk.fetchEvent("note1...", relays: relays)
+
+// Fetch using a filter
+let filter = NDKFilter(authors: ["pubkey"], kinds: [1], limit: 1)
+let event6 = try await ndk.fetchEvent(filter)
+```
+
+### Fetching Multiple Events
+
+```swift
+// Fetch events matching filters
+let filters = [
+    NDKFilter(kinds: [1], authors: ["pubkey1", "pubkey2"], limit: 100),
+    NDKFilter(kinds: [3], authors: ["pubkey3"])
+]
+let events = try await ndk.fetchEvents(filters: filters)
+
+// Fetch from specific relays
+let events2 = try await ndk.fetchEvents(filters: filters, relays: Set([relay1, relay2]))
 ```
 
 ## Models

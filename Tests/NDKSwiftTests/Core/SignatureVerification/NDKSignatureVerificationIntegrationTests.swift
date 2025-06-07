@@ -132,7 +132,7 @@ final class NDKSignatureVerificationIntegrationTests: XCTestCase {
         // Create subscription to track received events
         var receivedEvents: [NDKEvent] = []
         let subscription = ndk.subscribe(filters: [NDKFilter(kinds: [1])])
-        subscription.onEvent = { event in
+        subscription.onEvent { event in
             receivedEvents.append(event)
         }
         subscription.start()
@@ -156,7 +156,7 @@ final class NDKSignatureVerificationIntegrationTests: XCTestCase {
         // No events should have been received from the blacklisted relay
         XCTAssertEqual(receivedEvents.count, 0, "No events should be received from blacklisted relay")
 
-        subscription.stop()
+        subscription.close()
     }
 
     // MARK: - Performance Tests

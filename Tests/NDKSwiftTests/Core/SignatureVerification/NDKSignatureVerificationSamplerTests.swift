@@ -149,7 +149,7 @@ final class NDKSignatureVerificationSamplerTests: XCTestCase {
         )
 
         let sampler = NDKSignatureVerificationSampler(config: config)
-        await sampler.delegate = mockDelegate
+        await sampler.setDelegate(mockDelegate)
 
         let relay = NDKRelay(url: "wss://evil.relay.com")
         var stats = NDKRelaySignatureStats()

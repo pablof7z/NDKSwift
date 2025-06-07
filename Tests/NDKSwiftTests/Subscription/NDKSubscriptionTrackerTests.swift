@@ -279,6 +279,6 @@ final class NDKSubscriptionTrackerTests: XCTestCase {
         let filters = [NDKFilter(kinds: [1])]
         let options = NDKSubscriptionOptions()
         let ndk = NDK()
-        return NDKSubscription(filters: filters, options: options, ndk: ndk, id: id)
+        return NDKSubscription(id: id, filters: filters, options: options, ndk: ndk)
     }
 }
