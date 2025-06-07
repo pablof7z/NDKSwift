@@ -108,7 +108,7 @@ public struct BlossomAuth {
         }
 
         let pubkey = try await signer.pubkey
-        var event = NDKEvent(
+        let event = NDKEvent(
             pubkey: pubkey,
             createdAt: Timestamp(Date().timeIntervalSince1970),
             kind: 24242, // Blossom auth kind
@@ -129,13 +129,13 @@ public struct BlossomAuth {
         signer: NDKSigner,
         reason: String? = nil
     ) async throws -> BlossomAuth {
-        var tags: [[String]] = [
+        let tags: [[String]] = [
             ["t", "delete"],
             ["x", sha256],
         ]
 
         let pubkey = try await signer.pubkey
-        var event = NDKEvent(
+        let event = NDKEvent(
             pubkey: pubkey,
             createdAt: Timestamp(Date().timeIntervalSince1970),
             kind: 24242,

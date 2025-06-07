@@ -30,11 +30,23 @@ let package = Package(
             dependencies: [
                 .product(name: "CryptoSwift", package: "CryptoSwift"),
                 .product(name: "P256K", package: "secp256k1.swift"),
+            ],
+            exclude: [
+                "Outbox/README.md",
+                "Outbox/IMPLEMENTATION_SUMMARY.md"
             ]
         ),
         .testTarget(
             name: "NDKSwiftTests",
-            dependencies: ["NDKSwift"]
+            dependencies: ["NDKSwift"],
+            exclude: [
+                "Blossom/BlossomClientTests.swift.skip",
+                "Outbox/NDKPublishingStrategyTests.swift.disabled",
+                "Outbox/NDKPublishingStrategyTests.swift.disabled.bak",
+                "Outbox/NDKRelayRankerTests.swift.disabled.bak", 
+                "Outbox/NDKRelaySelectorTests.swift.disabled.bak",
+                "Outbox/NDKOutboxTrackerTests.swift.disabled.bak"
+            ]
         ),
     ]
 )
