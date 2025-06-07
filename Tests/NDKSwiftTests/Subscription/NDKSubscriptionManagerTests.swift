@@ -450,27 +450,14 @@ final class NDKSubscriptionManagerTests: XCTestCase {
 
 // MARK: - Mock Classes
 
-class MockRelay: NDKRelay {
-    var sentMessages: [String] = []
-    var isConnectedState = true
-
-    override var isConnected: Bool {
-        return isConnectedState
-    }
-
-    override func send(_ message: String) async throws {
-        sentMessages.append(message)
-    }
-
-    override func addSubscription(_: NDKSubscription) {
-        // Track subscription
-    }
-}
-
 class MockCacheAdapter: NDKCacheAdapter {
     var storedEvents: [NDKEvent] = []
     var queryCalled = false
     var setEventCalled = false
+    
+    // Protocol requirements
+    var locking: Bool = false
+    var ready: Bool = true
 
     func query(subscription: NDKSubscription) async -> [NDKEvent] {
         queryCalled = true
@@ -492,39 +479,42 @@ class MockCacheAdapter: NDKCacheAdapter {
         }
     }
 
-    func storeEvent(_ event: NDKEvent) async {
-        setEventCalled = true
-
-        if !storedEvents.contains(where: { $0.id == event.id }) {
-            storedEvents.append(event)
-        }
-    }
-
-    func storeProfile(_: NDKUserProfile, pubkey _: PublicKey) async {
+    func fetchProfile(pubkey: PublicKey) async -> NDKUserProfile? {
         // Not implemented for these tests
-    }
-
-    func loadProfile(pubkey _: PublicKey) async -> NDKUserProfile? {
         return nil
     }
 
-    func storeUnpublishedEvent(_: NDKEvent, relayUrls _: [RelayURL]) async {
+    func saveProfile(pubkey: PublicKey, profile: NDKUserProfile) async {
         // Not implemented for these tests
     }
 
-    func getUnpublishedEvents(relayUrl _: RelayURL) async -> [NDKEvent] {
+    func loadNip05(_ nip05: String) async -> (pubkey: PublicKey, relays: [String])? {
+        // Not implemented for these tests
+        return nil
+    }
+
+    func saveNip05(_ nip05: String, pubkey: PublicKey, relays: [String]) async {
+        // Not implemented for these tests
+    }
+
+    func updateRelayStatus(_ url: RelayURL, status: NDKRelayConnectionState) async {
+        // Not implemented for these tests
+    }
+
+    func getRelayStatus(_ url: RelayURL) async -> NDKRelayConnectionState? {
+        // Not implemented for these tests
+        return nil
+    }
+
+    func addUnpublishedEvent(_ event: NDKEvent, relayUrls: [RelayURL]) async {
+        // Not implemented for these tests
+    }
+
+    func getUnpublishedEvents(for relayUrl: RelayURL) async -> [NDKEvent] {
         return []
     }
 
-    func removeUnpublishedEvent(eventId _: EventID, relayUrl _: RelayURL) async {
+    func removeUnpublishedEvent(_ eventId: EventID, from relayUrl: RelayURL) async {
         // Not implemented for these tests
-    }
-
-    func clear() async {
-        storedEvents.removeAll()
-    }
-
-    func stats() async -> (events: Int, profiles: Int, nip05: Int) {
-        return (storedEvents.count, 0, 0)
     }
 }

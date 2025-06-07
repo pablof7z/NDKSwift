@@ -82,8 +82,12 @@ public final class NDKSubscription {
     /// Events received so far
     public private(set) var events: [NDKEvent] = []
 
-    /// Whether EOSE has been received
+    /// Whether EOSE has been received from all relays
     public private(set) var eoseReceived: Bool = false
+    
+    /// Track EOSE received from individual relays
+    private var eoseReceivedFromRelays: Set<String> = []
+    private let eoseReceivedLock = NSLock()
 
     /// Whether the subscription is active
     public private(set) var isActive: Bool = false
@@ -118,9 +122,12 @@ public final class NDKSubscription {
 
     /// State locks
     private let stateLock = NSLock()
+    
+    /// Task that handles registration with the subscription manager
+    internal var registrationTask: Task<Void, Never>?
 
     public init(
-        id: String = UUID().uuidString,
+        id: String = String(Int.random(in: 100000...999999)),
         filters: [NDKFilter],
         options: NDKSubscriptionOptions = NDKSubscriptionOptions(),
         ndk: NDK? = nil
@@ -254,10 +261,9 @@ public final class NDKSubscription {
 
         Task {
             for relay in relaysToUse {
-                // Use the relay's subscription manager which handles connection state
-                let _ = await relay.subscriptionManager.addSubscription(self, filters: filters)
+                // Only track the relay state - the main subscription manager handles the actual subscription
                 await relayState.addRelay(relay)
-                relay.addSubscription(self)
+                // Note: Don't call relay.subscriptionManager.addSubscription() as it's handled by the main NDKSubscriptionManager
             }
         }
     }
@@ -321,28 +327,44 @@ public final class NDKSubscription {
     }
 
     /// Handle EOSE (End of Stored Events)
-    public func handleEOSE(fromRelay _: NDKRelay? = nil) {
-        stateLock.lock()
-        let alreadyReceived = eoseReceived
-        if !alreadyReceived {
-            eoseReceived = true
-        }
-        stateLock.unlock()
+    public func handleEOSE(fromRelay relay: NDKRelay? = nil) {
+        // Track EOSE from this specific relay
+        let relayUrl = relay?.url ?? "unknown"
+        var shouldComplete = false
         
-        guard !alreadyReceived else { return }
-
-        // Thread-safe callback execution
-        eoseCallbacksLock.lock()
-        let callbacks = eoseCallbacks
-        eoseCallbacksLock.unlock()
+        eoseReceivedLock.lock()
+        eoseReceivedFromRelays.insert(relayUrl)
         
-        for callback in callbacks {
-            callback()
-        }
-        delegate?.subscription(self, didReceiveEOSE: ())
+        // Check if we've received EOSE from all expected relays
+        let expectedRelays = options.relays ?? Set(ndk?.relays ?? [])
+        let expectedRelayUrls = Set(expectedRelays.map { $0.url })
+        let allEoseReceived = expectedRelayUrls.isSubset(of: eoseReceivedFromRelays)
+        eoseReceivedLock.unlock()
+        
+        if allEoseReceived {
+            stateLock.lock()
+            let alreadyCompleted = eoseReceived
+            if !alreadyCompleted {
+                eoseReceived = true
+                shouldComplete = true
+            }
+            stateLock.unlock()
+            
+            if shouldComplete {
+                // Thread-safe callback execution
+                eoseCallbacksLock.lock()
+                let callbacks = eoseCallbacks
+                eoseCallbacksLock.unlock()
+                
+                for callback in callbacks {
+                    callback()
+                }
+                delegate?.subscription(self, didReceiveEOSE: ())
 
-        if options.closeOnEose {
-            close()
+                if options.closeOnEose {
+                    close()
+                }
+            }
         }
     }
 

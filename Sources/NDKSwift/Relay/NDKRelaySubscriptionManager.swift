@@ -179,13 +179,30 @@ public actor NDKRelaySubscriptionManager {
 
     /// Handle EOSE for a relay subscription
     public func handleEOSE(relaySubscriptionId: String) {
-        guard var relaySub = relaySubscriptions[relaySubscriptionId] else { return }
+        #if DEBUG
+        print("🔍 SubscriptionManager: Handling EOSE for relay subscription: \(relaySubscriptionId)")
+        print("   Available relay subscriptions: \(Array(relaySubscriptions.keys))")
+        #endif
+        
+        guard var relaySub = relaySubscriptions[relaySubscriptionId] else {
+            #if DEBUG
+            print("❌ SubscriptionManager: No relay subscription found for ID: \(relaySubscriptionId)")
+            #endif
+            return
+        }
+
+        #if DEBUG
+        print("✅ SubscriptionManager: Found relay subscription with \(relaySub.subscriptions.count) subscriptions")
+        #endif
 
         relaySub.status = .eoseReceived
         relaySubscriptions[relaySubscriptionId] = relaySub
 
         // Notify all subscriptions in this group
         for subscription in relaySub.subscriptions {
+            #if DEBUG
+            print("📤 SubscriptionManager: Notifying subscription \(subscription.id) of EOSE")
+            #endif
             subscription.handleEOSE(fromRelay: relay)
 
             // Track EOSE received
@@ -201,6 +218,9 @@ public actor NDKRelaySubscriptionManager {
 
         // Close if all subscriptions want closeOnEose
         if relaySub.closeOnEose {
+            #if DEBUG
+            print("🔒 SubscriptionManager: Closing relay subscription \(relaySubscriptionId) (closeOnEose=true)")
+            #endif
             closeRelaySubscription(relaySubscriptionId)
 
             // Remove subscriptions from tracking
@@ -214,12 +234,29 @@ public actor NDKRelaySubscriptionManager {
     public func handleEvent(_ event: NDKEvent, relaySubscriptionId: String?) {
         guard let eventId = event.id else { return }
 
+        #if DEBUG
+        print("🔍 SubscriptionManager: Handling event \(eventId) for relay subscription: \(relaySubscriptionId ?? "nil")")
+        print("   Available relay subscriptions: \(Array(relaySubscriptions.keys))")
+        #endif
+
         // If we have a specific relay subscription ID, route only to those subscriptions
         if let relaySubId = relaySubscriptionId,
            let relaySub = relaySubscriptions[relaySubId]
         {
+            #if DEBUG
+            print("✅ SubscriptionManager: Found relay subscription with \(relaySub.subscriptions.count) subscriptions")
+            #endif
+            
             for subscription in relaySub.subscriptions {
-                if subscription.filters.contains(where: { $0.matches(event: event) }) {
+                let matches = subscription.filters.contains(where: { $0.matches(event: event) })
+                #if DEBUG
+                print("🔍 SubscriptionManager: Subscription \(subscription.id) matches: \(matches)")
+                #endif
+                
+                if matches {
+                    #if DEBUG
+                    print("📤 SubscriptionManager: Notifying subscription \(subscription.id) of event")
+                    #endif
                     subscription.handleEvent(event, fromRelay: relay)
 
                     // Track event received
@@ -236,6 +273,10 @@ public actor NDKRelaySubscriptionManager {
                 }
             }
         } else {
+            #if DEBUG
+            print("🔍 SubscriptionManager: No specific relay subscription ID, routing to all matching subscriptions")
+            #endif
+            
             // Route to all matching subscriptions
             for relaySub in relaySubscriptions.values {
                 if relaySub.status == .running || relaySub.status == .eoseReceived {
@@ -264,7 +305,8 @@ public actor NDKRelaySubscriptionManager {
     // MARK: - Private Implementation
 
     private func createIndividualSubscription(_ subscription: NDKSubscription, filters: [NDKFilter]) -> String {
-        let relaySubId = UUID().uuidString
+        // Use subscription ID as the relay sub ID for wire protocol, but make it unique per relay
+        let relaySubId = subscription.id
         let relaySub = RelaySubscription(
             id: relaySubId,
             subscriptions: [subscription],
@@ -285,7 +327,7 @@ public actor NDKRelaySubscriptionManager {
     }
 
     private func createGroupedSubscription(_ subscription: NDKSubscription, filters: [NDKFilter], fingerprint: FilterFingerprint) -> String {
-        let relaySubId = UUID().uuidString
+        let relaySubId = subscription.id // Use the subscription's own ID for now
         var relaySub = RelaySubscription(
             id: relaySubId,
             subscriptions: [],
@@ -305,9 +347,8 @@ public actor NDKRelaySubscriptionManager {
         }
         subscriptionsByFingerprint[fingerprint]?.append(relaySub)
 
-        // Schedule execution with small delay for batching
+        // Execute immediately to avoid race conditions
         Task {
-            try? await Task.sleep(nanoseconds: 50_000_000) // 50ms delay
             await executeRelaySubscription(relaySubId)
         }
 

@@ -221,9 +221,9 @@ final class NDKRelaySubscriptionManagerTests: XCTestCase {
 
         // Create event from alice
         let event = NDKEvent(
+            pubkey: "alice",
             kind: 1,
-            content: "Hello",
-            pubkey: "alice"
+            content: "Hello"
         )
 
         await subscriptionManager.handleEvent(event, relaySubscriptionId: relaySubId)
