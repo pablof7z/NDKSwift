@@ -30,6 +30,11 @@ class NDK {
     // Subscriptions
     func subscribe(filters: [NDKFilter], options: NDKSubscriptionOptions? = nil) -> NDKSubscription
     
+    // Event fetching
+    func fetchEvent(_ idOrBech32: String, relays: Set<NDKRelay>? = nil) async throws -> NDKEvent?
+    func fetchEvent(_ filter: NDKFilter, relays: Set<NDKRelay>? = nil) async throws -> NDKEvent?
+    func fetchEvents(filters: [NDKFilter], relays: Set<NDKRelay>? = nil) async throws -> Set<NDKEvent>
+    
     // User operations
     func user(withPubkey pubkey: String) -> NDKUser
     func user(withNpub npub: String) throws -> NDKUser

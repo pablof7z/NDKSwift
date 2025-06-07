@@ -285,6 +285,74 @@ public struct NDKFilter: Codable, Equatable {
 
         return merged
     }
+    
+    /// Merge with another filter using union semantics (for profile batching)
+    public func mergedUnion(with other: NDKFilter) -> NDKFilter? {
+        // Only allow union merging for compatible filters
+        guard canMergeUnion(with: other) else { return nil }
+        
+        var merged = NDKFilter()
+        
+        // Union arrays
+        if let selfIds = ids, let otherIds = other.ids {
+            merged.ids = Array(Set(selfIds).union(Set(otherIds)))
+        } else {
+            merged.ids = ids ?? other.ids
+        }
+        
+        if let selfAuthors = authors, let otherAuthors = other.authors {
+            merged.authors = Array(Set(selfAuthors).union(Set(otherAuthors)))
+        } else {
+            merged.authors = authors ?? other.authors
+        }
+        
+        if let selfKinds = kinds, let otherKinds = other.kinds {
+            // For union merging, kinds must match exactly
+            if Set(selfKinds) != Set(otherKinds) { return nil }
+            merged.kinds = selfKinds
+        } else {
+            merged.kinds = kinds ?? other.kinds
+        }
+        
+        // For timestamps, use the most inclusive range
+        merged.since = min(since ?? 0, other.since ?? 0)
+        merged.until = max(until ?? .max, other.until ?? .max)
+        
+        // For limit, sum them up (capped at some reasonable max)
+        if let selfLimit = limit, let otherLimit = other.limit {
+            merged.limit = min(selfLimit + otherLimit, 1000)
+        }
+        
+        // Don't merge if tag filters differ
+        if !tagFilters.isEmpty || !other.tagFilters.isEmpty {
+            return nil
+        }
+        
+        return merged
+    }
+    
+    /// Check if this filter can be union-merged with another
+    private func canMergeUnion(with other: NDKFilter) -> Bool {
+        // Only allow union merging for metadata (profile) queries
+        if let selfKinds = kinds, let otherKinds = other.kinds {
+            let selfKindSet = Set(selfKinds)
+            let otherKindSet = Set(otherKinds)
+            
+            // Both must be requesting only metadata events
+            if selfKindSet != otherKindSet || selfKindSet != [EventKind.metadata] {
+                return false
+            }
+        }
+        
+        // Don't merge if either has tag filters, events, or pubkeys
+        if !tagFilters.isEmpty || !other.tagFilters.isEmpty ||
+           events != nil || other.events != nil ||
+           pubkeys != nil || other.pubkeys != nil {
+            return false
+        }
+        
+        return true
+    }
 
     /// Returns a dictionary representation of the filter
     public var dictionary: [String: Any] {

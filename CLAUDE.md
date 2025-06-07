@@ -127,3 +127,15 @@ swift package generate-xcodeproj
 - Relay URLs are normalized using URLNormalizer (adds trailing slashes, strips auth, removes www, etc. - matches ndk-core)
 - File-based cache uses JSON for human readability
 - Blossom support is implemented as an extension to NDK core
+
+## Development Guidelines
+
+- Always add and update a changelog file
+- When making changes, decide to change version number and which level of semantic version to change
+  - Major version (X.0.0): Breaking changes or significant rewrites
+  - Minor version (0.X.0): New features or substantial improvements
+  - Patch version (0.0.X): Bug fixes, performance improvements, small refactors
+
+## Claude's Responsibilities
+
+- You are also in charge of keeping the documentation and tutorial information highly in line with implementation and best practices
