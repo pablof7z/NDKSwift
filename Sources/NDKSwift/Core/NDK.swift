@@ -96,6 +96,9 @@ public final class NDK {
         public static let `default` = SubscriptionTrackingConfig()
     }
 
+    // MARK: - Profile Management
+    // Profile management will be added later
+
     // MARK: - Initialization
 
     public init(
@@ -115,6 +118,7 @@ public final class NDK {
             trackClosedSubscriptions: subscriptionTrackingConfig.trackClosedSubscriptions,
             maxClosedSubscriptions: subscriptionTrackingConfig.maxClosedSubscriptions
         )
+        // Profile manager will be initialized later
 
         // Initialize subscription manager after all properties are set
         self.subscriptionManager = NDKSubscriptionManager(ndk: self)
@@ -344,9 +348,9 @@ public final class NDK {
         return Set(subscription.events)
     }
 
-    /// Fetch a single event by ID
-    public func fetchEvent(_ id: EventID, relays: Set<NDKRelay>? = nil) async throws -> NDKEvent? {
-        let filter = NDKFilter(ids: [id])
+    /// Fetch a single event by ID (hex or bech32 format)
+    public func fetchEvent(_ idOrBech32: String, relays: Set<NDKRelay>? = nil) async throws -> NDKEvent? {
+        let filter = try NostrIdentifier.createFilter(from: idOrBech32)
         let events = try await fetchEvents(filters: [filter], relays: relays)
         return events.first
     }
@@ -450,6 +454,7 @@ public final class NDK {
         user.ndk = self
         return user
     }
+
 
     // MARK: - Queued Events
 
