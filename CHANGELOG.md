@@ -40,6 +40,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added tag validation and batch operations (deduplication, removal)
 - Added TagBuilder for complex tag construction
 - Created comprehensive tag operations guide documentation
+- Simplified subscription API with auto-starting subscriptions
+- Added subscription builder pattern for fluent configuration
+- Added fetch() method for one-time event queries with auto-close
+- Added stream() method for async event sequences
+- Added profile fetching convenience methods (fetchProfile, fetchProfiles)
+- Added subscription groups for bulk lifecycle management
+- Added scoped subscriptions with automatic cleanup
+- Added auto-closing subscription wrappers
+- Created comprehensive subscription API guide documentation
 
 ### Changed
 - Refactored all JSON operations to use the new JSONCoding utility
