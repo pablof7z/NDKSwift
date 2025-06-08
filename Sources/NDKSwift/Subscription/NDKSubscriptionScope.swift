@@ -196,7 +196,7 @@ public struct SubscriptionEventSequence: AsyncSequence {
 
 extension NDKSubscription {
     /// Get an async sequence of events from this subscription
-    public var events: SubscriptionEventSequence {
+    public var eventStream: SubscriptionEventSequence {
         return SubscriptionEventSequence(self)
     }
 }
