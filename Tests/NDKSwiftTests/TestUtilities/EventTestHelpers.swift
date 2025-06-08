@@ -17,7 +17,7 @@ struct EventTestHelpers {
         id: String? = nil,
         sig: String? = nil
     ) -> NDKEvent {
-        var event = NDKEvent(
+        let event = NDKEvent(
             pubkey: pubkey,
             createdAt: createdAt ?? Int64(Date().timeIntervalSince1970),
             kind: kind,

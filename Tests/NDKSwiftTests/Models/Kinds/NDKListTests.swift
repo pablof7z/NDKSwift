@@ -236,10 +236,16 @@ final class NDKListTests: XCTestCase {
         try await list.addItem(user, encrypted: true)
 
         // Should not appear in public items
-        XCTAssertFalse(list.publicItems.contains { $0.type == "p" && $0.value == "user123" })
+        let containsInPublic = list.publicItems.contains { tag in
+            tag.count >= 2 && tag[0] == "p" && tag[1] == "user123"
+        }
+        XCTAssertFalse(containsInPublic)
 
         // Should appear in all items
-        XCTAssertTrue(list.allItems.contains { $0.type == "p" && $0.value == "user123" })
+        let containsInAll = list.allItems.contains { tag in
+            tag.count >= 2 && tag[0] == "p" && tag[1] == "user123"
+        }
+        XCTAssertTrue(containsInAll)
 
         // Content should not be empty (contains encrypted data)
         XCTAssertFalse(list.content.isEmpty)
@@ -251,8 +257,9 @@ final class NDKListTests: XCTestCase {
         let user = NDKUser(pubkey: "user123")
         let tag = user.toListTag()
 
-        XCTAssertEqual(tag.type, "p")
-        XCTAssertEqual(tag.value, "user123")
+        XCTAssertEqual(tag.count, 2)
+        XCTAssertEqual(tag[0], "p")
+        XCTAssertEqual(tag[1], "user123")
         XCTAssertEqual(user.reference, "user123")
     }
 
@@ -263,8 +270,9 @@ final class NDKListTests: XCTestCase {
 
         let tag = event.toListTag()
 
-        XCTAssertEqual(tag.type, "e")
-        XCTAssertEqual(tag.value, "event123")
+        XCTAssertEqual(tag.count, 2)
+        XCTAssertEqual(tag[0], "e")
+        XCTAssertEqual(tag[1], "event123")
         XCTAssertEqual(event.reference, "event123")
     }
 
@@ -272,8 +280,9 @@ final class NDKListTests: XCTestCase {
         let relay = NDKRelay(url: "wss://relay.example.com")
         let tag = relay.toListTag()
 
-        XCTAssertEqual(tag.type, "r")
-        XCTAssertEqual(tag.value, "wss://relay.example.com")
+        XCTAssertEqual(tag.count, 2)
+        XCTAssertEqual(tag[0], "r")
+        XCTAssertEqual(tag[1], "wss://relay.example.com")
         XCTAssertEqual(relay.reference, "wss://relay.example.com")
     }
 
@@ -281,8 +290,9 @@ final class NDKListTests: XCTestCase {
         let hashtag = NDKStringListItem(tagType: "t", value: "nostr")
         let tag = hashtag.toListTag()
 
-        XCTAssertEqual(tag.type, "t")
-        XCTAssertEqual(tag.value, "nostr")
+        XCTAssertEqual(tag.count, 2)
+        XCTAssertEqual(tag[0], "t")
+        XCTAssertEqual(tag[1], "nostr")
         XCTAssertEqual(hashtag.reference, "nostr")
     }
 
