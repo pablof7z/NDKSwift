@@ -53,8 +53,7 @@ public enum NostrMessage {
                 throw NDKError.custom("Invalid event data")
             }
 
-            let eventData = try JSONSerialization.data(withJSONObject: eventDict)
-            let event = try JSONDecoder().decode(NDKEvent.self, from: eventData)
+            let event = try JSONCoding.decodeFromDictionary(NDKEvent.self, from: eventDict)
 
             return .event(subscriptionId: subscriptionId, event: event)
 
@@ -68,8 +67,7 @@ public enum NostrMessage {
             var filters: [NDKFilter] = []
             for i in 2 ..< array.count {
                 guard let filterDict = array[i] as? [String: Any] else { continue }
-                let filterData = try JSONSerialization.data(withJSONObject: filterDict)
-                let filter = try JSONDecoder().decode(NDKFilter.self, from: filterData)
+                let filter = try JSONCoding.decodeFromDictionary(NDKFilter.self, from: filterDict)
                 filters.append(filter)
             }
 
@@ -136,21 +134,15 @@ public enum NostrMessage {
         switch self {
         case let .event(_, event):
             array.append("EVENT")
-            let encoder = JSONEncoder()
-            encoder.outputFormatting = []
-            let eventData = try encoder.encode(event)
-            let eventDict = try JSONSerialization.jsonObject(with: eventData)
+            let eventDict = try JSONCoding.encodeToDictionary(event)
             array.append(eventDict)
 
         case let .req(subscriptionId, filters):
             array.append("REQ")
             array.append(subscriptionId)
 
-            let encoder = JSONEncoder()
-            encoder.outputFormatting = []
             for filter in filters {
-                let filterData = try encoder.encode(filter)
-                let filterDict = try JSONSerialization.jsonObject(with: filterData)
+                let filterDict = try JSONCoding.encodeToDictionary(filter)
                 array.append(filterDict)
             }
 

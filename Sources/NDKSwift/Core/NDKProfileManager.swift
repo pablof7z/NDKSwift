@@ -211,8 +211,7 @@ public actor NDKProfileManager {
             
             // Process events
             for event in events {
-                guard let profileData = event.content.data(using: .utf8),
-                      let profile = try? JSONDecoder().decode(NDKUserProfile.self, from: profileData) else {
+                guard let profile = JSONCoding.safeDecode(NDKUserProfile.self, from: event.content) else {
                     continue
                 }
                 
@@ -234,8 +233,9 @@ public actor NDKProfileManager {
         
         // Schedule new batch processing
         batchTask = Task { [weak self] in
-            try? await Task.sleep(nanoseconds: UInt64(config.batchDelay * 1_000_000_000))
-            await self?.processPendingBatch()
+            guard let self = self else { return }
+            try? await Task.sleep(nanoseconds: UInt64(self.config.batchDelay * 1_000_000_000))
+            await self.processPendingBatch()
         }
     }
     

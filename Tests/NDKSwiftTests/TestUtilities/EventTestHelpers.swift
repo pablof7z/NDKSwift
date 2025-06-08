@@ -360,13 +360,13 @@ struct EventTestDataSets {
         let reply1 = EventTestHelpers.createTextNoteEvent(
             content: "Reply to the conversation",
             pubkey: testPubkeys[1],
-            tags: [["e", rootEvent.id, "", "reply"], ["p", rootEvent.pubkey]]
+            tags: [["e", rootEvent.id ?? "", "", "reply"], ["p", rootEvent.pubkey]]
         )
         
         let reply2 = EventTestHelpers.createTextNoteEvent(
             content: "Another reply",
             pubkey: testPubkeys[2],
-            tags: [["e", rootEvent.id, "", "reply"], ["p", rootEvent.pubkey]]
+            tags: [["e", rootEvent.id ?? "", "", "reply"], ["p", rootEvent.pubkey]]
         )
         
         let nestedReply = EventTestHelpers.createTextNoteEvent(
