@@ -110,7 +110,7 @@ final class NDKErrorHandlingTests: XCTestCase {
     }
     
     func testSigningWithoutPrivateKey() async {
-        let event = createTestEvent()
+        _ = createTestEvent()
         
         // Test signing with uninitialized signer would require protocol changes
         // For now, test that we can detect missing signer
@@ -212,7 +212,11 @@ final class NDKErrorHandlingTests: XCTestCase {
         )
         
         // Should handle gracefully without crashing
-        XCTAssertNoThrow(await cache.setEvent(corruptedEvent, filters: [], relay: nil))
+        do {
+            try await cache.setEvent(corruptedEvent, filters: [], relay: nil)
+        } catch {
+            XCTFail("Should not throw: \(error)")
+        }
     }
     
     // MARK: - Memory Management Tests
