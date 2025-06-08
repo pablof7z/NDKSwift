@@ -54,35 +54,42 @@ func runSimpleDemo() async {
     let matches = filter.matches(event: event)
     print("✅ Filter matches event: \(matches)")
 
-    // 4. Test subscriptions
+    // 4. Test subscriptions with new AsyncStream API
     print("\n📡 Testing subscriptions...")
     let subscription = NDKSubscription(filters: [filter])
 
+    // Simulate events in background
+    Task {
+        subscription.handleEvent(event, fromRelay: nil as NDKRelay?)
+        
+        let event2 = NDKEvent(
+            pubkey: "d0a1ffb8761b974cec4a3be8cbcb2e96a7090dcf465ffeac839aa4ca20c9a59e",
+            createdAt: Timestamp(Date().timeIntervalSince1970),
+            kind: EventKind.textNote,
+            content: "Second test event"
+        )
+        event2.id = "test_event_2"
+        
+        subscription.handleEvent(event2, fromRelay: nil as NDKRelay?)
+        subscription.handleEOSE()
+    }
+    
+    // Use AsyncStream to handle events
     var receivedEvents = 0
-    subscription.onEvent { event in
-        receivedEvents += 1
-        print("📨 Received event \(receivedEvents): \(event.content)")
+    for await update in subscription.updates {
+        switch update {
+        case .event(let event):
+            receivedEvents += 1
+            print("📨 Received event \(receivedEvents): \(event.content)")
+        case .eose:
+            print("🏁 EOSE received")
+            break // Exit loop
+        case .error(let error):
+            print("❌ Error: \(error)")
+        }
     }
 
-    subscription.onEOSE {
-        print("🏁 EOSE received")
-    }
-
-    // Simulate events
-    subscription.handleEvent(event, fromRelay: nil as NDKRelay?)
-
-    let event2 = NDKEvent(
-        pubkey: "d0a1ffb8761b974cec4a3be8cbcb2e96a7090dcf465ffeac839aa4ca20c9a59e",
-        createdAt: Timestamp(Date().timeIntervalSince1970),
-        kind: EventKind.textNote,
-        content: "Second test event"
-    )
-    event2.id = "test_event_2"
-
-    subscription.handleEvent(event2, fromRelay: nil as NDKRelay?)
-    subscription.handleEOSE()
-
-    print("✅ Subscription received \(subscription.events.count) events")
+    print("✅ Subscription received \(receivedEvents) events")
 
     // 5. Test NDK instance
     print("\n🏗️ Testing NDK instance...")
@@ -100,13 +107,28 @@ func runSimpleDemo() async {
         print("   📡 Relay: \(relay.normalizedURL)")
     }
 
-    // 6. Test cache
+    // 6. Test cache with new API
     print("\n💾 Testing cache...")
-    if let cache = ndk.cacheAdapter {
-        await cache.setEvent(event, filters: [filter], relay: nil)
+    if let cache = ndk.cache {
+        try? await cache.saveEvent(event)
 
-        let cachedEvents = await cache.query(subscription: subscription)
+        let cachedEvents = await cache.queryEvents(filter)
         print("✅ Cache stored and retrieved \(cachedEvents.count) events")
+    }
+    
+    // 6b. Test fetch API
+    print("\n🎯 Testing fetch API...")
+    do {
+        // Fetch profile
+        if let profile = try await ndk.fetchProfile(user.pubkey) {
+            print("✅ Fetched profile: \(profile.displayName ?? "Unknown")")
+        }
+        
+        // Fetch recent events
+        let recentEvents = try await ndk.fetchEvents(filter)
+        print("✅ Fetched \(recentEvents.count) events")
+    } catch {
+        print("❌ Fetch error: \(error)")
     }
 
     // 7. Test user profiles
