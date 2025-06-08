@@ -14,7 +14,7 @@ public struct NDKRelayInfo: Codable, Equatable {
 }
 
 /// Relay connection state
-public enum NDKRelayConnectionState: Equatable {
+public enum NDKRelayConnectionState: Equatable, Codable {
     case disconnected
     case connecting
     case connected

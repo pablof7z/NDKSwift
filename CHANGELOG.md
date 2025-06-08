@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.0] - 2025-01-08
+
 ### Added
 - Created centralized `JSONCoding` utility to eliminate duplicate JSON encoder/decoder setup across the codebase
 - Added comprehensive tests for JSONCoding utility
@@ -26,6 +28,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added error recovery suggestions and automatic error migration
 - Added comprehensive error handling guide documentation
 - Added backward compatibility bridge for existing error types
+- Created unified cache architecture with layered caching system
+- Added `CacheLayer` protocol for consistent cache implementations
+- Added `MemoryCacheLayer` and `DiskCacheLayer` implementations
+- Added `LayeredCache` for managing multiple cache tiers
+- Added `UnifiedCacheAdapter` to bridge new architecture with NDKCacheAdapter
+- Added cache statistics and monitoring capabilities
+- Added comprehensive unified cache architecture documentation
 
 ### Changed
 - Refactored all JSON operations to use the new JSONCoding utility
