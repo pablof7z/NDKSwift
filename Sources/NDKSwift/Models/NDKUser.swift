@@ -53,7 +53,7 @@ public final class NDKUser: Equatable, Hashable {
         // Parse NIP-05 identifier (user@domain)
         let parts = nip05.split(separator: "@")
         guard parts.count == 2 else {
-            throw NDKError.validation("Invalid NIP-05 format")
+            throw NDKError.validation("invalid_nip05", "Invalid NIP-05 format")
         }
 
         let name = String(parts[0])
@@ -62,7 +62,7 @@ public final class NDKUser: Equatable, Hashable {
         // Build the well-known URL
         let urlString = "https://\(domain)/.well-known/nostr.json?name=\(name)"
         guard let url = URL(string: urlString) else {
-            throw NDKError.validation("Invalid NIP-05 URL")
+            throw NDKError.validation("invalid_nip05_url", "Invalid NIP-05 URL")
         }
 
         // Fetch the data
@@ -73,7 +73,7 @@ public final class NDKUser: Equatable, Hashable {
               let names = json["names"] as? [String: String],
               let pubkey = names[name]
         else {
-            throw NDKError.validation("NIP-05 verification failed")
+            throw NDKError.validation("nip05_verification_failed", "NIP-05 verification failed")
         }
 
         let user = NDKUser(pubkey: pubkey)
@@ -97,7 +97,7 @@ public final class NDKUser: Equatable, Hashable {
     @discardableResult
     public func fetchProfile(forceRefresh: Bool = false) async throws -> NDKUserProfile? {
         guard let ndk = ndk else {
-            throw NDKError.custom("NDK instance not set")
+            throw NDKError.runtime("ndk_not_set", "NDK instance not set")
         }
 
         // Check cache first unless force refresh is requested
@@ -120,7 +120,7 @@ public final class NDKUser: Equatable, Hashable {
             // Parse the profile from the event content
             guard let profileData = event.content.data(using: .utf8),
                   let profile = try? JSONDecoder().decode(NDKUserProfile.self, from: profileData) else {
-                throw NDKError.validation("Invalid profile data")
+                throw NDKError.validation("invalid_profile_data", "Invalid profile data")
             }
             
             // Update our local profile
@@ -144,7 +144,7 @@ public final class NDKUser: Equatable, Hashable {
     @discardableResult
     public func fetchRelayList() async throws -> [NDKRelayInfo] {
         guard let ndk = ndk else {
-            throw NDKError.custom("NDK instance not set")
+            throw NDKError.runtime("ndk_not_set", "NDK instance not set")
         }
 
         // Create filter for kind 10002 events
@@ -164,7 +164,7 @@ public final class NDKUser: Equatable, Hashable {
     /// Get users this user follows
     public func follows() async throws -> Set<NDKUser> {
         guard let ndk = ndk else {
-            throw NDKError.custom("NDK instance not set")
+            throw NDKError.runtime("ndk_not_set", "NDK instance not set")
         }
 
         // Create filter for kind 3 events
@@ -225,11 +225,11 @@ public final class NDKUser: Equatable, Hashable {
     /// - Returns: Payment confirmation
     public func pay(amount: Int64, comment: String? = nil, tags: [[String]]? = nil) async throws -> NDKPaymentConfirmation {
         guard let ndk = ndk else {
-            throw NDKError.custom("NDK instance not set")
+            throw NDKError.runtime("ndk_not_set", "NDK instance not set")
         }
 
         guard let paymentRouter = ndk.paymentRouter else {
-            throw NDKError.walletNotConfigured
+            throw NDKError.configuration("wallet_not_configured", "Wallet not configured")
         }
 
         let request = NDKPaymentRequest(
@@ -246,7 +246,7 @@ public final class NDKUser: Equatable, Hashable {
     /// - Returns: Set of payment methods this user supports
     public func getPaymentMethods() async throws -> Set<NDKPaymentMethod> {
         guard let ndk = ndk else {
-            throw NDKError.custom("NDK instance not set")
+            throw NDKError.runtime("ndk_not_set", "NDK instance not set")
         }
 
         var methods = Set<NDKPaymentMethod>()

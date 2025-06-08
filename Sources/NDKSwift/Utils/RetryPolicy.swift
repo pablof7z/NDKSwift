@@ -170,7 +170,7 @@ extension RetryPolicy {
                 
                 // Get next delay or throw if max attempts reached
                 guard let delay = nextDelay() else {
-                    throw NDKError.custom("Max retry attempts reached: \(error)")
+                    throw NDKError.runtime("max_retries_reached", "Max retry attempts reached: \(error)")
                 }
                 
                 // Wait for the delay
@@ -197,12 +197,12 @@ extension RetryPolicy {
             // Add timeout task
             group.addTask {
                 try await Task.sleep(nanoseconds: UInt64(timeout * 1_000_000_000))
-                throw NDKError.timeout
+                throw NDKError.network("timeout", "Operation timed out")
             }
             
             // Return the first result (either success or timeout)
             guard let result = try await group.next() else {
-                throw NDKError.custom("No result from retry operation")
+                throw NDKError.runtime("no_result", "No result from retry operation")
             }
             
             // Cancel remaining tasks

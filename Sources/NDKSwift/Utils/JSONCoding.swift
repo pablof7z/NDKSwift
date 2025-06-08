@@ -35,7 +35,7 @@ public enum JSONCoding {
     public static func encodeToString<T: Encodable>(_ value: T) throws -> String {
         let data = try encode(value)
         guard let string = String(data: data, encoding: .utf8) else {
-            throw NDKError.custom("Failed to convert JSON data to string")
+            throw NDKError.runtime("json_error", "Failed to convert JSON data to string")
         }
         return string
     }
@@ -48,7 +48,7 @@ public enum JSONCoding {
     /// Decode JSON string to object
     public static func decode<T: Decodable>(_ type: T.Type, from string: String) throws -> T {
         guard let data = string.data(using: .utf8) else {
-            throw NDKError.custom("Invalid UTF-8 string")
+            throw NDKError.runtime("json_error", "Invalid UTF-8 string")
         }
         return try decode(type, from: data)
     }
@@ -57,7 +57,7 @@ public enum JSONCoding {
     public static func encodeToDictionary<T: Encodable>(_ value: T) throws -> [String: Any] {
         let data = try encode(value)
         guard let dictionary = try JSONSerialization.jsonObject(with: data) as? [String: Any] else {
-            throw NDKError.custom("Failed to convert to dictionary")
+            throw NDKError.runtime("json_error", "Failed to convert to dictionary")
         }
         return dictionary
     }
@@ -74,7 +74,7 @@ public enum JSONCoding {
     public static func encodeForNostr<T: Encodable>(_ value: T) throws -> String {
         let data = try encoder.encode(value)
         guard let string = String(data: data, encoding: .utf8) else {
-            throw NDKError.custom("Failed to encode Nostr message")
+            throw NDKError.runtime("json_error", "Failed to encode Nostr message")
         }
         return string
     }

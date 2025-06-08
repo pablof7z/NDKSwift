@@ -312,7 +312,7 @@ public extension NDK {
     /// Publish a contact list
     func publishContactList(_ contactList: NDKContactList) async throws {
         guard signer != nil else {
-            throw NDKError.signingFailed
+            throw NDKError.crypto("no_signer", "No signer configured")
         }
 
         try await contactList.sign()

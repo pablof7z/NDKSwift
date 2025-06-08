@@ -232,7 +232,7 @@ extension NDK {
             
             group.addTask {
                 try await Task.sleep(nanoseconds: UInt64(timeout * 1_000_000_000))
-                throw NDKUnifiedError.network(.timeout)
+                throw NDKError.network("timeout", "Operation timed out")
             }
             
             try await group.next()
@@ -267,7 +267,7 @@ extension NDK {
             
             group.addTask {
                 try await Task.sleep(nanoseconds: UInt64(timeout * 1_000_000_000))
-                throw NDKUnifiedError.network(.timeout)
+                throw NDKError.network("timeout", "Operation timed out")
             }
             
             try await group.next()

@@ -182,7 +182,7 @@ public final class NDK {
         // Sign event if not already signed
         if event.sig == nil {
             guard signer != nil else {
-                throw NDKError.signingFailed
+                throw NDKError.crypto("no_signer", "No signer configured")
             }
 
             // Set NDK instance and sign (this will also generate content tags)

@@ -69,7 +69,7 @@ public extension NDKEvent {
             }
         }
 
-        throw NDKError.powGenerationFailed
+        throw NDKError.crypto("pow_generation_failed", "Failed to generate proof of work")
     }
 
     /// Extract p tags (mentioned pubkeys)

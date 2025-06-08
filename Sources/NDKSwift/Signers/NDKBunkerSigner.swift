@@ -330,7 +330,7 @@ public actor NDKBunkerSigner: NDKSigner, @unchecked Sendable {
     private func connectBunker() async throws -> NDKUser {
         guard let bunkerPubkey = bunkerPubkey else {
             print("[BunkerSigner] ERROR: Bunker pubkey not set!")
-            throw NDKError.signerError("Bunker pubkey not set")
+            throw NDKError.crypto("signer_error", "Bunker pubkey not set")
         }
 
         print("[BunkerSigner] Connecting to bunker with pubkey: \(bunkerPubkey)")
@@ -418,7 +418,7 @@ public actor NDKBunkerSigner: NDKSigner, @unchecked Sendable {
                 connectionContinuation?.resume(throwing: error)
             }
         } else {
-            let error = NDKError.signerError(response.error ?? "Connection failed")
+            let error = NDKError.crypto("signer_error", response.error ?? "Connection failed")
             connectionContinuation?.resume(throwing: error)
         }
         connectionContinuation = nil
@@ -438,7 +438,7 @@ public actor NDKBunkerSigner: NDKSigner, @unchecked Sendable {
 
     private func performSign(_ event: NDKEvent) async throws -> Signature {
         guard let bunkerPubkey = bunkerPubkey else {
-            throw NDKError.signerError("Not connected")
+            throw NDKError.crypto("signer_error", "Not connected")
         }
 
         let eventJson = try event.serialize()
@@ -455,7 +455,7 @@ public actor NDKBunkerSigner: NDKSigner, @unchecked Sendable {
               let json = try? JSONSerialization.jsonObject(with: resultData) as? [String: Any],
               let sig = json["sig"] as? String
         else {
-            throw NDKError.signerError("Failed to sign event")
+            throw NDKError.crypto("signer_error", "Failed to sign event")
         }
 
         return sig
@@ -475,7 +475,7 @@ public actor NDKBunkerSigner: NDKSigner, @unchecked Sendable {
         }
 
         guard let bunkerPubkey = bunkerPubkey else {
-            throw NDKError.signerError("Not connected")
+            throw NDKError.crypto("signer_error", "Not connected")
         }
 
         let response = try await rpcClient?.sendRequest(
@@ -487,7 +487,7 @@ public actor NDKBunkerSigner: NDKSigner, @unchecked Sendable {
         guard let response = response,
               response.error == nil
         else {
-            throw NDKError.signerError("Failed to get public key")
+            throw NDKError.crypto("signer_error", "Failed to get public key")
         }
 
         return response.result
@@ -495,7 +495,7 @@ public actor NDKBunkerSigner: NDKSigner, @unchecked Sendable {
 
     private func performCrypto(method: String, params: [String], errorMessage: String) async throws -> String {
         guard let bunkerPubkey = bunkerPubkey else {
-            throw NDKError.signerError("Not connected")
+            throw NDKError.crypto("signer_error", "Not connected")
         }
 
         let response = try await rpcClient?.sendRequest(
@@ -507,7 +507,7 @@ public actor NDKBunkerSigner: NDKSigner, @unchecked Sendable {
         guard let response = response,
               response.error == nil
         else {
-            throw NDKError.signerError(errorMessage)
+            throw NDKError.crypto("signer_error", errorMessage)
         }
 
         return response.result

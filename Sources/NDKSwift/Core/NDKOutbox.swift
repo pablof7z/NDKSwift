@@ -72,7 +72,7 @@ public extension NDK {
         // Sign event if needed
         if event.sig == nil {
             guard let signer = signer else {
-                throw NDKError.signingFailed
+                throw NDKError.crypto("no_signer", "No signer configured")
             }
 
             if event.id == nil {
