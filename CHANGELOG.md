@@ -18,6 +18,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added `EventCollection`, `CallbackCollection`, and `StateManager` actors as thread-safe alternatives to NSLock
 - Added comprehensive tests comparing actor-based vs lock-based performance
 - Added thread safety migration guide documentation
+- Created `EventDeduplicator` with LRU cache for centralized duplicate event detection
+- Added configurable deduplication with global and per-relay tracking
+- Added deduplication statistics for monitoring and debugging
+- Added comprehensive tests for EventDeduplicator functionality
 
 ### Changed
 - Refactored all JSON operations to use the new JSONCoding utility
@@ -27,6 +31,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Replaced manual exponential backoff logic in NDKRelayConnection with RetryPolicy
 - Removed duplicate retry delay calculations across the codebase
 - Demonstrated how to replace NSLock patterns with Swift actors for better thread safety
+- Leveraged existing LRUCache implementation for event deduplication
 
 ## [0.3.5] - 2025-01-07
 

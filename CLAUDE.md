@@ -143,3 +143,7 @@ swift package generate-xcodeproj
 UUIDs are stupid and should never be used in the context of nostr.
 
 - Unless otherwise specified, backward compatibility is not necessary
+
+## Claude Memories
+
+- Every time you finish doing significant work, as Gemini for a code-review; explain what the intended task was and any significant notes plus the files you worked on. To ask for the review use command: `vibe-tools repo "<prompt>"`
