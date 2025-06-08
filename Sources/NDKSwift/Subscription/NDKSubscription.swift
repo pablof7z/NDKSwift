@@ -55,15 +55,16 @@ public enum NDKCacheStrategy {
     case parallel // Check cache and relays in parallel
 }
 
-/// Delegate for subscription events
-public protocol NDKSubscriptionDelegate: AnyObject {
-    func subscription(_ subscription: NDKSubscription, didReceiveEvent event: NDKEvent)
-    func subscription(_ subscription: NDKSubscription, didReceiveEOSE: Void)
-    func subscription(_ subscription: NDKSubscription, didReceiveError error: Error)
+/// Update type for subscription stream
+public enum NDKSubscriptionUpdate {
+    case event(NDKEvent)
+    case eose
+    case error(Error)
 }
 
 /// Real implementation of NDKSubscription
-public final class NDKSubscription {
+public final class NDKSubscription: AsyncSequence {
+    public typealias Element = NDKEvent
     /// Unique subscription ID
     public let id: String
 
@@ -76,8 +77,6 @@ public final class NDKSubscription {
     /// Reference to NDK instance
     public weak var ndk: NDK?
 
-    /// Subscription delegate
-    public weak var delegate: NDKSubscriptionDelegate?
     
     /// Current subscription state
     public private(set) var state: NDKSubscriptionState = .pending
@@ -108,17 +107,15 @@ public final class NDKSubscription {
     /// Timer for timeout
     private var timeoutTimer: Timer?
 
-    /// Event callbacks - protected by lock
-    var eventCallbacks: [(NDKEvent) -> Void] = []
-    private let eventCallbacksLock = NSLock()
-
-    /// EOSE callbacks - protected by lock  
-    var eoseCallbacks: [() -> Void] = []
-    private let eoseCallbacksLock = NSLock()
-
-    /// Error callbacks - protected by lock
-    var errorCallbacks: [(Error) -> Void] = []
-    private let errorCallbacksLock = NSLock()
+    /// The stream continuation for sending events
+    private var continuation: AsyncStream<NDKEvent>.Continuation?
+    
+    /// The async stream of events
+    private let stream: AsyncStream<NDKEvent>
+    
+    /// Update stream for those who want all updates (events, EOSE, errors)
+    public let updates: AsyncStream<NDKSubscriptionUpdate>
+    private var updateContinuation: AsyncStream<NDKSubscriptionUpdate>.Continuation?
 
     /// Events array lock
     private let eventsLock = NSLock()
@@ -139,6 +136,20 @@ public final class NDKSubscription {
         self.filters = filters
         self.options = options
         self.ndk = ndk
+        
+        // Create the main event stream
+        var streamContinuation: AsyncStream<NDKEvent>.Continuation?
+        self.stream = AsyncStream<NDKEvent> { continuation in
+            streamContinuation = continuation
+        }
+        self.continuation = streamContinuation
+        
+        // Create the update stream
+        var updateStreamContinuation: AsyncStream<NDKSubscriptionUpdate>.Continuation?
+        self.updates = AsyncStream<NDKSubscriptionUpdate> { continuation in
+            updateStreamContinuation = continuation
+        }
+        self.updateContinuation = updateStreamContinuation
 
         setupTimeoutIfNeeded()
     }
@@ -147,27 +158,26 @@ public final class NDKSubscription {
         close()
     }
 
-    // MARK: - Callback Registration
-
-    /// Add a callback for events
-    public func onEvent(_ callback: @escaping (NDKEvent) -> Void) {
-        eventCallbacksLock.lock()
-        eventCallbacks.append(callback)
-        eventCallbacksLock.unlock()
+    // MARK: - AsyncSequence Conformance
+    
+    public struct AsyncIterator: AsyncIteratorProtocol {
+        private var iterator: AsyncStream<NDKEvent>.AsyncIterator
+        
+        init(iterator: AsyncStream<NDKEvent>.AsyncIterator) {
+            self.iterator = iterator
+        }
+        
+        public mutating func next() async -> NDKEvent? {
+            await iterator.next()
+        }
     }
-
-    /// Add a callback for EOSE
-    public func onEOSE(_ callback: @escaping () -> Void) {
-        eoseCallbacksLock.lock()
-        eoseCallbacks.append(callback)
-        eoseCallbacksLock.unlock()
-    }
-
-    /// Add a callback for errors
-    public func onError(_ callback: @escaping (Error) -> Void) {
-        errorCallbacksLock.lock()
-        errorCallbacks.append(callback)
-        errorCallbacksLock.unlock()
+    
+    public func makeAsyncIterator() -> AsyncIterator {
+        // Auto-start subscription when iteration begins
+        if state == .pending {
+            start()
+        }
+        return AsyncIterator(iterator: stream.makeAsyncIterator())
     }
 
     // MARK: - Subscription Control
@@ -223,30 +233,26 @@ public final class NDKSubscription {
             }
         }
         
-        // Thread-safe callback cleanup
-        eventCallbacksLock.lock()
-        eventCallbacks.removeAll()
-        eventCallbacksLock.unlock()
-        
-        eoseCallbacksLock.lock()
-        eoseCallbacks.removeAll()
-        eoseCallbacksLock.unlock()
-        
-        errorCallbacksLock.lock()
-        errorCallbacks.removeAll()
-        errorCallbacksLock.unlock()
+        // Complete the streams
+        continuation?.finish()
+        updateContinuation?.finish()
     }
 
     // MARK: - Cache Handling
 
     private func checkCache() {
-        guard let ndk = ndk, let cache = ndk.cacheAdapter else { return }
+        guard let ndk = ndk, let cache = ndk.cache else { return }
 
         Task {
-            let cachedEvents = await cache.query(subscription: self)
+            var cachedEvents: [NDKEvent] = []
+            for filter in filters {
+                let events = await cache.queryEvents(filter)
+                cachedEvents.append(contentsOf: events)
+            }
 
+            let eventsCopy = cachedEvents
             await MainActor.run {
-                for event in cachedEvents {
+                for event in eventsCopy {
                     self.handleEvent(event, fromRelay: nil)
                 }
 
@@ -310,21 +316,15 @@ public final class NDKSubscription {
         eventsLock.unlock()
 
         // Store in cache if available
-        if let ndk = ndk, let cache = ndk.cacheAdapter {
+        if let ndk = ndk, let cache = ndk.cache {
             Task {
-                await cache.setEvent(event, filters: filters, relay: relay)
+                try? await cache.saveEvent(event)
             }
         }
 
-        // Thread-safe callback execution
-        eventCallbacksLock.lock()
-        let callbacks = eventCallbacks
-        eventCallbacksLock.unlock()
-        
-        for callback in callbacks {
-            callback(event)
-        }
-        delegate?.subscription(self, didReceiveEvent: event)
+        // Send event to streams
+        continuation?.yield(event)
+        updateContinuation?.yield(.event(event))
 
         // Check limit with thread-safe access
         if let limit = options.limit, currentEventCount >= limit {
@@ -357,15 +357,8 @@ public final class NDKSubscription {
             stateLock.unlock()
             
             if shouldComplete {
-                // Thread-safe callback execution
-                eoseCallbacksLock.lock()
-                let callbacks = eoseCallbacks
-                eoseCallbacksLock.unlock()
-                
-                for callback in callbacks {
-                    callback()
-                }
-                delegate?.subscription(self, didReceiveEOSE: ())
+                // Send EOSE update
+                updateContinuation?.yield(.eose)
 
                 if options.closeOnEose {
                     close()
@@ -376,38 +369,55 @@ public final class NDKSubscription {
 
     /// Handle subscription error
     public func handleError(_ error: Error) {
-        // Thread-safe callback execution
-        errorCallbacksLock.lock()
-        let callbacks = errorCallbacks
-        errorCallbacksLock.unlock()
-        
-        for callback in callbacks {
-            callback(error)
-        }
-        delegate?.subscription(self, didReceiveError: error)
+        // Send error update
+        updateContinuation?.yield(.error(error))
     }
 
     // MARK: - Async Support (for modern Swift)
 
     /// Wait for EOSE as async
     public func waitForEOSE() async {
-        await withCheckedContinuation { continuation in
-            stateLock.lock()
-            let received = eoseReceived
-            stateLock.unlock()
-            
-            if received {
-                continuation.resume()
-                return
+        for await update in updates {
+            if case .eose = update {
+                break
             }
-
-            let callback = {
-                continuation.resume()
+        }
+    }
+    
+    // MARK: - Backward Compatibility
+    
+    /// Add a callback for events (deprecated, use AsyncSequence instead)
+    @available(*, deprecated, message: "Use for-await-in loop instead")
+    public func onEvent(_ callback: @escaping (NDKEvent) -> Void) {
+        Task {
+            for await event in self {
+                callback(event)
             }
-            
-            eoseCallbacksLock.lock()
-            eoseCallbacks.append(callback)
-            eoseCallbacksLock.unlock()
+        }
+    }
+    
+    /// Add a callback for EOSE (deprecated, use updates stream instead)
+    @available(*, deprecated, message: "Use updates stream instead")
+    public func onEOSE(_ callback: @escaping () -> Void) {
+        Task {
+            for await update in updates {
+                if case .eose = update {
+                    callback()
+                    break
+                }
+            }
+        }
+    }
+    
+    /// Add a callback for errors (deprecated, use updates stream instead)
+    @available(*, deprecated, message: "Use updates stream instead")
+    public func onError(_ callback: @escaping (Error) -> Void) {
+        Task {
+            for await update in updates {
+                if case .error(let error) = update {
+                    callback(error)
+                }
+            }
         }
     }
 
@@ -471,7 +481,7 @@ public extension NDKSubscription {
         // Use combined options
         var mergedOptions = options
         if let otherLimit = other.options.limit {
-            mergedOptions.limit = max(options.limit ?? 0, otherLimit)
+            mergedOptions.limit = Swift.max(options.limit ?? 0, otherLimit)
         }
 
         return NDKSubscription(

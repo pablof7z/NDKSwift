@@ -308,7 +308,7 @@ public actor NDKSubscriptionManager {
             // Set timer to execute group
             group.timer = Task {
                 try? await Task.sleep(nanoseconds: UInt64(groupingDelay * 1_000_000_000))
-                await executeGroup(fingerprint: fingerprint)
+                executeGroup(fingerprint: fingerprint)
             }
 
             pendingGroups[fingerprint] = group
@@ -459,10 +459,14 @@ public actor NDKSubscriptionManager {
     }
 
     private func executeCacheQuery(_ plan: ExecutionPlan) async {
-        guard let ndk = ndk, let cache = ndk.cacheAdapter else { return }
+        guard let ndk = ndk, let cache = ndk.cache else { return }
 
         for subscription in plan.subscriptions {
-            let cachedEvents = await cache.query(subscription: subscription)
+            var cachedEvents: [NDKEvent] = []
+            for filter in subscription.filters {
+                let events = await cache.queryEvents(filter)
+                cachedEvents.append(contentsOf: events)
+            }
 
             for event in cachedEvents {
                 subscription.handleEvent(event, fromRelay: nil)
@@ -482,7 +486,7 @@ public actor NDKSubscriptionManager {
         for relay in plan.relaySet {
             for subscription in plan.subscriptions {
                 // Register with relay's subscription manager
-                await relay.subscriptionManager.addSubscription(subscription, filters: plan.mergedFilters)
+                _ = await relay.subscriptionManager.addSubscription(subscription, filters: plan.mergedFilters)
             }
         }
     }
@@ -512,7 +516,7 @@ public actor NDKSubscriptionManager {
     private func startPeriodicCleanup() async {
         while true {
             try? await Task.sleep(nanoseconds: 60_000_000_000) // 1 minute
-            await performCleanup()
+            performCleanup()
         }
     }
 
