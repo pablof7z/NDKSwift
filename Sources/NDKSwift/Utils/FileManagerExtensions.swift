@@ -10,9 +10,7 @@ extension FileManager {
     /// - Returns: The decoded object
     func loadCodable<T: Codable>(_ type: T.Type, from fileURL: URL) throws -> T {
         let data = try Data(contentsOf: fileURL)
-        let decoder = JSONDecoder()
-        decoder.dateDecodingStrategy = .iso8601
-        return try decoder.decode(type, from: data)
+        return try JSONCoding.decode(type, from: data)
     }
     
     /// Saves a Codable object to a file
@@ -20,10 +18,7 @@ extension FileManager {
     ///   - object: The object to encode and save
     ///   - fileURL: The URL where the file should be saved
     func saveCodable<T: Codable>(_ object: T, to fileURL: URL) throws {
-        let encoder = JSONEncoder()
-        encoder.dateEncodingStrategy = .iso8601
-        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
-        let data = try encoder.encode(object)
+        let data = try JSONCoding.encode(object)
         try data.write(to: fileURL)
     }
     

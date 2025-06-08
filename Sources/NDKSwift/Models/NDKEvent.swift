@@ -382,10 +382,7 @@ public final class NDKEvent: Codable, Equatable, Hashable {
 
     /// Serialize event to JSON string
     public func serialize() throws -> String {
-        let encoder = JSONEncoder()
-        encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
-        let data = try encoder.encode(self)
-        return String(data: data, encoding: .utf8)!
+        return try JSONCoding.encodeToString(self)
     }
 
     /// Alias for serialize() - serialize event to JSON string
