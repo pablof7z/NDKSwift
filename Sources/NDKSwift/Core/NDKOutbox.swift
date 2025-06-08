@@ -86,7 +86,8 @@ public extension NDK {
         try event.validate()
 
         // Store in cache if available
-        if let cache = cacheAdapter as? NDKOutboxCacheAdapter {
+        // TODO: Implement outbox caching with new cache system
+        if false {
             let selection = await relaySelector.selectRelaysForPublishing(
                 event: event,
                 config: config?.selectionConfig ?? .default
@@ -107,7 +108,8 @@ public extension NDK {
 
     /// Retry publishing failed events
     func retryFailedPublishes(olderThan interval: TimeInterval = 300) async {
-        guard let cache = cacheAdapter as? NDKOutboxCacheAdapter else { return }
+        // TODO: Implement event retry with new cache system
+        return
 
         let eventsToRetry = await cache.getEventsForRetry(olderThan: interval)
 
@@ -188,7 +190,8 @@ public extension NDK {
         )
 
         // Update in cache if available
-        if let cache = cacheAdapter as? NDKOutboxCacheAdapter {
+        // TODO: Implement outbox caching with new cache system
+        if false {
             let healthScore = await relayRanker.getRelayHealthScore(url)
             let metrics = RelayHealthMetrics(
                 url: url,
@@ -212,7 +215,8 @@ public extension NDK {
         await publishingStrategy.cleanupCompleted()
 
         // Clean up cache
-        if let cache = cacheAdapter as? NDKOutboxCacheAdapter {
+        // TODO: Implement outbox caching with new cache system
+        if false {
             await cache.cleanupPublishedEvents(olderThan: 3600)
         }
     }

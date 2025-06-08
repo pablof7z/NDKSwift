@@ -38,8 +38,17 @@ let package = Package(
                 .product(name: "NDKSwift", package: "NDKSwift"),
             ],
             path: ".",
-            exclude: ["StandaloneDemo.swift", "BasicUsage.swift", "SimpleDemo.swift", "NostrDemo.swift", "README.md", "SimpleDemoMain.swift", "NostrDemoMain.swift"],
+            exclude: ["StandaloneDemo.swift", "BasicUsage.swift", "SimpleDemo.swift", "NostrDemo.swift", "README.md", "SimpleDemoMain.swift", "NostrDemoMain.swift", "CacheExample.swift"],
             sources: ["FileCacheDemo.swift"]
+        ),
+        .executableTarget(
+            name: "CacheExample",
+            dependencies: [
+                .product(name: "NDKSwift", package: "NDKSwift"),
+            ],
+            path: ".",
+            exclude: ["StandaloneDemo.swift", "BasicUsage.swift", "SimpleDemo.swift", "NostrDemo.swift", "README.md", "SimpleDemoMain.swift", "NostrDemoMain.swift", "FileCacheDemo.swift"],
+            sources: ["CacheExample.swift"]
         ),
         .executableTarget(
             name: "iOSNostrAppDemo",

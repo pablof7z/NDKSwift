@@ -156,58 +156,81 @@ class NostrDemo {
     private func demonstrateSubscriptions() async {
         print("\n📡 === Subscription Demo ===")
 
-        // Create subscription for recent text notes
-        let filter = NDKFilter(
+        // Demo 1: One-shot fetch using new API
+        print("\n1️⃣ One-shot fetch demo:")
+        let recentFilter = NDKFilter(
             kinds: [EventKind.textNote],
             since: Timestamp(Date().timeIntervalSince1970 - 3600), // Last hour
+            limit: 5
+        )
+        
+        do {
+            let recentEvents = try await ndk.fetchEvents(recentFilter)
+            print("Fetched \(recentEvents.count) recent events")
+            for event in recentEvents.prefix(3) {
+                print("   - \(event.content.prefix(50))...")
+            }
+        } catch {
+            print("❌ Failed to fetch events: \(error)")
+        }
+
+        // Demo 2: Continuous subscription using AsyncStream
+        print("\n2️⃣ Continuous subscription demo:")
+        let liveFilter = NDKFilter(
+            kinds: [EventKind.textNote],
             limit: 10
         )
-
-        let subscription = NDKSubscription(filters: [filter], ndk: ndk)
-
+        
+        let subscription = ndk.subscribe(filters: [liveFilter])
+        
         print("Created subscription with filter:")
-        print("   Kinds: \(filter.kinds ?? [])")
-        print("   Since: \(filter.since ?? 0)")
-        print("   Limit: \(filter.limit ?? 0)")
-
-        // Test callback-based API
-        var eventCount = 0
-        subscription.onEvent { event in
-            eventCount += 1
-            print("📨 Received event \(eventCount): \(event.content.prefix(50))...")
-        }
-
-        subscription.onEOSE {
-            print("🏁 End of stored events reached")
-        }
-
-        subscription.onError { error in
-            print("❌ Subscription error: \(error)")
-        }
-
-        // Test delegate pattern
-        let delegate = DemoSubscriptionDelegate()
-        subscription.delegate = delegate
-
+        print("   Kinds: \(liveFilter.kinds ?? [])")
+        print("   Limit: \(liveFilter.limit ?? 0)")
+        
         // Simulate some events (since we're not connected to real relays)
         print("\n🧪 Simulating received events...")
-        for i in 1 ... 3 {
-            let simulatedEvent = NDKEvent(
-                pubkey: "demo\(i)",
-                createdAt: Timestamp(Date().timeIntervalSince1970),
-                kind: EventKind.textNote,
-                content: "Simulated event #\(i) for testing"
-            )
-            simulatedEvent.id = "sim_event_\(i)"
-
-            subscription.handleEvent(simulatedEvent, fromRelay: nil)
+        Task {
+            // Simulate events arriving
+            for i in 1 ... 3 {
+                let simulatedEvent = NDKEvent(
+                    pubkey: "demo\(i)",
+                    createdAt: Timestamp(Date().timeIntervalSince1970),
+                    kind: EventKind.textNote,
+                    content: "Simulated event #\(i) for testing"
+                )
+                simulatedEvent.id = "sim_event_\(i)"
+                subscription.handleEvent(simulatedEvent, fromRelay: nil)
+                try? await Task.sleep(nanoseconds: 100_000_000) // 0.1 seconds
+            }
+            subscription.handleEOSE()
         }
-
-        subscription.handleEOSE()
-
-        print("✅ Subscription demo completed")
-        print("   Events received: \(subscription.events.count)")
-        print("   EOSE received: \(subscription.eoseReceived)")
+        
+        // Demo 3: Handle events with the new AsyncStream API
+        print("\n3️⃣ AsyncStream iteration demo:")
+        var eventCount = 0
+        
+        // Create a task to handle the subscription
+        let subscriptionTask = Task {
+            for await update in subscription.updates {
+                switch update {
+                case .event(let event):
+                    eventCount += 1
+                    print("📨 Received event \(eventCount): \(event.content.prefix(50))...")
+                case .eose:
+                    print("🏁 End of stored events reached")
+                    break // Exit the loop on EOSE for demo
+                case .error(let error):
+                    print("❌ Subscription error: \(error)")
+                }
+            }
+        }
+        
+        // Wait a bit for events to be processed
+        try? await Task.sleep(nanoseconds: 500_000_000) // 0.5 seconds
+        subscriptionTask.cancel()
+        
+        print("\n✅ Subscription demo completed")
+        print("   Events received: \(eventCount)")
     }
 
     // MARK: - Relay Connection Demo
@@ -385,21 +408,6 @@ class NostrDemo {
     }
 }
 
-// MARK: - Demo Subscription Delegate
-
-class DemoSubscriptionDelegate: NDKSubscriptionDelegate {
-    func subscription(_: NDKSubscription, didReceiveEvent event: NDKEvent) {
-        print("🎯 Delegate received event: \(event.content.prefix(30))...")
-    }
-
-    func subscription(_: NDKSubscription, didReceiveEOSE _: Void) {
-        print("🎯 Delegate received EOSE")
-    }
-
-    func subscription(_: NDKSubscription, didReceiveError error: Error) {
-        print("🎯 Delegate received error: \(error)")
-    }
-}
 
 // MARK: - NDKFilter Extension for Demo
 

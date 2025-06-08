@@ -32,15 +32,9 @@ final class NDKSubscriptionTests: XCTestCase {
         XCTAssertEqual(subscription.options.timeout, 30.0)
     }
 
-    func testEventHandling() {
+    func testEventHandling() async {
         let filter = NDKFilter(kinds: [1])
         let subscription = NDKSubscription(filters: [filter])
-
-        let expectation = XCTestExpectation(description: "Event received")
-
-        subscription.onEvent { _ in
-            expectation.fulfill()
-        }
 
         // Create a matching event
         let event = NDKEvent(
@@ -51,12 +45,27 @@ final class NDKSubscriptionTests: XCTestCase {
         )
         event.id = "event123"
 
-        subscription.handleEvent(event, fromRelay: nil as NDKRelay?)
+        // Handle event in background
+        Task {
+            subscription.handleEvent(event, fromRelay: nil as NDKRelay?)
+            subscription.handleEOSE()
+        }
 
-        wait(for: [expectation], timeout: 1.0)
+        // Collect events using AsyncStream
+        var receivedEvents: [NDKEvent] = []
+        for await update in subscription.updates {
+            switch update {
+            case .event(let event):
+                receivedEvents.append(event)
+            case .eose:
+                break
+            case .error:
+                XCTFail("Unexpected error")
+            }
+        }
 
-        XCTAssertEqual(subscription.events.count, 1)
-        XCTAssertEqual(subscription.events.first?.id, "event123")
+        XCTAssertEqual(receivedEvents.count, 1)
+        XCTAssertEqual(receivedEvents.first?.id, "event123")
     }
 
     func testEventDeduplication() {
@@ -109,20 +118,21 @@ final class NDKSubscriptionTests: XCTestCase {
         XCTAssertEqual(subscription.events.first?.pubkey, "alice")
     }
 
-    func testEOSEHandling() {
+    func testEOSEHandling() async {
         let subscription = NDKSubscription(filters: [NDKFilter(kinds: [1])])
-
-        let expectation = XCTestExpectation(description: "EOSE received")
-
-        subscription.onEOSE {
-            expectation.fulfill()
-        }
 
         XCTAssertFalse(subscription.eoseReceived)
 
-        subscription.handleEOSE()
+        Task {
+            subscription.handleEOSE()
+        }
 
-        wait(for: [expectation], timeout: 1.0)
+        // Wait for EOSE using update stream
+        for await update in subscription.updates {
+            if case .eose = update {
+                break
+            }
+        }
 
         XCTAssertTrue(subscription.eoseReceived)
     }
@@ -211,32 +221,39 @@ final class NDKSubscriptionTests: XCTestCase {
         XCTAssertNil(subscription1.merge(with: subscription2))
     }
 
-    func testCallbackIntegration() {
+    func testAsyncStreamAPI() async {
         let subscription = NDKSubscription(filters: [NDKFilter(kinds: [1])])
 
-        let eventExpectation = XCTestExpectation(description: "Event via callback")
-        let eoseExpectation = XCTestExpectation(description: "EOSE via callback")
+        Task {
+            let event = NDKEvent(
+                pubkey: "test",
+                createdAt: 12345,
+                kind: 1,
+                content: "Test"
+            )
+            event.id = "test123"
 
-        subscription.onEvent { _ in
-            eventExpectation.fulfill()
+            subscription.handleEvent(event, fromRelay: nil as NDKRelay?)
+            subscription.handleEOSE()
         }
 
-        subscription.onEOSE {
-            eoseExpectation.fulfill()
+        var receivedEvent: NDKEvent?
+        var receivedEOSE = false
+        
+        for await update in subscription.updates {
+            switch update {
+            case .event(let event):
+                receivedEvent = event
+            case .eose:
+                receivedEOSE = true
+                break
+            case .error:
+                XCTFail("Unexpected error")
+            }
         }
-
-        let event = NDKEvent(
-            pubkey: "test",
-            createdAt: 12345,
-            kind: 1,
-            content: "Test"
-        )
-        event.id = "test123"
-
-        subscription.handleEvent(event, fromRelay: nil as NDKRelay?)
-        subscription.handleEOSE()
-
-        wait(for: [eventExpectation, eoseExpectation], timeout: 1.0)
+        
+        XCTAssertEqual(receivedEvent?.id, "test123")
+        XCTAssertTrue(receivedEOSE)
     }
 
     func testSubscriptionLifecycle() {
@@ -279,7 +296,7 @@ final class NDKSubscriptionTests: XCTestCase {
         }
     }
 
-    func testAsyncEventStream() async {
+    func testAsyncSequenceIteration() async {
         let subscription = NDKSubscription(filters: [NDKFilter(kinds: [1])])
 
         Task {
@@ -295,11 +312,11 @@ final class NDKSubscriptionTests: XCTestCase {
             event.id = "test123"
 
             subscription.handleEvent(event, fromRelay: nil as NDKRelay?)
-            subscription.handleEOSE()
+            subscription.close() // Close to end iteration
         }
 
         var receivedEvents: [NDKEvent] = []
-        for await event in subscription.eventStream() {
+        for await event in subscription {
             receivedEvents.append(event)
         }
 
@@ -320,29 +337,21 @@ final class NDKSubscriptionTests: XCTestCase {
         XCTAssertTrue(subscription.eoseReceived)
     }
 
-    func testDelegatePattern() {
-        class TestDelegate: NDKSubscriptionDelegate {
-            var receivedEvent: NDKEvent?
-            var receivedEOSE = false
-            var receivedError: Error?
-
-            func subscription(_: NDKSubscription, didReceiveEvent event: NDKEvent) {
-                receivedEvent = event
-            }
-
-            func subscription(_: NDKSubscription, didReceiveEOSE _: Void) {
-                receivedEOSE = true
-            }
-
-            func subscription(_: NDKSubscription, didReceiveError error: Error) {
-                receivedError = error
-            }
-        }
-
-        let delegate = TestDelegate()
+    func testBackwardCompatibility() async {
+        // Test that deprecated callback methods still work
         let subscription = NDKSubscription(filters: [NDKFilter(kinds: [1])])
-        subscription.delegate = delegate
-
+        
+        var eventReceived = false
+        var eoseReceived = false
+        
+        subscription.onEvent { _ in
+            eventReceived = true
+        }
+        
+        subscription.onEOSE {
+            eoseReceived = true
+        }
+        
         let event = NDKEvent(
             pubkey: "test",
             createdAt: 12345,
@@ -350,11 +359,14 @@ final class NDKSubscriptionTests: XCTestCase {
             content: "Test"
         )
         event.id = "test123"
-
+        
         subscription.handleEvent(event, fromRelay: nil as NDKRelay?)
         subscription.handleEOSE()
-
-        XCTAssertEqual(delegate.receivedEvent?.id, "test123")
-        XCTAssertTrue(delegate.receivedEOSE)
+        
+        // Give callbacks time to execute
+        try? await Task.sleep(nanoseconds: 100_000_000) // 0.1 second
+        
+        XCTAssertTrue(eventReceived)
+        XCTAssertTrue(eoseReceived)
     }
 }

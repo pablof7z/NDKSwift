@@ -169,7 +169,7 @@ public struct BlossomAuth {
         }
 
         let pubkey = try await signer.pubkey
-        var event = NDKEvent(
+        let event = NDKEvent(
             pubkey: pubkey,
             createdAt: Timestamp(Date().timeIntervalSince1970),
             kind: 24242,

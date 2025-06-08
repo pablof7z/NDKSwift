@@ -40,7 +40,6 @@ let package = Package(
             name: "NDKSwiftTests",
             dependencies: ["NDKSwift"],
             exclude: [
-                "Blossom/BlossomClientTests.swift.skip",
                 "Outbox/NDKPublishingStrategyTests.swift.disabled",
                 "Outbox/NDKPublishingStrategyTests.swift.disabled.bak",
                 "Outbox/NDKRelayRankerTests.swift.disabled.bak", 

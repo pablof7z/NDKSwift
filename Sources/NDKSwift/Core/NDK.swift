@@ -5,8 +5,8 @@ public final class NDK {
     /// Active signer for this NDK instance
     public var signer: NDKSigner?
 
-    /// Cache adapter for storing events
-    public var cacheAdapter: NDKCacheAdapter?
+    /// Cache for storing events
+    public var cache: NDKCache?
 
     /// Active user (derived from signer)
     public var activeUser: NDKUser? {
@@ -104,12 +104,12 @@ public final class NDK {
     public init(
         relayUrls: [RelayURL] = [],
         signer: NDKSigner? = nil,
-        cacheAdapter: NDKCacheAdapter? = nil,
+        cache: NDKCache? = nil,
         signatureVerificationConfig: NDKSignatureVerificationConfig = .default,
         subscriptionTrackingConfig: SubscriptionTrackingConfig = .default
     ) {
         self.signer = signer
-        self.cacheAdapter = cacheAdapter
+        self.cache = cache
         self.relayPool = NDKRelayPool()
         self.eventRepository = NDKEventRepository()
         self.signatureVerificationConfig = signatureVerificationConfig
@@ -194,8 +194,8 @@ public final class NDK {
         try event.validate()
 
         // Store in cache if available
-        if let cache = cacheAdapter {
-            await cache.setEvent(event, filters: [], relay: nil)
+        if let cache = cache {
+            try? await cache.saveEvent(event)
         }
 
         // Track this event for OK message handling
@@ -220,9 +220,10 @@ public final class NDK {
             .map { $0.url }
 
         // Store unpublished event for later retry when relays connect
-        if !unpublishedRelayUrls.isEmpty, let cache = cacheAdapter {
-            await cache.addUnpublishedEvent(event, relayUrls: unpublishedRelayUrls)
-
+        if !unpublishedRelayUrls.isEmpty {
+            // TODO: Handle unpublished events tracking
+            // The new cache doesn't have unpublished event tracking yet
+            
             // Mark these relays as pending
             for relayUrl in unpublishedRelayUrls {
                 event.updatePublishStatus(relay: relayUrl, status: .pending)
@@ -331,42 +332,82 @@ public final class NDK {
         return subscription
     }
 
-    /// Fetch events matching the given filters
+    /// Fetch events matching the given filters (one-shot query)
     public func fetchEvents(
         filters: [NDKFilter],
-        relays: Set<NDKRelay>? = nil
+        relays: Set<NDKRelay>? = nil,
+        cacheStrategy: NDKCacheStrategy = .cacheFirst
     ) async throws -> Set<NDKEvent> {
         var options = NDKSubscriptionOptions()
         options.closeOnEose = true
         options.relays = relays
+        options.cacheStrategy = cacheStrategy
 
         let subscription = subscribe(filters: filters, options: options)
         
-        // Wait for registration to complete before starting
-        if let registrationTask = subscription.registrationTask {
-            await registrationTask.value
-        }
+        var events: [NDKEvent] = []
         
-        // Start the subscription
-        subscription.start()
+        // Collect events until EOSE
+        for await update in subscription.updates {
+            switch update {
+            case .event(let event):
+                events.append(event)
+            case .eose:
+                break
+            case .error(let error):
+                throw error
+            }
+        }
 
-        // Wait for EOSE using the new callback-based approach
-        await subscription.waitForEOSE()
-
-        return Set(subscription.events)
+        return Set(events)
+    }
+    
+    /// Fetch events matching a single filter (one-shot query)
+    public func fetchEvents(
+        _ filter: NDKFilter,
+        relays: Set<NDKRelay>? = nil,
+        cacheStrategy: NDKCacheStrategy = .cacheFirst
+    ) async throws -> Set<NDKEvent> {
+        return try await fetchEvents(filters: [filter], relays: relays, cacheStrategy: cacheStrategy)
     }
 
     /// Fetch a single event by ID (hex or bech32 format)
-    public func fetchEvent(_ idOrBech32: String, relays: Set<NDKRelay>? = nil) async throws -> NDKEvent? {
+    public func fetchEvent(
+        _ idOrBech32: String,
+        relays: Set<NDKRelay>? = nil,
+        cacheStrategy: NDKCacheStrategy = .cacheFirst
+    ) async throws -> NDKEvent? {
         let filter = try NostrIdentifier.createFilter(from: idOrBech32)
-        let events = try await fetchEvents(filters: [filter], relays: relays)
+        let events = try await fetchEvents(filters: [filter], relays: relays, cacheStrategy: cacheStrategy)
         return events.first
     }
 
     /// Fetch a single event matching the filter
-    public func fetchEvent(_ filter: NDKFilter, relays: Set<NDKRelay>? = nil) async throws -> NDKEvent? {
-        let events = try await fetchEvents(filters: [filter], relays: relays)
+    public func fetchEvent(
+        _ filter: NDKFilter,
+        relays: Set<NDKRelay>? = nil,
+        cacheStrategy: NDKCacheStrategy = .cacheFirst
+    ) async throws -> NDKEvent? {
+        let events = try await fetchEvents(filters: [filter], relays: relays, cacheStrategy: cacheStrategy)
         return events.first
+    }
+    
+    /// Fetch a user's profile (metadata event)
+    public func fetchProfile(
+        _ pubkey: String,
+        relays: Set<NDKRelay>? = nil,
+        cacheStrategy: NDKCacheStrategy = .cacheFirst
+    ) async throws -> NDKUserProfile? {
+        let filter = NDKFilter(
+            authors: [pubkey],
+            kinds: [EventKind.metadata]
+        )
+        
+        if let metadataEvent = try await fetchEvent(filter, relays: relays, cacheStrategy: cacheStrategy) {
+            return NDKUserProfile.from(metadataEvent: metadataEvent)
+        }
+        
+        return nil
     }
 
     // MARK: - Subscription Manager Integration
@@ -468,46 +509,9 @@ public final class NDK {
 
     /// Publish events that were queued while relay was disconnected
     private func publishQueuedEvents(for relay: NDKRelay) async {
-        guard let cache = cacheAdapter else { return }
-
-        let queuedEvents = await cache.getUnpublishedEvents(for: relay.url)
-
-        if !queuedEvents.isEmpty, debugMode {
-            print("📤 Publishing \(queuedEvents.count) queued event(s) to \(relay.url)")
-        }
-
-        for event in queuedEvents {
-            do {
-                // Re-track for OK message handling
-                if let eventId = event.id {
-                    publishedEvents[eventId] = event
-                }
-
-                // Send the event
-                let eventMessage = NostrMessage.event(subscriptionId: nil, event: event)
-                try await relay.send(eventMessage.serialize())
-
-                // Update status
-                event.updatePublishStatus(relay: relay.url, status: .succeeded)
-
-                // Remove from unpublished queue
-                if let eventId = event.id {
-                    await cache.removeUnpublishedEvent(eventId, from: relay.url)
-                }
-
-                if debugMode {
-                    let noteId = (try? Bech32.note(from: event.id ?? "")) ?? event.id ?? "unknown"
-                    print("✅ Published queued note \(noteId) to \(relay.url)")
-                }
-            } catch {
-                // Update status to failed
-                event.updatePublishStatus(relay: relay.url, status: .failed(.custom(error.localizedDescription)))
-
-                if debugMode {
-                    print("❌ Failed to publish queued event to \(relay.url): \(error)")
-                }
-            }
-        }
+        // TODO: Handle queued events with new cache
+        // The new cache doesn't have unpublished event tracking yet
+        return
     }
 
     // MARK: - Signature Verification

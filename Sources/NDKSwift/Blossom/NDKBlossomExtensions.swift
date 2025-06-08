@@ -111,7 +111,7 @@ public extension NDKEvent {
         }
 
         let pubkey = try await signer.pubkey
-        var event = NDKEvent(
+        let event = NDKEvent(
             pubkey: pubkey,
             createdAt: Timestamp(Date().timeIntervalSince1970),
             kind: EventKind.fileMetadata,
@@ -191,7 +191,7 @@ public extension NDKEvent {
         tags.append(imetaTag)
 
         let pubkey = try await signer.pubkey
-        var event = NDKEvent(
+        let event = NDKEvent(
             pubkey: pubkey,
             createdAt: Timestamp(Date().timeIntervalSince1970),
             kind: EventKind.image,

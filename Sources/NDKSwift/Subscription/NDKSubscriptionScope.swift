@@ -54,35 +54,10 @@ public extension NDK {
 }
 
 /// A subscription wrapper that automatically closes on deinitialization
-public class AutoClosingSubscription {
+public class AutoClosingSubscription: AsyncSequence {
+    public typealias Element = NDKEvent
+    
     private let subscription: NDKSubscription
-    
-    public var onEvent: ((NDKEvent) -> Void)? {
-        get { nil }
-        set {
-            if let handler = newValue {
-                subscription.onEvent(handler)
-            }
-        }
-    }
-    
-    public var onEOSE: (() -> Void)? {
-        get { nil }
-        set {
-            if let handler = newValue {
-                subscription.onEOSE(handler)
-            }
-        }
-    }
-    
-    public var onError: ((Error) -> Void)? {
-        get { nil }
-        set {
-            if let handler = newValue {
-                subscription.onError(handler)
-            }
-        }
-    }
     
     public init(_ subscription: NDKSubscription, autoStart: Bool = true) {
         self.subscription = subscription
@@ -103,6 +78,16 @@ public class AutoClosingSubscription {
     /// Get the underlying subscription
     public var underlying: NDKSubscription {
         return subscription
+    }
+    
+    /// AsyncSequence conformance - delegate to underlying subscription
+    public func makeAsyncIterator() -> NDKSubscription.AsyncIterator {
+        subscription.makeAsyncIterator()
+    }
+    
+    /// Access to update stream for EOSE and errors
+    public var updates: AsyncStream<NDKSubscriptionUpdate> {
+        subscription.updates
     }
 }
 
@@ -144,59 +129,3 @@ public struct SubscriptionHandle {
     }
 }
 
-/// Async sequence for subscription events
-public struct SubscriptionEventSequence: AsyncSequence {
-    public typealias Element = NDKEvent
-    
-    private let subscription: NDKSubscription
-    
-    init(_ subscription: NDKSubscription) {
-        self.subscription = subscription
-    }
-    
-    public func makeAsyncIterator() -> AsyncIterator {
-        return AsyncIterator(subscription: subscription)
-    }
-    
-    public struct AsyncIterator: AsyncIteratorProtocol {
-        private let subscription: NDKSubscription
-        private let stream: AsyncStream<NDKEvent>
-        private var iterator: AsyncStream<NDKEvent>.AsyncIterator
-        
-        init(subscription: NDKSubscription) {
-            self.subscription = subscription
-            
-            let (stream, continuation) = AsyncStream<NDKEvent>.makeStream()
-            self.stream = stream
-            self.iterator = stream.makeAsyncIterator()
-            
-            subscription.onEvent { event in
-                continuation.yield(event)
-            }
-            
-            subscription.onEOSE {
-                // Don't finish on EOSE for continuous subscriptions
-            }
-            
-            subscription.onError { _ in
-                continuation.finish()
-            }
-            
-            // Start the subscription if not already started
-            if subscription.state == .pending {
-                subscription.start()
-            }
-        }
-        
-        public mutating func next() async -> NDKEvent? {
-            return await iterator.next()
-        }
-    }
-}
-
-extension NDKSubscription {
-    /// Get an async sequence of events from this subscription
-    public var eventStream: SubscriptionEventSequence {
-        return SubscriptionEventSequence(self)
-    }
-}
