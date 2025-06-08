@@ -262,7 +262,7 @@ public actor NDKFetchingStrategy {
 
     private func getOrConnectRelay(url: String) async -> NDKRelay? {
         // First check if already connected
-        if let relay = await ndk.relayPool.relay(for: url) {
+        if let relay = ndk.relayPool.relay(for: url) {
             return relay
         }
 

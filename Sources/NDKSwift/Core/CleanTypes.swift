@@ -78,15 +78,6 @@ public enum NDKSubscriptionState: Equatable {
     case closed
 }
 
-// MARK: - Cache Strategy
-
-public enum CacheStrategy {
-    case cacheOnly
-    case relayOnly
-    case cacheFirst
-    case relayFirst
-}
-
 // MARK: - Publication Status
 
 public enum PublicationStatus: Equatable {

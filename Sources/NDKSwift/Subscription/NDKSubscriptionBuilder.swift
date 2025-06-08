@@ -96,7 +96,7 @@ public class NDKSubscriptionBuilder {
     
     /// Set cache strategy
     @discardableResult
-    public func cacheStrategy(_ strategy: CacheStrategy) -> Self {
+    public func cacheStrategy(_ strategy: NDKCacheStrategy) -> Self {
         options.cacheStrategy = strategy
         return self
     }

@@ -78,6 +78,9 @@ public final class NDKSubscription {
 
     /// Subscription delegate
     public weak var delegate: NDKSubscriptionDelegate?
+    
+    /// Current subscription state
+    public private(set) var state: NDKSubscriptionState = .pending
 
     /// Events received so far
     public private(set) var events: [NDKEvent] = []
@@ -172,8 +175,10 @@ public final class NDKSubscription {
     /// Start the subscription
     public func start() {
         stateLock.lock()
-        let shouldStart = !isActive && !isClosed
+        let currentState = state
+        let shouldStart = currentState == .pending || currentState == .inactive
         if shouldStart {
+            state = .active
             isActive = true
         }
         stateLock.unlock()
@@ -194,8 +199,9 @@ public final class NDKSubscription {
     /// Close the subscription
     public func close() {
         stateLock.lock()
-        let shouldClose = !isClosed
+        let shouldClose = state != .closed
         if shouldClose {
+            state = .closed
             isClosed = true
             isActive = false
         }
@@ -382,44 +388,6 @@ public final class NDKSubscription {
     }
 
     // MARK: - Async Support (for modern Swift)
-
-    /// Stream of events as an async sequence
-    public func eventStream() -> AsyncStream<NDKEvent> {
-        return AsyncStream { continuation in
-            let callback: (NDKEvent) -> Void = { event in
-                continuation.yield(event)
-            }
-
-            // Thread-safe callback registration
-            eventCallbacksLock.lock()
-            eventCallbacks.append(callback)
-            eventCallbacksLock.unlock()
-
-            // Handle completion
-            let eoseCallback = {
-                continuation.finish()
-            }
-            
-            eoseCallbacksLock.lock()
-            eoseCallbacks.append(eoseCallback)
-            eoseCallbacksLock.unlock()
-
-            continuation.onTermination = { _ in
-                // Thread-safe cleanup when stream is cancelled
-                self.eventCallbacksLock.lock()
-                if let index = self.eventCallbacks.firstIndex(where: { _ in true }) {
-                    self.eventCallbacks.remove(at: index)
-                }
-                self.eventCallbacksLock.unlock()
-                
-                self.eoseCallbacksLock.lock()
-                if let index = self.eoseCallbacks.firstIndex(where: { _ in true }) {
-                    self.eoseCallbacks.remove(at: index)
-                }
-                self.eoseCallbacksLock.unlock()
-            }
-        }
-    }
 
     /// Wait for EOSE as async
     public func waitForEOSE() async {
