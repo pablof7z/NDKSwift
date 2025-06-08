@@ -279,11 +279,16 @@ public final class NDKEvent: Codable, Equatable, Hashable {
     /// Sign this event using the NDK instance's signer
     public func sign() async throws {
         guard let ndk = ndk else {
-            throw NDKError.runtime("ndk_not_set", "NDK instance not set")
+            throw NDKError.runtime("ndk_not_set", "NDK instance not set", context: [
+                "eventKind": kind,
+                "eventId": id ?? "none"
+            ])
         }
 
         guard let signer = ndk.signer else {
-            throw NDKError.crypto("no_signer", "No signer configured")
+            throw NDKError.crypto("no_signer", "No signer configured", context: [
+                "eventKind": kind
+            ])
         }
 
         // Set pubkey from signer if not already set

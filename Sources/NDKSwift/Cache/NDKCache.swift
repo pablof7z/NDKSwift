@@ -1,6 +1,12 @@
 import Foundation
 
 /// The primary cache interface for NDKSwift
+/// 
+/// This is a clean, modern cache implementation that replaces the adapter-based approach.
+/// It uses LayeredCache internally to provide multi-tier caching (memory + disk).
+/// 
+/// TODO: This is the target cache architecture. Migration from NDKCacheAdapter to this
+/// implementation is planned for a future update. For now, NDK still uses the adapter pattern.
 public actor NDKCache {
     private let eventCache: LayeredCache
     private let profileCache: LayeredCache

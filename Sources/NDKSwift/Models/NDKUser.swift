@@ -66,14 +66,22 @@ public final class NDKUser: Equatable, Hashable {
         }
 
         // Fetch the data
-        let (data, _) = try await URLSession.shared.data(from: url)
+        let (data, _): (Data, URLResponse)
+        do {
+            (data, _) = try await URLSession.shared.data(from: url)
+        } catch {
+            throw NDKError.network("nip05_fetch_failed", "Failed to fetch NIP-05 data", 
+                                   context: ["url": urlString, "domain": domain], 
+                                   underlying: error)
+        }
 
         // Parse JSON response
         guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
               let names = json["names"] as? [String: String],
               let pubkey = names[name]
         else {
-            throw NDKError.validation("nip05_verification_failed", "NIP-05 verification failed")
+            throw NDKError.validation("nip05_verification_failed", "NIP-05 verification failed",
+                                      context: ["name": name, "domain": domain])
         }
 
         let user = NDKUser(pubkey: pubkey)

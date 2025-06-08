@@ -56,6 +56,10 @@ public struct NDKError: LocalizedError {
         NDKError(category: .storage, code: code, message: message, context: context, underlying: underlying)
     }
     
+    public static func `protocol`(_ code: String, _ message: String, context: [String: Any] = [:], underlying: Error? = nil) -> NDKError {
+        NDKError(category: .protocol, code: code, message: message, context: context, underlying: underlying)
+    }
+    
     public static func configuration(_ code: String, _ message: String, context: [String: Any] = [:], underlying: Error? = nil) -> NDKError {
         NDKError(category: .configuration, code: code, message: message, context: context, underlying: underlying)
     }
