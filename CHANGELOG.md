@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- Created centralized `JSONCoding` utility to eliminate duplicate JSON encoder/decoder setup across the codebase
+- Added comprehensive tests for JSONCoding utility
+
+### Changed
+- Refactored all JSON operations to use the new JSONCoding utility
+- Updated NostrMessage, NDKEvent, NDKProfileManager, and FileManagerExtensions to use consistent JSON handling
+- Fixed optional unwrapping issues in test helpers
+- Fixed Swift 6 warning in NDKProfileManager by properly capturing self in async closure
+
 ## [0.3.5] - 2025-01-07
 
 ### Changed
