@@ -48,7 +48,7 @@ public actor NDKNostrRPC {
         guard let data = decryptedContent.data(using: .utf8),
               let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
         else {
-            throw NDKError.invalidEvent("Failed to parse RPC content")
+            throw NDKError.validation("invalid_event", "Failed to parse RPC content")
         }
 
         let id = json["id"] as? String ?? ""
@@ -182,7 +182,7 @@ public actor NDKNostrRPC {
 
     private func handleTimeout(id: String, continuation: CheckedContinuation<NDKRPCResponse, Error>) async {
         if pendingRequests.removeValue(forKey: id) != nil {
-            continuation.resume(throwing: NDKError.timeout)
+            continuation.resume(throwing: NDKError.network("timeout", "Operation timed out"))
         }
     }
     

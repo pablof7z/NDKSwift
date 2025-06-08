@@ -15,7 +15,7 @@ public enum NostrIdentifier {
             switch decoded.type {
             case "note", "nevent":
                 guard let eventId = decoded.eventId else {
-                    throw NDKError.invalidInput("Invalid \(decoded.type) format")
+                    throw NDKError.validation("invalid_input", "Invalid \(decoded.type) format")
                 }
                 return NDKFilter(ids: [eventId])
                 
@@ -23,7 +23,7 @@ public enum NostrIdentifier {
                 guard let pubkey = decoded.pubkey,
                       let kind = decoded.kind,
                       let dTag = decoded.identifier else {
-                    throw NDKError.invalidInput("Invalid naddr format")
+                    throw NDKError.validation("invalid_input", "Invalid naddr format")
                 }
                 return NDKFilter(
                     authors: [pubkey],
@@ -32,12 +32,12 @@ public enum NostrIdentifier {
                 )
                 
             default:
-                throw NDKError.invalidInput("Unsupported bech32 type: \(decoded.type)")
+                throw NDKError.validation("invalid_input", "Unsupported bech32 type: \(decoded.type)")
             }
         } else {
             // Assume it's a hex event ID
             guard identifier.count == 64 else {
-                throw NDKError.invalidInput("Invalid event ID: must be 64-character hex or valid bech32")
+                throw NDKError.validation("invalid_input", "Invalid event ID: must be 64-character hex or valid bech32")
             }
             return NDKFilter(ids: [identifier])
         }

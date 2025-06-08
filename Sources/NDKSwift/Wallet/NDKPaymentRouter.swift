@@ -147,10 +147,10 @@ public class NDKPaymentRouter {
 
 extension NDKError {
     static func paymentFailed(_ message: String) -> NDKError {
-        return NDKError.validation("Payment failed: \(message)")
+        return NDKError.validation("payment_failed", "Payment failed: \(message)")
     }
 
     static func notImplemented(_ message: String) -> NDKError {
-        return NDKError.validation("Not implemented: \(message)")
+        return NDKError.runtime("not_implemented", "Not implemented: \(message)")
     }
 }

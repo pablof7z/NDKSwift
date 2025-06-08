@@ -117,7 +117,7 @@ public final class NDKRelay: Hashable, Equatable {
         stats.connectionAttempts += 1
 
         guard let url = URL(string: normalizedURL) else {
-            throw NDKError.relayConnectionFailed("Invalid URL: \(normalizedURL)")
+            throw NDKError.network("connection_failed", "Invalid URL: \(normalizedURL)")
         }
 
         connection = NDKRelayConnection(url: url)
@@ -202,7 +202,7 @@ public final class NDKRelay: Hashable, Equatable {
     /// Send a message to the relay
     public func send(_ message: String) async throws {
         guard connectionState == .connected, let connection = connection else {
-            throw NDKError.relayConnectionFailed("Not connected to relay")
+            throw NDKError.network("connection_failed", "Not connected to relay")
         }
 
         try await connection.send(message)
