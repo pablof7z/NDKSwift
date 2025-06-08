@@ -22,6 +22,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added configurable deduplication with global and per-relay tracking
 - Added deduplication statistics for monitoring and debugging
 - Added comprehensive tests for EventDeduplicator functionality
+- Created `NDKUnifiedError` system with hierarchical error categories and rich context
+- Added error recovery suggestions and automatic error migration
+- Added comprehensive error handling guide documentation
+- Added backward compatibility bridge for existing error types
 
 ### Changed
 - Refactored all JSON operations to use the new JSONCoding utility
@@ -32,6 +36,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Removed duplicate retry delay calculations across the codebase
 - Demonstrated how to replace NSLock patterns with Swift actors for better thread safety
 - Leveraged existing LRUCache implementation for event deduplication
+- Standardized error handling with unified error types and consistent error messages
 
 ## [0.3.5] - 2025-01-07
 
