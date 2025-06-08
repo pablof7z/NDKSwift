@@ -35,6 +35,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added `UnifiedCacheAdapter` to bridge new architecture with NDKCacheAdapter
 - Added cache statistics and monitoring capabilities
 - Added comprehensive unified cache architecture documentation
+- Created tag operation helpers with convenience methods for common patterns
+- Added thread-aware tag queries (rootEventId, replyToEventId, mentionedEventIds)
+- Added tag validation and batch operations (deduplication, removal)
+- Added TagBuilder for complex tag construction
+- Created comprehensive tag operations guide documentation
 
 ### Changed
 - Refactored all JSON operations to use the new JSONCoding utility
