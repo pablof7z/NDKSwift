@@ -14,6 +14,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added predefined retry configurations for relay connections, RPC requests, and critical operations
 - Added async/await support for retry operations with timeout capabilities
 - Added comprehensive tests for RetryPolicy functionality
+- Created `ThreadSafeCollections` utilities demonstrating actor-based thread safety patterns
+- Added `EventCollection`, `CallbackCollection`, and `StateManager` actors as thread-safe alternatives to NSLock
+- Added comprehensive tests comparing actor-based vs lock-based performance
+- Added thread safety migration guide documentation
 
 ### Changed
 - Refactored all JSON operations to use the new JSONCoding utility
@@ -22,6 +26,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fixed Swift 6 warning in NDKProfileManager by properly capturing self in async closure
 - Replaced manual exponential backoff logic in NDKRelayConnection with RetryPolicy
 - Removed duplicate retry delay calculations across the codebase
+- Demonstrated how to replace NSLock patterns with Swift actors for better thread safety
 
 ## [0.3.5] - 2025-01-07
 
