@@ -10,12 +10,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - Created centralized `JSONCoding` utility to eliminate duplicate JSON encoder/decoder setup across the codebase
 - Added comprehensive tests for JSONCoding utility
+- Created `RetryPolicy` class with configurable exponential backoff for network operations
+- Added predefined retry configurations for relay connections, RPC requests, and critical operations
+- Added async/await support for retry operations with timeout capabilities
+- Added comprehensive tests for RetryPolicy functionality
 
 ### Changed
 - Refactored all JSON operations to use the new JSONCoding utility
 - Updated NostrMessage, NDKEvent, NDKProfileManager, and FileManagerExtensions to use consistent JSON handling
 - Fixed optional unwrapping issues in test helpers
 - Fixed Swift 6 warning in NDKProfileManager by properly capturing self in async closure
+- Replaced manual exponential backoff logic in NDKRelayConnection with RetryPolicy
+- Removed duplicate retry delay calculations across the codebase
 
 ## [0.3.5] - 2025-01-07
 

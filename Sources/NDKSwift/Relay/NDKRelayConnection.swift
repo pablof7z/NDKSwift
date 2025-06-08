@@ -31,10 +31,8 @@ public final class NDKRelayConnection {
     public private(set) var messagesReceived = 0
     public private(set) var connectedAt: Date?
 
-    /// Reconnection configuration
-    private var reconnectDelay: TimeInterval = 1.0
-    private let maxReconnectDelay: TimeInterval = 300.0
-    private var reconnectTimer: Timer?
+    /// Retry policy for reconnection
+    private let retryPolicy = RetryPolicy(configuration: .relayConnection)
 
     public init(url: URL) {
         self.url = url
@@ -100,8 +98,8 @@ public final class NDKRelayConnection {
     }
 
     private func _disconnect() {
-        reconnectTimer?.invalidate()
-        reconnectTimer = nil
+        retryPolicy.cancel()
+        retryPolicy.reset()
 
         #if os(iOS) || os(macOS) || os(watchOS) || os(tvOS)
             webSocketTask?.cancel(with: .normalClosure, reason: nil)
@@ -236,7 +234,7 @@ public final class NDKRelayConnection {
                 if !isConnected {
                     isConnected = true
                     connectedAt = Date()
-                    reconnectDelay = 1.0 // Reset on successful connection
+                    retryPolicy.reset() // Reset on successful connection
 
                     DispatchQueue.main.async { [weak self] in
                         guard let self = self else { return }
@@ -280,11 +278,7 @@ public final class NDKRelayConnection {
     }
 
     private func scheduleReconnection() {
-        let delay = min(reconnectDelay, maxReconnectDelay)
-        reconnectDelay *= 2
-
-        reconnectTimer?.invalidate()
-        reconnectTimer = Timer.scheduledTimer(withTimeInterval: delay, repeats: false) { [weak self] _ in
+        retryPolicy.scheduleRetry { [weak self] in
             self?.connect()
         }
     }
