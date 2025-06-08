@@ -21,7 +21,7 @@ public class NDKCashuWallet: NDKWallet {
     public func pay(_ request: NDKPaymentRequest) async throws -> NDKPaymentConfirmation {
         // Check balance
         guard balance >= request.amount else {
-            throw NDKError.insufficientBalance
+            throw NDKError.validation("insufficient_balance", "Insufficient balance")
         }
 
         // Get recipient's mint preferences
@@ -84,7 +84,7 @@ public class NDKCashuWallet: NDKWallet {
 
     public func createInvoice(amount _: Int64, description _: String?) async throws -> String {
         // This would create a Lightning invoice via mint
-        throw NDKError.notImplemented
+        throw NDKError.runtime("not_implemented", "Creating invoices not implemented")
     }
 
     public func supports(method: NDKPaymentMethod) -> Bool {

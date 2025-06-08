@@ -175,7 +175,7 @@ public actor NDKProfileManager {
     
     private func fetchProfileImmediately(for pubkey: PublicKey) async throws -> NDKUserProfile? {
         guard let ndk = ndk else {
-            throw NDKError.custom("NDK instance not available")
+            throw NDKError.runtime("profile_error", "NDK instance not available")
         }
         
         let user = ndk.getUser(pubkey)
@@ -190,7 +190,7 @@ public actor NDKProfileManager {
     
     private func fetchProfilesBatch(_ pubkeys: [PublicKey]) async throws -> [PublicKey: NDKUserProfile] {
         guard let ndk = ndk else {
-            throw NDKError.custom("NDK instance not available")
+            throw NDKError.runtime("profile_error", "NDK instance not available")
         }
         
         var results: [PublicKey: NDKUserProfile] = [:]

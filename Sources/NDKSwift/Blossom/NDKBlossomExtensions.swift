@@ -25,7 +25,7 @@ extension NDK {
         expiration: Date? = nil
     ) async throws -> [BlossomBlob] {
         guard let signer = signer else {
-            throw NDKError.signingFailed
+            throw NDKError.crypto("no_signer", "No signer configured")
         }
 
         // Use provided servers or discover from relay list
@@ -156,7 +156,7 @@ public extension NDKEvent {
         ndk: NDK
     ) async throws -> NDKEvent {
         guard let signer = ndk.signer else {
-            throw NDKError.signingFailed
+            throw NDKError.crypto("no_signer", "No signer configured")
         }
 
         // Upload to Blossom

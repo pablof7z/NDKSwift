@@ -26,31 +26,31 @@ public enum NostrMessage {
     /// Parse a message from relay
     public static func parse(from json: String) throws -> NostrMessage {
         guard let data = json.data(using: .utf8) else {
-            throw NDKError.custom("Invalid JSON string")
+            throw NDKError.runtime("parse_error", "Invalid JSON string")
         }
 
         let array = try JSONSerialization.jsonObject(with: data) as? [Any]
         guard let array = array, !array.isEmpty else {
-            throw NDKError.custom("Invalid message format")
+            throw NDKError.runtime("parse_error", "Invalid message format")
         }
 
         guard let typeString = array[0] as? String,
               let type = NostrMessageType(rawValue: typeString)
         else {
-            throw NDKError.custom("Unknown message type")
+            throw NDKError.runtime("parse_error", "Unknown message type")
         }
 
         switch type {
         case .event:
             guard array.count >= 2 else {
-                throw NDKError.custom("Invalid EVENT message")
+                throw NDKError.runtime("parse_error", "Invalid EVENT message")
             }
 
             let subscriptionId = array.count > 2 ? array[1] as? String : nil
             let eventIndex = subscriptionId != nil ? 2 : 1
 
             guard let eventDict = array[eventIndex] as? [String: Any] else {
-                throw NDKError.custom("Invalid event data")
+                throw NDKError.runtime("parse_error", "Invalid event data")
             }
 
             let event = try JSONCoding.decodeFromDictionary(NDKEvent.self, from: eventDict)
@@ -61,7 +61,7 @@ public enum NostrMessage {
             guard array.count >= 3,
                   let subscriptionId = array[1] as? String
             else {
-                throw NDKError.custom("Invalid REQ message")
+                throw NDKError.runtime("parse_error", "Invalid REQ message")
             }
 
             var filters: [NDKFilter] = []
@@ -77,7 +77,7 @@ public enum NostrMessage {
             guard array.count >= 2,
                   let subscriptionId = array[1] as? String
             else {
-                throw NDKError.custom("Invalid CLOSE message")
+                throw NDKError.runtime("parse_error", "Invalid CLOSE message")
             }
             return .close(subscriptionId: subscriptionId)
 
@@ -85,7 +85,7 @@ public enum NostrMessage {
             guard array.count >= 2,
                   let message = array[1] as? String
             else {
-                throw NDKError.custom("Invalid NOTICE message")
+                throw NDKError.runtime("parse_error", "Invalid NOTICE message")
             }
             return .notice(message: message)
 
@@ -93,7 +93,7 @@ public enum NostrMessage {
             guard array.count >= 2,
                   let subscriptionId = array[1] as? String
             else {
-                throw NDKError.custom("Invalid EOSE message")
+                throw NDKError.runtime("parse_error", "Invalid EOSE message")
             }
             return .eose(subscriptionId: subscriptionId)
 
@@ -102,7 +102,7 @@ public enum NostrMessage {
                   let eventId = array[1] as? String,
                   let accepted = array[2] as? Bool
             else {
-                throw NDKError.custom("Invalid OK message")
+                throw NDKError.runtime("parse_error", "Invalid OK message")
             }
             let message = array.count > 3 ? array[3] as? String : nil
             return .ok(eventId: eventId, accepted: accepted, message: message)
@@ -111,7 +111,7 @@ public enum NostrMessage {
             guard array.count >= 2,
                   let challenge = array[1] as? String
             else {
-                throw NDKError.custom("Invalid AUTH message")
+                throw NDKError.runtime("parse_error", "Invalid AUTH message")
             }
             return .auth(challenge: challenge)
 
@@ -121,7 +121,7 @@ public enum NostrMessage {
                   let countDict = array[2] as? [String: Any],
                   let count = countDict["count"] as? Int
             else {
-                throw NDKError.custom("Invalid COUNT message")
+                throw NDKError.runtime("parse_error", "Invalid COUNT message")
             }
             return .count(subscriptionId: subscriptionId, count: count)
         }
@@ -178,7 +178,7 @@ public enum NostrMessage {
 
         let data = try JSONSerialization.data(withJSONObject: array, options: [.withoutEscapingSlashes])
         guard let json = String(data: data, encoding: .utf8) else {
-            throw NDKError.custom("Failed to serialize message")
+            throw NDKError.runtime("parse_error", "Failed to serialize message")
         }
 
 

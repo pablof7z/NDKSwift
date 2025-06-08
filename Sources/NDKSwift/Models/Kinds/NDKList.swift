@@ -455,7 +455,7 @@ public class NDKList {
     /// Sign this list as an event
     public func sign() async throws {
         guard let signer = ndk?.signer else {
-            throw NDKError.signingFailed
+            throw NDKError.crypto("no_signer", "No signer configured")
         }
 
         let event = toNDKEvent()
@@ -477,7 +477,7 @@ public class NDKList {
     /// Publish this list
     public func publish() async throws {
         guard let ndk = ndk else {
-            throw NDKError.custom("NDK instance not available")
+            throw NDKError.runtime("list_error", "NDK instance not available")
         }
 
         try await sign()

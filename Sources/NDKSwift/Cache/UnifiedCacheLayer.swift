@@ -350,6 +350,16 @@ public actor LayeredCache {
         }
     }
     
+    /// Check if key exists in any layer
+    public func contains(_ key: String) async -> Bool {
+        for layer in layers {
+            if await layer.contains(key) {
+                return true
+            }
+        }
+        return false
+    }
+    
     /// Remove from all layers
     public func remove(_ key: String) async {
         for layer in layers {

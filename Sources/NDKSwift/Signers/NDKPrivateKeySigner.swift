@@ -9,7 +9,7 @@ public final class NDKPrivateKeySigner: NDKSigner {
     /// Initialize with a private key
     public init(privateKey: PrivateKey) throws {
         guard let keyData = Data(hexString: privateKey), keyData.count == 32 else {
-            throw NDKError.invalidPrivateKey
+            throw NDKError.validation("invalid_private_key", "Invalid private key format")
         }
 
         self.privateKey = privateKey
@@ -45,7 +45,7 @@ public final class NDKPrivateKeySigner: NDKSigner {
         guard let eventId = event.id,
               let idData = Data(hexString: eventId)
         else {
-            throw NDKError.signingFailed
+            throw NDKError.crypto("signing_failed", "Failed to sign event")
         }
 
         return try Crypto.sign(message: idData, privateKey: privateKey)
@@ -64,7 +64,7 @@ public final class NDKPrivateKeySigner: NDKSigner {
         case .nip04:
             return try Crypto.nip04Encrypt(message: value, privateKey: privateKey, publicKey: recipient.pubkey)
         case .nip44:
-            throw NDKError.notImplemented
+            throw NDKError.runtime("not_implemented", "NIP-44 encryption not implemented")
         }
     }
 
@@ -73,7 +73,7 @@ public final class NDKPrivateKeySigner: NDKSigner {
         case .nip04:
             return try Crypto.nip04Decrypt(encrypted: value, privateKey: privateKey, publicKey: sender.pubkey)
         case .nip44:
-            throw NDKError.notImplemented
+            throw NDKError.runtime("not_implemented", "NIP-44 encryption not implemented")
         }
     }
 

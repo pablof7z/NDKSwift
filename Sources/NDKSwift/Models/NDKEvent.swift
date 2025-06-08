@@ -168,26 +168,26 @@ public final class NDKEvent: Codable, Equatable, Hashable {
     public func validate() throws {
         // Validate public key
         guard pubkey.count == 64, pubkey.allSatisfy({ $0.isHexDigit }) else {
-            throw NDKError.invalidPublicKey
+            throw NDKError.validation("invalid_public_key", "Invalid public key format")
         }
 
         // Validate ID if present
         if let id = id {
             guard id.count == 64, id.allSatisfy({ $0.isHexDigit }) else {
-                throw NDKError.invalidEventID
+                throw NDKError.validation("invalid_event_id", "Invalid event ID format")
             }
 
             // Verify ID matches content
             let calculatedID = try generateID()
             guard id == calculatedID else {
-                throw NDKError.invalidEventID
+                throw NDKError.validation("invalid_event_id", "Event ID does not match content")
             }
         }
 
         // Validate signature if present
         if let sig = sig {
             guard sig.count == 128, sig.allSatisfy({ $0.isHexDigit }) else {
-                throw NDKError.invalidSignature
+                throw NDKError.validation("invalid_signature", "Invalid signature format")
             }
         }
     }
@@ -279,11 +279,11 @@ public final class NDKEvent: Codable, Equatable, Hashable {
     /// Sign this event using the NDK instance's signer
     public func sign() async throws {
         guard let ndk = ndk else {
-            throw NDKError.custom("NDK instance not set")
+            throw NDKError.runtime("ndk_not_set", "NDK instance not set")
         }
 
         guard let signer = ndk.signer else {
-            throw NDKError.signingFailed
+            throw NDKError.crypto("no_signer", "No signer configured")
         }
 
         // Set pubkey from signer if not already set
@@ -398,11 +398,11 @@ public final class NDKEvent: Codable, Equatable, Hashable {
     /// @returns The reaction event
     public func react(content: String, publish: Bool = true) async throws -> NDKEvent {
         guard let ndk = ndk else {
-            throw NDKError.custom("NDK instance not set")
+            throw NDKError.runtime("ndk_not_set", "NDK instance not set")
         }
 
         guard ndk.signer != nil else {
-            throw NDKError.signingFailed
+            throw NDKError.crypto("no_signer", "No signer configured")
         }
 
         // Create the reaction event
@@ -438,7 +438,7 @@ public final class NDKEvent: Codable, Equatable, Hashable {
     /// Returns note1 for simple events, nevent1 for events with metadata, naddr1 for replaceable events
     public func encode(includeRelays: Bool = false) throws -> String {
         guard let eventId = id else {
-            throw NDKError.invalidEventID
+            throw NDKError.validation("missing_event_id", "Event ID is required for encoding")
         }
 
         // For parameterized replaceable events, use naddr encoding

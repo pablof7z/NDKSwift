@@ -127,7 +127,7 @@ public final class NDKRelayConnection {
     /// Send raw JSON to relay
     public func send(_ json: String) async throws {
         guard isConnected else {
-            throw NDKError.relayConnectionFailed("Not connected")
+            throw NDKError.network("connection_failed", "Not connected")
         }
 
         #if DEBUG
@@ -138,7 +138,7 @@ public final class NDKRelayConnection {
 
         #if os(iOS) || os(macOS) || os(watchOS) || os(tvOS)
             guard let task = webSocketTask else {
-                throw NDKError.relayConnectionFailed("No WebSocket task")
+                throw NDKError.network("connection_failed", "No WebSocket task")
             }
 
             let message = URLSessionWebSocketTask.Message.string(json)
