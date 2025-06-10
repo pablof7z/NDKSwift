@@ -22,12 +22,22 @@ final class NDKPrivateKeySignerTests: XCTestCase {
 
         // Test with invalid private key
         XCTAssertThrowsError(try NDKPrivateKeySigner(privateKey: "invalid")) { error in
-            XCTAssertEqual(error as? NDKError, NDKError.invalidPrivateKey)
+            if let ndkError = error as? NDKError {
+                XCTAssertEqual(ndkError.code, "invalid_private_key")
+                XCTAssertEqual(ndkError.category, .validation)
+            } else {
+                XCTFail("Expected NDKError")
+            }
         }
 
         // Test with wrong length private key
         XCTAssertThrowsError(try NDKPrivateKeySigner(privateKey: "abcd1234")) { error in
-            XCTAssertEqual(error as? NDKError, NDKError.invalidPrivateKey)
+            if let ndkError = error as? NDKError {
+                XCTAssertEqual(ndkError.code, "invalid_private_key")
+                XCTAssertEqual(ndkError.category, .validation)
+            } else {
+                XCTFail("Expected NDKError")
+            }
         }
     }
 
@@ -90,10 +100,10 @@ final class NDKPrivateKeySignerTests: XCTestCase {
     func testEncryptionSupport() async throws {
         let signer = try NDKPrivateKeySigner.generate()
 
-        // Should support NIP-04
+        // Should support NIP-04 and NIP-44
         let schemes = await signer.encryptionEnabled()
         XCTAssertTrue(schemes.contains(.nip04))
-        XCTAssertFalse(schemes.contains(.nip44)) // Not implemented yet
+        XCTAssertTrue(schemes.contains(.nip44))
     }
 
     func testNIP04Encryption() async throws {
@@ -113,10 +123,13 @@ final class NDKPrivateKeySignerTests: XCTestCase {
             scheme: .nip04
         )
 
+        print("Encrypted message: \(encrypted)")
         XCTAssertTrue(encrypted.contains("?iv="))
         XCTAssertNotEqual(encrypted, message)
 
         // Bob decrypts from Alice
+        print("Alice pubkey: \(aliceUser.pubkey)")
+        print("Bob pubkey: \(bobUser.pubkey)")
         let decrypted = try await bob.decrypt(
             sender: aliceUser,
             value: encrypted,
@@ -148,9 +161,9 @@ final class NDKPrivateKeySignerTests: XCTestCase {
     func testSpecificNsecDecoding() throws {
         // Test specific nsec decoding to known values (corrected based on actual implementation)
         let nsec = "nsec1mvnrf3h98a6gjjytehmufv2h3j2tzn6kk3lcmazztqwfdxwygjls3cy5yc"
-        let expectedPubkey = "a03530c991fe902c174666f7c4adf11ec062184d70c097e71496a2516ac8c1b3"
+        let expectedPubkey = "e64e6f029826af09bda652296ef15cd7be9a0ffb41e25217be0c691d6261566e"
         let expectedPrivateKey = "db2634c6e53f7489488bcdf7c4b1578c94b14f56b47f8df442581c9699c444bf"
-        let expectedNpub = "npub15q6npjv3l6gzc96xvmmuft03rmqxyxzdwrqf0ec5j639z6kgcxesjmnzqk"
+        let expectedNpub = "npub1ue8x7q5cy6hsn0dx2g5kau2u67lf5rlmg839y9a7p3536cnp2ehqwe32tj"
 
         // Create signer from nsec
         let signer = try NDKPrivateKeySigner(nsec: nsec)

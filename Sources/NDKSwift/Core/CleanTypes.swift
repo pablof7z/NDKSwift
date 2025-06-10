@@ -3,7 +3,7 @@ import Foundation
 // MARK: - Core Error Type (replacing NDKError entirely)
 
 /// Unified error system for NDKSwift
-public struct NDKError: LocalizedError {
+public struct NDKError: LocalizedError, Equatable {
     public let category: ErrorCategory
     public let code: String
     public let message: String
@@ -25,6 +25,14 @@ public struct NDKError: LocalizedError {
         }
         
         return description
+    }
+    
+    // MARK: - Equatable
+    
+    public static func == (lhs: NDKError, rhs: NDKError) -> Bool {
+        // Compare category and code for equality
+        // Context and underlying errors are not compared for simplicity
+        return lhs.category == rhs.category && lhs.code == rhs.code
     }
     
     /// Error categories for grouping related errors

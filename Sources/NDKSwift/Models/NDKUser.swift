@@ -110,7 +110,7 @@ public final class NDKUser: Equatable, Hashable {
 
         // Check cache first unless force refresh is requested
         if !forceRefresh {
-            if let cached = await ndk.cacheAdapter?.fetchProfile(pubkey: pubkey) {
+            if let cached = await ndk.cache?.getProfile(for: pubkey) {
                 self.profile = cached
                 return cached
             }
@@ -135,7 +135,7 @@ public final class NDKUser: Equatable, Hashable {
             self.profile = profile
             
             // Save to cache
-            await ndk.cacheAdapter?.saveProfile(pubkey: pubkey, profile: profile)
+            try? await ndk.cache?.saveProfile(profile, for: pubkey)
             
             return profile
         }

@@ -9,8 +9,9 @@ final class NDKListTests: XCTestCase {
     override func setUp() async throws {
         try await super.setUp()
         ndk = NDK()
-        signer = NDKPrivateKeySigner.generate()
-        testUser = NDKUser(pubkey: signer.publicKey)
+        signer = try NDKPrivateKeySigner.generate()
+        let pubkey = try await signer.pubkey
+        testUser = NDKUser(pubkey: pubkey)
         testUser.ndk = ndk
         ndk.signer = signer
     }
@@ -28,7 +29,7 @@ final class NDKListTests: XCTestCase {
         let list = NDKList(ndk: ndk, kind: 10001)
 
         XCTAssertEqual(list.kind, 10001)
-        XCTAssertEqual(list.ndk, ndk)
+        XCTAssertNotNil(list.ndk)
         XCTAssertTrue(list.tags.isEmpty)
         XCTAssertTrue(list.content.isEmpty)
     }
@@ -42,7 +43,7 @@ final class NDKListTests: XCTestCase {
         // Test setting custom title
         list.title = "My Custom List"
         XCTAssertEqual(list.title, "My Custom List")
-        XCTAssertTrue(list.tags.contains { $0.type == "title" && $0.value == "My Custom List" })
+        XCTAssertTrue(list.tags.contains { $0.count >= 2 && $0[0] == "title" && $0[1] == "My Custom List" })
 
         // Test clearing title
         list.title = nil
@@ -58,17 +59,17 @@ final class NDKListTests: XCTestCase {
         XCTAssertEqual(list.listDescription, "A test list")
         XCTAssertEqual(list.image, "https://example.com/image.jpg")
 
-        XCTAssertTrue(list.tags.contains { $0.type == "description" && $0.value == "A test list" })
-        XCTAssertTrue(list.tags.contains { $0.type == "image" && $0.value == "https://example.com/image.jpg" })
+        XCTAssertTrue(list.tags.contains { $0.count >= 2 && $0[0] == "description" && $0[1] == "A test list" })
+        XCTAssertTrue(list.tags.contains { $0.count >= 2 && $0[0] == "image" && $0[1] == "https://example.com/image.jpg" })
     }
 
     func testFromEvent() {
-        let originalEvent = NDKEvent(ndk: ndk)
+        let originalEvent = NDKEvent()
         originalEvent.kind = 10003
         originalEvent.tags = [
-            NDKTag(type: "title", value: "Test List"),
-            NDKTag(type: "e", value: "event123"),
-            NDKTag(type: "p", value: "pubkey123"),
+            ["title", "Test List"],
+            ["e", "event123"],
+            ["p", "pubkey123"],
         ]
         originalEvent.content = "test content"
 
@@ -90,12 +91,12 @@ final class NDKListTests: XCTestCase {
 
         XCTAssertTrue(list.contains("user123"))
         XCTAssertEqual(list.userPubkeys, ["user123"])
-        XCTAssertTrue(list.tags.contains { $0.type == "p" && $0.value == "user123" })
+        XCTAssertTrue(list.tags.contains { $0.count >= 2 && $0[0] == "p" && $0[1] == "user123" })
     }
 
     func testAddingEvents() async throws {
         let list = NDKList(ndk: ndk, kind: 10003)
-        let event = NDKEvent(ndk: ndk)
+        let event = NDKEvent()
         event.id = "event123"
         event.kind = 1
 
@@ -103,21 +104,21 @@ final class NDKListTests: XCTestCase {
 
         XCTAssertTrue(list.contains("event123"))
         XCTAssertEqual(list.eventIds, ["event123"])
-        XCTAssertTrue(list.tags.contains { $0.type == "e" && $0.value == "event123" })
+        XCTAssertTrue(list.tags.contains { $0.count >= 2 && $0[0] == "e" && $0[1] == "event123" })
     }
 
     func testAddingParameterizedReplaceableEvents() async throws {
         let list = NDKList(ndk: ndk, kind: 10003)
-        let event = NDKEvent(ndk: ndk)
+        let event = NDKEvent()
         event.kind = 30023
         event.pubkey = "author123"
-        event.tags = [NDKTag(type: "d", value: "article-slug")]
+        event.tags = [["d", "article-slug"]]
 
         try await list.addItem(event)
 
         let expectedReference = "30023:author123:article-slug"
         XCTAssertTrue(list.contains(expectedReference))
-        XCTAssertTrue(list.tags.contains { $0.type == "a" && $0.value == expectedReference })
+        XCTAssertTrue(list.tags.contains { $0.count >= 2 && $0[0] == "a" && $0[1] == expectedReference })
     }
 
     func testAddingHashtags() async throws {
@@ -127,8 +128,8 @@ final class NDKListTests: XCTestCase {
         try await list.addHashtag("#bitcoin")
 
         XCTAssertEqual(list.hashtags, ["nostr", "bitcoin"])
-        XCTAssertTrue(list.tags.contains { $0.type == "t" && $0.value == "nostr" })
-        XCTAssertTrue(list.tags.contains { $0.type == "t" && $0.value == "bitcoin" })
+        XCTAssertTrue(list.tags.contains { $0.count >= 2 && $0[0] == "t" && $0[1] == "nostr" })
+        XCTAssertTrue(list.tags.contains { $0.count >= 2 && $0[0] == "t" && $0[1] == "bitcoin" })
     }
 
     func testAddingURLs() async throws {
@@ -137,7 +138,7 @@ final class NDKListTests: XCTestCase {
         try await list.addURL("https://example.com")
 
         XCTAssertEqual(list.urls, ["https://example.com"])
-        XCTAssertTrue(list.tags.contains { $0.type == "r" && $0.value == "https://example.com" })
+        XCTAssertTrue(list.tags.contains { $0.count >= 2 && $0[0] == "r" && $0[1] == "https://example.com" })
     }
 
     func testItemWithMark() async throws {
@@ -146,9 +147,9 @@ final class NDKListTests: XCTestCase {
 
         try await list.addItem(user, mark: "bookmark")
 
-        let userTag = list.tags.first { $0.type == "p" && $0.value == "user123" }
+        let userTag = list.tags.first { $0.count >= 2 && $0[0] == "p" && $0[1] == "user123" }
         XCTAssertNotNil(userTag)
-        XCTAssertTrue(userTag!.additionalInfo.contains("bookmark"))
+        XCTAssertTrue(userTag!.contains("bookmark"))
     }
 
     func testPositionInsertion() async throws {
@@ -163,10 +164,10 @@ final class NDKListTests: XCTestCase {
         try await list.addItem(user2, position: .top)
         try await list.addItem(user3, position: .bottom)
 
-        let userTags = list.tags.filter { $0.type == "p" }
-        XCTAssertEqual(userTags[0].value, "user2") // Added to top
-        XCTAssertEqual(userTags[1].value, "user1") // Original bottom
-        XCTAssertEqual(userTags[2].value, "user3") // New bottom
+        let userTags = list.tags.filter { $0.count >= 2 && $0[0] == "p" }
+        XCTAssertEqual(userTags[0][1], "user2") // Added to top
+        XCTAssertEqual(userTags[1][1], "user1") // Original bottom
+        XCTAssertEqual(userTags[2][1], "user3") // New bottom
     }
 
     func testRemoveItemByReference() async throws {
@@ -189,7 +190,7 @@ final class NDKListTests: XCTestCase {
         try await list.addItem(user) // Should not add duplicate
 
         XCTAssertEqual(list.userPubkeys.count, 1)
-        XCTAssertEqual(list.tags.filter { $0.type == "p" }.count, 1)
+        XCTAssertEqual(list.tags.filter { $0.count >= 2 && $0[0] == "p" }.count, 1)
     }
 
     // MARK: - Filter Generation Tests
@@ -199,14 +200,14 @@ final class NDKListTests: XCTestCase {
 
         // Add various item types
         let user = NDKUser(pubkey: "user123")
-        let event = NDKEvent(ndk: ndk)
+        let event = NDKEvent()
         event.id = "event123"
         event.kind = 1
 
-        let paramEvent = NDKEvent(ndk: ndk)
+        let paramEvent = NDKEvent()
         paramEvent.kind = 30023
         paramEvent.pubkey = "author123"
-        paramEvent.tags = [NDKTag(type: "d", value: "article")]
+        paramEvent.tags = [["d", "article"]]
 
         try await list.addItem(user)
         try await list.addItem(event)

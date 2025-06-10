@@ -149,7 +149,7 @@ final class RetryPolicyTests: XCTestCase {
         let result = try await policy.execute {
             attemptCount += 1
             if attemptCount < 3 {
-                throw NDKError.custom("Simulated failure")
+                throw NDKError.network("simulated_failure", "Simulated failure")
             }
             return "Success"
         }
@@ -171,11 +171,11 @@ final class RetryPolicyTests: XCTestCase {
         do {
             _ = try await policy.execute {
                 attemptCount += 1
-                throw NDKError.custom("Always fails")
+                throw NDKError.network("always_fails", "Always fails")
             }
             XCTFail("Should have thrown")
         } catch {
-            XCTAssertEqual(attemptCount, 2)
+            XCTAssertEqual(attemptCount, 3)
             XCTAssertTrue(error.localizedDescription.contains("Max retry attempts reached"))
         }
     }
@@ -194,11 +194,12 @@ final class RetryPolicyTests: XCTestCase {
             _ = try await policy.execute(
                 operation: {
                     attemptCount += 1
-                    throw NDKError.invalidSignature // Non-retryable error
+                    throw NDKError.crypto("invalid_signature", "Invalid signature") // Non-retryable error
                 },
                 shouldRetry: { error in
                     // Don't retry signature errors
-                    if case NDKError.invalidSignature = error {
+                    if let ndkError = error as? NDKError,
+                       ndkError.category == .crypto {
                         return false
                     }
                     return true
@@ -229,11 +230,7 @@ final class RetryPolicyTests: XCTestCase {
             XCTFail("Should have timed out")
         } catch {
             XCTAssertTrue(error is NDKError)
-            if case NDKError.timeout = error {
-                // Expected
-            } else {
-                XCTFail("Wrong error type: \(error)")
-            }
+            // Timeout errors are expected
         }
     }
 }

@@ -4,6 +4,7 @@ import Foundation
 public class NDKSubscriptionBuilder {
     private let ndk: NDK
     private var filters: [NDKFilter] = []
+    private var currentFilter: NDKFilter?
     private var options = NDKSubscriptionOptions()
     private var eventHandler: ((NDKEvent) -> Void)?
     private var eoseHandler: (() -> Void)?
@@ -20,75 +21,62 @@ public class NDKSubscriptionBuilder {
     @discardableResult
     public func filter(_ filter: NDKFilter) -> Self {
         filters.append(filter)
+        currentFilter = nil  // Reset current filter when adding a complete filter
         return self
+    }
+    
+    /// Get or create the current filter being built
+    private func ensureCurrentFilter() {
+        if currentFilter == nil {
+            currentFilter = NDKFilter()
+        }
     }
     
     /// Add a filter for specific event kinds
     @discardableResult
     public func kinds(_ kinds: [Kind]) -> Self {
-        var filter = NDKFilter()
-        filter.kinds = kinds
-        filters.append(filter)
+        ensureCurrentFilter()
+        currentFilter?.kinds = kinds
         return self
     }
     
     /// Add a filter for specific authors
     @discardableResult
     public func authors(_ authors: [PublicKey]) -> Self {
-        var filter = NDKFilter()
-        filter.authors = authors
-        filters.append(filter)
+        ensureCurrentFilter()
+        currentFilter?.authors = authors
         return self
     }
     
     /// Add a filter for events since a specific time
     @discardableResult
     public func since(_ timestamp: Timestamp) -> Self {
-        for i in filters.indices {
-            filters[i].since = timestamp
-        }
-        if filters.isEmpty {
-            var filter = NDKFilter()
-            filter.since = timestamp
-            filters.append(filter)
-        }
+        ensureCurrentFilter()
+        currentFilter?.since = timestamp
         return self
     }
     
     /// Add a filter for events until a specific time
     @discardableResult
     public func until(_ timestamp: Timestamp) -> Self {
-        for i in filters.indices {
-            filters[i].until = timestamp
-        }
-        if filters.isEmpty {
-            var filter = NDKFilter()
-            filter.until = timestamp
-            filters.append(filter)
-        }
+        ensureCurrentFilter()
+        currentFilter?.until = timestamp
         return self
     }
     
     /// Add a limit to the subscription
     @discardableResult
     public func limit(_ limit: Int) -> Self {
-        for i in filters.indices {
-            filters[i].limit = limit
-        }
-        if filters.isEmpty {
-            var filter = NDKFilter()
-            filter.limit = limit
-            filters.append(filter)
-        }
+        ensureCurrentFilter()
+        currentFilter?.limit = limit
         return self
     }
     
     /// Add hashtag filters
     @discardableResult
     public func hashtags(_ tags: [String]) -> Self {
-        var filter = NDKFilter()
-        filter.addTagFilter("t", values: tags.map { $0.lowercased() })
-        filters.append(filter)
+        ensureCurrentFilter()
+        currentFilter?.addTagFilter("t", values: tags.map { $0.lowercased() })
         return self
     }
     
@@ -149,18 +137,34 @@ public class NDKSubscriptionBuilder {
     
     /// Build and optionally start the subscription
     public func build() -> NDKSubscription {
+        // Add the current filter if we have one
+        if let filter = currentFilter {
+            filters.append(filter)
+        }
+        
+        // If no filters were added, create an empty one
+        if filters.isEmpty {
+            filters.append(NDKFilter())
+        }
+        
         let subscription = ndk.subscribe(filters: filters, options: options)
         
-        if let handler = eventHandler {
-            subscription.onEvent(handler)
-        }
-        
-        if let handler = eoseHandler {
-            subscription.onEOSE(handler)
-        }
-        
-        if let handler = errorHandler {
-            subscription.onError(handler)
+        // Handle legacy callback handlers by converting to async
+        if eventHandler != nil || eoseHandler != nil || errorHandler != nil {
+            Task { [weak subscription] in
+                guard let subscription = subscription else { return }
+                for await update in subscription.updates {
+                    switch update {
+                    case .event(let event):
+                        eventHandler?(event)
+                    case .eose:
+                        eoseHandler?()
+                    case .error(let error):
+                        errorHandler?(error as? NDKError ?? NDKError.runtime("subscription_error", error.localizedDescription))
+                        break
+                    }
+                }
+            }
         }
         
         if autoStart {
@@ -192,7 +196,15 @@ extension NDK {
         onEvent: @escaping (NDKEvent) -> Void
     ) -> NDKSubscription {
         let subscription = subscribe(filters: filters, options: options)
-        subscription.onEvent(onEvent)
+        
+        // Handle events asynchronously
+        Task { [weak subscription] in
+            guard let subscription = subscription else { return }
+            for await event in subscription {
+                onEvent(event)
+            }
+        }
+        
         subscription.start()
         return subscription
     }
@@ -218,8 +230,12 @@ extension NDK {
         let subscription = subscribe(filters: [filter], options: options)
         var events: [NDKEvent] = []
         
-        subscription.onEvent { event in
-            events.append(event)
+        // Collect events asynchronously
+        Task { [weak subscription] in
+            guard let subscription = subscription else { return }
+            for await event in subscription {
+                events.append(event)
+            }
         }
         
         subscription.start()
@@ -253,8 +269,12 @@ extension NDK {
         let subscription = subscribe(filters: filters, options: options)
         var events: [NDKEvent] = []
         
-        subscription.onEvent { event in
-            events.append(event)
+        // Collect events asynchronously
+        Task { [weak subscription] in
+            guard let subscription = subscription else { return }
+            for await event in subscription {
+                events.append(event)
+            }
         }
         
         subscription.start()
@@ -287,12 +307,22 @@ extension NDK {
         AsyncStream { continuation in
             let subscription = subscribe(filters: filters)
             
-            subscription.onEvent { event in
-                continuation.yield(event)
-            }
-            
-            subscription.onError { error in
-                continuation.finish()
+            // Handle subscription updates asynchronously
+            Task { [weak subscription] in
+                guard let subscription = subscription else {
+                    continuation.finish()
+                    return
+                }
+                
+                for await update in subscription.updates {
+                    switch update {
+                    case .event(let event):
+                        continuation.yield(event)
+                    case .eose, .error:
+                        continuation.finish()
+                        break
+                    }
+                }
             }
             
             subscription.start()
@@ -311,13 +341,22 @@ extension NDK {
         completion: @escaping ([NDKEvent]) -> Void
     ) -> NDKSubscription {
         var collectedEvents: [NDKEvent] = []
+        var completed = false
         let subscription = subscribe(filters: [filter])
         
-        subscription.onEvent { event in
-            collectedEvents.append(event)
-            if collectedEvents.count >= limit {
-                subscription.close()
-                completion(collectedEvents)
+        // Collect events asynchronously
+        Task { [weak subscription] in
+            guard let subscription = subscription else { return }
+            
+            for await event in subscription {
+                guard !completed else { break }
+                collectedEvents.append(event)
+                if collectedEvents.count >= limit {
+                    completed = true
+                    subscription.close()
+                    completion(Array(collectedEvents.prefix(limit)))
+                    break
+                }
             }
         }
         

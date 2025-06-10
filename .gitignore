@@ -4,10 +4,13 @@
 /*.xcodeproj
 xcuserdata/
 DerivedData/
-.swiftpm/config/registries.json
-.swiftpm/xcode/package.xcworkspace/contents.xcworkspacedata
+.swiftpm/
 .netrc
 Examples/.build
 Examples/build
-*.resolvedndk
-.repomix-output.txt
+*.resolved
+*.xcuserstate
+.repomix*
+repomix-output.*
+debug_*.swift
+test_*.swift

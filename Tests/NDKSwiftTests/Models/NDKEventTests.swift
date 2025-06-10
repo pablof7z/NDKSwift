@@ -86,7 +86,12 @@ final class NDKEventTests: XCTestCase {
             content: "Invalid"
         )
         XCTAssertThrowsError(try invalidPubkeyEvent.validate()) { error in
-            XCTAssertEqual(error as? NDKError, NDKError.invalidPublicKey)
+            guard let ndkError = error as? NDKError else {
+                XCTFail("Expected NDKError")
+                return
+            }
+            XCTAssertEqual(ndkError.code, "invalid_public_key")
+            XCTAssertEqual(ndkError.category, .validation)
         }
 
         // Invalid ID
@@ -98,7 +103,12 @@ final class NDKEventTests: XCTestCase {
         )
         invalidIDEvent.id = "invalid"
         XCTAssertThrowsError(try invalidIDEvent.validate()) { error in
-            XCTAssertEqual(error as? NDKError, NDKError.invalidEventID)
+            guard let ndkError = error as? NDKError else {
+                XCTFail("Expected NDKError")
+                return
+            }
+            XCTAssertEqual(ndkError.code, "invalid_event_id")
+            XCTAssertEqual(ndkError.category, .validation)
         }
     }
 

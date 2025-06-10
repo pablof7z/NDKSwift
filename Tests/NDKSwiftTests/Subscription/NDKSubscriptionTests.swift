@@ -185,6 +185,8 @@ final class NDKSubscriptionTests: XCTestCase {
         XCTAssertTrue(subscription.isClosed)
     }
 
+    // MARK: - Subscription merging was removed in simplification
+    /*
     func testSubscriptionMerging() {
         // Test merging subscriptions with compatible filters (same kinds)
         let filter1 = NDKFilter(kinds: [1])
@@ -220,6 +222,7 @@ final class NDKSubscriptionTests: XCTestCase {
         XCTAssertFalse(subscription1.canMerge(with: subscription2))
         XCTAssertNil(subscription1.merge(with: subscription2))
     }
+    */
 
     func testAsyncStreamAPI() async {
         let subscription = NDKSubscription(filters: [NDKFilter(kinds: [1])])

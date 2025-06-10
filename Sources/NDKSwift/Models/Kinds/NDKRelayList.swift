@@ -51,8 +51,9 @@ public class NDKRelayList: NDKList {
     public static let kind: Kind = 10002
 
     /// Initialize a new relay list
-    override public convenience init(ndk: NDK? = nil) {
-        self.init(ndk: ndk, kind: NDKRelayList.kind)
+    public override init(ndk: NDK? = nil) {
+        super.init(ndk: ndk)
+        self.kind = NDKRelayList.kind
     }
 
     /// Create an NDKRelayList from an existing NDKEvent

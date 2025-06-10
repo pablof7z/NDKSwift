@@ -404,7 +404,12 @@ public final class NDK {
         )
         
         if let metadataEvent = try await fetchEvent(filter, relays: relays, cacheStrategy: cacheStrategy) {
-            return NDKUserProfile.from(metadataEvent: metadataEvent)
+            // Parse the profile from the event content
+            guard let profileData = metadataEvent.content.data(using: .utf8),
+                  let profile = try? JSONDecoder().decode(NDKUserProfile.self, from: profileData) else {
+                return nil
+            }
+            return profile
         }
         
         return nil
@@ -413,7 +418,7 @@ public final class NDK {
     // MARK: - Subscription Manager Integration
 
     /// Process an event received from a relay (called by relay connections)
-    func processEvent(_ event: NDKEvent, from relay: NDKRelay) {
+    func processEvent(_ event: NDKEvent, from relay: RelayProtocol) {
         // Mark event as seen on this relay
         event.markSeenOn(relay: relay.url)
 
@@ -460,7 +465,7 @@ public final class NDK {
     }
 
     /// Process EOSE received from a relay (called by relay connections)
-    func processEOSE(subscriptionId: String, from relay: NDKRelay) {
+    func processEOSE(subscriptionId: String, from relay: RelayProtocol) {
         Task {
             await subscriptionManager.processEOSE(subscriptionId: subscriptionId, from: relay)
         }
@@ -472,7 +477,7 @@ public final class NDK {
     }
 
     /// Process OK message from relay (called by relay connections)
-    func processOKMessage(eventId: EventID, accepted: Bool, message: String?, from relay: NDKRelay) {
+    func processOKMessage(eventId: EventID, accepted: Bool, message: String?, from relay: RelayProtocol) {
         // Find the event in our published events
         if let event = publishedEvents[eventId] {
             // Store the OK message

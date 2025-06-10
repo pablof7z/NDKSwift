@@ -56,7 +56,7 @@ public final class NDKPrivateKeySigner: NDKSigner {
     }
 
     public func encryptionEnabled() async -> [NDKEncryptionScheme] {
-        return [.nip04]
+        return [.nip04, .nip44]
     }
 
     public func encrypt(recipient: NDKUser, value: String, scheme: NDKEncryptionScheme) async throws -> String {
@@ -64,7 +64,7 @@ public final class NDKPrivateKeySigner: NDKSigner {
         case .nip04:
             return try Crypto.nip04Encrypt(message: value, privateKey: privateKey, publicKey: recipient.pubkey)
         case .nip44:
-            throw NDKError.runtime("not_implemented", "NIP-44 encryption not implemented")
+            return try Crypto.nip44Encrypt(message: value, privateKey: privateKey, publicKey: recipient.pubkey)
         }
     }
 
@@ -73,7 +73,7 @@ public final class NDKPrivateKeySigner: NDKSigner {
         case .nip04:
             return try Crypto.nip04Decrypt(encrypted: value, privateKey: privateKey, publicKey: sender.pubkey)
         case .nip44:
-            throw NDKError.runtime("not_implemented", "NIP-44 encryption not implemented")
+            return try Crypto.nip44Decrypt(encrypted: value, privateKey: privateKey, publicKey: sender.pubkey)
         }
     }
 

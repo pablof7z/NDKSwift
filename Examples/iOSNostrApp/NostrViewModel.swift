@@ -51,7 +51,8 @@ class NostrViewModel: ObservableObject {
         // Set up file cache for persistent storage and queued events
         do {
             let cache = try NDKFileCache(path: "NostrCache")
-            ndk = NDK(cacheAdapter: cache)
+            ndk = NDK()
+            ndk?.cache = cache
         } catch {
             print("[ViewModel] Failed to create file cache: \(error)")
             ndk = NDK()
@@ -197,41 +198,35 @@ class NostrViewModel: ObservableObject {
             let subscription = ndk.subscribe(filters: [filter])
             self.kind1Subscription = subscription
             
-            // Handle incoming events
-            subscription.onEvent { [weak self] event in
-                guard let self = self else { return }
-                
-                // Track unique events
-                if let eventId = event.id {
-                    Task { @MainActor in
-                        if !self.kind1Events.contains(eventId) {
-                            self.kind1Events.insert(eventId)
-                            self.kind1EventCount = self.kind1Events.count
+            // Start monitoring subscription events
+            Task {
+                for await update in subscription.updates {
+                    switch update {
+                    case .event(let event, _):
+                        // Track unique events
+                        if let eventId = event.id {
+                            await MainActor.run {
+                                if !self.kind1Events.contains(eventId) {
+                                    self.kind1Events.insert(eventId)
+                                    self.kind1EventCount = self.kind1Events.count
+                                }
+                            }
+                        }
+                    case .eose:
+                        await MainActor.run {
+                            self.isSubscribing = false
+                            self.statusMessage = "Subscription active. Listening for new events..."
+                            self.isError = false
+                        }
+                    case .closed:
+                        await MainActor.run {
+                            self.hasActiveSubscription = false
+                            self.statusMessage = "Subscription closed"
+                            self.isError = false
                         }
                     }
                 }
             }
-            
-            // Handle EOSE (End of Stored Events)
-            subscription.onEOSE { [weak self] in
-                Task { @MainActor in
-                    self?.isSubscribing = false
-                    self?.statusMessage = "Subscription active. Listening for new events..."
-                    self?.isError = false
-                }
-            }
-            
-            // Handle errors
-            subscription.onError { [weak self] error in
-                Task { @MainActor in
-                    self?.isSubscribing = false
-                    self?.statusMessage = "Subscription error: \(error.localizedDescription)"
-                    self?.isError = true
-                }
-            }
-            
-            // Start the subscription
-            subscription.start()
             
             await MainActor.run {
                 statusMessage = "Subscription started. Waiting for events..."
@@ -329,7 +324,12 @@ class NostrViewModel: ObservableObject {
 
             do {
                 // Create text note event (kind 1)
-                let event = NDKEvent(content: content)
+                let event = NDKEvent(
+                    pubkey: "", // Will be set during signing
+                    createdAt: Timestamp(Date().timeIntervalSince1970),
+                    kind: 1,
+                    content: content
+                )
                 event.ndk = ndk // Set the NDK instance
 
                 // Sign the event

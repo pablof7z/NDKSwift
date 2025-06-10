@@ -32,13 +32,14 @@ final class NDKFetchingStrategyTests: XCTestCase {
         // Track some authors
         await tracker.track(
             pubkey: "author1",
-            readRelays: ["wss://relay1.com", "wss://relay2.com"]
+            readRelays: Set(["wss://relay1.com", "wss://relay2.com"])
         )
         
         // Test that we can get relay information
         XCTAssertEqual(ndk.relays.count, 2)
         
-        let relayUrls = await tracker.getReadRelays(for: "author1")
+        let item = try await tracker.getRelaysFor(pubkey: "author1")
+        let relayUrls = item?.readRelays.map { $0.url } ?? []
         XCTAssertEqual(relayUrls.count, 2)
         XCTAssertTrue(relayUrls.contains("wss://relay1.com"))
         XCTAssertTrue(relayUrls.contains("wss://relay2.com"))
@@ -61,16 +62,18 @@ final class NDKFetchingStrategyTests: XCTestCase {
         // Test tracking multiple authors
         await tracker.track(
             pubkey: "author1",
-            readRelays: ["wss://relay1.com"]
+            readRelays: Set(["wss://relay1.com"])
         )
         
         await tracker.track(
             pubkey: "author2", 
-            readRelays: ["wss://relay2.com"]
+            readRelays: Set(["wss://relay2.com"])
         )
         
-        let author1Relays = await tracker.getReadRelays(for: "author1")
-        let author2Relays = await tracker.getReadRelays(for: "author2")
+        let author1Item = try await tracker.getRelaysFor(pubkey: "author1")
+        let author1Relays = author1Item?.readRelays.map { $0.url } ?? []
+        let author2Item = try await tracker.getRelaysFor(pubkey: "author2")
+        let author2Relays = author2Item?.readRelays.map { $0.url } ?? []
         
         XCTAssertEqual(author1Relays.count, 1)
         XCTAssertEqual(author2Relays.count, 1)

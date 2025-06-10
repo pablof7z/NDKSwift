@@ -53,7 +53,7 @@ public struct NDKRelayStats {
 }
 
 /// Represents a Nostr relay
-public final class NDKRelay: Hashable, Equatable {
+public final class NDKRelay: RelayProtocol, Hashable, Equatable {
     /// Relay URL
     public let url: RelayURL
 

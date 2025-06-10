@@ -9,7 +9,7 @@ final class NDKContactListTests: XCTestCase {
     override func setUp() async throws {
         try await super.setUp()
         ndk = NDK()
-        signer = NDKPrivateKeySigner.generate()
+        signer = try NDKPrivateKeySigner.generate()
         ndk.signer = signer
         contactList = NDKContactList(ndk: ndk)
     }
@@ -25,20 +25,26 @@ final class NDKContactListTests: XCTestCase {
 
     func testContactListInitialization() {
         XCTAssertEqual(contactList.kind, 3)
-        XCTAssertEqual(contactList.ndk, ndk)
+        XCTAssertTrue(contactList.ndk === ndk)
         XCTAssertTrue(contactList.contacts.isEmpty)
     }
 
     func testFromEvent() {
-        let event = NDKEvent(ndk: ndk)
+        let event = NDKEvent(
+            pubkey: "test_pubkey",
+            createdAt: 12345,
+            kind: 3,
+            content: ""
+        )
+        event.ndk = ndk
         event.kind = 3
         event.tags = [
-            NDKTag(type: "p", value: "pubkey1", additionalInfo: ["wss://relay1.com", "Alice"]),
-            NDKTag(type: "p", value: "pubkey2", additionalInfo: ["", "Bob"]),
-            NDKTag(type: "p", value: "pubkey3"),
+            ["p", "pubkey1", "wss://relay1.com", "Alice"],
+            ["p", "pubkey2", "", "Bob"],
+            ["p", "pubkey3"],
         ]
 
-        let contactList = NDKContactList.from(event)
+        let contactList = NDKContactList.fromEvent(event)
 
         XCTAssertEqual(contactList.kind, 3)
         XCTAssertEqual(contactList.contacts.count, 3)
@@ -125,23 +131,23 @@ final class NDKContactListTests: XCTestCase {
         let entry = NDKContactEntry(pubkey: "user123", relayURL: "wss://relay.com", petname: "Alice")
         let tag = entry.toTag()
 
-        XCTAssertEqual(tag.type, "p")
-        XCTAssertEqual(tag.value, "user123")
-        XCTAssertEqual(tag.additionalInfo[0], "wss://relay.com")
-        XCTAssertEqual(tag.additionalInfo[1], "Alice")
+        XCTAssertEqual(tag[0], "p")
+        XCTAssertEqual(tag[1], "user123")
+        XCTAssertEqual(tag[2], "wss://relay.com")
+        XCTAssertEqual(tag[3], "Alice")
     }
 
     func testContactEntryToTagWithEmptyFields() {
         let entry = NDKContactEntry(pubkey: "user123")
         let tag = entry.toTag()
 
-        XCTAssertEqual(tag.type, "p")
-        XCTAssertEqual(tag.value, "user123")
-        XCTAssertTrue(tag.additionalInfo.isEmpty || tag.additionalInfo[0].isEmpty)
+        XCTAssertEqual(tag[0], "p")
+        XCTAssertEqual(tag[1], "user123")
+        XCTAssertEqual(tag.count >= 3 ? tag[2] : "", "")
     }
 
     func testContactEntryFromTag() {
-        let tag = NDKTag(type: "p", value: "user123", additionalInfo: ["wss://relay.com", "Alice"])
+        let tag: Tag = ["p", "user123", "wss://relay.com", "Alice"]
         let entry = NDKContactEntry.from(tag: tag)
 
         XCTAssertNotNil(entry)
@@ -151,7 +157,7 @@ final class NDKContactListTests: XCTestCase {
     }
 
     func testContactEntryFromTagWithMissingData() {
-        let tag = NDKTag(type: "p", value: "user123", additionalInfo: [""])
+        let tag: Tag = ["p", "user123", ""]
         let entry = NDKContactEntry.from(tag: tag)
 
         XCTAssertNotNil(entry)
@@ -298,7 +304,7 @@ final class NDKContactListTests: XCTestCase {
         let contactList = NDKContactList.from(pubkeys: pubkeys, ndk: ndk)
 
         XCTAssertEqual(contactList.contacts.count, 3)
-        XCTAssertEqual(contactList.ndk, ndk)
+        XCTAssertTrue(contactList.ndk === ndk)
 
         for pubkey in pubkeys {
             XCTAssertTrue(contactList.isFollowing(pubkey))
@@ -324,16 +330,22 @@ final class NDKContactListTests: XCTestCase {
     // MARK: - Tag Parsing Tests
 
     func testParsingExistingTags() {
-        let event = NDKEvent(ndk: ndk)
+        let event = NDKEvent(
+            pubkey: "test_pubkey",
+            createdAt: 12345,
+            kind: 3,
+            content: ""
+        )
+        event.ndk = ndk
         event.kind = 3
         event.tags = [
-            NDKTag(type: "p", value: "user1"),
-            NDKTag(type: "p", value: "user2", additionalInfo: ["wss://relay.com"]),
-            NDKTag(type: "p", value: "user3", additionalInfo: ["", "Alice"]),
-            NDKTag(type: "p", value: "user4", additionalInfo: ["wss://relay.com", "Bob"]),
+            ["p", "user1"],
+            ["p", "user2", "wss://relay.com"],
+            ["p", "user3", "", "Alice"],
+            ["p", "user4", "wss://relay.com", "Bob"],
         ]
 
-        let contactList = NDKContactList.from(event)
+        let contactList = NDKContactList.fromEvent(event)
 
         XCTAssertEqual(contactList.contacts.count, 4)
 
@@ -365,14 +377,14 @@ final class NDKContactListTests: XCTestCase {
     }
 
     func testInvalidContactEntry() {
-        let invalidTag = NDKTag(type: "e", value: "event123") // Wrong tag type
+        let invalidTag: Tag = ["e", "event123"] // Wrong tag type
         let entry = NDKContactEntry.from(tag: invalidTag)
 
         XCTAssertNil(entry)
     }
 
     func testEmptyPubkeyContactEntry() {
-        let invalidTag = NDKTag(type: "p", value: "") // Empty pubkey
+        let invalidTag: Tag = ["p", ""] // Empty pubkey
         let entry = NDKContactEntry.from(tag: invalidTag)
 
         XCTAssertNil(entry)
