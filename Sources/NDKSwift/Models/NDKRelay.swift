@@ -95,6 +95,9 @@ public final class NDKRelay: RelayProtocol, Hashable, Equatable {
 
     /// Thread-safe access to subscriptions
     private let subscriptionsLock = NSLock()
+    
+    /// Thread-safe access to connection
+    private let connectionLock = NSLock()
 
     // MARK: - Initialization
 
@@ -114,14 +117,20 @@ public final class NDKRelay: RelayProtocol, Hashable, Equatable {
         }
 
         updateConnectionState(.connecting)
+        
+        statsLock.lock()
         stats.connectionAttempts += 1
+        statsLock.unlock()
 
         guard let url = URL(string: normalizedURL) else {
             throw NDKError.network("connection_failed", "Invalid URL: \(normalizedURL)")
         }
 
+        connectionLock.lock()
         connection = NDKRelayConnection(url: url)
         connection?.delegate = self
+        connectionLock.unlock()
+        
         connection?.connect()
     }
 
@@ -133,12 +142,18 @@ public final class NDKRelay: RelayProtocol, Hashable, Equatable {
 
         updateConnectionState(.disconnecting)
 
-        // Cancel reconnection timer
-        reconnectTimer?.invalidate()
-        reconnectTimer = nil
+        // Cancel reconnection timer on main thread
+        await MainActor.run {
+            reconnectTimer?.invalidate()
+            reconnectTimer = nil
+        }
 
-        connection?.disconnect()
+        connectionLock.lock()
+        let currentConnection = connection
         connection = nil
+        connectionLock.unlock()
+        
+        currentConnection?.disconnect()
 
         updateConnectionState(.disconnected)
     }
@@ -151,10 +166,12 @@ public final class NDKRelay: RelayProtocol, Hashable, Equatable {
         let delay = min(reconnectDelay, maxReconnectDelay)
         reconnectDelay *= 2
 
-        reconnectTimer?.invalidate()
-        reconnectTimer = Timer.scheduledTimer(withTimeInterval: delay, repeats: false) { [weak self] _ in
-            Task { [weak self] in
-                try? await self?.connect()
+        Task { @MainActor in
+            self.reconnectTimer?.invalidate()
+            self.reconnectTimer = Timer.scheduledTimer(withTimeInterval: delay, repeats: false) { [weak self] _ in
+                Task { [weak self] in
+                    try? await self?.connect()
+                }
             }
         }
     }
@@ -201,20 +218,33 @@ public final class NDKRelay: RelayProtocol, Hashable, Equatable {
 
     /// Send a message to the relay
     public func send(_ message: String) async throws {
-        guard connectionState == .connected, let connection = connection else {
+        guard connectionState == .connected else {
+            throw NDKError.network("connection_failed", "Not connected to relay")
+        }
+        
+        connectionLock.lock()
+        let currentConnection = connection
+        connectionLock.unlock()
+        
+        guard let currentConnection = currentConnection else {
             throw NDKError.network("connection_failed", "Not connected to relay")
         }
 
-        try await connection.send(message)
+        try await currentConnection.send(message)
+        
+        statsLock.lock()
         stats.messagesSent += 1
         stats.bytesSent += message.count
+        statsLock.unlock()
     }
 
     /// Handle received message
     private func handleMessage(_ message: String) {
+        statsLock.lock()
         stats.messagesReceived += 1
         stats.bytesReceived += message.count
         stats.lastMessageAt = Date()
+        statsLock.unlock()
 
         // Parse and route message
         do {
@@ -335,9 +365,12 @@ public final class NDKRelay: RelayProtocol, Hashable, Equatable {
     private func updateConnectionState(_ newState: NDKRelayConnectionState) {
         connectionState = newState
 
-        // Notify observers
-        for observer in stateObservers {
-            observer(newState)
+        // Notify observers on main thread to avoid UI issues
+        let observers = stateObservers
+        Task { @MainActor in
+            for observer in observers {
+                observer(newState)
+            }
         }
     }
 
@@ -369,8 +402,11 @@ public final class NDKRelay: RelayProtocol, Hashable, Equatable {
 
 extension NDKRelay: NDKRelayConnectionDelegate {
     public func relayConnectionDidConnect(_: NDKRelayConnection) {
+        statsLock.lock()
         stats.connectedAt = Date()
         stats.successfulConnections += 1
+        statsLock.unlock()
+        
         reconnectDelay = 1.0 // Reset delay on successful connection
 
         updateConnectionState(.connected)
