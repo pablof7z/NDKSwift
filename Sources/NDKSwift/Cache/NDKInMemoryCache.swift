@@ -24,7 +24,10 @@ public final class NDKInMemoryCache: NDKCacheAdapter {
                 var results = Set<NDKEvent>()
 
                 for filter in subscription.filters {
-                    // Get all events that match this filter
+                    // For complex filters or filters with multiple criteria,
+                    // we need to check all events that could potentially match
+                    
+                    // First, try exact filter key match
                     let filterKey = self.filterKey(from: filter)
                     if let eventIds = self.eventsByFilter[filterKey] {
                         for eventId in eventIds {
@@ -33,9 +36,46 @@ public final class NDKInMemoryCache: NDKCacheAdapter {
                             }
                         }
                     }
+                    
+                    // For filters with IDs, check those directly
+                    if let ids = filter.ids {
+                        for id in ids {
+                            if let event = self.events[id], filter.matches(event: event) {
+                                results.insert(event)
+                            }
+                        }
+                    }
+                    
+                    // For filters with authors, check author index
+                    if let authors = filter.authors {
+                        for author in authors {
+                            let authorKey = "authors:\(author)"
+                            if let eventIds = self.eventsByFilter[authorKey] {
+                                for eventId in eventIds {
+                                    if let event = self.events[eventId], filter.matches(event: event) {
+                                        results.insert(event)
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    
+                    // For filters with kinds, check kind index
+                    if let kinds = filter.kinds {
+                        for kind in kinds {
+                            let kindKey = "kinds:\(kind)"
+                            if let eventIds = self.eventsByFilter[kindKey] {
+                                for eventId in eventIds {
+                                    if let event = self.events[eventId], filter.matches(event: event) {
+                                        results.insert(event)
+                                    }
+                                }
+                            }
+                        }
+                    }
 
-                    // Also check all events if filter is broad
-                    if self.isBroadFilter(filter) {
+                    // For broad filters or time-based filters, check all events
+                    if self.isBroadFilter(filter) || filter.since != nil || filter.until != nil {
                         for event in self.events.values {
                             if filter.matches(event: event) {
                                 results.insert(event)

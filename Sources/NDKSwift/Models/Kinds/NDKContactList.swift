@@ -54,8 +54,9 @@ public class NDKContactList: NDKList {
     public static let kind = 3
 
     /// Initialize a new contact list
-    override public convenience init(ndk: NDK? = nil) {
-        self.init(ndk: ndk, kind: 3)
+    public override init(ndk: NDK? = nil) {
+        super.init(ndk: ndk)
+        self.kind = 3
     }
 
     /// Create an NDKContactList from an existing NDKEvent

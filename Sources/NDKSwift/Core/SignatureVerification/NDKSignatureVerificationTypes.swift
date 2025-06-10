@@ -12,7 +12,7 @@ public struct NDKSignatureVerificationConfig {
     public var autoBlacklistInvalidRelays: Bool
 
     /// Custom function to calculate validation ratio
-    public var validationRatioFunction: ((NDKRelay, Int, Int) -> Double)?
+    public var validationRatioFunction: ((RelayProtocol, Int, Int) -> Double)?
 
     /// Default configuration with full signature verification
     public static let `default` = NDKSignatureVerificationConfig(
@@ -77,9 +77,9 @@ public protocol NDKSignatureVerificationDelegate: AnyObject {
     /// - Parameters:
     ///   - event: The event with invalid signature
     ///   - relay: The relay that provided the invalid signature
-    func signatureVerificationFailed(for event: NDKEvent, from relay: NDKRelay)
+    func signatureVerificationFailed(for event: NDKEvent, from relay: RelayProtocol)
 
     /// Called when a relay is blacklisted for providing invalid signatures
     /// - Parameter relay: The blacklisted relay
-    func relayBlacklisted(_ relay: NDKRelay)
+    func relayBlacklisted(_ relay: RelayProtocol)
 }

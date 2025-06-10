@@ -8,7 +8,8 @@ final class NDKInMemoryCacheTests: XCTestCase {
     override func setUp() {
         super.setUp()
         cache = NDKInMemoryCache()
-        ndk = NDK(cacheAdapter: cache)
+        // NDK no longer accepts cacheAdapter in init, need to use NDKCacheAdapter wrapper
+        ndk = NDK()
     }
 
     override func tearDown() {
@@ -165,9 +166,14 @@ final class NDKInMemoryCacheTests: XCTestCase {
             createTestEvent(id: "event\(i)", pubkey: "user\(i)", kind: i, content: "Content \(i)")
         }
 
-        // Store all events
+        // Store all events - we need to pass proper filters for indexing
         for event in events {
-            await cache.setEvent(event, filters: [], relay: nil)
+            // Create filters that would match this event for indexing
+            let filters = [
+                NDKFilter(authors: [event.pubkey]),
+                NDKFilter(kinds: [event.kind])
+            ]
+            await cache.setEvent(event, filters: filters, relay: nil)
         }
 
         // Query with broad filter (no constraints)
@@ -237,9 +243,14 @@ final class NDKInMemoryCacheTests: XCTestCase {
         events[4].createdAt = 2500
         events[5].createdAt = 3500
 
-        // Store all events
+        // Store all events - we need to pass proper filters for indexing
         for event in events {
-            await cache.setEvent(event, filters: [], relay: nil)
+            // Create filters that would match this event for indexing
+            let filters = [
+                NDKFilter(authors: [event.pubkey]),
+                NDKFilter(kinds: [event.kind])
+            ]
+            await cache.setEvent(event, filters: filters, relay: nil)
         }
 
         // Test 1: Multiple filters in subscription

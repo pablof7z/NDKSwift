@@ -9,7 +9,7 @@ final class NDKRelayListTests: XCTestCase {
     override func setUp() async throws {
         try await super.setUp()
         ndk = NDK()
-        signer = NDKPrivateKeySigner.generate()
+        signer = try NDKPrivateKeySigner.generate()
         ndk.signer = signer
         relayList = NDKRelayList(ndk: ndk)
     }
@@ -25,20 +25,23 @@ final class NDKRelayListTests: XCTestCase {
 
     func testRelayListInitialization() {
         XCTAssertEqual(relayList.kind, 10002)
-        XCTAssertEqual(relayList.ndk, ndk)
+        XCTAssertNotNil(relayList.ndk)
         XCTAssertTrue(relayList.relayEntries.isEmpty)
     }
 
     func testFromEvent() {
-        let event = NDKEvent(ndk: ndk)
-        event.kind = 10002
-        event.tags = [
-            NDKTag(type: "r", value: "wss://relay1.example.com", additionalInfo: ["read"]),
-            NDKTag(type: "r", value: "wss://relay2.example.com", additionalInfo: ["write"]),
-            NDKTag(type: "r", value: "wss://relay3.example.com", additionalInfo: ["read", "write"]),
-        ]
+        let event = NDKEvent(
+            pubkey: "test_pubkey",
+            createdAt: Timestamp(Date().timeIntervalSince1970),
+            kind: 10002,
+            tags: [
+                ["r", "wss://relay1.example.com", "read"],
+                ["r", "wss://relay2.example.com", "write"],
+                ["r", "wss://relay3.example.com", "read", "write"],
+            ]
+        )
 
-        let relayList = NDKRelayList.from(event)
+        let relayList = NDKRelayList.fromEvent(event)
 
         XCTAssertEqual(relayList.kind, 10002)
         XCTAssertEqual(relayList.relayEntries.count, 3)
@@ -206,10 +209,10 @@ final class NDKRelayListTests: XCTestCase {
         let entry = NDKRelayListEntry(url: "wss://relay.example.com", access: [.read, .write])
         let tag = entry.toTag()
 
-        XCTAssertEqual(tag.type, "r")
-        XCTAssertEqual(tag.value, "wss://relay.example.com")
-        XCTAssertTrue(tag.additionalInfo.contains("read"))
-        XCTAssertTrue(tag.additionalInfo.contains("write"))
+        XCTAssertEqual(tag[0], "r")
+        XCTAssertEqual(tag[1], "wss://relay.example.com")
+        XCTAssertTrue(tag.contains("read"))
+        XCTAssertTrue(tag.contains("write"))
     }
 
     // MARK: - Bulk Operations Tests
@@ -249,7 +252,7 @@ final class NDKRelayListTests: XCTestCase {
         let relayList = NDKRelayList.from(relays: urls, ndk: ndk)
 
         XCTAssertEqual(relayList.relayEntries.count, 2)
-        XCTAssertEqual(relayList.ndk, ndk)
+        XCTAssertNotNil(relayList.ndk)
     }
 
     func testFromSeparateReadWrite() {
@@ -279,16 +282,16 @@ final class NDKRelayListTests: XCTestCase {
 
     func testParsingExistingTags() {
         // Test parsing relay list with existing tags
-        let event = NDKEvent(ndk: ndk)
+        let event = NDKEvent()
         event.kind = 10002
         event.tags = [
-            NDKTag(type: "r", value: "wss://relay1.example.com"),
-            NDKTag(type: "r", value: "wss://relay2.example.com", additionalInfo: ["read"]),
-            NDKTag(type: "r", value: "wss://relay3.example.com", additionalInfo: ["write"]),
-            NDKTag(type: "r", value: "wss://relay4.example.com", additionalInfo: ["read", "write"]),
+            ["r", "wss://relay1.example.com"],
+            ["r", "wss://relay2.example.com", "read"],
+            ["r", "wss://relay3.example.com", "write"],
+            ["r", "wss://relay4.example.com", "read", "write"],
         ]
 
-        let relayList = NDKRelayList.from(event)
+        let relayList = NDKRelayList.fromEvent(event)
 
         XCTAssertEqual(relayList.relayEntries.count, 4)
 

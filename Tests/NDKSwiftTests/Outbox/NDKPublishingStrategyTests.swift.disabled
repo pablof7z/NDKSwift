@@ -1,2 +1,0 @@
-// Temporarily disabled due to inheritance from final class NDK
-// This file needs refactoring to use composition instead of inheritance

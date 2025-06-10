@@ -89,14 +89,14 @@ public actor NDKSubscriptionManager {
     // MARK: - EOSE Tracking
 
     private struct EOSETracker {
-        let targetRelays: Set<NDKRelay>
-        var eosedRelays: Set<NDKRelay> = []
+        let targetRelayUrls: Set<String>
+        var eosedRelayUrls: Set<String> = []
         var lastEventReceived: Date = .init()
         let createdAt: Date = .init()
 
         var eosePercentage: Double {
-            guard !targetRelays.isEmpty else { return 1.0 }
-            return Double(eosedRelays.count) / Double(targetRelays.count)
+            guard !targetRelayUrls.isEmpty else { return 1.0 }
+            return Double(eosedRelayUrls.count) / Double(targetRelayUrls.count)
         }
 
         var shouldTimeout: Bool {
@@ -107,8 +107,8 @@ public actor NDKSubscriptionManager {
             return eosePercentage >= 0.5 && timeSinceLastEvent > 0.02 && timeSinceCreation > 0.1
         }
 
-        mutating func recordEose(from relay: NDKRelay) {
-            eosedRelays.insert(relay)
+        mutating func recordEose(from relay: RelayProtocol) {
+            eosedRelayUrls.insert(relay.url)
         }
 
         mutating func recordEvent() {
@@ -190,7 +190,7 @@ public actor NDKSubscriptionManager {
     }
 
     /// Process an event from a relay
-    public func processEvent(_ event: NDKEvent, from relay: NDKRelay) {
+    public func processEvent(_ event: NDKEvent, from relay: RelayProtocol) {
         guard let eventId = event.id else { return }
 
         // Check deduplication
@@ -232,7 +232,7 @@ public actor NDKSubscriptionManager {
     }
 
     /// Process EOSE from a relay
-    public func processEOSE(subscriptionId: String, from relay: NDKRelay) {
+    public func processEOSE(subscriptionId: String, from relay: RelayProtocol) {
         guard let subscription = activeSubscriptions[subscriptionId],
               var tracker = eoseTracking[subscriptionId] else { return }
 
@@ -250,7 +250,7 @@ public actor NDKSubscriptionManager {
         }
 
         // Check if we should emit EOSE for this subscription
-        if tracker.eosedRelays.count == tracker.targetRelays.count || tracker.shouldTimeout {
+        if tracker.eosedRelayUrls.count == tracker.targetRelayUrls.count || tracker.shouldTimeout {
             subscription.handleEOSE(fromRelay: relay)
 
             if subscription.options.closeOnEose {
@@ -437,7 +437,7 @@ public actor NDKSubscriptionManager {
 
         // Setup EOSE tracking
         for subscription in plan.subscriptions {
-            eoseTracking[subscription.id] = EOSETracker(targetRelays: plan.relaySet)
+            eoseTracking[subscription.id] = EOSETracker(targetRelayUrls: Set(plan.relaySet.map { $0.url }))
         }
 
         Task {

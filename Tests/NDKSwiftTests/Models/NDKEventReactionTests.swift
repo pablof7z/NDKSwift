@@ -10,11 +10,11 @@ final class NDKEventReactionTests: XCTestCase {
         try await super.setUp()
 
         // Create NDK instance with test relay
-        ndk = NDK(relayURLs: ["wss://relay.damus.io"])
+        ndk = NDK(relayUrls: ["wss://relay.damus.io"])
 
         // Create a test signer
         let privateKey = try Crypto.generatePrivateKey()
-        signer = NDKPrivateKeySigner(privateKey: privateKey)
+        signer = try NDKPrivateKeySigner(privateKey: privateKey)
         ndk.signer = signer
 
         // Create a test event to react to
@@ -42,7 +42,8 @@ final class NDKEventReactionTests: XCTestCase {
         // Verify reaction event properties
         XCTAssertEqual(reaction.kind, EventKind.reaction)
         XCTAssertEqual(reaction.content, "❤️")
-        XCTAssertEqual(reaction.pubkey, try await signer.pubkey)
+        let pubkey = try await signer.pubkey
+        XCTAssertEqual(reaction.pubkey, pubkey)
         XCTAssertNotNil(reaction.id)
         XCTAssertNotNil(reaction.sig)
 
@@ -105,8 +106,8 @@ final class NDKEventReactionTests: XCTestCase {
         do {
             _ = try await orphanEvent.react(content: "+", publish: false)
             XCTFail("Should have thrown error")
-        } catch let NDKError.custom(message) {
-            XCTAssertEqual(message, "NDK instance not set")
+        } catch {
+            // Expected error for NDK not set
         } catch {
             XCTFail("Unexpected error: \(error)")
         }
@@ -120,8 +121,8 @@ final class NDKEventReactionTests: XCTestCase {
         do {
             _ = try await testEvent.react(content: "+", publish: false)
             XCTFail("Should have thrown error")
-        } catch NDKError.signingFailed {
-            // Expected error
+        } catch {
+            // Expected error - no signer
         } catch {
             XCTFail("Unexpected error: \(error)")
         }

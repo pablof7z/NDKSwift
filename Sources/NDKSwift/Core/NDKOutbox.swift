@@ -86,17 +86,8 @@ public extension NDK {
         try event.validate()
 
         // Store in cache if available
-        // TODO: Implement outbox caching with new cache system
-        if false {
-            let selection = await relaySelector.selectRelaysForPublishing(
-                event: event,
-                config: config?.selectionConfig ?? .default
-            )
-            await cache.storeUnpublishedEvent(
-                event,
-                targetRelays: selection.relays,
-                publishConfig: config
-            )
+        if let cache = cache {
+            try? await cache.saveEvent(event)
         }
 
         // Publish using outbox strategy
@@ -108,26 +99,8 @@ public extension NDK {
 
     /// Retry publishing failed events
     func retryFailedPublishes(olderThan interval: TimeInterval = 300) async {
-        // TODO: Implement event retry with new cache system
-        return
-
-        let eventsToRetry = await cache.getEventsForRetry(olderThan: interval)
-
-        for record in eventsToRetry {
-            let config = record.publishConfig.map { publishConfig in
-                OutboxPublishConfig(
-                    minSuccessfulRelays: publishConfig.minSuccessfulRelays,
-                    maxRetries: publishConfig.maxRetries,
-                    enablePow: publishConfig.enablePow,
-                    maxPowDifficulty: publishConfig.maxPowDifficulty
-                )
-            }
-
-            _ = try? await publishingStrategy.publish(
-                record.event,
-                config: config ?? outboxConfig.defaultPublishConfig
-            )
-        }
+        // Note: Retry logic needs to be implemented with event tracking
+        // For now, this is a no-op as the new cache doesn't track unpublished events yet
     }
 
     // MARK: - Enhanced Fetching Methods
@@ -189,19 +162,7 @@ public extension NDK {
             responseTime: responseTime
         )
 
-        // Update in cache if available
-        // TODO: Implement outbox caching with new cache system
-        if false {
-            let healthScore = await relayRanker.getRelayHealthScore(url)
-            let metrics = RelayHealthMetrics(
-                url: url,
-                successRate: healthScore,
-                avgResponseTime: responseTime ?? 0,
-                lastSuccessAt: success ? Date() : nil,
-                lastFailureAt: success ? nil : Date()
-            )
-            await cache.updateRelayHealth(url: url, health: metrics)
-        }
+        // Note: Relay health metrics are tracked by the ranker and tracker components
     }
 
     // MARK: - Cleanup
@@ -214,11 +175,7 @@ public extension NDK {
         // Clean up publishing strategy
         await publishingStrategy.cleanupCompleted()
 
-        // Clean up cache
-        // TODO: Implement outbox caching with new cache system
-        if false {
-            await cache.cleanupPublishedEvents(olderThan: 3600)
-        }
+        // Note: Cache cleanup for published events can be handled by the cache's TTL mechanisms
     }
 }
 
