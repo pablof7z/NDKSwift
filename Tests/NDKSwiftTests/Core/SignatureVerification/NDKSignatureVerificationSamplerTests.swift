@@ -3,14 +3,14 @@ import XCTest
 
 /// Mock delegate for testing
 class MockSignatureVerificationDelegate: NDKSignatureVerificationDelegate {
-    var invalidSignatureEvents: [(event: NDKEvent, relay: NDKRelay)] = []
-    var blacklistedRelays: [NDKRelay] = []
+    var invalidSignatureEvents: [(event: NDKEvent, relay: RelayProtocol)] = []
+    var blacklistedRelays: [RelayProtocol] = []
 
-    func signatureVerificationFailed(for event: NDKEvent, from relay: NDKRelay) {
+    func signatureVerificationFailed(for event: NDKEvent, from relay: RelayProtocol) {
         invalidSignatureEvents.append((event, relay))
     }
 
-    func relayBlacklisted(_ relay: NDKRelay) {
+    func relayBlacklisted(_ relay: RelayProtocol) {
         blacklistedRelays.append(relay)
     }
 }
@@ -102,7 +102,7 @@ final class NDKSignatureVerificationSamplerTests: XCTestCase {
 
     func testCustomValidationRatioFunction() async {
         // Custom function that always returns 0.5 (50% sampling)
-        let customFunction: (NDKRelay, Int, Int) -> Double = { _, _, _ in 0.5 }
+        let customFunction: (RelayProtocol, Int, Int) -> Double = { _, _, _ in 0.5 }
 
         let config = NDKSignatureVerificationConfig(
             initialValidationRatio: 1.0,

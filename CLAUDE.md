@@ -71,6 +71,8 @@ swift package generate-xcodeproj
 
 4. **Relay Pool Pattern**: Multiple relay connections are managed by NDKRelayPool, which handles automatic reconnection, relay selection, and message routing.
 
+5. **AsyncSequence-Based Subscriptions**: Subscriptions use Swift's AsyncSequence protocol for modern, composable event streaming that integrates naturally with async/await.
+
 ### Key Architectural Components
 
 **NDK Core Flow**:
@@ -102,13 +104,16 @@ swift package generate-xcodeproj
 1. **Event Publishing Flow**:
    - Create NDKEvent → Sign with NDKSigner → Publish through NDK → RelayPool broadcasts → Cache stores
 
-2. **Subscription Flow**:
-   - Create NDKFilter → Subscribe through NDK → RelayPool sends REQ → Events arrive → Filter matches → Cache stores → Subscription receives
+2. **Subscription Flow (AsyncSequence)**:
+   - Create NDKFilter → Subscribe through NDK → Returns AsyncSequence → Iterate with for-await → Events arrive → Filter matches → Cache stores → Yield to iterator
 
-3. **User Profile Loading**:
-   - NDKUser.fetchProfile() → Creates metadata filter → Subscribes → Receives kind 0 event → Parses and caches profile
+3. **One-Shot Fetch Flow**:
+   - Create NDKFilter → Call fetchEvents/fetchEvent → Subscribe with closeOnEose → Collect events → Return when EOSE received
 
-4. **Blossom File Upload**:
+4. **User Profile Loading**:
+   - Call fetchProfile() → Creates metadata filter → Fetches events → Parses JSON → Returns NDKUserProfile
+
+5. **Blossom File Upload**:
    - Data → Calculate SHA256 → Create auth event → Upload to Blossom → Create file metadata event → Publish to Nostr
 
 ## Testing Approach
@@ -128,6 +133,37 @@ swift package generate-xcodeproj
 - File-based cache uses JSON for human readability
 - Blossom support is implemented as an extension to NDK core
 
+## Subscription API Design
+
+### Modern Swift Patterns
+
+The subscription system uses modern Swift patterns for cleaner, more intuitive code:
+
+1. **AsyncSequence for Continuous Streams**:
+   ```swift
+   // Modern pattern - self-explanatory and composable
+   for await event in subscription {
+       handleEvent(event)
+   }
+   ```
+
+2. **Async Functions for One-Shot Queries**:
+   ```swift
+   // Clear intent - fetch once and return
+   let events = try await ndk.fetchEvents(filter)
+   ```
+
+3. **No Callback Hell**: The API avoids nested callbacks in favor of linear async/await code
+
+4. **Automatic Resource Management**: Subscriptions clean up when their AsyncSequence completes
+
+### Design Rationale
+
+- **Fetch vs Subscribe**: Clear distinction between one-time data needs (fetch) and ongoing updates (subscribe)
+- **AsyncSequence**: Natural fit for event streams, integrates with Swift concurrency
+- **Backward Compatibility**: Deprecated callback methods still work but guide users to modern patterns
+- **Auto-Start**: Subscriptions start automatically when iteration begins, reducing boilerplate
+
 ## Development Guidelines
 
 - Always add and update a changelog file
@@ -139,10 +175,13 @@ swift package generate-xcodeproj
 ## Claude's Responsibilities
 
 - You are also in charge of keeping the documentation and tutorial information highly in line with implementation and best practices
+- When refactoring APIs, ensure examples and tests are updated to use the new patterns
+- Prefer modern Swift patterns (async/await, AsyncSequence) over callback-based APIs
+- Guide users toward best practices through API design and clear deprecation messages
 
 UUIDs are stupid and should never be used in the context of nostr.
 
-- Unless otherwise specified, backward compatibility is not necessary
+- Unless otherwise specified, backward compatibility is not necessary (but deprecation warnings are helpful)
 
 ## Claude Memories
 

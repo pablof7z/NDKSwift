@@ -29,7 +29,7 @@ public actor NDKSignatureVerificationSampler {
     ///   - relay: The relay that provided the event
     ///   - stats: The relay's signature statistics
     /// - Returns: The verification result
-    public func verifyEvent(_ event: NDKEvent, from relay: NDKRelay, stats: inout NDKRelaySignatureStats) async -> NDKSignatureVerificationResult {
+    public func verifyEvent(_ event: NDKEvent, from relay: RelayProtocol, stats: inout NDKRelaySignatureStats) async -> NDKSignatureVerificationResult {
         guard let eventId = event.id, let signature = event.sig else {
             return .invalid
         }
@@ -74,7 +74,7 @@ public actor NDKSignatureVerificationSampler {
     }
 
     /// Check if a relay is blacklisted
-    public func isBlacklisted(relay: NDKRelay) -> Bool {
+    public func isBlacklisted(relay: RelayProtocol) -> Bool {
         return blacklistedRelays.contains(relay.url)
     }
 
@@ -101,7 +101,7 @@ public actor NDKSignatureVerificationSampler {
     // MARK: - Private Methods
 
     /// Determine if we should verify an event based on sampling
-    private func shouldVerifyEvent(relay _: NDKRelay, stats: NDKRelaySignatureStats) -> Bool {
+    private func shouldVerifyEvent(relay _: RelayProtocol, stats: NDKRelaySignatureStats) -> Bool {
         let ratio = stats.currentValidationRatio
 
         // Always verify if ratio is 1.0
@@ -114,7 +114,7 @@ public actor NDKSignatureVerificationSampler {
     }
 
     /// Update the validation ratio for a relay
-    private func updateValidationRatio(relay: NDKRelay, stats: inout NDKRelaySignatureStats) {
+    private func updateValidationRatio(relay: RelayProtocol, stats: inout NDKRelaySignatureStats) {
         let newRatio: Double
 
         if let customFunction = config.validationRatioFunction {
@@ -174,7 +174,7 @@ public actor NDKSignatureVerificationSampler {
     }
 
     /// Handle an invalid signature detection
-    private func handleInvalidSignature(event: NDKEvent, relay: NDKRelay) async {
+    private func handleInvalidSignature(event: NDKEvent, relay: RelayProtocol) async {
         // A single invalid signature means the relay is evil
         print("⚠️ EVIL RELAY DETECTED: \(relay.url) provided event \(event.id ?? "unknown") with invalid signature")
 

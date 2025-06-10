@@ -238,22 +238,28 @@ public actor NDKFetchingStrategy {
             options: options
         )
 
-        // Handle events
-        relaySubscription.onEvent { [weak subscription] event in
-            // Deduplicate events
-            guard let subscription = subscription else { return }
-
-            guard let eventId = event.id else { return }
-            if !subscription.seenEventIds.contains(eventId) {
-                subscription.seenEventIds.insert(eventId)
-                subscription.eventCount += 1
-                subscription.eventHandler(event)
+        // Start async event handling
+        Task { [weak subscription, weak relaySubscription] in
+            guard let subscription = subscription,
+                  let relaySubscription = relaySubscription else { return }
+            
+            // Use async sequence for events
+            for await update in relaySubscription.updates {
+                switch update {
+                case .event(let event):
+                    // Deduplicate events
+                    guard let eventId = event.id else { continue }
+                    if !subscription.seenEventIds.contains(eventId) {
+                        subscription.seenEventIds.insert(eventId)
+                        subscription.eventCount += 1
+                        subscription.eventHandler(event)
+                    }
+                case .eose:
+                    subscription.updateRelayStatus(relayURL, status: .eose)
+                case .error(_):
+                    break
+                }
             }
-        }
-
-        // Handle EOSE
-        relaySubscription.onEOSE { [weak subscription] in
-            subscription?.updateRelayStatus(relayURL, status: .eose)
         }
 
         subscription.relaySubscriptions[relayURL] = relaySubscription

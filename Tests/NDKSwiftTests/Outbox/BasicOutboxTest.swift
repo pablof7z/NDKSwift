@@ -28,6 +28,12 @@ final class BasicOutboxTest: XCTestCase {
 
     func testRelaySelection() async throws {
         let ndk = NDK()
+        
+        // Add some test relays
+        let relay1 = ndk.addRelay("wss://relay1.test")
+        let relay2 = ndk.addRelay("wss://relay2.test")
+        let relay3 = ndk.addRelay("wss://relay3.test")
+        
         let tracker = NDKOutboxTracker(ndk: ndk)
         let ranker = NDKRelayRanker(ndk: ndk, tracker: tracker)
         let selector = NDKRelaySelector(
@@ -37,10 +43,13 @@ final class BasicOutboxTest: XCTestCase {
         )
 
         // Create a test event
-        let event = NDKEvent()
-        event.kind = 1
-        event.content = "Test message"
-        event.pubkey = "test-pubkey"
+        let event = NDKEvent(
+            pubkey: "test-pubkey",
+            createdAt: Timestamp(Date().timeIntervalSince1970),
+            kind: 1,
+            tags: [],
+            content: "Test message"
+        )
 
         // Test relay selection
         let result = await selector.selectRelaysForPublishing(event: event)

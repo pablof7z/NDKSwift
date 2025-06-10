@@ -72,14 +72,14 @@ final class TagHelpersTests: XCTestCase {
             content: "Test"
         )
         let referencedEvent = NDKEvent(
-            id: "ref123",
             pubkey: "pubkey123",
             createdAt: 0,
             kind: 1,
             tags: [],
-            content: "Referenced",
-            sig: "sig123"
+            content: "Referenced"
         )
+        referencedEvent.id = "ref123"
+        referencedEvent.sig = "sig123"
         
         // Test reply tag
         event.tagReply(to: referencedEvent, relay: "wss://relay.com")
@@ -121,14 +121,14 @@ final class TagHelpersTests: XCTestCase {
             content: "Test"
         )
         let addressableEvent = NDKEvent(
-            id: "addr123",
             pubkey: String(repeating: "a", count: 64),
             createdAt: 0,
             kind: 30023, // Long-form content
             tags: [["d", "my-article"]],
-            content: "Article content",
-            sig: "sig123"
+            content: "Article content"
         )
+        addressableEvent.id = "addr123"
+        addressableEvent.sig = "sig123"
         
         event.tagAddressableEvent(addressableEvent, relay: "wss://relay.com")
         let expectedTag = ["a", "30023:\(String(repeating: "a", count: 64)):my-article", "wss://relay.com"]
@@ -220,17 +220,17 @@ final class TagHelpersTests: XCTestCase {
     // MARK: - Thread Building Tests
     
     func testCreateReply() {
-        let ndk = NDK(relayPool: MockRelayPool(), signer: nil)
+        let ndk = NDK(signer: nil)
         
         let originalEvent = NDKEvent(
-            id: "original123",
             pubkey: "author123",
             createdAt: 0,
             kind: 1,
             tags: [["t", "test"]],
-            content: "Original post",
-            sig: "sig123"
+            content: "Original post"
         )
+        originalEvent.id = "original123"
+        originalEvent.sig = "sig123"
         originalEvent.ndk = ndk
         
         let reply = originalEvent.createReply(content: "This is a reply")
@@ -238,7 +238,7 @@ final class TagHelpersTests: XCTestCase {
         // Check basic properties
         XCTAssertEqual(reply.content, "This is a reply")
         XCTAssertEqual(reply.kind, 1)
-        XCTAssertEqual(reply.ndk, ndk)
+        XCTAssertTrue(reply.ndk === ndk) // Check same instance
         
         // Check tags
         let eTags = reply.tags(withName: "e")
@@ -262,17 +262,16 @@ final class TagHelpersTests: XCTestCase {
     
     func testCreateReplyToReply() {
         let threadRoot = NDKEvent(
-            id: "root123",
             pubkey: "rootauthor",
             createdAt: 0,
             kind: 1,
             tags: [],
-            content: "Root",
-            sig: "sig1"
+            content: "Root"
         )
+        threadRoot.id = "root123"
+        threadRoot.sig = "sig1"
         
         let firstReply = NDKEvent(
-            id: "reply123",
             pubkey: "replyauthor",
             createdAt: 1,
             kind: 1,
@@ -281,9 +280,10 @@ final class TagHelpersTests: XCTestCase {
                 ["e", "root123", "", "reply"],
                 ["p", "rootauthor"]
             ],
-            content: "First reply",
-            sig: "sig2"
+            content: "First reply"
         )
+        firstReply.id = "reply123"
+        firstReply.sig = "sig2"
         
         let secondReply = firstReply.createReply(content: "Second reply")
         
@@ -387,16 +387,16 @@ final class TagHelpersTests: XCTestCase {
     func testTagBuilder() {
         var builder = TagBuilder()
         
-        let tags = builder
-            .event("event123", relay: "wss://relay.com", marker: "root")
-            .event("event456", marker: "reply")
-            .pubkey("pubkey123", relay: "wss://relay2.com")
-            .pubkey("pubkey456", petname: "Alice")
-            .hashtag("#nostr")
-            .hashtag("bitcoin")
-            .url("https://example.com", petname: "Example")
-            .custom(["custom", "value"])
-            .build()
+        builder.event("event123", relay: "wss://relay.com", marker: "root")
+        builder.event("event456", marker: "reply")
+        builder.pubkey("pubkey123", relay: "wss://relay2.com")
+        builder.pubkey("pubkey456", petname: "Alice")
+        builder.hashtag("#nostr")
+        builder.hashtag("bitcoin")
+        builder.url("https://example.com", petname: "Example")
+        builder.custom(["custom", "value"])
+        
+        let tags = builder.build()
         
         XCTAssertEqual(tags.count, 8)
         
@@ -418,11 +418,11 @@ final class TagHelpersTests: XCTestCase {
         
         // Test hashtag filter
         filter.addHashtagFilter("Nostr", "Bitcoin", "Lightning")
-        XCTAssertEqual(filter.tagFilters["#t"], ["nostr", "bitcoin", "lightning"])
+        XCTAssertEqual(filter.tagFilter("t"), ["nostr", "bitcoin", "lightning"])
         
         // Test URL filter
         filter.addURLFilter("https://nostr.com", "https://bitcoin.org")
-        XCTAssertEqual(filter.tagFilters["#r"], ["https://nostr.com", "https://bitcoin.org"])
+        XCTAssertEqual(filter.tagFilter("r"), ["https://nostr.com", "https://bitcoin.org"])
         
         // Test hasTagFilter
         XCTAssertTrue(filter.hasTagFilter("t"))
@@ -461,10 +461,4 @@ final class TagHelpersTests: XCTestCase {
     }
 }
 
-// MARK: - Mock Objects
-
-class MockRelayPool: NDKRelayPool {
-    init() {
-        super.init(ndk: nil)
-    }
-}
+// MockRelayPool removed - no longer needed

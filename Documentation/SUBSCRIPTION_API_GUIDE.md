@@ -2,241 +2,302 @@
 
 ## Overview
 
-The enhanced subscription API in NDKSwift provides a simplified, intuitive interface for subscribing to Nostr events. Key improvements include auto-starting subscriptions, builder patterns, convenience methods, and better lifecycle management.
+NDKSwift provides a modern, Swift-first API for working with Nostr subscriptions. The API uses Swift's async/await and AsyncSequence patterns for a clean, intuitive interface that aligns with Swift best practices.
 
-## Quick Start
+## Core Concepts
 
-### Auto-Starting Subscriptions
+### One-Shot Fetches vs Continuous Subscriptions
 
-Subscriptions now start automatically when created with event handlers:
+NDKSwift distinguishes between two primary use cases:
 
-```swift
-// Before (required manual start)
-let subscription = ndk.subscribe(filters: [filter])
-subscription.onEvent { event in
-    print("Received: \(event.content)")
-}
-subscription.start() // Easy to forget!
+1. **One-shot fetches**: When you need data once (e.g., loading a user's profile)
+2. **Continuous subscriptions**: When you want ongoing updates (e.g., watching a feed)
 
-// After (auto-starts)
-let subscription = ndk.subscribe(filter: filter) { event in
-    print("Received: \(event.content)")
-}
-```
+### API Design Philosophy
 
-### Fetching Events
+- **Fetch = Async Function**: Returns data once and completes
+- **Subscribe = AsyncSequence**: Continuously yields events as they arrive
 
-For one-time event fetching with automatic cleanup:
+## One-Shot Fetch Methods
+
+### Fetch Events
 
 ```swift
-// Fetch all matching events (auto-closes on EOSE)
-let events = try await ndk.fetch(filter, timeout: 5.0)
+// Fetch events matching a filter
+let events = try await ndk.fetchEvents(
+    NDKFilter(kinds: [1], limit: 20)
+)
 
-// Fetch from multiple filters
-let filters = [
-    NDKFilter(kinds: [1], authors: ["pubkey1"]),
-    NDKFilter(kinds: [7], limit: 10)
-]
-let events = try await ndk.fetch(filters)
+// Fetch with specific relays
+let events = try await ndk.fetchEvents(
+    filter,
+    relays: specificRelays,
+    cacheStrategy: .cacheFirst
+)
 ```
-
-### Streaming Events
-
-For continuous event streams using async/await:
-
-```swift
-// Stream events as they arrive
-for await event in ndk.stream(filter) {
-    print("New event: \(event.content)")
-}
-
-// Or create a stream and iterate later
-let stream = ndk.stream(filter)
-Task {
-    for await event in stream {
-        updateUI(with: event)
-    }
-}
-```
-
-## Builder Pattern
-
-Create complex subscriptions fluently:
-
-```swift
-let subscription = ndk.subscription()
-    .kinds([1, 7])                    // Text notes and reactions
-    .authors(["pubkey1", "pubkey2"])  // From specific users
-    .since(.now - 3600)               // Last hour
-    .limit(100)                       // Max 100 events
-    .hashtags(["nostr", "bitcoin"])   // With specific hashtags
-    .cacheStrategy(.cacheFirst)       // Check cache first
-    .closeOnEose()                    // Close after initial batch
-    .onEvent { event in
-        print("Event: \(event.content)")
-    }
-    .onEose {
-        print("Initial batch complete")
-    }
-    .onError { error in
-        print("Error: \(error)")
-    }
-    .start()
-```
-
-### Builder Options
-
-- **Filters**: `kinds()`, `authors()`, `since()`, `until()`, `limit()`, `hashtags()`
-- **Options**: `cacheStrategy()`, `closeOnEose()`, `relays()`, `manualStart()`
-- **Handlers**: `onEvent()`, `onEose()`, `onError()`
-
-## Common Patterns
 
 ### Fetch Single Event
 
 ```swift
-// Subscribe and close after one event
-ndk.subscribeOnce(filter) { events in
-    if let event = events.first {
-        print("Got event: \(event.content)")
-    }
-}
+// Fetch by event ID (hex or bech32)
+let event = try await ndk.fetchEvent("eventId...")
 
-// Or with custom limit
-ndk.subscribeOnce(filter, limit: 5) { events in
-    print("Got \(events.count) events")
-}
+// Fetch first event matching filter
+let event = try await ndk.fetchEvent(
+    NDKFilter(authors: ["pubkey"], kinds: [0])
+)
 ```
 
-### Profile Management
-
-Convenient methods for profile operations:
+### Fetch Profile
 
 ```swift
-// Fetch a single profile
-if let profile = try await ndk.fetchProfile(pubkey) {
+// Fetch a user's profile metadata
+if let profile = try await ndk.fetchProfile("pubkey...") {
     print("Name: \(profile.name ?? "Unknown")")
-}
-
-// Fetch multiple profiles
-let profiles = try await ndk.fetchProfiles(pubkeys)
-for (pubkey, profile) in profiles {
-    print("\(pubkey): \(profile.name ?? "Unknown")")
-}
-
-// Subscribe to profile updates
-ndk.subscribeToProfile(pubkey) { profile in
-    updateUserInterface(with: profile)
+    print("About: \(profile.about ?? "")")
 }
 ```
-
-### Subscription Groups
-
-Manage multiple subscriptions together:
 
 ```swift
-let group = ndk.subscriptionGroup()
+## Continuous Subscriptions
 
-// Add subscriptions to the group
-group.subscribe(filter1) { event in
-    handleTextNote(event)
-}
-
-group.subscribe(filter2) { event in
-    handleReaction(event)
-}
-
-// Close all at once
-group.closeAll()
-```
-
-## Lifecycle Management
-
-### Scoped Subscriptions
-
-Subscriptions that automatically close when leaving scope:
+### Basic Subscription
 
 ```swift
-// Subscription closes automatically after block
-try await ndk.withSubscription(filter) { subscription in
-    // Use subscription here
-    let events = await collectEvents(from: subscription)
-    return processEvents(events)
-}
-// Subscription is closed here
+// Create a subscription
+let subscription = ndk.subscribe(
+    filters: [NDKFilter(kinds: [1])],
+    options: NDKSubscriptionOptions()
+)
 
-// Multiple subscriptions with auto-cleanup
-try await ndk.withSubscriptions([filter1, filter2]) { subscriptions in
-    // All subscriptions close when block exits
+// Iterate over events as they arrive
+for await event in subscription {
+    print("New event: \(event.content)")
 }
 ```
 
-### Auto-Closing Subscriptions
+### Handling All Updates
 
-Subscriptions that close when released:
-
-```swift
-class ViewModel {
-    private var subscription: AutoClosingSubscription?
-    
-    func startListening() {
-        subscription = ndk.autoSubscribe(filter: filter)
-        subscription?.onEvent = { [weak self] event in
-            self?.handleEvent(event)
-        }
-    }
-    
-    deinit {
-        // Subscription automatically closes
-    }
-}
-```
-
-## Async/Await Support
-
-### Event Sequences
-
-Iterate over subscription events using async sequences:
+For cases where you need to handle events, EOSE, and errors:
 
 ```swift
 let subscription = ndk.subscribe(filters: [filter])
 
-for await event in subscription.events {
-    // Process each event
-    if shouldStop(event) {
-        break // Stops iteration
+for await update in subscription.updates {
+    switch update {
+    case .event(let event):
+        // Handle new event
+        handleEvent(event)
+    case .eose:
+        // End of stored events reached
+        print("All historical events loaded")
+    case .error(let error):
+        // Handle error
+        print("Error: \(error)")
     }
 }
 ```
 
-### Concurrent Operations
+### Auto-Starting Subscriptions
 
-Fetch from multiple sources concurrently:
-
-```swift
-async let profiles = ndk.fetchProfiles(pubkeys)
-async let events = ndk.fetch(filter)
-async let metadata = ndk.fetch(metadataFilter)
-
-let (profileData, eventData, metadataData) = await (profiles, events, metadata)
-```
-
-## Error Handling
-
-The simplified API uses the unified error system:
+Subscriptions automatically start when you begin iterating:
 
 ```swift
-do {
-    let events = try await ndk.fetch(filter, timeout: 5.0)
-    processEvents(events)
-} catch NDKUnifiedError.network(.timeout) {
-    print("Request timed out")
-} catch NDKUnifiedError.network(.connectionFailed) {
-    print("Connection failed")
-} catch {
-    print("Unexpected error: \(error)")
+// No need to call start() - iteration triggers it
+for await event in ndk.subscribe(filters: [filter]) {
+    // Process events
 }
 ```
+```
+
+## Subscription Options
+
+```swift
+var options = NDKSubscriptionOptions()
+options.closeOnEose = true        // Close after historical events
+options.cacheStrategy = .cacheFirst // Check cache before relays
+options.limit = 100               // Maximum events to receive
+options.timeout = 30.0            // Timeout in seconds
+options.relays = specificRelays   // Use specific relays
+
+let subscription = ndk.subscribe(filters: [filter], options: options)
+```
+
+## Cache Strategies
+
+- `.cacheFirst`: Check cache first, then query relays (default)
+- `.cacheOnly`: Only check cache, don't query relays
+- `.relayOnly`: Skip cache, only query relays
+- `.parallel`: Check cache and relays simultaneously
+
+## Real-World Examples
+
+### Loading a Feed
+
+```swift
+// Initial load with fetch
+let recentPosts = try await ndk.fetchEvents(
+    NDKFilter(kinds: [1], limit: 50),
+    cacheStrategy: .cacheFirst
+)
+displayPosts(recentPosts)
+
+// Then subscribe for new posts
+let subscription = ndk.subscribe(
+    filters: [NDKFilter(kinds: [1], since: .now)]
+)
+
+for await newPost in subscription {
+    prependToFeed(newPost)
+}
+```
+
+### User Profile with Updates
+
+```swift
+// Load current profile
+if let profile = try await ndk.fetchProfile(pubkey) {
+    updateUI(with: profile)
+}
+
+// Watch for profile updates
+let subscription = ndk.subscribe(
+    filters: [NDKFilter(authors: [pubkey], kinds: [0])]
+)
+
+for await update in subscription.updates {
+    if case .event(let event) = update {
+        if let profileData = event.content.data(using: .utf8),
+           let profile = try? JSONDecoder().decode(NDKUserProfile.self, from: profileData) {
+            updateUI(with: profile)
+        }
+    }
+}
+```
+
+### Direct Messages
+
+```swift
+let dmFilter = NDKFilter(kinds: [4], "#p": [myPubkey])
+let subscription = ndk.subscribe(filters: [dmFilter])
+
+for await dm in subscription {
+    // Decrypt and display message
+    if let decrypted = try? decryptDM(dm) {
+        showMessage(decrypted)
+    }
+}
+```
+
+## Migration from Callbacks
+
+### Old Callback Pattern (Deprecated)
+
+```swift
+// ⚠️ Deprecated - avoid this pattern
+subscription.onEvent { event in
+    handleEvent(event)
+}
+subscription.onEOSE {
+    print("EOSE")
+}
+```
+
+### New AsyncSequence Pattern
+
+```swift
+// ✅ Recommended approach
+for await event in subscription {
+    handleEvent(event)
+}
+
+// Or with all updates:
+for await update in subscription.updates {
+    switch update {
+    case .event(let event): handleEvent(event)
+    case .eose: print("EOSE")
+    case .error(let error): handleError(error)
+    }
+}
+```
+
+## Task Management
+
+### Cancellation
+
+```swift
+// Store the task
+let subscriptionTask = Task {
+    for await event in subscription {
+        processEvent(event)
+    }
+}
+
+// Cancel when done
+subscriptionTask.cancel()
+```
+
+### Subscription Groups
+
+```swift
+await ndk.withSubscriptionGroup { group in
+    let sub1 = group.subscribe(filter1)
+    let sub2 = group.subscribe(filter2)
+    
+    // Process subscriptions
+    // All automatically close when block exits
+}
+```
+
+## Best Practices
+
+1. **Use fetch for one-time data needs**
+   - User profiles
+   - Specific events by ID
+   - Historical data queries
+
+2. **Use subscribe for ongoing updates**
+   - Live feeds
+   - Real-time notifications
+   - Chat messages
+
+3. **Always handle errors**
+   ```swift
+   do {
+       let events = try await ndk.fetchEvents(filter)
+   } catch {
+       // Handle network errors, timeouts, etc.
+   }
+   ```
+
+4. **Consider cache strategies**
+   - Use `.cacheFirst` for better performance
+   - Use `.relayOnly` for absolute freshness
+   - Use `.cacheOnly` for offline support
+
+5. **Manage subscription lifecycle**
+   - Subscriptions auto-close on deinit
+   - Explicitly cancel long-running subscriptions
+   - Use subscription groups for coordinated cleanup
+
+## Performance Tips
+
+1. **Limit concurrent subscriptions**
+   - Merge compatible filters when possible
+   - Close subscriptions when not needed
+
+2. **Use appropriate limits**
+   ```swift
+   options.limit = 50 // Don't fetch more than needed
+   ```
+
+3. **Filter efficiently**
+   - Be specific with filters to reduce data transfer
+   - Use time ranges (`since`/`until`) when appropriate
+
+4. **Leverage caching**
+   - Cache-first strategy reduces network usage
+   - Parallel strategy provides best of both worlds
 
 ## Migration Guide
 

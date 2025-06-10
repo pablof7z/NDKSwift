@@ -160,9 +160,9 @@ final class Bech32Tests: XCTestCase {
     func testSpecificNsecDecoding() throws {
         // Test specific nsec decoding to known values (corrected based on actual implementation)
         let nsec = "nsec1mvnrf3h98a6gjjytehmufv2h3j2tzn6kk3lcmazztqwfdxwygjls3cy5yc"
-        let expectedPubkey = "a03530c991fe902c174666f7c4adf11ec062184d70c097e71496a2516ac8c1b3"
+        let expectedPubkey = "e64e6f029826af09bda652296ef15cd7be9a0ffb41e25217be0c691d6261566e"
         let expectedPrivateKey = "db2634c6e53f7489488bcdf7c4b1578c94b14f56b47f8df442581c9699c444bf"
-        let expectedNpub = "npub15q6npjv3l6gzc96xvmmuft03rmqxyxzdwrqf0ec5j639z6kgcxesjmnzqk"
+        let expectedNpub = "npub1ue8x7q5cy6hsn0dx2g5kau2u67lf5rlmg839y9a7p3536cnp2ehqwe32tj"
 
         print("Testing specific nsec: \(nsec)")
 

@@ -95,5 +95,23 @@ let package = Package(
             exclude: ["StandaloneDemo.swift", "BasicUsage.swift", "SimpleDemo.swift", "NostrDemo.swift", "README.md", "SimpleDemoMain.swift", "NostrDemoMain.swift", "FileCacheDemo.swift", "iOSNostrAppDemo.swift", "PaymentDemo.swift", "EncodeDemo.swift", "BlossomDemo.swift", "RuniOSApp.swift", "BunkerDemo.swift", "TestBunker.swift", "iOSBunkerDemo.swift", "TestBunkerParsing.swift", "TestiOSBunker.swift"],
             sources: ["FetchEventCLI.swift"]
         ),
+        .executableTarget(
+            name: "SecureChatCLI",
+            dependencies: [
+                .product(name: "NDKSwift", package: "NDKSwift"),
+            ],
+            path: ".",
+            exclude: ["StandaloneDemo.swift", "BasicUsage.swift", "SimpleDemo.swift", "NostrDemo.swift", "README.md", "SimpleDemoMain.swift", "NostrDemoMain.swift", "FileCacheDemo.swift", "iOSNostrAppDemo.swift", "PaymentDemo.swift", "EncodeDemo.swift", "BlossomDemo.swift", "RuniOSApp.swift", "BunkerDemo.swift", "TestBunker.swift", "iOSBunkerDemo.swift", "TestBunkerParsing.swift", "TestiOSBunker.swift", "FetchEventCLI.swift", "MircStyleChat.swift"],
+            sources: ["SecureChatCLI.swift"]
+        ),
+        .executableTarget(
+            name: "MircStyleChat",
+            dependencies: [
+                .product(name: "NDKSwift", package: "NDKSwift"),
+            ],
+            path: ".",
+            exclude: ["StandaloneDemo.swift", "BasicUsage.swift", "SimpleDemo.swift", "NostrDemo.swift", "README.md", "SimpleDemoMain.swift", "NostrDemoMain.swift", "FileCacheDemo.swift", "iOSNostrAppDemo.swift", "PaymentDemo.swift", "EncodeDemo.swift", "BlossomDemo.swift", "RuniOSApp.swift", "BunkerDemo.swift", "TestBunker.swift", "iOSBunkerDemo.swift", "TestBunkerParsing.swift", "TestiOSBunker.swift", "FetchEventCLI.swift", "SecureChatCLI.swift"],
+            sources: ["MircStyleChat.swift"]
+        ),
     ]
 )
