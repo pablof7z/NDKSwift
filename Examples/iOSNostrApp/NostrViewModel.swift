@@ -49,14 +49,8 @@ class NostrViewModel: ObservableObject {
 
     private func setupNDK() {
         // Set up file cache for persistent storage and queued events
-        do {
-            let cache = try NDKFileCache(path: "NostrCache")
-            ndk = NDK()
-            ndk?.cache = cache
-        } catch {
-            print("[ViewModel] Failed to create file cache: \(error)")
-            ndk = NDK()
-        }
+        // Note: File cache support will be added in a future update
+        ndk = NDK()
         ndk?.debugMode = true // Enable debug mode to see queued event messages
     }
 
@@ -133,7 +127,7 @@ class NostrViewModel: ObservableObject {
                 ndk?.signer = signer
 
                 // Get keys in bech32 format
-                let nsecValue = try privateKeySigner.nsec
+                let _ = try privateKeySigner.nsec
                 let npubValue = try privateKeySigner.npub
                 let pubkeyValue = try await privateKeySigner.pubkey
 
@@ -202,7 +196,7 @@ class NostrViewModel: ObservableObject {
             Task {
                 for await update in subscription.updates {
                     switch update {
-                    case .event(let event, _):
+                    case .event(let event):
                         // Track unique events
                         if let eventId = event.id {
                             await MainActor.run {
@@ -218,11 +212,11 @@ class NostrViewModel: ObservableObject {
                             self.statusMessage = "Subscription active. Listening for new events..."
                             self.isError = false
                         }
-                    case .closed:
+                    case .error(let error):
                         await MainActor.run {
                             self.hasActiveSubscription = false
-                            self.statusMessage = "Subscription closed"
-                            self.isError = false
+                            self.statusMessage = "Subscription error: \(error.localizedDescription)"
+                            self.isError = true
                         }
                     }
                 }

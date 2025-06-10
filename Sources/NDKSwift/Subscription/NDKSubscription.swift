@@ -100,11 +100,13 @@ public final class NDKSubscription: AsyncSequence {
     
     /// Events received so far
     public private(set) var events: [NDKEvent] = []
+    private let eventsLock = NSLock()
     
     /// Thread-safe state management
     private let stateActor = SubscriptionStateActor()
     
-    /// Event deduplication - simple set for now
+    /// Event deduplication - thread-safe set
+    private let seenEventIdsLock = NSLock()
     private var seenEventIds: Set<EventID> = []
     
     /// Timer for timeout
@@ -294,19 +296,27 @@ public final class NDKSubscription: AsyncSequence {
         
         guard let eventId = event.id else { return }
         
-        // Deduplicate event
-        guard !seenEventIds.contains(eventId) else {
+        // Deduplicate event (thread-safe)
+        seenEventIdsLock.lock()
+        let alreadySeen = seenEventIds.contains(eventId)
+        if !alreadySeen {
+            seenEventIds.insert(eventId)
+        }
+        seenEventIdsLock.unlock()
+        
+        guard !alreadySeen else {
             return // Already seen
         }
-        seenEventIds.insert(eventId)
         
         // Check if event matches our filters
         guard filters.contains(where: { $0.matches(event: event) }) else {
             return
         }
         
-        // Store event
+        // Store event (thread-safe)
+        eventsLock.lock()
         events.append(event)
+        eventsLock.unlock()
         let currentEventCount = events.count
         
         // Store in cache if available

@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.1] - 2025-01-10
+
+### Fixed
+- Fixed critical thread safety issues in NDKRelay
+  - Added proper locking for connection state management
+  - Fixed race conditions in message handling and statistics
+  - Ensured state observers are notified on main thread
+- Fixed thread safety in NDKSubscription
+  - Added locks for event storage and deduplication
+  - Prevented race conditions when processing events from multiple relays
+- Updated iOS example app to handle subscription updates correctly
+  - Fixed subscription update handling to match new API
+  - Removed file cache usage temporarily (to be added in future update)
+- Improved Maestro test reliability by removing timeouts in favor of assertions
+
 ### Added
 - Comprehensive mock relay infrastructure for testing
   - `MockRelay`: Full relay implementation conforming to `RelayProtocol`

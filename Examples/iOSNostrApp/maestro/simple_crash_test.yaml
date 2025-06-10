@@ -1,0 +1,23 @@
+appId: com.example.iOSNostrApp
+---
+# Simple test to reproduce the crash when connecting to relay
+
+- launchApp
+
+# Create account
+- tapOn: "Create Account"
+- waitForAnimationToEnd
+
+# Wait for account creation UI to appear
+- assertVisible: "Your Account"
+
+# Wait for relays to appear
+- assertVisible: "Connected Relays"
+
+# Try to connect to first relay - this should trigger the crash
+- tapOn:
+    text: "Connect"
+    index: 0
+
+# If app doesn't crash, we should see connection message
+- assertVisible: "Connected"
