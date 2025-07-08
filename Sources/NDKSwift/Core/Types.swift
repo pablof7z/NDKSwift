@@ -56,16 +56,6 @@ public enum EventKind {
     public static let badgeDefinition = 30009
     public static let longFormContent = 30023
     public static let applicationSpecificData = 30078
-    // Cashu/NIP-60 kinds
-    public static let cashuReserve = 7373
-    public static let cashuQuote = 7374
-    public static let cashuToken = 7375
-    public static let cashuWalletTx = 7376
-    public static let cashuWallet = 17375
-    public static let cashuWalletBackup = 375
-    // NIP-61
-    public static let nutzap = 9321
-    public static let cashuMintList = 10019
 }
 
 /// Tag structure
