@@ -266,19 +266,6 @@ public final class NDKUser: Equatable, Hashable {
             }
         }
 
-        // Check for Cashu mint list (NIP-61)
-        let mintListFilter = NDKFilter(
-            authors: [pubkey],
-            kinds: [EventKind.cashuMintList]
-        )
-
-        if let mintListEvent = try? await ndk.fetchEvent(mintListFilter) {
-            // Check if user has valid mints
-            let mintTags = mintListEvent.tags.filter { $0.first == "mint" }
-            if !mintTags.isEmpty {
-                methods.insert(.nutzap)
-            }
-        }
 
         // TODO: Check for NWC support when implemented
 

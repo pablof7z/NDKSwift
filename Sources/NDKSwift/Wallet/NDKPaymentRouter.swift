@@ -34,25 +34,6 @@ public class NDKPaymentRouter {
             }
         }
 
-        // Try NIP-61 (Nutzap) if available or as fallback
-        if paymentMethods.contains(.nutzap) || walletConfig.nutzapAsFallback,
-           let cashuPay = walletConfig.cashuPay
-        {
-            do {
-                if let confirmation = try await cashuPay(request) {
-                    // Create and publish nutzap event
-                    if let nutzap = confirmation.nutzap {
-                        try await publishNutzap(nutzap, for: request)
-                    }
-
-                    walletConfig.onPaymentComplete?(confirmation, nil)
-                    return confirmation
-                }
-            } catch {
-                lastError = error
-                print("Cashu payment failed: \(error)")
-            }
-        }
 
         // If we get here, all payment methods failed
         let error = lastError ?? NDKError.paymentFailed("No payment methods available")
@@ -71,19 +52,6 @@ public class NDKPaymentRouter {
             }
         }
 
-        // Check for Cashu mint list (NIP-61)
-        let mintListFilter = NDKFilter(
-            authors: [recipient.pubkey],
-            kinds: [EventKind.cashuMintList]
-        )
-
-        if let mintListEvent = try? await ndk.fetchEvent(mintListFilter) {
-            // Parse mint list to verify it has valid mints
-            let mints = mintListEvent.tags.filter { $0.first == "mint" }.compactMap { $0[safe: 1] }
-            if !mints.isEmpty {
-                methods.insert(.nutzap)
-            }
-        }
 
         // TODO: Check for NWC support when implemented
 
@@ -117,12 +85,6 @@ public class NDKPaymentRouter {
         throw NDKError.notImplemented("Lightning invoice fetching not yet implemented")
     }
 
-    /// Publish a nutzap event
-    private func publishNutzap(_ nutzap: NDKNutzap, for request: NDKPaymentRequest) async throws {
-        let relays = try await getRecipientRelays(request.recipient)
-        let relaySet = NDKRelaySet(relayURLs: relays, ndk: ndk)
-        try await nutzap.publish(on: relaySet)
-    }
 
     /// Get recipient's preferred relays
     private func getRecipientRelays(_ recipient: NDKUser) async throws -> [String] {
