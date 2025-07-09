@@ -24,13 +24,13 @@ public protocol NDKNWCWalletProtocol: NDKWallet {
     func payInvoice(_ invoice: String, amount: Int64?) async throws -> PayInvoiceResponse
     
     /// Pay multiple invoices in a batch
-    func multiPayInvoice(_ invoices: [MultiPayInvoiceRequest.PayableInvoice]) async throws -> [String: Result<PayInvoiceResponse, NWCError>]
+    func multiPayInvoice(_ invoices: [MultiPayInvoiceRequest.PayableInvoice]) async throws -> [String: Result<PayInvoiceResponse, NDKError>]
     
     /// Send a keysend payment
     func payKeysend(amount: Int64, pubkey: String, preimage: String?, tlvRecords: [PayKeysendRequest.TLVRecord]?) async throws -> PayKeysendResponse
     
     /// Send multiple keysend payments
-    func multiPayKeysend(_ keysends: [MultiPayKeysendRequest.PayableKeysend]) async throws -> [String: Result<PayKeysendResponse, NWCError>]
+    func multiPayKeysend(_ keysends: [MultiPayKeysendRequest.PayableKeysend]) async throws -> [String: Result<PayKeysendResponse, NDKError>]
     
     /// Create a new invoice
     func makeInvoice(amount: Int64?, description: String?, descriptionHash: String?, expiry: Int?) async throws -> MakeInvoiceResponse
@@ -63,20 +63,18 @@ extension NDKNWCWalletProtocol {
     public func pay(_ request: NDKPaymentRequest) async throws -> NDKPaymentConfirmation {
         // For NWC, we need to get the invoice from somewhere
         // This is a simplified implementation - in practice you'd need to fetch the invoice
-        throw NDKError.runtime("NWC_NOT_IMPLEMENTED", "Direct payment requests not supported. Use payInvoice with a bolt11 invoice.")
+        throw NDKError.notImplemented("Direct payment requests not supported. Use payInvoice with a bolt11 invoice.")
     }
     
-    /// Default implementation of NDKWallet.getBalance
-    public func getBalance() async throws -> Int64 {
-        let response = try await getBalance()
-        return response.balance
-    }
+    // Note: getBalance() -> Int64 must be implemented by conforming types
+    // This is because the protocol requires a getBalance() -> GetBalanceResponse method
+    // and we can't provide a default implementation that would avoid recursion
     
     /// Default implementation of NDKWallet.createInvoice
     public func createInvoice(amount: Int64, description: String?) async throws -> String {
         let response = try await makeInvoice(amount: amount, description: description, descriptionHash: nil, expiry: nil)
         guard let invoice = response.invoice else {
-            throw NWCError(code: .internal, message: "No invoice returned from wallet service")
+            throw NDKError.walletError(message: "No invoice returned from wallet service")
         }
         return invoice
     }

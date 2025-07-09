@@ -1,7 +1,7 @@
 import Foundation
 
 /// Manages fetching events using the outbox model with intelligent relay selection
-public actor NDKFetchingStrategy {
+actor NDKFetchingStrategy {
     private let ndk: NDK
     private let selector: NDKRelaySelector
     private let ranker: NDKRelayRanker
@@ -12,24 +12,36 @@ public actor NDKFetchingStrategy {
     /// Subscription management
     private var activeSubscriptions: [String: OutboxSubscription] = [:]
 
-    public init(ndk: NDK, selector: NDKRelaySelector, ranker: NDKRelayRanker) {
+    init(ndk: NDK, selector: NDKRelaySelector) {
         self.ndk = ndk
         self.selector = selector
-        self.ranker = ranker
+        self.ranker = NDKRelayRanker(ndk: ndk, tracker: selector.tracker)
     }
 
     /// Fetch events using outbox model
-    public func fetchEvents(
+    func fetchEvents(
         filter: NDKFilter,
-        config: OutboxFetchConfig = .default
+        config: OutboxFetchConfig = .default,
+        customStrategy: RelaySelectionStrategy? = nil
     ) async throws -> [NDKEvent] {
-        let fetchId = UUID().uuidString
+        let fetchId = await sharedIDGenerator.nextRequestId()
 
         // Select source relays
-        let selection = await selector.selectRelaysForFetching(
-            filter: filter,
-            config: config.selectionConfig
-        )
+        let selection: RelaySelectionResult
+        if let customStrategy = customStrategy {
+            let pubkey = filter.authors?.first ?? ""
+            let customRelays = await customStrategy.selectRelays(pubkey)
+            selection = RelaySelectionResult(
+                relays: Set(customRelays),
+                missingRelayInfoPubkeys: [],
+                selectionMethod: .outbox
+            )
+        } else {
+            selection = await selector.selectRelaysForFetching(
+                filter: filter,
+                config: config.selectionConfig
+            )
+        }
 
         // Create fetch operation
         let operation = FetchOperation(
@@ -48,12 +60,12 @@ public actor NDKFetchingStrategy {
     }
 
     /// Subscribe to events using outbox model
-    public func subscribe(
+    func subscribe(
         filters: [NDKFilter],
         config: OutboxSubscriptionConfig = .default,
         eventHandler: @escaping (NDKEvent) -> Void
     ) async throws -> OutboxSubscription {
-        let subscriptionId = UUID().uuidString
+        let subscriptionId = await sharedIDGenerator.nextSubscriptionId()
 
         // Determine relay sets for each filter
         var relaySelections: [RelaySelectionResult] = []
@@ -86,12 +98,12 @@ public actor NDKFetchingStrategy {
     }
 
     /// Close a subscription
-    public func closeSubscription(_ subscriptionId: String) async {
+    func closeSubscription(_ subscriptionId: String) async {
         guard let subscription = activeSubscriptions[subscriptionId] else { return }
 
         // Close all relay subscriptions
         for (_, relaySubscription) in subscription.relaySubscriptions {
-            relaySubscription.close()
+            await relaySubscription.close()
         }
 
         subscription.status = .closed
@@ -99,7 +111,7 @@ public actor NDKFetchingStrategy {
     }
 
     /// Get active subscriptions
-    public func getActiveSubscriptions() -> [OutboxSubscription] {
+    func getActiveSubscriptions() -> [OutboxSubscription] {
         Array(activeSubscriptions.values)
     }
 
@@ -142,8 +154,7 @@ public actor NDKFetchingStrategy {
                 case let .failure(error):
                     errors.append(error)
                     if let fetchError = error as? FetchError,
-                       case let .relayError(relayURL, _) = fetchError
-                    {
+                       case let .relayError(relayURL, _) = fetchError {
                         operation.updateRelayStatus(relayURL, status: .failed)
                         await ranker.updateRelayPerformance(relayURL, success: false)
                     }
@@ -169,7 +180,18 @@ public actor NDKFetchingStrategy {
             )
         }
 
-        return Array(collectedEvents.values).sorted { $0.createdAt > $1.createdAt }
+        // Sort events by timestamp
+        let eventsArray = Array(collectedEvents.values)
+        var eventSnapshots: [(event: NDKEvent, createdAt: Timestamp)] = []
+        
+        for event in eventsArray {
+            let createdAt = await event.createdAt
+            eventSnapshots.append((event, createdAt))
+        }
+        
+        return eventSnapshots
+            .sorted { $0.createdAt > $1.createdAt }
+            .map { $0.event }
     }
 
     private func fetchFromRelay(
@@ -244,9 +266,8 @@ public actor NDKFetchingStrategy {
                   let relaySubscription = relaySubscription else { return }
             
             // Use async sequence for events
-            for await update in relaySubscription.updates {
-                switch update {
-                case .event(let event):
+            do {
+                for try await event in relaySubscription {
                     // Deduplicate events
                     guard let eventId = event.id else { continue }
                     if !subscription.seenEventIds.contains(eventId) {
@@ -254,11 +275,12 @@ public actor NDKFetchingStrategy {
                         subscription.eventCount += 1
                         subscription.eventHandler(event)
                     }
-                case .eose:
-                    subscription.updateRelayStatus(relayURL, status: .eose)
-                case .error(_):
-                    break
                 }
+                // If loop completes normally, we got EOSE
+                subscription.updateRelayStatus(relayURL, status: .eose)
+            } catch {
+                // Handle subscription errors
+                subscription.updateRelayStatus(relayURL, status: .error)
             }
         }
 
@@ -267,13 +289,17 @@ public actor NDKFetchingStrategy {
     }
 
     private func getOrConnectRelay(url: String) async -> NDKRelay? {
+        let normalizedUrl = URLNormalizer.tryNormalizeRelayUrl(url) ?? url
+        
         // First check if already connected
-        if let relay = ndk.relayPool.relay(for: url) {
+        if let relay = ndk.relayPool.relaysByUrl[normalizedUrl] {
             return relay
         }
 
         // Try to connect
-        return await ndk.relayPool.addRelay(url: url)
+        let relay = ndk.addRelay(normalizedUrl)
+        try? await relay.connect()
+        return relay
     }
 
     private func withTimeout<T>(
@@ -372,7 +398,7 @@ private class FetchOperation {
 }
 
 /// An outbox subscription
-public class OutboxSubscription {
+class OutboxSubscription {
     public let id: String
     public let filters: [NDKFilter]
     public let targetRelays: Set<String>
@@ -413,7 +439,7 @@ private enum FetchStatus {
 }
 
 /// Subscription status
-public enum SubscriptionStatus {
+enum SubscriptionStatus {
     case pending
     case connecting
     case active(connectedRelays: Int)
@@ -422,11 +448,12 @@ public enum SubscriptionStatus {
 }
 
 /// Subscription relay status
-public enum SubscriptionRelayStatus {
+enum SubscriptionRelayStatus {
     case pending
     case connecting
     case active
     case eose // End of stored events
+    case error
     case failed
     case closed
 }

@@ -23,20 +23,33 @@ public struct NWCRequestBuilder {
         let jsonData = try encoder.encode(envelope)
         let jsonString = String(data: jsonData, encoding: .utf8)!
         
-        // Create the event
-        var event = NDKEvent(ndk: ndk, kind: .nostrWalletConnectReq)
-        
-        // Add wallet service pubkey as p-tag
-        event.tags.append(["p", walletPubkey])
-        
-        // Set content (will be encrypted)
-        event.content = jsonString
+        // Get signer pubkey
+        let signerPubkey = try await signer.pubkey
         
         // Encrypt content using NIP-04
-        try await event.encrypt(recipientPublicKey: walletPubkey, signer: signer, algorithm: .nip04)
+        let walletUser = NDKUser(pubkey: walletPubkey)
+        let encryptedContent = try await signer.encrypt(
+            recipient: walletUser,
+            value: jsonString,
+            scheme: .nip04
+        )
+        
+        // Create the event
+        let event = NDKEvent(
+            pubkey: signerPubkey,
+            createdAt: Timestamp(Date().timeIntervalSince1970),
+            kind: .nostrWalletConnectReq,
+            content: encryptedContent
+        )
+        
+        // Add wallet service pubkey as p-tag
+        await event.addTag(["p", walletPubkey])
+        
+        // Set NDK instance
+        await event.setNDK(ndk)
         
         // Sign the event
-        try await event.sign(signer: signer)
+        try await event.sign()
         
         return event
     }
@@ -82,16 +95,16 @@ public struct NWCRequestBuilder {
 
 // MARK: - Event Kind Extension
 
-extension EventKind {
+extension Int {
     /// NWC request event kind (23194)
-    public static let nostrWalletConnectReq = EventKind(23194)
+    public static let nostrWalletConnectReq = 23194
     
     /// NWC response event kind (23195)
-    public static let nostrWalletConnectRes = EventKind(23195)
+    public static let nostrWalletConnectRes = 23195
     
     /// NWC notification event kind (23196)
-    public static let nostrWalletConnectNotification = EventKind(23196)
+    public static let nostrWalletConnectNotification = 23196
     
     /// NWC info event kind (13194)
-    public static let nostrWalletConnectInfo = EventKind(13194)
+    public static let nostrWalletConnectInfo = 13194
 }

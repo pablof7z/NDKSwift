@@ -9,10 +9,12 @@ public extension NDK {
         handler: (NDKSubscription) async throws -> T
     ) async rethrows -> T {
         let subscription = subscribe(filters: [filter], options: options)
-        subscription.start()
+        await subscription.start()
         
         defer {
-            subscription.close()
+            Task {
+                await subscription.close()
+            }
         }
         
         return try await handler(subscription)
@@ -24,15 +26,18 @@ public extension NDK {
         options: NDKSubscriptionOptions = NDKSubscriptionOptions(),
         handler: ([NDKSubscription]) async throws -> T
     ) async rethrows -> T {
-        let subscriptions = filters.map { filter in
+        var subscriptions: [NDKSubscription] = []
+        for filter in filters {
             let sub = subscribe(filters: [filter], options: options)
-            sub.start()
-            return sub
+            await sub.start()
+            subscriptions.append(sub)
         }
         
         defer {
-            for subscription in subscriptions {
-                subscription.close()
+            Task {
+                for subscription in subscriptions {
+                    await subscription.close()
+                }
             }
         }
         
@@ -45,11 +50,14 @@ public extension NDK {
     ) async rethrows -> T {
         let group = subscriptionGroup()
         
-        defer {
-            group.closeAll()
+        do {
+            let result = try await handler(group)
+            await group.closeAll()
+            return result
+        } catch {
+            await group.closeAll()
+            throw error
         }
-        
-        return try await handler(group)
     }
 }
 
@@ -62,17 +70,23 @@ public class AutoClosingSubscription: AsyncSequence {
     public init(_ subscription: NDKSubscription, autoStart: Bool = true) {
         self.subscription = subscription
         if autoStart {
-            subscription.start()
+            Task {
+                await subscription.start()
+            }
         }
     }
     
     deinit {
-        subscription.close()
+        Task { [subscription] in
+            await subscription.close()
+        }
     }
     
     /// Start the subscription if it was created with autoStart = false
     public func start() {
-        subscription.start()
+        Task {
+            await subscription.start()
+        }
     }
     
     /// Get the underlying subscription
@@ -85,10 +99,8 @@ public class AutoClosingSubscription: AsyncSequence {
         subscription.makeAsyncIterator()
     }
     
-    /// Access to update stream for EOSE and errors
-    public var updates: AsyncStream<NDKSubscriptionUpdate> {
-        subscription.updates
-    }
+    // Note: NDKSubscription doesn't have updates property anymore.
+    // Use the AsyncSequence directly to iterate over events.
 }
 
 extension NDK {
@@ -119,13 +131,14 @@ public struct SubscriptionHandle {
     }
     
     /// Cancel the subscription
-    public func cancel() {
-        subscription.close()
+    public func cancel() async {
+        await subscription.close()
     }
     
     /// Check if the subscription is still active
     public var isActive: Bool {
-        return subscription.state != .closed
+        get async {
+            return await subscription.state != .closed
+        }
     }
 }
-

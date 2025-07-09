@@ -225,16 +225,16 @@ public actor NDKSubscriptionTracker {
                         "totalEvents": detail.metrics.totalEvents,
                         "activeRelayCount": detail.metrics.activeRelayCount,
                         "startTime": detail.metrics.startTime.timeIntervalSince1970,
-                        "isActive": detail.metrics.isActive,
+                        "isActive": detail.metrics.isActive
                     ],
                     "relayMetrics": detail.relayMetrics.mapValues { relay in
                         [
                             "eventsReceived": relay.eventsReceived,
                             "eoseReceived": relay.eoseReceived,
                             "subscriptionTime": relay.subscriptionTime.timeIntervalSince1970,
-                            "timeToEose": relay.timeToEose ?? -1,
+                            "timeToEose": relay.timeToEose ?? -1
                         ]
-                    },
+                    }
                 ]
             },
             "closedSubscriptions": closedSubscriptions.map { closed in
@@ -245,7 +245,7 @@ public actor NDKSubscriptionTracker {
                     "uniqueEventCount": closed.uniqueEventCount,
                     "totalEventCount": closed.totalEventCount,
                     "duration": closed.duration,
-                    "eventsPerSecond": closed.eventsPerSecond,
+                    "eventsPerSecond": closed.eventsPerSecond
                 ]
             },
             "statistics": [
@@ -253,8 +253,8 @@ public actor NDKSubscriptionTracker {
                 "totalSubscriptions": getStatistics().totalSubscriptions,
                 "totalUniqueEvents": getStatistics().totalUniqueEvents,
                 "totalEvents": getStatistics().totalEvents,
-                "averageEventsPerSubscription": getStatistics().averageEventsPerSubscription,
-            ],
+                "averageEventsPerSubscription": getStatistics().averageEventsPerSubscription
+            ]
         ]
     }
 

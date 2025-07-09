@@ -23,20 +23,12 @@ public struct NWCConnectionURI {
         
         // Parse the URL
         guard let url = URL(string: uri) else {
-            throw NWCError(
-                code: .other,
-                message: "Invalid NWC connection URI",
-                context: ["uri": uri]
-            )
+            throw NDKError.invalidInput(message: "Invalid NWC connection URI: \(uri)")
         }
         
         // Validate scheme
         guard url.scheme == "nostr+walletconnect" else {
-            throw NWCError(
-                code: .other,
-                message: "Invalid URI scheme. Expected 'nostr+walletconnect'",
-                context: ["scheme": url.scheme ?? "nil"]
-            )
+            throw NDKError.invalidInput(message: "Invalid URI scheme '\(url.scheme ?? "nil")'. Expected 'nostr+walletconnect'")
         }
         
         // Extract wallet pubkey from host or path
@@ -51,54 +43,38 @@ public struct NWCConnectionURI {
         
         // Validate pubkey format (64 character hex)
         guard pubkey.count == 64, pubkey.range(of: "^[0-9a-fA-F]{64}$", options: .regularExpression) != nil else {
-            throw NWCError(
-                code: .other,
-                message: "Invalid wallet public key format",
-                context: ["pubkey": pubkey]
-            )
+            throw NDKError.invalidPublicKey(pubkey)
         }
         self.walletPubkey = pubkey.lowercased()
         
         // Parse query parameters
         guard let components = URLComponents(url: url, resolvingAgainstBaseURL: false),
               let queryItems = components.queryItems else {
-            throw NWCError(
-                code: .other,
-                message: "Missing query parameters",
-                context: ["uri": uri]
-            )
+            throw NDKError.invalidInput(message: "Missing query parameters in URI")
         }
         
         // Extract relay URLs
         let relays = queryItems.filter { $0.name == "relay" }.compactMap { $0.value }
         guard !relays.isEmpty else {
-            throw NWCError.missingRequiredParameter("relay")
+            throw NDKError.invalidInput(message: "Missing required parameter: relay")
         }
         
         // Validate relay URLs
         for relay in relays {
             guard URL(string: relay) != nil else {
-                throw NWCError(
-                    code: .other,
-                    message: "Invalid relay URL",
-                    context: ["relay": relay]
-                )
+                throw NDKError.invalidURL(relay)
             }
         }
         self.relayURLs = relays
         
         // Extract secret
         guard let secret = queryItems.first(where: { $0.name == "secret" })?.value else {
-            throw NWCError.missingRequiredParameter("secret")
+            throw NDKError.invalidInput(message: "Missing required parameter: secret")
         }
         
         // Validate secret format (64 character hex)
         guard secret.count == 64, secret.range(of: "^[0-9a-fA-F]{64}$", options: .regularExpression) != nil else {
-            throw NWCError(
-                code: .other,
-                message: "Invalid client secret format",
-                context: ["secretLength": secret.count]
-            )
+            throw NDKError.invalidInput(message: "Invalid client secret format (expected 64 hex characters, got \(secret.count))")
         }
         self.secret = secret.lowercased()
         
@@ -110,31 +86,21 @@ public struct NWCConnectionURI {
     public init(walletPubkey: String, relayURLs: [String], secret: String, lud16: String? = nil) throws {
         // Validate inputs
         guard walletPubkey.count == 64, walletPubkey.range(of: "^[0-9a-fA-F]{64}$", options: .regularExpression) != nil else {
-            throw NWCError(
-                code: .other,
-                message: "Invalid wallet public key format"
-            )
+            throw NDKError.invalidPublicKey(walletPubkey)
         }
         
         guard secret.count == 64, secret.range(of: "^[0-9a-fA-F]{64}$", options: .regularExpression) != nil else {
-            throw NWCError(
-                code: .other,
-                message: "Invalid client secret format"
-            )
+            throw NDKError.invalidInput(message: "Invalid client secret format")
         }
         
         guard !relayURLs.isEmpty else {
-            throw NWCError.missingRequiredParameter("relayURLs")
+            throw NDKError.invalidInput(message: "Missing required parameter: relayURLs")
         }
         
         // Validate relay URLs
         for relay in relayURLs {
             guard URL(string: relay) != nil else {
-                throw NWCError(
-                    code: .other,
-                    message: "Invalid relay URL",
-                    context: ["relay": relay]
-                )
+                throw NDKError.invalidURL(relay)
             }
         }
         
@@ -159,18 +125,14 @@ public struct NWCConnectionURI {
         components.queryItems = queryItems
         
         guard let uri = components.string else {
-            throw NWCError(
-                code: .other,
-                message: "Failed to construct URI from components"
-            )
+            throw NDKError.invalidInput(message: "Failed to construct URI from components")
         }
         self.uri = uri
     }
     
     /// Get the client's public key derived from the secret
     public func clientPubkey() throws -> String {
-        let keyPair = try NostrKeyPair(privateKey: secret)
-        return keyPair.publicKey
+        return try Crypto.getPublicKey(from: secret)
     }
     
     /// Create a signer for this NWC connection
@@ -179,11 +141,10 @@ public struct NWCConnectionURI {
     }
     
     /// Normalize relay URLs according to NDKSwift conventions
-    public func normalizedRelayURLs() -> [String] {
-        return relayURLs.compactMap { urlString in
-            guard let url = URL(string: urlString) else { return nil }
-            return URLNormalizer.shared.normalize(url)?.absoluteString
-        }
+    public func normalizedRelayURLs() -> Set<String> {
+        return Set(relayURLs.compactMap { urlString in
+            return URLNormalizer.tryNormalizeRelayUrl(urlString) ?? urlString
+        })
     }
 }
 

@@ -42,10 +42,9 @@ class NostrDemo {
             relayUrls: [
                 "wss://relay.damus.io",
                 "wss://nos.lol",
-                "wss://relay.nostr.band",
+                "wss://relay.nostr.band"
             ],
-            signer: signer,
-            cacheAdapter: NDKInMemoryCache()
+            signer: signer
         )
 
         print("✅ NDKSwift initialized with \(ndk.relays.count) relays")
@@ -216,9 +215,9 @@ class NostrDemo {
                 case .event(let event):
                     eventCount += 1
                     print("📨 Received event \(eventCount): \(event.content.prefix(50))...")
-                case .eose:
+                    case .eose:
                     print("🏁 End of stored events reached")
-                    break // Exit the loop on EOSE for demo
+                     // Exit the loop on EOSE for demo
                 case .error(let error):
                     print("❌ Subscription error: \(error)")
                 }
@@ -281,14 +280,14 @@ class NostrDemo {
             createTestEvent(author: "alice", kind: 1, content: "Hello from Alice!"),
             createTestEvent(author: "bob", kind: 1, content: "Bob here!"),
             createTestEvent(author: "alice", kind: 3, content: "Alice's contact list"),
-            createTestEvent(author: "charlie", kind: 1, content: "Charlie speaking"),
+            createTestEvent(author: "charlie", kind: 1, content: "Charlie speaking")
         ]
 
         // Test different filters
         let filters = [
             NDKFilter(authors: ["alice"], label: "Alice's events"),
             NDKFilter(kinds: [1], label: "Text notes only"),
-            NDKFilter(authors: ["alice"], kinds: [1], label: "Alice's text notes"),
+            NDKFilter(authors: ["alice"], kinds: [1], label: "Alice's text notes")
         ]
 
         for filter in filters {
@@ -326,7 +325,7 @@ class NostrDemo {
         let events = [
             createTestEvent(author: user.pubkey, kind: 1, content: "Cached message 1"),
             createTestEvent(author: user.pubkey, kind: 1, content: "Cached message 2"),
-            createTestEvent(author: "other", kind: 3, content: "Someone else's contact list"),
+            createTestEvent(author: "other", kind: 3, content: "Someone else's contact list")
         ]
 
         // Store events in cache
@@ -382,7 +381,7 @@ class NostrDemo {
         let testUsers = [
             ("Alice", "alice123", "Alice loves Nostr and decentralization"),
             ("Bob", "bob456", "Bitcoin maximalist and Nostr enthusiast"),
-            ("Charlie", "charlie789", "Building the future of social media"),
+            ("Charlie", "charlie789", "Building the future of social media")
         ]
 
         print("\nCreated test users:")
@@ -407,7 +406,6 @@ class NostrDemo {
         return event
     }
 }
-
 
 // MARK: - NDKFilter Extension for Demo
 

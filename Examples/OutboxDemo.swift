@@ -3,14 +3,15 @@
 import Foundation
 import NDKSwift
 
-// Example: Using the Outbox Model with NDKSwift
-// This demonstrates intelligent relay selection and publishing
+// Example: NDKSwift uses Outbox Model by default
+// This demonstrates how outbox model works automatically
 
 @main
 struct OutboxDemo {
     static func main() async {
         print("🚀 NDKSwift Outbox Model Demo")
-        print("================================\n")
+        print("================================")
+        print("Note: Outbox model is enabled by default!\n")
 
         // Initialize NDK with some relays
         let ndk = NDK()
@@ -48,17 +49,10 @@ struct OutboxDemo {
         print("\n📋 Demo 1: Tracking User Relay Preferences")
         print("==========================================")
 
-        await ndk.setRelaysForUser(
-            pubkey: pubkey,
-            readRelays: ["wss://relay.damus.io", "wss://nos.lol"],
-            writeRelays: ["wss://relay.damus.io", "wss://relay.nostr.band"]
-        )
+        // Track user to enable outbox model
+        await ndk.outbox.trackUser(pubkey)
 
-        if let relayInfo = await ndk.getRelaysForUser(pubkey: pubkey) {
-            print("✅ User relay preferences tracked:")
-            print("   Read relays: \(relayInfo.readRelayUrls)")
-            print("   Write relays: \(relayInfo.writeRelayUrls)")
-        }
+        print("✅ User tracked for outbox model")
 
         // Demo 2: Publish with intelligent relay selection
         print("\n📤 Demo 2: Publishing with Outbox Model")
@@ -73,27 +67,20 @@ struct OutboxDemo {
         // Add some tags
         noteEvent.tags = [
             ["t", "nostr"],
-            ["t", "ndkswift"],
+            ["t", "ndkswift"]
         ]
 
         print("📝 Publishing note: \(noteEvent.content)")
 
         do {
-            // Publish using outbox model
-            let result = try await ndk.publishWithOutbox(noteEvent)
+            // Just call publish() - outbox model is used automatically!
+            let publishedRelays = try await ndk.publish(noteEvent)
 
-            print("\n✅ Published successfully!")
-            print("   Total relays: \(result.relayResults.count)")
-            print("   Successful: \(result.successfulRelays.count)")
-            print("   Failed: \(result.failedRelays.count)")
-
-            for (relay, success) in result.relayResults {
-                print("   - \(relay): \(success ? "✓" : "✗")")
+            print("\n✅ Published successfully using outbox model!")
+            print("   Successful relays: \(publishedRelays.count)")
+            for relay in publishedRelays {
+                print("   - \(relay.url): ✓")
             }
-
-            print("\n📊 Selection details:")
-            print("   Method: \(result.selectionMethod)")
-            print("   Publish time: \(String(format: "%.2f", result.publishTime))s")
 
         } catch {
             print("❌ Failed to publish: \(error)")
@@ -112,13 +99,8 @@ struct OutboxDemo {
         print("🔍 Fetching events for author: \(pubkey)")
 
         do {
-            let events = try await ndk.fetchEventsWithOutbox(
-                filter: filter,
-                config: OutboxFetchConfig(
-                    minSuccessfulRelays: 2,
-                    timeoutInterval: 5.0
-                )
-            )
+            // Just call fetchEvents() - outbox model is used automatically!
+            let events = try await ndk.fetchEvents(filter)
 
             print("✅ Fetched \(events.count) events")
 
@@ -145,26 +127,25 @@ struct OutboxDemo {
         print("🔔 Creating subscription for text notes...")
 
         do {
-            let subscription = try await ndk.subscribeWithOutbox(
-                filters: [subscriptionFilter],
-                eventHandler: { event in
+            // For subscriptions, we'll use the regular NDK subscribe method
+            // The outbox model can be used for one-shot fetches
+            let subscription = ndk.subscribe(filters: [subscriptionFilter])
+            
+            Task {
+                for await event in subscription {
                     print("\n🆕 New event received:")
                     print("   Author: \(event.pubkey)")
                     print("   Content: \(String(event.content.prefix(50)))...")
                 }
-            )
+            }
 
-            print("✅ Subscription active on \(subscription.targetRelays.count) relays")
+            print("✅ Subscription active")
 
             // Wait a bit for events
             try await Task.sleep(nanoseconds: 5_000_000_000) // 5 seconds
 
-            print("\n📊 Subscription stats:")
-            print("   Events received: \(subscription.eventCount)")
-            print("   Unique events: \(subscription.seenEventIds.count)")
-
             // Close subscription
-            await ndk.closeOutboxSubscription(subscription.id)
+            subscription.close()
             print("✅ Subscription closed")
 
         } catch {
@@ -175,13 +156,48 @@ struct OutboxDemo {
         print("\n🏥 Demo 5: Relay Health and Ranking")
         print("===================================")
 
-        let relayScores = await ndk.getRelayScores()
-
-        print("📊 Relay health scores:")
-        for (relay, score) in relayScores.sorted(by: { $0.value > $1.value }).prefix(5) {
+        // Get relay recommendations for the user
+        let recommendedRelays = await ndk.outbox.getRecommendedRelays(for: pubkey)
+        
+        print("📊 Recommended relays for user:")
+        for (index, relay) in recommendedRelays.enumerated() {
+            let score = await ndk.outbox.getRelayScore(relay: relay, for: pubkey)
             let health = score > 0.8 ? "🟢" : score > 0.5 ? "🟡" : "🔴"
-            print("   \(health) \(relay): \(String(format: "%.1f%%", score * 100))")
+            print("   \(index + 1). \(health) \(relay): \(String(format: "%.1f%%", score * 100))")
         }
+
+        // Demo 6: Disabling outbox model
+        print("\n🔧 Demo 6: Disabling Outbox Model")
+        print("=================================")
+        
+        // Create a new NDK instance with outbox disabled
+        let ndkNoOutbox = NDK()
+        ndkNoOutbox.outboxEnabled = false
+        
+        // Add relays
+        _ = ndkNoOutbox.addRelay(url: "wss://relay.damus.io")
+        _ = ndkNoOutbox.addRelay(url: "wss://nos.lol")
+        
+        // Set up signer
+        ndkNoOutbox.signer = signer
+        
+        print("📡 Connecting without outbox model...")
+        await ndkNoOutbox.connect()
+        
+        let simpleNote = NDKEvent(ndk: ndkNoOutbox)
+        simpleNote.kind = 1
+        simpleNote.content = "This is published directly without outbox model"
+        simpleNote.pubkey = pubkey
+        simpleNote.createdAt = Timestamp(Date().timeIntervalSince1970)
+        
+        do {
+            let publishedRelays = try await ndkNoOutbox.publish(simpleNote)
+            print("✅ Published to \(publishedRelays.count) relays (outbox disabled)")
+        } catch {
+            print("❌ Failed to publish: \(error)")
+        }
+        
+        await ndkNoOutbox.disconnect()
 
         // Cleanup
         print("\n🧹 Cleaning up...")

@@ -145,7 +145,7 @@ final class NDKRelaySubscriptionManagerTests: XCTestCase {
             options: NDKSubscriptionOptions()
         )
 
-        let _ = await subscriptionManager.addSubscription(sub, filters: sub.filters)
+        _ = await subscriptionManager.addSubscription(sub, filters: sub.filters)
 
         // Simulate reconnection by calling executePendingSubscriptions
         await subscriptionManager.executePendingSubscriptions()
@@ -206,37 +206,6 @@ final class NDKRelaySubscriptionManagerTests: XCTestCase {
     func testEventRoutedToCorrectSubscription() async throws {
         // Skip - event routing to subscriptions needs proper relay subscription ID
         throw XCTSkip("Event routing test requires proper relay subscription setup")
-        let expectation = XCTestExpectation(description: "Event received")
-
-        let sub1 = NDKSubscription(
-            filters: [NDKFilter(authors: ["alice"], kinds: [1])],
-            options: NDKSubscriptionOptions()
-        )
-
-        let sub2 = NDKSubscription(
-            filters: [NDKFilter(authors: ["bob"], kinds: [1])],
-            options: NDKSubscriptionOptions()
-        )
-
-        // Set up event callback
-        sub1.onEvent { event in
-            XCTAssertEqual(event.pubkey, "alice")
-            expectation.fulfill()
-        }
-
-        let relaySubId = await subscriptionManager.addSubscription(sub1, filters: sub1.filters)
-        let _ = await subscriptionManager.addSubscription(sub2, filters: sub2.filters)
-
-        // Create event from alice
-        let event = NDKEvent(
-            pubkey: "alice",
-            kind: 1,
-            content: "Hello"
-        )
-
-        await subscriptionManager.handleEvent(event, relaySubscriptionId: relaySubId)
-
-        await fulfillment(of: [expectation], timeout: 1.0)
     }
 
     // MARK: - Subscription Removal Tests
@@ -244,51 +213,6 @@ final class NDKRelaySubscriptionManagerTests: XCTestCase {
     func testRemoveSubscriptionUpdatesFilters() async throws {
         // Skip - filter update after subscription removal needs review
         throw XCTSkip("Subscription removal and filter update needs proper implementation")
-        
-        let sub1 = NDKSubscription(
-            id: "sub1",
-            filters: [NDKFilter(authors: ["alice"], kinds: [1])],
-            options: NDKSubscriptionOptions()
-        )
-
-        let sub2 = NDKSubscription(
-            id: "sub2",
-            filters: [NDKFilter(authors: ["bob"], kinds: [1])],
-            options: NDKSubscriptionOptions()
-        )
-
-        let relaySubId = await subscriptionManager.addSubscription(sub1, filters: sub1.filters)
-        let _ = await subscriptionManager.addSubscription(sub2, filters: sub2.filters)
-
-        // Remove first subscription
-        await subscriptionManager.removeSubscription("sub1")
-
-        // Create event from alice - should not be received
-        let aliceEvent = NDKEvent(pubkey: "alice", createdAt: Timestamp(Date().timeIntervalSince1970), kind: 1, tags: [], content: "Hello")
-
-        var aliceEventReceived = false
-        sub1.onEvent { _ in
-            aliceEventReceived = true
-        }
-
-        await subscriptionManager.handleEvent(aliceEvent, relaySubscriptionId: relaySubId)
-
-        // Give time for event to be processed
-        try? await Task.sleep(nanoseconds: 100_000_000) // 100ms
-
-        XCTAssertFalse(aliceEventReceived, "Removed subscription should not receive events")
-
-        // Create event from bob - should be received
-        let bobEvent = NDKEvent(pubkey: "bob", createdAt: Timestamp(Date().timeIntervalSince1970), kind: 1, tags: [], content: "Hello")
-
-        let bobExpectation = XCTestExpectation(description: "Bob event received")
-        sub2.onEvent { _ in
-            bobExpectation.fulfill()
-        }
-
-        await subscriptionManager.handleEvent(bobEvent, relaySubscriptionId: relaySubId)
-
-        await fulfillment(of: [bobExpectation], timeout: 1.0)
     }
 
     // MARK: - Fingerprint Tests

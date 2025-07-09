@@ -75,7 +75,7 @@ public class NDKList {
         30000, // Categorized people list
         30001, // Categorized bookmark list
         30002, // Relay list metadata
-        30063, // Blossom server list
+        30063 // Blossom server list
     ]
 
     /// Initialize a new list
@@ -94,7 +94,7 @@ public class NDKList {
     public var title: String? {
         get {
             // First check for explicit title tag
-            if let titleTag = tags.first(where: { $0.count > 0 && ($0[0] == "title" || $0[0] == "name") }) {
+            if let titleTag = tags.first(where: { !$0.isEmpty && ($0[0] == "title" || $0[0] == "name") }) {
                 return titleTag.count > 1 ? titleTag[1] : nil
             }
 
@@ -103,7 +103,7 @@ public class NDKList {
         }
         set {
             // Remove existing title/name tags
-            tags.removeAll { $0.count > 0 && ($0[0] == "title" || $0[0] == "name") }
+            tags.removeAll { !$0.isEmpty && ($0[0] == "title" || $0[0] == "name") }
 
             // Add new title if provided
             if let title = newValue, !title.isEmpty {
@@ -137,11 +137,11 @@ public class NDKList {
     /// Description of this list
     public var listDescription: String? {
         get {
-            let descTag = tags.first { $0.count > 0 && $0[0] == "description" }
+            let descTag = tags.first { !$0.isEmpty && $0[0] == "description" }
             return (descTag?.count ?? 0) > 1 ? descTag?[1] : nil
         }
         set {
-            tags.removeAll { $0.count > 0 && $0[0] == "description" }
+            tags.removeAll { !$0.isEmpty && $0[0] == "description" }
             if let description = newValue, !description.isEmpty {
                 tags.append(["description", description])
             }
@@ -151,11 +151,11 @@ public class NDKList {
     /// Image URL for this list
     public var image: String? {
         get {
-            let imageTag = tags.first { $0.count > 0 && $0[0] == "image" }
+            let imageTag = tags.first { !$0.isEmpty && $0[0] == "image" }
             return (imageTag?.count ?? 0) > 1 ? imageTag?[1] : nil
         }
         set {
-            tags.removeAll { $0.count > 0 && $0[0] == "image" }
+            tags.removeAll { !$0.isEmpty && $0[0] == "image" }
             if let image = newValue, !image.isEmpty {
                 tags.append(["image", image])
             }
@@ -166,7 +166,7 @@ public class NDKList {
     public var publicItems: [Tag] {
         return tags.filter { tag in
             // Include standard list item tags but exclude metadata tags
-            guard tag.count > 0 else { return false }
+            guard !tag.isEmpty else { return false }
             let tagType = tag[0]
             switch tagType {
             case "p", "e", "a", "r", "t":
@@ -291,7 +291,7 @@ public class NDKList {
             if position == .top {
                 // Insert after metadata tags
                 let metadataCount = tags.prefix { tag in
-                    guard tag.count > 0 else { return false }
+                    guard !tag.isEmpty else { return false }
                     return ["title", "name", "description", "image"].contains(tag[0])
                 }.count
                 tags.insert(listTag, at: metadataCount)
@@ -455,7 +455,7 @@ public class NDKList {
     /// Sign this list as an event
     public func sign() async throws {
         guard let signer = ndk?.signer else {
-            throw NDKError.crypto("no_signer", "No signer configured")
+            throw NDKError.notConfigured("No signer configured")
         }
 
         let event = toNDKEvent()
@@ -477,7 +477,7 @@ public class NDKList {
     /// Publish this list
     public func publish() async throws {
         guard let ndk = ndk else {
-            throw NDKError.runtime("list_error", "NDK instance not available")
+            throw NDKError.notConfigured("NDK instance not available")
         }
 
         try await sign()
@@ -502,7 +502,7 @@ extension NDKEvent: NDKListItem {
     public func toListTag() -> Tag {
         if isParameterizedReplaceable {
             // Use 'a' tag for parameterized replaceable events
-            let dTagElement = tags.first { $0.count > 0 && $0[0] == "d" }
+            let dTagElement = tags.first { !$0.isEmpty && $0[0] == "d" }
             let dTag = (dTagElement?.count ?? 0) > 1 ? dTagElement![1] : ""
             let aTagValue = "\(kind):\(pubkey):\(dTag)"
             return ["a", aTagValue]
@@ -514,7 +514,7 @@ extension NDKEvent: NDKListItem {
 
     public var reference: String {
         if isParameterizedReplaceable {
-            let dTagElement = tags.first { $0.count > 0 && $0[0] == "d" }
+            let dTagElement = tags.first { !$0.isEmpty && $0[0] == "d" }
             let dTag = (dTagElement?.count ?? 0) > 1 ? dTagElement![1] : ""
             return "\(kind):\(pubkey):\(dTag)"
         } else {

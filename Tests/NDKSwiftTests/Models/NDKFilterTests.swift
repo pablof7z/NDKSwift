@@ -143,7 +143,7 @@ final class NDKFilterTests: XCTestCase {
             kind: 1,
             tags: [
                 ["e", "referenced123"],
-                ["p", "mentioned456"],
+                ["p", "mentioned456"]
             ],
             content: "Test"
         )
@@ -156,7 +156,7 @@ final class NDKFilterTests: XCTestCase {
             kind: 1,
             tags: [
                 ["e", "referenced123"],
-                ["p", "different789"],
+                ["p", "different789"]
             ],
             content: "Test"
         )
@@ -169,7 +169,7 @@ final class NDKFilterTests: XCTestCase {
             kind: 1,
             tags: [
                 ["e", "different111"],
-                ["p", "different222"],
+                ["p", "different222"]
             ],
             content: "Test"
         )
@@ -187,7 +187,7 @@ final class NDKFilterTests: XCTestCase {
             kind: 1,
             tags: [
                 ["t", "nostr"],
-                ["t", "test"],
+                ["t", "test"]
             ],
             content: "Test"
         )
@@ -199,7 +199,7 @@ final class NDKFilterTests: XCTestCase {
             createdAt: 1500,
             kind: 1,
             tags: [
-                ["t", "bitcoin"],
+                ["t", "bitcoin"]
             ],
             content: "Test"
         )
@@ -212,7 +212,7 @@ final class NDKFilterTests: XCTestCase {
             kind: 1,
             tags: [
                 ["t", "ethereum"],
-                ["t", "defi"],
+                ["t", "defi"]
             ],
             content: "Test"
         )
@@ -304,5 +304,115 @@ final class NDKFilterTests: XCTestCase {
         )
 
         XCTAssertTrue(emptyFilter.matches(event: event))
+    }
+    
+    // MARK: - Test Cases from nostr-tools
+    
+    func testNostrToolsFilterMatchingVectors() {
+        // Test vectors inspired by nostr-tools filter.test.ts
+        
+        // Test ID filtering
+        let idFilter = NDKFilter(ids: ["a84c5de86f48e93c57f18bb8330cded0241d6dd40c559bbf462a6e8b8660c7e0"])
+        let eventWithId = NDKEvent(pubkey: "test", createdAt: 1234, kind: 1, content: "test")
+        eventWithId.id = "a84c5de86f48e93c57f18bb8330cded0241d6dd40c559bbf462a6e8b8660c7e0"
+        XCTAssertTrue(idFilter.matches(event: eventWithId))
+        
+        eventWithId.id = "different_id"
+        XCTAssertFalse(idFilter.matches(event: eventWithId))
+        
+        // Test kind filtering
+        let kindFilter = NDKFilter(kinds: [1, 2, 3])
+        let eventKind1 = NDKEvent(pubkey: "test", createdAt: 1234, kind: 1, content: "test")
+        let eventKind4 = NDKEvent(pubkey: "test", createdAt: 1234, kind: 4, content: "test")
+        XCTAssertTrue(kindFilter.matches(event: eventKind1))
+        XCTAssertFalse(kindFilter.matches(event: eventKind4))
+        
+        // Test author filtering
+        let authorFilter = NDKFilter(authors: ["82341f882b6eabcd2ba7f1ef90aad961cf074af15b9ef44a09f9d2a8fbfbe6a2"])
+        let eventWithAuthor = NDKEvent(pubkey: "82341f882b6eabcd2ba7f1ef90aad961cf074af15b9ef44a09f9d2a8fbfbe6a2", createdAt: 1234, kind: 1, content: "test")
+        let eventDifferentAuthor = NDKEvent(pubkey: "different_author", createdAt: 1234, kind: 1, content: "test")
+        XCTAssertTrue(authorFilter.matches(event: eventWithAuthor))
+        XCTAssertFalse(authorFilter.matches(event: eventDifferentAuthor))
+        
+        // Test timestamp filtering
+        let timestampFilter = NDKFilter(since: 1000, until: 2000)
+        let eventIn = NDKEvent(pubkey: "test", createdAt: 1500, kind: 1, content: "test")
+        let eventBefore = NDKEvent(pubkey: "test", createdAt: 500, kind: 1, content: "test")
+        let eventAfter = NDKEvent(pubkey: "test", createdAt: 2500, kind: 1, content: "test")
+        XCTAssertTrue(timestampFilter.matches(event: eventIn))
+        XCTAssertFalse(timestampFilter.matches(event: eventBefore))
+        XCTAssertFalse(timestampFilter.matches(event: eventAfter))
+        
+        // Test combined filters
+        let combinedFilter = NDKFilter(
+            authors: ["82341f882b6eabcd2ba7f1ef90aad961cf074af15b9ef44a09f9d2a8fbfbe6a2"],
+            kinds: [1],
+            since: 1000,
+            until: 2000
+        )
+        
+        let perfectMatch = NDKEvent(
+            pubkey: "82341f882b6eabcd2ba7f1ef90aad961cf074af15b9ef44a09f9d2a8fbfbe6a2",
+            createdAt: 1500,
+            kind: 1,
+            content: "perfect match"
+        )
+        XCTAssertTrue(combinedFilter.matches(event: perfectMatch))
+        
+        let wrongKind = NDKEvent(
+            pubkey: "82341f882b6eabcd2ba7f1ef90aad961cf074af15b9ef44a09f9d2a8fbfbe6a2",
+            createdAt: 1500,
+            kind: 2,
+            content: "wrong kind"
+        )
+        XCTAssertFalse(combinedFilter.matches(event: wrongKind))
+    }
+    
+    func testNostrToolsTagFiltering() {
+        // Test hashtag filtering
+        var hashtagFilter = NDKFilter()
+        hashtagFilter.addTagFilter("t", values: ["nostr", "bitcoin"])
+        
+        let eventWithHashtag = NDKEvent(
+            pubkey: "test",
+            createdAt: 1234,
+            kind: 1,
+            tags: [["t", "nostr"]],
+            content: "test"
+        )
+        XCTAssertTrue(hashtagFilter.matches(event: eventWithHashtag))
+        
+        let eventWithoutHashtag = NDKEvent(
+            pubkey: "test",
+            createdAt: 1234,
+            kind: 1,
+            tags: [["t", "ethereum"]],
+            content: "test"
+        )
+        XCTAssertFalse(hashtagFilter.matches(event: eventWithoutHashtag))
+        
+        // Test reference filtering (#e tags)
+        let referenceFilter = NDKFilter(events: ["a84c5de86f48e93c57f18bb8330cded0241d6dd40c559bbf462a6e8b8660c7e0"])
+        
+        let eventWithReference = NDKEvent(
+            pubkey: "test",
+            createdAt: 1234,
+            kind: 1,
+            tags: [["e", "a84c5de86f48e93c57f18bb8330cded0241d6dd40c559bbf462a6e8b8660c7e0"]],
+            content: "test"
+        )
+        XCTAssertTrue(referenceFilter.matches(event: eventWithReference))
+        
+        // Test mention filtering (#p tags)
+        let mentionFilter = NDKFilter(pubkeys: ["82341f882b6eabcd2ba7f1ef90aad961cf074af15b9ef44a09f9d2a8fbfbe6a2"])
+        
+        let eventWithMention = NDKEvent(
+            pubkey: "test",
+            createdAt: 1234,
+            kind: 1,
+            tags: [["p", "82341f882b6eabcd2ba7f1ef90aad961cf074af15b9ef44a09f9d2a8fbfbe6a2"]],
+            content: "test"
+        )
+        XCTAssertTrue(mentionFilter.matches(event: eventWithMention))
     }
 }

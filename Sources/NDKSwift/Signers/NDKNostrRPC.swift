@@ -48,14 +48,13 @@ public actor NDKNostrRPC {
         guard let data = decryptedContent.data(using: .utf8),
               let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
         else {
-            throw NDKError.validation("invalid_event", "Failed to parse RPC content")
+            throw NDKError.invalidMessage("Failed to parse RPC content")
         }
 
         let id = json["id"] as? String ?? ""
 
         if let method = json["method"] as? String,
-           let params = json["params"] as? [String]
-        {
+           let params = json["params"] as? [String] {
             return NDKRPCRequest(
                 id: id,
                 pubkey: event.pubkey,
@@ -84,13 +83,13 @@ public actor NDKNostrRPC {
     }
 
     func sendRequest(to pubkey: String, method: String, params: [String], handler: ((NDKRPCResponse) -> Void)? = nil) async throws {
-        let id = UUID().uuidString.prefix(8).lowercased()
+        let id = IDGenerator.randomId(length: 8)
         print("[RPC] Creating request - id: \(id), method: \(method), to: \(pubkey)")
 
         let request: [String: Any] = [
             "id": id,
             "method": method,
-            "params": params,
+            "params": params
         ]
 
         let requestData = try JSONSerialization.data(withJSONObject: request)
@@ -143,7 +142,7 @@ public actor NDKNostrRPC {
     }
 
     func sendRequest(to pubkey: String, method: String, params: [String]) async throws -> NDKRPCResponse {
-        let id = UUID().uuidString.prefix(8).lowercased()
+        let id = IDGenerator.randomId(length: 8)
 
         return try await withCheckedThrowingContinuation { continuation in
             self.pendingRequests[id] = continuation
@@ -182,7 +181,7 @@ public actor NDKNostrRPC {
 
     private func handleTimeout(id: String, continuation: CheckedContinuation<NDKRPCResponse, Error>) async {
         if pendingRequests.removeValue(forKey: id) != nil {
-            continuation.resume(throwing: NDKError.network("timeout", "Operation timed out"))
+            continuation.resume(throwing: NDKError.timeout(operation: "RPC request", seconds: 30))
         }
     }
     

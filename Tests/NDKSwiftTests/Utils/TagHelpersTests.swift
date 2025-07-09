@@ -1,5 +1,5 @@
-import XCTest
 @testable import NDKSwift
+import XCTest
 
 final class TagHelpersTests: XCTestCase {
     
@@ -458,6 +458,92 @@ final class TagHelpersTests: XCTestCase {
             let copy = event
             copy.deduplicateTags()
         }
+    }
+    
+    // MARK: - Test Vectors from nostr-tools references.test.ts
+    
+    func testNostrToolsReferenceExtractionVectors() {
+        // Test content with references (#[0], #[2] pattern)
+        let content = "Hello #[0], please see my reply to #[2] for more context."
+        let tags: [Tag] = [
+            ["p", "c9d556c6d40472cc8933c1447a2a9628641b14f6c6c1beaefa4135ad68d30fc0", "wss://nostr.com"],
+            ["e", "a84c5de86f48e93c57f18bb8330cded0241d6dd40c559bbf462a6e8b8660c7e0", "wss://other.com", "reply"],
+            ["e", "6f4b70547db32a8bec3eb9036e930f473ced96b63fd8b1300ecb85fe87745e20"]
+        ]
+        
+        // Test reference extraction patterns
+        let references = extractReferences(from: content)
+        XCTAssertEqual(references, [0, 2])
+        
+        // Test reference replacement
+        let processedContent = replaceReferences(in: content, with: tags)
+        XCTAssertTrue(processedContent.contains("@c9d556c6d40472cc8933c1447a2a9628641b14f6c6c1beaefa4135ad68d30fc0"))
+        XCTAssertTrue(processedContent.contains("#6f4b70547db32a8bec3eb9036e930f473ced96b63fd8b1300ecb85fe87745e20"))
+        XCTAssertFalse(processedContent.contains("#["))
+    }
+    
+    func testComplexReferenceScenarios() {
+        // Test overlapping references
+        let content1 = "#[0] and #[10] are both referenced"
+        let refs1 = extractReferences(from: content1)
+        XCTAssertEqual(refs1, [0, 10])
+        
+        // Test malformed references
+        let content2 = "#[a] and #[] and #[999999999] and #[-1]"
+        let refs2 = extractReferences(from: content2)
+        XCTAssertEqual(refs2, [999999999]) // Only valid numeric reference
+        
+        // Test no references
+        let content3 = "This has no references"
+        let refs3 = extractReferences(from: content3)
+        XCTAssertEqual(refs3, [])
+        
+        // Test escaped references (should not match)
+        let content4 = "This \\#[0] is escaped"
+        let refs4 = extractReferences(from: content4)
+        XCTAssertEqual(refs4, [])
+    }
+    
+    // Helper functions for reference extraction (these would be in the actual implementation)
+    private func extractReferences(from content: String) -> [Int] {
+        let pattern = #"#\[(\d+)\]"#
+        let regex = try! NSRegularExpression(pattern: pattern)
+        let matches = regex.matches(in: content, range: NSRange(content.startIndex..., in: content))
+        
+        return matches.compactMap { match in
+            guard let range = Range(match.range(at: 1), in: content) else { return nil }
+            return Int(content[range])
+        }.sorted()
+    }
+    
+    private func replaceReferences(in content: String, with tags: [Tag]) -> String {
+        var result = content
+        let pattern = #"#\[(\d+)\]"#
+        let regex = try! NSRegularExpression(pattern: pattern)
+        
+        // Replace in reverse order to maintain indices
+        let matches = regex.matches(in: content, range: NSRange(content.startIndex..., in: content))
+        
+        for match in matches.reversed() {
+            guard let range = Range(match.range, in: content),
+                  let indexRange = Range(match.range(at: 1), in: content),
+                  let index = Int(content[indexRange]),
+                  let tag = tags[safe: index] else { continue }
+            
+            let replacement: String
+            switch tag[safe: 0] {
+            case "p":
+                replacement = "@\(tag[safe: 1] ?? "")"
+            case "e":
+                replacement = "#\(tag[safe: 1] ?? "")"
+            default:
+                continue
+            }
+            
+            result.replaceSubrange(range, with: replacement)
+        }
+        
+        return result
     }
 }
 

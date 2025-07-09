@@ -24,7 +24,7 @@ public actor BlossomClient {
         }
 
         guard let baseURL = URL(string: serverURL) else {
-            throw BlossomError.invalidURL
+            throw NDKError.invalidURL(serverURL)
         }
 
         let wellKnownURL = baseURL.appendingPathComponent(".well-known/blossom")
@@ -37,11 +37,11 @@ public actor BlossomClient {
             let (data, response) = try await urlSession.data(for: request)
 
             guard let httpResponse = response as? HTTPURLResponse else {
-                throw BlossomError.invalidResponse
+                throw NDKError.invalidResponse(from: "Blossom server")
             }
 
             guard httpResponse.statusCode == 200 else {
-                throw BlossomError.serverError(httpResponse.statusCode, nil)
+                throw NDKError.serverError(relay: serverURL, code: httpResponse.statusCode, message: nil)
             }
 
             let descriptor = try JSONDecoder().decode(BlossomServerDescriptor.self, from: data)
@@ -50,10 +50,10 @@ public actor BlossomClient {
             serverCache[serverURL] = descriptor
 
             return descriptor
-        } catch let error as BlossomError {
+        } catch let error as NDKError {
             throw error
         } catch {
-            throw BlossomError.networkError(error)
+            throw NDKError.connectionFailed(relay: serverURL, message: "Network error", underlying: error)
         }
     }
 
@@ -67,7 +67,7 @@ public actor BlossomClient {
         auth: BlossomAuth
     ) async throws -> BlossomBlob {
         guard let baseURL = URL(string: serverURL) else {
-            throw BlossomError.invalidURL
+            throw NDKError.invalidURL(serverURL)
         }
 
         // Calculate SHA256
@@ -79,15 +79,14 @@ public actor BlossomClient {
 
         // Validate file size if server has limits
         if let maxSize = descriptor?.maxUploadSize, data.count > maxSize {
-            throw BlossomError.fileTooLarge
+            throw NDKError.fileTooLarge(maxSize: maxSize)
         }
 
         // Validate mime type if server has restrictions
         if let acceptedTypes = descriptor?.acceptsMimeTypes,
            let mimeType = mimeType,
-           !acceptedTypes.contains(mimeType) && !acceptedTypes.contains("*/*")
-        {
-            throw BlossomError.unsupportedMimeType
+           !acceptedTypes.contains(mimeType) && !acceptedTypes.contains("*/*") {
+            throw NDKError.unsupportedMimeType(mimeType ?? "unknown")
         }
 
         // Construct upload URL
@@ -110,7 +109,7 @@ public actor BlossomClient {
             let (responseData, response) = try await urlSession.data(for: request)
 
             guard let httpResponse = response as? HTTPURLResponse else {
-                throw BlossomError.invalidResponse
+                throw NDKError.invalidResponse(from: "Blossom server")
             }
 
             switch httpResponse.statusCode {
@@ -119,7 +118,7 @@ public actor BlossomClient {
 
                 // Verify SHA256 matches
                 guard uploadDescriptor.sha256 == sha256Hex else {
-                    throw BlossomError.invalidSHA256
+                    throw NDKError.invalidSHA256(sha256Hex)
                 }
 
                 return BlossomBlob(
@@ -131,22 +130,22 @@ public actor BlossomClient {
                 )
 
             case 401:
-                throw BlossomError.unauthorized
+                throw NDKError.unauthorized(relay: serverURL, message: "Blossom authorization failed")
 
             case 413:
-                throw BlossomError.fileTooLarge
+                throw NDKError.fileTooLarge(maxSize: descriptor?.maxUploadSize ?? Int64.max)
 
             case 415:
-                throw BlossomError.unsupportedMimeType
+                throw NDKError.unsupportedMimeType(mimeType ?? "unknown")
 
             default:
                 let errorMessage = String(data: responseData, encoding: .utf8)
-                throw BlossomError.serverError(httpResponse.statusCode, errorMessage)
+                throw NDKError.serverError(relay: serverURL, code: httpResponse.statusCode, message: errorMessage)
             }
-        } catch let error as BlossomError {
+        } catch let error as NDKError {
             throw error
         } catch {
-            throw BlossomError.networkError(error)
+            throw NDKError.connectionFailed(relay: serverURL, message: "Network error", underlying: error)
         }
     }
 
@@ -160,7 +159,7 @@ public actor BlossomClient {
         until: Date? = nil
     ) async throws -> [BlossomBlob] {
         guard let baseURL = URL(string: serverURL) else {
-            throw BlossomError.invalidURL
+            throw NDKError.invalidURL(serverURL)
         }
 
         let descriptor = try? await discoverServer(serverURL)
@@ -182,7 +181,7 @@ public actor BlossomClient {
         }
 
         guard let listURL = urlComponents.url else {
-            throw BlossomError.invalidURL
+            throw NDKError.invalidURL(serverURL)
         }
 
         var request = URLRequest(url: listURL)
@@ -196,7 +195,7 @@ public actor BlossomClient {
             let (data, response) = try await urlSession.data(for: request)
 
             guard let httpResponse = response as? HTTPURLResponse else {
-                throw BlossomError.invalidResponse
+                throw NDKError.invalidResponse(from: "Blossom server")
             }
 
             switch httpResponse.statusCode {
@@ -214,16 +213,16 @@ public actor BlossomClient {
                 }
 
             case 401:
-                throw BlossomError.unauthorized
+                throw NDKError.unauthorized(relay: serverURL, message: "Blossom authorization failed")
 
             default:
                 let errorMessage = String(data: data, encoding: .utf8)
-                throw BlossomError.serverError(httpResponse.statusCode, errorMessage)
+                throw NDKError.serverError(relay: serverURL, code: httpResponse.statusCode, message: errorMessage)
             }
-        } catch let error as BlossomError {
+        } catch let error as NDKError {
             throw error
         } catch {
-            throw BlossomError.networkError(error)
+            throw NDKError.connectionFailed(relay: serverURL, message: "Network error", underlying: error)
         }
     }
 
@@ -236,7 +235,7 @@ public actor BlossomClient {
         auth: BlossomAuth
     ) async throws {
         guard let baseURL = URL(string: serverURL) else {
-            throw BlossomError.invalidURL
+            throw NDKError.invalidURL(serverURL)
         }
 
         let deleteURL = baseURL.appendingPathComponent(sha256)
@@ -251,7 +250,7 @@ public actor BlossomClient {
             let (data, response) = try await urlSession.data(for: request)
 
             guard let httpResponse = response as? HTTPURLResponse else {
-                throw BlossomError.invalidResponse
+                throw NDKError.invalidResponse(from: "Blossom server")
             }
 
             switch httpResponse.statusCode {
@@ -260,19 +259,19 @@ public actor BlossomClient {
                 return
 
             case 401:
-                throw BlossomError.unauthorized
+                throw NDKError.unauthorized(relay: serverURL, message: "Blossom authorization failed")
 
             case 404:
-                throw BlossomError.blobNotFound
+                throw NDKError.blobNotFound(sha256: sha256)
 
             default:
                 let errorMessage = String(data: data, encoding: .utf8)
-                throw BlossomError.serverError(httpResponse.statusCode, errorMessage)
+                throw NDKError.serverError(relay: serverURL, code: httpResponse.statusCode, message: errorMessage)
             }
-        } catch let error as BlossomError {
+        } catch let error as NDKError {
             throw error
         } catch {
-            throw BlossomError.networkError(error)
+            throw NDKError.connectionFailed(relay: serverURL, message: "Network error", underlying: error)
         }
     }
 
@@ -284,7 +283,7 @@ public actor BlossomClient {
         from serverURL: String
     ) async throws -> Data {
         guard let url = URL(string: "\(serverURL)/\(sha256)") else {
-            throw BlossomError.invalidURL
+            throw NDKError.invalidURL(serverURL)
         }
 
         var request = URLRequest(url: url)
@@ -294,7 +293,7 @@ public actor BlossomClient {
             let (data, response) = try await urlSession.data(for: request)
 
             guard let httpResponse = response as? HTTPURLResponse else {
-                throw BlossomError.invalidResponse
+                throw NDKError.invalidResponse(from: "Blossom server")
             }
 
             switch httpResponse.statusCode {
@@ -304,22 +303,22 @@ public actor BlossomClient {
                 let downloadedHex = downloadedSHA256.compactMap { String(format: "%02x", $0) }.joined()
 
                 guard downloadedHex == sha256 else {
-                    throw BlossomError.invalidSHA256
+                    throw NDKError.invalidSHA256(sha256)
                 }
 
                 return data
 
             case 404:
-                throw BlossomError.blobNotFound
+                throw NDKError.blobNotFound(sha256: sha256)
 
             default:
                 let errorMessage = String(data: data, encoding: .utf8)
-                throw BlossomError.serverError(httpResponse.statusCode, errorMessage)
+                throw NDKError.serverError(relay: serverURL, code: httpResponse.statusCode, message: errorMessage)
             }
-        } catch let error as BlossomError {
+        } catch let error as NDKError {
             throw error
         } catch {
-            throw BlossomError.networkError(error)
+            throw NDKError.connectionFailed(relay: serverURL, message: "Network error", underlying: error)
         }
     }
 

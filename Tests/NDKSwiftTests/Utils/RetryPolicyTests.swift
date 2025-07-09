@@ -1,5 +1,5 @@
-import XCTest
 @testable import NDKSwift
+import XCTest
 
 final class RetryPolicyTests: XCTestCase {
     
@@ -149,7 +149,7 @@ final class RetryPolicyTests: XCTestCase {
         let result = try await policy.execute {
             attemptCount += 1
             if attemptCount < 3 {
-                throw NDKError.network("simulated_failure", "Simulated failure")
+                throw NDKError.connectionFailed(relay: "test", message: "Simulated failure")
             }
             return "Success"
         }
@@ -171,7 +171,7 @@ final class RetryPolicyTests: XCTestCase {
         do {
             _ = try await policy.execute {
                 attemptCount += 1
-                throw NDKError.network("always_fails", "Always fails")
+                throw NDKError.connectionFailed(relay: "test", message: "Always fails")
             }
             XCTFail("Should have thrown")
         } catch {
@@ -194,13 +194,15 @@ final class RetryPolicyTests: XCTestCase {
             _ = try await policy.execute(
                 operation: {
                     attemptCount += 1
-                    throw NDKError.crypto("invalid_signature", "Invalid signature") // Non-retryable error
+                    throw NDKError.invalidSignature("Invalid signature") // Non-retryable error
                 },
                 shouldRetry: { error in
                     // Don't retry signature errors
-                    if let ndkError = error as? NDKError,
-                       ndkError.category == .crypto {
-                        return false
+                    if error is NDKError {
+                        // Check if it's a signature error
+                        if case NDKError.invalidSignature = error {
+                            return false
+                        }
                     }
                     return true
                 }

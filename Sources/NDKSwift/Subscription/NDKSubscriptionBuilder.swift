@@ -6,9 +6,6 @@ public class NDKSubscriptionBuilder {
     private var filters: [NDKFilter] = []
     private var currentFilter: NDKFilter?
     private var options = NDKSubscriptionOptions()
-    private var eventHandler: ((NDKEvent) -> Void)?
-    private var eoseHandler: (() -> Void)?
-    private var errorHandler: ((Error) -> Void)?
     private var autoStart = true
     
     init(ndk: NDK) {
@@ -82,10 +79,10 @@ public class NDKSubscriptionBuilder {
     
     // MARK: - Options Configuration
     
-    /// Set cache strategy
+    /// Enable or disable cache usage
     @discardableResult
-    public func cacheStrategy(_ strategy: NDKCacheStrategy) -> Self {
-        options.cacheStrategy = strategy
+    public func useCache(_ useCache: Bool) -> Self {
+        options.useCache = useCache
         return self
     }
     
@@ -110,29 +107,6 @@ public class NDKSubscriptionBuilder {
         return self
     }
     
-    // MARK: - Event Handlers
-    
-    /// Set event handler
-    @discardableResult
-    public func onEvent(_ handler: @escaping (NDKEvent) -> Void) -> Self {
-        eventHandler = handler
-        return self
-    }
-    
-    /// Set EOSE handler
-    @discardableResult
-    public func onEose(_ handler: @escaping () -> Void) -> Self {
-        eoseHandler = handler
-        return self
-    }
-    
-    /// Set error handler
-    @discardableResult
-    public func onError(_ handler: @escaping (Error) -> Void) -> Self {
-        errorHandler = handler
-        return self
-    }
-    
     // MARK: - Build and Start
     
     /// Build and optionally start the subscription
@@ -149,26 +123,10 @@ public class NDKSubscriptionBuilder {
         
         let subscription = ndk.subscribe(filters: filters, options: options)
         
-        // Handle legacy callback handlers by converting to async
-        if eventHandler != nil || eoseHandler != nil || errorHandler != nil {
-            Task { [weak subscription] in
-                guard let subscription = subscription else { return }
-                for await update in subscription.updates {
-                    switch update {
-                    case .event(let event):
-                        eventHandler?(event)
-                    case .eose:
-                        eoseHandler?()
-                    case .error(let error):
-                        errorHandler?(error as? NDKError ?? NDKError.runtime("subscription_error", error.localizedDescription))
-                        break
-                    }
-                }
-            }
-        }
-        
         if autoStart {
-            subscription.start()
+            Task {
+                await subscription.start()
+            }
         }
         
         return subscription
@@ -188,37 +146,6 @@ extension NDK {
         return NDKSubscriptionBuilder(ndk: self)
     }
     
-    /// Subscribe with auto-start and inline event handler
-    @discardableResult
-    public func subscribe(
-        filters: [NDKFilter],
-        options: NDKSubscriptionOptions = NDKSubscriptionOptions(),
-        onEvent: @escaping (NDKEvent) -> Void
-    ) -> NDKSubscription {
-        let subscription = subscribe(filters: filters, options: options)
-        
-        // Handle events asynchronously
-        Task { [weak subscription] in
-            guard let subscription = subscription else { return }
-            for await event in subscription {
-                onEvent(event)
-            }
-        }
-        
-        subscription.start()
-        return subscription
-    }
-    
-    /// Subscribe to a single filter with auto-start
-    @discardableResult
-    public func subscribe(
-        filter: NDKFilter,
-        options: NDKSubscriptionOptions = NDKSubscriptionOptions(),
-        onEvent: @escaping (NDKEvent) -> Void
-    ) -> NDKSubscription {
-        return subscribe(filters: [filter], options: options, onEvent: onEvent)
-    }
-    
     /// Fetch events and auto-close on EOSE
     public func fetch(
         _ filter: NDKFilter,
@@ -233,12 +160,16 @@ extension NDK {
         // Collect events asynchronously
         Task { [weak subscription] in
             guard let subscription = subscription else { return }
-            for await event in subscription {
-                events.append(event)
+            do {
+                for try await event in subscription {
+                    events.append(event)
+                }
+            } catch {
+                // Ignore errors for fetch operation
             }
         }
         
-        subscription.start()
+        await subscription.start()
         
         // Wait for EOSE or timeout
         try await withThrowingTaskGroup(of: Void.self) { group in
@@ -248,7 +179,7 @@ extension NDK {
             
             group.addTask {
                 try await Task.sleep(nanoseconds: UInt64(timeout * 1_000_000_000))
-                throw NDKError.network("timeout", "Operation timed out")
+                throw NDKError.timeout(operation: "Fetch events", seconds: Int(timeout))
             }
             
             try await group.next()
@@ -272,12 +203,16 @@ extension NDK {
         // Collect events asynchronously
         Task { [weak subscription] in
             guard let subscription = subscription else { return }
-            for await event in subscription {
-                events.append(event)
+            do {
+                for try await event in subscription {
+                    events.append(event)
+                }
+            } catch {
+                // Ignore errors for fetch operation
             }
         }
         
-        subscription.start()
+        await subscription.start()
         
         // Wait for EOSE or timeout
         try await withThrowingTaskGroup(of: Void.self) { group in
@@ -287,7 +222,7 @@ extension NDK {
             
             group.addTask {
                 try await Task.sleep(nanoseconds: UInt64(timeout * 1_000_000_000))
-                throw NDKError.network("timeout", "Operation timed out")
+                throw NDKError.timeout(operation: "Fetch events", seconds: Int(timeout))
             }
             
             try await group.next()
@@ -314,55 +249,27 @@ extension NDK {
                     return
                 }
                 
-                for await update in subscription.updates {
-                    switch update {
-                    case .event(let event):
+                // Start the subscription
+                await subscription.start()
+                
+                do {
+                    for try await event in subscription {
                         continuation.yield(event)
-                    case .eose, .error:
-                        continuation.finish()
-                        break
                     }
+                    continuation.finish()
+                } catch {
+                    continuation.finish()
                 }
             }
             
-            subscription.start()
-            
             continuation.onTermination = { _ in
-                subscription.close()
+                Task {
+                    await subscription.close()
+                }
             }
         }
     }
     
-    /// Subscribe and automatically close after receiving N events
-    @discardableResult
-    public func subscribeOnce(
-        _ filter: NDKFilter,
-        limit: Int = 1,
-        completion: @escaping ([NDKEvent]) -> Void
-    ) -> NDKSubscription {
-        var collectedEvents: [NDKEvent] = []
-        var completed = false
-        let subscription = subscribe(filters: [filter])
-        
-        // Collect events asynchronously
-        Task { [weak subscription] in
-            guard let subscription = subscription else { return }
-            
-            for await event in subscription {
-                guard !completed else { break }
-                collectedEvents.append(event)
-                if collectedEvents.count >= limit {
-                    completed = true
-                    subscription.close()
-                    completion(Array(collectedEvents.prefix(limit)))
-                    break
-                }
-            }
-        }
-        
-        subscription.start()
-        return subscription
-    }
 }
 
 // MARK: - Profile Fetching Convenience
@@ -404,24 +311,6 @@ extension NDK {
         
         return profiles
     }
-    
-    /// Subscribe to profile updates for a user
-    @discardableResult
-    public func subscribeToProfile(
-        _ pubkey: PublicKey,
-        onUpdate: @escaping (NDKUserProfile) -> Void
-    ) -> NDKSubscription {
-        var filter = NDKFilter()
-        filter.authors = [pubkey]
-        filter.kinds = [0] // Profile metadata
-        
-        return subscribe(filter: filter) { event in
-            if let profileData = event.content.data(using: .utf8),
-               let profile = try? JSONCoding.decoder.decode(NDKUserProfile.self, from: profileData) {
-                onUpdate(profile)
-            }
-        }
-    }
 }
 
 // MARK: - Subscription Groups
@@ -437,37 +326,45 @@ public class NDKSubscriptionGroup {
     
     /// Add a subscription to the group
     @discardableResult
-    public func subscribe(
-        _ filter: NDKFilter,
-        onEvent: @escaping (NDKEvent) -> Void
-    ) -> NDKSubscription {
-        let subscription = ndk.subscribe(filter: filter, onEvent: onEvent)
+    public func subscribe(_ filter: NDKFilter) -> NDKSubscription {
+        let subscription = ndk.subscribe(filters: [filter])
         subscriptions.append(subscription)
+        Task {
+            await subscription.start()
+        }
         return subscription
     }
     
     /// Add multiple filters as a single subscription
     @discardableResult
-    public func subscribe(
-        filters: [NDKFilter],
-        onEvent: @escaping (NDKEvent) -> Void
-    ) -> NDKSubscription {
-        let subscription = ndk.subscribe(filters: filters, onEvent: onEvent)
+    public func subscribe(filters: [NDKFilter]) -> NDKSubscription {
+        let subscription = ndk.subscribe(filters: filters)
         subscriptions.append(subscription)
+        Task {
+            await subscription.start()
+        }
         return subscription
     }
     
     /// Close all subscriptions in the group
-    public func closeAll() {
+    public func closeAll() async {
         for subscription in subscriptions {
-            subscription.close()
+            await subscription.close()
         }
         subscriptions.removeAll()
     }
     
     /// Get all active subscriptions
     public var activeSubscriptions: [NDKSubscription] {
-        return subscriptions.filter { $0.state != .closed }
+        get async {
+            var active: [NDKSubscription] = []
+            for subscription in subscriptions {
+                if await subscription.state != .closed {
+                    active.append(subscription)
+                }
+            }
+            return active
+        }
     }
 }
 

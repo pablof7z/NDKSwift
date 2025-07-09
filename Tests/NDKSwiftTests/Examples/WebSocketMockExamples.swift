@@ -1,5 +1,5 @@
-import XCTest
 @testable import NDKSwift
+import XCTest
 
 /// Example tests demonstrating mock relay usage patterns
 final class WebSocketMockExamples: XCTestCase {
@@ -144,7 +144,7 @@ final class WebSocketMockExamples: XCTestCase {
         try await Task.sleep(nanoseconds: 150_000_000)
         
         // Verify REQ was sent
-        XCTAssertTrue(mockRelay.sentMessages.count > 0)
+        XCTAssertTrue(!mockRelay.sentMessages.isEmpty)
     }
     
     // MARK: - Example 5: Testing Concurrent Operations

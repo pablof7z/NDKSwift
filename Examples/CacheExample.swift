@@ -8,13 +8,10 @@ struct CacheExample {
         print("🚀 NDKCache Example")
         
         do {
-            // Create cache instance
-            let cache = try await NDKCache()
-            
-            // Create NDK instance with cache
+            // Create NDK instance without cache for now
+            // (cache implementations have been removed from the codebase)
             let ndk = NDK(
-                relayUrls: ["wss://relay.damus.io"],
-                cache: cache
+                relayUrls: ["wss://relay.damus.io"]
             )
             
             // Example event
@@ -27,21 +24,20 @@ struct CacheExample {
             event.id = try event.generateID()
             
             // Save event to cache
-            print("\n💾 Saving event to cache...")
-            try await cache.saveEvent(event)
-            print("✅ Event saved!")
+            print("\n💾 Would save event to cache...")
+            // try await cache.saveEvent(event) - cache not available
+            print("✅ Event would be saved!")
             
             // Retrieve event from cache
-            print("\n🔍 Retrieving event from cache...")
-            if let retrieved = await cache.getEvent(event.id!) {
-                print("✅ Event retrieved: \(retrieved.content)")
-            }
+            print("\n🔍 Would retrieve event from cache...")
+            // if let retrieved = await cache.getEvent(event.id!) - cache not available
+            print("✅ Event content: \(event.content)")
             
             // Query events by filter
-            print("\n🔎 Querying events by author...")
+            print("\n🔎 Would query events by author...")
             let filter = NDKFilter(authors: [event.pubkey])
-            let events = await cache.queryEvents(filter)
-            print("✅ Found \(events.count) event(s)")
+            // let events = await cache.queryEvents(filter) - cache not available
+            print("✅ Filter created for author")
             
             // Save and retrieve profile
             print("\n👤 Saving user profile...")
@@ -52,22 +48,21 @@ struct CacheExample {
                 picture: nil,
                 banner: nil,
                 nip05: nil,
-                lud06: nil,
-                lud16: nil
+                lud16: nil,
+                lud06: nil
             )
-            try await cache.saveProfile(profile, for: event.pubkey)
-            print("✅ Profile saved!")
+            // try await cache.saveProfile(profile, for: event.pubkey) - cache not available
+            print("✅ Profile would be saved!")
             
-            if let retrievedProfile = await cache.getProfile(for: event.pubkey) {
-                print("✅ Profile retrieved: \(retrievedProfile.name ?? "Unknown")")
-            }
+            // if let retrievedProfile = await cache.getProfile(for: event.pubkey) - cache not available
+            print("✅ Profile name: \(profile.name ?? "Unknown")")
             
             // Get cache statistics
             print("\n📊 Cache Statistics:")
-            let stats = await cache.statistics()
-            print("  Hits: \(stats.hits)")
-            print("  Misses: \(stats.misses)")
-            print("  Current size: \(stats.currentSize)")
+            // let stats = await cache.statistics() - cache not available
+            print("  Hits: (would show cache hits)")
+            print("  Misses: (would show cache misses)")
+            print("  Current size: (would show cache size)")
             
         } catch {
             print("❌ Error: \(error)")

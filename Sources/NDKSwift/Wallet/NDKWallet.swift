@@ -40,7 +40,6 @@ public struct NDKLightningPaymentConfirmation: NDKPaymentConfirmation {
     }
 }
 
-
 /// Base wallet protocol
 public protocol NDKWallet {
     /// Pay a payment request
@@ -62,19 +61,3 @@ public enum NDKPaymentMethod: String {
     case nwc = "nip47"
 }
 
-/// Wallet configuration for NDK
-public struct NDKWalletConfig {
-    /// Lightning payment callback
-    public var lnPay: ((NDKPaymentRequest, String) async throws -> NDKLightningPaymentConfirmation?)?
-
-    /// Completion callback
-    public var onPaymentComplete: ((NDKPaymentConfirmation?, Error?) -> Void)?
-
-    public init(
-        lnPay: ((NDKPaymentRequest, String) async throws -> NDKLightningPaymentConfirmation?)? = nil,
-        onPaymentComplete: ((NDKPaymentConfirmation?, Error?) -> Void)? = nil
-    ) {
-        self.lnPay = lnPay
-        self.onPaymentComplete = onPaymentComplete
-    }
-}

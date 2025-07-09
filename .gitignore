@@ -14,3 +14,6 @@ Examples/build
 repomix-output.*
 debug_*.swift
 test_*.swift
+
+# TENEX project files
+.tenex/

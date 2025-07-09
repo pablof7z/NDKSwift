@@ -1,5 +1,3 @@
-#!/usr/bin/env swift
-
 import Foundation
 import NDKSwift
 
@@ -182,7 +180,7 @@ struct MircStyleChat {
         let nickname = readLine()?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
         
         do {
-            let pubkey = try Bech32.publicKey(from: npub)
+            let pubkey = try Bech32.pubkey(from: npub)
             let name = nickname.isEmpty ? String(pubkey.prefix(8)) : nickname
             return (pubkey, npub, name)
         } catch {
@@ -204,17 +202,13 @@ struct MircStyleChat {
         
         for relayUrl in relays {
             print("  \(Colors.dim)→\(Colors.reset) \(relayUrl)", terminator: "")
-            do {
-                _ = try await ndk.relay(relayUrl)
-                print(" \(Colors.green)✓\(Colors.reset)")
-            } catch {
-                print(" \(Colors.red)✗\(Colors.reset)")
-            }
+            _ = ndk.addRelay(relayUrl)
+            print(" \(Colors.green)✓\(Colors.reset)")
         }
         
         try? await Task.sleep(nanoseconds: 1_500_000_000)
         
-        let connectedCount = ndk.pool.relays.filter { $0.connectionState == .connected }.count
+        let connectedCount = ndk.relays.filter { $0.connectionState == .connected }.count
         print("\n\(Colors.green)Connected to \(connectedCount) relays\(Colors.reset)")
         print("\nPress Enter to start chatting...")
         _ = readLine()
@@ -230,12 +224,12 @@ struct MircStyleChat {
         // Create filter for last 24 hours of messages
         let since = Timestamp(Date().timeIntervalSince1970 - 86400) // 24 hours ago
         
-        let filter = NDKFilter(
-            kinds: [9999],
+        var filter = NDKFilter(
             authors: [userPubkey, recipientPubkey],
-            tags: ["p": [userPubkey, recipientPubkey]],
+            kinds: [9999],
             since: since
         )
+        filter.addTagFilter("p", values: [userPubkey, recipientPubkey])
         
         do {
             let events = try await ndk.fetchEvents(filter)
@@ -398,7 +392,7 @@ struct MircStyleChat {
         case "/status", "/s":
             print("\n\(Colors.yellow)📊 Connection Status\(Colors.reset)")
             print("\(Colors.dim)───────────────────\(Colors.reset)")
-            for relay in ndk.pool.relays {
+            for relay in ndk.relays {
                 let state = relay.connectionState
                 let icon = state == .connected ? "\(Colors.green)●\(Colors.reset)" : "\(Colors.red)●\(Colors.reset)"
                 print("\(icon) \(relay.url): \(state)")
@@ -451,7 +445,8 @@ struct MircStyleChat {
             content: encrypted
         )
         
-        try await event.sign(using: signer)
+        event.ndk = ndk
+        try await event.sign()
         _ = try await ndk.publish(event)
     }
     
@@ -462,17 +457,17 @@ struct MircStyleChat {
         signer: NDKPrivateKeySigner,
         recipientName: String
     ) async {
-        let filter = NDKFilter(
-            kinds: [9999],
+        var filter = NDKFilter(
             authors: [recipientPubkey], // Only listen for messages from recipient
-            tags: ["p": [userPubkey]]   // That are tagged to us
+            kinds: [9999]
         )
+        filter.addTagFilter("p", values: [userPubkey])   // That are tagged to us
         
-        let subscription = await ndk.subscribe(filter)
+        let subscription = ndk.subscribe(filters: [filter])
         var seenEvents = Set<String>()
         
         do {
-            for await event in subscription {
+            for try await event in subscription {
                 guard let eventId = event.id,
                       !seenEvents.contains(eventId) else {
                     continue
@@ -481,7 +476,7 @@ struct MircStyleChat {
                 
                 // Check if it's NIP-44
                 let isNip44 = event.tags.contains { tag in
-                    tag.count >= 2 && tag[0] == "encrypted" && tag[1] == "nip44"
+                    return tag.count >= 2 && tag[0] == "encrypted" && tag[1] == "nip44"
                 }
                 
                 guard isNip44 else { continue }

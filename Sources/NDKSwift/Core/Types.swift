@@ -41,9 +41,16 @@ public enum EventKind {
     public static let fileMetadata = 1063
     public static let zapRequest = 9734
     public static let zap = 9735
+    public static let zapReceipt = 9735  // Alias for clarity
+    public static let cashuWallet = 7375
+    public static let cashuToken = 7376
+    public static let nutzap = 9321
+    public static let nutzapRedemption = 7376
     public static let muteList = 10000
     public static let pinList = 10001
     public static let relayList = 10002
+    public static let cashuMintList = 10019
+    public static let nutzapPreferences = 10019  // Alias for NIP-61
     public static let walletInfo = 13194
     public static let clientAuthentication = 22242
     public static let walletRequest = 23194
@@ -62,7 +69,7 @@ public enum EventKind {
 public typealias Tag = [String]
 
 /// Imeta tag representation
-public struct NDKImetaTag {
+public struct NDKImetaTag: Sendable {
     public var url: String?
     public var blurhash: String?
     public var dim: String?
@@ -97,9 +104,8 @@ public struct NDKImetaTag {
 }
 
 /// OK message from relay
-public struct OKMessage: Equatable {
+public struct OKMessage: Equatable, Sendable {
     public let accepted: Bool
     public let message: String?
     public let receivedAt: Date
 }
-

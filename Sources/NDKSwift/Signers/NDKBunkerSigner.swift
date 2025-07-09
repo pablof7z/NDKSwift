@@ -62,7 +62,7 @@ struct BunkerURLParser {
 }
 
 /// NIP-46 remote signer implementation supporting both bunker:// and nostrconnect:// flows
-public actor NDKBunkerSigner: NDKSigner, @unchecked Sendable {
+public actor NDKBunkerSigner: NDKSigner, Sendable {
     private let ndk: NDK
     private var userPubkey: String?
     private var bunkerPubkey: String?
@@ -195,7 +195,7 @@ public actor NDKBunkerSigner: NDKSigner, @unchecked Sendable {
     }
 
     private func generateNostrConnectSecret() -> String {
-        return UUID().uuidString.replacingOccurrences(of: "-", with: "").prefix(16).lowercased()
+        return IDGenerator.randomId(length: 16)
     }
 
     // MARK: - Connection
@@ -214,7 +214,8 @@ public actor NDKBunkerSigner: NDKSigner, @unchecked Sendable {
             print("[BunkerSigner] Using NIP-05 flow for: \(nip05)")
             let user = try await NDKUser.fromNip05(nip05, ndk: ndk)
             self.userPubkey = user.pubkey
-            if let nip46Urls = user.nip46Urls {
+            let nip46Urls = await user.nip46Urls
+            if let nip46Urls = nip46Urls {
                 self.relayUrls = nip46Urls
                 print("[BunkerSigner] Found NIP-46 relays from NIP-05: \(nip46Urls)")
             }
@@ -230,10 +231,10 @@ public actor NDKBunkerSigner: NDKSigner, @unchecked Sendable {
             print("[BunkerSigner] Adding and connecting to bunker relays...")
             for relayUrl in relayUrls {
                 let relay = ndk.addRelay(relayUrl)
-                print("[BunkerSigner] Added relay: \(relayUrl), current state: \(relay.connectionState)")
+                print("[BunkerSigner] Added relay: \(relayUrl), current state: \(await relay.connectionState)")
 
                 // Connect to the relay if not already connected
-                if relay.connectionState != .connected {
+                if await relay.connectionState != .connected {
                     print("[BunkerSigner] Connecting to relay: \(relayUrl)")
                     do {
                         try await relay.connect()
@@ -300,20 +301,25 @@ public actor NDKBunkerSigner: NDKSigner, @unchecked Sendable {
             print("[BunkerSigner] Subscription created for all relays")
         }
 
-        // Listen for events
-        subscription?.onEvent { [weak self] event in
+        // Start subscription and listen for events
+        if let subscription = subscription {
             Task { [weak self] in
-                print("[BunkerSigner] Received event: kind=\(event.kind), from=\(event.pubkey)")
-                await self?.handleIncomingEvent(event)
+                await subscription.start()
+                print("[BunkerSigner] Subscription started")
+                
+                do {
+                    for try await event in subscription {
+                        let eventKind = await event.kind
+                        let eventPubkey = await event.pubkey
+                        print("[BunkerSigner] Received event: kind=\(eventKind), from=\(eventPubkey)")
+                        await self?.handleIncomingEvent(event)
+                    }
+                    print("[BunkerSigner] EOSE received from relay")
+                } catch {
+                    print("[BunkerSigner] Subscription error: \(error)")
+                }
             }
         }
-
-        subscription?.onEOSE {
-            print("[BunkerSigner] EOSE received from relay")
-        }
-
-        subscription?.start()
-        print("[BunkerSigner] Subscription started")
     }
 
     private func connectNostrConnect() async throws -> NDKUser {
@@ -330,7 +336,7 @@ public actor NDKBunkerSigner: NDKSigner, @unchecked Sendable {
     private func connectBunker() async throws -> NDKUser {
         guard let bunkerPubkey = bunkerPubkey else {
             print("[BunkerSigner] ERROR: Bunker pubkey not set!")
-            throw NDKError.crypto("signer_error", "Bunker pubkey not set")
+            throw NDKError.notConfigured("Bunker pubkey not set")
         }
 
         print("[BunkerSigner] Connecting to bunker with pubkey: \(bunkerPubkey)")
@@ -389,11 +395,12 @@ public actor NDKBunkerSigner: NDKSigner, @unchecked Sendable {
 
         // Handle nostrconnect flow
         if let secret = nostrConnectSecret, response.result == secret {
-            userPubkey = response.event.pubkey
-            bunkerPubkey = response.event.pubkey
+            let responsePubkey = await response.event.pubkey
+            userPubkey = responsePubkey
+            bunkerPubkey = responsePubkey
             isConnected = true
 
-            let user = NDKUser(pubkey: response.event.pubkey)
+            let user = NDKUser(pubkey: responsePubkey)
             connectionContinuation?.resume(returning: user)
             connectionContinuation = nil
             return
@@ -418,7 +425,7 @@ public actor NDKBunkerSigner: NDKSigner, @unchecked Sendable {
                 connectionContinuation?.resume(throwing: error)
             }
         } else {
-            let error = NDKError.crypto("signer_error", response.error ?? "Connection failed")
+            let error = NDKError.connectionFailed(relay: "bunker", message: response.error ?? "Connection failed")
             connectionContinuation?.resume(throwing: error)
         }
         connectionContinuation = nil
@@ -438,10 +445,10 @@ public actor NDKBunkerSigner: NDKSigner, @unchecked Sendable {
 
     private func performSign(_ event: NDKEvent) async throws -> Signature {
         guard let bunkerPubkey = bunkerPubkey else {
-            throw NDKError.crypto("signer_error", "Not connected")
+            throw NDKError.connectionLost(relay: "bunker", message: "Not connected")
         }
 
-        let eventJson = try event.serialize()
+        let eventJson = try await event.serialize()
 
         let response = try await rpcClient?.sendRequest(
             to: bunkerPubkey,
@@ -455,7 +462,7 @@ public actor NDKBunkerSigner: NDKSigner, @unchecked Sendable {
               let json = try? JSONSerialization.jsonObject(with: resultData) as? [String: Any],
               let sig = json["sig"] as? String
         else {
-            throw NDKError.crypto("signer_error", "Failed to sign event")
+            throw NDKError.signingFailed("Failed to sign event")
         }
 
         return sig
@@ -466,7 +473,8 @@ public actor NDKBunkerSigner: NDKSigner, @unchecked Sendable {
     }
 
     public func sign(event: inout NDKEvent) async throws {
-        event.sig = try await performSign(event)
+        let signature = try await performSign(event)
+        await event.setSig(signature)
     }
 
     public func getPublicKey() async throws -> String {
@@ -475,7 +483,7 @@ public actor NDKBunkerSigner: NDKSigner, @unchecked Sendable {
         }
 
         guard let bunkerPubkey = bunkerPubkey else {
-            throw NDKError.crypto("signer_error", "Not connected")
+            throw NDKError.connectionLost(relay: "bunker", message: "Not connected")
         }
 
         let response = try await rpcClient?.sendRequest(
@@ -487,7 +495,7 @@ public actor NDKBunkerSigner: NDKSigner, @unchecked Sendable {
         guard let response = response,
               response.error == nil
         else {
-            throw NDKError.crypto("signer_error", "Failed to get public key")
+            throw NDKError.signingFailed("Failed to get public key")
         }
 
         return response.result
@@ -495,7 +503,7 @@ public actor NDKBunkerSigner: NDKSigner, @unchecked Sendable {
 
     private func performCrypto(method: String, params: [String], errorMessage: String) async throws -> String {
         guard let bunkerPubkey = bunkerPubkey else {
-            throw NDKError.crypto("signer_error", "Not connected")
+            throw NDKError.connectionLost(relay: "bunker", message: "Not connected")
         }
 
         let response = try await rpcClient?.sendRequest(
@@ -507,7 +515,7 @@ public actor NDKBunkerSigner: NDKSigner, @unchecked Sendable {
         guard let response = response,
               response.error == nil
         else {
-            throw NDKError.crypto("signer_error", errorMessage)
+            throw NDKError.signingFailed(errorMessage)
         }
 
         return response.result

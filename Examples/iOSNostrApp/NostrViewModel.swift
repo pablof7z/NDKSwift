@@ -31,7 +31,7 @@ class NostrViewModel: ObservableObject {
     private let defaultRelays = [
         "wss://relay.primal.net",
         "wss://relay.damus.io",
-        "wss://nos.lol",
+        "wss://nos.lol"
     ]
     private var authUrlCancellable: AnyCancellable?
 
@@ -127,7 +127,7 @@ class NostrViewModel: ObservableObject {
                 ndk?.signer = signer
 
                 // Get keys in bech32 format
-                let _ = try privateKeySigner.nsec
+                _ = try privateKeySigner.nsec
                 let npubValue = try privateKeySigner.npub
                 let pubkeyValue = try await privateKeySigner.pubkey
 
@@ -158,13 +158,16 @@ class NostrViewModel: ObservableObject {
     private func connectToRelays() async {
         guard let ndk = ndk else { return }
 
-        // Add default relays but don't connect yet
+        // Add default relays
         for relayUrl in defaultRelays {
             _ = ndk.addRelay(relayUrl)
         }
 
+        // Connect to all relays
+        await ndk.connect()
+
         await MainActor.run {
-            statusMessage = "Relays added. Use Connect button to connect."
+            statusMessage = "Connected to relays"
             isError = false
             updateRelayStatus()
         }
@@ -194,9 +197,14 @@ class NostrViewModel: ObservableObject {
             
             // Start monitoring subscription events
             Task {
-                for await update in subscription.updates {
-                    switch update {
-                    case .event(let event):
+                // Start the subscription
+                await subscription.start()
+                
+                // Track if we've received EOSE
+                var receivedEOSE = false
+                
+                do {
+                    for try await event in subscription {
                         // Track unique events
                         if let eventId = event.id {
                             await MainActor.run {
@@ -206,18 +214,22 @@ class NostrViewModel: ObservableObject {
                                 }
                             }
                         }
-                    case .eose:
-                        await MainActor.run {
-                            self.isSubscribing = false
-                            self.statusMessage = "Subscription active. Listening for new events..."
-                            self.isError = false
+                        
+                        // Check if we've received EOSE (subscription will close on EOSE if closeOnEose is true)
+                        if !receivedEOSE && await subscription.eoseReceived {
+                            receivedEOSE = true
+                            await MainActor.run {
+                                self.isSubscribing = false
+                                self.statusMessage = "Subscription active. Listening for new events..."
+                                self.isError = false
+                            }
                         }
-                    case .error(let error):
-                        await MainActor.run {
-                            self.hasActiveSubscription = false
-                            self.statusMessage = "Subscription error: \(error.localizedDescription)"
-                            self.isError = true
-                        }
+                    }
+                } catch {
+                    await MainActor.run {
+                        self.hasActiveSubscription = false
+                        self.statusMessage = "Subscription error: \(error.localizedDescription)"
+                        self.isError = true
                     }
                 }
             }

@@ -1,5 +1,5 @@
-import XCTest
 @testable import NDKSwift
+import XCTest
 
 final class NDKProfileManagerTests: XCTestCase {
     var ndk: NDK!

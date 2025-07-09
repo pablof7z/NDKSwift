@@ -48,7 +48,7 @@ struct RelayTrackingDemo {
 
         do {
             // Publish the event
-            let publishedRelays = try await ndk.publish(event)
+            let publishedRelays = try await ndk.publish(event: event)
 
             print("\n✅ Event published!")
             print("   Event ID: \(event.id ?? "unknown")")

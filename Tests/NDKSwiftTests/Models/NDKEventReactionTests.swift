@@ -13,7 +13,7 @@ final class NDKEventReactionTests: XCTestCase {
         ndk = NDK(relayUrls: ["wss://relay.damus.io"])
 
         // Create a test signer
-        let privateKey = try Crypto.generatePrivateKey()
+        let privateKey = Crypto.generatePrivateKey()
         signer = try NDKPrivateKeySigner(privateKey: privateKey)
         ndk.signer = signer
 
@@ -186,7 +186,7 @@ final class NDKEventReactionTests: XCTestCase {
         let reactions = try [
             await testEvent.react(content: "❤️", publish: false),
             await testEvent.react(content: "👍", publish: false),
-            await testEvent.react(content: "🔥", publish: false),
+            await testEvent.react(content: "🔥", publish: false)
         ]
 
         // All should reference the same event

@@ -36,7 +36,7 @@ final class NDKImageTests: XCTestCase {
             createdAt: 1_234_567_890,
             kind: EventKind.image,
             tags: [
-                ["imeta", "url https://example.com/image.jpg", "alt Test image"],
+                ["imeta", "url https://example.com/image.jpg", "alt Test image"]
             ],
             content: "Check out this image!"
         )
@@ -81,7 +81,7 @@ final class NDKImageTests: XCTestCase {
             ["imeta", "url https://example1.com/image.jpg", "alt First image"],
             ["imeta", "url https://example2.com/image.jpg", "alt Second image", "dim 800x600"],
             ["not-imeta", "url https://example3.com/image.jpg"], // Should be ignored
-            ["imeta", "alt No URL tag"], // Should be filtered out (no URL)
+            ["imeta", "alt No URL tag"] // Should be filtered out (no URL)
         ]
 
         let imetas = image.imetas
@@ -101,13 +101,13 @@ final class NDKImageTests: XCTestCase {
         image.tags = [
             ["p", "some-pubkey"],
             ["imeta", "url https://old.com/image.jpg"],
-            ["t", "photography"],
+            ["t", "photography"]
         ]
 
         // Set new imetas
         let newImetas = [
             NDKImetaTag(url: "https://new1.com/image.jpg", alt: "New image 1"),
-            NDKImetaTag(url: "https://new2.com/image.jpg", blurhash: "LKO2?V%2Tw=w]~RBVZRi};RPxuwH"),
+            NDKImetaTag(url: "https://new2.com/image.jpg", blurhash: "LKO2?V%2Tw=w]~RBVZRi};RPxuwH")
         ]
 
         image.setImetas(newImetas)
@@ -147,7 +147,7 @@ final class NDKImageTests: XCTestCase {
         // Add imetas
         image.setImetas([
             NDKImetaTag(url: "https://primary.com/image.jpg"),
-            NDKImetaTag(url: "https://secondary.com/image.jpg"),
+            NDKImetaTag(url: "https://secondary.com/image.jpg")
         ])
 
         XCTAssertEqual(image.primaryImageURL, "https://primary.com/image.jpg")
@@ -160,7 +160,7 @@ final class NDKImageTests: XCTestCase {
             NDKImetaTag(url: "https://example1.com/image.jpg"),
             NDKImetaTag(alt: "No URL"), // Should be filtered out
             NDKImetaTag(url: "https://example2.com/image.jpg"),
-            NDKImetaTag(url: "https://example3.com/image.jpg"),
+            NDKImetaTag(url: "https://example3.com/image.jpg")
         ])
 
         let urls = image.imageURLs
@@ -182,7 +182,7 @@ final class NDKImageTests: XCTestCase {
 
         // Set imeta with valid dimensions
         image.setImetas([
-            NDKImetaTag(url: "https://example.com/image.jpg", dim: "1920x1080"),
+            NDKImetaTag(url: "https://example.com/image.jpg", dim: "1920x1080")
         ])
 
         let dimensions = image.primaryImageDimensions
@@ -196,12 +196,12 @@ final class NDKImageTests: XCTestCase {
             "1920",
             "x1080",
             "1920x",
-            "widthxheight",
+            "widthxheight"
         ]
 
         for dimString in invalidDimensions {
             image.setImetas([
-                NDKImetaTag(url: "https://example.com/image.jpg", dim: dimString),
+                NDKImetaTag(url: "https://example.com/image.jpg", dim: dimString)
             ])
             XCTAssertNil(image.primaryImageDimensions, "Dimension string '\(dimString)' should not parse")
         }
@@ -212,7 +212,7 @@ final class NDKImageTests: XCTestCase {
 
         // Add imeta tags
         image.tags = [
-            ["imeta", "url https://example.com/image.jpg", "alt Test image"],
+            ["imeta", "url https://example.com/image.jpg", "alt Test image"]
         ]
 
         // First access
@@ -228,7 +228,7 @@ final class NDKImageTests: XCTestCase {
 
         // Using setImetas replaces all imeta tags
         image.setImetas([
-            NDKImetaTag(url: "https://new.com/image.jpg"),
+            NDKImetaTag(url: "https://new.com/image.jpg")
         ])
 
         let imetas3 = image.imetas

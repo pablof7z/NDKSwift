@@ -1,35 +1,63 @@
 import Foundation
 
+/// Actor for thread-safe user state management
+actor UserStateActor {
+    var profile: NDKUserProfile?
+    var relayList: [NDKRelayInfo] = []
+    var nip46Urls: [String]?
+    
+    func getProfile() -> NDKUserProfile? { profile }
+    func setProfile(_ newProfile: NDKUserProfile?) { profile = newProfile }
+    
+    func getRelayList() -> [NDKRelayInfo] { relayList }
+    func setRelayList(_ newList: [NDKRelayInfo]) { relayList = newList }
+    
+    func getNip46Urls() -> [String]? { nip46Urls }
+    func setNip46Urls(_ urls: [String]?) { nip46Urls = urls }
+}
+
 /// Represents a Nostr user
-public final class NDKUser: Equatable, Hashable {
+public final class NDKUser: Equatable, Hashable, Sendable {
     /// User's public key
     public let pubkey: PublicKey
 
     /// Reference to NDK instance
-    public weak var ndk: NDK?
+    public nonisolated(unsafe) weak var ndk: NDK?
+    
+    /// Internal state actor that manages all mutable state
+    private let stateActor = UserStateActor()
 
     /// User's profile metadata
-    public private(set) var profile: NDKUserProfile?
+    public var profile: NDKUserProfile? {
+        get async { await stateActor.getProfile() }
+    }
 
     /// Relay list (NIP-65)
-    public private(set) var relayList: [NDKRelayInfo] = []
+    public var relayList: [NDKRelayInfo] {
+        get async { await stateActor.getRelayList() }
+    }
 
     /// User's NIP-05 identifier
     public var nip05: String? {
-        return profile?.nip05
+        get async { await stateActor.getProfile()?.nip05 }
     }
 
     /// NIP-46 relay URLs (for remote signing)
-    public var nip46Urls: [String]?
+    public var nip46Urls: [String]? {
+        get async { await stateActor.getNip46Urls() }
+    }
 
     /// Display name (from profile)
     public var displayName: String? {
-        return profile?.displayName ?? profile?.name
+        get async {
+            let userProfile = await stateActor.getProfile()
+            return userProfile?.displayName ?? userProfile?.name
+        }
     }
 
     /// Profile name
     public var name: String? {
-        return profile?.name
+        get async { await stateActor.getProfile()?.name }
     }
 
     // MARK: - Initialization
@@ -53,7 +81,7 @@ public final class NDKUser: Equatable, Hashable {
         // Parse NIP-05 identifier (user@domain)
         let parts = nip05.split(separator: "@")
         guard parts.count == 2 else {
-            throw NDKError.validation("invalid_nip05", "Invalid NIP-05 format")
+            throw NDKError.invalidInput(message: "Invalid NIP-05 format")
         }
 
         let name = String(parts[0])
@@ -62,7 +90,7 @@ public final class NDKUser: Equatable, Hashable {
         // Build the well-known URL
         let urlString = "https://\(domain)/.well-known/nostr.json?name=\(name)"
         guard let url = URL(string: urlString) else {
-            throw NDKError.validation("invalid_nip05_url", "Invalid NIP-05 URL")
+            throw NDKError.invalidURL("Invalid NIP-05 URL: \(urlString)")
         }
 
         // Fetch the data
@@ -70,9 +98,7 @@ public final class NDKUser: Equatable, Hashable {
         do {
             (data, _) = try await URLSession.shared.data(from: url)
         } catch {
-            throw NDKError.network("nip05_fetch_failed", "Failed to fetch NIP-05 data", 
-                                   context: ["url": urlString, "domain": domain], 
-                                   underlying: error)
+            throw NDKError.connectionFailed(relay: domain, message: "Failed to fetch NIP-05 data from \(urlString)", underlying: error)
         }
 
         // Parse JSON response
@@ -80,8 +106,7 @@ public final class NDKUser: Equatable, Hashable {
               let names = json["names"] as? [String: String],
               let pubkey = names[name]
         else {
-            throw NDKError.validation("nip05_verification_failed", "NIP-05 verification failed",
-                                      context: ["name": name, "domain": domain])
+            throw NDKError.invalidInput(message: "NIP-05 verification failed for \(name)@\(domain)")
         }
 
         let user = NDKUser(pubkey: pubkey)
@@ -89,9 +114,8 @@ public final class NDKUser: Equatable, Hashable {
 
         // Check for NIP-46 relays
         if let nip46 = json["nip46"] as? [String: Any],
-           let relays = nip46[pubkey] as? [String]
-        {
-            user.nip46Urls = relays
+           let relays = nip46[pubkey] as? [String] {
+            await user.stateActor.setNip46Urls(relays)
         }
 
         return user
@@ -105,13 +129,13 @@ public final class NDKUser: Equatable, Hashable {
     @discardableResult
     public func fetchProfile(forceRefresh: Bool = false) async throws -> NDKUserProfile? {
         guard let ndk = ndk else {
-            throw NDKError.runtime("ndk_not_set", "NDK instance not set")
+            throw NDKError.notConfigured("NDK instance not set")
         }
 
         // Check cache first unless force refresh is requested
         if !forceRefresh {
-            if let cached = await ndk.cache?.getProfile(for: pubkey) {
-                self.profile = cached
+            if let cached = await ndk.cache?.getProfile(pubkey: pubkey) {
+                await stateActor.setProfile(cached)
                 return cached
             }
         }
@@ -126,16 +150,17 @@ public final class NDKUser: Equatable, Hashable {
         // Fetch the profile event
         if let event = try await ndk.fetchEvent(filter) {
             // Parse the profile from the event content
-            guard let profileData = event.content.data(using: .utf8),
+            let eventContent = await event.content
+            guard let profileData = eventContent.data(using: .utf8),
                   let profile = try? JSONDecoder().decode(NDKUserProfile.self, from: profileData) else {
-                throw NDKError.validation("invalid_profile_data", "Invalid profile data")
+                throw NDKError.invalidInput(message: "Invalid profile data")
             }
             
             // Update our local profile
-            self.profile = profile
+            await stateActor.setProfile(profile)
             
             // Save to cache
-            try? await ndk.cache?.saveProfile(profile, for: pubkey)
+            try? await ndk.cache?.saveProfile(profile, pubkey: pubkey)
             
             return profile
         }
@@ -144,15 +169,15 @@ public final class NDKUser: Equatable, Hashable {
     }
 
     /// Update profile with new metadata
-    public func updateProfile(_ profile: NDKUserProfile) {
-        self.profile = profile
+    public func updateProfile(_ profile: NDKUserProfile) async {
+        await stateActor.setProfile(profile)
     }
 
     /// Fetch user's relay list (NIP-65)
     @discardableResult
     public func fetchRelayList() async throws -> [NDKRelayInfo] {
         guard let ndk = ndk else {
-            throw NDKError.runtime("ndk_not_set", "NDK instance not set")
+            throw NDKError.notConfigured("NDK instance not set")
         }
 
         // Create filter for kind 10002 events
@@ -162,8 +187,27 @@ public final class NDKUser: Equatable, Hashable {
             limit: 1
         )
 
-        // TODO: Implement subscription and fetch
-        // For now, return empty array
+        // Fetch the relay list event
+        if let event = try await ndk.fetchEvent(filter) {
+            // Parse relay tags
+            let eventTags = await event.tags
+            let relays = eventTags
+                .filter { $0.first == "r" }
+                .compactMap { tag -> NDKRelayInfo? in
+                    guard let url = tag[safe: 1] else { return nil }
+                    
+                    // Check for read/write markers
+                    let marker = tag[safe: 2]?.lowercased()
+                    let read = marker == nil || marker == "read"
+                    let write = marker == nil || marker == "write"
+                    
+                    return NDKRelayInfo(url: url, read: read, write: write)
+                }
+            
+            await stateActor.setRelayList(relays)
+            return relays
+        }
+        
         return []
     }
 
@@ -172,7 +216,7 @@ public final class NDKUser: Equatable, Hashable {
     /// Get users this user follows
     public func follows() async throws -> Set<NDKUser> {
         guard let ndk = ndk else {
-            throw NDKError.runtime("ndk_not_set", "NDK instance not set")
+            throw NDKError.notConfigured("NDK instance not set")
         }
 
         // Create filter for kind 3 events
@@ -182,8 +226,24 @@ public final class NDKUser: Equatable, Hashable {
             limit: 1
         )
 
-        // TODO: Implement subscription and fetch
-        // Parse 'p' tags from contact list
+        // Fetch the contact list event
+        if let event = try await ndk.fetchEvent(filter) {
+            // Parse 'p' tags from contact list
+            let eventTags = await event.tags
+            let followedPubkeys = eventTags
+                .filter { $0.first == "p" }
+                .compactMap { $0[safe: 1] }
+            
+            // Create NDKUser instances for each followed pubkey
+            let users = followedPubkeys.map { pubkey in
+                let user = NDKUser(pubkey: pubkey)
+                user.ndk = ndk
+                return user
+            }
+            
+            return Set(users)
+        }
+        
         return []
     }
 
@@ -232,49 +292,48 @@ public final class NDKUser: Equatable, Hashable {
     ///   - tags: Optional additional tags
     /// - Returns: Payment confirmation
     public func pay(amount: Int64, comment: String? = nil, tags: [[String]]? = nil) async throws -> NDKPaymentConfirmation {
-        guard let ndk = ndk else {
-            throw NDKError.runtime("ndk_not_set", "NDK instance not set")
+        guard ndk != nil else {
+            throw NDKError.notConfigured("NDK instance not set")
         }
 
-        guard let paymentRouter = ndk.paymentRouter else {
-            throw NDKError.configuration("wallet_not_configured", "Wallet not configured")
-        }
-
-        let request = NDKPaymentRequest(
-            recipient: self,
-            amount: amount,
-            comment: comment,
-            tags: tags
-        )
-
-        return try await paymentRouter.pay(request)
+        // Payment routing will be implemented when wallet integration is complete
+        throw NDKError.notConfigured("Payment routing not yet implemented")
     }
 
     /// Get available payment methods for this user
     /// - Returns: Set of payment methods this user supports
     public func getPaymentMethods() async throws -> Set<NDKPaymentMethod> {
-        guard let ndk = ndk else {
-            throw NDKError.runtime("ndk_not_set", "NDK instance not set")
+        guard ndk != nil else {
+            throw NDKError.notConfigured("NDK instance not set")
         }
 
         var methods = Set<NDKPaymentMethod>()
 
         // Check for Lightning support (NIP-57)
-        if let profile = try? await fetchProfile() {
-            if profile.lud06 != nil || profile.lud16 != nil {
+        let userProfile = try? await fetchProfile()
+        if let userProfile = userProfile {
+            if userProfile.lud06 != nil || userProfile.lud16 != nil {
                 methods.insert(.lightning)
             }
         }
 
-
-        // TODO: Check for NWC support when implemented
+        // Check for NWC support (kind 13194 - NWC info event)
+        let nwcFilter = NDKFilter(
+            authors: [pubkey],
+            kinds: [13194], // NIP-47 NWC info event
+            limit: 1
+        )
+        
+        if let _ = try? await ndk?.fetchEvent(nwcFilter) {
+            methods.insert(.nwc)
+        }
 
         return methods
     }
 }
 
 /// User profile metadata (kind 0)
-public struct NDKUserProfile: Codable {
+public struct NDKUserProfile: Codable, Sendable {
     public var name: String?
     public var displayName: String?
     public var about: String?

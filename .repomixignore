@@ -1,4 +1,19 @@
-./Examples
-./Documentation
-Tests
-**/*.md
+# Ignore build directories
+.build/
+build/
+DerivedData/
+
+# Ignore test data
+Tests/
+CashuTests/
+
+# Ignore dependencies
+.swiftpm/
+Package.resolved
+
+# Ignore examples
+Examples/
+
+# Focus on source code only
+\!Sources/
+EOF < /dev/null

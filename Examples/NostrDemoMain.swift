@@ -37,7 +37,7 @@ struct NostrDemoMain {
             // 6. Test user profiles
             print("\n👤 6. Testing User Profiles")
             print("==========================")
-            testUserProfiles()
+            await testUserProfiles()
 
             print("\n🎉 All tests completed successfully!")
             print("====================================")
@@ -173,42 +173,47 @@ struct NostrDemoMain {
 
         let subscription = NDKSubscription(filters: [filter])
 
+        // Simulate receiving events in background
+        Task {
+            print("\nSimulating event stream...")
+            
+            for i in 1 ... 3 {
+                let event = NDKEvent(
+                    pubkey: "d0a1ffb8761b974cec4a3be8cbcb2e96a7090dcf465ffeac839aa4ca20c9a59e",
+                    createdAt: Timestamp(Date().timeIntervalSince1970),
+                    kind: EventKind.textNote,
+                    content: "Test event #\(i)"
+                )
+                event.id = "test_event_\(i)"
+
+                await subscription.handleEvent(event, fromRelay: nil)
+            }
+
+            await subscription.handleEOSE()
+        }
+
+        // Use modern async updates API
         var eventCount = 0
         var eoseReceived = false
 
-        // Set up event handler
-        subscription.onEvent { event in
-            eventCount += 1
-            print("📨 Event \(eventCount): \(event.content)")
+        do {
+            for try await event in subscription {
+                eventCount += 1
+                print("📨 Event \(eventCount): \(event.content)")
+                if eventCount >= 3 {
+                    eoseReceived = true
+                    print("🏁 Processing complete")
+                    break
+                }
+            }
+        } catch {
+            print("❌ Subscription error: \(error)")
         }
-
-        // Set up EOSE handler
-        subscription.onEOSE {
-            eoseReceived = true
-            print("🏁 EOSE received")
-        }
-
-        // Simulate receiving events
-        print("\nSimulating event stream...")
-
-        for i in 1 ... 3 {
-            let event = NDKEvent(
-                pubkey: "d0a1ffb8761b974cec4a3be8cbcb2e96a7090dcf465ffeac839aa4ca20c9a59e",
-                createdAt: Timestamp(Date().timeIntervalSince1970),
-                kind: EventKind.textNote,
-                content: "Test event #\(i)"
-            )
-            event.id = "test_event_\(i)"
-
-            subscription.handleEvent(event, fromRelay: nil as NDKRelay?)
-        }
-
-        subscription.handleEOSE()
 
         print("\n✅ Subscription summary:")
         print("   Events received: \(eventCount)")
         print("   EOSE received:   \(eoseReceived)")
-        print("   Stored events:   \(subscription.events.count)")
+        print("   Stored events:   \(await subscription.events.count)")
 
         // Test async stream
         print("\nTesting async stream API...")
@@ -216,12 +221,16 @@ struct NostrDemoMain {
 
         Task {
             var streamCount = 0
-            for await event in streamSubscription.eventStream() {
-                streamCount += 1
-                print("🌊 Stream event: \(event.content)")
-                if streamCount >= 2 {
-                    break
+            do {
+                for try await event in streamSubscription {
+                    streamCount += 1
+                    print("🌊 Stream event: \(event.content)")
+                    if streamCount >= 2 {
+                        break
+                    }
                 }
+            } catch {
+                print("❌ Stream error: \(error)")
             }
         }
 
@@ -234,7 +243,7 @@ struct NostrDemoMain {
                 content: "Stream event #\(i)"
             )
             event.id = "stream_event_\(i)"
-            streamSubscription.handleEvent(event, fromRelay: nil as NDKRelay?)
+            await streamSubscription.handleEvent(event, fromRelay: nil)
         }
 
         // Give stream time to process
@@ -248,14 +257,13 @@ struct NostrDemoMain {
             relayUrls: [
                 "wss://relay.damus.io",
                 "wss://nos.lol",
-                "wss://relay.nostr.band",
-            ],
-            cacheAdapter: NDKInMemoryCache()
+                "wss://relay.nostr.band"
+            ]
         )
 
         print("✅ NDK instance created:")
         print("   Relays:       \(ndk.relays.count)")
-        print("   Cache:        \(ndk.cacheAdapter != nil ? "Enabled" : "Disabled")")
+        print("   Cache:        \(ndk.cache != nil ? "Enabled" : "Disabled")")
         print("   Active user:  \(ndk.activeUser?.pubkey ?? "None")")
 
         print("\nRelay details:")
@@ -271,10 +279,10 @@ struct NostrDemoMain {
         print("\n✅ Created subscription:")
         print("   ID:      \(subscription.id)")
         print("   Filters: \(subscription.filters.count)")
-        print("   Active:  \(subscription.isActive)")
+        print("   Active:  \(await subscription.isActive)")
 
         // Test cache functionality
-        if let cache = ndk.cacheAdapter {
+        if let cache = ndk.cache {
             let testEvent = NDKEvent(
                 pubkey: "test_pubkey",
                 createdAt: Timestamp(Date().timeIntervalSince1970),
@@ -283,16 +291,16 @@ struct NostrDemoMain {
             )
             testEvent.id = "cached_event_id"
 
-            await cache.setEvent(testEvent, filters: [filter], relay: nil)
+            try? await cache.saveEvent(testEvent)
 
-            let cachedEvents = await cache.query(subscription: subscription)
+            let cachedEvents = await cache.queryEvents(filter)
             print("\n✅ Cache test:")
             print("   Stored events: 1")
             print("   Retrieved:     \(cachedEvents.count)")
         }
     }
 
-    static func testUserProfiles() {
+    static func testUserProfiles() async {
         print("Creating user profiles...")
 
         // Create NDK instance for user management
@@ -342,7 +350,7 @@ struct NostrDemoMain {
         let testPubkeys = [
             "d0a1ffb8761b974cec4a3be8cbcb2e96a7090dcf465ffeac839aa4ca20c9a59e",
             "82341f882b6eabcd2ba7f1ef90aad961cf074af15b9ef44a09f9d2a8fbfbe6a2",
-            "3bf0c63fcb93463407af97a5e5ee64fa883d107ef9e558472c4eb9aaaefa459d",
+            "3bf0c63fcb93463407af97a5e5ee64fa883d107ef9e558472c4eb9aaaefa459d"
         ]
 
         for (index, pubkey) in testPubkeys.enumerated() {

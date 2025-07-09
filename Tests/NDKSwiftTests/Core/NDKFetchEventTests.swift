@@ -1,5 +1,5 @@
-import XCTest
 @testable import NDKSwift
+import XCTest
 
 class NDKFetchEventTests: XCTestCase {
     var ndk: NDK!

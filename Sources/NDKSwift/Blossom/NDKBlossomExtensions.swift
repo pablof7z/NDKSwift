@@ -25,7 +25,7 @@ extension NDK {
         expiration: Date? = nil
     ) async throws -> [BlossomBlob] {
         guard let signer = signer else {
-            throw NDKError.crypto("no_signer", "No signer configured")
+            throw NDKError.notConfigured("No signer configured")
         }
 
         // Use provided servers or discover from relay list
@@ -37,7 +37,7 @@ extension NDK {
         }
 
         guard !targetServers.isEmpty else {
-            throw BlossomError.invalidURL
+            throw NDKError.invalidURL("No Blossom servers available")
         }
 
         var uploadedBlobs: [BlossomBlob] = []
@@ -61,7 +61,7 @@ extension NDK {
         }
 
         if uploadedBlobs.isEmpty {
-            throw lastError ?? BlossomError.uploadFailed("Failed to upload to any server")
+            throw lastError ?? NDKError.uploadFailed(reason: "Failed to upload to any server")
         }
 
         return uploadedBlobs
@@ -78,7 +78,7 @@ extension NDK {
         return [
             "https://blossom.primal.net",
             "https://media.nostr.band",
-            "https://nostr.build",
+            "https://nostr.build"
         ]
     }
 }
@@ -156,7 +156,7 @@ public extension NDKEvent {
         ndk: NDK
     ) async throws -> NDKEvent {
         guard let signer = ndk.signer else {
-            throw NDKError.crypto("no_signer", "No signer configured")
+            throw NDKError.notConfigured("No signer configured")
         }
 
         // Upload to Blossom
@@ -166,7 +166,7 @@ public extension NDKEvent {
         )
 
         guard let firstBlob = blobs.first else {
-            throw BlossomError.uploadFailed("No blobs returned")
+            throw NDKError.uploadFailed(reason: "No blobs returned")
         }
 
         // Create image event with imeta tags

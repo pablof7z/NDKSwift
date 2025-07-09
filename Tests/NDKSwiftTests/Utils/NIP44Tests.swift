@@ -1,5 +1,5 @@
-import XCTest
 @testable import NDKSwift
+import XCTest
 
 final class NIP44Tests: XCTestCase {
     // Test vectors from https://github.com/paulmillr/nip44
@@ -13,12 +13,21 @@ final class NIP44Tests: XCTestCase {
         let plaintext: String?
         let payload: String?
         let note: String?
+        let letter: String?
+        let `repeat`: Int?
+        let payloadChecksumSha256: String?
+        
+        enum CodingKeys: String, CodingKey {
+            case sec1, sec2, pub1, pub2, conversationKey, nonce, plaintext, payload, note, letter
+            case `repeat` = "repeat"
+            case payloadChecksumSha256 = "payload_checksum_sha256"
+        }
     }
     
     struct TestVectors: Codable {
         struct ValidTests: Codable {
             let getConversationKey: [TestVector]?
-            let getMessageKeys: [[String]]?
+            let getMessageKeys: MessageKeysTests?
             let calcPaddedLen: [[Int]]?
             let encryptDecrypt: [TestVector]?
             let encryptDecryptLongMsg: [TestVector]?
@@ -35,12 +44,14 @@ final class NIP44Tests: XCTestCase {
         struct InvalidTests: Codable {
             let getConversationKey: [TestVector]?
             let decrypt: [TestVector]?
-            let encryptMsgLengths: [String]?
+            let encryptMsgLengths: [Int]?
+            let decryptMsgLengths: [Int]?
             
             enum CodingKeys: String, CodingKey {
                 case getConversationKey = "get_conversation_key"
                 case decrypt
                 case encryptMsgLengths = "encrypt_msg_lengths"
+                case decryptMsgLengths = "decrypt_msg_lengths"
             }
         }
         
@@ -49,6 +60,30 @@ final class NIP44Tests: XCTestCase {
         struct V2Tests: Codable {
             let valid: ValidTests?
             let invalid: InvalidTests?
+        }
+        
+        struct MessageKeysTests: Codable {
+            let conversationKey: String
+            let keys: [MessageKeyTest]
+            
+            enum CodingKeys: String, CodingKey {
+                case conversationKey = "conversation_key"
+                case keys
+            }
+        }
+        
+        struct MessageKeyTest: Codable {
+            let nonce: String
+            let chachaKey: String
+            let chachaNonce: String
+            let hmacKey: String
+            
+            enum CodingKeys: String, CodingKey {
+                case nonce
+                case chachaKey = "chacha_key"
+                case chachaNonce = "chacha_nonce"
+                case hmacKey = "hmac_key"
+            }
         }
     }
     
@@ -120,20 +155,19 @@ final class NIP44Tests: XCTestCase {
     // MARK: - Message Keys Tests
     
     func testGetMessageKeys() async throws {
-        let vectors = testVectors?.v2?.valid?.getMessageKeys ?? []
+        guard let messageKeysTests = testVectors?.v2?.valid?.getMessageKeys else {
+            XCTFail("No message keys test vectors found")
+            return
+        }
         
-        for vector in vectors {
-            guard vector.count >= 5 else { continue }
-            
-            let conversationKeyHex = vector[0]
-            let nonceHex = vector[1]
-            let expectedChachaKey = vector[2]
-            let expectedChachaNonce = vector[3]
-            let expectedHmacKey = vector[4]
-            
-            guard let conversationKey = Data(hexString: conversationKeyHex),
-                  let nonce = Data(hexString: nonceHex) else {
-                XCTFail("Invalid hex in test vector")
+        guard let conversationKey = Data(hexString: messageKeysTests.conversationKey) else {
+            XCTFail("Invalid conversation key hex")
+            return
+        }
+        
+        for vector in messageKeysTests.keys {
+            guard let nonce = Data(hexString: vector.nonce) else {
+                XCTFail("Invalid nonce hex: \(vector.nonce)")
                 continue
             }
             
@@ -142,9 +176,9 @@ final class NIP44Tests: XCTestCase {
                 nonce: nonce
             )
             
-            XCTAssertEqual(chachaKey.hexString, expectedChachaKey)
-            XCTAssertEqual(chachaNonce.hexString, expectedChachaNonce)
-            XCTAssertEqual(hmacKey.hexString, expectedHmacKey)
+            XCTAssertEqual(chachaKey.hexString, vector.chachaKey)
+            XCTAssertEqual(chachaNonce.hexString, vector.chachaNonce)
+            XCTAssertEqual(hmacKey.hexString, vector.hmacKey)
         }
     }
     
@@ -235,9 +269,7 @@ final class NIP44Tests: XCTestCase {
         let conversationKey = Crypto.randomBytes(count: 32)
         let nonce = Crypto.randomBytes(count: 32)
         
-        for lengthStr in lengths {
-            guard let length = Int(lengthStr) else { continue }
-            
+        for length in lengths {
             // Create a string of the specified length
             let plaintext = String(repeating: "a", count: length)
             

@@ -8,7 +8,7 @@ func demonstrateBasicUsage() {
     let ndk = NDK(relayUrls: [
         "wss://relay.damus.io",
         "wss://nos.lol",
-        "wss://relay.nostr.band",
+        "wss://relay.nostr.band"
     ])
 
     // Create a user
@@ -105,7 +105,7 @@ func demonstrateEventTags() {
             ["e", "event456", "wss://relay.example.com", "reply"],
             ["p", "pubkey789"],
             ["t", "nostr"],
-            ["t", "development"],
+            ["t", "development"]
         ],
         content: "This is a reply with tags"
     )

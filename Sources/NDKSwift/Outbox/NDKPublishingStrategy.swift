@@ -1,7 +1,7 @@
 import Foundation
 
 /// Manages publishing events using the outbox model with retry logic and status tracking
-public actor NDKPublishingStrategy {
+actor NDKPublishingStrategy {
     private let ndk: NDK
     private let selector: NDKRelaySelector
     private let ranker: NDKRelayRanker
@@ -15,23 +15,34 @@ public actor NDKPublishingStrategy {
     /// Active publishing tasks
     private var activeTasks: [String: Task<Void, Never>] = [:]
 
-    public init(ndk: NDK, selector: NDKRelaySelector, ranker: NDKRelayRanker) {
+    init(ndk: NDK, selector: NDKRelaySelector, tracker: NDKOutboxTracker) {
         self.ndk = ndk
         self.selector = selector
-        self.ranker = ranker
+        self.ranker = NDKRelayRanker(ndk: ndk, tracker: tracker)
     }
 
     /// Publish an event using the outbox model
     @discardableResult
-    public func publish(
+    func publish(
         _ event: NDKEvent,
-        config: OutboxPublishConfig = .default
+        config: OutboxPublishConfig = .default,
+        customStrategy: RelaySelectionStrategy? = nil
     ) async throws -> PublishResult {
         // Select target relays
-        let selection = await selector.selectRelaysForPublishing(
-            event: event,
-            config: config.selectionConfig
-        )
+        let selection: RelaySelectionResult
+        if let customStrategy = customStrategy {
+            let customRelays = await customStrategy.selectRelays(event.pubkey)
+            selection = RelaySelectionResult(
+                relays: Set(customRelays),
+                missingRelayInfoPubkeys: [],
+                selectionMethod: .outbox
+            )
+        } else {
+            selection = await selector.selectRelaysForPublishing(
+                event: event,
+                config: config.selectionConfig
+            )
+        }
 
         // Create outbox item
         let item = OutboxItem(
@@ -75,7 +86,7 @@ public actor NDKPublishingStrategy {
     }
 
     /// Get the current status of a publishing operation
-    public func getPublishResult(for eventId: String) -> PublishResult {
+    func getPublishResult(for eventId: String) -> PublishResult {
         guard let item = outboxItems[eventId] else {
             return PublishResult(
                 eventId: eventId,
@@ -98,21 +109,21 @@ public actor NDKPublishingStrategy {
     }
 
     /// Cancel publishing for an event
-    public func cancelPublish(eventId: String) {
+    func cancelPublish(eventId: String) {
         activeTasks[eventId]?.cancel()
         activeTasks.removeValue(forKey: eventId)
         outboxItems[eventId]?.overallStatus = .cancelled
     }
 
     /// Get all pending outbox items
-    public func getPendingItems() -> [OutboxItem] {
+    func getPendingItems() -> [OutboxItem] {
         outboxItems.values.filter { item in
             item.overallStatus == .pending || item.overallStatus == .inProgress
         }
     }
 
     /// Clean up completed items older than specified age
-    public func cleanupCompleted(olderThan age: TimeInterval = 3600) {
+    func cleanupCompleted(olderThan age: TimeInterval = 3600) {
         let cutoffDate = Date().addingTimeInterval(-age)
 
         outboxItems = outboxItems.filter { _, item in
@@ -272,29 +283,11 @@ public actor NDKPublishingStrategy {
             return false
         }
 
-        // Generate POW
-        // TODO: Implement POW generation when available
-        // For now, we can't generate POW, so return false
+        // POW generation is computationally expensive and not currently implemented.
+        // Relays requiring POW will be marked as failed.
+        // Future implementations could add POW support using a worker pool or
+        // delegating to native code for better performance.
         return false
-
-        /* Future implementation:
-         do {
-             var mutableEvent = item.event
-             try await mutableEvent.generatePow(targetDifficulty: difficulty)
-
-             // Update the event in the outbox item
-             item.event = mutableEvent
-
-             // Reset all relay statuses to pending since event ID changed
-             for relayURL in item.targetRelays {
-                 item.updateRelayStatus(relayURL, status: .pending)
-             }
-
-             return true
-         } catch {
-             return false
-         }
-         */
     }
 
     private func handleAuthChallenge(relay _: NDKRelay) async -> Bool {
@@ -304,13 +297,17 @@ public actor NDKPublishingStrategy {
     }
 
     private func getOrConnectRelay(url: String) async -> NDKRelay? {
+        let normalizedUrl = URLNormalizer.tryNormalizeRelayUrl(url) ?? url
+        
         // First check if already connected
-        if let relay = ndk.relayPool.relay(for: url) {
+        if let relay = ndk.relayPool.relaysByUrl[normalizedUrl] {
             return relay
         }
 
         // Try to connect
-        return await ndk.relayPool.addRelay(url: url)
+        let relay = ndk.addRelay(normalizedUrl)
+        try? await relay.connect()
+        return relay
     }
 
     private func updateOverallStatus(for item: OutboxItem) {
@@ -355,7 +352,7 @@ public actor NDKPublishingStrategy {
 // MARK: - Supporting Types
 
 /// Configuration for outbox publishing
-public struct OutboxPublishConfig {
+public struct OutboxPublishConfig: Sendable {
     public let selectionConfig: PublishingConfig
     public let minSuccessfulRelays: Int
     public let maxRetries: Int
@@ -389,7 +386,7 @@ public struct OutboxPublishConfig {
 }
 
 /// An item in the outbox queue
-public class OutboxItem {
+class OutboxItem {
     public var event: NDKEvent
     public let targetRelays: Set<String>
     public let config: OutboxPublishConfig
@@ -428,7 +425,7 @@ public class OutboxItem {
 }
 
 /// Overall publish status
-public enum PublishStatus: String, Codable {
+public enum PublishStatus: String, Codable, Sendable {
     case pending
     case inProgress
     case succeeded
@@ -438,7 +435,7 @@ public enum PublishStatus: String, Codable {
 }
 
 /// Status of publishing to a specific relay
-public enum RelayPublishStatus: Equatable, Codable {
+public enum RelayPublishStatus: Equatable, Codable, Sendable {
     case pending
     case inProgress
     case succeeded
@@ -499,7 +496,7 @@ public enum RelayPublishStatus: Equatable, Codable {
 }
 
 /// Reason for publish failure
-public enum PublishFailureReason: Equatable, Codable {
+public enum PublishFailureReason: Equatable, Codable, Sendable {
     case connectionFailed
     case authFailed
     case invalid(String)
@@ -569,7 +566,7 @@ private enum PublishAttemptResult {
 }
 
 /// Result of a publish operation
-public struct PublishResult {
+public struct PublishResult: Sendable {
     public let eventId: String
     public let overallStatus: PublishStatus
     public let relayStatuses: [String: RelayPublishStatus]
@@ -579,5 +576,14 @@ public struct PublishResult {
 
     public var isComplete: Bool {
         overallStatus == .succeeded || overallStatus == .failed || overallStatus == .cancelled
+    }
+    
+    public var successfulRelayUrls: Set<String> {
+        Set(relayStatuses.compactMap { url, status in
+            if case .succeeded = status {
+                return url
+            }
+            return nil
+        })
     }
 }

@@ -1,5 +1,3 @@
-#!/usr/bin/env swift
-
 import Foundation
 import NDKSwift
 
@@ -41,13 +39,13 @@ struct SecureChatCLI {
         ]
         
         for relayUrl in relays {
-            _ = try? await ndk.relay(relayUrl)
+            _ = ndk.addRelay(relayUrl)
         }
         
         // Wait a bit for connections
         try? await Task.sleep(nanoseconds: 1_000_000_000)
         
-        print("✅ Connected to \(ndk.pool.relays.count) relays")
+        print("✅ Connected to \(ndk.relays.count) relays")
         print("\n═══════════════════════════════════════════════════════════════════")
         print("💬 Chat Session Started")
         print("═══════════════════════════════════════════════════════════════════")
@@ -130,7 +128,7 @@ struct SecureChatCLI {
         }
         
         do {
-            let pubkey = try Bech32.publicKey(from: input)
+            let pubkey = try Bech32.pubkey(from: input)
             return (pubkey, input)
         } catch {
             print("❌ Invalid npub: \(error)")
@@ -190,10 +188,17 @@ struct SecureChatCLI {
         case "/status":
             print("\n📊 Connection Status")
             print("───────────────────")
-            for relay in ndk.pool.relays {
+            for relay in ndk.relays {
                 let state = relay.connectionState
                 let icon = state == .connected ? "🟢" : "🔴"
-                print("\(icon) \(relay.url): \(state)")
+                let stateString = switch state {
+                    case .disconnected: "Disconnected"
+                    case .connecting: "Connecting"
+                    case .connected: "Connected"
+                    case .disconnecting: "Disconnecting"
+                    case .failed: "Failed"
+                }
+                print("\(icon) \(relay.url): \(stateString)")
             }
             print()
             
@@ -237,7 +242,8 @@ struct SecureChatCLI {
         )
         
         // Sign and publish
-        try await event.sign(using: signer)
+        event.ndk = ndk
+        try await event.sign()
         let published = try await ndk.publish(event)
         
         if !published.isEmpty {
@@ -255,23 +261,21 @@ struct SecureChatCLI {
         signer: NDKPrivateKeySigner
     ) async {
         // Create filter for messages between user and recipient
-        let filter = NDKFilter(
-            kinds: [9999],
+        var filter = NDKFilter(
             authors: [userPubkey, recipientPubkey],
-            tags: [
-                "p": [userPubkey, recipientPubkey]
-            ]
+            kinds: [9999]
         )
+        filter.addTagFilter("p", values: [userPubkey, recipientPubkey])
         
         // Subscribe to messages
-        let subscription = await ndk.subscribe(filter)
+        let subscription = ndk.subscribe(filters: [filter])
         
         // Keep track of seen events to avoid duplicates
         var seenEvents = Set<String>()
         
         // Listen for messages
         do {
-            for await event in subscription {
+            for try await event in subscription {
                 guard let eventId = event.id,
                       !seenEvents.contains(eventId) else {
                     continue
@@ -280,7 +284,7 @@ struct SecureChatCLI {
                 
                 // Check if it's encrypted with NIP-44
                 let isNip44 = event.tags.contains { tag in
-                    tag.count >= 2 && tag[0] == "encrypted" && tag[1] == "nip44"
+                    return tag.count >= 2 && tag[0] == "encrypted" && tag[1] == "nip44"
                 }
                 
                 guard isNip44 else {
@@ -347,15 +351,3 @@ struct SecureChatCLI {
     }
 }
 
-// Extensions for better display
-extension NDKRelayConnectionState: CustomStringConvertible {
-    public var description: String {
-        switch self {
-        case .disconnected: return "Disconnected"
-        case .connecting: return "Connecting"
-        case .connected: return "Connected"
-        case .disconnecting: return "Disconnecting"
-        case .error: return "Error"
-        }
-    }
-}

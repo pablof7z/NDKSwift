@@ -1,7 +1,7 @@
 import Foundation
 
 /// Represents relay information for a specific user in the outbox model
-public struct NDKOutboxItem: Codable, Equatable {
+struct NDKOutboxItem: Codable, Equatable, Sendable {
     /// The user's public key
     public let pubkey: String
 
@@ -45,7 +45,7 @@ public struct NDKOutboxItem: Codable, Equatable {
 }
 
 /// Information about a specific relay
-public struct RelayInfo: Codable, Hashable, Equatable {
+struct RelayInfo: Codable, Hashable, Equatable, Sendable {
     /// The relay URL (normalized)
     public let url: String
 
@@ -68,7 +68,7 @@ public struct RelayInfo: Codable, Hashable, Equatable {
 }
 
 /// Metadata about a relay
-public struct RelayMetadata: Codable, Equatable {
+struct RelayMetadata: Codable, Equatable, Sendable {
     /// Relay health score (0-1)
     public let score: Double?
 
@@ -105,7 +105,7 @@ public struct RelayMetadata: Codable, Equatable {
 }
 
 /// Source of relay list information
-public enum RelayListSource: String, Codable {
+enum RelayListSource: String, Codable, Sendable {
     /// NIP-65 relay list (kind 10002)
     case nip65
 

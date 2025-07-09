@@ -219,7 +219,7 @@ class BunkerViewModel: ObservableObject {
 
                 // Sign and publish
                 try await event.sign()
-                let result = try await ndk.publish(event)
+                let result = try await ndk.publish(event: event)
 
                 await MainActor.run {
                     isPublishing = false

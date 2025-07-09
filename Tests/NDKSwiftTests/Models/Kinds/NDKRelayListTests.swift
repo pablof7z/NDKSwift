@@ -37,7 +37,7 @@ final class NDKRelayListTests: XCTestCase {
             tags: [
                 ["r", "wss://relay1.example.com", "read"],
                 ["r", "wss://relay2.example.com", "write"],
-                ["r", "wss://relay3.example.com", "read", "write"],
+                ["r", "wss://relay3.example.com", "read", "write"]
             ]
         )
 
@@ -221,7 +221,7 @@ final class NDKRelayListTests: XCTestCase {
         let entries = [
             NDKRelayListEntry(url: "wss://relay1.example.com", access: [.read]),
             NDKRelayListEntry(url: "wss://relay2.example.com", access: [.write]),
-            NDKRelayListEntry(url: "wss://relay3.example.com", access: [.read, .write]),
+            NDKRelayListEntry(url: "wss://relay3.example.com", access: [.read, .write])
         ]
 
         relayList.setRelays(entries)
@@ -288,7 +288,7 @@ final class NDKRelayListTests: XCTestCase {
             ["r", "wss://relay1.example.com"],
             ["r", "wss://relay2.example.com", "read"],
             ["r", "wss://relay3.example.com", "write"],
-            ["r", "wss://relay4.example.com", "read", "write"],
+            ["r", "wss://relay4.example.com", "read", "write"]
         ]
 
         let relayList = NDKRelayList.fromEvent(event)

@@ -34,7 +34,7 @@ Task {
 
     print("\nCreating and publishing test event...")
     try await testEvent.sign()
-    let publishedRelays = try await ndk.publish(testEvent)
+    let publishedRelays = try await ndk.publish(event: testEvent)
     print("Published to \(publishedRelays.count) relay(s)")
 
     if let eventId = testEvent.id {
