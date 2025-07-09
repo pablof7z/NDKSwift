@@ -290,8 +290,9 @@ public actor NDKBunkerSigner: NDKSigner, Sendable {
         // Create subscription with specific relays if available
         if !relayUrls.isEmpty {
             var options = NDKSubscriptionOptions()
+            let allRelays = await ndk.relays
             let relayObjects = relayUrls.compactMap { url in
-                ndk.relays.first { $0.url == url }
+                allRelays.first { $0.url == url }
             }
             options.relays = Set(relayObjects)
             subscription = ndk.subscribe(filters: [filter], options: options)

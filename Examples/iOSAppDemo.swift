@@ -161,7 +161,7 @@ class NostrAppSimulator {
         // Connect
         await ndk.connect()
         
-        print("✅ Connected to \(ndk.relays.count) relay(s)")
+        print("✅ Connected to \((await ndk.relays).count) relay(s)")
     }
     
     private func showAccountInfo() {
@@ -203,8 +203,8 @@ class NostrAppSimulator {
             print("📝 Event ID: \(event.id ?? "unknown")")
             
             // Show publish status
-            for relay in ndk.relays {
-                let status = event.relayPublishStatuses[relay.url] ?? .pending
+            for relay in await ndk.relays {
+                let status = await event.relayPublishStatuses[relay.url] ?? .pending
                 print("  - \(relay.url): \(status)")
             }
             
@@ -285,7 +285,8 @@ class NostrAppSimulator {
         print("\n🌐 Relay Status")
         print(String(repeating: "-", count: 50))
         
-        for relay in ndk.relays {
+        Task {
+            for relay in await ndk.relays {
             let status: String
             switch relay.connectionState {
             case .connected:
@@ -310,6 +311,7 @@ class NostrAppSimulator {
                 print("  Connected at: \(formatter.string(from: connectedAt))")
             }
             print()
+            }
         }
     }
     
@@ -331,19 +333,21 @@ class NostrAppSimulator {
 // Helper to simulate MainActor behavior
 extension NDKEvent {
     var relayPublishStatuses: [String: PublishStatus] {
-        // This would normally be tracked by the event
-        // For demo purposes, we'll return a simple status
-        var statuses: [String: PublishStatus] = [:]
-        if let ndk = self.ndk {
-            for relay in ndk.relays {
-                if relay.connectionState == .connected {
-                    statuses[relay.url] = .succeeded
-                } else {
-                    statuses[relay.url] = .failed(reason: .connectionFailed)
+        get async {
+            // This would normally be tracked by the event
+            // For demo purposes, we'll return a simple status
+            var statuses: [String: PublishStatus] = [:]
+            if let ndk = await self.ndk {
+                for relay in await ndk.relays {
+                    if await relay.connectionState == .connected {
+                        statuses[relay.url] = .succeeded
+                    } else {
+                        statuses[relay.url] = .failed(reason: .connectionFailed)
+                    }
                 }
             }
+            return statuses
         }
-        return statuses
     }
 }
 

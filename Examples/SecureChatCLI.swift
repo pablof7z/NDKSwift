@@ -45,7 +45,7 @@ struct SecureChatCLI {
         // Wait a bit for connections
         try? await Task.sleep(nanoseconds: 1_000_000_000)
         
-        print("✅ Connected to \(ndk.relays.count) relays")
+        print("✅ Connected to \((await ndk.relays).count) relays")
         print("\n═══════════════════════════════════════════════════════════════════")
         print("💬 Chat Session Started")
         print("═══════════════════════════════════════════════════════════════════")
@@ -188,7 +188,7 @@ struct SecureChatCLI {
         case "/status":
             print("\n📊 Connection Status")
             print("───────────────────")
-            for relay in ndk.relays {
+            for relay in await ndk.relays {
                 let state = relay.connectionState
                 let icon = state == .connected ? "🟢" : "🔴"
                 let stateString = switch state {

@@ -34,8 +34,8 @@ struct TestPublishFetch {
             try await Task.sleep(nanoseconds: 2_000_000_000) // 2 seconds
             
             // Check connection status
-            let relay = ndk.relays.first!
-            print("   Relay status: \(relay.connectionState)")
+            let relay = (await ndk.relays).first!
+            print("   Relay status: \(await relay.connectionState)")
             
             // 3. Publish a hello world message
             let helloEvent = NDKEvent(

@@ -354,11 +354,11 @@ class NostrViewModel: ObservableObject {
                 let publishedRelays = try await ndk.publish(event)
 
                 // Update relay statuses
+                let totalRelays = (await ndk.relays).count
                 await MainActor.run {
                     isPublishing = false
                     updatePublishStatuses(for: event)
 
-                    let totalRelays = ndk.relays.count
                     let queuedRelays = totalRelays - publishedRelays.count
 
                     if publishedRelays.isEmpty {
@@ -402,14 +402,19 @@ class NostrViewModel: ObservableObject {
             return
         }
 
-        connectedRelays = ndk.relays.map { relay in
-            RelayInfo(
-                url: relay.url,
-                connectionState: relay.connectionState,
-                connectedAt: relay.stats.connectedAt,
-                messagesSent: relay.stats.messagesSent,
-                messagesReceived: relay.stats.messagesReceived
-            )
+        Task {
+            let relays = await ndk.relays
+            await MainActor.run {
+                connectedRelays = relays.map { relay in
+                    RelayInfo(
+                        url: relay.url,
+                        connectionState: relay.connectionState,
+                        connectedAt: relay.stats.connectedAt,
+                        messagesSent: relay.stats.messagesSent,
+                        messagesReceived: relay.stats.messagesReceived
+                    )
+                }
+            }
         }
     }
 
@@ -438,7 +443,7 @@ class NostrViewModel: ObservableObject {
         Task {
             do {
                 // Find the relay
-                if let relay = ndk.relays.first(where: { $0.url == url }) {
+                if let relay = (await ndk.relays).first(where: { $0.url == url }) {
                     try await relay.connect()
 
                     await MainActor.run {
@@ -461,7 +466,7 @@ class NostrViewModel: ObservableObject {
 
         Task {
             // Find the relay
-            if let relay = ndk.relays.first(where: { $0.url == url }) {
+            if let relay = (await ndk.relays).first(where: { $0.url == url }) {
                 await relay.disconnect()
 
                 await MainActor.run {
@@ -478,8 +483,15 @@ class NostrViewModel: ObservableObject {
     private func updatePublishStatuses(for event: NDKEvent) {
         var statuses: [(relay: String, status: String, okMessage: String?)] = []
 
-        // Add all relays with their current status
-        for relay in ndk?.relays ?? [] {
+        // We'll update the statuses based on the event's relay publish statuses
+        // Since we can't access ndk.relays synchronously, we'll rely on the event's tracked statuses
+        Task {
+            guard let ndk = ndk else { return }
+            let allRelays = await ndk.relays
+            
+            await MainActor.run {
+                // Add all relays with their current status
+                for relay in allRelays {
             let relayUrl = relay.url
             var statusText = ""
             var okMessage: String?
@@ -523,10 +535,12 @@ class NostrViewModel: ObservableObject {
                 okMessage = ok.message
             }
 
-            statuses.append((relay: relayUrl, status: statusText, okMessage: okMessage))
-        }
+                    statuses.append((relay: relayUrl, status: statusText, okMessage: okMessage))
+                }
 
-        publishedEventRelayStatuses = statuses
+                publishedEventRelayStatuses = statuses
+            }
+        }
     }
 
     private func startMonitoringPublishStatus(for event: NDKEvent) {

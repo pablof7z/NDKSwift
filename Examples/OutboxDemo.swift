@@ -22,7 +22,7 @@ struct OutboxDemo {
         _ = ndk.addRelay(url: "wss://relay.nostr.band")
 
         print("📡 Added relays:")
-        for relay in ndk.relays {
+        for relay in await ndk.relays {
             print("   - \(relay.url)")
         }
 

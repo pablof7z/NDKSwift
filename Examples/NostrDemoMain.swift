@@ -262,12 +262,12 @@ struct NostrDemoMain {
         )
 
         print("✅ NDK instance created:")
-        print("   Relays:       \(ndk.relays.count)")
+        print("   Relays:       \((await ndk.relays).count)")
         print("   Cache:        \(ndk.cache != nil ? "Enabled" : "Disabled")")
         print("   Active user:  \(ndk.activeUser?.pubkey ?? "None")")
 
         print("\nRelay details:")
-        for relay in ndk.relays {
+        for relay in await ndk.relays {
             print("   📡 \(relay.normalizedURL)")
             print("      Status: \(relay.connectionState)")
         }

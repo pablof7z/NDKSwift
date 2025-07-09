@@ -27,6 +27,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Convenient extensions: `user.zap()`, `event.zap()`, `fetchZaps()`
   - Comprehensive test coverage for all zap components
 
+### Changed
+- **Refactored NDKCashuWallet** to work as a proof-of-funds provider within the zap architecture
+  - Added `send()` method for creating P2PK-locked proofs
+  - Added `getMints()` and `getBalance(mint:)` for provider optimization
+  - Added `payLightning()` for cross-mint transfers
+  - Removed high-level `sendNutzap()` logic (now handled by NDKZapManager)
+- **Updated configureDefaults** to accept cashuWallet parameter for easy setup
+
 - **Cashu Wallet Support (NIP-60)** - Full implementation of Cashu ecash wallets on Nostr
   - `NDKCashuWallet` actor for thread-safe wallet operations
   - Complete CashuSwift integration for ecash operations

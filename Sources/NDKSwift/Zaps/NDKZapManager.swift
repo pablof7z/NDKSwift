@@ -34,17 +34,26 @@ public actor NDKZapManager {
     }
     
     /// Configure with default providers based on available wallets
-    public func configureDefaults(wallet: NDKWallet? = nil, nwcWallet: NDKNWCWallet? = nil) {
+    public func configureDefaults(
+        cashuWallet: NDKCashuWallet? = nil,
+        nwcWallet: NDKNWCWallet? = nil,
+        legacyWallet: NDKWallet? = nil
+    ) {
         // Clear existing providers
         paymentProviders.removeAll()
+        
+        // Add Cashu provider if available (highest priority for privacy)
+        if let cashuWallet = cashuWallet {
+            register(provider: CashuPaymentProvider(cashuWallet: cashuWallet))
+        }
         
         // Add NWC provider if available
         if let nwcWallet = nwcWallet {
             register(provider: NWCPaymentProvider(nwcWallet: nwcWallet))
         }
         
-        // Add wallet adapter if available
-        if let wallet = wallet {
+        // Add legacy wallet adapter if available
+        if let wallet = legacyWallet {
             register(provider: WalletAdapterPaymentProvider(wallet: wallet))
         }
         

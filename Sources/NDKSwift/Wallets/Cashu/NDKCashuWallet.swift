@@ -30,43 +30,12 @@ public actor NDKCashuWallet: NDKWallet {
         self.p2pkManager = P2PKManager()
     }
     
-    // MARK: - NDKWallet Protocol
+    // MARK: - NDKWallet Protocol (Legacy - will be removed)
     
     public func pay(_ request: NDKPaymentRequest) async throws -> NDKPaymentConfirmation {
-        // Ensure wallet is loaded
-        if !isLoaded {
-            try await load()
-        }
-        
-        // Check balance
-        let currentBalance = try await getBalance()
-        guard currentBalance >= request.amount else {
-            throw NDKError.paymentFailed(reason: "Insufficient balance: \(currentBalance) < \(request.amount)")
-        }
-        
-        // Get recipient's mints
-        let recipientMints = try await getRecipientMints(request.recipient)
-        
-        // Find common mint
-        let commonMints = mints.intersection(recipientMints)
-        guard let selectedMint = commonMints.first else {
-            throw NDKError.paymentFailed(reason: "No common mint found with recipient")
-        }
-        
-        // Send nutzap
-        let nutzap = try await sendNutzap(
-            to: request.recipient,
-            amount: request.amount,
-            mint: selectedMint,
-            comment: request.comment
-        )
-        
-        return NDKCashuPaymentConfirmation(
-            amount: request.amount,
-            recipient: request.recipient.pubkey,
-            timestamp: Date(),
-            nutzap: nutzap
-        )
+        // Legacy method - kept for backward compatibility
+        // New code should use CashuPaymentProvider with NDKZapManager
+        throw NDKError.notImplemented("Use CashuPaymentProvider with NDKZapManager instead")
     }
     
     public func getBalance() async throws -> Int64 {
@@ -219,7 +188,151 @@ public actor NDKCashuWallet: NDKWallet {
         try await save()
     }
     
-    // MARK: - Nutzap Operations
+    // MARK: - Core Send Operations
+    
+    /// Send P2PK-locked proofs to a recipient
+    /// This is the core method used by payment providers
+    public func send(
+        amount: Int64,
+        to recipientP2PK: String,
+        mint mintURL: URL
+    ) async throws -> (proofs: [CashuProof], change: [CashuProof]?) {
+        // Ensure wallet is loaded
+        if !isLoaded {
+            try await load()
+        }
+        
+        // Check if we have this mint
+        guard mints.contains(mintURL.absoluteString) else {
+            throw NDKError.paymentFailed(reason: "Mint not available in wallet: \(mintURL)")
+        }
+        
+        // Reserve proofs for this amount
+        let reservationId = "send-\(UUID().uuidString)"
+        let reservedProofs = try await proofManager.reserveProofs(
+            amount: amount,
+            mint: mintURL.absoluteString,
+            for: reservationId
+        )
+        
+        do {
+            // Get mint connection
+            let mint = try await ensureMintConnected(mintURL.absoluteString)
+            
+            // Convert our proofs to CashuSwift format
+            let inputProofs = reservedProofs.map { $0.toCashuSwiftProof() }
+            
+            // Create P2PK-locked outputs
+            let seed = try await generateSeed()
+            let (lockedProofs, changeProofs, validDLEQ) = try await CashuSwift.send(
+                proofs: inputProofs,
+                amount: Int(amount),
+                to: recipientP2PK,
+                privKey: try await p2pkManager.getOrCreatePrivateKey(),
+                mint: mint,
+                seed: seed
+            )
+            
+            if !validDLEQ {
+                print("⚠️ Warning: DLEQ verification failed for locked proofs")
+            }
+            
+            // Mark original proofs as spent
+            await proofManager.markProofsAsSpent(
+                proofs: reservedProofs,
+                mint: mintURL.absoluteString
+            )
+            
+            // Add change proofs back to wallet if any
+            if !changeProofs.isEmpty {
+                let ndkChangeProofs = changeProofs.map { $0.toNDKProof() }
+                await proofManager.addProofs(ndkChangeProofs, mint: mintURL.absoluteString)
+            }
+            
+            // Convert locked proofs to our format
+            let ndkLockedProofs = lockedProofs.map { $0.toNDKProof() }
+            let ndkChangeProofs = changeProofs.isEmpty ? nil : changeProofs.map { $0.toNDKProof() }
+            
+            // Save wallet state
+            try? await save()
+            
+            return (proofs: ndkLockedProofs, change: ndkChangeProofs)
+            
+        } catch {
+            // Release reserved proofs on failure
+            await proofManager.releaseReservation(reservationId)
+            throw error
+        }
+    }
+    
+    /// Get available mints in this wallet
+    public func getMints() async -> [MintInfo] {
+        return mints.compactMap { urlString in
+            guard let url = URL(string: urlString) else { return nil }
+            return MintInfo(url: url, features: nil)
+        }
+    }
+    
+    /// Get balance for a specific mint
+    public func getBalance(mint mintURL: URL) async -> Int64 {
+        let availableProofs = await proofManager.getAvailableProofs(mint: mintURL.absoluteString)
+        return availableProofs.reduce(0) { $0 + Int64($1.amount) }
+    }
+    
+    /// Pay a Lightning invoice through a mint
+    public func payLightning(invoice: String, amount: Int64) async throws -> (preimage: String, feePaid: Int64?) {
+        // Find a mint that supports Lightning
+        // For now, just use the first mint
+        guard let mintURL = mints.first else {
+            throw NDKError.paymentFailed(reason: "No mints available")
+        }
+        
+        let mint = try await ensureMintConnected(mintURL)
+        
+        // Reserve proofs
+        let reservationId = "lightning-\(UUID().uuidString)"
+        let reservedProofs = try await proofManager.reserveProofs(
+            amount: amount,
+            mint: mintURL,
+            for: reservationId
+        )
+        
+        do {
+            // Convert proofs
+            let inputProofs = reservedProofs.map { $0.toCashuSwiftProof() }
+            
+            // Melt tokens to pay Lightning invoice
+            let meltResponse = try await CashuSwift.melt(
+                invoice: invoice,
+                with: inputProofs,
+                mint: mint
+            )
+            
+            // Mark proofs as spent
+            await proofManager.markProofsAsSpent(
+                proofs: reservedProofs,
+                mint: mintURL
+            )
+            
+            // Add change if any
+            if !meltResponse.change.isEmpty {
+                let changeProofs = meltResponse.change.map { $0.toNDKProof() }
+                await proofManager.addProofs(changeProofs, mint: mintURL)
+            }
+            
+            // Save wallet state
+            try? await save()
+            
+            return (preimage: meltResponse.preimage ?? "", feePaid: Int64(meltResponse.fee_reserve ?? 0))
+            
+        } catch {
+            // Release reserved proofs on failure
+            await proofManager.releaseReservation(reservationId)
+            throw error
+        }
+    }
+    
+    // MARK: - Nutzap Operations (Legacy)
     
     private func sendNutzap(
         to recipient: NDKUser,

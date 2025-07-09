@@ -32,7 +32,8 @@ public struct NWCResponseHandler {
         print("[NWC Response] Filter: kinds=\(filter.kinds ?? []), e-tag=\(requestId)")
         
         // Get the connected relays
-        let connectedRelays = ndk.relays.filter { relay in
+        let allRelays = await ndk.relays
+        let connectedRelays = allRelays.filter { relay in
             relayURLs.contains { url in
                 relay.normalizedURL == URLNormalizer.tryNormalizeRelayUrl(url) ||
                 relay.url == url
@@ -239,7 +240,7 @@ public struct NWCResponseHandler {
                 
                 // Get connected relays that match our wallet relays
                 var connectedRelays: [NDKRelay] = []
-                for relay in ndk.relays {
+                for relay in await ndk.relays {
                     let state = await relay.connectionState
                     if state == .connected && relayURLs.contains(relay.url) {
                         connectedRelays.append(relay)

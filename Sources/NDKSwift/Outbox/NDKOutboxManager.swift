@@ -50,8 +50,15 @@ public actor NDKOutboxManager {
         }
         
         // Convert URLs to NDKRelay objects
-        let relayObjects = relays.compactMap { url in
-            ndk.relayPool.relaysByUrl[url] ?? ndk.addRelay(url)
+        var relayObjects: [NDKRelay] = []
+        for url in relays {
+            if let relay = await ndk.relayPool.getRelay(for: url) {
+                relayObjects.append(relay)
+            } else {
+                let newRelay = await ndk.relayPool.addRelay(url)
+                newRelay.ndk = ndk
+                relayObjects.append(newRelay)
+            }
         }
         
         // Use standard fetchEvents with selected relays

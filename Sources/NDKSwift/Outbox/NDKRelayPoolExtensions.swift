@@ -3,9 +3,8 @@ import Foundation
 /// Extensions to NDKRelayPool for outbox model support
 public extension NDKRelayPool {
     /// Get relay by URL
-    func relay(for url: String) -> NDKRelay? {
-        let normalizedUrl = URLNormalizer.tryNormalizeRelayUrl(url) ?? url
-        return relaysByUrl[normalizedUrl]
+    func relay(for url: String) async -> NDKRelay? {
+        return await getRelay(for: url)
     }
 
     /// Add a relay and optionally connect to it

@@ -208,7 +208,8 @@ struct MircStyleChat {
         
         try? await Task.sleep(nanoseconds: 1_500_000_000)
         
-        let connectedCount = ndk.relays.filter { $0.connectionState == .connected }.count
+        let allRelays = await ndk.relays
+        let connectedCount = allRelays.filter { await $0.connectionState == .connected }.count
         print("\n\(Colors.green)Connected to \(connectedCount) relays\(Colors.reset)")
         print("\nPress Enter to start chatting...")
         _ = readLine()
@@ -392,7 +393,7 @@ struct MircStyleChat {
         case "/status", "/s":
             print("\n\(Colors.yellow)📊 Connection Status\(Colors.reset)")
             print("\(Colors.dim)───────────────────\(Colors.reset)")
-            for relay in ndk.relays {
+            for relay in await ndk.relays {
                 let state = relay.connectionState
                 let icon = state == .connected ? "\(Colors.green)●\(Colors.reset)" : "\(Colors.red)●\(Colors.reset)"
                 print("\(icon) \(relay.url): \(state)")

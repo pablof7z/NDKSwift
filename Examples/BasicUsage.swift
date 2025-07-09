@@ -72,10 +72,13 @@ func demonstrateBasicUsage() {
     }
 
     // Relay management
-    let relay = ndk.relays.first!
+    // Note: Since ndk.relays is now async, we can't access it directly in a sync function
+    // In a real app, you would use this in an async context
+    // For demonstration, we'll use the addRelay method which returns the relay
+    let relay = ndk.addRelay("wss://relay.damus.io")
     print("Relay URL: \(relay.url)")
     print("Normalized URL: \(relay.normalizedURL)")
-    print("Is connected: \(relay.isConnected)")
+    // Note: connectionState is async, so we can't check it here synchronously
 
     // Observe relay connection state
     relay.observeConnectionState { state in

@@ -307,7 +307,7 @@ actor NDKRelaySelector {
         guard neededCount > 0 else { return [] }
 
         // Get default relays from pool
-        let poolRelays = ndk.relayPool.relays
+        let poolRelays = (await ndk.relayPool.relays)
             .filter { !excludeRelays.contains($0.url) }
             .prefix(neededCount)
             .map { $0.url }

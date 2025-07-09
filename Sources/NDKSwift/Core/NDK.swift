@@ -14,7 +14,7 @@ public final class NDK {
         return nil
     }
 
-    /// Relay pool
+    /// Relay pool (thread-safe actor)
     let relayPool: NDKRelayPool
 
     /// Event repository
@@ -142,15 +142,21 @@ public final class NDK {
     /// Add a relay to the pool
     @discardableResult
     public func addRelay(_ url: RelayURL) -> NDKRelay {
-        let relay = relayPool.addRelay(url)
+        // This needs to be async now but we can't change the API
+        // Create a task to handle the async operation
+        let relay = NDKRelay(url: URLNormalizer.tryNormalizeRelayUrl(url) ?? url)
         relay.ndk = self
-
-        // Set up connection state observer to publish queued events
+        
         Task {
-            await relay.observeConnectionState { [weak self] state in
+            // Add to pool (will return existing if already present)
+            let actualRelay = await relayPool.addRelay(url)
+            actualRelay.ndk = self
+            
+            // Set up connection state observer to publish queued events
+            await actualRelay.observeConnectionState { [weak self] state in
                 if case .connected = state {
                     Task { [weak self] in
-                        await self?.publishQueuedEvents(for: relay)
+                        await self?.publishQueuedEvents(for: actualRelay)
                     }
                 }
             }
@@ -161,12 +167,16 @@ public final class NDK {
 
     /// Remove a relay from the pool
     public func removeRelay(_ url: RelayURL) {
-        relayPool.removeRelay(url)
+        Task {
+            await relayPool.removeRelay(url)
+        }
     }
 
     /// Get all relays
     public var relays: [NDKRelay] {
-        return relayPool.relays
+        get async {
+            return await relayPool.relays
+        }
     }
 
     /// Connect to all relays
@@ -235,9 +245,13 @@ public final class NDK {
         if outboxEnabled {
             let successfulRelays = try await outbox.publish(event)
             // Convert URLs back to NDKRelay objects for backward compatibility
-            return Set(successfulRelays.compactMap { url in
-                relayPool.relaysByUrl[url]
-            })
+            var relaySet = Set<NDKRelay>()
+            for url in successfulRelays {
+                if let relay = await relayPool.getRelay(for: url) {
+                    relaySet.insert(relay)
+                }
+            }
+            return relaySet
         }
 
         // Fallback to direct publishing if outbox is disabled
@@ -247,7 +261,7 @@ public final class NDK {
         }
 
         // Get all relays we want to publish to
-        let targetRelays = relayPool.relays
+        let targetRelays = await relayPool.relays
 
         // Publish to connected relays
         let publishedRelays = await relayPool.publishEvent(event)
@@ -300,11 +314,12 @@ public final class NDK {
             let normalizedUrl = URLNormalizer.tryNormalizeRelayUrl(url) ?? url
 
             // Check if relay is already in the pool
-            if let existingRelay = relayPool.relaysByUrl[normalizedUrl] {
+            if let existingRelay = await relayPool.getRelay(for: normalizedUrl) {
                 targetRelays.insert(existingRelay)
             } else {
                 // Add relay to pool
-                let relay = addRelay(normalizedUrl)
+                let relay = await relayPool.addRelay(normalizedUrl)
+                relay.ndk = self
                 targetRelays.insert(relay)
             }
         }
@@ -389,7 +404,7 @@ public final class NDK {
                 subscriptionOptions.relays = Set<NDKRelay>()
             } else {
                 // Use all configured relays when outbox is disabled
-                subscriptionOptions.relays = Set(relays)
+                subscriptionOptions.relays = Set(await relays)
             }
         }
         
@@ -433,8 +448,15 @@ public final class NDK {
                 }
                 
                 // Convert URLs to NDKRelay objects
-                let relayObjects = allRelays.compactMap { url in
-                    self.relayPool.relaysByUrl[url] ?? self.addRelay(url)
+                var relayObjects: [NDKRelay] = []
+                for url in allRelays {
+                    if let relay = await self.relayPool.getRelay(for: url) {
+                        relayObjects.append(relay)
+                    } else {
+                        let newRelay = await self.relayPool.addRelay(url)
+                        newRelay.ndk = self
+                        relayObjects.append(newRelay)
+                    }
                 }
                 
                 // Update subscription with selected relays
@@ -704,6 +726,13 @@ public final class NDK {
         user.ndk = self
         return user
     }
+    
+    // MARK: - Wallet Management
+    
+    /// Create a Cashu wallet
+    public func createCashuWallet(walletId: String? = nil) -> NDKCashuWallet {
+        return NDKCashuWallet(ndk: self, walletId: walletId)
+    }
 
     // MARK: - Queued Events
 
@@ -743,8 +772,25 @@ public final class NDK {
 
 // MARK: - Relay Pool Implementation
 
-public class NDKRelayPool {
-    var relaysByUrl: [RelayURL: NDKRelay] = [:]
+/// Thread-safe relay pool using actor-based concurrency
+/// 
+/// The relay pool manages all relay connections and ensures thread-safe access
+/// to the relay collection. All mutations to the relay dictionary are isolated
+/// within the actor, preventing race conditions.
+/// 
+/// ## Thread Safety
+/// 
+/// This actor replaces the previous class-based implementation that had race conditions.
+/// Methods like `addRelay(_:)` and `removeRelay(_:)` previously mutated the dictionary
+/// directly, which could corrupt state when called from multiple threads.
+/// 
+/// ## Object Identity
+/// 
+/// Relay instances maintain their identity - the same NDKRelay object is returned
+/// for the same normalized URL. This ensures consistent state tracking across
+/// the application.
+public actor NDKRelayPool {
+    private var relaysByUrl: [RelayURL: NDKRelay] = [:]
 
     func addRelay(_ url: RelayURL) -> NDKRelay {
         // Normalize the URL before storing
@@ -766,6 +812,17 @@ public class NDKRelayPool {
 
     var relays: [NDKRelay] {
         return Array(relaysByUrl.values)
+    }
+    
+    /// Get relay by URL (normalized)
+    func getRelay(for url: RelayURL) -> NDKRelay? {
+        let normalizedUrl = URLNormalizer.tryNormalizeRelayUrl(url) ?? url
+        return relaysByUrl[normalizedUrl]
+    }
+    
+    /// Get all relay URLs
+    var relayURLs: [RelayURL] {
+        return Array(relaysByUrl.keys)
     }
 
     /// Get currently connected relays
