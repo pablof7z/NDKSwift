@@ -1,265 +1,64 @@
 import Foundation
 
-/// The primary cache interface for NDKSwift
+/// The primary cache protocol for NDKSwift
 /// 
-/// This is a clean, modern cache implementation that replaces the adapter-based approach.
-/// It uses LayeredCache internally to provide multi-tier caching (memory + disk).
-/// 
-/// TODO: This is the target cache architecture. Migration from NDKCacheAdapter to this
-/// implementation is planned for a future update. For now, NDK still uses the adapter pattern.
-public actor NDKCache {
-    private let eventCache: LayeredCache
-    private let profileCache: LayeredCache
-    private let metadataCache: LayeredCache
-    
-    // Cache key prefixes
-    private enum Prefix {
-        static let event = "event:"
-        static let profile = "profile:"
-        static let nip05 = "nip05:"
-        static let relay = "relay:"
-        static let eventsByAuthor = "events:author:"
-        static let eventsByKind = "events:kind:"
-        static let eventsByTag = "events:tag:"
-    }
-    
-    public init(
-        cacheDirectory: URL? = nil,
-        memoryEventLimit: Int = 10000,
-        memoryProfileLimit: Int = 1000
-    ) async throws {
-        let cacheDir: URL
-        if let provided = cacheDirectory {
-            cacheDir = provided
-        } else {
-            cacheDir = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first!
-                .appendingPathComponent("NDKSwift")
-                .appendingPathComponent("cache")
-        }
-        
-        // Create cache directories
-        let eventDir = cacheDir.appendingPathComponent("events")
-        let profileDir = cacheDir.appendingPathComponent("profiles")
-        let metadataDir = cacheDir.appendingPathComponent("metadata")
-        
-        // Initialize layered caches
-        self.eventCache = try await CacheFactory.createStandardCache(
-            diskURL: eventDir,
-            memorySize: memoryEventLimit,
-            diskSize: 100_000_000, // 100MB
-            defaultTTL: nil // Events don't expire
-        )
-        
-        self.profileCache = try await CacheFactory.createStandardCache(
-            diskURL: profileDir,
-            memorySize: memoryProfileLimit,
-            diskSize: 50_000_000, // 50MB
-            defaultTTL: 3600 // 1 hour
-        )
-        
-        self.metadataCache = try await CacheFactory.createStandardCache(
-            diskURL: metadataDir,
-            memorySize: 500,
-            diskSize: 10_000_000, // 10MB
-            defaultTTL: 86400 // 24 hours
-        )
-    }
-    
+/// This protocol defines the caching interface that implementations must conform to.
+/// The SQLite cache implementation provides the default, high-performance solution.
+public protocol NDKCache: Actor {
     // MARK: - Event Operations
     
     /// Save an event to cache
-    public func saveEvent(_ event: NDKEvent) async throws {
-        guard let id = event.id else { return }
-        
-        let key = Prefix.event + id
-        try await eventCache.set(key, value: event)
-        
-        // Update indexes
-        await updateEventIndexes(event)
-    }
+    func saveEvent(_ event: NDKEvent) async throws
     
     /// Retrieve an event by ID
-    public func getEvent(_ id: EventID) async -> NDKEvent? {
-        let key = Prefix.event + id
-        return await eventCache.get(key, type: NDKEvent.self)
-    }
+    func getEvent(id: String) async -> NDKEvent?
     
     /// Query events matching a filter
-    public func queryEvents(_ filter: NDKFilter) async -> [NDKEvent] {
-        // If filter has specific IDs, fetch those directly
-        if let ids = filter.ids, !ids.isEmpty {
-            var events: [NDKEvent] = []
-            for id in ids {
-                if let event = await getEvent(id) {
-                    events.append(event)
-                }
-            }
-            return events.filter { filter.matches(event: $0) }
-        }
-        
-        // Use indexes for author-based queries
-        if let authors = filter.authors, !authors.isEmpty {
-            var events: [NDKEvent] = []
-            for author in authors {
-                let authorEvents = await getEventsByAuthor(author)
-                events.append(contentsOf: authorEvents)
-            }
-            return events.filter { filter.matches(event: $0) }
-        }
-        
-        // For other queries, we'd need more sophisticated indexing
-        // This is a limitation of simple key-value caching
-        return []
-    }
+    func queryEvents(_ filter: NDKFilter) async throws -> [NDKEvent]
     
-    /// Remove all events from cache
-    public func clearEvents() async {
-        await eventCache.clear()
-    }
+    /// Delete an event from cache
+    func deleteEvent(id: String) async throws
     
     // MARK: - Profile Operations
     
     /// Save a user profile
-    public func saveProfile(_ profile: NDKUserProfile, for pubkey: PublicKey) async throws {
-        let key = Prefix.profile + pubkey
-        try await profileCache.set(key, value: profile)
-    }
+    func saveProfile(_ profile: NDKUserProfile, pubkey: String) async throws
     
     /// Retrieve a user profile
-    public func getProfile(for pubkey: PublicKey) async -> NDKUserProfile? {
-        let key = Prefix.profile + pubkey
-        return await profileCache.get(key, type: NDKUserProfile.self)
-    }
+    func getProfile(pubkey: String) async -> NDKUserProfile?
     
-    // MARK: - NIP-05 Operations
+    // MARK: - Cache Management
     
-    /// Save NIP-05 verification data
-    public func saveNip05(_ pubkey: PublicKey, relays: [String], for nip05: String) async throws {
-        struct NIP05Data: Codable {
-            let pubkey: String
-            let relays: [String]
-            let verifiedAt: Date
-        }
-        
-        let key = Prefix.nip05 + nip05.lowercased()
-        let data = NIP05Data(pubkey: pubkey, relays: relays, verifiedAt: Date())
-        try await metadataCache.set(key, value: data)
-    }
-    
-    /// Retrieve NIP-05 verification data
-    public func getNip05(for nip05: String) async -> (pubkey: PublicKey, relays: [String])? {
-        struct NIP05Data: Codable {
-            let pubkey: String
-            let relays: [String]
-            let verifiedAt: Date
-        }
-        
-        let key = Prefix.nip05 + nip05.lowercased()
-        guard let data = await metadataCache.get(key, type: NIP05Data.self) else {
-            return nil
-        }
-        return (pubkey: data.pubkey, relays: data.relays)
-    }
-    
-    // MARK: - Relay Status Operations
-    
-    /// Update relay connection status
-    public func updateRelayStatus(_ url: RelayURL, status: NDKRelayConnectionState) async throws {
-        let key = Prefix.relay + url
-        try await metadataCache.set(key, value: status, ttl: 300) // 5 minutes
-    }
-    
-    /// Get relay connection status
-    public func getRelayStatus(_ url: RelayURL) async -> NDKRelayConnectionState? {
-        let key = Prefix.relay + url
-        return await metadataCache.get(key, type: NDKRelayConnectionState.self)
-    }
-    
-    // MARK: - Statistics
-    
-    /// Get cache statistics for all layers
-    public func statistics() async -> CacheStatistics {
-        let eventStats = await eventCache.statistics()
-        let profileStats = await profileCache.statistics()
-        let metadataStats = await metadataCache.statistics()
-        
-        // Combine statistics
-        return eventStats.map { stats in
-            CacheStatistics(
-                hits: stats.hits + (profileStats.first?.hits ?? 0) + (metadataStats.first?.hits ?? 0),
-                misses: stats.misses + (profileStats.first?.misses ?? 0) + (metadataStats.first?.misses ?? 0),
-                evictions: stats.evictions + (profileStats.first?.evictions ?? 0) + (metadataStats.first?.evictions ?? 0),
-                currentSize: stats.currentSize + (profileStats.first?.currentSize ?? 0) + (metadataStats.first?.currentSize ?? 0),
-                maxSize: nil
-            )
-        }.first ?? CacheStatistics(hits: 0, misses: 0, evictions: 0, currentSize: 0, maxSize: nil)
-    }
-    
-    // MARK: - Private Methods
-    
-    private func updateEventIndexes(_ event: NDKEvent) async {
-        // Update author index
-        let authorKey = Prefix.eventsByAuthor + event.pubkey
-        var authorEvents = await eventCache.get(authorKey, type: [EventID].self) ?? []
-        if let eventId = event.id, !authorEvents.contains(eventId) {
-            authorEvents.append(eventId)
-            try? await eventCache.set(authorKey, value: authorEvents)
-        }
-        
-        // Update kind index
-        let kindKey = Prefix.eventsByKind + String(event.kind)
-        var kindEvents = await eventCache.get(kindKey, type: [EventID].self) ?? []
-        if let eventId = event.id, !kindEvents.contains(eventId) {
-            kindEvents.append(eventId)
-            try? await eventCache.set(kindKey, value: kindEvents)
-        }
-        
-        // Update tag indexes for common tag types
-        for tag in event.tags {
-            guard tag.count >= 2 else { continue }
-            let tagKey = Prefix.eventsByTag + "\(tag[0]):\(tag[1])"
-            var tagEvents = await eventCache.get(tagKey, type: [EventID].self) ?? []
-            if let eventId = event.id, !tagEvents.contains(eventId) {
-                tagEvents.append(eventId)
-                try? await eventCache.set(tagKey, value: tagEvents)
-            }
-        }
-    }
-    
-    private func getEventsByAuthor(_ pubkey: PublicKey) async -> [NDKEvent] {
-        let key = Prefix.eventsByAuthor + pubkey
-        guard let eventIds = await eventCache.get(key, type: [EventID].self) else {
-            return []
-        }
-        
-        var events: [NDKEvent] = []
-        for id in eventIds {
-            if let event = await getEvent(id) {
-                events.append(event)
-            }
-        }
-        return events
-    }
+    /// Clear all cached data
+    func clear() async throws
 }
 
-// MARK: - Cache-Only Operations
+// MARK: - Optional Protocol Extensions
 
-extension NDKCache {
-    /// Perform a cache-only query (no relay fallback)
-    public func queryCacheOnly(_ filter: NDKFilter) async -> [NDKEvent] {
-        return await queryEvents(filter)
-    }
-    
+public extension NDKCache {
     /// Check if an event exists in cache
-    public func hasEvent(_ id: EventID) async -> Bool {
-        let key = Prefix.event + id
-        return await eventCache.contains(key)
+    func hasEvent(id: String) async -> Bool {
+        return await getEvent(id: id) != nil
     }
     
     /// Batch save events
-    public func saveEvents(_ events: [NDKEvent]) async throws {
+    func saveEvents(_ events: [NDKEvent]) async throws {
         for event in events {
             try await saveEvent(event)
         }
+    }
+    
+    /// Query events by author
+    func queryEvents(author: String, kinds: [Int]? = nil, limit: Int? = nil) async throws -> [NDKEvent] {
+        var filter = NDKFilter(authors: [author])
+        filter.kinds = kinds
+        filter.limit = limit
+        return try await queryEvents(filter)
+    }
+    
+    /// Query events by kind
+    func queryEvents(kind: Int, limit: Int? = nil) async throws -> [NDKEvent] {
+        let filter = NDKFilter(kinds: [kind], limit: limit)
+        return try await queryEvents(filter)
     }
 }

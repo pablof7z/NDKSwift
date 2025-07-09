@@ -63,28 +63,28 @@ final class Bech32Tests: XCTestCase {
     func testInvalidBech32() {
         // Test invalid characters
         XCTAssertThrowsError(try Bech32.decode("test1invalid!character")) { error in
-            if case Bech32.Bech32Error.invalidCharacter = error {
+            if case NDKError.invalidInput = error {
                 // Success
             } else {
-                XCTFail("Expected invalid character error")
+                XCTFail("Expected invalid input error, got \(error)")
             }
         }
 
         // Test invalid checksum (using valid characters but wrong checksum)
         XCTAssertThrowsError(try Bech32.decode("test1qqqsyqcyq5rqwzqfpg9scrgwpuccg6ks")) { error in
-            if case Bech32.Bech32Error.invalidChecksum = error {
+            if case NDKError.invalidInput = error {
                 // Success
             } else {
-                XCTFail("Expected invalid checksum error, got: \(error)")
+                XCTFail("Expected invalid input error, got: \(error)")
             }
         }
 
         // Test invalid HRP
         XCTAssertThrowsError(try Bech32.decode("noseparator")) { error in
-            if case Bech32.Bech32Error.invalidHRP = error {
+            if case NDKError.invalidInput = error {
                 // Success
             } else {
-                XCTFail("Expected invalid HRP error")
+                XCTFail("Expected invalid input error, got \(error)")
             }
         }
     }
@@ -95,10 +95,10 @@ final class Bech32Tests: XCTestCase {
 
         // Try to decode npub as nsec
         XCTAssertThrowsError(try Bech32.privateKey(from: npub)) { error in
-            if case Bech32.Bech32Error.invalidHRP = error {
+            if case NDKError.invalidInput = error {
                 // Success
             } else {
-                XCTFail("Expected invalid HRP error")
+                XCTFail("Expected invalid input error, got \(error)")
             }
         }
     }
@@ -190,5 +190,62 @@ final class Bech32Tests: XCTestCase {
         XCTAssertEqual(roundTripNsec, nsec, "Nsec round-trip failed!")
 
         print("✅ All Bech32 tests passed!")
+    }
+    
+    // MARK: - Test Vectors from nostr-tools
+    
+    func testNostrToolsNIP19Vectors() throws {
+        // Test vectors from nostr-tools nip19.test.ts
+        
+        // npub test vector
+        let npubVector = "npub1jz5mdljkmffmqjshpyjgqgrhdkuxd9ztzasv8xeh5q92fv33sjgqy4pats"
+        let expectedNpubHex = "9094b5a57d82465a76f89fc38bac0ab7a70bd0c4a312a20ddec7b06aa4e46448"
+        let decodedNpub = try Bech32.pubkey(from: npubVector)
+        XCTAssertEqual(decodedNpub, expectedNpubHex, "npub decoding mismatch")
+        
+        // nsec test vector
+        let nsecVector = "nsec1lqw6zqyanj9mz8gwhdam6tqge42vptz4zg93qsfej440xm5h5esqya0juv"
+        let expectedNsecHex = "f81da10093989b61d08e5dbb7d2d0465a9a60ac55120b1041399556a79eb7a66"
+        let decodedNsec = try Bech32.privateKey(from: nsecVector)
+        XCTAssertEqual(decodedNsec, expectedNsecHex, "nsec decoding mismatch")
+        
+        // note test vector
+        let noteVector = "note1gmtnz6q2m55epmlpe3semjdcq987av3jvx4emmjsa8g3s9x7tg4sclreky"
+        let expectedNoteHex = "45973169015b69329f7e1cc66d93ac02a7ef326260d59dee521d1d11816de5a3"
+        let decodedNote = try Bech32.eventId(from: noteVector)
+        XCTAssertEqual(decodedNote, expectedNoteHex, "note decoding mismatch")
+    }
+    
+    func testNostrToolsNprofileNaddr() throws {
+        // nprofile test vector - we'll just test basic decoding structure
+        let nprofileVector = "nprofile1qqsvc6ulagpn7kwrcwdqgp797xl7usumqa6s3kgcelwq6m75x8fe8yc5usxdg"
+        
+        // naddr test vector - we'll just test basic decoding structure
+        let naddrVector = "naddr1qq98yetxv4ex2mnrv4esygrl54h466tz4v0re4pyuavvxqptsejl0vxcmnhfl60z3rth2xkpjspsgqqqw4rsf34vl5"
+        
+        // We can test that these decode without error
+        let (nprofileHrp, _) = try Bech32.decode(nprofileVector)
+        XCTAssertEqual(nprofileHrp, "nprofile")
+        
+        let (naddrHrp, _) = try Bech32.decode(naddrVector)
+        XCTAssertEqual(naddrHrp, "naddr")
+    }
+    
+    func testNostrToolsNevent() throws {
+        // nevent test vector
+        let neventVector = "nevent1qqst8cujky046negxgwwm5ynqwn53t8aqjr6afd8g59nfqwxpdhylpcpzamhxue69uhhyetvv9ujuetcv9khqmr99e3k7mg8arnc9"
+        
+        // We can test that it decodes without error
+        let (neventHrp, _) = try Bech32.decode(neventVector)
+        XCTAssertEqual(neventHrp, "nevent")
+    }
+    
+    func testNostrToolsNcryptsec() throws {
+        // ncryptsec test vector
+        let ncryptsecVector = "ncryptsec1qgg9947rlpvqu76pj5ecreduf9jxhselq2nae2kghhvd5g7dgjtcxfqtd67p9m0w57lspw8gsq6yphnm8623nsl8xn9j4jdzz84zm3frztj3z7s35vpzmq"
+        
+        // We can test that it decodes without error
+        let (ncryptsecHrp, _) = try Bech32.decode(ncryptsecVector)
+        XCTAssertEqual(ncryptsecHrp, "ncryptsec")
     }
 }

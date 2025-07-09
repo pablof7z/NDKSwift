@@ -4,7 +4,10 @@ import Foundation
 /// Mock relay for testing
 public final class MockRelay: RelayProtocol {
     public let url: String
-    public var connectionState: NDKRelayConnectionState = .disconnected
+    private var _connectionState: NDKRelayConnectionState = .disconnected
+    public var connectionState: NDKRelayConnectionState {
+        get async { _connectionState }
+    }
     public weak var ndk: NDK?
     
     // Mock configuration
@@ -35,19 +38,19 @@ public final class MockRelay: RelayProtocol {
     // MARK: - RelayProtocol Implementation
     
     public var activeSubscriptions: [NDKSubscription] {
-        return Array(subscriptions.values)
+        get async { Array(subscriptions.values) }
     }
     
     public func connect() async throws {
-        guard connectionState == .disconnected else { return }
+        guard _connectionState == .disconnected else { return }
         
-        connectionState = .connecting
+        _connectionState = .connecting
         notifyStateObservers()
         
         if shouldFailConnection {
-            connectionState = .failed(connectionError?.localizedDescription ?? "Connection failed")
+            _connectionState = .failed(connectionError?.localizedDescription ?? "Connection failed")
             notifyStateObservers()
-            throw connectionError ?? NDKError.network("connection_failed", "Mock connection failed")
+            throw connectionError ?? NDKError.connectionFailed(relay: url, message: "Mock connection failed")
         }
         
         if connectionDelay > 0 {
@@ -55,31 +58,31 @@ public final class MockRelay: RelayProtocol {
         }
         
         if autoConnect {
-            connectionState = .connected
+            _connectionState = .connected
             notifyStateObservers()
         }
     }
     
     public func disconnect() async {
-        guard connectionState != .disconnected else { return }
+        guard _connectionState != .disconnected else { return }
         
-        connectionState = .disconnecting
+        _connectionState = .disconnecting
         notifyStateObservers()
         
         // Clear subscriptions
         subscriptions.removeAll()
         
-        connectionState = .disconnected
+        _connectionState = .disconnected
         notifyStateObservers()
     }
     
     public func send(_ message: String) async throws {
-        guard connectionState == .connected else {
-            throw NDKError.network("not_connected", "Mock relay is not connected")
+        guard _connectionState == .connected else {
+            throw NDKError.connectionLost(relay: url, message: "Mock relay is not connected")
         }
         
         if shouldFailSend {
-            throw sendError ?? NDKError.network("send_failed", "Mock send failed")
+            throw sendError ?? NDKError.connectionFailed(relay: url, message: "Mock send failed")
         }
         
         sentMessages.append(message)
@@ -90,26 +93,26 @@ public final class MockRelay: RelayProtocol {
         }
     }
     
-    public func addSubscription(_ subscription: NDKSubscription) {
+    public func addSubscription(_ subscription: NDKSubscription) async {
         subscriptions[subscription.id] = subscription
     }
     
-    public func removeSubscription(byId id: String) {
+    public func removeSubscription(byId id: String) async {
         subscriptions.removeValue(forKey: id)
     }
     
-    public func getSignatureStats() -> NDKRelaySignatureStats {
+    public func getSignatureStats() async -> NDKRelaySignatureStats {
         return signatureStats
     }
     
-    public func updateSignatureStats(_ updater: (inout NDKRelaySignatureStats) -> Void) {
+    public func updateSignatureStats(_ updater: (inout NDKRelaySignatureStats) -> Void) async {
         updater(&signatureStats)
     }
     
-    public func observeConnectionState(_ observer: @escaping (NDKRelayConnectionState) -> Void) {
+    public func observeConnectionState(_ observer: @escaping (NDKRelayConnectionState) -> Void) async {
         stateObservers.append(observer)
         // Immediately notify of current state
-        observer(connectionState)
+        observer(_connectionState)
     }
     
     // MARK: - Mock Helpers
@@ -161,7 +164,7 @@ public final class MockRelay: RelayProtocol {
         subscriptions.removeAll()
         mockEvents.removeAll()
         mockResponses.removeAll()
-        connectionState = .disconnected
+        _connectionState = .disconnected
         notifyStateObservers()
     }
     
@@ -169,7 +172,7 @@ public final class MockRelay: RelayProtocol {
     
     private func notifyStateObservers() {
         for observer in stateObservers {
-            observer(connectionState)
+            observer(_connectionState)
         }
     }
     

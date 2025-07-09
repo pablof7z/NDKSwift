@@ -1,9 +1,9 @@
 import Foundation
 
 /// Intelligently selects relays for publishing and fetching based on the outbox model
-public actor NDKRelaySelector {
+actor NDKRelaySelector {
     private let ndk: NDK
-    private let tracker: NDKOutboxTracker
+    let tracker: NDKOutboxTracker
     private let ranker: NDKRelayRanker
 
     public init(ndk: NDK, tracker: NDKOutboxTracker, ranker: NDKRelayRanker) {
@@ -24,8 +24,7 @@ public actor NDKRelaySelector {
         if let userItem = await tracker.getRelaysSyncFor(pubkey: event.pubkey, type: .write) {
             targetRelays.formUnion(userItem.writeRelays.map { $0.url })
         } else if config.includeUserReadRelays,
-                  let userItem = await tracker.getRelaysSyncFor(pubkey: event.pubkey, type: .read)
-        {
+                  let userItem = await tracker.getRelaysSyncFor(pubkey: event.pubkey, type: .read) {
             // Fallback to read relays if no write relays
             targetRelays.formUnion(userItem.readRelays.map { $0.url })
         }
@@ -81,8 +80,7 @@ public actor NDKRelaySelector {
         // 1. Add user's primary read relays
         let userPubkey = try? await ndk.signer?.pubkey
         if let userPubkey = userPubkey,
-           let userItem = await tracker.getRelaysSyncFor(pubkey: userPubkey, type: .read)
-        {
+           let userItem = await tracker.getRelaysSyncFor(pubkey: userPubkey, type: .read) {
             sourceRelays.formUnion(userItem.readRelays.map { $0.url })
         }
 
@@ -132,6 +130,13 @@ public actor NDKRelaySelector {
             selectionMethod: determineSelectionMethod(sourceRelays)
         )
     }
+    
+    /// Select relays for a list of public keys
+    func selectRelays(for pubkey: String, count: Int = 5) async -> [String] {
+        let filter = NDKFilter(authors: [pubkey])
+        let result = await selectRelaysForFetching(filter: filter, config: FetchingConfig(maxRelayCount: count))
+        return Array(result.relays)
+    }
 
     /// Choose relay combination for multiple pubkeys (optimized for minimal connections)
     public func chooseRelayCombinationForPubkeys(
@@ -140,7 +145,7 @@ public actor NDKRelaySelector {
         config: CombinationConfig = .default
     ) async -> RelayToPubkeysMap {
         var relayToPubkeys = RelayToPubkeysMap()
-        let connectedRelays = ndk.relayPool.connectedRelays()
+        let connectedRelays = await ndk.relayPool.connectedRelays()
 
         // Track how many relays each pubkey has been assigned to
         var pubkeyRelayCount: [String: Int] = [:]
@@ -367,7 +372,7 @@ public actor NDKRelaySelector {
 // MARK: - Configuration Types
 
 /// Configuration for publishing events
-public struct PublishingConfig {
+public struct PublishingConfig: Sendable {
     public let minRelayCount: Int
     public let maxRelayCount: Int
     public let includeUserReadRelays: Bool
@@ -389,7 +394,7 @@ public struct PublishingConfig {
 }
 
 /// Configuration for fetching events
-public struct FetchingConfig {
+public struct FetchingConfig: Sendable {
     public let minRelayCount: Int
     public let maxRelayCount: Int
     public let preferWriteRelaysIfNoRead: Bool
@@ -411,7 +416,7 @@ public struct FetchingConfig {
 }
 
 /// Configuration for relay combination selection
-public struct CombinationConfig {
+struct CombinationConfig: Sendable {
     public let relaysPerAuthor: Int
 
     public init(relaysPerAuthor: Int = 2) {
@@ -424,7 +429,7 @@ public struct CombinationConfig {
 // MARK: - Result Types
 
 /// Result of relay selection
-public struct RelaySelectionResult {
+struct RelaySelectionResult: Sendable {
     public let relays: Set<String>
     public let missingRelayInfoPubkeys: Set<String>
     public let selectionMethod: SelectionMethod
@@ -440,7 +445,7 @@ private enum RelayPurpose {
 }
 
 /// Method used for relay selection
-public enum SelectionMethod {
+enum SelectionMethod: Sendable {
     case outbox
     case contextual
     case fallback

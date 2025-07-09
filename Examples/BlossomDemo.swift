@@ -63,7 +63,7 @@ struct BlossomDemo {
                     mimeType: "image/png",
                     servers: [
                         "https://blossom.primal.net",
-                        "https://media.nostr.band",
+                        "https://media.nostr.band"
                     ]
                 )
 
@@ -238,7 +238,7 @@ struct BlossomDemo {
             0x18, 0xDD, 0x8D, 0xB4, // CRC
             0x00, 0x00, 0x00, 0x00, // IEND chunk length
             0x49, 0x45, 0x4E, 0x44, // IEND
-            0xAE, 0x42, 0x60, 0x82, // CRC
+            0xAE, 0x42, 0x60, 0x82 // CRC
         ]
         return Data(pngHeader)
     }

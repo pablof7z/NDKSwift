@@ -55,44 +55,52 @@ struct SimpleDemoMain {
         let matches = filter.matches(event: event)
         print("✅ Filter matches event: \(matches)")
 
-        // 4. Test subscriptions
+        // 4. Test subscriptions with modern async API
         print("\n📡 Testing subscriptions...")
         let subscription = NDKSubscription(filters: [filter])
 
+        // Simulate events in background
+        Task {
+            // Small delay to ensure subscription starts
+            try? await Task.sleep(nanoseconds: 100_000_000)
+            
+            await subscription.handleEvent(event, fromRelay: nil)
+
+            let event2 = NDKEvent(
+                pubkey: "d0a1ffb8761b974cec4a3be8cbcb2e96a7090dcf465ffeac839aa4ca20c9a59e",
+                createdAt: Timestamp(Date().timeIntervalSince1970),
+                kind: EventKind.textNote,
+                content: "Second test event"
+            )
+            event2.id = "test_event_2"
+
+            await subscription.handleEvent(event2, fromRelay: nil)
+            await subscription.handleEOSE()
+        }
+
+        // Use modern async iteration
         var receivedEvents = 0
-        subscription.onEvent { event in
-            receivedEvents += 1
-            print("📨 Received event \(receivedEvents): \(event.content)")
+        do {
+            for try await event in subscription {
+                receivedEvents += 1
+                print("📨 Received event \(receivedEvents): \(event.content)")
+                if receivedEvents >= 2 {
+                    break // Exit after receiving both test events
+                }
+            }
+        } catch {
+            print("❌ Subscription error: \(error)")
         }
 
-        subscription.onEOSE {
-            print("🏁 EOSE received")
-        }
-
-        // Simulate events
-        subscription.handleEvent(event, fromRelay: nil as NDKRelay?)
-
-        let event2 = NDKEvent(
-            pubkey: "d0a1ffb8761b974cec4a3be8cbcb2e96a7090dcf465ffeac839aa4ca20c9a59e",
-            createdAt: Timestamp(Date().timeIntervalSince1970),
-            kind: EventKind.textNote,
-            content: "Second test event"
-        )
-        event2.id = "test_event_2"
-
-        subscription.handleEvent(event2, fromRelay: nil as NDKRelay?)
-        subscription.handleEOSE()
-
-        print("✅ Subscription received \(subscription.events.count) events")
+        print("✅ Subscription received \(receivedEvents) events")
 
         // 5. Test NDK instance
         print("\n🏗️ Testing NDK instance...")
-        let ndk = NDK(
+        let ndk = try await NDK(
             relayUrls: [
                 "wss://relay.damus.io",
-                "wss://nos.lol",
-            ],
-            cacheAdapter: NDKInMemoryCache()
+                "wss://nos.lol"
+            ]
         )
 
         print("✅ NDK created with \(ndk.relays.count) relays")
@@ -103,10 +111,10 @@ struct SimpleDemoMain {
 
         // 6. Test cache
         print("\n💾 Testing cache...")
-        if let cache = ndk.cacheAdapter {
-            await cache.setEvent(event, filters: [filter], relay: nil)
+        if let cache = ndk.cache {
+            try? await cache.saveEvent(event)
 
-            let cachedEvents = await cache.query(subscription: subscription)
+            let cachedEvents = await cache.queryEvents(filter)
             print("✅ Cache stored and retrieved \(cachedEvents.count) events")
         }
 

@@ -488,33 +488,18 @@
       ],
       "encrypt_decrypt_long_msg": [
         {
-          "conversation_key": "8fc262099ce0d0bb9b89bac05bb9e04f9bc0090acc181fef6840ccee470371ed",
-          "nonce": "326bcb2c943cd6bb717588c9e5a7e738edf6ed14ec5f5344caa6ef56f0b9cff7",
-          "pattern": "x",
+          "conversation_key": "7a1ccf5ce5a08e380f590de0c02776623b85a61ae67cfb6a017317e505b7cb51",
+          "nonce": "a000000000000000000000000000000000000000000000000000000000000001",
+          "letter": "ф",
           "repeat": 65535,
-          "plaintext_sha256": "09ab7495d3e61a76f0deb12cb0306f0696cbb17ffc12131368c7a939f12f56d3",
-          "payload_sha256": "90714492225faba06310bff2f249ebdc2a5e609d65a629f1c87f2d4ffc55330a"
-        },
-        {
-          "conversation_key": "56adbe3720339363ab9c3b8526ffce9fd77600927488bfc4b59f7a68ffe5eae0",
-          "nonce": "ad68da81833c2a8ff609c3d2c0335fd44fe5954f85bb580c6a8d467aa9fc5dd0",
-          "pattern": "!",
-          "repeat": 65535,
-          "plaintext_sha256": "6af297793b72ae092c422e552c3bb3cbc310da274bd1cf9e31023a7fe4a2d75e",
-          "payload_sha256": "8013e45a109fad3362133132b460a2d5bce235fe71c8b8f4014793fb52a49844"
-        },
-        {
-          "conversation_key": "7fc540779979e472bb8d12480b443d1e5eb1098eae546ef2390bee499bbf46be",
-          "nonce": "34905e82105c20de9a2f6cd385a0d541e6bcc10601d12481ff3a7575dc622033",
-          "pattern": "🦄",
-          "repeat": 16383,
-          "plaintext_sha256": "a249558d161b77297bc0cb311dde7d77190f6571b25c7e4429cd19044634a61f",
-          "payload_sha256": "b3348422471da1f3c59d79acfe2fe103f3cd24488109e5b18734cdb5953afd15"
+          "payload_checksum_sha256": "",
+          "note": "фффф... (65535 times)"
         }
       ]
     },
     "invalid": {
       "encrypt_msg_lengths": [0, 65536, 100000, 10000000],
+      "decrypt_msg_lengths": [0, 1, 2, 5, 10, 20, 32, 48, 64],
       "get_conversation_key": [
         {
           "sec1": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
@@ -613,34 +598,6 @@
           "plaintext": "censorship-resistant and global social network",
           "payload": "Am+f1yZnwnOs0jymZTcRpwhDRHTdnrFcPtsBzpqVdD6b2NZDaNm/TPkZGr75kbB6tCSoq7YRcbPiNfJXNch3Tf+o9+zZTMxwjgX/nm3yDKR2kHQMBhVleCB9uPuljl40AJ8kXRD0gjw+aYRJFUMK9gCETZAjjmrsCM+nGRZ1FfNsHr6Z",
           "note": "invalid padding"
-        },
-        {
-          "conversation_key": "5cd2d13b9e355aeb2452afbd3786870dbeecb9d355b12cb0a3b6e9da5744cd35",
-          "nonce": "b60036976a1ada277b948fd4caa065304b96964742b89d26f26a25263a5060bd",
-          "plaintext": "0",
-          "payload": "",
-          "note": "invalid payload length: 0"
-        },
-        {
-          "conversation_key": "d61d3f09c7dfe1c0be91af7109b60a7d9d498920c90cbba1e137320fdd938853",
-          "nonce": "1a29d02c8b4527745a2ccb38bfa45655deb37bc338ab9289d756354cea1fd07c",
-          "plaintext": "1",
-          "payload": "Ag==",
-          "note": "invalid payload length: 4"
-        },
-        {
-          "conversation_key": "873bb0fc665eb950a8e7d5971965539f6ebd645c83c08cd6a85aafbad0f0bc47",
-          "nonce": "c826d3c38e765ab8cc42060116cd1464b2a6ce01d33deba5dedfb48615306d4a",
-          "plaintext": "2",
-          "payload": "AqxgToSh3H7iLYRJjoWAM+vSv/Y1mgNlm6OWWjOYUClrFF8=",
-          "note": "invalid payload length: 48"
-        },
-        {
-          "conversation_key": "9f2fef8f5401ac33f74641b568a7a30bb19409c76ffdc5eae2db6b39d2617fbe",
-          "nonce": "9ff6484642545221624eaac7b9ea27133a4cc2356682a6033aceeef043549861",
-          "plaintext": "3",
-          "payload": "Ap/2SEZCVFIhYk6qx7nqJxM6TMI1ZoKmAzrO7vBDVJhhuZXWiM20i/tIsbjT0KxkJs2MZjh1oXNYMO9ggfk7i47WQA==",
-          "note": "invalid payload length: 92"
         }
       ]
     }

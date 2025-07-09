@@ -131,9 +131,8 @@ final class NDKCoreTests: XCTestCase {
     // MARK: - Error Handling Tests
     
     func testNDKError() {
-        let error = NDKError.validation("invalid_key", "The key is invalid")
-        XCTAssertEqual(error.code, "invalid_key")
-        XCTAssertEqual(error.message, "The key is invalid")
+        let error = NDKError.invalidPublicKey("invalid_key")
+        XCTAssertEqual(error.errorDescription, "Invalid public key: invalid_key")
     }
     
     func testOKMessage() {

@@ -310,6 +310,7 @@ public struct GetBalanceRequest: Codable {
 }
 
 public struct GetBalanceResponse: Codable {
+    /// Balance in millisatoshis (msat)
     public let balance: Int64
 }
 

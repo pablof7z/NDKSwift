@@ -5,6 +5,22 @@ actor SubscriptionStateActor {
     private var state: NDKSubscriptionState = .pending
     private var activeRelays: Set<NDKRelay> = []
     private var eoseReceivedFrom: Set<String> = []
+    private var seenEventIds: Set<EventID> = []
+    private var events: [NDKEvent] = []
+    private var hasReceivedEOSE: Bool = false
+    private var countResults: [String: Int] = [:] // relay URL -> count
+    
+    // Mutable properties moved from NDKSubscription
+    private var options: NDKSubscriptionOptions
+    private weak var ndk: NDK?
+    private var timeoutTask: Task<Void, Never>?
+    private var continuation: AsyncThrowingStream<NDKEvent, Error>.Continuation?
+    private var registrationTask: Task<Void, Never>?
+    
+    init(options: NDKSubscriptionOptions, ndk: NDK?) {
+        self.options = options
+        self.ndk = ndk
+    }
     
     func transitionToActive() -> Bool {
         guard state == .pending || state == .inactive else { return false }
@@ -17,6 +33,13 @@ actor SubscriptionStateActor {
         state = .closed
         let relays = activeRelays
         activeRelays.removeAll()
+        
+        // Clean up tasks
+        timeoutTask?.cancel()
+        timeoutTask = nil
+        registrationTask?.cancel()
+        registrationTask = nil
+        
         return (true, relays)
     }
     
@@ -30,16 +53,90 @@ actor SubscriptionStateActor {
         
         // Check if we've received EOSE from all expected relays
         let expectedUrls = Set(expectedRelays.map { $0.url })
-        return expectedUrls.isSubset(of: eoseReceivedFrom)
+        let allEOSEReceived = expectedUrls.isSubset(of: eoseReceivedFrom)
+        if allEOSEReceived {
+            hasReceivedEOSE = true
+        }
+        return allEOSEReceived
+    }
+    
+    func addEventIfNotSeen(_ event: NDKEvent) -> Bool {
+        guard let eventId = event.id else { return false }
+        
+        // Check if already seen
+        guard !seenEventIds.contains(eventId) else { return false }
+        
+        // Add to seen set and events array
+        seenEventIds.insert(eventId)
+        events.append(event)
+        return true
+    }
+    
+    func getEvents() -> [NDKEvent] {
+        return events
+    }
+    
+    func getEventCount() -> Int {
+        return events.count
+    }
+    
+    func updateCount(_ count: Int, from relay: RelayProtocol?) {
+        let relayUrl = relay?.url ?? "unknown"
+        countResults[relayUrl] = count
+    }
+    
+    func getCountResults() -> [String: Int] {
+        return countResults
+    }
+    
+    // Accessors for mutable properties
+    func getOptions() -> NDKSubscriptionOptions {
+        return options
+    }
+    
+    func updateOptions(_ newOptions: NDKSubscriptionOptions) {
+        self.options = newOptions
+    }
+    
+    func getNDK() -> NDK? {
+        return ndk
+    }
+    
+    func getContinuation() -> AsyncThrowingStream<NDKEvent, Error>.Continuation? {
+        return continuation
+    }
+    
+    func setContinuation(_ newContinuation: AsyncThrowingStream<NDKEvent, Error>.Continuation?) {
+        self.continuation = newContinuation
+    }
+    
+    func setTimeoutTask(_ task: Task<Void, Never>?) {
+        timeoutTask?.cancel()
+        timeoutTask = task
+    }
+    
+    func setRegistrationTask(_ task: Task<Void, Never>?) {
+        registrationTask = task
+    }
+    
+    func cancelTimeoutTask() {
+        timeoutTask?.cancel()
+        timeoutTask = nil
+    }
+    
+    func finishContinuation() {
+        continuation?.finish()
+        continuation = nil
     }
     
     var currentState: NDKSubscriptionState { state }
     var isActive: Bool { state == .active }
     var isClosed: Bool { state == .closed }
+    var eoseReceived: Bool { hasReceivedEOSE }
 }
 
 /// Simplified subscription options
-public struct NDKSubscriptionOptions {
+public struct NDKSubscriptionOptions: Sendable {
     /// Whether to close the subscription on EOSE
     public var closeOnEose: Bool = false
     
@@ -55,32 +152,68 @@ public struct NDKSubscriptionOptions {
     /// Specific relays to use for this subscription
     public var relays: Set<NDKRelay>?
     
-    /// Legacy cache strategy support
-    public var cacheStrategy: NDKCacheStrategy {
-        get { useCache ? .cacheFirst : .relayOnly }
-        set { useCache = newValue != .relayOnly }
-    }
-    
     public init() {}
 }
 
-/// Cache strategy for subscriptions (kept for compatibility)
-public enum NDKCacheStrategy {
-    case cacheFirst // Check cache first, then relays
-    case cacheOnly // Only check cache
-    case relayOnly // Only check relays
-    case parallel // Check cache and relays in parallel
-}
-
-/// Update type for subscription stream (kept for compatibility)
-public enum NDKSubscriptionUpdate {
-    case event(NDKEvent)
-    case eose
-    case error(Error)
-}
-
 /// Simplified subscription implementation
-public final class NDKSubscription: AsyncSequence {
+/// 
+/// ## Usage Pattern
+/// 
+/// NDKSubscription conforms to AsyncSequence, making it easy to consume events:
+/// 
+/// ```swift
+/// let subscription = ndk.subscribe(filters: [filter])
+/// 
+/// do {
+///     for try await event in subscription {
+///         // Process event
+///     }
+/// } catch {
+///     // Handle subscription errors
+///     print("Subscription failed: \(error)")
+/// }
+/// ```
+/// 
+/// ## Resource Management
+/// 
+/// **Important**: Subscriptions must be explicitly closed to free server resources. 
+/// If you let a subscription go out of scope without calling `close()`, it will 
+/// remain active on the relays.
+/// 
+/// ### Recommended Pattern with Task:
+/// 
+/// ```swift
+/// let subscriptionTask = Task {
+///     let subscription = ndk.subscribe(filters: [filter])
+///     defer {
+///         // Ensure close is called when task completes or is cancelled
+///         Task { await subscription.close() }
+///     }
+///     
+///     do {
+///         for try await event in subscription {
+///             // Process events
+///         }
+///     } catch {
+///         // Handle errors
+///     }
+/// }
+/// 
+/// // Later, to stop the subscription:
+/// subscriptionTask.cancel()
+/// ```
+/// 
+/// ### Manual Management:
+/// 
+/// ```swift
+/// let subscription = ndk.subscribe(filters: [filter])
+/// 
+/// // Process events...
+/// 
+/// // Always close when done
+/// await subscription.close()
+/// ```
+public final class NDKSubscription: AsyncSequence, Sendable {
     public typealias Element = NDKEvent
     
     /// Unique subscription ID
@@ -89,197 +222,186 @@ public final class NDKSubscription: AsyncSequence {
     /// Filters for this subscription
     public let filters: [NDKFilter]
     
-    /// Subscription options
-    public let options: NDKSubscriptionOptions
-    
-    /// Reference to NDK instance
-    public weak var ndk: NDK?
-    
-    /// Current subscription state (public read-only)
-    public private(set) var state: NDKSubscriptionState = .pending
-    
-    /// Events received so far
-    public private(set) var events: [NDKEvent] = []
-    private let eventsLock = NSLock()
-    
     /// Thread-safe state management
-    private let stateActor = SubscriptionStateActor()
-    
-    /// Event deduplication - thread-safe set
-    private let seenEventIdsLock = NSLock()
-    private var seenEventIds: Set<EventID> = []
-    
-    /// Timer for timeout
-    private var timeoutTimer: Timer?
-    
-    /// The stream continuation for sending events
-    private var continuation: AsyncStream<NDKEvent>.Continuation?
+    internal let stateActor: SubscriptionStateActor
     
     /// The async stream of events
-    private let stream: AsyncStream<NDKEvent>
+    private let stream: AsyncThrowingStream<NDKEvent, Error>
     
-    /// Update stream for backward compatibility
-    public let updates: AsyncStream<NDKSubscriptionUpdate>
-    private var updateContinuation: AsyncStream<NDKSubscriptionUpdate>.Continuation?
+    // All state is now async-only for thread safety
+    public var isActive: Bool {
+        get async { await stateActor.isActive }
+    }
     
-    /// Task that handles registration with the subscription manager
-    internal var registrationTask: Task<Void, Never>?
+    public var isClosed: Bool {
+        get async { await stateActor.isClosed }
+    }
     
-    // State properties that need to be synchronous for compatibility
-    public var eoseReceived: Bool = false
-    public var isActive: Bool = false
-    public var isClosed: Bool = false
+    public var eoseReceived: Bool {
+        get async { await stateActor.eoseReceived }
+    }
+    
+    public var events: [NDKEvent] {
+        get async { await stateActor.getEvents() }
+    }
+    
+    /// Count results from relays (NIP-45)
+    public var countResults: [String: Int] {
+        get async { await stateActor.getCountResults() }
+    }
+    
+    /// Current subscription state (public read-only)
+    public var state: NDKSubscriptionState {
+        get async { await stateActor.currentState }
+    }
+    
+    /// Subscription options
+    public var options: NDKSubscriptionOptions {
+        get async { await stateActor.getOptions() }
+    }
+    
+    /// Reference to NDK instance
+    public var ndk: NDK? {
+        get async { await stateActor.getNDK() }
+    }
 
     public init(
-        id: String = String(Int.random(in: 100000...999999)),
+        id: String? = nil,
         filters: [NDKFilter],
         options: NDKSubscriptionOptions = NDKSubscriptionOptions(),
         ndk: NDK? = nil
     ) {
-        self.id = id
+        self.id = id ?? "sub_\(Int.random(in: 100000...999999))"
         self.filters = filters
-        self.options = options
-        self.ndk = ndk
+        
+        // Initialize the state actor with the options and ndk
+        self.stateActor = SubscriptionStateActor(options: options, ndk: ndk)
         
         // Create the event stream with proper cleanup
-        var streamContinuation: AsyncStream<NDKEvent>.Continuation?
-        self.stream = AsyncStream<NDKEvent> { continuation in
+        var streamContinuation: AsyncThrowingStream<NDKEvent, Error>.Continuation?
+        self.stream = AsyncThrowingStream<NDKEvent, Error> { continuation in
             streamContinuation = continuation
             continuation.onTermination = { _ in
                 // Clean up when stream is terminated
             }
         }
-        self.continuation = streamContinuation
         
-        // Create the update stream for compatibility
-        var updateStreamContinuation: AsyncStream<NDKSubscriptionUpdate>.Continuation?
-        self.updates = AsyncStream<NDKSubscriptionUpdate> { continuation in
-            updateStreamContinuation = continuation
-            continuation.onTermination = { _ in
-                // Clean up when stream is terminated
-            }
+        // Store continuation in the actor
+        Task {
+            await self.stateActor.setContinuation(streamContinuation)
+            await self.setupTimeoutIfNeeded()
         }
-        self.updateContinuation = updateStreamContinuation
-        
-        setupTimeoutIfNeeded()
     }
 
     deinit {
-        // Don't call close() here as it creates a retain cycle
-        // Instead, just clean up synchronous resources
-        timeoutTimer?.invalidate()
-        timeoutTimer = nil
-        
-        // Finish the streams if they're still open
-        continuation?.finish()
-        updateContinuation?.finish()
-        
-        // Cancel the registration task
-        registrationTask?.cancel()
+        // Clean up in the actor
+        Task {
+            await self.stateActor.cancelTimeoutTask()
+            await self.stateActor.finishContinuation()
+        }
     }
 
     // MARK: - AsyncSequence Conformance
     
     public struct AsyncIterator: AsyncIteratorProtocol {
-        private var iterator: AsyncStream<NDKEvent>.AsyncIterator
+        private var iterator: AsyncThrowingStream<NDKEvent, Error>.AsyncIterator
         
-        init(iterator: AsyncStream<NDKEvent>.AsyncIterator) {
+        init(iterator: AsyncThrowingStream<NDKEvent, Error>.AsyncIterator) {
             self.iterator = iterator
         }
         
-        public mutating func next() async -> NDKEvent? {
-            await iterator.next()
+        public mutating func next() async throws -> NDKEvent? {
+            try await iterator.next()
         }
     }
     
     public func makeAsyncIterator() -> AsyncIterator {
         // Auto-start subscription when iteration begins
-        if state == .pending {
-            start()
+        Task {
+            let currentState = await stateActor.currentState
+            if currentState == .pending {
+                await start()
+            }
         }
         return AsyncIterator(iterator: stream.makeAsyncIterator())
     }
 
     // MARK: - Subscription Control
+    
+    /// Wait for EOSE to be received from all relays
+    public func waitForEOSE() async {
+        while await !self.eoseReceived {
+            try? await Task.sleep(nanoseconds: 100_000_000) // Sleep 100ms
+        }
+    }
 
     /// Start the subscription
-    public func start() {
-        Task.detached { [weak self] in
-            guard let self = self else { return }
-            
-            let shouldStart = await self.stateActor.transitionToActive()
-            guard shouldStart else { return }
-            
-            // Update public state
-            await MainActor.run {
-                self.state = .active
-                self.isActive = true
-            }
-            
-            // Start with cache if needed
-            if self.options.useCache {
-                await self.checkCache()
-            }
-            
-            // Query relays
-            await self.queryRelays()
+    public func start() async {
+        let shouldStart = await stateActor.transitionToActive()
+        guard shouldStart else { return }
+        
+        let options = await stateActor.getOptions()
+        
+        // Start with cache if needed
+        if options.useCache {
+            await checkCache()
+        }
+        
+        // Query relays
+        await queryRelays()
+    }
+    
+    /// Update the relays for this subscription (used by outbox model)
+    public func updateRelays(_ newRelays: Set<NDKRelay>) async {
+        // Get current options from actor
+        var newOptions = await stateActor.getOptions()
+        newOptions.relays = newRelays
+        await stateActor.updateOptions(newOptions)
+        
+        // If already active, query the new relays
+        if await stateActor.isActive {
+            await queryRelays()
         }
     }
 
     /// Close the subscription
-    public func close() {
-        // Create a detached task to avoid retain cycles
-        Task.detached { [weak self, id = self.id] in
-            guard let self = self else { return }
-            
-            let (shouldClose, relays) = await self.stateActor.transitionToClosed()
-            guard shouldClose else { return }
-            
-            // Update public state
-            await MainActor.run {
-                self.state = .closed
-                self.isClosed = true
-                self.isActive = false
-                
-                self.timeoutTimer?.invalidate()
-                self.timeoutTimer = nil
-            }
-            
-            // Close on all active relays
-            for relay in relays {
-                await relay.subscriptionManager.removeSubscription(id)
-                relay.removeSubscription(byId: id)
-            }
-            
-            // Complete the streams
-            await MainActor.run {
-                self.continuation?.finish()
-                self.updateContinuation?.finish()
-            }
+    public func close() async {
+        let (shouldClose, relays) = await stateActor.transitionToClosed()
+        guard shouldClose else { return }
+        
+        // Close on all active relays
+        for relay in relays {
+            await relay.subscriptionManager.removeSubscription(id)
+            await relay.removeSubscription(byId: id)
         }
+        
+        // Complete the stream (done in the actor)
+        await stateActor.finishContinuation()
     }
 
     // MARK: - Cache Handling
 
     private func checkCache() async {
-        guard let ndk = ndk, let cache = ndk.cache else { return }
+        guard let ndk = await stateActor.getNDK(), let cache = ndk.cache else { return }
         
         var cachedEvents: [NDKEvent] = []
         for filter in filters {
-            let events = await cache.queryEvents(filter)
-            cachedEvents.append(contentsOf: events)
+            if let events = try? await cache.queryEvents(filter) {
+                cachedEvents.append(contentsOf: events)
+            }
         }
         
         for event in cachedEvents {
-            handleEvent(event, fromRelay: nil)
+            await handleEvent(event, fromRelay: nil)
         }
     }
 
     // MARK: - Relay Handling
 
     private func queryRelays() async {
-        guard let ndk = ndk else { return }
+        guard let ndk = await stateActor.getNDK() else { return }
         
+        let options = await stateActor.getOptions()
         let relaysToUse = options.relays ?? Set(ndk.relays)
         
         for relay in relaysToUse {
@@ -291,90 +413,95 @@ public final class NDKSubscription: AsyncSequence {
     // MARK: - Event Handling
 
     /// Handle an event received from a relay
-    public func handleEvent(_ event: NDKEvent, fromRelay relay: RelayProtocol?) {
-        guard state != .closed else { return }
-        
-        guard let eventId = event.id else { return }
-        
-        // Deduplicate event (thread-safe)
-        seenEventIdsLock.lock()
-        let alreadySeen = seenEventIds.contains(eventId)
-        if !alreadySeen {
-            seenEventIds.insert(eventId)
-        }
-        seenEventIdsLock.unlock()
-        
-        guard !alreadySeen else {
-            return // Already seen
-        }
+    public func handleEvent(_ event: NDKEvent, fromRelay relay: RelayProtocol?) async {
+        guard await stateActor.currentState != .closed else { return }
         
         // Check if event matches our filters
         guard filters.contains(where: { $0.matches(event: event) }) else {
             return
         }
         
-        // Store event (thread-safe)
-        eventsLock.lock()
-        events.append(event)
-        eventsLock.unlock()
-        let currentEventCount = events.count
+        // Use actor for thread-safe deduplication and storage
+        let wasAdded = await stateActor.addEventIfNotSeen(event)
+        guard wasAdded else { return } // Already seen
+        
+        let currentEventCount = await stateActor.getEventCount()
         
         // Store in cache if available
-        if let ndk = ndk, let cache = ndk.cache {
-            Task {
-                try? await cache.saveEvent(event)
-            }
+        if let ndk = await stateActor.getNDK(), let cache = ndk.cache {
+            try? await cache.saveEvent(event)
         }
         
-        // Send event to streams
-        continuation?.yield(event)
-        updateContinuation?.yield(.event(event))
+        // Send event to stream
+        if let continuation = await stateActor.getContinuation() {
+            continuation.yield(event)
+        }
         
         // Check limit
+        let options = await stateActor.getOptions()
         if let limit = options.limit, currentEventCount >= limit {
-            close()
+            await close()
         }
     }
 
     /// Handle EOSE (End of Stored Events)
-    public func handleEOSE(fromRelay relay: RelayProtocol? = nil) {
-        Task {
-            let shouldComplete = await stateActor.handleEOSE(
-                fromRelay: relay,
-                expectedRelays: options.relays ?? Set(ndk?.relays ?? [])
-            )
-            
-            if shouldComplete {
-                // Send EOSE update
-                self.updateContinuation?.yield(.eose)
-                self.eoseReceived = true
-                
-                if self.options.closeOnEose {
-                    self.close()
-                }
-            }
+    public func handleEOSE(fromRelay relay: RelayProtocol? = nil) async {
+        let ndk = await stateActor.getNDK()
+        let options = await stateActor.getOptions()
+        let shouldComplete = await stateActor.handleEOSE(
+            fromRelay: relay,
+            expectedRelays: options.relays ?? Set(ndk?.relays ?? [])
+        )
+        
+        if shouldComplete && options.closeOnEose {
+            await close()
         }
     }
 
     /// Handle subscription error
     public func handleError(_ error: Error) {
-        // Send error update
-        updateContinuation?.yield(.error(error))
+        Task {
+            // Log if debug mode
+            if let ndk = await stateActor.getNDK(), ndk.debugMode {
+                print("❌ Subscription error: \(error)")
+            }
+            
+            // Propagate error through stream and close
+            if let continuation = await stateActor.getContinuation() {
+                continuation.finish(throwing: error)
+            }
+            await close()
+        }
+    }
+    
+    /// Handle COUNT message from relay (NIP-45)
+    public func handleCount(_ count: Int, fromRelay relay: RelayProtocol? = nil) async {
+        // Store count result
+        await stateActor.updateCount(count, from: relay)
         
         // Log if debug mode
-        if let ndk = ndk, ndk.debugMode {
-            print("❌ Subscription error: \(error)")
+        if let ndk = await stateActor.getNDK(), ndk.debugMode {
+            let relayInfo = relay.map { " from \($0.url)" } ?? ""
+            print("🔢 Received count: \(count)\(relayInfo)")
         }
     }
 
     // MARK: - Private Helpers
 
-    private func setupTimeoutIfNeeded() {
+    private func setupTimeoutIfNeeded() async {
+        let options = await stateActor.getOptions()
         guard let timeout = options.timeout else { return }
-
-        timeoutTimer = Timer.scheduledTimer(withTimeInterval: timeout, repeats: false) { [weak self] _ in
-            self?.close()
+        
+        let timeoutTask = Task { [weak self] in
+            try? await Task.sleep(nanoseconds: UInt64(timeout * 1_000_000_000))
+            
+            // If the task wasn't cancelled, the timeout was reached
+            if !Task.isCancelled {
+                await self?.close()
+            }
         }
+        
+        await stateActor.setTimeoutTask(timeoutTask)
     }
 }
 
@@ -389,52 +516,3 @@ extension NDKSubscription: Equatable, Hashable {
         hasher.combine(id)
     }
 }
-
-// MARK: - Backward Compatibility
-
-extension NDKSubscription {
-    /// Add a callback for events (deprecated, use AsyncSequence instead)
-    @available(*, deprecated, message: "Use for-await-in loop instead")
-    public func onEvent(_ callback: @escaping (NDKEvent) -> Void) {
-        Task {
-            for await event in self {
-                callback(event)
-            }
-        }
-    }
-    
-    /// Add a callback for EOSE (deprecated, use updates stream instead)
-    @available(*, deprecated, message: "Use updates stream instead")
-    public func onEOSE(_ callback: @escaping () -> Void) {
-        Task {
-            for await update in updates {
-                if case .eose = update {
-                    callback()
-                    break
-                }
-            }
-        }
-    }
-    
-    /// Add a callback for errors (deprecated, use updates stream instead)
-    @available(*, deprecated, message: "Use updates stream instead")
-    public func onError(_ callback: @escaping (Error) -> Void) {
-        Task {
-            for await update in updates {
-                if case .error(let error) = update {
-                    callback(error)
-                }
-            }
-        }
-    }
-    
-    /// Wait for EOSE as async
-    public func waitForEOSE() async {
-        for await update in updates {
-            if case .eose = update {
-                break
-            }
-        }
-    }
-}
-

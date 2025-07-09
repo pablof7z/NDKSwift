@@ -5,7 +5,168 @@ All notable changes to NDKSwift will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.8.0] - 2025-01-09
+
+### Added
+- **Comprehensive Zap Support (NIP-57 & NIP-61)** - Full implementation of Lightning Zaps and Nutzaps
+  - Decoupled architecture: Any payment method can fund any zap type
+  - `NDKZapManager` as an actor for thread-safe zap operations
+  - Protocol-based design with `NDKZapProtocol` and `NDKPaymentProvider`
+  - `NDKLightningZapProtocol` for NIP-57 Lightning Zaps with LNURL resolution
+  - `NDKNutzapProtocol` for NIP-61 Cashu-based Nutzaps with P2PK support
+  - Payment providers: NWC, QR Code, and legacy wallet adapter
+  - Strongly-typed event models: `NDKZapRequest`, `NDKZapReceipt`, `NDKNutzap`, `NDKNutzapPreferences`
+  - Smart routing with privacy preference (prefers Nutzaps when available)
+  - Convenient extensions: `user.zap()`, `event.zap()`, `fetchZaps()`
+  - Comprehensive test coverage for all zap components
+
+- **Cashu Wallet Support (NIP-60)** - Full implementation of Cashu ecash wallets on Nostr
+  - `NDKCashuWallet` actor for thread-safe wallet operations
+  - Complete CashuSwift integration for ecash operations
+  - Proof management with state tracking (available, reserved, spent, pending)
+  - P2PK support for Nutzaps using P256K Schnorr signatures
+  - NIP-44 encrypted event storage for wallet metadata and proofs
+  - Mint connection management with automatic TTL and caching
+  - Token minting from Lightning invoices with payment polling
+  - Nutzap sending with P2PK locking and change handling
+  - Incoming nutzap receiving and proof unlocking
+  - E2E test suite for wallet operations
+
+### Changed
+- **BREAKING**: Complete thread safety overhaul - removed all `@unchecked Sendable` usage
+  - `NDKSubscription` now uses `SubscriptionStateActor` for all mutable state management
+  - `NDKRelay` now uses `RelayStateActor` instead of NSLock
+  - `NDKEvent` now uses `EventStateActor` for thread-safe property access
+  - `NDKUser` now uses `UserStateActor` for mutable state
+  - `NDKBunkerSigner` verified as properly Sendable actor
+- **BREAKING**: Many properties are now async due to actor-based state management
+  - Event properties (`id`, `pubkey`, `kind`, `tags`, `content`, etc.) require `await`
+  - User properties (`profile`, `relayList`, `nip46Urls`, etc.) require `await`
+  - Relay properties (`connectionState`, `stats`, `info`, etc.) require `await`
+  - Methods that access these properties are now async
+
+### Improved
+- Eliminated all race conditions and thread safety issues
+- Better performance with compile-time thread safety guarantees
+- More predictable behavior in concurrent environments
+- Cleaner architecture with proper actor boundaries
+- State-mutating methods are now async instead of fire-and-forget for stronger guarantees
+- Added `EventSnapshot` struct and `snapshot()` method for efficient multi-property access
+- Documented object identity behavior for `Equatable` implementations
+
+## [0.7.0] - 2025-01-09
+
+### Added
+- **SQLite-backed cache implementation** using GRDB for efficient event and profile storage
+  - Support for complex Nostr query patterns (by author, kind, tags, time ranges)
+  - Profile-specific optimized queries (`getProfileName`, `getProfilePicture`, `searchProfiles`)
+  - Proper database indexes for performance optimization
+  - Full NDKCache protocol implementation with async/await support
+
+### Changed
+- **BREAKING**: Simplified cache architecture - removed complex multi-tier abstractions in favor of single concrete implementation
+  - Removed `CacheLayer`, `MemoryCacheLayer`, `DiskCacheLayer`, `LayeredCache`, and `CacheFactory`
+  - Removed all cache adapter pattern abstractions
+  - Cache is now optional and uses concrete `NDKSQLiteCache` implementation
+  - Made `queryEvents` throw errors for better error handling
+- **BREAKING**: Removed all callback-based subscription methods in favor of modern AsyncSequence API
+  - Removed `onEvent`, `onEose`, and `onError` methods from `NDKSubscriptionBuilder`
+  - Removed `subscribe(..., onEvent:)` overloads from `NDK`
+  - Removed `subscribeToProfile(..., onUpdate:)` method
+  - Removed callback-based methods from `NDKSubscriptionGroup`
+  - Use `for await event in subscription` or `AsyncSequence` iteration instead
+- **Complete Documentation Rewrite** - All documentation rebuilt from scratch to match current implementation
+  - New comprehensive [API Reference](Documentation/API_REFERENCE.md) with all public APIs
+  - New [Getting Started Guide](Documentation/GETTING_STARTED.md) with modern patterns
+  - New [Examples](Documentation/EXAMPLES.md) with practical use cases
+  - New [Architecture Overview](Documentation/ARCHITECTURE.md) explaining system design
+  - Removed all outdated documentation files
+
+### Added
+- **Comprehensive Zap Support (NIP-57 & NIP-61)** - Full implementation of Lightning Zaps and Nutzaps
+  - `NDKZapManager` for smart routing between Lightning and Nutzap providers
+  - `NDKLightningZapProvider` for NIP-57 Lightning Zaps
+  - `NDKNutzapProvider` for NIP-61 Cashu-based Nutzaps
+  - Strongly-typed event models: `NDKZapRequest`, `NDKZapReceipt`, `NDKNutzap`, `NDKNutzapPreferences`
+  - Smart zap routing with privacy-first approach (prefers Nutzaps when available)
+  - Convenient extensions: `user.zap()`, `event.zap()`, `fetchZaps()`
+  - Support for both profile and event zaps
+  - Automatic LNURL resolution and validation
+  - Zap receipt verification and validation
+- **Outbox model is now the default!** - All publishing and fetching uses intelligent relay selection by default
+- Added `outboxEnabled` flag to disable outbox model globally (default: true)
+- Added `NDKOutboxManager` facade for advanced outbox operations
+  - `ndk.outbox.publish()` - Publish with custom strategies
+  - `ndk.outbox.fetchEvents()` - Fetch with custom strategies
+  - `ndk.outbox.trackUser()` - Track user relay preferences
+  - `ndk.outbox.untrackUser()` - Stop tracking a user
+  - `ndk.outbox.getRelayScore()` - Get relay health score
+  - `ndk.outbox.getRecommendedRelays()` - Get recommended relays for a user
+- Added `RelaySelectionStrategy` for custom relay selection logic
+- **Comprehensive E2E Test Suite** - New end-to-end tests for core functionality
+  - Created `E2ECoreTest` executable that tests against live Nostr relays
+  - Tests relay connection, event publishing, fetching, and real-time subscriptions
+  - Includes timeout handling and proper error reporting
+  - Removed redundant test scripts in favor of consolidated E2E test
+
+### Breaking Changes
+- **BREAKING**: Outbox model is now enabled by default
+  - `publish()` now uses outbox model automatically
+  - `fetchEvents()` now uses outbox model automatically (for single filters without specific relays)
+  - `subscribe()` now uses outbox model automatically
+  - Set `ndk.outboxEnabled = false` to disable outbox globally
+  - Pass specific relays to override outbox model: `publish(event, to: relayUrls)`
+- **BREAKING**: Simplified outbox model API
+  - Made all internal outbox components private: `NDKOutboxTracker`, `NDKRelayRanker`, `NDKRelaySelector`, `NDKPublishingStrategy`, `NDKFetchingStrategy`
+  - Made all internal outbox types private: `PublishingConfig`, `FetchingConfig`, `RelaySelectionResult`, `OutboxPublishConfig`, `PublishResult`, etc.
+  - Advanced outbox functionality now accessed through `ndk.outbox` manager
+  - Removed public methods: `publishWithOutbox()`, `fetchEventsWithOutbox()`, `subscribeWithOutbox()`
+  - Removed public methods: `trackUser()`, `setRelaysForUser()`, `updateRelayPerformance()`, `cleanupOutbox()`
+- **BREAKING**: Fully migrated NDKSubscription to actor-based concurrency
+  - All state properties (`events`, `isActive`, `isClosed`, `eoseReceived`) are now async-only
+  - `start()` and `close()` methods are now async
+  - `handleEvent()` and `handleEOSE()` are now async
+  - Removed all synchronous property access - use `await` for all state queries
+  - Removed deprecated callback methods (`onEvent`, `onEOSE`, `onError`)
+- **BREAKING**: Simplified cache control system
+  - Removed `NDKCacheStrategy` enum (was broken with non-existent cases)
+  - Replaced with simple `useCache: Bool` flag in `NDKSubscriptionOptions`
+  - All `fetchEvents()` methods now use `useCache` parameter instead of `cacheStrategy`
+  - Default behavior remains the same (cache-first when `useCache = true`)
+  - Cache-only pattern achieved by setting `useCache = true` with empty relay set
+  - Removed `NDKSubscriptionUpdate` enum and `updates` stream
+- **BREAKING**: Unified error handling with idiomatic Swift enum
+  - Replaced struct-based `NDKError` with Swift enum using associated values
+  - Removed error categories and factory methods
+  - Removed `NWCError` - all NWC errors now use `NDKError` cases
+  - Removed `BlossomError` - all Blossom errors now use `NDKError` cases
+  - Removed `Bech32Error` - all Bech32 errors now use `NDKError` cases
+  - Removed conversion methods like `toNDKError()`
+
+### Changed
+- Consolidated all thread synchronization into single `SubscriptionStateActor`
+- Eliminated all NSLock usage in favor of Swift actors
+- Improved performance and type safety with compile-time thread safety guarantees
+- Replaced Timer-based timeout with Task-based timeout for better async integration
+- NDKSubscription now uses AsyncThrowingStream for proper error propagation
+- Simplified error handling across the entire codebase to use idiomatic Swift patterns
+- All errors now use descriptive enum cases with associated values for context
+
+### Added
+- Comprehensive documentation for subscription resource management patterns
+- Error propagation through AsyncThrowingStream - subscription errors now properly throw
+- Task-based timeout mechanism for cleaner async/await integration
+- New wallet-specific error cases for NWC operations
+- New file/Blossom-specific error cases for file operations
+
+### Removed
+- Backward compatibility layers for synchronous access
+- Legacy callback-based API
+- Update stream for compatibility
+- All cached state properties
+- Timer-based timeout in favor of Task-based implementation
+- All module-specific error types (NWCError, BlossomError, Bech32Error)
+- Error conversion methods between different error types
 
 ## [0.6.1] - 2025-01-10
 

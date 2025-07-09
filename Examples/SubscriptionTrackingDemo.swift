@@ -13,7 +13,7 @@ let ndk = NDK(
     relayUrls: [
         "wss://relay.damus.io",
         "wss://relay.nostr.band",
-        "wss://nos.lol",
+        "wss://nos.lol"
     ],
     subscriptionTrackingConfig: NDK.SubscriptionTrackingConfig(
         trackClosedSubscriptions: true,
@@ -165,8 +165,7 @@ Task {
 
     // Convert to JSON for display
     if let jsonData = try? JSONSerialization.data(withJSONObject: exportData, options: .prettyPrinted),
-       let jsonString = String(data: jsonData, encoding: .utf8)
-    {
+       let jsonString = String(data: jsonData, encoding: .utf8) {
         // Show a snippet of the exported data
         let lines = jsonString.components(separatedBy: "\n")
         let snippet = lines.prefix(20).joined(separator: "\n")

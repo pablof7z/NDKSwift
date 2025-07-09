@@ -128,7 +128,7 @@ public actor EventDeduplicator {
     ///   - relayUrl: Optional relay URL for per-relay tracking
     /// - Returns: true if the event is new (not a duplicate), false if duplicate
     public func processEvent(_ event: NDKEvent, from relayUrl: String? = nil) async -> Bool {
-        guard let eventId = event.id else { return false }
+        guard let eventId = await event.id else { return false }
         
         // Check if duplicate
         if await isDuplicate(eventId, from: relayUrl) {
@@ -214,13 +214,13 @@ extension NDK {
 extension NDKEvent {
     /// Check if this event is a duplicate using the global deduplicator
     public func isDuplicate(in ndk: NDK, from relayUrl: String? = nil) async -> Bool {
-        guard let id = self.id else { return false }
+        guard let id = await self.id else { return false }
         return await ndk.eventDeduplicator.isDuplicate(id, from: relayUrl)
     }
     
     /// Mark this event as seen using the global deduplicator
     public func markSeen(in ndk: NDK, from relayUrl: String? = nil) async {
-        guard let id = self.id else { return }
+        guard let id = await self.id else { return }
         await ndk.eventDeduplicator.markSeen(id, from: relayUrl)
     }
 }

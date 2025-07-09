@@ -1,7 +1,7 @@
 import Foundation
 
 /// Ranks relays based on various criteria for optimal selection
-public actor NDKRelayRanker {
+actor NDKRelayRanker {
     private let ndk: NDK
     private let tracker: NDKOutboxTracker
 
@@ -103,6 +103,13 @@ public actor NDKRelayRanker {
 
         return successRate * recencyFactor
     }
+    
+    /// Get score for a relay and pubkey combination
+    func getScore(relay: String, pubkey: String) async -> Double {
+        let preferences = RelayPreferences.default
+        let isConnected = await ndk.relayPool.connectedRelays().contains { $0.url == relay }
+        return await calculateRelayScore(relay, for: [pubkey], isConnected: isConnected, preferences: preferences)
+    }
 
     // MARK: - Private Methods
 
@@ -127,8 +134,7 @@ public actor NDKRelayRanker {
         var authorCoverage = 0
         for pubkey in pubkeys {
             if let item = await tracker.getRelaysSyncFor(pubkey: pubkey),
-               item.allRelayURLs.contains(relayURL)
-            {
+               item.allRelayURLs.contains(relayURL) {
                 authorCoverage += 1
             }
         }
@@ -148,7 +154,7 @@ public actor NDKRelayRanker {
 }
 
 /// Preferences for relay ranking
-public struct RelayPreferences {
+public struct RelayPreferences: Sendable {
     /// Bonus score for already connected relays
     public let connectionBonus: Double
 
@@ -182,7 +188,7 @@ public struct RelayPreferences {
 }
 
 /// A relay with its calculated score
-public struct RankedRelay {
+struct RankedRelay {
     public let url: String
     public let score: Double
 }

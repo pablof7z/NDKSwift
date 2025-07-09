@@ -58,8 +58,7 @@ public enum URLNormalizer {
         // Remove default ports
         if let port = urlComponents.port {
             if (urlComponents.scheme == "ws" && port == 80) ||
-                (urlComponents.scheme == "wss" && port == 443)
-            {
+                (urlComponents.scheme == "wss" && port == 443) {
                 urlComponents.port = nil
             }
         }

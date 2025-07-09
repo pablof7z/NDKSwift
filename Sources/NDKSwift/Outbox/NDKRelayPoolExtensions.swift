@@ -24,10 +24,10 @@ public extension NDKRelayPool {
     }
 
     /// Get permanent and connected relays
-    func permanentAndConnectedRelays() -> [NDKRelay] {
+    func permanentAndConnectedRelays() async -> [NDKRelay] {
         // For now, return all connected relays
         // In the future, could distinguish between permanent and temporary relays
-        return connectedRelays()
+        return await connectedRelays()
     }
 }
 
@@ -56,7 +56,7 @@ public extension NDKRelay {
     func subscribe(
         filters: [NDKFilter],
         eventHandler: @escaping (NDKEvent) -> Void
-    ) -> NDKSubscription {
+    ) -> Task<Void, Error> {
         // Create subscription with this specific relay
         var options = NDKSubscriptionOptions()
         options.relays = Set([self])
@@ -67,11 +67,16 @@ public extension NDKRelay {
             ndk: nil
         )
 
-        // Add event handler using onEvent method
-        subscription.onEvent { event in
-            eventHandler(event)
+        // Start task to handle events
+        return Task {
+            do {
+                for try await event in subscription {
+                    eventHandler(event)
+                }
+            } catch {
+                // Subscription completed or failed
+                throw error
+            }
         }
-
-        return subscription
     }
 }

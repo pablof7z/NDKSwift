@@ -5,11 +5,11 @@ public actor NDKNWCWallet: NDKNWCWalletProtocol {
     // MARK: - Properties
     
     public let ndk: NDK
-    public let connectionURI: NWCConnectionURI
+    nonisolated public let connectionURI: NWCConnectionURI
     
     private let signer: NDKSigner
     private let requestBuilder: NWCRequestBuilder
-    private let responseHandler: NWCResponseHandler
+    nonisolated private let responseHandler: NWCResponseHandler
     private var _status: NWCConnectionStatus = .disconnected
     private var _walletInfo: GetInfoResponse?
     private var _cachedBalance: Int64?
@@ -41,7 +41,7 @@ public actor NDKNWCWallet: NDKNWCWalletProtocol {
         self.responseHandler = NWCResponseHandler(
             ndk: ndk,
             signer: signer,
-            relayURLs: self.connectionURI.normalizedRelayURLs()
+            relayURLs: Array(self.connectionURI.normalizedRelayURLs())
         )
     }
     
@@ -58,7 +58,7 @@ public actor NDKNWCWallet: NDKNWCWalletProtocol {
         self.responseHandler = NWCResponseHandler(
             ndk: ndk,
             signer: signer,
-            relayURLs: connectionURI.normalizedRelayURLs()
+            relayURLs: Array(connectionURI.normalizedRelayURLs())
         )
     }
     
@@ -66,13 +66,17 @@ public actor NDKNWCWallet: NDKNWCWalletProtocol {
     
     public func connect() async throws {
         _status = .connecting
+        print("[NWC] Starting connection...")
         
         do {
             // Fetch wallet info to verify connection
+            print("[NWC] Fetching wallet info...")
             let info = try await getInfo()
+            print("[NWC] Got wallet info: \(info.methods.count) methods")
             _walletInfo = info
             _status = .connected
         } catch {
+            print("[NWC] Connection error: \(error)")
             _status = .error(error.localizedDescription)
             throw error
         }
@@ -93,24 +97,21 @@ public actor NDKNWCWallet: NDKNWCWalletProtocol {
         let request = PayInvoiceRequest(invoice: invoice, amount: amount)
         let event = try await requestBuilder.buildPayInvoiceRequest(request)
         
-        // Publish request
-        try await ndk.publish(event, to: connectionURI.normalizedRelayURLs())
-        
-        // Wait for response
-        return try await responseHandler.waitForResponse(
-            requestId: event.id!,
+        // Use the new method that subscribes before publishing
+        return try await responseHandler.executeRequestAndWaitForResponse(
+            event: event,
             responseType: PayInvoiceResponse.self
         )
     }
     
-    public func multiPayInvoice(_ invoices: [MultiPayInvoiceRequest.PayableInvoice]) async throws -> [String: Result<PayInvoiceResponse, NWCError>] {
+    public func multiPayInvoice(_ invoices: [MultiPayInvoiceRequest.PayableInvoice]) async throws -> [String: Result<PayInvoiceResponse, NDKError>] {
         try await ensureConnected()
         
         let request = MultiPayInvoiceRequest(invoices: invoices)
         let event = try await requestBuilder.buildMultiPayInvoiceRequest(request)
         
         // Publish request
-        try await ndk.publish(event, to: connectionURI.normalizedRelayURLs())
+        _ = try await ndk.publish(event)
         
         // Wait for multiple responses
         return try await responseHandler.waitForMultipleResponses(
@@ -131,24 +132,21 @@ public actor NDKNWCWallet: NDKNWCWalletProtocol {
         )
         let event = try await requestBuilder.buildPayKeysendRequest(request)
         
-        // Publish request
-        try await ndk.publish(event, to: connectionURI.normalizedRelayURLs())
-        
-        // Wait for response
-        return try await responseHandler.waitForResponse(
-            requestId: event.id!,
+        // Use the new method that subscribes before publishing
+        return try await responseHandler.executeRequestAndWaitForResponse(
+            event: event,
             responseType: PayKeysendResponse.self
         )
     }
     
-    public func multiPayKeysend(_ keysends: [MultiPayKeysendRequest.PayableKeysend]) async throws -> [String: Result<PayKeysendResponse, NWCError>] {
+    public func multiPayKeysend(_ keysends: [MultiPayKeysendRequest.PayableKeysend]) async throws -> [String: Result<PayKeysendResponse, NDKError>] {
         try await ensureConnected()
         
         let request = MultiPayKeysendRequest(keysends: keysends)
         let event = try await requestBuilder.buildMultiPayKeysendRequest(request)
         
         // Publish request
-        try await ndk.publish(event, to: connectionURI.normalizedRelayURLs())
+        _ = try await ndk.publish(event)
         
         // Wait for multiple responses
         return try await responseHandler.waitForMultipleResponses(
@@ -171,12 +169,9 @@ public actor NDKNWCWallet: NDKNWCWalletProtocol {
         )
         let event = try await requestBuilder.buildMakeInvoiceRequest(request)
         
-        // Publish request
-        try await ndk.publish(event, to: connectionURI.normalizedRelayURLs())
-        
-        // Wait for response
-        return try await responseHandler.waitForResponse(
-            requestId: event.id!,
+        // Use the new method that subscribes before publishing
+        return try await responseHandler.executeRequestAndWaitForResponse(
+            event: event,
             responseType: MakeInvoiceResponse.self
         )
     }
@@ -185,18 +180,15 @@ public actor NDKNWCWallet: NDKNWCWalletProtocol {
         try await ensureConnected()
         
         guard paymentHash != nil || invoice != nil else {
-            throw NWCError.missingRequiredParameter("paymentHash or invoice")
+            throw NDKError.invalidInput(message: "Missing required parameter: paymentHash or invoice")
         }
         
         let request = LookupInvoiceRequest(paymentHash: paymentHash, invoice: invoice)
         let event = try await requestBuilder.buildLookupInvoiceRequest(request)
         
-        // Publish request
-        try await ndk.publish(event, to: connectionURI.normalizedRelayURLs())
-        
-        // Wait for response
-        return try await responseHandler.waitForResponse(
-            requestId: event.id!,
+        // Use the new method that subscribes before publishing
+        return try await responseHandler.executeRequestAndWaitForResponse(
+            event: event,
             responseType: Transaction.self
         )
     }
@@ -216,12 +208,9 @@ public actor NDKNWCWallet: NDKNWCWalletProtocol {
         )
         let event = try await requestBuilder.buildListTransactionsRequest(request)
         
-        // Publish request
-        try await ndk.publish(event, to: connectionURI.normalizedRelayURLs())
-        
-        // Wait for response
-        let response = try await responseHandler.waitForResponse(
-            requestId: event.id!,
+        // Use the new method that subscribes before publishing
+        let response = try await responseHandler.executeRequestAndWaitForResponse(
+            event: event,
             responseType: ListTransactionsResponse.self
         )
         
@@ -230,7 +219,7 @@ public actor NDKNWCWallet: NDKNWCWalletProtocol {
     
     // MARK: - Balance & Info Methods
     
-    public func getBalance() async throws -> GetBalanceResponse {
+    private func fetchBalance() async throws -> GetBalanceResponse {
         try await ensureConnected()
         
         // Check cache
@@ -242,14 +231,14 @@ public actor NDKNWCWallet: NDKNWCWalletProtocol {
         
         let event = try await requestBuilder.buildGetBalanceRequest()
         
-        // Publish request
-        try await ndk.publish(event, to: connectionURI.normalizedRelayURLs())
-        
-        // Wait for response
-        let response = try await responseHandler.waitForResponse(
-            requestId: event.id!,
+        // Use the new method that subscribes before publishing
+        let eventId = await event.id ?? "nil"
+        print("[NWC] Executing get_balance request with ID: \(eventId)")
+        let response = try await responseHandler.executeRequestAndWaitForResponse(
+            event: event,
             responseType: GetBalanceResponse.self
         )
+        print("[NWC] Received balance response: \(response.balance) msat")
         
         // Update cache
         _cachedBalance = response.balance
@@ -258,22 +247,35 @@ public actor NDKNWCWallet: NDKNWCWalletProtocol {
         return response
     }
     
+    /// Implementation of NDKWallet.getBalance() -> Int64
+    /// Returns balance in satoshis (converts from millisatoshis)
+    public func getBalance() async throws -> Int64 {
+        let response = try await fetchBalance()
+        return response.balance / 1000  // Convert msat to sats
+    }
+    
+    /// NWC-specific getBalance that returns full response
+    public func getBalance() async throws -> GetBalanceResponse {
+        return try await fetchBalance()
+    }
+    
     public func getInfo() async throws -> GetInfoResponse {
+        print("[NWC] Building get_info request...")
         let event = try await requestBuilder.buildGetInfoRequest()
+        let eventId = await event.id ?? "nil"
+        print("[NWC] Request event ID: \(eventId)")
         
-        // Publish request
-        try await ndk.publish(event, to: connectionURI.normalizedRelayURLs())
-        
-        // Wait for response
-        return try await responseHandler.waitForResponse(
-            requestId: event.id!,
+        // Use the new method that subscribes before publishing
+        print("[NWC] Executing get_info request...")
+        return try await responseHandler.executeRequestAndWaitForResponse(
+            event: event,
             responseType: GetInfoResponse.self
         )
     }
     
     // MARK: - Notifications
     
-    public func notifications() -> AsyncStream<NWCNotification<PaymentNotification>> {
+    public nonisolated func notifications() -> AsyncStream<NWCNotification<PaymentNotification>> {
         return responseHandler.subscribeToNotifications()
     }
     
@@ -291,9 +293,9 @@ public actor NDKNWCWallet: NDKNWCWalletProtocol {
             if case .connected = _status {
                 return
             }
-            throw NWCError.connectionFailed(url: connectionURI.relayURLs.joined(separator: ", "))
+            throw NDKError.connectionFailed(relay: connectionURI.relayURLs.joined(separator: ", "), message: "Wallet not connected")
         case .error(let message):
-            throw NWCError(code: .internal, message: "Wallet connection error: \(message)")
+            throw NDKError.walletError(message: "Wallet connection error: \(message)")
         }
     }
 }

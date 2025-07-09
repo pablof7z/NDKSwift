@@ -32,17 +32,12 @@ struct NostrAppDemo {
 
         // Connect to relay
         print("\n2️⃣ Connecting to relay...")
-        do {
-            // Add relay
-            try await ndk.addRelay("wss://relay.primal.net")
+        // Add relay
+        _ = ndk.addRelay("wss://relay.primal.net")
 
-            // Connect to relays
-            try await ndk.connect()
-            print("✅ Connected to wss://relay.primal.net")
-        } catch {
-            print("❌ Failed to connect: \(error)")
-            return
-        }
+        // Connect to relays
+        await ndk.connect()
+        print("✅ Connected to wss://relay.primal.net")
 
         // Publish a message
         print("\n3️⃣ Publishing message to Nostr...")
@@ -52,9 +47,9 @@ struct NostrAppDemo {
         do {
             // Sign and publish
             try await event.sign()
-            try await ndk.publish(event)
+            let publishedRelays = try await ndk.publish(event)
 
-            print("✅ Message published successfully!")
+            print("✅ Message published successfully to \(publishedRelays.count) relay(s)!")
             print("📝 Event ID: \(event.id ?? "unknown")")
         } catch {
             print("❌ Failed to publish: \(error)")

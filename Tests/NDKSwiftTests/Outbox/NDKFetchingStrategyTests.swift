@@ -13,7 +13,7 @@ final class NDKFetchingStrategyTests: XCTestCase {
         tracker = NDKOutboxTracker(ndk: ndk)
         ranker = NDKRelayRanker(ndk: ndk, tracker: tracker)
         selector = NDKRelaySelector(ndk: ndk, tracker: tracker, ranker: ranker)
-        strategy = NDKFetchingStrategy(ndk: ndk, selector: selector, ranker: ranker)
+        strategy = NDKFetchingStrategy(ndk: ndk, selector: selector)
     }
 
     func testStrategyInitialization() {

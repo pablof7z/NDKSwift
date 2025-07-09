@@ -41,7 +41,7 @@ final class NDKContactListTests: XCTestCase {
         event.tags = [
             ["p", "pubkey1", "wss://relay1.com", "Alice"],
             ["p", "pubkey2", "", "Bob"],
-            ["p", "pubkey3"],
+            ["p", "pubkey3"]
         ]
 
         let contactList = NDKContactList.fromEvent(event)
@@ -272,7 +272,7 @@ final class NDKContactListTests: XCTestCase {
         let entries = [
             NDKContactEntry(pubkey: "user1", petname: "Alice"),
             NDKContactEntry(pubkey: "user2", petname: "Bob"),
-            NDKContactEntry(pubkey: "user3", relayURL: "wss://relay.com"),
+            NDKContactEntry(pubkey: "user3", relayURL: "wss://relay.com")
         ]
 
         contactList.setContacts(entries)
@@ -315,7 +315,7 @@ final class NDKContactListTests: XCTestCase {
         let users = [
             NDKUser(pubkey: "user1"),
             NDKUser(pubkey: "user2"),
-            NDKUser(pubkey: "user3"),
+            NDKUser(pubkey: "user3")
         ]
 
         let contactList = NDKContactList.from(users: users, ndk: ndk)
@@ -342,7 +342,7 @@ final class NDKContactListTests: XCTestCase {
             ["p", "user1"],
             ["p", "user2", "wss://relay.com"],
             ["p", "user3", "", "Alice"],
-            ["p", "user4", "wss://relay.com", "Bob"],
+            ["p", "user4", "wss://relay.com", "Bob"]
         ]
 
         let contactList = NDKContactList.fromEvent(event)

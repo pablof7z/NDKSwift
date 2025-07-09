@@ -22,21 +22,17 @@ final class NDKPrivateKeySignerTests: XCTestCase {
 
         // Test with invalid private key
         XCTAssertThrowsError(try NDKPrivateKeySigner(privateKey: "invalid")) { error in
-            if let ndkError = error as? NDKError {
-                XCTAssertEqual(ndkError.code, "invalid_private_key")
-                XCTAssertEqual(ndkError.category, .validation)
-            } else {
-                XCTFail("Expected NDKError")
+            guard case NDKError.invalidPrivateKey = error else {
+                XCTFail("Expected NDKError.invalidPrivateKey, got \(error)")
+                return
             }
         }
 
         // Test with wrong length private key
         XCTAssertThrowsError(try NDKPrivateKeySigner(privateKey: "abcd1234")) { error in
-            if let ndkError = error as? NDKError {
-                XCTAssertEqual(ndkError.code, "invalid_private_key")
-                XCTAssertEqual(ndkError.category, .validation)
-            } else {
-                XCTFail("Expected NDKError")
+            guard case NDKError.invalidPrivateKey = error else {
+                XCTFail("Expected NDKError.invalidPrivateKey, got \(error)")
+                return
             }
         }
     }

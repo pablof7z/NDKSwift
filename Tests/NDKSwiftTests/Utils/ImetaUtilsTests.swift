@@ -22,7 +22,7 @@ final class ImetaUtilsTests: XCTestCase {
             "dim 1920x1080",
             "m image/jpeg",
             "x 1234567890abcdef",
-            "size 1048576",
+            "size 1048576"
         ]
 
         let imeta = ImetaUtils.mapImetaTag(tag)
@@ -42,7 +42,7 @@ final class ImetaUtilsTests: XCTestCase {
             "imeta",
             "url https://primary.com/image.jpg",
             "fallback https://fallback1.com/image.jpg",
-            "fallback https://fallback2.com/image.jpg",
+            "fallback https://fallback2.com/image.jpg"
         ]
 
         let imeta = ImetaUtils.mapImetaTag(tag)
@@ -59,7 +59,7 @@ final class ImetaUtilsTests: XCTestCase {
             "imeta",
             "url https://example.com/image.jpg",
             "custom-field custom-value",
-            "another-field another-value",
+            "another-field another-value"
         ]
 
         let imeta = ImetaUtils.mapImetaTag(tag)
@@ -74,7 +74,7 @@ final class ImetaUtilsTests: XCTestCase {
         let invalidTags: [Tag] = [
             ["not-imeta", "url https://example.com"],
             ["imeta"], // Too short
-            [], // Empty
+            [] // Empty
         ]
 
         for tag in invalidTags {

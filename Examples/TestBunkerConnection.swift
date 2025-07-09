@@ -17,7 +17,7 @@ struct TestBunkerConnection {
         // Example bunker URLs - replace with your actual bunker URL
         let exampleUrls = [
             "bunker://bunker-pubkey?relay=wss://relay.nsec.app&secret=your-secret",
-            "bunker://bunker-pubkey?relay=wss://relay.nsecbunker.com",
+            "bunker://bunker-pubkey?relay=wss://relay.nsecbunker.com"
         ]
 
         print("Example bunker URL formats:")

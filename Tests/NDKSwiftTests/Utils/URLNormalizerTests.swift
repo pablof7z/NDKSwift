@@ -105,7 +105,7 @@ final class URLNormalizerTests: XCTestCase {
             "wss://www.relay3.example.com",
             "wss://relay1.example.com/", // Duplicate of first
             "not a valid url", // Invalid, should be skipped
-            "relay4.example.com:8080",
+            "relay4.example.com:8080"
         ]
 
         let normalized = URLNormalizer.normalize(urls)
@@ -118,7 +118,7 @@ final class URLNormalizerTests: XCTestCase {
             "wss://relay1.example.com/",
             "wss://relay2.example.com/",
             "wss://relay3.example.com/",
-            "wss://relay4.example.com:8080/",
+            "wss://relay4.example.com:8080/"
         ])
     }
 

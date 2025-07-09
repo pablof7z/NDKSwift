@@ -204,7 +204,7 @@ struct FetchEventCLI {
         if !event.tags.isEmpty {
             print("\n🏷️  Tags:")
             for tag in event.tags {
-                if tag.count > 0 {
+                if !tag.isEmpty {
                     let tagName = tag[0]
                     let tagValue = tag.count > 1 ? tag[1] : ""
                     let extra = tag.count > 2 ? " +" : ""

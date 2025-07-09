@@ -60,14 +60,14 @@ public enum ContentTagger {
         switch hrp {
         case "npub":
             guard data.count == 32 else {
-                throw Bech32.Bech32Error.invalidData
+                throw NDKError.invalidInput(message: "Invalid bech32 data")
             }
             let pubkey = Data(data).hexString
             return DecodedNostrEntity(type: "npub", eventId: nil, pubkey: pubkey, relays: nil, kind: nil, identifier: nil)
 
         case "note":
             guard data.count == 32 else {
-                throw Bech32.Bech32Error.invalidData
+                throw NDKError.invalidInput(message: "Invalid bech32 data")
             }
             let eventId = Data(data).hexString
             return DecodedNostrEntity(type: "note", eventId: eventId, pubkey: nil, relays: nil, kind: nil, identifier: nil)
@@ -75,7 +75,7 @@ public enum ContentTagger {
         case "nprofile":
             let decoded = try decodeTLV(data)
             guard let pubkeyData = decoded[2]?.first, pubkeyData.count == 32 else {
-                throw Bech32.Bech32Error.invalidData
+                throw NDKError.invalidInput(message: "Invalid bech32 data")
             }
             let pubkey = Data(pubkeyData).hexString
             let relays = decoded[1]?.compactMap { String(data: Data($0), encoding: .utf8) } ?? []
@@ -84,7 +84,7 @@ public enum ContentTagger {
         case "nevent":
             let decoded = try decodeTLV(data)
             guard let eventIdData = decoded[0]?.first, eventIdData.count == 32 else {
-                throw Bech32.Bech32Error.invalidData
+                throw NDKError.invalidInput(message: "Invalid bech32 data")
             }
             let eventId = Data(eventIdData).hexString
             let relays = decoded[1]?.compactMap { String(data: Data($0), encoding: .utf8) } ?? []
@@ -98,7 +98,7 @@ public enum ContentTagger {
                   let pubkeyData = decoded[2]?.first, pubkeyData.count == 32,
                   let kindData = decoded[3]?.first
             else {
-                throw Bech32.Bech32Error.invalidData
+                throw NDKError.invalidInput(message: "Invalid bech32 data")
             }
             let identifier = String(data: Data(identifierData), encoding: .utf8) ?? ""
             let pubkey = Data(pubkeyData).hexString
@@ -108,7 +108,7 @@ public enum ContentTagger {
             return DecodedNostrEntity(type: "naddr", eventId: eventId, pubkey: pubkey, relays: relays.isEmpty ? nil : relays, kind: kind, identifier: identifier)
 
         default:
-            throw Bech32.Bech32Error.invalidHRP
+            throw NDKError.invalidInput(message: "Invalid bech32: no separator found")
         }
     }
 
@@ -286,7 +286,7 @@ public enum ContentTagger {
             index += 2
 
             guard index + length <= data.count else {
-                throw Bech32.Bech32Error.invalidData
+                throw NDKError.invalidInput(message: "Invalid bech32 data")
             }
 
             let value = Array(data[index ..< index + length])

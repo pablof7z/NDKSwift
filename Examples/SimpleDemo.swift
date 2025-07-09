@@ -81,9 +81,9 @@ func runSimpleDemo() async {
         case .event(let event):
             receivedEvents += 1
             print("📨 Received event \(receivedEvents): \(event.content)")
-        case .eose:
+            case .eose:
             print("🏁 EOSE received")
-            break // Exit loop
+             // Exit loop
         case .error(let error):
             print("❌ Error: \(error)")
         }
@@ -96,9 +96,8 @@ func runSimpleDemo() async {
     let ndk = NDK(
         relayUrls: [
             "wss://relay.damus.io",
-            "wss://nos.lol",
-        ],
-        cacheAdapter: NDKInMemoryCache()
+            "wss://nos.lol"
+        ]
     )
 
     print("✅ NDK created with \(ndk.relays.count) relays")

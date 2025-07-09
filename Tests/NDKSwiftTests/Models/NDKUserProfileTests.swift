@@ -1,5 +1,5 @@
-import XCTest
 @testable import NDKSwift
+import XCTest
 
 final class NDKUserProfileTests: XCTestCase {
     var ndk: NDK!
@@ -173,7 +173,6 @@ final class NDKUserProfileTests: XCTestCase {
         XCTAssertNil(merged)
     }
 }
-
 
 // MARK: - Extensions
 

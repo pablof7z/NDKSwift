@@ -1,12 +1,12 @@
 import Foundation
 
 /// Tracks relay information for users to implement the outbox model
-public actor NDKOutboxTracker {
+actor NDKOutboxTracker {
     /// Default TTL for cached relay information (2 minutes)
-    public static let defaultTTL: TimeInterval = 120
+    static let defaultTTL: TimeInterval = 120
 
     /// Default cache capacity
-    public static let defaultCapacity = 1000
+    static let defaultCapacity = 1000
 
     private let ndk: NDK
     private let cache: LRUCache<String, NDKOutboxItem>
@@ -15,7 +15,7 @@ public actor NDKOutboxTracker {
     /// Track pending fetches to avoid duplicate requests
     private var pendingFetches: [String: Task<NDKOutboxItem?, Error>] = [:]
 
-    public init(
+    init(
         ndk: NDK,
         capacity: Int = defaultCapacity,
         ttl: TimeInterval = defaultTTL,
@@ -27,7 +27,7 @@ public actor NDKOutboxTracker {
     }
 
     /// Get relay information for a user
-    public func getRelaysFor(
+    func getRelaysFor(
         pubkey: String,
         type: RelayListType = .both
     ) async throws -> NDKOutboxItem? {
@@ -59,7 +59,7 @@ public actor NDKOutboxTracker {
     }
 
     /// Get relay information synchronously from cache only
-    public func getRelaysSyncFor(
+    func getRelaysSyncFor(
         pubkey: String,
         type: RelayListType = .both
     ) async -> NDKOutboxItem? {
@@ -68,7 +68,7 @@ public actor NDKOutboxTracker {
     }
 
     /// Track a user's relay information
-    public func track(
+    func track(
         pubkey: String,
         readRelays: Set<String> = [],
         writeRelays: Set<String> = [],
@@ -93,7 +93,7 @@ public actor NDKOutboxTracker {
     }
 
     /// Update relay metadata (e.g., health scores)
-    public func updateRelayMetadata(
+    func updateRelayMetadata(
         url: String,
         metadata: RelayMetadata
     ) async {
@@ -133,13 +133,13 @@ public actor NDKOutboxTracker {
     }
 
     /// Clear the cache
-    public func clear() async {
+    func clear() async {
         await cache.clear()
         pendingFetches.removeAll()
     }
 
     /// Clean up expired entries
-    public func cleanupExpired() async {
+    func cleanupExpired() async {
         await cache.cleanupExpired()
     }
 
@@ -156,13 +156,11 @@ public actor NDKOutboxTracker {
     }
 
     private func fetchNIP65RelayList(for pubkey: String) async throws -> NDKOutboxItem? {
-        let filter = NDKFilter(
-            authors: [pubkey],
-            kinds: [NDKRelayList.kind]
-        )
+        var filter = NDKFilter()
+        filter.authors = [pubkey]
+        filter.kinds = [NDKRelayList.kind]
 
-        let eventSet = try await ndk.fetchEvents(filters: [filter])
-        let events = Array(eventSet).sorted { $0.createdAt > $1.createdAt }
+        let events = try await ndk.fetchEvents(filter)
 
         guard let latestEvent = events.first else {
             return nil
@@ -195,13 +193,11 @@ public actor NDKOutboxTracker {
     }
 
     private func fetchContactListRelays(for pubkey: String) async throws -> NDKOutboxItem? {
-        let filter = NDKFilter(
-            authors: [pubkey],
-            kinds: [EventKind.contacts]
-        )
+        var filter = NDKFilter()
+        filter.authors = [pubkey]
+        filter.kinds = [EventKind.contacts]
 
-        let eventSet = try await ndk.fetchEvents(filters: [filter])
-        let events = Array(eventSet).sorted { $0.createdAt > $1.createdAt }
+        let events = try await ndk.fetchEvents(filter)
 
         guard let latestEvent = events.first else {
             return nil
@@ -249,7 +245,7 @@ public actor NDKOutboxTracker {
 }
 
 /// Type of relay list to fetch
-public enum RelayListType {
+enum RelayListType {
     case read
     case write
     case both

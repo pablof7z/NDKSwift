@@ -128,7 +128,7 @@ extension NDKBunkerSignerTests {
         let response: [String: Any] = [
             "id": id,
             "result": result,
-            "error": error as Any,
+            "error": error as Any
         ].compactMapValues { $0 }
 
         let responseData = try! JSONSerialization.data(withJSONObject: response)

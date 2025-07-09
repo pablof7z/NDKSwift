@@ -111,14 +111,15 @@ public actor NDKRelaySubscriptionManager {
     // MARK: - Public Interface
 
     /// Add a subscription to be managed
-    public func addSubscription(_ subscription: NDKSubscription, filters: [NDKFilter]) -> String {
+    public func addSubscription(_ subscription: NDKSubscription, filters: [NDKFilter]) async -> String {
         guard enableGrouping else {
             // No grouping, create individual relay subscription
-            return createIndividualSubscription(subscription, filters: filters)
+            return await createIndividualSubscription(subscription, filters: filters)
         }
 
         // Check if subscription can be grouped
-        let fingerprint = FilterFingerprint(filters: filters, closeOnEose: subscription.options.closeOnEose)
+        let options = await subscription.options
+        let fingerprint = FilterFingerprint(filters: filters, closeOnEose: options.closeOnEose)
 
         // Find existing relay subscription that can accept this subscription
         if let existingSubscriptions = subscriptionsByFingerprint[fingerprint] {
@@ -134,7 +135,7 @@ public actor NDKRelaySubscriptionManager {
         }
 
         // Create new relay subscription
-        return createGroupedSubscription(subscription, filters: filters, fingerprint: fingerprint)
+        return await createGroupedSubscription(subscription, filters: filters, fingerprint: fingerprint)
     }
 
     /// Remove a subscription
@@ -203,7 +204,9 @@ public actor NDKRelaySubscriptionManager {
             #if DEBUG
             print("📤 SubscriptionManager: Notifying subscription \(subscription.id) of EOSE")
             #endif
-            subscription.handleEOSE(fromRelay: relay)
+            Task {
+                await subscription.handleEOSE(fromRelay: relay)
+            }
 
             // Track EOSE received
             if let ndk = relay?.ndk {
@@ -241,8 +244,7 @@ public actor NDKRelaySubscriptionManager {
 
         // If we have a specific relay subscription ID, route only to those subscriptions
         if let relaySubId = relaySubscriptionId,
-           let relaySub = relaySubscriptions[relaySubId]
-        {
+           let relaySub = relaySubscriptions[relaySubId] {
             #if DEBUG
             print("✅ SubscriptionManager: Found relay subscription with \(relaySub.subscriptions.count) subscriptions")
             #endif
@@ -257,7 +259,9 @@ public actor NDKRelaySubscriptionManager {
                     #if DEBUG
                     print("📤 SubscriptionManager: Notifying subscription \(subscription.id) of event")
                     #endif
-                    subscription.handleEvent(event, fromRelay: relay)
+                    Task {
+                        await subscription.handleEvent(event, fromRelay: relay)
+                    }
 
                     // Track event received
                     if let ndk = relay?.ndk {
@@ -282,7 +286,9 @@ public actor NDKRelaySubscriptionManager {
                 if relaySub.status == .running || relaySub.status == .eoseReceived {
                     for subscription in relaySub.subscriptions {
                         if subscription.filters.contains(where: { $0.matches(event: event) }) {
-                            subscription.handleEvent(event, fromRelay: relay)
+                            Task {
+                                await subscription.handleEvent(event, fromRelay: relay)
+                            }
 
                             // Track event received
                             if let ndk = relay?.ndk {
@@ -304,14 +310,14 @@ public actor NDKRelaySubscriptionManager {
 
     // MARK: - Private Implementation
 
-    private func createIndividualSubscription(_ subscription: NDKSubscription, filters: [NDKFilter]) -> String {
+    private func createIndividualSubscription(_ subscription: NDKSubscription, filters: [NDKFilter]) async -> String {
         // Use subscription ID as the relay sub ID for wire protocol, but make it unique per relay
         let relaySubId = subscription.id
         let relaySub = RelaySubscription(
             id: relaySubId,
             subscriptions: [subscription],
             mergedFilters: filters,
-            closeOnEose: subscription.options.closeOnEose,
+            closeOnEose: await subscription.options.closeOnEose,
             status: .pending
         )
 
@@ -326,13 +332,13 @@ public actor NDKRelaySubscriptionManager {
         return relaySubId
     }
 
-    private func createGroupedSubscription(_ subscription: NDKSubscription, filters: [NDKFilter], fingerprint: FilterFingerprint) -> String {
+    private func createGroupedSubscription(_ subscription: NDKSubscription, filters: [NDKFilter], fingerprint: FilterFingerprint) async -> String {
         let relaySubId = subscription.id // Use the subscription's own ID for now
         var relaySub = RelaySubscription(
             id: relaySubId,
             subscriptions: [],
             mergedFilters: [],
-            closeOnEose: subscription.options.closeOnEose,
+            closeOnEose: await subscription.options.closeOnEose,
             status: .pending
         )
 
@@ -360,7 +366,7 @@ public actor NDKRelaySubscriptionManager {
               let relay = relay else { return }
 
         // Check relay connection
-        if !relay.isConnected {
+        if !(await relay.isConnected) {
             relaySub.status = .waiting
             relaySubscriptions[relaySubId] = relaySub
             return
@@ -378,11 +384,19 @@ public actor NDKRelaySubscriptionManager {
         // Send subscription to relay
         do {
             let reqMessage = NostrMessage.req(subscriptionId: relaySubId, filters: relaySub.mergedFilters)
-            try await relay.send(reqMessage.serialize())
+            let serialized = try reqMessage.serialize()
+            
+            // Log the raw filter being sent
+            if let ndk = relay.ndk, ndk.debugMode {
+                print("📤 Sending subscription \(relaySubId) to relay \(relay.url):")
+                print("   Raw filter: \(serialized)")
+            }
+            
+            try await relay.send(serialized)
 
             // Register subscription with relay
             for subscription in relaySub.subscriptions {
-                relay.addSubscription(subscription)
+                await relay.addSubscription(subscription)
 
                 // Track subscription sent to relay with actual filters
                 if let ndk = relay.ndk {
@@ -401,7 +415,9 @@ public actor NDKRelaySubscriptionManager {
             relaySubscriptions[relaySubId] = relaySub
 
             for subscription in relaySub.subscriptions {
-                subscription.handleError(error)
+                Task {
+                    await subscription.handleError(error)
+                }
             }
         }
     }
@@ -422,10 +438,20 @@ public actor NDKRelaySubscriptionManager {
         // Send new subscription with updated filters
         do {
             let reqMessage = NostrMessage.req(subscriptionId: relaySubId, filters: relaySub.mergedFilters)
-            try await relay.send(reqMessage.serialize())
+            let serialized = try reqMessage.serialize()
+            
+            // Log the updated filter being sent
+            if let ndk = relay.ndk, ndk.debugMode {
+                print("📤 Updating subscription \(relaySubId) on relay \(relay.url):")
+                print("   Raw filter: \(serialized)")
+            }
+            
+            try await relay.send(serialized)
         } catch {
             for subscription in relaySub.subscriptions {
-                subscription.handleError(error)
+                Task {
+                    await subscription.handleError(error)
+                }
             }
         }
     }
@@ -457,7 +483,7 @@ public actor NDKRelaySubscriptionManager {
         guard let relay = relay else { return }
 
         // Monitor connection state changes
-        relay.observeConnectionState { [weak self] state in
+        await relay.observeConnectionState { [weak self] state in
             guard let self = self else { return }
 
             Task {

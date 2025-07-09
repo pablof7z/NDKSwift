@@ -71,7 +71,7 @@ public class NDKRelayList: NDKList {
 
     /// All relay entries in this list with their access permissions
     public var relayEntries: [NDKRelayListEntry] {
-        let relayTags = tags.filter { $0.count > 0 && $0[0] == "r" }
+        let relayTags = tags.filter { !$0.isEmpty && $0[0] == "r" }
         return relayTags.compactMap { tag in
             guard tag.count > 1 else { return nil }
             let url = tag[1]
@@ -116,7 +116,7 @@ public class NDKRelayList: NDKList {
     /// Set the complete list of relay entries
     public func setRelays(_ entries: [NDKRelayListEntry]) {
         // Remove all existing relay tags
-        tags.removeAll { $0.count > 0 && $0[0] == "r" }
+        tags.removeAll { !$0.isEmpty && $0[0] == "r" }
 
         // Add new relay entries
         for entry in entries {
@@ -287,7 +287,7 @@ public extension NDK {
     /// Publish a relay list
     func publishRelayList(_ relayList: NDKRelayList) async throws {
         guard signer != nil else {
-            throw NDKError.crypto("no_signer", "No signer configured")
+            throw NDKError.notConfigured("No signer configured")
         }
 
         try await relayList.sign()

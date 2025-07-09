@@ -69,7 +69,7 @@ final class NDKListTests: XCTestCase {
         originalEvent.tags = [
             ["title", "Test List"],
             ["e", "event123"],
-            ["p", "pubkey123"],
+            ["p", "pubkey123"]
         ]
         originalEvent.content = "test content"
 
@@ -314,7 +314,7 @@ final class NDKListTests: XCTestCase {
             (10001, "Pinned"),
             (10002, "Relays"),
             (10003, "Bookmarks"),
-            (10015, "Interests"),
+            (10015, "Interests")
         ]
 
         for testCase in testCases {

@@ -46,7 +46,7 @@ final class NDKSignatureVerificationIntegrationTests: XCTestCase {
         try? await Task.sleep(nanoseconds: 100_000_000)
 
         // Check relay stats
-        let stats = relay.getSignatureStats()
+        let stats = await relay.getSignatureStats()
         XCTAssertEqual(stats.validatedCount, 0, "No events should be validated with disabled config")
     }
 
@@ -75,7 +75,7 @@ final class NDKSignatureVerificationIntegrationTests: XCTestCase {
         // Give time to process
         try? await Task.sleep(nanoseconds: 500_000_000)
 
-        let stats = relay.getSignatureStats()
+        let stats = await relay.getSignatureStats()
         let totalEvents = stats.validatedCount + stats.nonValidatedCount
 
         XCTAssertEqual(totalEvents, 100, "Should have processed 100 events")
@@ -132,10 +132,17 @@ final class NDKSignatureVerificationIntegrationTests: XCTestCase {
         // Create subscription to track received events
         var receivedEvents: [NDKEvent] = []
         let subscription = ndk.subscribe(filters: [NDKFilter(kinds: [1])])
-        subscription.onEvent { event in
-            receivedEvents.append(event)
+        
+        // Start collecting events in background task
+        Task {
+            do {
+                for try await event in subscription {
+                    receivedEvents.append(event)
+                }
+            } catch {
+                // Subscription error - expected when relay is blacklisted
+            }
         }
-        subscription.start()
 
         // Send invalid event to get relay blacklisted
         let invalidEvent = createInvalidEvent()
@@ -156,7 +163,7 @@ final class NDKSignatureVerificationIntegrationTests: XCTestCase {
         // No events should have been received from the blacklisted relay
         XCTAssertEqual(receivedEvents.count, 0, "No events should be received from blacklisted relay")
 
-        subscription.close()
+        await subscription.close()
     }
 
     // MARK: - Performance Tests
@@ -188,7 +195,7 @@ final class NDKSignatureVerificationIntegrationTests: XCTestCase {
 
         print("Processed 1000 events in \(elapsed) seconds")
 
-        let stats = relay.getSignatureStats()
+        let stats = await relay.getSignatureStats()
         let verificationRate = Double(stats.validatedCount) / 1000.0
 
         print("Verified \(stats.validatedCount) events (\(verificationRate * 100)%)")
@@ -238,8 +245,8 @@ final class NDKSignatureVerificationIntegrationTests: XCTestCase {
         XCTAssertEqual(globalStats.blacklistedRelays, 1)
 
         // Check individual relay stats
-        let relay1Stats = relay1.getSignatureStats()
-        let relay2Stats = relay2.getSignatureStats()
+        let relay1Stats = await relay1.getSignatureStats()
+        let relay2Stats = await relay2.getSignatureStats()
 
         print("\nRelay 1 stats:")
         print("  Validated: \(relay1Stats.validatedCount)")
@@ -272,9 +279,9 @@ final class NDKSignatureVerificationIntegrationTests: XCTestCase {
         try? await Task.sleep(nanoseconds: 200_000_000)
 
         // Only relay1 should have actually verified the signature
-        let stats1 = relay1.getSignatureStats()
-        let stats2 = relay2.getSignatureStats()
-        let stats3 = relay3.getSignatureStats()
+        let stats1 = await relay1.getSignatureStats()
+        let stats2 = await relay2.getSignatureStats()
+        let stats3 = await relay3.getSignatureStats()
 
         // First relay verifies
         XCTAssertEqual(stats1.validatedCount, 1, "First relay should verify")

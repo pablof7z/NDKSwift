@@ -12,275 +12,326 @@ public struct NWCResponseHandler {
         self.relayURLs = relayURLs
     }
     
-    /// Wait for a response to a specific request
-    public func waitForResponse<T: Decodable>(
-        requestId: String,
+    /// Execute a request and wait for response with proper sequencing
+    public func executeRequestAndWaitForResponse<T: Decodable>(
+        event: NDKEvent,
         responseType: T.Type,
         timeout: TimeInterval = 30
     ) async throws -> T {
-        // Create filter for response events
-        let filter = NDKFilter(
-            kinds: [.nostrWalletConnectRes],
-            tags: ["e": [requestId]],
-            limit: 1
-        )
+        guard let requestId = await event.id else {
+            throw NDKError.invalidResponse(from: "Event must have an ID")
+        }
         
-        // Create task with timeout
-        let responseTask = Task {
-            // Fetch the response event
-            let events = try await ndk.fetchEvents(filter, relayURLs: relayURLs)
+        print("[NWC Response] Setting up response listener for request \(requestId)")
+        
+        // 1. First, create filter for response events
+        var filter = NDKFilter()
+        filter.kinds = [.nostrWalletConnectRes]
+        filter.addTagFilter("e", values: [requestId])
+        filter.limit = 1
+        print("[NWC Response] Filter: kinds=\(filter.kinds ?? []), e-tag=\(requestId)")
+        
+        // Get the connected relays
+        let connectedRelays = ndk.relays.filter { relay in
+            relayURLs.contains { url in
+                relay.normalizedURL == URLNormalizer.tryNormalizeRelayUrl(url) ||
+                relay.url == url
+            }
+        }
+        print("[NWC Response] Using \(connectedRelays.count) connected relays")
+        
+        // 2. Create subscription for the response BEFORE publishing
+        var options = NDKSubscriptionOptions()
+        options.relays = Set(connectedRelays)
+        options.closeOnEose = false // Keep subscription open to catch the response
+        
+        let subscription = ndk.subscribe(filters: [filter], options: options)
+        
+        // Collect response in a task
+        let responseTask = Task { () -> T in
+            print("[NWC Response] Waiting for response event...")
             
-            guard let responseEvent = events.first else {
-                throw NWCError.timeout(method: "unknown", timeoutSeconds: Int(timeout))
+            for try await responseEvent in subscription {
+                print("[NWC Response] Got response event:")
+                print("[NWC Response]   ID: \(await responseEvent.id ?? "nil")")
+                print("[NWC Response]   Pubkey: \(await responseEvent.pubkey)")
+                print("[NWC Response]   Tags: \(await responseEvent.tags)")
+                
+                // Decrypt the content
+                let senderPubkey = await responseEvent.pubkey
+                let sender = NDKUser(pubkey: senderPubkey)
+                print("[NWC Response] Decrypting content from \(sender.pubkey)")
+                let eventContent = await responseEvent.content
+                let decryptedContent = try await signer.decrypt(
+                    sender: sender,
+                    value: eventContent,
+                    scheme: .nip04
+                )
+                print("[NWC Response] Decrypted content: \(decryptedContent)")
+                
+                // Parse and return the response
+                let result = try parseResponse(decryptedContent, expectedType: responseType)
+                
+                // Close the subscription
+                await subscription.close()
+                
+                return result
             }
             
-            // Decrypt the content
-            try await responseEvent.decrypt(signer: signer)
-            
-            // Parse the response
-            return try parseResponse(responseEvent.content, expectedType: responseType)
+            // If we get here, subscription ended without response
+            throw NDKError.timeout(operation: "NWC response", seconds: Int(timeout))
         }
         
-        // Race between response and timeout
+        // 3. Wait a moment for subscription to be established
+        try await Task.sleep(nanoseconds: 500_000_000) // 0.5 seconds
+        
+        // 4. Now publish the request
+        print("[NWC Response] Publishing request event \(requestId)")
+        let publishedRelays = try await ndk.publish(event)
+        print("[NWC Response] Published to \(publishedRelays.count) relays")
+        
+        // 5. Set up timeout
         let timeoutTask = Task {
             try await Task.sleep(nanoseconds: UInt64(timeout * 1_000_000_000))
-            throw NWCError.timeout(method: "unknown", timeoutSeconds: Int(timeout))
+            await subscription.close()
+            throw NDKError.timeout(operation: "NWC response", seconds: Int(timeout))
         }
         
-        // Wait for either response or timeout
-        let result = await withTaskGroup(of: T?.self) { group in
+        // 6. Race between response and timeout
+        let result: T = try await withThrowingTaskGroup(of: Result<T, Error>.self) { group in
             group.addTask {
                 do {
-                    return try await responseTask.value
+                    return .success(try await responseTask.value)
                 } catch {
-                    return nil
+                    return .failure(error)
                 }
             }
             
             group.addTask {
                 do {
                     try await timeoutTask.value
-                    return nil
+                    return .failure(NDKError.timeout(operation: "NWC response", seconds: Int(timeout)))
                 } catch {
-                    throw error
+                    return .failure(error)
                 }
             }
             
-            // Return first non-nil result
-            for await value in group {
-                if let value = value {
-                    group.cancelAll()
-                    return value
-                }
+            // Wait for first result
+            guard let firstResult = try await group.next() else {
+                throw NDKError.timeout(operation: "NWC response", seconds: Int(timeout))
             }
             
-            return nil
-        }
-        
-        guard let result = result else {
-            throw NWCError.timeout(method: "unknown", timeoutSeconds: Int(timeout))
+            // Cancel the other task
+            group.cancelAll()
+            
+            switch firstResult {
+            case .success(let value):
+                return value
+            case .failure(let error):
+                throw error
+            }
         }
         
         return result
     }
     
-    /// Subscribe to response events for a request with retry logic
-    public func subscribeToResponse<T: Decodable>(
-        requestId: String,
-        responseType: T.Type,
-        timeout: TimeInterval = 30,
-        retryOnEose: Bool = true
-    ) async throws -> T {
-        let filter = NDKFilter(
-            kinds: [.nostrWalletConnectRes],
-            tags: ["e": [requestId]],
-            limit: 1
-        )
-        
-        let startTime = Date()
-        var hasReceivedEose = false
-        var retryCount = 0
-        let maxRetries = 3
-        
-        // Create subscription
-        let subscription = ndk.subscribe(filter, relayURLs: relayURLs)
-        
-        // Use AsyncStream to handle events
-        for await event in subscription {
-            // Check timeout
-            if Date().timeIntervalSince(startTime) > timeout {
-                subscription.cancel()
-                throw NWCError.timeout(method: "unknown", timeoutSeconds: Int(timeout))
-            }
-            
-            switch event {
-            case .event(let responseEvent):
-                // Decrypt and parse response
-                do {
-                    try await responseEvent.decrypt(signer: signer)
-                    let response = try parseResponse(responseEvent.content, expectedType: responseType)
-                    subscription.cancel()
-                    return response
-                } catch {
-                    subscription.cancel()
-                    throw error
-                }
-                
-            case .eose:
-                hasReceivedEose = true
-                
-                // If we got EOSE without a response and retry is enabled
-                if retryOnEose && retryCount < maxRetries {
-                    retryCount += 1
-                    // Small delay before retry
-                    try await Task.sleep(nanoseconds: 500_000_000) // 0.5 seconds
-                    // The subscription continues, waiting for more events
-                } else if retryCount >= maxRetries {
-                    subscription.cancel()
-                    throw NWCError.timeout(method: "unknown", timeoutSeconds: Int(timeout))
-                }
-                
-            case .notice(let message):
-                print("NWC Response Handler Notice: \(message)")
-                
-            case .closed:
-                throw NWCError.connectionFailed(url: relayURLs.joined(separator: ", "))
-            }
-        }
-        
-        throw NWCError.timeout(method: "unknown", timeoutSeconds: Int(timeout))
-    }
     
-    /// Parse a response JSON string into the expected type
-    private func parseResponse<T: Decodable>(_ jsonString: String, expectedType: T.Type) throws -> T {
-        guard let jsonData = jsonString.data(using: .utf8) else {
-            throw NWCError.invalidResponse(reason: "Invalid UTF-8 string")
-        }
-        
-        let decoder = JSONDecoder()
-        decoder.keyDecodingStrategy = .convertFromSnakeCase
-        
-        // First decode the wrapper to check for errors
-        let wrapper = try decoder.decode(NWCResponse<T>.self, from: jsonData)
-        
-        // Check for error
-        if let error = wrapper.error {
-            throw NWCError(responseError: error)
-        }
-        
-        // Extract result
-        guard let result = wrapper.result else {
-            throw NWCError.invalidResponse(reason: "No result in response")
-        }
-        
-        return result
-    }
-    
-    /// Subscribe to notification events
-    public func subscribeToNotifications() -> AsyncStream<NWCNotification<PaymentNotification>> {
-        return AsyncStream { continuation in
-            let filter = NDKFilter(kinds: [.nostrWalletConnectNotification])
-            let subscription = ndk.subscribe(filter, relayURLs: relayURLs)
-            
-            Task {
-                for await event in subscription {
-                    switch event {
-                    case .event(let notificationEvent):
-                        do {
-                            // Decrypt content
-                            try await notificationEvent.decrypt(signer: signer)
-                            
-                            // Parse notification
-                            guard let jsonData = notificationEvent.content.data(using: .utf8) else {
-                                continue
-                            }
-                            
-                            let decoder = JSONDecoder()
-                            decoder.keyDecodingStrategy = .convertFromSnakeCase
-                            
-                            let notification = try decoder.decode(
-                                NWCNotification<PaymentNotification>.self,
-                                from: jsonData
-                            )
-                            
-                            continuation.yield(notification)
-                        } catch {
-                            print("Error processing NWC notification: \(error)")
-                        }
-                        
-                    case .closed:
-                        continuation.finish()
-                        return
-                        
-                    default:
-                        break
-                    }
-                }
-            }
-        }
-    }
-}
-
-// MARK: - Multi-Response Handler
-
-extension NWCResponseHandler {
-    /// Handle multiple responses for multi-payment methods
+    /// Wait for multiple responses
     public func waitForMultipleResponses<T: Decodable>(
         requestId: String,
         responseType: T.Type,
         expectedCount: Int,
-        timeout: TimeInterval = 60
-    ) async throws -> [String: Result<T, NWCError>] {
-        var responses: [String: Result<T, NWCError>] = [:]
-        let startTime = Date()
+        timeout: TimeInterval = 30
+    ) async throws -> [String: Result<T, NDKError>] {
+        // Create filter for responses with this request ID
+        var filter = NDKFilter()
+        filter.kinds = [.nostrWalletConnectRes]
+        filter.addTagFilter("e", values: [requestId])
         
-        let filter = NDKFilter(
-            kinds: [.nostrWalletConnectRes],
-            tags: ["e": [requestId]]
+        // Get connected relays that match our wallet relays
+        let allConnected = await ndk.relayPool.connectedRelays()
+        let connectedRelays = allConnected.filter { relay in
+            relayURLs.contains(relay.url)
+        }
+        
+        guard !connectedRelays.isEmpty else {
+            throw NDKError.notConfigured("No relays connected for NWC wallet")
+        }
+        
+        // Create subscription
+        let subscription = ndk.subscribe(
+            filters: [filter],
+            options: NDKSubscriptionOptions()
         )
         
-        let subscription = ndk.subscribe(filter, relayURLs: relayURLs)
+        var responses: [String: Result<T, NDKError>] = [:]
         
-        for await event in subscription {
-            // Check timeout
-            if Date().timeIntervalSince(startTime) > timeout {
-                subscription.cancel()
-                break
-            }
-            
-            switch event {
-            case .event(let responseEvent):
+        let responseTask = Task<[String: Result<T, NDKError>], Error> {
+            for try await event in subscription {
+                // Get the d-tag for this response
+                let eventTags = await event.tags
+                guard let dTag = eventTags.first(where: { $0.count >= 2 && $0[0] == "d" }),
+                      dTag.count > 1 else {
+                    continue
+                }
+                
+                let dTagValue = dTag[1]
+                
+                // Decrypt and parse the response
                 do {
-                    // Get the d-tag for correlation
-                    guard let dTag = responseEvent.tags.first(where: { $0.count > 1 && $0[0] == "d" })?[1] else {
+                    // Get wallet service pubkey from p-tag
+                    let eventTags = await event.tags
+                    guard let pTag = eventTags.first(where: { $0.count >= 2 && $0[0] == "p" }) else {
                         continue
                     }
+                    let walletPubkey = pTag[1]
+                    let walletUser = NDKUser(pubkey: walletPubkey)
                     
-                    // Decrypt and parse
-                    try await responseEvent.decrypt(signer: signer)
-                    let response = try parseResponse(responseEvent.content, expectedType: responseType)
-                    responses[dTag] = .success(response)
+                    let eventContent = await event.content
+                    let decrypted = try await signer.decrypt(
+                        sender: walletUser,
+                        value: eventContent,
+                        scheme: .nip04
+                    )
                     
-                    // Check if we have all responses
-                    if responses.count >= expectedCount {
-                        subscription.cancel()
-                        return responses
-                    }
-                } catch let error as NWCError {
-                    if let dTag = responseEvent.tags.first(where: { $0.count > 1 && $0[0] == "d" })?[1] {
-                        responses[dTag] = .failure(error)
-                    }
+                    let parsed = try parseResponse(decrypted, expectedType: responseType)
+                    responses[dTagValue] = .success(parsed)
                 } catch {
-                    if let dTag = responseEvent.tags.first(where: { $0.count > 1 && $0[0] == "d" })?[1] {
-                        responses[dTag] = .failure(NWCError.invalidResponse(reason: error.localizedDescription))
+                    responses[dTagValue] = .failure(error as? NDKError ?? NDKError.invalidResponse(from: "Parse error: \(error)"))
+                }
+                
+                // Check if we have enough responses
+                if responses.count >= expectedCount {
+                    return responses
+                }
+            }
+            
+            // If we exit the loop without enough responses
+            throw NDKError.timeout(operation: "NWC multi-response", seconds: Int(timeout))
+        }
+        
+        let timeoutTask = Task<[String: Result<T, NDKError>], Error> {
+            try await Task.sleep(nanoseconds: UInt64(timeout * 1_000_000_000))
+            throw NDKError.timeout(operation: "NWC multi-response", seconds: Int(timeout))
+        }
+        
+        let result = try await withThrowingTaskGroup(of: [String: Result<T, NDKError>].self) { group in
+            group.addTask { try await responseTask.value }
+            group.addTask { try await timeoutTask.value }
+            
+            guard let firstResult = try await group.next() else {
+                throw NDKError.timeout(operation: "NWC multi-response", seconds: Int(timeout))
+            }
+            
+            group.cancelAll()
+            return firstResult
+        }
+        
+        return result
+    }
+    
+    /// Subscribe to payment notifications
+    public func subscribeToNotifications() -> AsyncStream<NWCNotification<PaymentNotification>> {
+        AsyncStream { continuation in
+            Task {
+                // Create filter for notification events (no e-tag)
+                let filter = NDKFilter(kinds: [.nostrWalletConnectRes])
+                
+                // Get connected relays that match our wallet relays
+                var connectedRelays: [NDKRelay] = []
+                for relay in ndk.relays {
+                    let state = await relay.connectionState
+                    if state == .connected && relayURLs.contains(relay.url) {
+                        connectedRelays.append(relay)
                     }
                 }
                 
-            default:
-                break
+                guard !connectedRelays.isEmpty else {
+                    continuation.finish()
+                    return
+                }
+                
+                // Create subscription
+                let subscription = ndk.subscribe(
+                    filters: [filter],
+                    options: NDKSubscriptionOptions()
+                )
+                
+                let task = Task {
+                for try await event in subscription {
+                    // Check if this is an NWC notification (no e-tag)
+                    let eventTags = await event.tags
+                    guard !eventTags.contains(where: { $0.count >= 1 && $0[0] == "e" }) else {
+                        continue
+                    }
+                    
+                    // Get wallet service pubkey from p-tag
+                    guard let pTag = eventTags.first(where: { $0.count >= 2 && $0[0] == "p" }) else {
+                        continue
+                    }
+                    let walletPubkey = pTag[1]
+                    let walletUser = NDKUser(pubkey: walletPubkey)
+                    
+                    // Decrypt the notification
+                    do {
+                        let eventContent = await event.content
+                        let decrypted = try await signer.decrypt(
+                            sender: walletUser,
+                            value: eventContent,
+                            scheme: .nip04
+                        )
+                        
+                        // Parse as notification
+                        guard let data = decrypted.data(using: .utf8),
+                              let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+                              let notificationType = json["notification_type"] as? String,
+                              let notificationData = json["notification"] else {
+                            continue
+                        }
+                        
+                        // Convert notification data back to JSON for parsing
+                        let notificationJSON = try JSONSerialization.data(withJSONObject: notificationData)
+                        let paymentNotification = try JSONDecoder().decode(PaymentNotification.self, from: notificationJSON)
+                        
+                        let notification = NWCNotification(
+                            notificationType: notificationType,
+                            notification: paymentNotification
+                        )
+                        
+                        continuation.yield(notification)
+                    } catch {
+                        // Silently ignore parse errors for notifications
+                        continue
+                    }
+                }
+                
+                continuation.finish()
+            }
+            
+                continuation.onTermination = { _ in
+                    task.cancel()
+                }
             }
         }
+    }
+    
+    // MARK: - Private Helpers
+    
+    private func parseResponse<T: Decodable>(_ content: String, expectedType: T.Type) throws -> T {
+        guard let data = content.data(using: .utf8) else {
+            throw NDKError.invalidResponse(from: "Invalid response content")
+        }
         
-        return responses
+        let response = try JSONDecoder().decode(NWCResponse<T>.self, from: data)
+        
+        if let error = response.error {
+            throw NDKError.walletError(message: error.message)
+        }
+        
+        guard let result = response.result else {
+            throw NDKError.invalidResponse(from: "No result in response")
+        }
+        
+        return result
     }
 }

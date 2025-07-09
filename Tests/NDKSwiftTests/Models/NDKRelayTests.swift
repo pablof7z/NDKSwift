@@ -2,14 +2,14 @@
 import XCTest
 
 final class NDKRelayTests: XCTestCase {
-    func testRelayInitialization() {
+    func testRelayInitialization() async {
         let relay = NDKRelay(url: "wss://relay.example.com")
 
         XCTAssertEqual(relay.url, "wss://relay.example.com")
-        XCTAssertEqual(relay.connectionState, .disconnected)
-        XCTAssertNil(relay.info)
-        XCTAssertTrue(relay.activeSubscriptions.isEmpty)
-        XCTAssertFalse(relay.isConnected)
+        XCTAssertEqual(await relay.connectionState, .disconnected)
+        XCTAssertNil(await relay.info)
+        XCTAssertTrue(await relay.activeSubscriptions.isEmpty)
+        XCTAssertFalse(await relay.isConnected)
     }
 
     func testRelayURLNormalization() {
@@ -124,9 +124,15 @@ final class NDKRelayTests: XCTestCase {
     func testRelayConnectionFailure() async {
         let relay = NDKRelay(url: "wss://relay.example.com")
 
-        var lastState: NDKRelayConnectionState?
-        relay.observeConnectionState { state in
-            lastState = state
+        actor StateCollector {
+            var states: [NDKRelayConnectionState] = []
+            func add(_ state: NDKRelayConnectionState) {
+                states.append(state)
+            }
+        }
+        let stateCollector = StateCollector()
+        await relay.observeConnectionState { state in
+            Task { await stateCollector.add(state) }
         }
 
         // Test that trying to send while disconnected throws error
@@ -134,12 +140,12 @@ final class NDKRelayTests: XCTestCase {
             try await relay.send("TEST")
             XCTFail("Should have thrown error")
         } catch {
-            if let ndkError = error as? NDKError {
-                XCTAssertEqual(ndkError.code, "connection_failed")
-                XCTAssertEqual(ndkError.message, "Not connected to relay")
-            } else {
-                XCTFail("Wrong error type")
+            guard case NDKError.connectionLost(let relayUrl, let message) = error else {
+                XCTFail("Expected NDKError.connectionLost, got \(error)")
+                return
             }
+            XCTAssertEqual(relayUrl, "wss://relay.example.com")
+            XCTAssertEqual(message, "Not connected to relay")
         }
     }
 

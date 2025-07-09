@@ -1,5 +1,5 @@
-import XCTest
 @testable import NDKSwift
+import XCTest
 
 // Helper extension for testing
 extension NDKRelayConnectionState {
@@ -247,11 +247,12 @@ final class WebSocketRelayTests: XCTestCase {
         var receivedError = false
         
         Task {
-            for await update in subscription.updates {
-                if case .error = update {
-                    receivedError = true
-                    break
+            do {
+                for try await _ in subscription {
+                    // We don't expect events in this error test
                 }
+            } catch {
+                receivedError = true
             }
         }
         

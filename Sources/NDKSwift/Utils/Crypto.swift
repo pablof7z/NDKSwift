@@ -32,6 +32,7 @@ public enum Crypto {
                 return "Invalid scalar value"
             }
         }
+        
     }
 
     /// Generate a new private key
@@ -290,6 +291,7 @@ public extension Crypto {
                 return "Invalid nonce (must be 32 bytes)"
             }
         }
+        
     }
     
     /// NIP-44 constants

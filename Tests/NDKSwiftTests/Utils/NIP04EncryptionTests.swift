@@ -1,5 +1,5 @@
-import XCTest
 @testable import NDKSwift
+import XCTest
 
 final class NIP04EncryptionTests: XCTestCase {
     

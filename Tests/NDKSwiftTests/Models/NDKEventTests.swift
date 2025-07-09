@@ -48,13 +48,13 @@ final class NDKEventTests: XCTestCase {
         )
 
         // Generate ID to ensure all fields are set
-        try event.generateID()
+        _ = try event.generateID()
 
         // Test encoding
         let encoder = JSONEncoder()
         encoder.outputFormatting = .sortedKeys
         let data = try encoder.encode(event)
-        let json = String(data: data, encoding: .utf8)!
+        _ = String(data: data, encoding: .utf8)!
 
         // Test decoding
         let decoder = JSONDecoder()
@@ -75,7 +75,7 @@ final class NDKEventTests: XCTestCase {
             kind: 1,
             content: "Valid"
         )
-        try validEvent.generateID()
+        _ = try validEvent.generateID()
         XCTAssertNoThrow(try validEvent.validate())
 
         // Invalid pubkey
@@ -86,12 +86,10 @@ final class NDKEventTests: XCTestCase {
             content: "Invalid"
         )
         XCTAssertThrowsError(try invalidPubkeyEvent.validate()) { error in
-            guard let ndkError = error as? NDKError else {
-                XCTFail("Expected NDKError")
+            guard case NDKError.invalidPublicKey = error else {
+                XCTFail("Expected NDKError.invalidPublicKey, got \(error)")
                 return
             }
-            XCTAssertEqual(ndkError.code, "invalid_public_key")
-            XCTAssertEqual(ndkError.category, .validation)
         }
 
         // Invalid ID
@@ -103,12 +101,10 @@ final class NDKEventTests: XCTestCase {
         )
         invalidIDEvent.id = "invalid"
         XCTAssertThrowsError(try invalidIDEvent.validate()) { error in
-            guard let ndkError = error as? NDKError else {
-                XCTFail("Expected NDKError")
+            guard case NDKError.invalidEventID = error else {
+                XCTFail("Expected NDKError.invalidEventID, got \(error)")
                 return
             }
-            XCTAssertEqual(ndkError.code, "invalid_event_id")
-            XCTAssertEqual(ndkError.category, .validation)
         }
     }
 
@@ -123,7 +119,7 @@ final class NDKEventTests: XCTestCase {
                 ["p", "pubkey1"],
                 ["p", "pubkey2", "wss://relay3.com"],
                 ["t", "nostr"],
-                ["t", "test"],
+                ["t", "test"]
             ],
             content: "Test"
         )

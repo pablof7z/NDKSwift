@@ -1,7 +1,7 @@
 import Foundation
 
 /// Configuration for signature verification sampling
-public struct NDKSignatureVerificationConfig {
+public struct NDKSignatureVerificationConfig: Sendable {
     /// The signature verification validation ratio for new relays (1.0 = verify all)
     public var initialValidationRatio: Double
 
@@ -12,7 +12,7 @@ public struct NDKSignatureVerificationConfig {
     public var autoBlacklistInvalidRelays: Bool
 
     /// Custom function to calculate validation ratio
-    public var validationRatioFunction: ((RelayProtocol, Int, Int) -> Double)?
+    public var validationRatioFunction: (@Sendable (RelayProtocol, Int, Int) -> Double)?
 
     /// Default configuration with full signature verification
     public static let `default` = NDKSignatureVerificationConfig(
@@ -32,7 +32,7 @@ public struct NDKSignatureVerificationConfig {
 }
 
 /// Statistics for signature verification on a relay
-public struct NDKRelaySignatureStats {
+public struct NDKRelaySignatureStats: Sendable {
     /// Number of events that had their signatures validated
     public private(set) var validatedCount: Int = 0
 
@@ -64,7 +64,7 @@ public struct NDKRelaySignatureStats {
 }
 
 /// Result of a signature verification attempt
-public enum NDKSignatureVerificationResult {
+public enum NDKSignatureVerificationResult: Sendable {
     case valid
     case invalid
     case skipped // Skipped due to sampling

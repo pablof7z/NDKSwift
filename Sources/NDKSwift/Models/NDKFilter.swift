@@ -1,7 +1,7 @@
 import Foundation
 
 /// Filter for subscribing to events
-public struct NDKFilter: Codable, Equatable {
+public struct NDKFilter: Codable, Equatable, Sendable {
     /// Event IDs to filter
     public var ids: [EventID]?
 
@@ -151,33 +151,38 @@ public struct NDKFilter: Codable, Equatable {
     // MARK: - Matching
 
     /// Check if an event matches this filter
-    public func matches(event: NDKEvent) -> Bool {
+    public func matches(event: NDKEvent) async -> Bool {
         // Check IDs
-        if let ids = ids, !ids.contains(event.id ?? "") {
+        let eventId = await event.id
+        if let ids = ids, !ids.contains(eventId ?? "") {
             return false
         }
 
         // Check authors
-        if let authors = authors, !authors.contains(event.pubkey) {
+        let eventPubkey = await event.pubkey
+        if let authors = authors, !authors.contains(eventPubkey) {
             return false
         }
 
         // Check kinds
-        if let kinds = kinds, !kinds.contains(event.kind) {
+        let eventKind = await event.kind
+        if let kinds = kinds, !kinds.contains(eventKind) {
             return false
         }
 
         // Check timestamp
-        if let since = since, event.createdAt < since {
+        let eventCreatedAt = await event.createdAt
+        if let since = since, eventCreatedAt < since {
             return false
         }
-        if let until = until, event.createdAt > until {
+        if let until = until, eventCreatedAt > until {
             return false
         }
 
         // Check referenced events
         if let events = events {
-            let eventRefs = event.tags(withName: "e").compactMap { $0.count > 1 ? $0[1] : nil }
+            let eventTags = await event.tags(withName: "e")
+            let eventRefs = eventTags.compactMap { $0.count > 1 ? $0[1] : nil }
             if !events.contains(where: { eventRefs.contains($0) }) {
                 return false
             }
@@ -185,7 +190,8 @@ public struct NDKFilter: Codable, Equatable {
 
         // Check referenced pubkeys
         if let pubkeys = pubkeys {
-            let pubkeyRefs = event.tags(withName: "p").compactMap { $0.count > 1 ? $0[1] : nil }
+            let pTags = await event.tags(withName: "p")
+            let pubkeyRefs = pTags.compactMap { $0.count > 1 ? $0[1] : nil }
             if !pubkeys.contains(where: { pubkeyRefs.contains($0) }) {
                 return false
             }
@@ -194,7 +200,8 @@ public struct NDKFilter: Codable, Equatable {
         // Check generic tag filters
         for (tagKey, filterValues) in tagFilters {
             let tagName = String(tagKey.dropFirst()) // Remove '#'
-            let eventTagValues = event.tags(withName: tagName).compactMap { $0.count > 1 ? $0[1] : nil }
+            let eventTags = await event.tags(withName: tagName)
+            let eventTagValues = eventTags.compactMap { $0.count > 1 ? $0[1] : nil }
 
             if !filterValues.contains(where: { eventTagValues.contains($0) }) {
                 return false

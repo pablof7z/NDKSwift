@@ -97,17 +97,17 @@ final class NDKErrorHandlingTests: XCTestCase {
     
     func testInvalidNsecHandling() {
         // Test invalid nsec format
-        XCTAssertThrowsError(try NDKPrivateKeySigner(nsec: "invalid_nsec")) { error in
+        XCTAssertThrowsError(try NDKPrivateKeySigner(nsec: "invalid_nsec")) { _ in
             // Should throw error for invalid nsec format
         }
         
         // Test empty nsec
-        XCTAssertThrowsError(try NDKPrivateKeySigner(nsec: "")) { error in
+        XCTAssertThrowsError(try NDKPrivateKeySigner(nsec: "")) { _ in
             // Should throw error for empty nsec
         }
         
         // Test wrong bech32 prefix
-        XCTAssertThrowsError(try NDKPrivateKeySigner(nsec: "npub1234567890abcdef")) { error in
+        XCTAssertThrowsError(try NDKPrivateKeySigner(nsec: "npub1234567890abcdef")) { _ in
             // Should throw error for wrong prefix (npub instead of nsec)
         }
     }
@@ -128,13 +128,15 @@ final class NDKErrorHandlingTests: XCTestCase {
         XCTAssertEqual(emptyFiltersSubscription.filters.count, 0)
         
         // Should handle gracefully
-        XCTAssertNoThrow(emptyFiltersSubscription.start())
-        XCTAssertNoThrow(emptyFiltersSubscription.close())
+        Task {
+            await emptyFiltersSubscription.start()
+            await emptyFiltersSubscription.close()
+        }
     }
     
-    func testSubscriptionTimeout() async {
+    func testSubscriptionTimeout() async throws {
         // Skip timeout test as it may not be implemented yet
-        XCTSkip("Subscription timeout feature may not be implemented")
+        throw XCTSkip("Subscription timeout feature may not be implemented")
         
         var options = NDKSubscriptionOptions()
         options.timeout = 0.1 // Very short timeout
@@ -145,19 +147,24 @@ final class NDKErrorHandlingTests: XCTestCase {
             ndk: ndk
         )
         
-        subscription.start()
+        Task {
+            await subscription.start()
+        }
         
         // Wait for timeout
         try? await Task.sleep(nanoseconds: 150_000_000) // 150ms
         
         // Should be closed due to timeout
-        XCTAssertTrue(subscription.isClosed)
+        let isClosed = await subscription.isClosed
+        XCTAssertTrue(isClosed)
     }
     
     func testDuplicateSubscriptionClose() async {
         let subscription = NDKSubscription(filters: [NDKFilter(kinds: [1])], ndk: ndk)
         
-        subscription.start()
+        Task {
+            await subscription.start()
+        }
         
         // Wait a bit for the subscription to start
         try? await Task.sleep(nanoseconds: 10_000_000) // 10ms
@@ -166,19 +173,19 @@ final class NDKErrorHandlingTests: XCTestCase {
         XCTAssertEqual(subscription.state, .active)
         
         // Close multiple times should be safe
-        subscription.close()
+        await subscription.close()
         XCTAssertEqual(subscription.state, .closed)
         
-        subscription.close() // Second close
+        await subscription.close() // Second close
         XCTAssertEqual(subscription.state, .closed)
         
-        subscription.close() // Third close
+        await subscription.close() // Third close
         XCTAssertEqual(subscription.state, .closed)
     }
     
     // MARK: - Relay Error Tests
     
-    func testInvalidRelayURL() async {
+    func testInvalidRelayURL() async throws {
         // The current implementation doesn't validate URLs at creation time
         // It accepts any URL and normalizes it
         let invalidRelay = ndk.addRelay("invalid-url")
@@ -192,12 +199,12 @@ final class NDKErrorHandlingTests: XCTestCase {
         
         // Skip connection test - relay connections don't currently validate URLs
         // and may succeed even with invalid URLs
-        XCTSkip("Relay connection validation not implemented")
+        throw XCTSkip("Relay connection validation not implemented")
     }
     
-    func testRelayConnectionFailure() async {
+    func testRelayConnectionFailure() async throws {
         // Skip - relay connections may not fail immediately for non-existent hosts
-        XCTSkip("Relay connection failure testing requires actual network conditions")
+        throw XCTSkip("Relay connection failure testing requires actual network conditions")
         
         let relay = ndk.addRelay("wss://nonexistent.relay.invalid")
         
@@ -214,10 +221,6 @@ final class NDKErrorHandlingTests: XCTestCase {
     // MARK: - Cache Error Tests
     
     func testCacheCorruptionHandling() async {
-        let cache = NDKInMemoryCache()
-        // Note: cache adapter is no longer settable on NDK
-        // ndk.cache = cache
-        
         // Test handling of corrupted event data
         let corruptedEvent = NDKEvent(
             pubkey: "", // Invalid empty pubkey
@@ -227,11 +230,9 @@ final class NDKErrorHandlingTests: XCTestCase {
             content: "Test"
         )
         
-        // Should handle gracefully without crashing
-        do {
-            try await cache.setEvent(corruptedEvent, filters: [], relay: nil)
-        } catch {
-            XCTFail("Should not throw: \(error)")
+        // Test that validation catches the invalid pubkey
+        XCTAssertThrowsError(try corruptedEvent.validate()) { error in
+            XCTAssertTrue(error is NDKError)
         }
     }
     
@@ -244,8 +245,10 @@ final class NDKErrorHandlingTests: XCTestCase {
             let subscription = NDKSubscription(filters: [NDKFilter(kinds: [1])], ndk: ndk)
             weakSubscription = subscription
             
-            subscription.start()
-            subscription.close()
+            Task {
+                await subscription.start()
+                await subscription.close()
+            }
         }
         
         // Give time for cleanup
@@ -277,10 +280,10 @@ final class NDKErrorHandlingTests: XCTestCase {
         await withTaskGroup(of: Void.self) { group in
             for _ in 0..<10 {
                 group.addTask {
-                    subscription.start()
+                    await subscription.start()
                 }
                 group.addTask {
-                    subscription.close()
+                    await subscription.close()
                 }
             }
         }
@@ -295,16 +298,22 @@ final class NDKErrorHandlingTests: XCTestCase {
         
         var eventCount = 0
         
-        // Add event handler to count events
-        subscription.onEvent { _ in
-            eventCount += 1
+        // Set up event counting via AsyncSequence
+        Task {
+            do {
+                for try await _ in subscription {
+                    eventCount += 1
+                }
+            } catch {
+                // Handle error if needed
+            }
         }
         
         // Test concurrent event handling
         await withTaskGroup(of: Void.self) { group in
             for _ in 0..<10 { // Reduced from 100 to avoid overwhelming
                 group.addTask {
-                    subscription.handleEvent(event, fromRelay: nil)
+                    await subscription.handleEvent(event, fromRelay: nil)
                 }
             }
         }

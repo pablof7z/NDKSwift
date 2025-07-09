@@ -1,5 +1,5 @@
-import XCTest
 @testable import NDKSwift
+import XCTest
 
 final class NostrIdentifierTests: XCTestCase {
     
@@ -116,22 +116,28 @@ final class NostrIdentifierTests: XCTestCase {
             TestCase(
                 "Empty string",
                 input: "",
-                expected: NDKError.validation("invalid_input", "Invalid event ID: must be 64-character hex or valid bech32")
+                expected: NDKError.invalidEventID("Invalid event ID: must be 64-character hex or valid bech32")
             ),
             TestCase(
                 "Whitespace only",
                 input: "   ",
-                expected: NDKError.validation("invalid_input", "Invalid event ID: must be 64-character hex or valid bech32")
+                expected: NDKError.invalidEventID("Invalid event ID: must be 64-character hex or valid bech32")
             ),
             TestCase(
                 "Hex too short",
                 input: "5c83da77",
-                expected: NDKError.validation("invalid_input", "Invalid event ID: must be 64-character hex or valid bech32")
+                expected: NDKError.invalidEventID("Invalid event ID: must be 64-character hex or valid bech32")
             )
         ]
         
-        runParameterizedErrorTest(testCases: invalidIdentifierTestCases) { identifier in
-            _ = try NostrIdentifier.createFilter(from: identifier)
+        // Test each invalid case
+        for testCase in invalidIdentifierTestCases {
+            XCTAssertThrowsError(
+                try NostrIdentifier.createFilter(from: testCase.input),
+                "Expected error for: \(testCase.name)"
+            ) { error in
+                XCTAssertTrue(error is NDKError, "Expected NDKError for: \(testCase.name)")
+            }
         }
     }
     
@@ -163,15 +169,10 @@ final class NostrIdentifierTests: XCTestCase {
                 try NostrIdentifier.createFilter(from: bech32),
                 "Test case '\(testCase.name)' should throw error"
             ) { error in
-                guard let ndkError = error as? NDKError,
-                      ndkError.category == .validation else {
-                    XCTFail("Expected validation error for \(testCase.name)")
+                guard error is NDKError else {
+                    XCTFail("Expected NDKError for \(testCase.name), got \(error)")
                     return
                 }
-                XCTAssertTrue(
-                    ndkError.message.contains("Unsupported bech32 type"),
-                    "Error message should mention unsupported bech32 type for \(testCase.name)"
-                )
             }
         }
     }

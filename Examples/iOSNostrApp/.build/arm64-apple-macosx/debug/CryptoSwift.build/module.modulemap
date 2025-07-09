@@ -1,4 +1,0 @@
-module CryptoSwift {
-    header "/Users/pablofernandez/src/NDKSwift/Examples/iOSNostrApp/.build/arm64-apple-macosx/debug/CryptoSwift.build/CryptoSwift-Swift.h"
-    requires objc
-}

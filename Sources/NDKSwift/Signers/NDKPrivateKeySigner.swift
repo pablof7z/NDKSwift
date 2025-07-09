@@ -9,11 +9,17 @@ public final class NDKPrivateKeySigner: NDKSigner {
     /// Initialize with a private key
     public init(privateKey: PrivateKey) throws {
         guard let keyData = Data(hexString: privateKey), keyData.count == 32 else {
-            throw NDKError.validation("invalid_private_key", "Invalid private key format")
+            throw NDKError.invalidPrivateKey(privateKey)
         }
 
         self.privateKey = privateKey
-        self._pubkey = try Crypto.getPublicKey(from: privateKey)
+        do {
+            self._pubkey = try Crypto.getPublicKey(from: privateKey)
+        } catch let error as Crypto.CryptoError {
+            throw NDKError.keyDerivationFailed(error.errorDescription ?? "Failed to derive public key", underlying: error)
+        } catch {
+            throw NDKError.keyDerivationFailed("Failed to derive public key", underlying: error)
+        }
     }
 
     /// Initialize with an nsec string
@@ -45,10 +51,27 @@ public final class NDKPrivateKeySigner: NDKSigner {
         guard let eventId = event.id,
               let idData = Data(hexString: eventId)
         else {
-            throw NDKError.crypto("signing_failed", "Failed to sign event")
+            throw NDKError.signingFailed("Failed to sign event: invalid event ID")
         }
 
-        return try Crypto.sign(message: idData, privateKey: privateKey)
+        do {
+            return try Crypto.sign(message: idData, privateKey: privateKey)
+        } catch let error as Crypto.CryptoError {
+            throw NDKError.signingFailed(error.errorDescription ?? "Failed to sign event", underlying: error)
+        } catch {
+            throw NDKError.signingFailed("Failed to sign event", underlying: error)
+        }
+    }
+    
+    public func sign(event: inout NDKEvent) async throws {
+        // Set the pubkey if not already set
+        if event.pubkey.isEmpty {
+            event.pubkey = _pubkey
+        }
+        
+        // Generate the signature
+        let signature = try await sign(event)
+        event.sig = signature
     }
 
     public func blockUntilReady() async throws {
@@ -62,18 +85,46 @@ public final class NDKPrivateKeySigner: NDKSigner {
     public func encrypt(recipient: NDKUser, value: String, scheme: NDKEncryptionScheme) async throws -> String {
         switch scheme {
         case .nip04:
-            return try Crypto.nip04Encrypt(message: value, privateKey: privateKey, publicKey: recipient.pubkey)
+            do {
+                return try Crypto.nip04Encrypt(message: value, privateKey: privateKey, publicKey: recipient.pubkey)
+            } catch let error as Crypto.CryptoError {
+                throw NDKError.encryptionFailed("NIP-04 encryption failed: \(error.errorDescription ?? "")", underlying: error)
+            } catch {
+                throw NDKError.encryptionFailed("NIP-04 encryption failed", underlying: error)
+            }
         case .nip44:
-            return try Crypto.nip44Encrypt(message: value, privateKey: privateKey, publicKey: recipient.pubkey)
+            do {
+                return try Crypto.nip44Encrypt(message: value, privateKey: privateKey, publicKey: recipient.pubkey)
+            } catch let error as Crypto.NIP44Error {
+                throw NDKError.encryptionFailed("NIP-44 encryption failed: \(error.errorDescription ?? "")", underlying: error)
+            } catch let error as Crypto.CryptoError {
+                throw NDKError.encryptionFailed("NIP-44 encryption failed: \(error.errorDescription ?? "")", underlying: error)
+            } catch {
+                throw NDKError.encryptionFailed("NIP-44 encryption failed", underlying: error)
+            }
         }
     }
 
     public func decrypt(sender: NDKUser, value: String, scheme: NDKEncryptionScheme) async throws -> String {
         switch scheme {
         case .nip04:
-            return try Crypto.nip04Decrypt(encrypted: value, privateKey: privateKey, publicKey: sender.pubkey)
+            do {
+                return try Crypto.nip04Decrypt(encrypted: value, privateKey: privateKey, publicKey: sender.pubkey)
+            } catch let error as Crypto.CryptoError {
+                throw NDKError.decryptionFailed("NIP-04 decryption failed: \(error.errorDescription ?? "")", underlying: error)
+            } catch {
+                throw NDKError.decryptionFailed("NIP-04 decryption failed", underlying: error)
+            }
         case .nip44:
-            return try Crypto.nip44Decrypt(encrypted: value, privateKey: privateKey, publicKey: sender.pubkey)
+            do {
+                return try Crypto.nip44Decrypt(encrypted: value, privateKey: privateKey, publicKey: sender.pubkey)
+            } catch let error as Crypto.NIP44Error {
+                throw NDKError.decryptionFailed("NIP-44 decryption failed: \(error.errorDescription ?? "")", underlying: error)
+            } catch let error as Crypto.CryptoError {
+                throw NDKError.decryptionFailed("NIP-44 decryption failed: \(error.errorDescription ?? "")", underlying: error)
+            } catch {
+                throw NDKError.decryptionFailed("NIP-44 decryption failed", underlying: error)
+            }
         }
     }
 
@@ -102,7 +153,7 @@ public final class NDKPrivateKeySigner: NDKSigner {
     public func toPayload() -> String {
         let payload: [String: Any] = [
             "type": "privatekey",
-            "privateKey": privateKey,
+            "privateKey": privateKey
         ]
         let data = try! JSONSerialization.data(withJSONObject: payload)
         return String(data: data, encoding: .utf8)!

@@ -96,7 +96,7 @@ public struct BlossomAuth {
         var tags: [[String]] = [
             ["t", "upload"],
             ["x", sha256],
-            ["size", String(size)],
+            ["size", String(size)]
         ]
 
         if let mimeType = mimeType {
@@ -131,7 +131,7 @@ public struct BlossomAuth {
     ) async throws -> BlossomAuth {
         let tags: [[String]] = [
             ["t", "delete"],
-            ["x", sha256],
+            ["x", sha256]
         ]
 
         let pubkey = try await signer.pubkey
@@ -157,7 +157,7 @@ public struct BlossomAuth {
         until: Date? = nil
     ) async throws -> BlossomAuth {
         var tags: [[String]] = [
-            ["t", "list"],
+            ["t", "list"]
         ]
 
         if let since = since {
@@ -189,45 +189,6 @@ public struct BlossomAuth {
         let eventJSON = try event.serialize()
         let eventData = eventJSON.data(using: .utf8)!
         return "Nostr " + eventData.base64EncodedString()
-    }
-}
-
-/// Blossom error types
-public enum BlossomError: LocalizedError {
-    case invalidURL
-    case invalidResponse
-    case unauthorized
-    case serverError(Int, String?)
-    case fileTooLarge
-    case unsupportedMimeType
-    case blobNotFound
-    case uploadFailed(String)
-    case networkError(Error)
-    case invalidSHA256
-
-    public var errorDescription: String? {
-        switch self {
-        case .invalidURL:
-            return "Invalid Blossom server URL"
-        case .invalidResponse:
-            return "Invalid response from Blossom server"
-        case .unauthorized:
-            return "Unauthorized - invalid or expired authorization"
-        case let .serverError(code, message):
-            return "Server error \(code): \(message ?? "Unknown error")"
-        case .fileTooLarge:
-            return "File exceeds maximum size limit"
-        case .unsupportedMimeType:
-            return "File type not supported by this server"
-        case .blobNotFound:
-            return "Blob not found on server"
-        case let .uploadFailed(message):
-            return "Upload failed: \(message)"
-        case let .networkError(error):
-            return "Network error: \(error.localizedDescription)"
-        case .invalidSHA256:
-            return "Invalid SHA256 hash"
-        }
     }
 }
 

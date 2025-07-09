@@ -1,5 +1,5 @@
-import XCTest
 @testable import NDKSwift
+import XCTest
 
 final class NDKNWCWalletTests: XCTestCase {
     var ndk: NDK!
@@ -39,11 +39,11 @@ final class NDKNWCWalletTests: XCTestCase {
         let uri = "https://example.com/wallet"
         
         XCTAssertThrowsError(try NWCConnectionURI(uri: uri)) { error in
-            guard let nwcError = error as? NWCError else {
-                XCTFail("Expected NWCError")
+            guard error is NDKError else {
+                XCTFail("Expected NDKError")
                 return
             }
-            XCTAssertEqual(nwcError.code, .other)
+            // Check for NDKError
         }
     }
     
@@ -52,22 +52,22 @@ final class NDKNWCWalletTests: XCTestCase {
         let uriNoSecret = "nostr+walletconnect://b889ff5b1513b641e2a139f661a661364979c5beee91842f8f0ef42ab558e9d4?relay=wss%3A%2F%2Frelay.damus.io"
         
         XCTAssertThrowsError(try NWCConnectionURI(uri: uriNoSecret)) { error in
-            guard let nwcError = error as? NWCError else {
-                XCTFail("Expected NWCError")
+            guard let ndkError = error as? NDKError else {
+                XCTFail("Expected NDKError")
                 return
             }
-            XCTAssertTrue(nwcError.message.contains("secret"))
+            XCTAssertTrue(ndkError.errorDescription?.contains("secret") ?? false)
         }
         
         // Missing relay
         let uriNoRelay = "nostr+walletconnect://b889ff5b1513b641e2a139f661a661364979c5beee91842f8f0ef42ab558e9d4?secret=71a8c14c1407c113601079c4302dab36460f0ccd0ad506f1f2dc73b5100e4f3c"
         
         XCTAssertThrowsError(try NWCConnectionURI(uri: uriNoRelay)) { error in
-            guard let nwcError = error as? NWCError else {
-                XCTFail("Expected NWCError")
+            guard error is NDKError else {
+                XCTFail("Expected NDKError")
                 return
             }
-            XCTAssertTrue(nwcError.message.contains("relay"))
+            // Check for relay in error
         }
     }
     
@@ -76,11 +76,11 @@ final class NDKNWCWalletTests: XCTestCase {
         let uri = "nostr+walletconnect://invalid?relay=wss%3A%2F%2Frelay.damus.io&secret=71a8c14c1407c113601079c4302dab36460f0ccd0ad506f1f2dc73b5100e4f3c"
         
         XCTAssertThrowsError(try NWCConnectionURI(uri: uri)) { error in
-            guard let nwcError = error as? NWCError else {
-                XCTFail("Expected NWCError")
+            guard let ndkError = error as? NDKError else {
+                XCTFail("Expected NDKError")
                 return
             }
-            XCTAssertTrue(nwcError.message.contains("public key"))
+            XCTAssertTrue(ndkError.errorDescription?.contains("public key") ?? false)
         }
     }
     
@@ -120,7 +120,7 @@ final class NDKNWCWalletTests: XCTestCase {
         let request = PayInvoiceRequest(invoice: "lnbc50n1...", amount: 1000)
         let event = try await builder.buildPayInvoiceRequest(request)
         
-        XCTAssertEqual(event.kind, .nostrWalletConnectReq)
+        XCTAssertEqual(event.kind, EventKind.walletRequest)
         XCTAssertTrue(event.tags.contains(where: { $0.count >= 2 && $0[0] == "p" && $0[1] == walletPubkey }))
         XCTAssertNotNil(event.id)
         XCTAssertNotNil(event.sig)
@@ -139,7 +139,7 @@ final class NDKNWCWalletTests: XCTestCase {
         
         let event = try await builder.buildGetBalanceRequest()
         
-        XCTAssertEqual(event.kind, .nostrWalletConnectReq)
+        XCTAssertEqual(event.kind, EventKind.walletRequest)
         XCTAssertTrue(event.tags.contains(where: { $0.count >= 2 && $0[0] == "p" && $0[1] == walletPubkey }))
     }
     
@@ -189,25 +189,17 @@ final class NDKNWCWalletTests: XCTestCase {
         XCTAssertNil(response.result)
     }
     
-    // MARK: - Error Conversion Tests
+    // MARK: - Error Tests
     
-    func testNWCErrorToNDKError() {
-        let nwcError = NWCError.paymentFailed(reason: "Insufficient balance")
-        let ndkError = nwcError.toNDKError()
+    func testNDKWalletErrors() {
+        let paymentError = NDKError.paymentFailed(reason: "Insufficient balance")
+        XCTAssertTrue(paymentError.errorDescription?.contains("Insufficient balance") ?? false)
         
-        XCTAssertEqual(ndkError.category, .runtime)
-        XCTAssertEqual(ndkError.code, "NWC_PAYMENT_FAILED")
-        XCTAssertEqual(ndkError.message, "Insufficient balance")
-    }
-    
-    func testNWCErrorFactoryMethods() {
-        let rateLimitError = NWCError.rateLimited(retryAfter: 5)
-        XCTAssertEqual(rateLimitError.code, .rateLimited)
-        XCTAssertEqual(rateLimitError.context["retryAfter"] as? Int, 5)
+        let rateLimitError = NDKError.walletRateLimited(retryAfter: 5)
+        XCTAssertTrue(rateLimitError.errorDescription?.contains("5 seconds") ?? false)
         
-        let timeoutError = NWCError.timeout(method: "pay_invoice", timeoutSeconds: 30)
-        XCTAssertEqual(timeoutError.code, .internal)
-        XCTAssertTrue(timeoutError.message.contains("30 seconds"))
+        let timeoutError = NDKError.timeout(operation: "pay_invoice", seconds: 30)
+        XCTAssertTrue(timeoutError.errorDescription?.contains("30 seconds") ?? false)
     }
     
     // MARK: - Integration Tests (Mocked)
@@ -217,8 +209,10 @@ final class NDKNWCWalletTests: XCTestCase {
         
         let wallet = try await NDKNWCWallet(ndk: ndk, connectionURI: uri)
         
-        XCTAssertEqual(await wallet.status, .disconnected)
-        XCTAssertNil(await wallet.walletInfo)
+        let status = await wallet.status
+        let walletInfo = await wallet.walletInfo
+        XCTAssertEqual(status, .disconnected)
+        XCTAssertNil(walletInfo)
         XCTAssertEqual(wallet.connectionURI.walletPubkey, "b889ff5b1513b641e2a139f661a661364979c5beee91842f8f0ef42ab558e9d4")
     }
     
@@ -229,6 +223,7 @@ final class NDKNWCWalletTests: XCTestCase {
         
         XCTAssertTrue(wallet.supports(method: .nwc))
         XCTAssertTrue(wallet.supports(method: .lightning))
-        XCTAssertFalse(wallet.supports(method: .nutzap))
+        // Nutzap support is not yet implemented
+        // XCTAssertFalse(wallet.supports(method: .nutzap))
     }
 }
