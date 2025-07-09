@@ -33,6 +33,21 @@ public struct CashuProofRequest: PaymentRequest {
     }
 }
 
+/// A request for funding a Nutzap - includes all accepted mints so payment provider can choose
+public struct NutzapFundingRequest: PaymentRequest {
+    public let amountSats: Int64
+    public let recipientP2PK: String
+    public let acceptedMints: [URL]  // All mints the recipient accepts
+    public let comment: String?
+    
+    public init(amountSats: Int64, recipientP2PK: String, acceptedMints: [URL], comment: String? = nil) {
+        self.amountSats = amountSats
+        self.recipientP2PK = recipientP2PK
+        self.acceptedMints = acceptedMints
+        self.comment = comment
+    }
+}
+
 // MARK: - Payment Confirmation Types
 
 /// An abstract confirmation of payment, returned by a Payment Provider
@@ -55,10 +70,12 @@ public struct LightningPaymentConfirmation: PaymentConfirmation {
 public struct CashuPaymentConfirmation: PaymentConfirmation {
     public let proofs: [CashuProof]
     public let change: [CashuProof]?
+    public let mintURL: URL  // The mint that was actually used
     
-    public init(proofs: [CashuProof], change: [CashuProof]? = nil) {
+    public init(proofs: [CashuProof], change: [CashuProof]? = nil, mintURL: URL) {
         self.proofs = proofs
         self.change = change
+        self.mintURL = mintURL
     }
 }
 
