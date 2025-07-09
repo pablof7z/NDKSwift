@@ -123,53 +123,87 @@ public class NDKLightningZapProtocol: NDKZapProtocol {
         // For Lightning zaps, the payment confirmation doesn't directly create the zap receipt
         // The LNURL server will publish the receipt when it sees the payment
         
-        // Create result with confirmation handler
-        let sentEvent = zapRequest.event
+        // Wait for zap receipt (kind: 9735) from the LNURL provider
+        let receiptEvent = try await waitForZapReceipt(
+            for: prepared.recipient,
+            zappedEvent: prepared.zappedEvent,
+            zapRequestId: await zapRequest.event.id,
+            providerPubkey: endpoint.nostrPubkey,
+            timeout: 30 // seconds
+        )
         
-        let awaitConfirmation: () async throws -> NDKEvent? = { [weak self] in
-            guard let self = self else {
-                throw NDKError.cancelled
-            }
-            
-            // Wait for zap receipt (kind: 9735) from the provider
-            var filter = NDKFilter()
-            filter.kinds = [EventKind.zapReceipt]
-            filter.addTagFilter("p", values: [prepared.recipient.pubkey])
-            if let zappedEvent = prepared.zappedEvent {
-                let eventId = await zappedEvent.id
-                if let eventId = eventId {
-                    filter.addTagFilter("e", values: [eventId])
-                }
-            }
-            
-            // Subscribe and wait for receipt
-            let subscription = self.ndk.subscribe(filters: [filter])
-            
-            for try await receiptEvent in subscription {
-                let receipt = NDKZapReceipt(event: receiptEvent)
-                
-                // Validate the receipt
-                if let providerPubkey = endpoint.nostrPubkey,
-                   receipt.validate(lnurlProviderPubkey: providerPubkey, zapRequest: zapRequest) {
-                    await subscription.close()
-                    return receiptEvent
-                }
-            }
-            
-            return nil
-        }
-        
-        // For now, return immediately with the sent event
-        // In a real implementation, we'd wait for the receipt
+        // Return result with the actual receipt
         return ZapResult(
             type: .lightning,
-            amountSats: prepared.paymentRequest.amount,
-            receiptEvent: sentEvent,
+            amountSats: prepared.paymentRequest.amountSats,
+            receiptEvent: receiptEvent,
             nutzapEvent: nil
         )
     }
     
     // MARK: - Private Methods
+    
+    private func waitForZapReceipt(
+        for recipient: NDKUser,
+        zappedEvent: NDKEvent?,
+        zapRequestId: String?,
+        providerPubkey: String?,
+        timeout: TimeInterval
+    ) async throws -> NDKEvent? {
+        // Create filter for zap receipts
+        var filter = NDKFilter()
+        filter.kinds = [EventKind.zapReceipt]
+        filter.addTagFilter("p", values: [recipient.pubkey])
+        
+        if let zappedEvent = zappedEvent {
+            let eventId = await zappedEvent.id
+            if let eventId = eventId {
+                filter.addTagFilter("e", values: [eventId])
+            }
+        }
+        
+        // Subscribe with timeout
+        let subscription = ndk.subscribe(filters: [filter])
+        
+        // Create timeout task
+        let timeoutTask = Task {
+            try await Task.sleep(nanoseconds: UInt64(timeout * 1_000_000_000))
+            await subscription.close()
+            throw ZapError.timeoutWaitingForReceipt
+        }
+        
+        do {
+            for try await event in subscription {
+                let receipt = NDKZapReceipt(event: event)
+                
+                // Check if this receipt matches our zap request
+                let receiptZapRequestId = await receipt.zapRequestId
+                if let zapRequestId = zapRequestId,
+                   receiptZapRequestId == zapRequestId {
+                    // Validate the receipt if we have provider pubkey
+                    if let providerPubkey = providerPubkey {
+                        let isValid = await receipt.validate(lnurlProviderPubkey: providerPubkey)
+                        if isValid {
+                            timeoutTask.cancel()
+                            await subscription.close()
+                            return event
+                        }
+                    } else {
+                        // No provider pubkey to validate against, accept the receipt
+                        timeoutTask.cancel()
+                        await subscription.close()
+                        return event
+                    }
+                }
+            }
+        } catch {
+            timeoutTask.cancel()
+            await subscription.close()
+            throw error
+        }
+        
+        return nil
+    }
     
     private func resolveLNURL(for user: NDKUser) async throws -> LNURLPayEndpoint {
         guard let profile = try? await user.fetchProfile() else {

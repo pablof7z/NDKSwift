@@ -31,24 +31,24 @@ public class NDKNutzapProtocol: NDKZapProtocol {
             throw ZapError.nutzapPreferencesNotFound
         }
         
-        // 2. For now, select the first mint
-        // In a real implementation, this could be smarter (e.g., check balances)
-        guard let selectedMint = preferences.mints.first else {
+        // 2. Get all accepted mints
+        let acceptedMints = preferences.mints.map { $0.url }
+        guard !acceptedMints.isEmpty else {
             throw ZapError.invalidMint
         }
         
-        // 3. Create payment request for Cashu proofs
-        let paymentRequest = CashuProofRequest(
+        // 3. Create payment request with ALL accepted mints
+        // Payment provider will choose the optimal one
+        let paymentRequest = NutzapFundingRequest(
             amountSats: amountSats,
-            mintURL: selectedMint.url,
             recipientP2PK: preferences.p2pkPubkey,
+            acceptedMints: acceptedMints,
             comment: comment
         )
         
         // 4. Store metadata for completion
         let metadata: [String: Any] = [
             "preferences": preferences,
-            "selectedMint": selectedMint.url,
             "relays": preferences.relays
         ]
         
@@ -67,7 +67,6 @@ public class NDKNutzapProtocol: NDKZapProtocol {
     ) async throws -> ZapResult {
         // Extract metadata
         guard let preferences = prepared.metadata["preferences"] as? NDKNutzapPreferences,
-              let mintURL = prepared.metadata["selectedMint"] as? URL,
               let relays = prepared.metadata["relays"] as? [String] else {
             throw NDKError.invalidInput(message: "Missing nutzap metadata")
         }
@@ -77,12 +76,12 @@ public class NDKNutzapProtocol: NDKZapProtocol {
             throw NDKError.invalidInput(message: "Invalid payment confirmation type for nutzap")
         }
         
-        // Create nutzap event
+        // Create nutzap event using the mint from the confirmation
         let nutzap = try await NDKNutzap.create(
             ndk: ndk,
             recipient: prepared.recipient,
             proofs: cashuConfirmation.proofs,
-            mint: mintURL,
+            mint: cashuConfirmation.mintURL,  // Use the mint that was actually used
             comment: prepared.comment,
             zappedEvent: prepared.zappedEvent
         )
@@ -91,14 +90,9 @@ public class NDKNutzapProtocol: NDKZapProtocol {
         _ = try await ndk.publish(event: nutzap.event, to: Set(relays))
         
         // Create result - Nutzaps are complete immediately
-        let awaitConfirmation: () async throws -> NDKEvent? = {
-            // Nutzaps don't have a separate confirmation step
-            return nutzap.event
-        }
-        
         return ZapResult(
             type: .nutzap,
-            amountSats: confirmation.amount,
+            amountSats: prepared.paymentRequest.amountSats,
             receiptEvent: nil,
             nutzapEvent: nutzap.event
         )

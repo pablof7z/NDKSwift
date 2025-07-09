@@ -13,8 +13,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `NDKZapManager` as an actor for thread-safe zap operations
   - Protocol-based design with `NDKZapProtocol` and `NDKPaymentProvider`
   - `NDKLightningZapProtocol` for NIP-57 Lightning Zaps with LNURL resolution
+    - Properly waits for zap receipts from LNURL service (doesn't create them)
+    - Validates receipts against provider pubkey
   - `NDKNutzapProtocol` for NIP-61 Cashu-based Nutzaps with P2PK support
-  - Payment providers: NWC, QR Code, and legacy wallet adapter
+    - Uses `NutzapFundingRequest` with ALL accepted mints
+    - Payment providers choose optimal mint
+  - Payment providers:
+    - `NWCPaymentProvider`: Handles Lightning invoices and Nutzap funding via mint quotes
+    - `CashuPaymentProvider`: Optimizes for same-mint transfers (free)
+    - `QRCodePaymentProvider`: Fallback for manual payments
   - Strongly-typed event models: `NDKZapRequest`, `NDKZapReceipt`, `NDKNutzap`, `NDKNutzapPreferences`
   - Smart routing with privacy preference (prefers Nutzaps when available)
   - Convenient extensions: `user.zap()`, `event.zap()`, `fetchZaps()`
