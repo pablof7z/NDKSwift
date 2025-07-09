@@ -29,7 +29,8 @@ Task {
     // Wait for connections
     try await Task.sleep(nanoseconds: 2_000_000_000) // 2 seconds
 
-    print("✅ Connected to \(ndk.relays.filter { $0.isConnected }.count) relays\n")
+    let connectedRelays = await ndk.relays.filter { await $0.connectionState == .connected }
+print("✅ Connected to \(connectedRelays.count) relays\n")
 
     // MARK: - Demo 1: Basic Subscription Tracking
 

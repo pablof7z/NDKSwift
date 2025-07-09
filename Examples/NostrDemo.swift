@@ -47,7 +47,7 @@ class NostrDemo {
             signer: signer
         )
 
-        print("✅ NDKSwift initialized with \(ndk.relays.count) relays")
+        print("✅ NDKSwift initialized with \((await ndk.relays).count) relays")
     }
 
     // MARK: - Main Demo Function
@@ -237,7 +237,7 @@ class NostrDemo {
     private func demonstrateRelayConnections() async {
         print("\n🔗 === Relay Connection Demo ===")
 
-        for relay in ndk.relays {
+        for relay in await ndk.relays {
             print("Relay: \(relay.url)")
             print("   Normalized URL: \(relay.normalizedURL)")
             print("   Connection State: \(relay.connectionState)")

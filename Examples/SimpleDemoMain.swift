@@ -103,9 +103,9 @@ struct SimpleDemoMain {
             ]
         )
 
-        print("✅ NDK created with \(ndk.relays.count) relays")
+        print("✅ NDK created with \((await ndk.relays).count) relays")
 
-        for relay in ndk.relays {
+        for relay in await ndk.relays {
             print("   📡 Relay: \(relay.normalizedURL)")
         }
 

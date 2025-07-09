@@ -32,7 +32,7 @@ Task {
         try await Task.sleep(nanoseconds: 2_000_000_000) // 2 seconds
         
         print("Checking relay states:")
-        for relay in ndk.relays {
+        for relay in await ndk.relays {
             print("  \(relay.url): \(relay.connectionState)")
         }
         

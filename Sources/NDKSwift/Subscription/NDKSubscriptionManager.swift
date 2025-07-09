@@ -154,7 +154,7 @@ public actor NDKSubscriptionManager {
             await ndk.subscriptionTracker.trackSubscription(
                 subscription,
                 filter: subscription.filters.first ?? NDKFilter(),
-                relayUrls: subscription.options.relays?.map { $0.url } ?? ndk.relays.map { $0.url }
+                relayUrls: subscription.options.relays?.map { $0.url } ?? (await ndk.relays).map { $0.url }
             )
         }
 
@@ -339,7 +339,9 @@ public actor NDKSubscriptionManager {
         let mergedFilters = mergeFilters(from: subscriptions)
 
         // Use default relay set since we can't access options synchronously
-        let relaySet: Set<NDKRelay> = ndk != nil ? Set(ndk!.relays) : []
+        // Note: This is a workaround since we can't use async in this synchronous context
+        // The relay set will be properly populated when the subscription is executed
+        let relaySet: Set<NDKRelay> = []
 
         // Default to safe values for now since we can't access options synchronously
         let useCache = true
@@ -397,7 +399,7 @@ public actor NDKSubscriptionManager {
             let plan = ExecutionPlan(
                 subscriptions: [subscription],
                 mergedFilters: subscription.filters,
-                relaySet: options.relays ?? Set(ndk?.relays ?? []),
+                relaySet: options.relays ?? Set(await ndk?.relays ?? []),
                 useCache: options.useCache,
                 closeOnEose: options.closeOnEose,
                 delay: 0

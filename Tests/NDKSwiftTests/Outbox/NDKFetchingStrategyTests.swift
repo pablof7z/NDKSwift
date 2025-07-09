@@ -36,7 +36,7 @@ final class NDKFetchingStrategyTests: XCTestCase {
         )
         
         // Test that we can get relay information
-        XCTAssertEqual(ndk.relays.count, 2)
+        XCTAssertEqual((await ndk.relays).count, 2)
         
         let item = try await tracker.getRelaysFor(pubkey: "author1")
         let relayUrls = item?.readRelays.map { $0.url } ?? []

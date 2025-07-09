@@ -60,7 +60,7 @@ final class NDKCoreTests: XCTestCase {
         let ndk = NDK(relayUrls: relayUrls)
         
         // Get relay URLs from the pool
-        let poolRelays = ndk.relayPool.relays
+        let poolRelays = await ndk.relayPool.relays
         let poolUrls = poolRelays.map { $0.url }
         
         XCTAssertEqual(poolUrls.count, 3)
@@ -79,13 +79,13 @@ final class NDKCoreTests: XCTestCase {
         XCTAssertNotNil(relay1)
         XCTAssertNotNil(relay2)
         
-        let relays = ndk.relayPool.relays
+        let relays = await ndk.relayPool.relays
         XCTAssertEqual(relays.count, 2)
         
         // Remove a relay
-        ndk.relayPool.removeRelay("wss://relay1.test.com/")
+        await ndk.relayPool.removeRelay("wss://relay1.test.com/")
         
-        let remainingRelays = ndk.relayPool.relays
+        let remainingRelays = await ndk.relayPool.relays
         XCTAssertEqual(remainingRelays.count, 1)
         XCTAssertEqual(remainingRelays.first?.url, "wss://relay2.test.com/")
     }

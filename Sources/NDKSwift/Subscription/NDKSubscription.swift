@@ -402,7 +402,7 @@ public final class NDKSubscription: AsyncSequence, Sendable {
         guard let ndk = await stateActor.getNDK() else { return }
         
         let options = await stateActor.getOptions()
-        let relaysToUse = options.relays ?? Set(ndk.relays)
+        let relaysToUse = options.relays ?? Set(await ndk.relays)
         
         for relay in relaysToUse {
             await stateActor.addRelay(relay)
@@ -450,7 +450,7 @@ public final class NDKSubscription: AsyncSequence, Sendable {
         let options = await stateActor.getOptions()
         let shouldComplete = await stateActor.handleEOSE(
             fromRelay: relay,
-            expectedRelays: options.relays ?? Set(ndk?.relays ?? [])
+            expectedRelays: options.relays ?? Set(await ndk?.relays ?? [])
         )
         
         if shouldComplete && options.closeOnEose {

@@ -3,6 +3,17 @@ import CashuSwift
 
 // MARK: - Core Types
 
+/// Information about a Cashu mint
+public struct MintInfo {
+    public let url: URL
+    public let features: [String]?
+    
+    public init(url: URL, features: [String]? = nil) {
+        self.url = url
+        self.features = features
+    }
+}
+
 /// Represents a Cashu proof
 public struct CashuProof: Codable, Equatable {
     public let id: String      // Keyset ID

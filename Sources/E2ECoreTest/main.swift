@@ -81,14 +81,14 @@ class E2ECoreTest {
             _ = ndk.addRelay(url)
         }
         
-        print("🔌 Connecting to \(ndk.relays.count) relays...")
+        print("🔌 Connecting to \((await ndk.relays).count) relays...")
         await ndk.connect()
         
         // Brief pause to allow WebSocket connections to establish fully.
         try await Task.sleep(nanoseconds: 2_000_000_000)
         
         var connectedCount = 0
-        for relay in ndk.relays {
+        for relay in await ndk.relays {
             print("  - \(relay.url): \(relay.connectionState)")
             if relay.connectionState == .connected {
                 connectedCount += 1
@@ -96,7 +96,7 @@ class E2ECoreTest {
         }
         
         assert(connectedCount > 0, "Failed to connect to any relays.")
-        print("✅ Connected to \(connectedCount)/\(ndk.relays.count) relays.")
+        print("✅ Connected to \(connectedCount)/\((await ndk.relays).count) relays.")
     }
 
     /// Test 2: Publishes a unique event and asserts it was sent.
@@ -208,12 +208,12 @@ class E2ECoreTest {
         try? await Task.sleep(nanoseconds: 1_000_000_000)
 
         var disconnectedCount = 0
-        for relay in ndk.relays {
+        for relay in await ndk.relays {
              if relay.connectionState == .disconnected {
                 disconnectedCount += 1
             }
         }
-        print("✅ Disconnected from \(disconnectedCount)/\(ndk.relays.count) relays.")
+        print("✅ Disconnected from \(disconnectedCount)/\((await ndk.relays).count) relays.")
     }
 }
 

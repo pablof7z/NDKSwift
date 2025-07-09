@@ -300,12 +300,13 @@ actor NDKPublishingStrategy {
         let normalizedUrl = URLNormalizer.tryNormalizeRelayUrl(url) ?? url
         
         // First check if already connected
-        if let relay = ndk.relayPool.relaysByUrl[normalizedUrl] {
+        if let relay = await ndk.relayPool.getRelay(for: normalizedUrl) {
             return relay
         }
 
         // Try to connect
-        let relay = ndk.addRelay(normalizedUrl)
+        let relay = await ndk.relayPool.addRelay(normalizedUrl)
+        relay.ndk = ndk
         try? await relay.connect()
         return relay
     }

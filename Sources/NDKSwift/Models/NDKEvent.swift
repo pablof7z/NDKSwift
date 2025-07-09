@@ -797,7 +797,7 @@ public final class NDKEvent: Codable, Equatable, Hashable, Sendable {
 
         // Add relays from NDK instance if available
         if let ndk = await stateActor.getNDK() {
-            let ndkRelays = ndk.relays.prefix(3).map { $0.url }
+            let ndkRelays = (await ndk.relays).prefix(3).map { $0.url }
             relays.append(contentsOf: ndkRelays)
         }
 

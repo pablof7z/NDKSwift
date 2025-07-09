@@ -187,7 +187,7 @@ public actor NDKNostrRPC {
     
     private func attemptDirectSend(event: NDKEvent, to relayUrls: [String]) async {
         for url in relayUrls {
-            if let relay = ndk.relays.first(where: { $0.url == url }) {
+            if let relay = (await ndk.relays).first(where: { $0.url == url }) {
                 print("[RPC] Attempting direct send to \(url)")
                 do {
                     let eventMessage = NostrMessage.event(subscriptionId: nil, event: event)

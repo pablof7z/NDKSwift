@@ -84,15 +84,9 @@ public class CashuPaymentProvider: NDKPaymentProvider {
                 forAmount: request.amountSats
             )
         } else {
-            // No common mints - need to use Lightning
-            // Pick a mint from recipient's list and pay via Lightning
-            guard let targetMint = request.acceptedMints.first else {
-                throw PaymentError.noAvailableMint
-            }
-            
-            // Get Lightning invoice from the target mint
-            // This would involve getting a mint quote
-            // For now, throw an error indicating Lightning is needed
+            // No common mints - need to use Lightning bridge
+            // This is where we'd implement cross-mint transfers via Lightning
+            // For now, throw an error indicating Lightning bridge is needed
             throw PaymentError.requiresLightningBridge
         }
         
@@ -132,8 +126,7 @@ public class CashuPaymentProvider: NDKPaymentProvider {
     }
     
     private func fulfillLightningRequest(_ request: LightningInvoiceRequest) async throws -> PaymentConfirmation {
-        // Pay Lightning invoice via mint
-        // This would melt tokens to pay the invoice
+        // Pay Lightning invoice via mint (melting ecash)
         let result = try await cashuWallet.payLightning(
             invoice: request.invoice,
             amount: request.amountSats
@@ -147,11 +140,6 @@ public class CashuPaymentProvider: NDKPaymentProvider {
     
     private func selectOptimalMint(from mints: [URL], forAmount amount: Int64) async throws -> URL {
         // Select the mint with the best balance for this amount
-        // In a real implementation, this would check:
-        // 1. Available balance on each mint
-        // 2. Fee structure
-        // 3. Reliability metrics
-        
         for mint in mints {
             let balance = await cashuWallet.getBalance(mint: mint)
             if balance >= amount {
@@ -159,13 +147,14 @@ public class CashuPaymentProvider: NDKPaymentProvider {
             }
         }
         
-        // If no single mint has enough, would need to implement splitting
-        // For now, just return the first mint
-        guard let mint = mints.first else {
-            throw PaymentError.insufficientBalance(available: 0, required: amount)
+        // If no single mint has enough balance
+        let totalBalance = await cashuWallet.getBalance()
+        if totalBalance < amount {
+            throw PaymentError.insufficientBalance(available: totalBalance, required: amount)
         }
         
-        return mint
+        // Would need to implement mint splitting in the future
+        throw PaymentError.noAvailableMint
     }
 }
 
