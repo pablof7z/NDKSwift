@@ -5,6 +5,22 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.7.0] - 2025-01-10
+
+### Added
+- NIP-60 mint discovery support (kind 38000)
+  - `NDKMintAnnouncement` model for mint announcements with full NIP-60 field support
+  - `MintDiscovery` service for discovering Cashu mints via Nostr
+  - Reputation scoring system for discovered mints
+  - Suspicious mint detection (localhost, non-HTTPS, uncommon ports)
+  - Methods to discover all mints, filter by unit, or find specific mints by URL
+  - Ability to publish mint announcements to Nostr
+  - Integration with `NDKCashuWallet` via `mintDiscovery` property
+  - Comprehensive tests and demo for mint discovery functionality
+
+### Changed
+- Added `mintAnnouncement = 38000` to `EventKind` constants
+
 ## [0.6.2] - 2025-01-10
 
 ### Added
