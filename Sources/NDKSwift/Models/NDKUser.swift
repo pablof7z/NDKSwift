@@ -172,6 +172,23 @@ public final class NDKUser: Equatable, Hashable, Sendable {
     public func updateProfile(_ profile: NDKUserProfile) async {
         await stateActor.setProfile(profile)
     }
+    
+    /// Process a metadata event to update the user's profile
+    /// Used internally when fetching profiles from events
+    public func processMetadataEvent(_ event: NDKEvent) {
+        Task {
+            let eventContent = await event.content
+            if let profileData = eventContent.data(using: .utf8),
+               let profile = try? JSONDecoder().decode(NDKUserProfile.self, from: profileData) {
+                await updateProfile(profile)
+                
+                // Save to cache if available
+                if let ndk = ndk {
+                    try? await ndk.cache?.saveProfile(profile, pubkey: pubkey)
+                }
+            }
+        }
+    }
 
     /// Fetch user's relay list (NIP-65)
     @discardableResult
