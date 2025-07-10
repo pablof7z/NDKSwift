@@ -17,3 +17,6 @@ test_*.swift
 
 # TENEX project files
 .tenex/
+
+# Local CashuSwift checkout
+CashuSwift-fixed/

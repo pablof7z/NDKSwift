@@ -63,6 +63,7 @@ public enum EventKind {
     public static let badgeDefinition = 30009
     public static let longFormContent = 30023
     public static let applicationSpecificData = 30078
+    public static let mintAnnouncement = 38000  // NIP-60 mint discovery
 }
 
 /// Tag structure
