@@ -23,14 +23,14 @@ Add NDKSwift to your `Package.swift` file:
 
 ```swift
 dependencies: [
-    .package(url: "https://github.com/nostr-dev-kit/ndk-swift", from: "0.6.1")
+    .package(url: "https://github.com/nostr-dev-kit/ndk-swift", from: "0.6.2")
 ]
 ```
 
 Or add it through Xcode:
 1. File → Add Package Dependencies
 2. Enter: `https://github.com/nostr-dev-kit/ndk-swift`
-3. Select version 0.6.1 or later
+3. Select version 0.6.2 or later
 
 ## Quick Start
 

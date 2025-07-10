@@ -23,6 +23,138 @@ public struct DecodedNostrEntity {
 
 /// Content tagging utilities for NDK Swift
 public enum ContentTagger {
+    
+    /// Result of parsing content without fetching entities
+    public struct ParseResult {
+        public let segments: [ParseSegment]
+        public let tags: [Tag]
+    }
+    
+    /// A parsed segment with entity information but no fetched data
+    public enum ParseSegment {
+        case text(String)
+        case mention(npub: String)
+        case event(nevent: String)
+        case hashtag(String)
+        case url(URL)
+    }
+    
+    /// Parse content into segments without fetching entities
+    public static func parseContentSegments(from content: String) -> ParseResult {
+        var segments: [ParseSegment] = []
+        var tags: [Tag] = []
+        var lastIndex = content.startIndex
+        
+        // Combined regex for all entity types
+        let patterns = [
+            // Nostr entities: @npub, @nprofile, nostr:npub, etc.
+            (#"(@|nostr:)(npub|nprofile|note|nevent|naddr)[a-zA-Z0-9]+"#, "nostr"),
+            // Hashtags
+            (#"(?<=\s|^)(#[^\s!@#$%^&*()=+./,\[{\]};:'"?><]+)"#, "hashtag"),
+            // URLs
+            (#"https?://[^\s<>"{}|\\^`\[\]]+"#, "url")
+        ]
+        
+        var allMatches: [(range: Range<String.Index>, type: String, value: String)] = []
+        
+        // Collect all matches
+        for (pattern, type) in patterns {
+            guard let regex = try? NSRegularExpression(pattern: pattern, options: []) else { continue }
+            let matches = regex.matches(in: content, options: [], range: NSRange(location: 0, length: content.utf16.count))
+            
+            for match in matches {
+                if let range = Range(match.range, in: content) {
+                    allMatches.append((range: range, type: type, value: String(content[range])))
+                }
+            }
+        }
+        
+        // Sort matches by position
+        allMatches.sort { $0.range.lowerBound < $1.range.lowerBound }
+        
+        // Process matches and create segments
+        for match in allMatches {
+            // Skip if this match overlaps with previous match
+            if match.range.lowerBound < lastIndex { continue }
+            
+            // Add text segment before this match
+            if lastIndex < match.range.lowerBound {
+                let textRange = lastIndex..<match.range.lowerBound
+                let text = String(content[textRange])
+                if !text.isEmpty {
+                    segments.append(.text(text))
+                }
+            }
+            
+            // Process the match
+            switch match.type {
+            case "nostr":
+                // Extract the entity part
+                let components = match.value.components(separatedBy: CharacterSet(charactersIn: "@:"))
+                if let entity = components.last, !entity.isEmpty {
+                    do {
+                        let decoded = try decodeNostrEntity(entity)
+                        
+                        switch decoded.type {
+                        case "npub", "nprofile":
+                            if let pubkey = decoded.pubkey {
+                                segments.append(.mention(npub: entity))
+                                tags.append(["p", pubkey])
+                            }
+                        case "note", "nevent", "naddr":
+                            segments.append(.event(nevent: entity))
+                            if let eventId = decoded.eventId {
+                                let relay = decoded.relays?.first ?? ""
+                                tags.append(["q", eventId, relay])
+                            }
+                            if let pubkey = decoded.pubkey {
+                                tags.append(["p", pubkey])
+                            }
+                        default:
+                            segments.append(.text(match.value))
+                        }
+                    } catch {
+                        segments.append(.text(match.value))
+                    }
+                }
+                
+            case "hashtag":
+                let tag = String(match.value.dropFirst()) // Remove #
+                segments.append(.hashtag(tag))
+                tags.append(["t", tag])
+                
+            case "url":
+                if let url = URL(string: match.value) {
+                    segments.append(.url(url))
+                } else {
+                    segments.append(.text(match.value))
+                }
+                
+            default:
+                segments.append(.text(match.value))
+            }
+            
+            lastIndex = match.range.upperBound
+        }
+        
+        // Add remaining text
+        if lastIndex < content.endIndex {
+            let text = String(content[lastIndex...])
+            if !text.isEmpty {
+                segments.append(.text(text))
+            }
+        }
+        
+        // If no matches found, entire content is text
+        if segments.isEmpty {
+            segments.append(.text(content))
+        }
+        
+        // Remove duplicate tags
+        let uniqueTags = mergeTags([], tags)
+        
+        return ParseResult(segments: segments, tags: uniqueTags)
+    }
     /// Generate hashtags from content
     public static func generateHashtags(from content: String) -> [String] {
         // Regex pattern for hashtags: #word (no special characters except underscore and hyphen)

@@ -223,18 +223,18 @@ public final class NDK {
     @discardableResult
     public func publish(_ event: NDKEvent) async throws -> Set<NDKRelay> {
         // Sign event if not already signed
-        if event.sig == nil {
+        if await event.sig == nil {
             guard signer != nil else {
                 throw NDKError.notConfigured("No signer configured")
             }
 
             // Set NDK instance and sign (this will also generate content tags)
-            event.ndk = self
+            await event.setNDK(self)
             try await event.sign()
         }
 
         // Validate event
-        try event.validate()
+        try await event.validate()
 
         // Store in cache if available
         if let cache = cache {
@@ -256,7 +256,7 @@ public final class NDK {
 
         // Fallback to direct publishing if outbox is disabled
         // Track this event for OK message handling
-        if let eventId = event.id {
+        if let eventId = await event.id {
             publishedEvents[eventId] = event
         }
 
@@ -268,7 +268,7 @@ public final class NDK {
 
         // Update event's relay publish statuses
         for relay in publishedRelays {
-            event.updatePublishStatus(relay: relay.url, status: .succeeded)
+            await event.updatePublishStatus(relay: relay.url, status: .succeeded)
         }
 
         // Find relays that weren't connected or failed
@@ -280,12 +280,13 @@ public final class NDK {
         if !unpublishedRelayUrls.isEmpty {
             // Mark these relays as pending
             for relayUrl in unpublishedRelayUrls {
-                event.updatePublishStatus(relay: relayUrl, status: .pending)
+                await event.updatePublishStatus(relay: relayUrl, status: .pending)
             }
         }
 
         if debugMode {
-            let noteId = (try? Bech32.note(from: event.id ?? "")) ?? event.id ?? "unknown"
+            let eventId = await event.id
+            let noteId = (try? Bech32.note(from: eventId ?? "")) ?? eventId ?? "unknown"
             if publishedRelays.isEmpty {
                 print("📝 Event \(noteId) created but not published to any relays. Will retry when relays connect.")
             } else {
@@ -303,8 +304,8 @@ public final class NDK {
     /// Publish an event to specific relays by URL
     public func publish(event: NDKEvent, to relayUrls: Set<String>) async throws -> Set<NDKRelay> {
         // Sign the event if needed
-        if event.sig == nil {
-            event.ndk = self
+        if await event.sig == nil {
+            await event.setNDK(self)
             try await event.sign()
         }
 
@@ -345,10 +346,10 @@ public final class NDK {
                     do {
                         let eventMessage = NostrMessage.event(subscriptionId: nil, event: event)
                         try await relay.send(eventMessage.serialize())
-                        event.updatePublishStatus(relay: relay.url, status: .succeeded)
+                        await event.updatePublishStatus(relay: relay.url, status: .succeeded)
                         return relay
                     } catch {
-                        event.updatePublishStatus(relay: relay.url, status: .failed(.connectionFailed))
+                        await event.updatePublishStatus(relay: relay.url, status: .failed(.connectionFailed))
                         return nil
                     }
                 }
@@ -404,7 +405,8 @@ public final class NDK {
                 subscriptionOptions.relays = Set<NDKRelay>()
             } else {
                 // Use all configured relays when outbox is disabled
-                subscriptionOptions.relays = Set(await relays)
+                // This will be populated asynchronously later
+                subscriptionOptions.relays = Set<NDKRelay>()
             }
         }
         
@@ -569,7 +571,7 @@ public final class NDK {
         
         if let metadataEvent = try await fetchEvent(filter, relays: relays, useCache: useCache) {
             // Parse the profile from the event content
-            guard let profileData = metadataEvent.content.data(using: .utf8),
+            guard let profileData = (await metadataEvent.content).data(using: .utf8),
                   let profile = try? JSONDecoder().decode(NDKUserProfile.self, from: profileData) else {
                 return nil
             }
@@ -582,9 +584,9 @@ public final class NDK {
     // MARK: - Subscription Manager Integration
 
     /// Process an event received from a relay (called by relay connections)
-    func processEvent(_ event: NDKEvent, from relay: RelayProtocol) {
+    func processEvent(_ event: NDKEvent, from relay: RelayProtocol) async {
         // Mark event as seen on this relay
-        event.markSeenOn(relay: relay.url)
+        await event.markSeenOn(relay: relay.url)
 
         Task {
             // Get current stats
@@ -608,12 +610,12 @@ public final class NDK {
             case .invalid:
                 // Invalid signature - don't process this event
                 if debugMode {
-                    print("❌ Event \(event.id ?? "unknown") from \(relay.url) has invalid signature")
+                    print("❌ Event \(await event.id ?? "unknown") from \(relay.url) has invalid signature")
                 }
                 return
             case .valid:
                 if debugMode {
-                    print("✅ Event \(event.id ?? "unknown") signature verified from \(relay.url)")
+                    print("✅ Event \(await event.id ?? "unknown") signature verified from \(relay.url)")
                 }
             case .cached:
                 // Already verified
@@ -621,7 +623,7 @@ public final class NDK {
             case .skipped:
                 // Skipped due to sampling
                 if debugMode {
-                    print("⏭️ Event \(event.id ?? "unknown") signature verification skipped (sampling) from \(relay.url)")
+                    print("⏭️ Event \(await event.id ?? "unknown") signature verification skipped (sampling) from \(relay.url)")
                 }
             }
 
@@ -643,18 +645,18 @@ public final class NDK {
     }
 
     /// Process OK message from relay (called by relay connections)
-    func processOKMessage(eventId: EventID, accepted: Bool, message: String?, from relay: RelayProtocol) {
+    func processOKMessage(eventId: EventID, accepted: Bool, message: String?, from relay: RelayProtocol) async {
         // Find the event in our published events
         if let event = publishedEvents[eventId] {
             // Store the OK message
-            event.addOKMessage(relay: relay.url, accepted: accepted, message: message)
+            await event.addOKMessage(relay: relay.url, accepted: accepted, message: message)
 
             // Update publish status based on OK response
             if accepted {
-                event.updatePublishStatus(relay: relay.url, status: .succeeded)
+                await event.updatePublishStatus(relay: relay.url, status: .succeeded)
             } else {
                 let reason = message ?? "Rejected by relay"
-                event.updatePublishStatus(relay: relay.url, status: .failed(.custom(reason)))
+                await event.updatePublishStatus(relay: relay.url, status: .failed(.custom(reason)))
             }
         }
     }
@@ -688,12 +690,12 @@ public final class NDK {
         
         // Create auth event (kind 22242)
         let authEvent = NDKEvent()
-        authEvent.kind = 22242
-        authEvent.tags = [
+        await authEvent.setKind(22242)
+        await authEvent.setTags([
             ["relay", relay.url],
             ["challenge", challenge]
-        ]
-        authEvent.ndk = self
+        ])
+        await authEvent.setNDK(self)
         
         do {
             // Sign the auth event
@@ -725,6 +727,250 @@ public final class NDK {
         guard let user = NDKUser(npub: npub) else { return nil }
         user.ndk = self
         return user
+    }
+    
+    // MARK: - Content Parsing
+    
+    /// Parse content and fetch referenced entities (users and events)
+    /// 
+    /// This method parses Nostr content to identify mentions, event references, hashtags, and URLs,
+    /// then fetches the referenced users and events from the network to provide rich content segments.
+    /// 
+    /// - Parameters:
+    ///   - content: The content string to parse (e.g., "Hello @npub1... check out nostr:nevent1...")
+    ///   - options: Options controlling parsing behavior and fetch limits
+    /// 
+    /// - Returns: ParsedContent containing segments with fetched NDKUser and NDKEvent objects
+    /// 
+    /// ## Example
+    /// ```swift
+    /// let parsed = try await ndk.parseContent(
+    ///     "Hello @npub1l2vyh47mk2p0qlsku7hg0vn29faehy9hy34ygaclpn66ukqp3afqutajft!"
+    /// )
+    /// 
+    /// for segment in parsed.segments {
+    ///     switch segment {
+    ///     case .text(let text):
+    ///         print(text)
+    ///     case .mention(let user):
+    ///         print("@\(user.profile?.name ?? user.npub)")
+    ///     case .event(let event):
+    ///         print("Event by \(event.author.profile?.name ?? "unknown")")
+    ///     case .hashtag(let tag):
+    ///         print("#\(tag)")
+    ///     case .url(let url):
+    ///         print(url.absoluteString)
+    ///     }
+    /// }
+    /// ```
+    public func parseContent(
+        _ content: String,
+        options: ParseContentOptions = ParseContentOptions()
+    ) async throws -> ParsedContent {
+        // First, parse the content to identify segments
+        let parseResult = ContentTagger.parseContentSegments(from: content)
+        
+        // Collect entities to fetch
+        var npubsToFetch: Set<String> = []
+        var eventsToFetch: Set<String> = []
+        
+        for segment in parseResult.segments {
+            switch segment {
+            case .mention(let npub) where options.fetchUserProfiles:
+                npubsToFetch.insert(npub)
+            case .event(let nevent) where options.fetchReferencedEvents:
+                eventsToFetch.insert(nevent)
+            default:
+                break
+            }
+        }
+        
+        // Fetch users and events in parallel
+        async let usersFetch = fetchUsers(npubsToFetch, timeout: options.fetchTimeout)
+        async let eventsFetch = fetchEvents(eventsToFetch, timeout: options.fetchTimeout)
+        
+        let (usersByNpub, eventsByBech32) = try await (usersFetch, eventsFetch)
+        
+        // Build final segments with fetched entities
+        var finalSegments: [ContentSegment] = []
+        
+        for segment in parseResult.segments {
+            switch segment {
+            case .text(let text):
+                finalSegments.append(.text(text))
+                
+            case .mention(let npub):
+                if let user = usersByNpub[npub] {
+                    finalSegments.append(.mention(user))
+                } else {
+                    // Fallback: create user without profile if fetch failed
+                    if let user = getUser(npub: npub) {
+                        finalSegments.append(.mention(user))
+                    } else {
+                        // If npub is invalid, treat as text
+                        finalSegments.append(.text("@\(npub)"))
+                    }
+                }
+                
+            case .event(let nevent):
+                if let event = eventsByBech32[nevent] {
+                    finalSegments.append(.event(event))
+                } else {
+                    // Fallback: treat as text if fetch failed
+                    finalSegments.append(.text("nostr:\(nevent)"))
+                }
+                
+            case .hashtag(let tag):
+                if options.includeHashtags {
+                    finalSegments.append(.hashtag(tag))
+                } else {
+                    finalSegments.append(.text("#\(tag)"))
+                }
+                
+            case .url(let url):
+                if options.includeURLs {
+                    finalSegments.append(.url(url))
+                } else {
+                    finalSegments.append(.text(url.absoluteString))
+                }
+            }
+        }
+        
+        return ParsedContent(
+            original: content,
+            segments: finalSegments,
+            tags: parseResult.tags
+        )
+    }
+    
+    /// Fetch multiple users by npub
+    private func fetchUsers(
+        _ npubs: Set<String>,
+        timeout: TimeInterval
+    ) async throws -> [String: NDKUser] {
+        guard !npubs.isEmpty else { return [:] }
+        
+        var result: [String: NDKUser] = [:]
+        
+        // Convert npubs to pubkeys and create users
+        var pubkeyToNpub: [String: String] = [:]
+        for npub in npubs {
+            if let user = getUser(npub: npub) {
+                result[npub] = user
+                pubkeyToNpub[user.pubkey] = npub
+            }
+        }
+        
+        // Fetch profiles for all users
+        if !pubkeyToNpub.isEmpty {
+            let filter = NDKFilter(
+                authors: Array(pubkeyToNpub.keys),
+                kinds: [EventKind.metadata]
+            )
+            
+            // Use timeout for fetch
+            let fetchTask = Task {
+                try await fetchEvents(filter)
+            }
+            
+            let events: Set<NDKEvent>
+            do {
+                events = try await withTimeout(seconds: timeout) {
+                    try await fetchTask.value
+                }
+            } catch {
+                // Timeout or error - return users without profiles
+                return result
+            }
+            
+            // Update users with fetched profiles
+            for event in events {
+                if let npub = pubkeyToNpub[event.pubkey],
+                   let user = result[npub] {
+                    // Profile will be automatically parsed and cached by NDKUser
+                    user.processMetadataEvent(event)
+                }
+            }
+        }
+        
+        return result
+    }
+    
+    /// Fetch multiple events by bech32 identifier
+    private func fetchEvents(
+        _ bech32s: Set<String>,
+        timeout: TimeInterval
+    ) async throws -> [String: NDKEvent] {
+        guard !bech32s.isEmpty else { return [:] }
+        
+        var result: [String: NDKEvent] = [:]
+        var filters: [NDKFilter] = []
+        var eventIdToBech32: [String: String] = [:]
+        
+        // Create filters for each bech32
+        for bech32 in bech32s {
+            do {
+                let filter = try NostrIdentifier.createFilter(from: bech32)
+                filters.append(filter)
+                
+                // Map event IDs back to bech32
+                if let eventIds = filter.ids {
+                    for eventId in eventIds {
+                        eventIdToBech32[eventId] = bech32
+                    }
+                }
+            } catch {
+                // Invalid bech32, skip
+                continue
+            }
+        }
+        
+        guard !filters.isEmpty else { return [:] }
+        
+        // Fetch all events
+        let fetchTask = Task {
+            try await fetchEvents(filters: filters)
+        }
+        
+        let events: Set<NDKEvent>
+        do {
+            events = try await withTimeout(seconds: timeout) {
+                try await fetchTask.value
+            }
+        } catch {
+            // Timeout or error
+            return result
+        }
+        
+        // Map events back to their bech32 identifiers
+        for event in events {
+            if let bech32 = eventIdToBech32[event.id] {
+                result[bech32] = event
+            }
+        }
+        
+        return result
+    }
+    
+    /// Helper function to run async work with timeout
+    private func withTimeout<T>(
+        seconds: TimeInterval,
+        operation: @escaping () async throws -> T
+    ) async throws -> T {
+        try await withThrowingTaskGroup(of: T.self) { group in
+            group.addTask {
+                try await operation()
+            }
+            
+            group.addTask {
+                try await Task.sleep(nanoseconds: UInt64(seconds * 1_000_000_000))
+                throw NDKError.timeout(operation: "parseContent", seconds: Int(seconds))
+            }
+            
+            let result = try await group.next()!
+            group.cancelAll()
+            return result
+        }
     }
     
     // MARK: - Wallet Management
@@ -898,12 +1144,12 @@ public actor NDKRelayPool {
 
 // MARK: - Event Repository Implementation
 
-class NDKEventRepository {
+final class NDKEventRepository: @unchecked Sendable {
     private var events: [EventID: NDKEvent] = [:]
     private let queue = DispatchQueue(label: "com.ndkswift.eventrepository", attributes: .concurrent)
 
-    func addEvent(_ event: NDKEvent) {
-        guard let eventId = event.id else { return }
+    func addEvent(_ event: NDKEvent) async {
+        guard let eventId = await event.id else { return }
 
         queue.async(flags: .barrier) { [weak self] in
             self?.events[eventId] = event
