@@ -247,6 +247,13 @@ public final class NDKRelay: RelayProtocol, Hashable, Equatable, Sendable {
 
     /// Internal state actor that manages all mutable state
     private let stateActor = RelayStateActor()
+    
+    /// Get the current connection (internal use only)
+    internal var connection: NDKRelayConnection? {
+        get async {
+            await stateActor.getConnection()
+        }
+    }
 
     // MARK: - Initialization
 
@@ -531,9 +538,6 @@ public final class NDKRelay: RelayProtocol, Hashable, Equatable, Sendable {
 
     /// Handle EVENT message
     private func handleEventMessage(_ event: NDKEvent, subscriptionId: String?) async {
-        // Set relay reference on event
-        await event.setRelay(self)
-
         // Route to subscription manager via NDK only
         if let ndk = ndk {
             Task {

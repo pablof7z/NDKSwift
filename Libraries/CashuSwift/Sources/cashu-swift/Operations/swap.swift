@@ -117,7 +117,7 @@ extension CashuSwift {
         return (sendProofs, changeProofs, inputDLEQ, outputDLEQ)
     }
     
-    static func swap(inputs: [Proof],
+    internal static func swap(inputs: [Proof],
                      with mint: Mint,
                      sendOutputs: (outputs:[Output], blindingFactors: [String], secrets: [String]),
                      keepOutputs: (outputs:[Output], blindingFactors: [String], secrets: [String])) async throws -> (send: [Proof],
@@ -214,11 +214,11 @@ extension CashuSwift {
                            amount: Int? = nil,
                            seed: String? = nil,
                            preferredReturnDistribution: [Int]? = nil) async throws -> (new: [Proof], change: [Proof]) {
-        let result = try await swap(mint: mint as MintRepresenting,
-                                   proofs: proofs as [ProofRepresenting],
+        let result = try await swap(with: mint,
+                                   inputs: proofs,
                                    amount: amount,
                                    seed: seed,
                                    preferredReturnDistribution: preferredReturnDistribution)
-        return (result.new as! [Proof], result.change as! [Proof])
+        return (result.new, result.change)
     }
 }

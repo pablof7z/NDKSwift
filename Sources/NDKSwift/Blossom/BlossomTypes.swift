@@ -164,8 +164,8 @@ public struct BlossomAuth {
     }
 
     /// Get base64-encoded authorization header value
-    public func authorizationHeaderValue() async throws -> String {
-        let eventJSON = try await event.serialize()
+    public func authorizationHeaderValue() throws -> String {
+        let eventJSON = try event.serialize()
         let eventData = eventJSON.data(using: .utf8)!
         return "Nostr " + eventData.base64EncodedString()
     }

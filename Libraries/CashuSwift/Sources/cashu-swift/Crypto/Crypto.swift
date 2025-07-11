@@ -109,7 +109,10 @@ extension CashuSwift {
                                                                        blindingFactor: PrivateKey,
                                                                        secret:String) {
             
-            let keysetInt = keysetID.count == 16 ? convertHexKeysetID(keysetID: keysetID)! : convertKeysetID(keysetID: keysetID)!
+            guard keysetID.count == 16 else {
+                throw Error.invalidSecret("Keyset ID must be 16 characters (hex format)")
+            }
+            let keysetInt = convertHexKeysetID(keysetID: keysetID)!
             
             let secretPath = "m/129372'/0'/\(keysetInt)'/\(index)'/0"
             let blindingFactorPath = "m/129372'/0'/\(keysetInt)'/\(index)'/1"

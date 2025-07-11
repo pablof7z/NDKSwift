@@ -1,4 +1,5 @@
 import CryptoSwift
+import CryptoKit
 import Foundation
 import secp256k1
 
@@ -59,10 +60,13 @@ public enum NIP44 {
             return 32
         }
         
-        let nextPower = 1 << (Int(log2(Double(unpadded - 1))) + 1)
+        // Use floor(log2()) explicitly to match nostr-tools
+        let log = floor(log2(Double(unpadded - 1)))
+        let nextPower = 1 << (Int(log) + 1)
         let chunk = nextPower <= 256 ? 32 : nextPower / 8
         
-        return chunk * ((unpadded - 1) / chunk + 1)
+        // Use floor division explicitly
+        return chunk * (((unpadded - 1) / chunk) + 1)
     }
     
     /// Pad plaintext according to NIP-44
@@ -131,33 +135,36 @@ public enum NIP44 {
             throw Crypto.CryptoError.invalidKeyLength
         }
         
-        // Use secp256k1 ECDH to get shared x coordinate (unhashed)
-        let privKey = try secp256k1.KeyAgreement.PrivateKey(dataRepresentation: privKeyData)
+        // Prepare public key bytes with 02 prefix for secp256k1
+        let publicKeyBytes = [UInt8]([0x02]) + [UInt8](pubKeyData)
         
-        // For x-only pubkey, we need to try both possible y coordinates
-        // First try with 02 prefix (even y)
-        let fullPubKey = Data([0x02]) + pubKeyData
-        
-        let pubKey: secp256k1.KeyAgreement.PublicKey
-        do {
-            pubKey = try secp256k1.KeyAgreement.PublicKey(dataRepresentation: fullPubKey)
-        } catch {
-            // If that fails, try with 03 prefix (odd y)
-            let fullPubKeyOdd = Data([0x03]) + pubKeyData
-            pubKey = try secp256k1.KeyAgreement.PublicKey(dataRepresentation: fullPubKeyOdd)
+        // Parse public key using low-level secp256k1
+        var pubkey = secp256k1_pubkey()
+        guard secp256k1_ec_pubkey_parse(secp256k1.Context.rawRepresentation, &pubkey, publicKeyBytes, publicKeyBytes.count) == 1 else {
+            throw Crypto.CryptoError.invalidPoint
         }
         
-        // Get shared secret (x coordinate only as per NIP-44)
-        let sharedSecret = try privKey.sharedSecretFromKeyAgreement(with: pubKey)
-        let shared_x = Data(sharedSecret.bytes)
+        // Compute shared secret using custom ECDH that extracts only x-coordinate
+        var sharedSecret = [UInt8](repeating: 0, count: 32)
+        let privateKeyBytes = [UInt8](privKeyData)
         
-        // Use HKDF-extract with sha256
-        // For HKDF-extract, we need to use the salt as salt and shared_x as IKM
-        let hkdf = try HKDF(password: Array(shared_x), salt: Array(Constants.salt), keyLength: 32, variant: .sha2(.sha256))
-        let conversationKey = try hkdf.calculate()
+        // Use secp256k1_ecdh with custom callback to extract only x-coordinate
+        guard secp256k1_ecdh(secp256k1.Context.rawRepresentation, &sharedSecret, &pubkey, privateKeyBytes, { (output, x32, _, _) in
+            // Copy only the x-coordinate (32 bytes)
+            memcpy(output, x32, 32)
+            return 1
+        }, nil) != 0 else {
+            throw Crypto.CryptoError.invalidPoint
+        }
         
-        // HKDF-extract output is always 32 bytes for SHA256
-        return Data(conversationKey.prefix(32))
+        // Use HKDF-extract with sha256 using CryptoKit
+        let salt = Data("nip44-v2".utf8)
+        let conversationKey = CryptoKit.HKDF<CryptoKit.SHA256>.extract(
+            inputKeyMaterial: SymmetricKey(data: Data(sharedSecret)),
+            salt: salt
+        )
+        
+        return Data(conversationKey)
     }
     
     /// Get message keys for NIP-44
@@ -169,13 +176,18 @@ public enum NIP44 {
             throw NIP44Error.invalidNonce
         }
         
-        // Use HKDF-expand with sha256
-        let hkdf = try HKDF(password: Array(conversationKey), info: Array(nonce), keyLength: 76, variant: .sha2(.sha256))
-        let keys = try hkdf.calculate()
+        // Use HKDF-expand with sha256 using CryptoKit
+        let keys = CryptoKit.HKDF<CryptoKit.SHA256>.expand(
+            pseudoRandomKey: SymmetricKey(data: conversationKey),
+            info: nonce,
+            outputByteCount: 76
+        )
         
-        let chachaKey = Data(keys[0..<32])
-        let chachaNonce = Data(keys[32..<44])
-        let hmacKey = Data(keys[44..<76])
+        // Convert SymmetricKey to Data
+        let keysData = keys.withUnsafeBytes { Data($0) }
+        let chachaKey = Data(keysData[0..<32])
+        let chachaNonce = Data(keysData[32..<44])
+        let hmacKey = Data(keysData[44..<76])
         
         return (chachaKey, chachaNonce, hmacKey)
     }
@@ -185,6 +197,7 @@ public enum NIP44 {
         // Get message keys
         let (chachaKey, chachaNonce, hmacKey) = try getMessageKeys(conversationKey: conversationKey, nonce: nonce)
         
+        
         // Pad plaintext
         let padded = try pad(plaintext)
         
@@ -192,13 +205,17 @@ public enum NIP44 {
         let chacha = try ChaCha20(key: Array(chachaKey), iv: Array(chachaNonce))
         let ciphertext = try chacha.encrypt(Array(padded))
         
+        
         // Calculate HMAC with AAD (nonce + ciphertext)
         var aad = Data()
         aad.append(nonce)
         aad.append(Data(ciphertext))
         
-        let hmac = HMAC(key: Array(hmacKey), variant: .sha2(.sha256))
-        let mac = try hmac.authenticate(Array(aad))
+        // Calculate HMAC using CryptoKit
+        let mac = CryptoKit.HMAC<CryptoKit.SHA256>.authenticationCode(
+            for: aad,
+            using: SymmetricKey(data: hmacKey)
+        )
         
         // Construct payload: version + nonce + ciphertext + mac
         var payload = Data()
@@ -251,20 +268,14 @@ public enum NIP44 {
         aad.append(nonce)
         aad.append(ciphertext)
         
-        let hmac = HMAC(key: Array(hmacKey), variant: .sha2(.sha256))
-        let calculatedMac = try hmac.authenticate(Array(aad))
+        // Calculate HMAC using CryptoKit
+        let calculatedMac = CryptoKit.HMAC<CryptoKit.SHA256>.authenticationCode(
+            for: aad,
+            using: SymmetricKey(data: hmacKey)
+        )
         
-        // Constant-time comparison
-        guard mac.count == calculatedMac.count else {
-            throw NIP44Error.invalidMAC
-        }
-        
-        var equal = true
-        for i in 0..<mac.count {
-            equal = equal && (mac[i] == calculatedMac[i])
-        }
-        
-        guard equal else {
+        // Verify MAC
+        guard Data(calculatedMac) == mac else {
             throw NIP44Error.invalidMAC
         }
         

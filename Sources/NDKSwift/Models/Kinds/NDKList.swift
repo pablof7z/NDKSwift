@@ -501,7 +501,7 @@ extension NDKUser: NDKListItem {
 }
 
 extension NDKEvent: NDKListItem {
-    public func toListTag() -> Tag {
+    public func toListTag() async -> Tag {
         if isParameterizedReplaceable {
             // Use 'a' tag for parameterized replaceable events
             let dTagElement = tags.first { !$0.isEmpty && $0[0] == "d" }
@@ -516,13 +516,12 @@ extension NDKEvent: NDKListItem {
 
     public var reference: String {
         get async {
-            if await isParameterizedReplaceable {
-                let tags = await self.tags
+            if isParameterizedReplaceable {
                 let dTagElement = tags.first { !$0.isEmpty && $0[0] == "d" }
                 let dTag = (dTagElement?.count ?? 0) > 1 ? dTagElement![1] : ""
-                return "\(await kind):\(await pubkey):\(dTag)"
+                return "\(kind):\(pubkey):\(dTag)"
             } else {
-                return await id ?? ""
+                return id
             }
         }
     }

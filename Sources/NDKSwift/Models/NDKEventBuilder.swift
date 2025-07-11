@@ -154,8 +154,14 @@ public final class NDKEventBuilder {
     /// This method is called automatically during build unless disabled.
     @discardableResult
     public func generateContentTags() -> NDKEventBuilder {
-        // For now, just return self until ContentTagger is updated
-        // TODO: Implement content tag generation
+        let result = ContentTagger.generateContentTags(from: content, existingTags: tags)
+        
+        // Update content with normalized nostr: format
+        self.content = result.content
+        
+        // Update tags with merged tags
+        self.tags = result.tags
+        
         return self
     }
     

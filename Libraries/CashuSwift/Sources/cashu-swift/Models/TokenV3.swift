@@ -8,7 +8,7 @@
 import Foundation
 import OSLog
 
-fileprivate var logger = Logger(subsystem: "cashu-swift", category: "Token")
+fileprivate let logger = Logger(subsystem: "cashu-swift", category: "Token")
 
 extension CashuSwift {
     

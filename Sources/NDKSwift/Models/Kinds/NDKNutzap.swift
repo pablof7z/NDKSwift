@@ -109,7 +109,7 @@ public struct NDKNutzap {
     /// - Returns: true if valid, false otherwise
     public func validate(recipientPreferences: NDKNutzapPreferences) async -> Bool {
         // 1. Check that the mint is in the recipient's accepted list
-        guard let mintURL = await mintURL else {
+        guard let mintURL = self.mintURL else {
             return false
         }
         
@@ -120,7 +120,7 @@ public struct NDKNutzap {
         
         // 2. Check that proofs are P2PK-locked to the recipient's pubkey
         let recipientP2PKPubkey = await recipientPreferences.p2pkPubkey
-        let proofs = await self.proofs
+        let proofs = self.proofs
         for proof in proofs {
             guard proof.isLockedTo(pubkey: recipientP2PKPubkey) else {
                 return false
@@ -131,18 +131,40 @@ public struct NDKNutzap {
         for proof in proofs {
             if let _ = proof.dleq {
                 // DLEQ verification would require complex cryptographic operations
-                // that are beyond the scope of this library. Cashu wallets
-                // should handle DLEQ verification when redeeming tokens.
+                // For now, we assume they're valid if present
                 continue
             }
         }
         
         return true
     }
+    
+    /// Create nutzap preferences from a user's kind 10019 event
+    public static func createPreferences(ndk: NDK, mints: [NDKNutzapPreferences.MintConfig]) async throws -> NDKEvent {
+        guard let signer = ndk.signer else {
+            throw NDKError.notConfigured("No signer configured")
+        }
+        
+        var tags: [[String]] = []
+        
+        for mint in mints {
+            tags.append(["mint", mint.url.absoluteString])
+        }
+        
+        // Add P2PK pubkey tag (for now, same as event author)
+        let pubkey = try await signer.pubkey
+        tags.append(["pubkey", pubkey])
+        
+        let event = try await NDKEventBuilder()
+            .kind(10019)
+            .tags(tags)
+            .build(signer: signer)
+        
+        return event
+    }
 }
 
-/// NIP-61 Nutzap Preferences (kind: 10019)
-/// Specifies how a user wants to receive nutzaps
+/// Nutzap preferences (kind: 10019)
 public struct NDKNutzapPreferences {
     public let event: NDKEvent
     
@@ -150,71 +172,48 @@ public struct NDKNutzapPreferences {
         self.event = event
     }
     
-    /// Create nutzap preferences
-    public static func create(
-        ndk: NDK,
-        relays: [String],
-        mints: [(url: URL, units: [String])],
-        p2pkKeyPair: KeyPair
-    ) async throws -> NDKNutzapPreferences {
-        guard let signer = ndk.signer else {
-            throw NDKError.notConfigured("No signer configured")
+    /// Mint configuration
+    public struct MintConfig {
+        public let url: URL
+        public let relays: [String]
+        
+        public init(url: URL, relays: [String] = []) {
+            self.url = url
+            self.relays = relays
         }
-        
-        var tags: [[String]] = []
-        
-        // Add relay tags
-        for relay in relays {
-            tags.append(["relay", relay])
-        }
-        
-        // Add mint tags
-        for mint in mints {
-            var mintTag = ["mint", mint.url.absoluteString]
-            mintTag.append(contentsOf: mint.units)
-            tags.append(mintTag)
-        }
-        
-        // Add P2PK pubkey (prefixed with "02" for nostr<>cashu compatibility)
-        let p2pkPubkey = "02" + p2pkKeyPair.publicKey
-        tags.append(["pubkey", p2pkPubkey])
-        
-        let event = try await NDKEventBuilder()
-            .kind(10019)
-            .tags(tags)
-            .build(signer: signer)
-        
-        return NDKNutzapPreferences(event: event)
     }
     
-    // MARK: - Computed Properties
-    
-    /// Relays where the user will read nutzap events
-    public var relays: [String] {
-        return event.tags
-            .filter { $0.first == "relay" }
-            .compactMap { $0[safe: 1] }
-    }
-    
-    /// Accepted mints and their supported units
-    public var mints: [(url: URL, units: [String])] {
-        return event.tags
-            .filter { $0.first == "mint" }
-            .compactMap { tag in
-                guard let urlString = tag[safe: 1],
-                      let url = URL(string: urlString) else {
-                    return nil
+    /// Get configured mints
+    public var mints: [MintConfig] {
+        get async {
+            let tags = event.tags
+            return tags
+                .filter { $0.first == "mint" }
+                .compactMap { tag in
+                    guard let urlString = tag[safe: 1],
+                          let url = URL(string: urlString) else {
+                        return nil
+                    }
+                    
+                    let relays = Array(tag.dropFirst(2))
+                    return MintConfig(url: url, relays: relays)
                 }
-                let units = Array(tag.dropFirst(2))
-                return (url: url, units: units)
-            }
+        }
     }
     
-    /// P2PK public key for receiving nutzaps
+    /// Get P2PK pubkey for receiving nutzaps
     public var p2pkPubkey: String {
-        return event.tags.first(where: { $0.first == "pubkey" })?[safe: 1] ?? ""
+        get async {
+            let tags = event.tags
+            // Look for pubkey tag
+            if let pubkey = tags.first(where: { $0.first == "pubkey" })?[safe: 1] {
+                return pubkey
+            }
+            // Fall back to event author's pubkey
+            return event.pubkey
+        }
     }
 }
 
-// MARK: - Cashu Types
-// Using types from CashuTypes.swift
+// MARK: - Helper Extensions
+// Note: The isLockedTo implementation is now in CashuTypes.swift

@@ -205,6 +205,7 @@ public struct NDKEvent: Codable, Equatable, Hashable, Sendable {
             return false
         }
     }
+    
 
     // MARK: - Convenience
 

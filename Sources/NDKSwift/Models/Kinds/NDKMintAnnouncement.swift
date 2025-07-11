@@ -10,7 +10,7 @@ public struct NDKMintAnnouncement: Codable, Sendable {
     public let contact: [[String]]?
     public let motd: String?
     public let units: [String]?
-    public let nuts: [String: Any]?
+    public let nuts: [String: AnyCodable]?
     public let icon: URL?
     
     enum CodingKeys: String, CodingKey {
@@ -29,7 +29,7 @@ public struct NDKMintAnnouncement: Codable, Sendable {
     public init(mintURL: URL, name: String? = nil, description: String? = nil,
                 descriptions: [String: String]? = nil, pubkey: String? = nil,
                 contact: [[String]]? = nil, motd: String? = nil,
-                units: [String]? = nil, nuts: [String: Any]? = nil,
+                units: [String]? = nil, nuts: [String: AnyCodable]? = nil,
                 icon: URL? = nil) {
         self.mintURL = mintURL
         self.name = name
@@ -63,12 +63,7 @@ public struct NDKMintAnnouncement: Codable, Sendable {
         self.units = try container.decodeIfPresent([String].self, forKey: .units)
         
         // Handle nuts as dynamic JSON
-        if let nutsData = try? container.decodeIfPresent(Data.self, forKey: .nuts),
-           let nutsJSON = try? JSONSerialization.jsonObject(with: nutsData) as? [String: Any] {
-            self.nuts = nutsJSON
-        } else {
-            self.nuts = nil
-        }
+        self.nuts = try container.decodeIfPresent([String: AnyCodable].self, forKey: .nuts)
         
         if let iconString = try container.decodeIfPresent(String.self, forKey: .icon) {
             self.icon = URL(string: iconString)
@@ -89,10 +84,7 @@ public struct NDKMintAnnouncement: Codable, Sendable {
         try container.encodeIfPresent(motd, forKey: .motd)
         try container.encodeIfPresent(units, forKey: .units)
         
-        if let nuts = nuts {
-            let nutsData = try JSONSerialization.data(withJSONObject: nuts)
-            try container.encode(nutsData, forKey: .nuts)
-        }
+        try container.encodeIfPresent(nuts, forKey: .nuts)
         
         try container.encodeIfPresent(icon?.absoluteString, forKey: .icon)
     }

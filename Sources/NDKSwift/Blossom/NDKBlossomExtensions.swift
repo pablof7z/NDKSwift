@@ -120,12 +120,12 @@ public extension NDKEvent {
     }
 
     /// Extract Blossom URLs from a file metadata event
-    func extractBlossomURLs() async -> [(url: String, sha256: String)] {
-        guard await kind == EventKind.fileMetadata else { return [] }
+    func extractBlossomURLs() -> [(url: String, sha256: String)] {
+        guard kind == EventKind.fileMetadata else { return [] }
 
         var urls: [(url: String, sha256: String)] = []
-        let urlTags = (await tags).filter { $0.first == "url" }
-        let sha256Tags = (await tags).filter { $0.first == "x" }
+        let urlTags = tags.filter { $0.first == "url" }
+        let sha256Tags = tags.filter { $0.first == "x" }
 
         for (index, urlTag) in urlTags.enumerated() {
             guard urlTag.count > 1 else { continue }

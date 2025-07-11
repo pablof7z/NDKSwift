@@ -26,6 +26,7 @@ public enum NDKError: LocalizedError {
     case serverError(relay: String, code: Int, message: String?)
     case unauthorized(relay: String, message: String)
     case relayError(relay: String, message: String)
+    case publishFailed(relay: String, message: String)
     
     // Storage errors
     case cacheFailed(operation: String, underlying: Error? = nil)
@@ -47,6 +48,7 @@ public enum NDKError: LocalizedError {
     case notImplemented(String)
     case cancelled
     case unknown(String, underlying: Error? = nil)
+    case internalError(String)
     
     // Wallet errors (NWC)
     case walletRateLimited(retryAfter: Int?)
@@ -58,6 +60,7 @@ public enum NDKError: LocalizedError {
     case paymentFailed(reason: String)
     case walletNotFound(resource: String)
     case walletError(message: String)
+    case paymentRequired(String)
     
     // Cashu errors
     case invalidRequest(String)
@@ -152,6 +155,10 @@ public enum NDKError: LocalizedError {
             return "Operation was cancelled"
         case .unknown(let message, let underlying):
             return underlying != nil ? "\(message): \(underlying!.localizedDescription)" : message
+        case .internalError(let message):
+            return "Internal error: \(message)"
+        case .publishFailed(let relay, let message):
+            return "Failed to publish to \(relay): \(message)"
             
         // Wallet
         case .walletRateLimited(let retryAfter):
@@ -171,6 +178,8 @@ public enum NDKError: LocalizedError {
         case .walletNotFound(let resource):
             return "Wallet resource not found: \(resource)"
         case .walletError(let message):
+            return message
+        case .paymentRequired(let message):
             return message
             
         // Cashu
