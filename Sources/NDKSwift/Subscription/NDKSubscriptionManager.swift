@@ -154,7 +154,13 @@ public actor NDKSubscriptionManager {
             await ndk.subscriptionTracker.trackSubscription(
                 subscription,
                 filter: subscription.filters.first ?? NDKFilter(),
-                relayUrls: subscription.options.relays?.map { $0.url } ?? (await ndk.relays).map { $0.url }
+                relayUrls: {
+                    if let relays = await subscription.options.relays {
+                        return relays.map { $0.url }
+                    } else {
+                        return (await ndk.relays).map { $0.url }
+                    }
+                }()
             )
         }
 
@@ -182,8 +188,8 @@ public actor NDKSubscriptionManager {
     }
 
     /// Process an event from a relay
-    public func processEvent(_ event: NDKEvent, from relay: RelayProtocol) {
-        guard let eventId = event.id else { return }
+    public func processEvent(_ event: NDKEvent, from relay: RelayProtocol) async {
+        let eventId = event.id
 
         // Check deduplication
         let now = Timestamp(Date().timeIntervalSince1970)
@@ -199,7 +205,14 @@ public actor NDKSubscriptionManager {
 
         // Find matching subscriptions and dispatch
         for (subscriptionId, subscription) in activeSubscriptions {
-            if subscription.filters.contains(where: { $0.matches(event: event) }) {
+            var matches = false
+            for filter in subscription.filters {
+                if await filter.matches(event: event) {
+                    matches = true
+                    break
+                }
+            }
+            if matches {
                 Task {
                     await subscription.handleEvent(event, fromRelay: relay)
                 }
@@ -396,10 +409,18 @@ public actor NDKSubscriptionManager {
     private func executeImmediately(_ subscription: NDKSubscription) {
         Task {
             let options = await subscription.options
-            let plan = ExecutionPlan(
+            let plan = await ExecutionPlan(
                 subscriptions: [subscription],
                 mergedFilters: subscription.filters,
-                relaySet: options.relays ?? Set(await ndk?.relays ?? []),
+                relaySet: {
+                    if let relays = options.relays {
+                        return relays
+                    } else if let ndk = ndk {
+                        return Set(await ndk.relays)
+                    } else {
+                        return Set([])
+                    }
+                }(),
                 useCache: options.useCache,
                 closeOnEose: options.closeOnEose,
                 delay: 0

@@ -14,6 +14,10 @@ struct LNURLPayEndpoint: Codable {
         guard let url = URL(string: callback) else { return nil }
         return url.host
     }
+    
+    var supportsZaps: Bool {
+        return allowsNostr == true && nostrPubkey != nil
+    }
 }
 
 /// NIP-57 Lightning Zap protocol implementation
@@ -73,6 +77,7 @@ public class NDKLightningZapProtocol: NDKZapProtocol {
         // 4. Create zap request event
         let zapRequest = try await NDKZapRequest.create(
             ndk: ndk,
+            signer: ndk.signer!,
             recipient: user,
             amountMillisats: amountMillisats,
             comment: comment,
@@ -127,7 +132,7 @@ public class NDKLightningZapProtocol: NDKZapProtocol {
         let receiptEvent = try await waitForZapReceipt(
             for: prepared.recipient,
             zappedEvent: prepared.zappedEvent,
-            zapRequestId: await zapRequest.event.id,
+            zapRequestId: zapRequest.event.id,
             providerPubkey: endpoint.nostrPubkey,
             timeout: 30 // seconds
         )
@@ -156,10 +161,8 @@ public class NDKLightningZapProtocol: NDKZapProtocol {
         filter.addTagFilter("p", values: [recipient.pubkey])
         
         if let zappedEvent = zappedEvent {
-            let eventId = await zappedEvent.id
-            if let eventId = eventId {
-                filter.addTagFilter("e", values: [eventId])
-            }
+            let eventId = zappedEvent.id
+            filter.addTagFilter("e", values: [eventId])
         }
         
         // Subscribe with timeout
@@ -177,12 +180,12 @@ public class NDKLightningZapProtocol: NDKZapProtocol {
                 let receipt = NDKZapReceipt(event: event)
                 
                 // Check if this receipt matches our zap request
-                let receiptZapRequestId = await receipt.zapRequestId
+                let receiptZapRequestId = receipt.zapRequestId
                 if let zapRequestId = zapRequestId,
                    receiptZapRequestId == zapRequestId {
                     // Validate the receipt if we have provider pubkey
                     if let providerPubkey = providerPubkey {
-                        let isValid = await receipt.validate(lnurlProviderPubkey: providerPubkey)
+                        let isValid = receipt.validate(lnurlProviderPubkey: providerPubkey)
                         if isValid {
                             timeoutTask.cancel()
                             await subscription.close()
@@ -274,6 +277,8 @@ public class NDKLightningZapProtocol: NDKZapProtocol {
             let allowsNostr: Bool?
             let nostrPubkey: String?
             let commentAllowed: Int?
+            let metadata: String?
+            let tag: String?
         }
         
         let lnurlResponse = try JSONDecoder().decode(LNURLResponse.self, from: data)
@@ -283,12 +288,13 @@ public class NDKLightningZapProtocol: NDKZapProtocol {
         }
         
         return LNURLPayEndpoint(
-            callback: callbackURL,
-            minSendable: lnurlResponse.minSendable ?? 1000,
+            callback: callbackURL.absoluteString,
             maxSendable: lnurlResponse.maxSendable ?? 100_000_000_000,
+            minSendable: lnurlResponse.minSendable ?? 1000,
+            metadata: lnurlResponse.metadata ?? "",
+            tag: lnurlResponse.tag ?? "payRequest",
             allowsNostr: lnurlResponse.allowsNostr ?? false,
-            nostrPubkey: lnurlResponse.nostrPubkey,
-            commentAllowed: lnurlResponse.commentAllowed
+            nostrPubkey: lnurlResponse.nostrPubkey
         )
     }
     
@@ -301,7 +307,7 @@ public class NDKLightningZapProtocol: NDKZapProtocol {
         let zapRequestJSON = try zapRequest.encodeForCallback()
         
         // Build callback URL with parameters
-        var components = URLComponents(url: endpoint.callback, resolvingAgainstBaseURL: false)!
+        var components = URLComponents(url: URL(string: endpoint.callback)!, resolvingAgainstBaseURL: false)!
         components.queryItems = [
             URLQueryItem(name: "amount", value: String(amountMillisats)),
             URLQueryItem(name: "nostr", value: zapRequestJSON)
@@ -342,7 +348,7 @@ public class NDKLightningZapProtocol: NDKZapProtocol {
         relayListFilter.kinds = [EventKind.relayList]
         
         if let relayListEvent = try? await ndk.fetchEvent(relayListFilter) {
-            let eventTags = await relayListEvent.tags
+            let eventTags = relayListEvent.tags
             let relays = eventTags
                 .filter { $0.first == "r" }
                 .compactMap { $0[safe: 1] }

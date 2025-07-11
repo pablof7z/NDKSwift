@@ -96,15 +96,12 @@ public extension NDKEvent {
         
         let encryptedContent = try await signer.encrypt(recipient: user, value: content, scheme: scheme)
         
-        var event = NDKEvent(
-            pubkey: try await signer.pubkey,
-            createdAt: Timestamp(Date().timeIntervalSince1970),
-            kind: 4, // Encrypted Direct Message
-            tags: [["p", recipientPubkey]],
-            content: encryptedContent
-        )
+        let event = try await NDKEventBuilder()
+            .content(encryptedContent)
+            .kind(4) // Encrypted Direct Message
+            .tags([["p", recipientPubkey]])
+            .build(signer: signer)
         
-        try await event.sign(signer: signer)
         return event
     }
     
@@ -114,21 +111,27 @@ public extension NDKEvent {
     ///   - senderPubkey: The sender's public key (optional, will extract from event if not provided)
     /// - Returns: The decrypted message content
     func decryptedContent(signer: NDKSigner, senderPubkey: PublicKey? = nil) async throws -> String {
-        guard kind == 4 else {
+        guard await kind == 4 else {
             throw NDKEncryptionError.invalidFormat
         }
         
-        let pubkey = senderPubkey ?? self.pubkey
+        let pubkey: PublicKey
+        if let senderPubkey = senderPubkey {
+            pubkey = senderPubkey
+        } else {
+            pubkey = await self.pubkey
+        }
         let sender = NDKUser(pubkey: pubkey)
         
         // Try to detect the encryption scheme based on content format
         let scheme: NDKEncryptionScheme
-        if content.contains("?iv=") {
+        let eventContent = await content
+        if eventContent.contains("?iv=") {
             scheme = .nip04
         } else {
             scheme = .nip44
         }
         
-        return try await signer.decrypt(sender: sender, value: content, scheme: scheme)
+        return try await signer.decrypt(sender: sender, value: eventContent, scheme: scheme)
     }
 }

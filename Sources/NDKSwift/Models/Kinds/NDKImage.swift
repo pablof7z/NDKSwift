@@ -21,66 +21,57 @@ public struct NDKImage {
     // MARK: - Event Property Forwarding
 
     /// The event ID
-    public var id: EventID? {
-        get { event.id }
-        set { event.id = newValue }
+    public var id: EventID {
+        return event.id
     }
 
     /// The public key of the event creator
     public var pubkey: PublicKey {
-        get { event.pubkey }
-        set { event.pubkey = newValue }
+        return event.pubkey
     }
 
     /// The timestamp when the event was created
     public var createdAt: Timestamp {
-        get { event.createdAt }
-        set { event.createdAt = newValue }
+        return event.createdAt
     }
 
     /// The event kind (always EventKind.image for NDKImage)
     public var kind: Kind {
-        get { event.kind }
-        set { event.kind = newValue }
+        return event.kind
     }
 
     /// The event content
     public var content: String {
-        get { event.content }
-        set { event.content = newValue }
+        return event.content
     }
 
     /// The event tags
     public var tags: [[String]] {
-        get { event.tags }
-        set { event.tags = newValue }
+        return event.tags
     }
 
     /// The event signature
-    public var sig: String? {
-        get { event.sig }
-        set { event.sig = newValue }
+    public var sig: String {
+        return event.sig
     }
 
-    /// The associated NDK instance
-    public var ndk: NDK? {
-        get { event.ndk }
-        set { event.ndk = newValue }
-    }
 
     // MARK: - Initialization
 
     /// Initialize a new NDKImage event
     public init(ndk: NDK? = nil, pubkey: PublicKey = "") {
+        // Create a placeholder event - this will need to be properly signed later
         self.event = NDKEvent(
+            id: "", // Will be set when signed
             pubkey: pubkey,
             createdAt: Timestamp(Date().timeIntervalSince1970),
             kind: NDKImage.kind,
             tags: [],
-            content: ""
+            content: "",
+            sig: "" // Will be set when signed
         )
-        self.event.ndk = ndk
     }
+    
 
     /// Create an NDKImage from an existing NDKEvent
     public init(event: NDKEvent) {
@@ -103,33 +94,19 @@ public struct NDKImage {
 
     /// Get all imeta tags from this image event
     public var imetas: [NDKImetaTag] {
-        let imetaTags = event.tags
+        return event.tags
             .filter { $0.first == "imeta" }
             .compactMap { ImetaUtils.mapImetaTag($0) }
             .filter { $0.url != nil }
-
-        return imetaTags
     }
 
-    /// Set imeta tags for this image event
-    public mutating func setImetas(_ newImetas: [NDKImetaTag]) {
-        // Remove all existing imeta tags
-        event.tags = event.tags.filter { $0.first != "imeta" }
-
-        // Add new imeta tags
-        for imeta in newImetas {
-            let tag = ImetaUtils.imetaTagToTag(imeta)
-            event.tags.append(tag)
-        }
-    }
+    // Note: NDKEvent is immutable, so we cannot modify tags.
+    // To create a new image with different imeta tags, use NDKEventBuilder.
 
     // MARK: - Convenience Methods
 
-    /// Add a single imeta tag
-    public mutating func addImeta(_ imeta: NDKImetaTag) {
-        let tag = ImetaUtils.imetaTagToTag(imeta)
-        event.tags.append(tag)
-    }
+    // Note: NDKEvent is immutable, so we cannot add tags.
+    // To create a new image with additional imeta tags, use NDKEventBuilder.
 
     /// Get the primary image URL (from the first imeta tag)
     public var primaryImageURL: String? {
@@ -138,24 +115,30 @@ public struct NDKImage {
 
     /// Get all image URLs
     public var imageURLs: [String] {
-        return imetas.compactMap { $0.url }
+        get async {
+            let metaTags = await imetas
+            return metaTags.compactMap { $0.url }
+        }
     }
 
     /// Get dimensions for the primary image
     public var primaryImageDimensions: (width: Int, height: Int)? {
-        guard let dim = imetas.first?.dim else { return nil }
-        let parts = dim.split(separator: "x")
-        guard parts.count == 2,
-              let width = Int(parts[0]),
-              let height = Int(parts[1]) else { return nil }
-        return (width, height)
+        get async {
+            let metaTags = await imetas
+            guard let dim = metaTags.first?.dim else { return nil }
+            let parts = dim.split(separator: "x")
+            guard parts.count == 2,
+                  let width = Int(parts[0]),
+                  let height = Int(parts[1]) else { return nil }
+            return (width, height)
+        }
     }
 
     // MARK: - Convenience Tag Methods
 
     /// Add a tag to the image
-    public mutating func addTag(_ tag: [String]) {
-        event.addTag(tag)
+    public mutating func addTag(_ tag: [String]) async {
+        await event.addTag(tag)
     }
 
     /// Get tags matching a specific tag name

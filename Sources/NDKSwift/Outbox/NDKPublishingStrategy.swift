@@ -53,17 +53,14 @@ actor NDKPublishingStrategy {
         )
 
         // Store in outbox
-        if let eventId = event.id {
-            outboxItems[eventId] = item
-        }
+        let eventId = event.id
+        outboxItems[eventId] = item
 
         // Start publishing
         let task = Task {
             await publishOutboxItem(item)
         }
-        if let eventId = event.id {
-            activeTasks[eventId] = task
-        }
+        activeTasks[eventId] = task
 
         // Wait for initial results if not background
         if !config.publishInBackground {
@@ -71,22 +68,11 @@ actor NDKPublishingStrategy {
         }
 
         // Return current status
-        if let eventId = event.id {
-            return getPublishResult(for: eventId)
-        } else {
-            return PublishResult(
-                eventId: "",
-                overallStatus: .pending,
-                relayStatuses: [:],
-                successCount: 0,
-                failureCount: 0,
-                powDifficulty: 0
-            )
-        }
+        return await getPublishResult(for: eventId)
     }
 
     /// Get the current status of a publishing operation
-    func getPublishResult(for eventId: String) -> PublishResult {
+    func getPublishResult(for eventId: String) async -> PublishResult {
         guard let item = outboxItems[eventId] else {
             return PublishResult(
                 eventId: eventId,
@@ -100,45 +86,58 @@ actor NDKPublishingStrategy {
 
         return PublishResult(
             eventId: eventId,
-            overallStatus: item.overallStatus,
-            relayStatuses: item.relayStatuses,
-            successCount: item.successCount,
-            failureCount: item.failureCount,
-            powDifficulty: item.currentPowDifficulty
+            overallStatus: await item.overallStatus,
+            relayStatuses: await item.relayStatuses,
+            successCount: await item.successCount,
+            failureCount: await item.failureCount,
+            powDifficulty: await item.currentPowDifficulty
         )
     }
 
     /// Cancel publishing for an event
-    func cancelPublish(eventId: String) {
+    func cancelPublish(eventId: String) async {
         activeTasks[eventId]?.cancel()
         activeTasks.removeValue(forKey: eventId)
-        outboxItems[eventId]?.overallStatus = .cancelled
+        if let item = outboxItems[eventId] {
+            await item.setOverallStatus(.cancelled)
+        }
     }
 
     /// Get all pending outbox items
-    func getPendingItems() -> [OutboxItem] {
-        outboxItems.values.filter { item in
-            item.overallStatus == .pending || item.overallStatus == .inProgress
+    func getPendingItems() async -> [OutboxItem] {
+        var pendingItems: [OutboxItem] = []
+        for item in outboxItems.values {
+            let status = await item.getOverallStatus()
+            if status == .pending || status == .inProgress {
+                pendingItems.append(item)
+            }
         }
+        return pendingItems
     }
 
     /// Clean up completed items older than specified age
-    func cleanupCompleted(olderThan age: TimeInterval = 3600) {
+    func cleanupCompleted(olderThan age: TimeInterval = 3600) async {
         let cutoffDate = Date().addingTimeInterval(-age)
 
-        outboxItems = outboxItems.filter { _, item in
+        var itemsToKeep: [String: OutboxItem] = [:]
+        for (key, item) in outboxItems {
+            let status = await item.getOverallStatus()
+            let lastUpdated = await item.getLastUpdated()
+            
             // Keep if not completed or recent
-            if item.overallStatus != .succeeded, item.overallStatus != .failed {
-                return true
+            if status != .succeeded && status != .failed {
+                itemsToKeep[key] = item
+            } else if lastUpdated > cutoffDate {
+                itemsToKeep[key] = item
             }
-            return item.lastUpdated > cutoffDate
         }
+        outboxItems = itemsToKeep
     }
 
     // MARK: - Private Methods
 
     private func publishOutboxItem(_ item: OutboxItem) async {
-        item.overallStatus = .inProgress
+        await item.setOverallStatus(.inProgress)
 
         // Create tasks for each relay
         await withTaskGroup(of: Void.self) { group in
@@ -150,24 +149,25 @@ actor NDKPublishingStrategy {
         }
 
         // Update overall status
-        updateOverallStatus(for: item)
+        await updateOverallStatus(for: item)
     }
 
     private func publishToRelay(item: OutboxItem, relayURL: String) async {
         var attempts = 0
-        var backoffInterval: TimeInterval = item.config.initialBackoffInterval
+        let config = item.config
+        var backoffInterval: TimeInterval = config.initialBackoffInterval
 
-        while attempts < item.config.maxRetries {
+        while attempts < config.maxRetries {
             attempts += 1
 
             // Check if cancelled
-            if item.overallStatus == .cancelled {
+            if await item.getOverallStatus() == .cancelled {
                 return
             }
 
             // Get or establish connection
             guard let relay = await getOrConnectRelay(url: relayURL) else {
-                item.updateRelayStatus(relayURL, status: .failed(.connectionFailed))
+                await item.updateRelayStatus(relayURL, status: .failed(.connectionFailed))
                 await ranker.updateRelayPerformance(relayURL, success: false)
                 return
             }
@@ -183,13 +183,13 @@ actor NDKPublishingStrategy {
 
             switch result {
             case .success:
-                item.updateRelayStatus(relayURL, status: .succeeded)
+                await item.updateRelayStatus(relayURL, status: .succeeded)
                 await ranker.updateRelayPerformance(
                     relayURL,
                     success: true,
                     responseTime: responseTime
                 )
-                updateOverallStatus(for: item)
+                await updateOverallStatus(for: item)
                 return
 
             case let .requiresPow(difficulty):
@@ -199,15 +199,15 @@ actor NDKPublishingStrategy {
                     attempts = 0 // Reset attempts for POW retry
                     continue
                 } else {
-                    item.updateRelayStatus(relayURL, status: .failed(.powGenerationFailed))
+                    await item.updateRelayStatus(relayURL, status: .failed(.powGenerationFailed))
                     return
                 }
 
             case .rateLimited:
-                item.updateRelayStatus(relayURL, status: .rateLimited)
+                await item.updateRelayStatus(relayURL, status: .rateLimited)
                 // Exponential backoff
                 try? await Task.sleep(nanoseconds: UInt64(backoffInterval * 1_000_000_000))
-                backoffInterval *= item.config.backoffMultiplier
+                backoffInterval *= config.backoffMultiplier
 
             case .authRequired:
                 // Attempt NIP-42 auth
@@ -215,22 +215,22 @@ actor NDKPublishingStrategy {
                     // Retry after auth
                     continue
                 } else {
-                    item.updateRelayStatus(relayURL, status: .failed(.authFailed))
+                    await item.updateRelayStatus(relayURL, status: .failed(.authFailed))
                     return
                 }
 
             case let .permanentFailure(reason):
-                item.updateRelayStatus(relayURL, status: .failed(reason))
+                await item.updateRelayStatus(relayURL, status: .failed(reason))
                 await ranker.updateRelayPerformance(relayURL, success: false)
                 return
 
             case .temporaryFailure:
-                if attempts < item.config.maxRetries {
-                    item.updateRelayStatus(relayURL, status: .retrying(attempt: attempts))
+                if attempts < config.maxRetries {
+                    await item.updateRelayStatus(relayURL, status: .retrying(attempt: attempts))
                     try? await Task.sleep(nanoseconds: UInt64(backoffInterval * 1_000_000_000))
-                    backoffInterval *= item.config.backoffMultiplier
+                    backoffInterval *= config.backoffMultiplier
                 } else {
-                    item.updateRelayStatus(relayURL, status: .failed(.maxRetriesExceeded))
+                    await item.updateRelayStatus(relayURL, status: .failed(.maxRetriesExceeded))
                     await ranker.updateRelayPerformance(relayURL, success: false)
                     return
                 }
@@ -273,11 +273,13 @@ actor NDKPublishingStrategy {
 
     private func handlePowRequirement(item: OutboxItem, difficulty: Int) async -> Bool {
         // Update required difficulty
-        item.currentPowDifficulty = max(item.currentPowDifficulty ?? 0, difficulty)
+        let currentDifficulty = await item.currentPowDifficulty ?? 0
+        await item.setCurrentPowDifficulty(max(currentDifficulty, difficulty))
 
         // Check if we should generate POW
-        guard item.config.enablePow,
-              let maxDifficulty = item.config.maxPowDifficulty,
+        let config = item.config
+        guard config.enablePow,
+              let maxDifficulty = config.maxPowDifficulty,
               difficulty <= maxDifficulty
         else {
             return false
@@ -311,26 +313,28 @@ actor NDKPublishingStrategy {
         return relay
     }
 
-    private func updateOverallStatus(for item: OutboxItem) {
-        let successCount = item.relayStatuses.values.filter { $0 == .succeeded }.count
-        let failureCount = item.relayStatuses.values.filter {
+    private func updateOverallStatus(for item: OutboxItem) async {
+        let relayStatuses = await item.relayStatuses
+        let successCount = relayStatuses.values.filter { $0 == .succeeded }.count
+        let failureCount = relayStatuses.values.filter {
             if case .failed = $0 { return true }
             return false
         }.count
-        let pendingCount = item.relayStatuses.values.filter {
+        let pendingCount = relayStatuses.values.filter {
             $0 == .pending || $0 == .inProgress
         }.count
 
-        item.successCount = successCount
-        item.failureCount = failureCount
+        await item.setSuccessCount(successCount)
+        await item.setFailureCount(failureCount)
 
-        if successCount >= item.config.minSuccessfulRelays {
-            item.overallStatus = .succeeded
-        } else if pendingCount == 0, successCount < item.config.minSuccessfulRelays {
-            item.overallStatus = .failed
+        let config = item.config
+        if successCount >= config.minSuccessfulRelays {
+            await item.setOverallStatus(.succeeded)
+        } else if pendingCount == 0, successCount < config.minSuccessfulRelays {
+            await item.setOverallStatus(.failed)
         }
 
-        item.lastUpdated = Date()
+        await item.setLastUpdated(Date())
     }
 
     private func extractPowDifficulty(from message: String) -> Int? {
@@ -387,8 +391,8 @@ public struct OutboxPublishConfig: Sendable {
 }
 
 /// An item in the outbox queue
-class OutboxItem {
-    public var event: NDKEvent
+actor OutboxItem {
+    public let event: NDKEvent
     public let targetRelays: Set<String>
     public let config: OutboxPublishConfig
     public let selectionMethod: SelectionMethod
@@ -416,12 +420,48 @@ class OutboxItem {
         }
     }
 
-    func updateRelayStatus(_ relay: String, status: RelayPublishStatus) {
+    func updateRelayStatus(_ relay: String, status: RelayPublishStatus) async {
         relayStatuses[relay] = status
         lastUpdated = Date()
 
         // Also update the event's relay status
         event.updatePublishStatus(relay: relay, status: status)
+    }
+    
+    func setOverallStatus(_ status: PublishStatus) {
+        overallStatus = status
+    }
+    
+    func getOverallStatus() -> PublishStatus {
+        return overallStatus
+    }
+    
+    func getLastUpdated() -> Date {
+        return lastUpdated
+    }
+    
+    func incrementSuccessCount() {
+        successCount += 1
+    }
+    
+    func incrementFailureCount() {
+        failureCount += 1
+    }
+    
+    func setSuccessCount(_ count: Int) {
+        successCount = count
+    }
+    
+    func setFailureCount(_ count: Int) {
+        failureCount = count
+    }
+    
+    func setCurrentPowDifficulty(_ difficulty: Int?) {
+        currentPowDifficulty = difficulty
+    }
+    
+    func setLastUpdated(_ date: Date) {
+        lastUpdated = date
     }
 }
 

@@ -110,29 +110,22 @@ public extension NDKEvent {
             tags.append(["alt", description])
         }
 
-        let pubkey = try await signer.pubkey
-        let event = NDKEvent(
-            pubkey: pubkey,
-            createdAt: Timestamp(Date().timeIntervalSince1970),
-            kind: EventKind.fileMetadata,
-            tags: tags,
-            content: description ?? ""
-        )
-
-        // Generate ID and sign
-        _ = try event.generateID()
-        event.sig = try await signer.sign(event)
+        let event = try await NDKEventBuilder()
+            .content(description ?? "")
+            .kind(EventKind.fileMetadata)
+            .tags(tags)
+            .build(signer: signer)
 
         return event
     }
 
     /// Extract Blossom URLs from a file metadata event
-    func extractBlossomURLs() -> [(url: String, sha256: String)] {
-        guard kind == EventKind.fileMetadata else { return [] }
+    func extractBlossomURLs() async -> [(url: String, sha256: String)] {
+        guard await kind == EventKind.fileMetadata else { return [] }
 
         var urls: [(url: String, sha256: String)] = []
-        let urlTags = tags.filter { $0.first == "url" }
-        let sha256Tags = tags.filter { $0.first == "x" }
+        let urlTags = (await tags).filter { $0.first == "url" }
+        let sha256Tags = (await tags).filter { $0.first == "x" }
 
         for (index, urlTag) in urlTags.enumerated() {
             guard urlTag.count > 1 else { continue }
@@ -190,18 +183,11 @@ public extension NDKEvent {
 
         tags.append(imetaTag)
 
-        let pubkey = try await signer.pubkey
-        let event = NDKEvent(
-            pubkey: pubkey,
-            createdAt: Timestamp(Date().timeIntervalSince1970),
-            kind: EventKind.image,
-            tags: tags,
-            content: caption ?? firstBlob.url
-        )
-
-        // Generate ID and sign
-        _ = try event.generateID()
-        event.sig = try await signer.sign(event)
+        let event = try await NDKEventBuilder()
+            .content(caption ?? firstBlob.url)
+            .kind(EventKind.image)
+            .tags(tags)
+            .build(signer: signer)
 
         return event
     }

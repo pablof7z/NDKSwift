@@ -150,7 +150,7 @@ public final class NDKUser: Equatable, Hashable, Sendable {
         // Fetch the profile event
         if let event = try await ndk.fetchEvent(filter) {
             // Parse the profile from the event content
-            let eventContent = await event.content
+            let eventContent = event.content
             guard let profileData = eventContent.data(using: .utf8),
                   let profile = try? JSONDecoder().decode(NDKUserProfile.self, from: profileData) else {
                 throw NDKError.invalidInput(message: "Invalid profile data")
@@ -177,7 +177,7 @@ public final class NDKUser: Equatable, Hashable, Sendable {
     /// Used internally when fetching profiles from events
     public func processMetadataEvent(_ event: NDKEvent) {
         Task {
-            let eventContent = await event.content
+            let eventContent = event.content
             if let profileData = eventContent.data(using: .utf8),
                let profile = try? JSONDecoder().decode(NDKUserProfile.self, from: profileData) {
                 await updateProfile(profile)
@@ -207,7 +207,7 @@ public final class NDKUser: Equatable, Hashable, Sendable {
         // Fetch the relay list event
         if let event = try await ndk.fetchEvent(filter) {
             // Parse relay tags
-            let eventTags = await event.tags
+            let eventTags = event.tags
             let relays = eventTags
                 .filter { $0.first == "r" }
                 .compactMap { tag -> NDKRelayInfo? in
@@ -246,7 +246,7 @@ public final class NDKUser: Equatable, Hashable, Sendable {
         // Fetch the contact list event
         if let event = try await ndk.fetchEvent(filter) {
             // Parse 'p' tags from contact list
-            let eventTags = await event.tags
+            let eventTags = event.tags
             let followedPubkeys = eventTags
                 .filter { $0.first == "p" }
                 .compactMap { $0[safe: 1] }

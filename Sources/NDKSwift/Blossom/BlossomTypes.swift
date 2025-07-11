@@ -107,18 +107,11 @@ public struct BlossomAuth {
             tags.append(["expiration", String(Int(expiration.timeIntervalSince1970))])
         }
 
-        let pubkey = try await signer.pubkey
-        let event = NDKEvent(
-            pubkey: pubkey,
-            createdAt: Timestamp(Date().timeIntervalSince1970),
-            kind: 24242, // Blossom auth kind
-            tags: tags,
-            content: "Authorize upload"
-        )
-
-        // Generate ID and sign
-        _ = try event.generateID()
-        event.sig = try await signer.sign(event)
+        let event = try await NDKEventBuilder()
+            .content("Authorize upload")
+            .kind(24242) // Blossom auth kind
+            .tags(tags)
+            .build(signer: signer)
 
         return BlossomAuth(event: event)
     }
@@ -134,18 +127,11 @@ public struct BlossomAuth {
             ["x", sha256]
         ]
 
-        let pubkey = try await signer.pubkey
-        let event = NDKEvent(
-            pubkey: pubkey,
-            createdAt: Timestamp(Date().timeIntervalSince1970),
-            kind: 24242,
-            tags: tags,
-            content: reason ?? "Delete blob"
-        )
-
-        // Generate ID and sign
-        _ = try event.generateID()
-        event.sig = try await signer.sign(event)
+        let event = try await NDKEventBuilder()
+            .content(reason ?? "Delete blob")
+            .kind(24242)
+            .tags(tags)
+            .build(signer: signer)
 
         return BlossomAuth(event: event)
     }
@@ -168,25 +154,18 @@ public struct BlossomAuth {
             tags.append(["until", String(Int(until.timeIntervalSince1970))])
         }
 
-        let pubkey = try await signer.pubkey
-        let event = NDKEvent(
-            pubkey: pubkey,
-            createdAt: Timestamp(Date().timeIntervalSince1970),
-            kind: 24242,
-            tags: tags,
-            content: "List blobs"
-        )
-
-        // Generate ID and sign
-        _ = try event.generateID()
-        event.sig = try await signer.sign(event)
+        let event = try await NDKEventBuilder()
+            .content("List blobs")
+            .kind(24242)
+            .tags(tags)
+            .build(signer: signer)
 
         return BlossomAuth(event: event)
     }
 
     /// Get base64-encoded authorization header value
-    public func authorizationHeaderValue() throws -> String {
-        let eventJSON = try event.serialize()
+    public func authorizationHeaderValue() async throws -> String {
+        let eventJSON = try await event.serialize()
         let eventData = eventJSON.data(using: .utf8)!
         return "Nostr " + eventData.base64EncodedString()
     }

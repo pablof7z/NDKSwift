@@ -64,7 +64,9 @@ extension Tag {
 // Note: isHexDigit is already defined in NDKEvent.swift
 
 // MARK: - Tag Creation Helpers
+// NOTE: These methods are deprecated. Use NDKEventBuilder for creating events with tags.
 
+/*
 extension NDKEvent {
     /// Tags this event as a reply to another event
     public func tagReply(to event: NDKEvent, relay: String? = nil) async {
@@ -105,11 +107,11 @@ extension NDKEvent {
     
     /// Tags an addressable event (NIP-33)
     public func tagAddressableEvent(_ event: NDKEvent, relay: String? = nil) async {
-        let isReplaceable = await event.isParameterizedReplaceable
+        let isReplaceable = event.isParameterizedReplaceable
         guard isReplaceable else { return }
-        let dTag = await event.tagValue("d") ?? ""
-        let eventKind = await event.kind
-        let eventPubkey = await event.pubkey
+        let dTag = event.tagValue("d") ?? ""
+        let eventKind = event.kind
+        let eventPubkey = event.pubkey
         var tag = ["a", "\(eventKind):\(eventPubkey):\(dTag)"]
         if let relay = relay {
             tag.append(relay)
@@ -370,6 +372,7 @@ extension NDKEvent {
         return currentTags.filter { $0.isValid }
     }
 }
+*/
 
 // MARK: - Tag Builder
 

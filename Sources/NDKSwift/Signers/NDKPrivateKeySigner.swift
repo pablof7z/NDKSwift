@@ -43,14 +43,7 @@ public final class NDKPrivateKeySigner: NDKSigner {
     }
 
     public func sign(_ event: NDKEvent) async throws -> Signature {
-        // Ensure event has an ID
-        if event.id == nil {
-            _ = try event.generateID()
-        }
-
-        guard let eventId = event.id,
-              let idData = Data(hexString: eventId)
-        else {
+        guard let idData = Data(hexString: event.id) else {
             throw NDKError.signingFailed("Failed to sign event: invalid event ID")
         }
 
@@ -64,14 +57,8 @@ public final class NDKPrivateKeySigner: NDKSigner {
     }
     
     public func sign(event: inout NDKEvent) async throws {
-        // Set the pubkey if not already set
-        if event.pubkey.isEmpty {
-            event.pubkey = _pubkey
-        }
-        
-        // Generate the signature
-        let signature = try await sign(event)
-        event.sig = signature
+        // This method is deprecated and should not be used with immutable events
+        throw NDKError.notImplemented("Mutating sign method is deprecated. Use NDKEventBuilder instead.")
     }
 
     public func blockUntilReady() async throws {

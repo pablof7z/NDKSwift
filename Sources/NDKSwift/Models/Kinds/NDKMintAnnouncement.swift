@@ -101,29 +101,36 @@ public struct NDKMintAnnouncement: Codable, Sendable {
 // MARK: - NDKEvent Extension
 extension NDKEvent {
     /// Creates a mint announcement event (kind 38000)
-    public static func mintAnnouncement(announcement: NDKMintAnnouncement, keypair: NDKKeypair) throws -> NDKEvent {
+    public static func mintAnnouncement(announcement: NDKMintAnnouncement, pubkey: String, signer: NDKSigner) async throws -> NDKEvent {
         let content = try JSONEncoder().encode(announcement)
         let contentString = String(data: content, encoding: .utf8) ?? "{}"
         
-        var event = NDKEvent(kind: .mintAnnouncement, content: contentString, keypair: keypair)
-        
-        // Add tags for mint URL and units for easier filtering
-        event.tags.append(["u", announcement.mintURL.absoluteString])
+        // Build tags for mint URL and units
+        var tags: [[String]] = []
+        tags.append(["u", announcement.mintURL.absoluteString])
         
         if let units = announcement.units {
             for unit in units {
-                event.tags.append(["unit", unit])
+                tags.append(["unit", unit])
             }
         }
+        
+        let event = try await NDKEventBuilder()
+            .content(contentString)
+            .kind(38000) // Mint announcement
+            .tags(tags)
+            .pubkey(pubkey)
+            .build(signer: signer)
         
         return event
     }
     
     /// Parses a mint announcement from the event content
     public func parseMintAnnouncement() throws -> NDKMintAnnouncement? {
-        guard kind == .mintAnnouncement else { return nil }
+        guard self.kind == 38000 else { return nil }
         
-        let data = content.data(using: .utf8) ?? Data()
+        let eventContent = self.content
+        let data = eventContent.data(using: .utf8) ?? Data()
         return try JSONDecoder().decode(NDKMintAnnouncement.self, from: data)
     }
 }

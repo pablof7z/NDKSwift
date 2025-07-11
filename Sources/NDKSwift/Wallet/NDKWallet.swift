@@ -1,7 +1,16 @@
 import Foundation
 
-/// Payment request details
-public struct NDKPaymentRequest {
+/// Payment request protocol
+public protocol NDKPaymentRequest {
+    var recipient: NDKUser { get }
+    var amount: Int64 { get }
+    var comment: String? { get }
+    var tags: [[String]]? { get }
+    var unit: String { get }
+}
+
+/// Standard payment request
+public struct NDKStandardPaymentRequest: NDKPaymentRequest {
     public let recipient: NDKUser
     public let amount: Int64 // in satoshis
     public let comment: String?
@@ -40,6 +49,21 @@ public struct NDKLightningPaymentConfirmation: NDKPaymentConfirmation {
     }
 }
 
+/// Cashu payment confirmation
+public struct NDKCashuPaymentConfirmation: NDKPaymentConfirmation {
+    public let amount: Int64
+    public let recipient: String
+    public let timestamp: Date
+    public let nutzap: NDKEvent
+
+    public init(amount: Int64, recipient: String, timestamp: Date, nutzap: NDKEvent) {
+        self.amount = amount
+        self.recipient = recipient
+        self.timestamp = timestamp
+        self.nutzap = nutzap
+    }
+}
+
 /// Base wallet protocol
 public protocol NDKWallet {
     /// Pay a payment request
@@ -55,9 +79,30 @@ public protocol NDKWallet {
     func supports(method: NDKPaymentMethod) -> Bool
 }
 
+/// Nutzap payment request details (NIP-61)
+public struct NDKNutzapRequest: NDKPaymentRequest {
+    public let recipient: NDKUser
+    public let amount: Int64 // in satoshis
+    public let comment: String?
+    public let tags: [[String]]?
+    public let unit: String = "sat"
+    public let mints: [URL] // Accepted mints for the nutzap
+    public let recipientPubkey: String // Recipient's public key for P2PK locking
+
+    public init(recipient: NDKUser, amount: Int64, mints: [URL], recipientPubkey: String, comment: String? = nil, tags: [[String]]? = nil) {
+        self.recipient = recipient
+        self.amount = amount
+        self.mints = mints
+        self.recipientPubkey = recipientPubkey
+        self.comment = comment
+        self.tags = tags
+    }
+}
+
 /// Payment methods
 public enum NDKPaymentMethod: String {
     case lightning = "nip57"
     case nwc = "nip47"
+    case nutzap = "nip61"
 }
 

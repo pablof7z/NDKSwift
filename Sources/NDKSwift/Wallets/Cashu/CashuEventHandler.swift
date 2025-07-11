@@ -35,17 +35,11 @@ actor CashuEventHandler {
         )
         
         // Create event
-        let event = NDKEvent(
-            pubkey: userPubkey,
-            createdAt: Timestamp(Date().timeIntervalSince1970),
-            kind: EventKind.cashuWallet,
-            tags: [["d", walletId]],
-            content: encryptedContent
-        )
-        
-        // Set NDK and sign
-        await event.setNDK(ndk)
-        try await event.sign()
+        let event = try await NDKEventBuilder()
+            .content(encryptedContent)
+            .kind(EventKind.cashuWallet)
+            .tags([["d", walletId]])
+            .build(signer: signer)
         
         return event
     }
@@ -58,10 +52,9 @@ actor CashuEventHandler {
         }
         let userPubkey = try await signer.pubkey
         let user = NDKUser(pubkey: userPubkey)
-        let eventContent = await event.content
         let decrypted = try await signer.decrypt(
             sender: user,
-            value: eventContent,
+            value: event.content,
             scheme: .nip44
         )
         
@@ -94,21 +87,15 @@ actor CashuEventHandler {
         )
         
         // Create event
-        let event = NDKEvent(
-            pubkey: userPubkey,
-            createdAt: Timestamp(Date().timeIntervalSince1970),
-            kind: EventKind.cashuToken,
-            tags: [
+        let event = try await NDKEventBuilder()
+            .content(encryptedContent)
+            .kind(EventKind.cashuToken)
+            .tags([
                 ["d", UUID().uuidString],
                 ["mint", mint],
                 ["wallet", walletId]
-            ],
-            content: encryptedContent
-        )
-        
-        // Set NDK and sign
-        await event.setNDK(ndk)
-        try await event.sign()
+            ])
+            .build(signer: signer)
         
         return event
     }
@@ -121,10 +108,9 @@ actor CashuEventHandler {
         }
         let userPubkey = try await signer.pubkey
         let user = NDKUser(pubkey: userPubkey)
-        let eventContent = await event.content
         let decrypted = try await signer.decrypt(
             sender: user,
-            value: eventContent,
+            value: event.content,
             scheme: .nip44
         )
         
@@ -143,7 +129,7 @@ actor CashuEventHandler {
         guard let signer = ndk.signer else {
             throw NDKError.notConfigured("No signer configured")
         }
-        let userPubkey = try await signer.pubkey
+        let _ = try await signer.pubkey
         
         // Build tags
         var tags: [Tag] = []
@@ -159,17 +145,11 @@ actor CashuEventHandler {
         }
         
         // Create event
-        let event = NDKEvent(
-            pubkey: userPubkey,
-            createdAt: Timestamp(Date().timeIntervalSince1970),
-            kind: EventKind.cashuMintList,
-            tags: tags,
-            content: ""
-        )
-        
-        // Set NDK and sign
-        await event.setNDK(ndk)
-        try await event.sign()
+        let event = try await NDKEventBuilder()
+            .content("")
+            .kind(EventKind.cashuMintList)
+            .tags(tags)
+            .build(signer: signer)
         
         return event
     }
@@ -179,8 +159,7 @@ actor CashuEventHandler {
         var mints: [String] = []
         var p2pkPubkey: String?
         
-        let eventTags = await event.tags
-        for tag in eventTags {
+        for tag in event.tags {
             if tag.count >= 2 {
                 switch tag[0] {
                 case "mint":
@@ -214,20 +193,14 @@ actor CashuEventHandler {
         )
         
         // Create event
-        let event = NDKEvent(
-            pubkey: userPubkey,
-            createdAt: Timestamp(Date().timeIntervalSince1970),
-            kind: EventKind.cashuWallet,
-            tags: [
+        let event = try await NDKEventBuilder()
+            .content(encryptedContent)
+            .kind(EventKind.cashuWallet)
+            .tags([
                 ["d", "\(walletId)-p2pk"],
                 ["type", "p2pk-backup"]
-            ],
-            content: encryptedContent
-        )
-        
-        // Set NDK and sign
-        await event.setNDK(ndk)
-        try await event.sign()
+            ])
+            .build(signer: signer)
         
         return event
     }
@@ -240,10 +213,9 @@ actor CashuEventHandler {
         }
         let userPubkey = try await signer.pubkey
         let user = NDKUser(pubkey: userPubkey)
-        let eventContent = await event.content
         return try await signer.decrypt(
             sender: user,
-            value: eventContent,
+            value: event.content,
             scheme: .nip44
         )
     }

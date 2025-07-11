@@ -1,5 +1,6 @@
 import Foundation
-import CashuSwift
+// FIXME: Temporarily disabled due to CashuSwift build issues
+// import CashuSwift
 
 // MARK: - Core Types
 
@@ -98,7 +99,9 @@ public struct CashuMintList: Codable {
 }
 
 // MARK: - Extensions for CashuSwift Integration
+// FIXME: Temporarily disabled due to CashuSwift build issues
 
+/*
 extension CashuProof {
     /// Convert to CashuSwift Proof format
     func toCashuSwiftProof() -> CashuSwift.Proof {
@@ -123,6 +126,7 @@ extension CashuSwift.Proof {
         )
     }
 }
+*/
 
 // MARK: - Helper Functions
 
@@ -157,11 +161,7 @@ public struct KeyPair {
 }
 
 // MARK: - Payment Method Extension
-
-extension NDKPaymentMethod {
-    /// Nutzap payment method
-    public static let nutzap = NDKPaymentMethod(rawValue: "nip61")
-}
+// Removed - nutzap is now defined in NDKWallet.swift
 
 // MARK: - CashuProof Extensions
 

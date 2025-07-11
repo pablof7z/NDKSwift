@@ -151,27 +151,27 @@ public struct NDKFilter: Codable, Equatable, Sendable {
     // MARK: - Matching
 
     /// Check if an event matches this filter
-    public func matches(event: NDKEvent) async -> Bool {
+    public func matches(event: NDKEvent) -> Bool {
         // Check IDs
-        let eventId = await event.id
-        if let ids = ids, !ids.contains(eventId ?? "") {
+        let eventId = event.id
+        if let ids = ids, !ids.contains(eventId) {
             return false
         }
 
         // Check authors
-        let eventPubkey = await event.pubkey
+        let eventPubkey = event.pubkey
         if let authors = authors, !authors.contains(eventPubkey) {
             return false
         }
 
         // Check kinds
-        let eventKind = await event.kind
+        let eventKind = event.kind
         if let kinds = kinds, !kinds.contains(eventKind) {
             return false
         }
 
         // Check timestamp
-        let eventCreatedAt = await event.createdAt
+        let eventCreatedAt = event.createdAt
         if let since = since, eventCreatedAt < since {
             return false
         }
@@ -181,7 +181,7 @@ public struct NDKFilter: Codable, Equatable, Sendable {
 
         // Check referenced events
         if let events = events {
-            let eventTags = await event.tags(withName: "e")
+            let eventTags = event.tags(withName: "e")
             let eventRefs = eventTags.compactMap { $0.count > 1 ? $0[1] : nil }
             if !events.contains(where: { eventRefs.contains($0) }) {
                 return false
@@ -190,7 +190,7 @@ public struct NDKFilter: Codable, Equatable, Sendable {
 
         // Check referenced pubkeys
         if let pubkeys = pubkeys {
-            let pTags = await event.tags(withName: "p")
+            let pTags = event.tags(withName: "p")
             let pubkeyRefs = pTags.compactMap { $0.count > 1 ? $0[1] : nil }
             if !pubkeys.contains(where: { pubkeyRefs.contains($0) }) {
                 return false
@@ -200,7 +200,7 @@ public struct NDKFilter: Codable, Equatable, Sendable {
         // Check generic tag filters
         for (tagKey, filterValues) in tagFilters {
             let tagName = String(tagKey.dropFirst()) // Remove '#'
-            let eventTags = await event.tags(withName: tagName)
+            let eventTags = event.tags(withName: tagName)
             let eventTagValues = eventTags.compactMap { $0.count > 1 ? $0[1] : nil }
 
             if !filterValues.contains(where: { eventTagValues.contains($0) }) {

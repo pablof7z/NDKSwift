@@ -8,7 +8,8 @@ public protocol NDKSigner {
     /// Sign an event
     func sign(_ event: NDKEvent) async throws -> Signature
 
-    /// Sign an event in place (mutating)
+    /// Sign an event in place (mutating) - DEPRECATED: Use NDKEventBuilder instead
+    @available(*, deprecated, message: "Use NDKEventBuilder for creating and signing events")
     func sign(event: inout NDKEvent) async throws
 
     /// Block until the signer is ready (e.g., user has unlocked it)
@@ -46,8 +47,8 @@ public extension NDKSigner {
     }
 
     func sign(event: inout NDKEvent) async throws {
-        let signature = try await sign(event)
-        event.sig = signature
+        // This method is deprecated and should not be used with immutable events
+        throw NDKError.notImplemented("Mutating sign method is deprecated. Use NDKEventBuilder instead.")
     }
 
     func blockUntilReady() async throws {

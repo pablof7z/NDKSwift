@@ -215,12 +215,13 @@ public actor NDKProfileManager {
                     continue
                 }
                 
-                results[event.pubkey] = profile
-                updateCache(pubkey: event.pubkey, profile: profile)
+                let eventPubkey = event.pubkey
+                results[eventPubkey] = profile
+                updateCache(pubkey: eventPubkey, profile: profile)
                 
                 // Update the user object if available
-                let user = ndk.getUser(event.pubkey)
-                user.updateProfile(profile)
+                let user = ndk.getUser(eventPubkey)
+                await user.updateProfile(profile)
             }
         }
         

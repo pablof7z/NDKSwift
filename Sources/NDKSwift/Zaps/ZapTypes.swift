@@ -21,6 +21,14 @@ public enum ZapError: LocalizedError {
     case paymentFailed(String)
     case timeoutWaitingForReceipt
     case invalidZapReceipt
+    // Mint-specific errors
+    case mintConnectionFailed(mint: String, reason: String)
+    case mintQuoteFailed(mint: String, reason: String)
+    case mintTokenCreationFailed(mint: String, reason: String)
+    case allMintsFailed(attempts: Int)
+    case noCommonMints(wallet: [String], recipient: [String])
+    case endpointDoesNotSupportZaps
+    case amountOutOfRange(min: Int64, max: Int64)
     
     public var errorDescription: String? {
         switch self {
@@ -50,6 +58,20 @@ public enum ZapError: LocalizedError {
             return "Timeout waiting for zap receipt"
         case .invalidZapReceipt:
             return "Invalid zap receipt"
+        case .mintConnectionFailed(let mint, let reason):
+            return "Failed to connect to mint \(mint): \(reason)"
+        case .mintQuoteFailed(let mint, let reason):
+            return "Failed to get quote from mint \(mint): \(reason)"
+        case .mintTokenCreationFailed(let mint, let reason):
+            return "Failed to create tokens at mint \(mint): \(reason)"
+        case .allMintsFailed(let attempts):
+            return "All \(attempts) mint(s) failed to process the payment"
+        case .noCommonMints(let wallet, let recipient):
+            return "No common mints between wallet (\(wallet.joined(separator: ", "))) and recipient (\(recipient.joined(separator: ", ")))"
+        case .endpointDoesNotSupportZaps:
+            return "Endpoint does not support zaps"
+        case .amountOutOfRange(let min, let max):
+            return "Amount out of range: \(min) - \(max) sats"
         }
     }
 }

@@ -51,7 +51,7 @@ public class WalletAdapterPaymentProvider: NDKPaymentProvider {
         
         // Create legacy payment request
         let recipient = NDKUser(pubkey: lightningRequest.recipient)
-        let paymentRequest = NDKPaymentRequest(
+        let paymentRequest = NDKStandardPaymentRequest(
             recipient: recipient,
             amount: lightningRequest.amountSats,
             comment: nil

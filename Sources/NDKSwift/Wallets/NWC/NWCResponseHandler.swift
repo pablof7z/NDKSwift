@@ -18,9 +18,7 @@ public struct NWCResponseHandler {
         responseType: T.Type,
         timeout: TimeInterval = 30
     ) async throws -> T {
-        guard let requestId = await event.id else {
-            throw NDKError.invalidResponse(from: "Event must have an ID")
-        }
+        let requestId = event.id
         
         print("[NWC Response] Setting up response listener for request \(requestId)")
         
@@ -54,15 +52,15 @@ public struct NWCResponseHandler {
             
             for try await responseEvent in subscription {
                 print("[NWC Response] Got response event:")
-                print("[NWC Response]   ID: \(await responseEvent.id ?? "nil")")
-                print("[NWC Response]   Pubkey: \(await responseEvent.pubkey)")
-                print("[NWC Response]   Tags: \(await responseEvent.tags)")
+                print("[NWC Response]   ID: \(responseEvent.id)")
+                print("[NWC Response]   Pubkey: \(responseEvent.pubkey)")
+                print("[NWC Response]   Tags: \(responseEvent.tags)")
                 
                 // Decrypt the content
-                let senderPubkey = await responseEvent.pubkey
+                let senderPubkey = responseEvent.pubkey
                 let sender = NDKUser(pubkey: senderPubkey)
                 print("[NWC Response] Decrypting content from \(sender.pubkey)")
-                let eventContent = await responseEvent.content
+                let eventContent = responseEvent.content
                 let decryptedContent = try await signer.decrypt(
                     sender: sender,
                     value: eventContent,
@@ -170,7 +168,7 @@ public struct NWCResponseHandler {
         let responseTask = Task<[String: Result<T, NDKError>], Error> {
             for try await event in subscription {
                 // Get the d-tag for this response
-                let eventTags = await event.tags
+                let eventTags = event.tags
                 guard let dTag = eventTags.first(where: { $0.count >= 2 && $0[0] == "d" }),
                       dTag.count > 1 else {
                     continue
@@ -181,14 +179,14 @@ public struct NWCResponseHandler {
                 // Decrypt and parse the response
                 do {
                     // Get wallet service pubkey from p-tag
-                    let eventTags = await event.tags
+                    let eventTags = event.tags
                     guard let pTag = eventTags.first(where: { $0.count >= 2 && $0[0] == "p" }) else {
                         continue
                     }
                     let walletPubkey = pTag[1]
                     let walletUser = NDKUser(pubkey: walletPubkey)
                     
-                    let eventContent = await event.content
+                    let eventContent = event.content
                     let decrypted = try await signer.decrypt(
                         sender: walletUser,
                         value: eventContent,
@@ -261,7 +259,7 @@ public struct NWCResponseHandler {
                 let task = Task {
                 for try await event in subscription {
                     // Check if this is an NWC notification (no e-tag)
-                    let eventTags = await event.tags
+                    let eventTags = event.tags
                     guard !eventTags.contains(where: { $0.count >= 1 && $0[0] == "e" }) else {
                         continue
                     }
@@ -275,7 +273,7 @@ public struct NWCResponseHandler {
                     
                     // Decrypt the notification
                     do {
-                        let eventContent = await event.content
+                        let eventContent = event.content
                         let decrypted = try await signer.decrypt(
                             sender: walletUser,
                             value: eventContent,

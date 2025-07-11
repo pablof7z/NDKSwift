@@ -8,7 +8,7 @@ actor EventCollection {
     /// Add an event if it's not a duplicate
     /// - Returns: true if the event was added, false if it was a duplicate
     func addEvent(_ event: NDKEvent) async -> Bool {
-        guard let eventId = await event.id else { return false }
+        let eventId = event.id
         
         // Check for duplicate
         guard !receivedEventIds.contains(eventId) else { return false }

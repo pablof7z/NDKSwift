@@ -17,7 +17,7 @@ public class CashuPaymentProvider: NDKPaymentProvider {
         guard !mints.isEmpty else { return false }
         
         // Check if we have any balance
-        let balance = await cashuWallet.getBalance()
+        let balance = (try? await cashuWallet.getBalance()) ?? 0
         return balance > 0
     }
     
@@ -31,11 +31,12 @@ public class CashuPaymentProvider: NDKPaymentProvider {
             return await isAvailable()
         }
         
-        if let lightningRequest = request as? LightningInvoiceRequest {
+        if let _ = request as? LightningInvoiceRequest {
             // Check if any of our mints support Lightning
             let mints = await cashuWallet.getMints()
             // In a real implementation, check mint capabilities
-            return !mints.isEmpty && await isAvailable()
+            let available = await isAvailable()
+            return !mints.isEmpty && available
         }
         
         return false
@@ -61,7 +62,7 @@ public class CashuPaymentProvider: NDKPaymentProvider {
     }
     
     public func getBalance() async throws -> Int64? {
-        return await cashuWallet.getBalance()
+        return try? await cashuWallet.getBalance()
     }
     
     // MARK: - Private Methods
@@ -85,9 +86,13 @@ public class CashuPaymentProvider: NDKPaymentProvider {
             )
         } else {
             // No common mints - need to use Lightning bridge
-            // This is where we'd implement cross-mint transfers via Lightning
-            // For now, throw an error indicating Lightning bridge is needed
-            throw PaymentError.requiresLightningBridge
+            // Get wallet mint URLs for error message
+            let walletMintStrings = walletMintURLs.map { $0.absoluteString }
+            let recipientMintStrings = acceptedMintURLs.map { $0.absoluteString }
+            throw ZapError.noCommonMints(
+                wallet: walletMintStrings,
+                recipient: recipientMintStrings
+            )
         }
         
         // Generate P2PK-locked proofs for the selected mint
@@ -148,7 +153,7 @@ public class CashuPaymentProvider: NDKPaymentProvider {
         }
         
         // If no single mint has enough balance
-        let totalBalance = await cashuWallet.getBalance()
+        let totalBalance = (try? await cashuWallet.getBalance()) ?? 0
         if totalBalance < amount {
             throw PaymentError.insufficientBalance(available: totalBalance, required: amount)
         }
@@ -158,27 +163,18 @@ public class CashuPaymentProvider: NDKPaymentProvider {
     }
 }
 
-// MARK: - Payment Errors
+// MARK: - Cashu-specific Payment Errors
 
-enum PaymentError: LocalizedError {
-    case cannotFulfillRequest
-    case noAvailableMint
-    case requiresLightningBridge
-    case mintNotAvailable
-    case insufficientBalance(available: Int64, required: Int64)
+extension PaymentError {
+    static var noAvailableMint: PaymentError {
+        return .paymentFailed(reason: "No available mint for payment")
+    }
     
-    var errorDescription: String? {
-        switch self {
-        case .cannotFulfillRequest:
-            return "Cannot fulfill this payment request"
-        case .noAvailableMint:
-            return "No available mint for payment"
-        case .requiresLightningBridge:
-            return "Payment requires Lightning bridge"
-        case .mintNotAvailable:
-            return "Requested mint is not available in wallet"
-        case .insufficientBalance(let available, let required):
-            return "Insufficient balance: \(available) sats available, \(required) required"
-        }
+    static var requiresLightningBridge: PaymentError {
+        return .paymentFailed(reason: "Payment requires Lightning bridge")
+    }
+    
+    static var mintNotAvailable: PaymentError {
+        return .paymentFailed(reason: "Requested mint is not available in wallet")
     }
 }

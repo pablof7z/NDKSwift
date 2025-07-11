@@ -30,7 +30,10 @@ public actor NDKSignatureVerificationSampler {
     ///   - stats: The relay's signature statistics
     /// - Returns: The verification result
     public func verifyEvent(_ event: NDKEvent, from relay: RelayProtocol, stats: inout NDKRelaySignatureStats) async -> NDKSignatureVerificationResult {
-        guard let eventId = event.id, let signature = event.sig else {
+        let eventId = event.id
+        let signature = event.sig
+        
+        guard !eventId.isEmpty, !signature.isEmpty else {
             return .invalid
         }
 
@@ -56,7 +59,7 @@ public actor NDKSignatureVerificationSampler {
         }
 
         // Perform actual signature verification
-        let isValid = verifySignature(event: event)
+        let isValid = await verifySignature(event: event)
 
         if isValid {
             // Cache the verified signature
@@ -149,16 +152,23 @@ public actor NDKSignatureVerificationSampler {
     }
 
     /// Verify the actual signature
-    private func verifySignature(event: NDKEvent) -> Bool {
-        guard let eventId = event.id,
-              let signature = event.sig
-        else {
+    private func verifySignature(event: NDKEvent) async -> Bool {
+        let eventId = event.id
+        let signature = event.sig
+        
+        guard !eventId.isEmpty, !signature.isEmpty else {
             return false
         }
 
         do {
             // Generate the expected event ID
-            let calculatedId = try event.generateID()
+            let calculatedId = try calculateEventID(
+                pubkey: event.pubkey,
+                createdAt: event.createdAt,
+                kind: event.kind,
+                tags: event.tags,
+                content: event.content
+            )
 
             // Verify the ID matches
             guard eventId == calculatedId else {
@@ -176,7 +186,7 @@ public actor NDKSignatureVerificationSampler {
     /// Handle an invalid signature detection
     private func handleInvalidSignature(event: NDKEvent, relay: RelayProtocol) async {
         // A single invalid signature means the relay is evil
-        print("⚠️ EVIL RELAY DETECTED: \(relay.url) provided event \(event.id ?? "unknown") with invalid signature")
+        print("⚠️ EVIL RELAY DETECTED: \(relay.url) provided event \(event.id) with invalid signature")
 
         // Notify delegate on main thread
         let delegateCopy = delegate
@@ -199,5 +209,32 @@ public actor NDKSignatureVerificationSampler {
                 await relay.disconnect()
             }
         }
+    }
+    
+    /// Calculate the event ID according to NIP-01
+    private func calculateEventID(
+        pubkey: String,
+        createdAt: Timestamp,
+        kind: Kind,
+        tags: [Tag],
+        content: String
+    ) throws -> EventID {
+        // [0, pubkey, created_at, kind, tags, content]
+        let array: [Any] = [
+            0,
+            pubkey,
+            createdAt,
+            kind,
+            tags,
+            content
+        ]
+
+        let data = try JSONSerialization.data(withJSONObject: array, options: [.withoutEscapingSlashes])
+        guard let jsonString = String(data: data, encoding: .utf8) else {
+            throw NDKError.encodingError("Failed to serialize event for ID generation")
+        }
+        
+        let hash = jsonString.data(using: .utf8)!.sha256()
+        return hash.toHexString()
     }
 }

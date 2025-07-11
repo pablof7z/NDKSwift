@@ -166,7 +166,7 @@ actor NDKOutboxTracker {
             return nil
         }
 
-        let relayList = NDKRelayList.fromEvent(latestEvent)
+        let relayList = await NDKRelayList.fromEvent(latestEvent)
 
         let readRelayUrls = Set(relayList.readRelays.map { $0.url })
         let readRelays = readRelayUrls
@@ -203,7 +203,7 @@ actor NDKOutboxTracker {
             return nil
         }
 
-        let contactList = NDKContactList.fromEvent(latestEvent)
+        let contactList = await NDKContactList.fromEvent(latestEvent)
 
         // Extract relay URLs from contact entries
         let relayUrls = Set(contactList.contacts.compactMap { $0.relayURL })

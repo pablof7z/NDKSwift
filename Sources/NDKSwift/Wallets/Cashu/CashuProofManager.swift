@@ -151,6 +151,22 @@ actor CashuProofManager {
         proofs[secret]?.state = .spent
     }
     
+    /// Mark multiple proofs as spent
+    func markProofsAsSpent(proofs proofsToMark: [CashuProof], mint: String) {
+        for proof in proofsToMark {
+            self.proofs[proof.secret]?.state = .spent
+            
+            // Remove from mint mapping
+            proofsByMint[mint]?.remove(proof.secret)
+        }
+        
+        // Remove from active reservations
+        let secrets = proofsToMark.map { $0.secret }
+        activeReservations = activeReservations.filter { _, reservation in
+            !reservation.proofs.contains { secrets.contains($0.secret) }
+        }
+    }
+    
     // MARK: - Private Helpers
     
     /// Select proofs to meet the target amount

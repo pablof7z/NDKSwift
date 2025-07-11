@@ -1,4 +1,6 @@
 import Foundation
+// FIXME: Temporarily disabled due to CashuSwift build issues
+// import CashuSwift
 
 /// NIP-61 Nutzap protocol implementation
 public class NDKNutzapProtocol: NDKZapProtocol {
@@ -17,7 +19,7 @@ public class NDKNutzapProtocol: NDKZapProtocol {
         }
         
         // We can zap if they have at least one mint configured
-        return !preferences.mints.isEmpty
+        return !(await preferences.mints).isEmpty
     }
     
     public func prepareZap(
@@ -32,7 +34,7 @@ public class NDKNutzapProtocol: NDKZapProtocol {
         }
         
         // 2. Get all accepted mints
-        let acceptedMints = preferences.mints.map { $0.url }
+        let acceptedMints = (await preferences.mints).map { $0.url }
         guard !acceptedMints.isEmpty else {
             throw ZapError.invalidMint
         }
@@ -41,7 +43,7 @@ public class NDKNutzapProtocol: NDKZapProtocol {
         // Payment provider will choose the optimal one
         let paymentRequest = NutzapFundingRequest(
             amountSats: amountSats,
-            recipientP2PK: preferences.p2pkPubkey,
+            recipientP2PK: await preferences.p2pkPubkey,
             acceptedMints: acceptedMints,
             comment: comment
         )
@@ -49,7 +51,7 @@ public class NDKNutzapProtocol: NDKZapProtocol {
         // 4. Store metadata for completion
         let metadata: [String: Any] = [
             "preferences": preferences,
-            "relays": preferences.relays
+            "relays": await preferences.relays
         ]
         
         return PreparedZap(
@@ -66,7 +68,7 @@ public class NDKNutzapProtocol: NDKZapProtocol {
         confirmation: PaymentConfirmation
     ) async throws -> ZapResult {
         // Extract metadata
-        guard let preferences = prepared.metadata["preferences"] as? NDKNutzapPreferences,
+        guard let _ = prepared.metadata["preferences"] as? NDKNutzapPreferences,
               let relays = prepared.metadata["relays"] as? [String] else {
             throw NDKError.invalidInput(message: "Missing nutzap metadata")
         }
@@ -98,6 +100,55 @@ public class NDKNutzapProtocol: NDKZapProtocol {
         )
     }
     
+    // MARK: - Mint Communication
+    
+    /// Get available mints for a recipient
+    public func getAcceptedMints(for user: NDKUser) async throws -> [URL] {
+        guard let preferences = try await fetchNutzapPreferences(for: user) else {
+            return []
+        }
+        return (await preferences.mints).map { $0.url }
+    }
+    
+    /// Create a mint quote for Lightning-to-Cashu conversion
+    public func createMintQuote(
+        invoice: String,
+        mint: URL,
+        amount: Int64
+    ) async throws -> MintQuote {
+        // FIXME: CashuSwift functionality temporarily disabled due to build issues
+        throw ZapError.mintQuoteFailed(mint: mint.host ?? mint.absoluteString, reason: "CashuSwift temporarily disabled due to build issues")
+        
+        /*
+        // Create a CashuSwift mint connection
+        let cashuMint = CashuSwift.Mint(url: mint, keysets: [])
+        
+        // Request a mint quote from the mint
+        let quoteRequest = CashuSwift.Bolt11.RequestMintQuote(
+            unit: "sat",
+            amount: Int(amount)
+        )
+        
+        do {
+            let quote = try await CashuSwift.getQuote(mint: cashuMint, quoteRequest: quoteRequest)
+            
+            guard let mintQuote = quote as? CashuSwift.Bolt11.MintQuote else {
+                throw ZapError.mintQuoteFailed(mint: mint.host ?? mint.absoluteString, reason: "Invalid quote type")
+            }
+            
+            return MintQuote(
+                id: mintQuote.quote,
+                mint: mint,
+                amount: amount,
+                invoice: mintQuote.request,  // The Lightning invoice to pay
+                expiry: Date(timeIntervalSince1970: TimeInterval(mintQuote.expiry ?? 0))
+            )
+        } catch {
+            throw ZapError.mintQuoteFailed(mint: mint.host ?? mint.absoluteString, reason: error.localizedDescription)
+        }
+        */
+    }
+    
     // MARK: - Private Methods
     
     private func fetchNutzapPreferences(for user: NDKUser) async throws -> NDKNutzapPreferences? {
@@ -111,4 +162,14 @@ public class NDKNutzapProtocol: NDKZapProtocol {
         
         return NDKNutzapPreferences(event: event)
     }
+}
+
+// MARK: - Mint Quote Support
+
+public struct MintQuote {
+    public let id: String
+    public let mint: URL
+    public let amount: Int64
+    public let invoice: String
+    public let expiry: Date
 }

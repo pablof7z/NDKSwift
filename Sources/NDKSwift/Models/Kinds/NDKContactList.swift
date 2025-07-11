@@ -60,8 +60,8 @@ public class NDKContactList: NDKList {
     }
 
     /// Create an NDKContactList from an existing NDKEvent
-    public static func fromEvent(_ event: NDKEvent) -> NDKContactList {
-        let contactList = NDKContactList(ndk: event.ndk)
+    public static func fromEvent(_ event: NDKEvent, ndk: NDK? = nil) -> NDKContactList {
+        let contactList = NDKContactList(ndk: ndk)
         contactList.id = event.id
         contactList.pubkey = event.pubkey
         contactList.createdAt = event.createdAt
@@ -299,7 +299,7 @@ public extension NDK {
         let events = try await fetchEvents(filters: [filter])
 
         guard let event = events.first else { return nil }
-        return NDKContactList.fromEvent(event)
+        return await NDKContactList.fromEvent(event)
     }
 
     /// Fetch the contact list for the current user

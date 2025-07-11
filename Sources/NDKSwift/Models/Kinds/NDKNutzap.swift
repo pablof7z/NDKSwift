@@ -18,9 +18,9 @@ public struct NDKNutzap {
         comment: String? = nil,
         zappedEvent: NDKEvent? = nil
     ) async throws -> NDKNutzap {
-        let event = NDKEvent()
-        event.kind = 9321
-        event.content = comment ?? ""
+        guard let signer = ndk.signer else {
+            throw NDKError.notConfigured("No signer configured")
+        }
         
         var tags: [[String]] = []
         
@@ -39,12 +39,15 @@ public struct NDKNutzap {
         tags.append(["p", recipient.pubkey])
         
         // Add zapped event if present
-        if let zappedEvent = zappedEvent, let eventId = zappedEvent.id {
-            tags.append(["e", eventId, ""])
+        if let zappedEvent = zappedEvent {
+            tags.append(["e", zappedEvent.id, ""])
         }
         
-        event.tags = tags
-        try await event.sign()
+        let event = try await NDKEventBuilder()
+            .kind(9321)
+            .content(comment ?? "")
+            .tags(tags)
+            .build(signer: signer)
         
         return NDKNutzap(event: event)
     }
@@ -53,12 +56,14 @@ public struct NDKNutzap {
     
     /// The comment/message
     public var comment: String? {
-        event.content.isEmpty ? nil : event.content
+        let content = event.content
+        return content.isEmpty ? nil : content
     }
     
     /// Cashu proofs
     public var proofs: [CashuProof] {
-        event.tags
+        let tags = event.tags
+        return tags
             .filter { $0.first == "proof" }
             .compactMap { tag in
                 guard let proofJSON = tag[safe: 1],
@@ -72,7 +77,8 @@ public struct NDKNutzap {
     
     /// Mint URL
     public var mintURL: URL? {
-        guard let urlString = event.tags.first(where: { $0.first == "u" })?[safe: 1] else {
+        let tags = event.tags
+        guard let urlString = tags.first(where: { $0.first == "u" })?[safe: 1] else {
             return nil
         }
         return URL(string: urlString)
@@ -80,17 +86,20 @@ public struct NDKNutzap {
     
     /// Recipient's pubkey
     public var recipientPubkey: String? {
-        event.tags.first(where: { $0.first == "p" })?[safe: 1]
+        let tags = event.tags
+        return tags.first(where: { $0.first == "p" })?[safe: 1]
     }
     
     /// Zapped event ID if this is zapping an event
     public var zappedEventId: String? {
-        event.tags.first(where: { $0.first == "e" })?[safe: 1]
+        let tags = event.tags
+        return tags.first(where: { $0.first == "e" })?[safe: 1]
     }
     
     /// Total amount in the proofs
     public var totalAmount: Int64 {
-        proofs.reduce(0) { $0 + Int64($1.amount) }
+        let proofs = self.proofs
+        return proofs.reduce(0) { $0 + Int64($1.amount) }
     }
     
     // MARK: - Validation
@@ -98,15 +107,20 @@ public struct NDKNutzap {
     /// Validate the nutzap according to NIP-61 requirements
     /// - Parameter recipientPreferences: The recipient's nutzap preferences
     /// - Returns: true if valid, false otherwise
-    public func validate(recipientPreferences: NDKNutzapPreferences) -> Bool {
+    public func validate(recipientPreferences: NDKNutzapPreferences) async -> Bool {
         // 1. Check that the mint is in the recipient's accepted list
-        guard let mintURL = mintURL,
-              recipientPreferences.mints.contains(where: { $0.url == mintURL }) else {
+        guard let mintURL = await mintURL else {
+            return false
+        }
+        
+        let recipientMints = await recipientPreferences.mints
+        guard recipientMints.contains(where: { $0.url == mintURL }) else {
             return false
         }
         
         // 2. Check that proofs are P2PK-locked to the recipient's pubkey
-        let recipientP2PKPubkey = recipientPreferences.p2pkPubkey
+        let recipientP2PKPubkey = await recipientPreferences.p2pkPubkey
+        let proofs = await self.proofs
         for proof in proofs {
             guard proof.isLockedTo(pubkey: recipientP2PKPubkey) else {
                 return false
@@ -143,8 +157,9 @@ public struct NDKNutzapPreferences {
         mints: [(url: URL, units: [String])],
         p2pkKeyPair: KeyPair
     ) async throws -> NDKNutzapPreferences {
-        let event = NDKEvent()
-        event.kind = 10019
+        guard let signer = ndk.signer else {
+            throw NDKError.notConfigured("No signer configured")
+        }
         
         var tags: [[String]] = []
         
@@ -164,8 +179,10 @@ public struct NDKNutzapPreferences {
         let p2pkPubkey = "02" + p2pkKeyPair.publicKey
         tags.append(["pubkey", p2pkPubkey])
         
-        event.tags = tags
-        try await event.sign()
+        let event = try await NDKEventBuilder()
+            .kind(10019)
+            .tags(tags)
+            .build(signer: signer)
         
         return NDKNutzapPreferences(event: event)
     }
@@ -174,14 +191,14 @@ public struct NDKNutzapPreferences {
     
     /// Relays where the user will read nutzap events
     public var relays: [String] {
-        event.tags
+        return event.tags
             .filter { $0.first == "relay" }
             .compactMap { $0[safe: 1] }
     }
     
     /// Accepted mints and their supported units
     public var mints: [(url: URL, units: [String])] {
-        event.tags
+        return event.tags
             .filter { $0.first == "mint" }
             .compactMap { tag in
                 guard let urlString = tag[safe: 1],
@@ -195,7 +212,7 @@ public struct NDKNutzapPreferences {
     
     /// P2PK public key for receiving nutzaps
     public var p2pkPubkey: String {
-        event.tags.first(where: { $0.first == "pubkey" })?[safe: 1] ?? ""
+        return event.tags.first(where: { $0.first == "pubkey" })?[safe: 1] ?? ""
     }
 }
 

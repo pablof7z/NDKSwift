@@ -43,20 +43,22 @@ public actor MintDiscovery {
         units: [String]? = nil,
         since: Date? = nil
     ) async throws -> [DiscoveredMint] {
-        var filter = NDKFilter(kinds: [.mintAnnouncement], limit: limit)
-        
-        // Add unit filter if specified
+        // Prepare tags
+        var tags: [String: Set<String>]? = nil
         if let units = units, !units.isEmpty {
-            filter.tags = ["unit": units]
+            tags = ["unit": Set(units)]
         }
         
-        // Add time filter if specified
-        if let since = since {
-            filter.since = Timestamp(since.timeIntervalSince1970)
-        }
+        // Create filter
+        let filter = NDKFilter(
+            kinds: [38000], // Mint announcement events
+            since: since.map { Timestamp($0.timeIntervalSince1970) },
+            limit: limit,
+            tags: tags
+        )
         
         // Fetch events
-        let events = try await ndk.fetchEvents(filter, from: relays)
+        let events = try await ndk.fetchEvents(filter)
         
         // Parse and score mints
         var discoveredMints: [DiscoveredMint] = []
@@ -67,7 +69,7 @@ public actor MintDiscovery {
             }
             
             // Calculate reputation
-            let reputation = calculateReputation(for: event, announcement: announcement)
+            let reputation = await calculateReputation(for: event, announcement: announcement)
             
             let discovered = DiscoveredMint(
                 announcement: announcement,
@@ -86,9 +88,9 @@ public actor MintDiscovery {
     
     /// Discovers a specific mint by URL
     public func discoverMint(url: URL, from relays: [String]? = nil) async throws -> [DiscoveredMint] {
-        let filter = NDKFilter(kinds: [.mintAnnouncement], tags: ["u": [url.absoluteString]])
+        let filter = NDKFilter(kinds: [38000], tags: ["u": Set([url.absoluteString])])
         
-        let events = try await ndk.fetchEvents(filter, from: relays)
+        let events = try await ndk.fetchEvents(filter)
         
         var discoveredMints: [DiscoveredMint] = []
         
@@ -97,7 +99,7 @@ public actor MintDiscovery {
                 continue
             }
             
-            let reputation = calculateReputation(for: event, announcement: announcement)
+            let reputation = await calculateReputation(for: event, announcement: announcement)
             
             let discovered = DiscoveredMint(
                 announcement: announcement,
@@ -114,20 +116,20 @@ public actor MintDiscovery {
     /// Publishes a mint announcement to Nostr
     public func announceMint(_ announcement: NDKMintAnnouncement, to relays: [String]? = nil) async throws -> NDKEvent {
         guard let signer = ndk.signer else {
-            throw NDKError.signerNotSet
+            throw NDKError.notConfigured("No signer configured")
         }
         
-        let keypair = try await signer.keypair()
-        let event = try NDKEvent.mintAnnouncement(announcement: announcement, keypair: keypair)
+        let pubkey = try await signer.pubkey
+        let event = try await NDKEvent.mintAnnouncement(announcement: announcement, pubkey: pubkey, signer: signer)
         
-        try await ndk.publish(event, to: relays)
+        try await ndk.publish(event)
         
         return event
     }
     
     // MARK: - Private Methods
     
-    private func calculateReputation(for event: NDKEvent, announcement: NDKMintAnnouncement) -> MintReputation {
+    private func calculateReputation(for event: NDKEvent, announcement: NDKMintAnnouncement) async -> MintReputation {
         var score = 0.5  // Base score
         
         // Increase score for well-formed announcements

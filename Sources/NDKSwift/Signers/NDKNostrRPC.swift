@@ -100,17 +100,12 @@ public actor NDKNostrRPC {
         let encryptedContent = try await localSigner.encrypt(recipient: remoteUser, value: requestString, scheme: encryptionScheme)
         print("[RPC] Encrypted content using scheme: \(encryptionScheme)")
 
-        let localPubkey = try await localSigner.pubkey
-        var event = NDKEvent(
-            pubkey: localPubkey,
-            createdAt: Timestamp(Date().timeIntervalSince1970),
-            kind: 24133,
-            tags: [["p", pubkey]],
-            content: encryptedContent
-        )
-
-        try await localSigner.sign(event: &event)
-        print("[RPC] Created and signed event - id: \(event.id ?? "nil")")
+        let event = try await NDKEventBuilder()
+            .content(encryptedContent)
+            .kind(24133)
+            .tags([["p", pubkey]])
+            .build(signer: localSigner)
+        print("[RPC] Created and signed event - id: \(event.id)")
 
         // Prepare target relays
         let targetRelayUrls = relayUrls.isEmpty ? nil : Set(relayUrls)
