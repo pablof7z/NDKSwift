@@ -920,6 +920,22 @@ public actor NDKCashuWallet: NDKWallet {
         try await saveTokenEvents(signer: signer)
     }
     
+    /// Process a new token event (used when monitoring real-time events)
+    public func processIncomingTokenEvent(_ event: NDKEvent) async throws {
+        guard let signer = ndk.signer else {
+            throw NDKError.notConfigured("No signer configured")
+        }
+        
+        // Only process events from ourselves
+        let userPubkey = try await signer.pubkey
+        guard event.pubkey == userPubkey else {
+            return
+        }
+        
+        // Load the token event if it's not filtered
+        try await loadTokenEvent(event: event, signer: signer)
+    }
+    
     /// Save wallet configuration event (kind 17375)
     private func saveWalletEvent(signer: NDKSigner) async throws {
         print("🔍 Preparing wallet event...")
@@ -1093,6 +1109,9 @@ public actor NDKCashuWallet: NDKWallet {
         guard let signer = ndk.signer else {
             throw NDKError.notConfigured("No signer configured for NDKCashuWallet")
         }
+        
+        // Add original event IDs to our superseded set immediately
+        supersededTokenEventIds.formUnion(originalEventIds)
         
         // Create delete events for the original token events
         for eventId in originalEventIds {
