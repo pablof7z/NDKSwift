@@ -310,8 +310,8 @@ public actor NDKBunkerSigner: NDKSigner, Sendable {
                 
                 do {
                     for try await event in subscription {
-                        let eventKind = await event.kind
-                        let eventPubkey = await event.pubkey
+                        let eventKind = event.kind
+                        let eventPubkey = event.pubkey
                         print("[BunkerSigner] Received event: kind=\(eventKind), from=\(eventPubkey)")
                         await self?.handleIncomingEvent(event)
                     }
@@ -396,7 +396,7 @@ public actor NDKBunkerSigner: NDKSigner, Sendable {
 
         // Handle nostrconnect flow
         if let secret = nostrConnectSecret, response.result == secret {
-            let responsePubkey = await response.event.pubkey
+            let responsePubkey = response.event.pubkey
             userPubkey = responsePubkey
             bunkerPubkey = responsePubkey
             isConnected = true
@@ -449,7 +449,7 @@ public actor NDKBunkerSigner: NDKSigner, Sendable {
             throw NDKError.connectionLost(relay: "bunker", message: "Not connected")
         }
 
-        let eventJson = try await event.serialize()
+        let eventJson = try event.serialize()
 
         let response = try await rpcClient?.sendRequest(
             to: bunkerPubkey,
@@ -474,8 +474,9 @@ public actor NDKBunkerSigner: NDKSigner, Sendable {
     }
 
     public func sign(event: inout NDKEvent) async throws {
-        let signature = try await performSign(event)
-        await event.setSig(signature)
+        // This method is deprecated - NDKBunkerSigner doesn't support direct signing
+        // Use NDKEventBuilder instead
+        throw NDKError.unsupportedOperation(message: "NDKBunkerSigner requires using NDKEventBuilder for signing")
     }
 
     public func getPublicKey() async throws -> String {

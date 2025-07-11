@@ -59,6 +59,12 @@ public enum NDKError: LocalizedError {
     case walletNotFound(resource: String)
     case walletError(message: String)
     
+    // Cashu errors
+    case invalidRequest(String)
+    case noMintAvailable(String)
+    case encodingError(String)
+    case invalidContent(String)
+    
     // File/Blossom errors
     case invalidURL(String)
     case invalidResponse(from: String)
@@ -166,6 +172,16 @@ public enum NDKError: LocalizedError {
             return "Wallet resource not found: \(resource)"
         case .walletError(let message):
             return message
+            
+        // Cashu
+        case .invalidRequest(let message):
+            return "Invalid request: \(message)"
+        case .noMintAvailable(let message):
+            return "No mint available: \(message)"
+        case .encodingError(let message):
+            return "Encoding error: \(message)"
+        case .invalidContent(let message):
+            return "Invalid content: \(message)"
             
         // File/Blossom
         case .invalidURL(let url):

@@ -20,8 +20,8 @@ public final class NDK {
     /// Event repository
     private let eventRepository: NDKEventRepository
 
-    /// Published events tracking (for OK message handling)
-    private var publishedEvents: [EventID: NDKEvent] = [:]
+    /// Event tracker for managing event metadata
+    public let eventTracker: NDKEventTracker = NDKEventTracker()
 
     /// Subscription manager
     private var subscriptionManager: NDKSubscriptionManager!
@@ -222,19 +222,8 @@ public final class NDK {
     /// ```
     @discardableResult
     public func publish(_ event: NDKEvent) async throws -> Set<NDKRelay> {
-        // Sign event if not already signed
-        if await event.sig == nil {
-            guard signer != nil else {
-                throw NDKError.notConfigured("No signer configured")
-            }
-
-            // Set NDK instance and sign (this will also generate content tags)
-            await event.setNDK(self)
-            try await event.sign()
-        }
-
-        // Validate event
-        try await event.validate()
+        // Validate event (events must be pre-signed)
+        try event.validate()
 
         // Store in cache if available
         if let cache = cache {
@@ -255,20 +244,15 @@ public final class NDK {
         }
 
         // Fallback to direct publishing if outbox is disabled
-        // Track this event for OK message handling
-        if let eventId = await event.id {
-            publishedEvents[eventId] = event
-        }
-
         // Get all relays we want to publish to
         let targetRelays = await relayPool.relays
 
         // Publish to connected relays
         let publishedRelays = await relayPool.publishEvent(event)
 
-        // Update event's relay publish statuses
+        // Update event's relay publish statuses in tracker
         for relay in publishedRelays {
-            await event.updatePublishStatus(relay: relay.url, status: .succeeded)
+            await eventTracker.updatePublishStatus(eventId: event.id, relay: relay.url, status: .succeeded)
         }
 
         // Find relays that weren't connected or failed
@@ -280,13 +264,12 @@ public final class NDK {
         if !unpublishedRelayUrls.isEmpty {
             // Mark these relays as pending
             for relayUrl in unpublishedRelayUrls {
-                await event.updatePublishStatus(relay: relayUrl, status: .pending)
+                await eventTracker.updatePublishStatus(eventId: event.id, relay: relayUrl, status: .pending)
             }
         }
 
         if debugMode {
-            let eventId = await event.id
-            let noteId = (try? Bech32.note(from: eventId ?? "")) ?? eventId ?? "unknown"
+            let noteId = (try? Bech32.note(from: event.id)) ?? event.id
             if publishedRelays.isEmpty {
                 print("📝 Event \(noteId) created but not published to any relays. Will retry when relays connect.")
             } else {
@@ -298,16 +281,13 @@ public final class NDK {
             }
         }
 
-        return publishedRelays
+        return Set(publishedRelays)
     }
 
     /// Publish an event to specific relays by URL
     public func publish(event: NDKEvent, to relayUrls: Set<String>) async throws -> Set<NDKRelay> {
-        // Sign the event if needed
-        if await event.sig == nil {
-            await event.setNDK(self)
-            try await event.sign()
-        }
+        // Validate event (events must be pre-signed)
+        try event.validate()
 
         // Use relays from the pool or add them if needed
         var targetRelays: Set<NDKRelay> = []
@@ -346,10 +326,10 @@ public final class NDK {
                     do {
                         let eventMessage = NostrMessage.event(subscriptionId: nil, event: event)
                         try await relay.send(eventMessage.serialize())
-                        await event.updatePublishStatus(relay: relay.url, status: .succeeded)
+                        await self.eventTracker.updatePublishStatus(eventId: event.id, relay: relay.url, status: .succeeded)
                         return relay
                     } catch {
-                        await event.updatePublishStatus(relay: relay.url, status: .failed(.connectionFailed))
+                        await self.eventTracker.updatePublishStatus(eventId: event.id, relay: relay.url, status: .failed(.connectionFailed))
                         return nil
                     }
                 }
@@ -363,6 +343,32 @@ public final class NDK {
         }
 
         return publishedRelays
+    }
+    
+    /// Publish an event using the builder pattern (convenience method)
+    /// 
+    /// - Parameter builder: A closure that configures the event builder
+    /// 
+    /// - Returns: The published event and set of successful relays
+    /// 
+    /// - Throws: Building, signing, or publishing errors
+    /// 
+    /// ## Example
+    /// ```swift
+    /// let (event, relays) = try await ndk.publish { builder in
+    ///     builder.content("Hello!")
+    ///           .kind(EventKind.textNote)
+    /// }
+    /// ```
+    @discardableResult
+    public func publish(_ builder: (NDKEventBuilder) -> NDKEventBuilder) async throws -> (event: NDKEvent, relays: Set<NDKRelay>) {
+        guard let signer = signer else {
+            throw NDKError.notConfigured("No signer configured")
+        }
+        
+        let event = try await builder(NDKEventBuilder()).build(signer: signer)
+        let relays = try await publish(event)
+        return (event, relays)
     }
 
     // MARK: - Subscriptions
@@ -571,7 +577,7 @@ public final class NDK {
         
         if let metadataEvent = try await fetchEvent(filter, relays: relays, useCache: useCache) {
             // Parse the profile from the event content
-            guard let profileData = (await metadataEvent.content).data(using: .utf8),
+            guard let profileData = metadataEvent.content.data(using: .utf8),
                   let profile = try? JSONDecoder().decode(NDKUserProfile.self, from: profileData) else {
                 return nil
             }
@@ -586,7 +592,7 @@ public final class NDK {
     /// Process an event received from a relay (called by relay connections)
     func processEvent(_ event: NDKEvent, from relay: RelayProtocol) async {
         // Mark event as seen on this relay
-        await event.markSeenOn(relay: relay.url)
+        await eventTracker.markSeenOn(event: event, relay: relay.url)
 
         Task {
             // Get current stats
@@ -610,12 +616,12 @@ public final class NDK {
             case .invalid:
                 // Invalid signature - don't process this event
                 if debugMode {
-                    print("❌ Event \(await event.id ?? "unknown") from \(relay.url) has invalid signature")
+                    print("❌ Event \(event.id ?? "unknown") from \(relay.url) has invalid signature")
                 }
                 return
             case .valid:
                 if debugMode {
-                    print("✅ Event \(await event.id ?? "unknown") signature verified from \(relay.url)")
+                    print("✅ Event \(event.id ?? "unknown") signature verified from \(relay.url)")
                 }
             case .cached:
                 // Already verified
@@ -623,7 +629,7 @@ public final class NDK {
             case .skipped:
                 // Skipped due to sampling
                 if debugMode {
-                    print("⏭️ Event \(await event.id ?? "unknown") signature verification skipped (sampling) from \(relay.url)")
+                    print("⏭️ Event \(event.id ?? "unknown") signature verification skipped (sampling) from \(relay.url)")
                 }
             }
 
@@ -646,18 +652,15 @@ public final class NDK {
 
     /// Process OK message from relay (called by relay connections)
     func processOKMessage(eventId: EventID, accepted: Bool, message: String?, from relay: RelayProtocol) async {
-        // Find the event in our published events
-        if let event = publishedEvents[eventId] {
-            // Store the OK message
-            await event.addOKMessage(relay: relay.url, accepted: accepted, message: message)
+        // Store the OK message
+        await eventTracker.addOKMessage(eventId: eventId, relay: relay.url, accepted: accepted, message: message)
 
-            // Update publish status based on OK response
-            if accepted {
-                await event.updatePublishStatus(relay: relay.url, status: .succeeded)
-            } else {
-                let reason = message ?? "Rejected by relay"
-                await event.updatePublishStatus(relay: relay.url, status: .failed(.custom(reason)))
-            }
+        // Update publish status based on OK response
+        if accepted {
+            await eventTracker.updatePublishStatus(eventId: eventId, relay: relay.url, status: .succeeded)
+        } else {
+            let reason = message ?? "Rejected by relay"
+            await eventTracker.updatePublishStatus(eventId: eventId, relay: relay.url, status: .failed(.custom(reason)))
         }
     }
     
@@ -689,17 +692,15 @@ public final class NDK {
         }
         
         // Create auth event (kind 22242)
-        let authEvent = NDKEvent()
-        await authEvent.setKind(22242)
-        await authEvent.setTags([
-            ["relay", relay.url],
-            ["challenge", challenge]
-        ])
-        await authEvent.setNDK(self)
-        
         do {
-            // Sign the auth event
-            try await authEvent.sign()
+            // Build and sign the auth event
+            let authEvent = try await NDKEventBuilder()
+                .kind(22242)
+                .tags([
+                    ["relay", relay.url],
+                    ["challenge", challenge]
+                ])
+                .build(signer: signer!)
             
             // Send AUTH response (as an EVENT message containing the signed auth event)
             let authMessage = NostrMessage.event(subscriptionId: nil, event: authEvent)
@@ -885,7 +886,8 @@ public final class NDK {
             
             // Update users with fetched profiles
             for event in events {
-                if let npub = pubkeyToNpub[event.pubkey],
+                let eventPubkey = event.pubkey
+                if let npub = pubkeyToNpub[eventPubkey],
                    let user = result[npub] {
                     // Profile will be automatically parsed and cached by NDKUser
                     user.processMetadataEvent(event)
@@ -944,7 +946,8 @@ public final class NDK {
         
         // Map events back to their bech32 identifiers
         for event in events {
-            if let bech32 = eventIdToBech32[event.id] {
+            let eventId = event.id
+            if let eventId = eventId, let bech32 = eventIdToBech32[eventId] {
                 result[bech32] = event
             }
         }
@@ -1149,7 +1152,7 @@ final class NDKEventRepository: @unchecked Sendable {
     private let queue = DispatchQueue(label: "com.ndkswift.eventrepository", attributes: .concurrent)
 
     func addEvent(_ event: NDKEvent) async {
-        guard let eventId = await event.id else { return }
+        guard let eventId = event.id else { return }
 
         queue.async(flags: .barrier) { [weak self] in
             self?.events[eventId] = event

@@ -86,7 +86,7 @@ public actor BlossomClient {
         if let acceptedTypes = descriptor?.acceptsMimeTypes,
            let mimeType = mimeType,
            !acceptedTypes.contains(mimeType) && !acceptedTypes.contains("*/*") {
-            throw NDKError.unsupportedMimeType(mimeType ?? "unknown")
+            throw NDKError.unsupportedMimeType(mimeType)
         }
 
         // Construct upload URL
@@ -102,7 +102,7 @@ public actor BlossomClient {
             request.setValue(mimeType, forHTTPHeaderField: "Content-Type")
         }
 
-        let authHeader = try auth.authorizationHeaderValue()
+        let authHeader = try await auth.authorizationHeaderValue()
         request.setValue(authHeader, forHTTPHeaderField: "Authorization")
 
         do {
@@ -188,7 +188,7 @@ public actor BlossomClient {
         request.httpMethod = "GET"
         request.setValue("application/json", forHTTPHeaderField: "Accept")
 
-        let authHeader = try auth.authorizationHeaderValue()
+        let authHeader = try await auth.authorizationHeaderValue()
         request.setValue(authHeader, forHTTPHeaderField: "Authorization")
 
         do {
@@ -243,7 +243,7 @@ public actor BlossomClient {
         var request = URLRequest(url: deleteURL)
         request.httpMethod = "DELETE"
 
-        let authHeader = try auth.authorizationHeaderValue()
+        let authHeader = try await auth.authorizationHeaderValue()
         request.setValue(authHeader, forHTTPHeaderField: "Authorization")
 
         do {

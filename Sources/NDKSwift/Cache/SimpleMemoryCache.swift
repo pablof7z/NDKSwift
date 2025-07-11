@@ -10,9 +10,7 @@ public actor SimpleMemoryCache: NDKCache {
     // MARK: - Event Operations
     
     public func saveEvent(_ event: NDKEvent) async throws {
-        guard let eventId = event.id else {
-            throw NDKError.invalidEventID("Event has no ID")
-        }
+        let eventId = event.id
         events[eventId] = event
         print("[SimpleMemoryCache] Saved event \(eventId)")
     }
@@ -27,7 +25,7 @@ public actor SimpleMemoryCache: NDKCache {
         var results: [NDKEvent] = []
         
         for event in events.values {
-            if filter.matches(event: event) {
+            if await filter.matches(event: event) {
                 results.append(event)
             }
         }
@@ -38,7 +36,27 @@ public actor SimpleMemoryCache: NDKCache {
         }
         
         // Sort by created_at descending
-        results.sort { $0.createdAt > $1.createdAt }
+        // Extract created_at values for sorting
+        let sortedResults = await withTaskGroup(of: (NDKEvent, Timestamp).self) { group in
+            for event in results {
+                group.addTask {
+                    let timestamp = event.createdAt
+                    return (event, timestamp)
+                }
+            }
+            
+            var eventWithTimestamps: [(NDKEvent, Timestamp)] = []
+            for await result in group {
+                eventWithTimestamps.append(result)
+            }
+            
+            // Sort by timestamp descending
+            eventWithTimestamps.sort { $0.1 > $1.1 }
+            
+            return eventWithTimestamps.map { $0.0 }
+        }
+        
+        results = sortedResults
         
         print("[SimpleMemoryCache] Query returned \(results.count) events")
         return results

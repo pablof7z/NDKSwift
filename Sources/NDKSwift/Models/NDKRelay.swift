@@ -78,6 +78,7 @@ actor RelayStateActor {
     var reconnectTask: Task<Void, Never>?
     var reconnectDelay: TimeInterval = 1.0
     let maxReconnectDelay: TimeInterval = 300.0 // 5 minutes
+    var manuallyDisconnected: Bool = false
     
     // MARK: - Connection State
     
@@ -134,6 +135,14 @@ actor RelayStateActor {
     
     func resetReconnectDelay() {
         reconnectDelay = 1.0
+    }
+    
+    func setManuallyDisconnected(_ value: Bool) {
+        manuallyDisconnected = value
+    }
+    
+    func isManuallyDisconnected() -> Bool {
+        return manuallyDisconnected
     }
     
     // MARK: - Stats
@@ -220,9 +229,21 @@ public final class NDKRelay: RelayProtocol, Hashable, Equatable, Sendable {
     public nonisolated(unsafe) weak var ndk: NDK?
 
     /// Subscription manager for this relay
-    lazy var subscriptionManager: NDKRelaySubscriptionManager = {
-        return NDKRelaySubscriptionManager(relay: self)
-    }()
+    nonisolated(unsafe) private var _subscriptionManager: NDKRelaySubscriptionManager?
+    private let subscriptionManagerLock = NSLock()
+    
+    var subscriptionManager: NDKRelaySubscriptionManager {
+        subscriptionManagerLock.lock()
+        defer { subscriptionManagerLock.unlock() }
+        
+        if let manager = _subscriptionManager {
+            return manager
+        }
+        
+        let manager = NDKRelaySubscriptionManager(relay: self)
+        _subscriptionManager = manager
+        return manager
+    }
 
     /// Internal state actor that manages all mutable state
     private let stateActor = RelayStateActor()
@@ -302,6 +323,9 @@ public final class NDKRelay: RelayProtocol, Hashable, Equatable, Sendable {
         await stateActor.updateConnectionState(.connecting)
         print("[NDKRelay] State updated to connecting for \(url)")
         
+        // Reset manual disconnection flag when explicitly connecting
+        await stateActor.setManuallyDisconnected(false)
+        
         await stateActor.updateStats {
             $0.connectionAttempts += 1
         }
@@ -338,6 +362,9 @@ public final class NDKRelay: RelayProtocol, Hashable, Equatable, Sendable {
 
         await stateActor.updateConnectionState(.disconnecting)
 
+        // Mark as manually disconnected to prevent auto-reconnection
+        await stateActor.setManuallyDisconnected(true)
+
         // Cancel reconnection task
         await stateActor.cancelReconnectTask()
 
@@ -352,6 +379,13 @@ public final class NDKRelay: RelayProtocol, Hashable, Equatable, Sendable {
     /// Handle connection failure with exponential backoff
     private func handleConnectionFailure(_ error: Error) async {
         await stateActor.updateConnectionState(.failed(error.localizedDescription))
+
+        // Don't auto-reconnect if the relay was manually disconnected
+        let isManuallyDisconnected = await stateActor.isManuallyDisconnected()
+        if isManuallyDisconnected {
+            print("[NDKRelay] Skipping auto-reconnect for \(url) - manually disconnected")
+            return
+        }
 
         // Schedule reconnection with exponential backoff
         let delay = await stateActor.getReconnectDelay()
@@ -501,7 +535,11 @@ public final class NDKRelay: RelayProtocol, Hashable, Equatable, Sendable {
         await event.setRelay(self)
 
         // Route to subscription manager via NDK only
-        ndk?.processEvent(event, from: self)
+        if let ndk = ndk {
+            Task {
+                await ndk.processEvent(event, from: self)
+            }
+        }
     }
 
     /// Handle EOSE message
@@ -519,7 +557,11 @@ public final class NDKRelay: RelayProtocol, Hashable, Equatable, Sendable {
         }
 
         // Notify NDK about OK message
-        ndk?.processOKMessage(eventId: eventId, accepted: accepted, message: message, from: self)
+        if let ndk = ndk {
+            Task {
+                await ndk.processOKMessage(eventId: eventId, accepted: accepted, message: message, from: self)
+            }
+        }
     }
 
     /// Handle NOTICE message

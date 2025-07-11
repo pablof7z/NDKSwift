@@ -115,7 +115,7 @@ public actor NDKNWCWallet: NDKNWCWalletProtocol {
         
         // Wait for multiple responses
         return try await responseHandler.waitForMultipleResponses(
-            requestId: event.id!,
+            requestId: event.id,
             responseType: PayInvoiceResponse.self,
             expectedCount: invoices.count
         )
@@ -150,7 +150,7 @@ public actor NDKNWCWallet: NDKNWCWalletProtocol {
         
         // Wait for multiple responses
         return try await responseHandler.waitForMultipleResponses(
-            requestId: event.id!,
+            requestId: event.id,
             responseType: PayKeysendResponse.self,
             expectedCount: keysends.count
         )
@@ -232,7 +232,7 @@ public actor NDKNWCWallet: NDKNWCWalletProtocol {
         let event = try await requestBuilder.buildGetBalanceRequest()
         
         // Use the new method that subscribes before publishing
-        let eventId = await event.id ?? "nil"
+        let eventId = event.id
         print("[NWC] Executing get_balance request with ID: \(eventId)")
         let response = try await responseHandler.executeRequestAndWaitForResponse(
             event: event,
@@ -262,7 +262,7 @@ public actor NDKNWCWallet: NDKNWCWalletProtocol {
     public func getInfo() async throws -> GetInfoResponse {
         print("[NWC] Building get_info request...")
         let event = try await requestBuilder.buildGetInfoRequest()
-        let eventId = await event.id ?? "nil"
+        let eventId = event.id
         print("[NWC] Request event ID: \(eventId)")
         
         // Use the new method that subscribes before publishing

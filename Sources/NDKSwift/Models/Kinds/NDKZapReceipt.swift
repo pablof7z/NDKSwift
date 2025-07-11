@@ -13,26 +13,17 @@ public struct NDKZapReceipt {
     
     /// The bolt11 invoice
     public var bolt11: String? {
-        get async {
-            let tags = await event.tags
-            return tags.first(where: { $0.first == "bolt11" })?[safe: 1]
-        }
+        return event.tags.first(where: { $0.first == "bolt11" })?[safe: 1]
     }
     
     /// The preimage (payment proof)
     public var preimage: String? {
-        get async {
-            let tags = await event.tags
-            return tags.first(where: { $0.first == "preimage" })?[safe: 1]
-        }
+        return event.tags.first(where: { $0.first == "preimage" })?[safe: 1]
     }
     
     /// The original zap request as JSON
     public var descriptionJSON: String? {
-        get async {
-            let tags = await event.tags
-            return tags.first(where: { $0.first == "description" })?[safe: 1]
-        }
+        return event.tags.first(where: { $0.first == "description" })?[safe: 1]
     }
     
     /// The decoded zap request
@@ -45,36 +36,29 @@ public struct NDKZapReceipt {
         return NDKZapRequest(event: requestEvent)
     }
     
+    /// The zap request ID (from the decoded request)
+    public var zapRequestId: String? {
+        return zapRequest?.event.id
+    }
+    
     /// Zap recipient's pubkey
     public var recipientPubkey: String? {
-        get async {
-            let tags = await event.tags
-            return tags.first(where: { $0.first == "p" })?[safe: 1]
-        }
+        return event.tags.first(where: { $0.first == "p" })?[safe: 1]
     }
     
     /// Zap sender's pubkey (optional)
     public var senderPubkey: String? {
-        get async {
-            let tags = await event.tags
-            return tags.first(where: { $0.first == "P" })?[safe: 1]
-        }
+        return event.tags.first(where: { $0.first == "P" })?[safe: 1]
     }
     
     /// Zapped event ID if this receipt is for an event zap
     public var zappedEventId: String? {
-        get async {
-            let tags = await event.tags
-            return tags.first(where: { $0.first == "e" })?[safe: 1]
-        }
+        return event.tags.first(where: { $0.first == "e" })?[safe: 1]
     }
     
     /// Zapped event coordinate for addressable events
     public var zappedEventCoordinate: String? {
-        get async {
-            let tags = await event.tags
-            return tags.first(where: { $0.first == "a" })?[safe: 1]
-        }
+        return event.tags.first(where: { $0.first == "a" })?[safe: 1]
     }
     
     /// Amount in millisatoshis (parsed from bolt11)
@@ -85,12 +69,12 @@ public struct NDKZapReceipt {
     
     /// Amount in satoshis
     public var amountSats: Int64? {
-        amountMillisats.map { $0 / 1000 }
+        return amountMillisats.map { $0 / 1000 }
     }
     
     /// The comment from the original zap request
     public var comment: String? {
-        zapRequest?.comment
+        return zapRequest?.comment
     }
     
     // MARK: - Validation
@@ -100,15 +84,16 @@ public struct NDKZapReceipt {
     ///   - lnurlProviderPubkey: The pubkey from the recipient's LNURL provider
     ///   - zapRequest: The original zap request to validate against
     /// - Returns: true if valid, false otherwise
-    public func validate(lnurlProviderPubkey: String, zapRequest: NDKZapRequest? = nil) async -> Bool {
+    public func validate(lnurlProviderPubkey: String, zapRequest: NDKZapRequest? = nil) -> Bool {
         // 1. The zap receipt event's pubkey MUST match the provider's nostrPubkey
-        let eventPubkey = await event.pubkey
+        let eventPubkey = event.pubkey
         guard eventPubkey == lnurlProviderPubkey else {
             return false
         }
         
         // 2. If we have the original zap request, validate amounts match
-        if let request = zapRequest ?? self.zapRequest,
+        let effectiveRequest = zapRequest ?? self.zapRequest
+        if let request = effectiveRequest,
            let requestAmount = request.amountMillisats,
            let receiptAmount = amountMillisats {
             guard requestAmount == receiptAmount else {
@@ -140,13 +125,6 @@ public struct NDKZapReceipt {
         preimage: String? = nil,
         paidAt: Date = Date()
     ) async throws -> NDKZapReceipt {
-        let event = NDKEvent(
-            pubkey: "", // Will be set by signer
-            createdAt: Timestamp(paidAt.timeIntervalSince1970),
-            kind: EventKind.zap,
-            content: ""
-        )
-        
         var tags: [[String]] = []
         
         // Copy p, e, a, P tags from zap request
@@ -169,13 +147,12 @@ public struct NDKZapReceipt {
             tags.append(["preimage", preimage])
         }
         
-        for tag in tags {
-            event.addTag(tag)
-        }
-        
-        // Sign with the lightning provider's key
-        event.pubkey = try await signer.pubkey
-        event.sig = try await signer.sign(event)
+        let event = try await NDKEventBuilder()
+            .content("")
+            .kind(EventKind.zap)
+            .tags(tags)
+            .createdAt(Timestamp(paidAt.timeIntervalSince1970))
+            .build(signer: signer)
         
         return NDKZapReceipt(event: event)
     }

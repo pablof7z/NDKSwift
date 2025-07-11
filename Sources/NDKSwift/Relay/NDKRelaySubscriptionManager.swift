@@ -234,8 +234,8 @@ public actor NDKRelaySubscriptionManager {
     }
 
     /// Handle event for routing to appropriate subscriptions
-    public func handleEvent(_ event: NDKEvent, relaySubscriptionId: String?) {
-        guard let eventId = event.id else { return }
+    public func handleEvent(_ event: NDKEvent, relaySubscriptionId: String?) async {
+        let eventId = event.id
 
         #if DEBUG
         print("🔍 SubscriptionManager: Handling event \(eventId) for relay subscription: \(relaySubscriptionId ?? "nil")")
@@ -250,7 +250,13 @@ public actor NDKRelaySubscriptionManager {
             #endif
             
             for subscription in relaySub.subscriptions {
-                let matches = subscription.filters.contains(where: { $0.matches(event: event) })
+                var matches = false
+                for filter in subscription.filters {
+                    if await filter.matches(event: event) {
+                        matches = true
+                        break
+                    }
+                }
                 #if DEBUG
                 print("🔍 SubscriptionManager: Subscription \(subscription.id) matches: \(matches)")
                 #endif
@@ -285,7 +291,14 @@ public actor NDKRelaySubscriptionManager {
             for relaySub in relaySubscriptions.values {
                 if relaySub.status == .running || relaySub.status == .eoseReceived {
                     for subscription in relaySub.subscriptions {
-                        if subscription.filters.contains(where: { $0.matches(event: event) }) {
+                        var matches = false
+                        for filter in subscription.filters {
+                            if await filter.matches(event: event) {
+                                matches = true
+                                break
+                            }
+                        }
+                        if matches {
                             Task {
                                 await subscription.handleEvent(event, fromRelay: relay)
                             }

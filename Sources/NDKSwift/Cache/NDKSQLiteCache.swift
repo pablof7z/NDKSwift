@@ -88,9 +88,15 @@ public actor NDKSQLiteCache: NDKCache {
     // MARK: - Event Operations
     
     public func saveEvent(_ event: NDKEvent) async throws {
-        guard let eventId = event.id else {
-            throw NDKError.invalidEventID("Event has no ID")
-        }
+        let eventId = event.id
+        // Extract values from the event
+        let pubkey = event.pubkey
+        let createdAt = event.createdAt
+        let kind = event.kind
+        let content = event.content
+        let sig = event.sig
+        let tags = event.tags
+
         
         let encoder = JSONEncoder()
         let jsonData = try encoder.encode(event)
@@ -105,11 +111,11 @@ public actor NDKSQLiteCache: NDKCache {
                 """,
                 arguments: [
                     eventId,
-                    event.pubkey,
-                    event.createdAt,
-                    event.kind,
-                    event.content,
-                    event.sig ?? "",
+                    pubkey,
+                    createdAt,
+                    kind,
+                    content,
+                    sig,
                     jsonString
                 ]
             )
@@ -117,7 +123,7 @@ public actor NDKSQLiteCache: NDKCache {
             // Save tags
             try db.execute(sql: "DELETE FROM tags WHERE event_id = ?", arguments: [eventId])
             
-            for (index, tag) in event.tags.enumerated() {
+            for (index, tag) in tags.enumerated() {
                 guard tag.count >= 2 else { continue }
                 
                 try db.execute(

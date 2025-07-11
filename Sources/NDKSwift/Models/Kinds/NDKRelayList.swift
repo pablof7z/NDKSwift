@@ -57,8 +57,8 @@ public class NDKRelayList: NDKList {
     }
 
     /// Create an NDKRelayList from an existing NDKEvent
-    public static func fromEvent(_ event: NDKEvent) -> NDKRelayList {
-        let relayList = NDKRelayList(ndk: event.ndk)
+    public static func fromEvent(_ event: NDKEvent, ndk: NDK? = nil) -> NDKRelayList {
+        let relayList = NDKRelayList(ndk: ndk)
         relayList.id = event.id
         relayList.pubkey = event.pubkey
         relayList.createdAt = event.createdAt
@@ -273,7 +273,7 @@ public extension NDK {
         let events = try await fetchEvents(filters: [filter])
 
         guard let event = events.first else { return nil }
-        return NDKRelayList.fromEvent(event)
+        return await NDKRelayList.fromEvent(event)
     }
 
     /// Fetch the relay list for the current user

@@ -13,6 +13,7 @@ public struct NDKZapRequest {
     /// Create a new zap request
     public static func create(
         ndk: NDK,
+        signer: NDKSigner,
         recipient: NDKUser,
         amountMillisats: Int64,
         comment: String? = nil,
@@ -20,12 +21,6 @@ public struct NDKZapRequest {
         zappedEvent: NDKEvent? = nil,
         zappedEventCoordinate: String? = nil
     ) async throws -> NDKZapRequest {
-        let event = NDKEvent(
-            pubkey: "", // Will be set by signer
-            kind: EventKind.zapRequest,
-            content: comment ?? ""
-        )
-        
         var tags: [[String]] = []
         
         // Required tags
@@ -42,10 +37,8 @@ public struct NDKZapRequest {
         
         // Optional: zapped event
         if let zappedEvent = zappedEvent {
-            let eventId = await zappedEvent.id
-            if let eventId = eventId {
-                tags.append(["e", eventId])
-            }
+            let eventId = zappedEvent.id
+            tags.append(["e", eventId])
         }
         
         // Optional: zapped event coordinate (for addressable events)
@@ -53,10 +46,11 @@ public struct NDKZapRequest {
             tags.append(["a", coordinate])
         }
         
-        for tag in tags {
-            event.addTag(tag)
-        }
-        try await event.sign()
+        let event = try await NDKEventBuilder()
+            .content(comment ?? "")
+            .kind(EventKind.zapRequest)
+            .tags(tags)
+            .build(signer: signer)
         
         return NDKZapRequest(event: event)
     }
@@ -65,72 +59,54 @@ public struct NDKZapRequest {
     
     /// Amount in millisatoshis
     public var amountMillisats: Int64? {
-        get async {
-            let tags = await event.tags
-            return tags.first(where: { $0.first == "amount" })?[safe: 1].flatMap { Int64($0) }
-        }
+        return event.tags.first(where: { $0.first == "amount" })?[safe: 1].flatMap { Int64($0) }
     }
     
     /// Amount in satoshis
     public var amountSats: Int64? {
-        get async {
-            let millis = await amountMillisats
-            return millis.map { $0 / 1000 }
-        }
+        return amountMillisats.map { $0 / 1000 }
     }
     
     /// Optional comment
     public var comment: String? {
-        get async {
-            let content = await event.content
-            return content.isEmpty ? nil : content
+        return event.content.isEmpty ? nil : event.content
         }
     }
     
     /// Recipient's pubkey
     public var recipientPubkey: String? {
-        get async {
-            let tags = await event.tags
-            return tags.first(where: { $0.first == "p" })?[safe: 1]
-        }
+        return event.tags.first(where: { $0.first == "p" })?[safe: 1]
     }
     
     /// Relays where the zap receipt should be published
     public var relays: [String] {
-        get async {
-            let tags = await event.tags
-            return tags.first(where: { $0.first == "relays" })?.dropFirst().map { String($0) } ?? []
-        }
+        return event.tags.first(where: { $0.first == "relays" })?.dropFirst().map { String($0) } ?? []
     }
     
     /// LNURL if present
     public var lnurl: String? {
-        get async {
-            let tags = await event.tags
-            return tags.first(where: { $0.first == "lnurl" })?[safe: 1]
-        }
+        return event.tags.first(where: { $0.first == "lnurl" })?[safe: 1]
     }
     
     /// Zapped event ID if this is zapping an event
     public var zappedEventId: String? {
-        get async {
-            let tags = await event.tags
-            return tags.first(where: { $0.first == "e" })?[safe: 1]
-        }
+        return event.tags.first(where: { $0.first == "e" })?[safe: 1]
     }
     
     /// Zapped event coordinate for addressable events
     public var zappedEventCoordinate: String? {
-        get async {
-            let tags = await event.tags
-            return tags.first(where: { $0.first == "a" })?[safe: 1]
-        }
+        return event.tags.first(where: { $0.first == "a" })?[safe: 1]
     }
     
     /// Encode as JSON for sending to LNURL callback
     public func encodeForCallback() throws -> String {
         let jsonData = try JSONEncoder().encode(event)
         return String(data: jsonData, encoding: .utf8) ?? ""
+    }
+    
+    /// LNURL from tags
+    public var lnurl: String? {
+        return event.tags.first(where: { $0.first == "lnurl" })?[safe: 1]
     }
 }
 

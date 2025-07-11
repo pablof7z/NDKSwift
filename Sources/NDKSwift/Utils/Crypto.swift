@@ -112,5 +112,19 @@ public enum Crypto {
         #endif
         return Data(bytes)
     }
+
+    // MARK: - NIP-44 Encryption
+    
+    /// Encrypt a message using NIP-44
+    static func nip44Encrypt(message: String, privateKey: PrivateKey, publicKey: PublicKey) throws -> String {
+        return try NIP44.encrypt(message: message, privateKey: privateKey, publicKey: publicKey)
+    }
+    
+    /// Decrypt a message using NIP-44
+    static func nip44Decrypt(encrypted: String, privateKey: PrivateKey, publicKey: PublicKey) throws -> String {
+        return try NIP44.decrypt(encrypted: encrypted, privateKey: privateKey, publicKey: publicKey)
+    }
+    
+    typealias NIP44Error = NIP44.NIP44Error
 }
 

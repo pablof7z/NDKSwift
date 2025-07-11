@@ -1,5 +1,5 @@
 import Foundation
-import P256K
+import secp256k1
 
 /// Manages P2PK keys for Cashu wallet operations
 actor P2PKManager {
@@ -17,7 +17,7 @@ actor P2PKManager {
         }
         
         // Generate new Schnorr keypair
-        let privateKey = try P256K.Schnorr.PrivateKey()
+        let privateKey = try secp256k1.Schnorr.PrivateKey()
         let publicKey = privateKey.publicKey
         
         let keypair = (
@@ -29,6 +29,12 @@ actor P2PKManager {
         keyCreatedAt = Date()
         
         return keypair
+    }
+    
+    /// Get or create private key
+    func getOrCreatePrivateKey() async throws -> String {
+        let (privateKey, _) = try await getOrCreateKeypair()
+        return privateKey
     }
     
     /// Get Cashu-formatted public key (with "02" prefix)
@@ -45,7 +51,7 @@ actor P2PKManager {
         guard let privateKeyData = Data(hexString: privateKeyHex) else {
             throw P2PKError.invalidPrivateKey
         }
-        let privateKey = try P256K.Schnorr.PrivateKey(dataRepresentation: privateKeyData)
+        let privateKey = try secp256k1.Schnorr.PrivateKey(dataRepresentation: privateKeyData)
         
         // Create message to sign (secret)
         guard let messageData = secret.data(using: .utf8) else {

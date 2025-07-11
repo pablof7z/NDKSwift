@@ -34,22 +34,14 @@ public struct NWCRequestBuilder {
             scheme: .nip04
         )
         
-        // Create the event
-        let event = NDKEvent(
-            pubkey: signerPubkey,
-            createdAt: Timestamp(Date().timeIntervalSince1970),
-            kind: .nostrWalletConnectReq,
-            content: encryptedContent
-        )
-        
-        // Add wallet service pubkey as p-tag
-        await event.addTag(["p", walletPubkey])
-        
-        // Set NDK instance
-        await event.setNDK(ndk)
-        
-        // Sign the event
-        try await event.sign()
+        // Create the event using the builder
+        let event = try await NDKEventBuilder()
+            .pubkey(signerPubkey)
+            .createdAt(Timestamp(Date().timeIntervalSince1970))
+            .kind(.nostrWalletConnectReq)
+            .content(encryptedContent)
+            .tag(["p", walletPubkey])
+            .build(signer: signer)
         
         return event
     }

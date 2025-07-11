@@ -143,9 +143,8 @@ actor NDKFetchingStrategy {
 
                     // Deduplicate events
                     for event in events {
-                        if let eventId = event.id {
-                            collectedEvents[eventId] = event
-                        }
+                        let eventId = event.id
+                        collectedEvents[eventId] = event
                     }
 
                     // Update relay performance
@@ -185,8 +184,7 @@ actor NDKFetchingStrategy {
         var eventSnapshots: [(event: NDKEvent, createdAt: Timestamp)] = []
         
         for event in eventsArray {
-            let createdAt = await event.createdAt
-            eventSnapshots.append((event, createdAt))
+            eventSnapshots.append((event, event.createdAt))
         }
         
         return eventSnapshots
@@ -269,7 +267,7 @@ actor NDKFetchingStrategy {
             do {
                 for try await event in relaySubscription {
                     // Deduplicate events
-                    guard let eventId = event.id else { continue }
+                    let eventId = event.id
                     if !subscription.seenEventIds.contains(eventId) {
                         subscription.seenEventIds.insert(eventId)
                         subscription.eventCount += 1

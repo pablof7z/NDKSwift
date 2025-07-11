@@ -3,10 +3,10 @@ import Foundation
 /// Protocol for objects that can be stored in an NDKList
 public protocol NDKListItem {
     /// Convert this item to a Tag for storage in a list
-    func toListTag() -> Tag
+    func toListTag() async -> Tag
 
     /// The reference value used to identify this item in a list
-    var reference: String { get }
+    var reference: String { get async }
 }
 
 /// Represents an item in a list with optional marking and position
@@ -213,8 +213,8 @@ public class NDKList {
     }
 
     /// Create an NDKList from an existing NDKEvent
-    public static func from(_ event: NDKEvent) -> NDKList {
-        let list = NDKList(ndk: event.ndk)
+    public static func from(_ event: NDKEvent, ndk: NDK? = nil) -> NDKList {
+        let list = NDKList(ndk: ndk)
         list.id = event.id
         list.pubkey = event.pubkey
         list.createdAt = event.createdAt
@@ -228,15 +228,14 @@ public class NDKList {
     /// Convert this list to an NDKEvent
     public func toNDKEvent() -> NDKEvent {
         let event = NDKEvent(
+            id: id ?? "",
             pubkey: pubkey,
             createdAt: createdAt,
             kind: kind,
             tags: tags,
-            content: content
+            content: content,
+            sig: signature ?? ""
         )
-        event.id = id
-        event.sig = signature
-        event.ndk = ndk
         return event
     }
 
@@ -261,11 +260,11 @@ public class NDKList {
     @discardableResult
     public func addItem(_ item: NDKListItem, mark: String? = nil, encrypted: Bool = false, position: ListPosition = .bottom) async throws -> NDKList {
         // Check if item already exists
-        guard !contains(item.reference) else {
+        guard !contains(await item.reference) else {
             return self
         }
 
-        var listTag = item.toListTag()
+        var listTag = await item.toListTag()
 
         // Add mark as additional info if provided
         if let mark = mark, !mark.isEmpty {
@@ -460,18 +459,19 @@ public class NDKList {
 
         let event = toNDKEvent()
 
-        // Generate ID if not present
-        if event.id == nil {
-            _ = try event.generateID()
-        }
-
-        // Sign the event
-        let signature = try await signer.sign(event)
+        // Use NDKEventBuilder for signing
+        let signedEvent = try await NDKEventBuilder()
+            .pubkey(try await signer.pubkey)
+            .createdAt(event.createdAt)
+            .kind(event.kind)
+            .tags(event.tags)
+            .content(event.content)
+            .build(signer: signer)
 
         // Update our properties with signed values
-        self.id = event.id
-        self.signature = signature
-        self.pubkey = try await signer.pubkey
+        self.id = signedEvent.id
+        self.signature = signedEvent.sig
+        self.pubkey = signedEvent.pubkey
     }
 
     /// Publish this list
@@ -489,12 +489,14 @@ public class NDKList {
 // MARK: - NDKListItem Implementations
 
 extension NDKUser: NDKListItem {
-    public func toListTag() -> Tag {
+    public func toListTag() async -> Tag {
         return ["p", pubkey]
     }
 
     public var reference: String {
-        return pubkey
+        get async {
+            return pubkey
+        }
     }
 }
 
@@ -508,28 +510,33 @@ extension NDKEvent: NDKListItem {
             return ["a", aTagValue]
         } else {
             // Use 'e' tag for regular events
-            return ["e", id ?? ""]
+            return ["e", id]
         }
     }
 
     public var reference: String {
-        if isParameterizedReplaceable {
-            let dTagElement = tags.first { !$0.isEmpty && $0[0] == "d" }
-            let dTag = (dTagElement?.count ?? 0) > 1 ? dTagElement![1] : ""
-            return "\(kind):\(pubkey):\(dTag)"
-        } else {
-            return id ?? ""
+        get async {
+            if await isParameterizedReplaceable {
+                let tags = await self.tags
+                let dTagElement = tags.first { !$0.isEmpty && $0[0] == "d" }
+                let dTag = (dTagElement?.count ?? 0) > 1 ? dTagElement![1] : ""
+                return "\(await kind):\(await pubkey):\(dTag)"
+            } else {
+                return await id ?? ""
+            }
         }
     }
 }
 
 extension NDKRelay: NDKListItem {
-    public func toListTag() -> Tag {
+    public func toListTag() async -> Tag {
         return ["r", url]
     }
 
     public var reference: String {
-        return url
+        get async {
+            return url
+        }
     }
 }
 
@@ -543,12 +550,14 @@ public struct NDKStringListItem: NDKListItem {
         self.value = value
     }
 
-    public func toListTag() -> Tag {
+    public func toListTag() async -> Tag {
         return [tagType, value]
     }
 
     public var reference: String {
-        return value
+        get async {
+            return value
+        }
     }
 }
 

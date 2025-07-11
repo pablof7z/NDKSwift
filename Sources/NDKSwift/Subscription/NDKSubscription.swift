@@ -60,8 +60,8 @@ actor SubscriptionStateActor {
         return allEOSEReceived
     }
     
-    func addEventIfNotSeen(_ event: NDKEvent) -> Bool {
-        guard let eventId = event.id else { return false }
+    func addEventIfNotSeen(_ event: NDKEvent) async -> Bool {
+        let eventId = event.id
         
         // Check if already seen
         guard !seenEventIds.contains(eventId) else { return false }
@@ -294,10 +294,10 @@ public final class NDKSubscription: AsyncSequence, Sendable {
     }
 
     deinit {
-        // Clean up in the actor
-        Task {
-            await self.stateActor.cancelTimeoutTask()
-            await self.stateActor.finishContinuation()
+        // Clean up synchronously to avoid Task creation during deallocation
+        Task.detached { [stateActor] in
+            await stateActor.cancelTimeoutTask()
+            await stateActor.finishContinuation()
         }
     }
 
@@ -402,7 +402,8 @@ public final class NDKSubscription: AsyncSequence, Sendable {
         guard let ndk = await stateActor.getNDK() else { return }
         
         let options = await stateActor.getOptions()
-        let relaysToUse = options.relays ?? Set(await ndk.relays)
+        let ndkRelays = await ndk.relays
+        let relaysToUse = options.relays ?? Set(ndkRelays)
         
         for relay in relaysToUse {
             await stateActor.addRelay(relay)
@@ -417,7 +418,14 @@ public final class NDKSubscription: AsyncSequence, Sendable {
         guard await stateActor.currentState != .closed else { return }
         
         // Check if event matches our filters
-        guard filters.contains(where: { $0.matches(event: event) }) else {
+        var matchesAny = false
+        for filter in filters {
+            if await filter.matches(event: event) {
+                matchesAny = true
+                break
+            }
+        }
+        guard matchesAny else {
             return
         }
         
@@ -448,9 +456,19 @@ public final class NDKSubscription: AsyncSequence, Sendable {
     public func handleEOSE(fromRelay relay: RelayProtocol? = nil) async {
         let ndk = await stateActor.getNDK()
         let options = await stateActor.getOptions()
+        
+        let expectedRelays: Set<NDKRelay>
+        if let relays = options.relays {
+            expectedRelays = relays
+        } else if let ndk = ndk {
+            expectedRelays = Set(await ndk.relays)
+        } else {
+            expectedRelays = Set([])
+        }
+        
         let shouldComplete = await stateActor.handleEOSE(
             fromRelay: relay,
-            expectedRelays: options.relays ?? Set(await ndk?.relays ?? [])
+            expectedRelays: expectedRelays
         )
         
         if shouldComplete && options.closeOnEose {

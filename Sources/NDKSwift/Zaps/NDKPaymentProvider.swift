@@ -3,7 +3,10 @@ import Foundation
 // MARK: - Payment Request Types
 
 /// An abstract request for payment, created by a Zap Protocol handler
-public protocol PaymentRequest { }
+public protocol PaymentRequest { 
+    /// The amount in satoshis
+    var amountSats: Int64 { get }
+}
 
 /// A concrete request to pay a BOLT11 invoice
 public struct LightningInvoiceRequest: PaymentRequest {
