@@ -285,7 +285,7 @@ extension NDK {
         let events = try await fetch(filter, timeout: 3.0)
         
         if let profileEvent = events.first,
-           let profileData = profileEvent.content.data(using: .utf8),
+           let profileData = (await profileEvent.content).data(using: .utf8),
            let profile = try? JSONCoding.decoder.decode(NDKUserProfile.self, from: profileData) {
             return profile
         }
@@ -303,9 +303,9 @@ extension NDK {
         var profiles: [PublicKey: NDKUserProfile] = [:]
         
         for event in events {
-            if let profileData = event.content.data(using: .utf8),
+            if let profileData = (await event.content).data(using: .utf8),
                let profile = try? JSONCoding.decoder.decode(NDKUserProfile.self, from: profileData) {
-                profiles[event.pubkey] = profile
+                profiles[await event.pubkey] = profile
             }
         }
         

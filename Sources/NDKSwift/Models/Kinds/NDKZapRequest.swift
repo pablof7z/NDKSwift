@@ -70,7 +70,6 @@ public struct NDKZapRequest {
     /// Optional comment
     public var comment: String? {
         return event.content.isEmpty ? nil : event.content
-        }
     }
     
     /// Recipient's pubkey
@@ -102,11 +101,6 @@ public struct NDKZapRequest {
     public func encodeForCallback() throws -> String {
         let jsonData = try JSONEncoder().encode(event)
         return String(data: jsonData, encoding: .utf8) ?? ""
-    }
-    
-    /// LNURL from tags
-    public var lnurl: String? {
-        return event.tags.first(where: { $0.first == "lnurl" })?[safe: 1]
     }
 }
 

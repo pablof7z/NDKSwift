@@ -1,6 +1,5 @@
 import Foundation
-// FIXME: Temporarily disabled due to CashuSwift build issues
-// import CashuSwift
+import CashuSwift
 
 /// NIP-61 Nutzap protocol implementation
 public class NDKNutzapProtocol: NDKZapProtocol {
@@ -50,8 +49,7 @@ public class NDKNutzapProtocol: NDKZapProtocol {
         
         // 4. Store metadata for completion
         let metadata: [String: Any] = [
-            "preferences": preferences,
-            "relays": await preferences.relays
+            "preferences": preferences
         ]
         
         return PreparedZap(
@@ -116,12 +114,8 @@ public class NDKNutzapProtocol: NDKZapProtocol {
         mint: URL,
         amount: Int64
     ) async throws -> MintQuote {
-        // FIXME: CashuSwift functionality temporarily disabled due to build issues
-        throw ZapError.mintQuoteFailed(mint: mint.host ?? mint.absoluteString, reason: "CashuSwift temporarily disabled due to build issues")
-        
-        /*
-        // Create a CashuSwift mint connection
-        let cashuMint = CashuSwift.Mint(url: mint, keysets: [])
+        // Load the mint
+        let cashuMint = try await CashuSwift.loadMint(url: mint)
         
         // Request a mint quote from the mint
         let quoteRequest = CashuSwift.Bolt11.RequestMintQuote(
@@ -146,7 +140,6 @@ public class NDKNutzapProtocol: NDKZapProtocol {
         } catch {
             throw ZapError.mintQuoteFailed(mint: mint.host ?? mint.absoluteString, reason: error.localizedDescription)
         }
-        */
     }
     
     // MARK: - Private Methods

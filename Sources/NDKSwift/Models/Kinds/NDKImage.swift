@@ -55,7 +55,6 @@ public struct NDKImage {
         return event.sig
     }
 
-
     // MARK: - Initialization
 
     /// Initialize a new NDKImage event
@@ -87,7 +86,8 @@ public struct NDKImage {
 
     /// Check if this image event is valid (has at least one imeta tag with a URL)
     public var isValid: Bool {
-        return !imetas.isEmpty && imetas.contains { $0.url != nil }
+        let metaTags = imetas
+        return !metaTags.isEmpty && metaTags.contains { $0.url != nil }
     }
 
     // MARK: - Imeta Tag Management
@@ -115,39 +115,29 @@ public struct NDKImage {
 
     /// Get all image URLs
     public var imageURLs: [String] {
-        get async {
-            let metaTags = await imetas
-            return metaTags.compactMap { $0.url }
-        }
+        return imetas.compactMap { $0.url }
     }
 
     /// Get dimensions for the primary image
     public var primaryImageDimensions: (width: Int, height: Int)? {
-        get async {
-            let metaTags = await imetas
-            guard let dim = metaTags.first?.dim else { return nil }
-            let parts = dim.split(separator: "x")
-            guard parts.count == 2,
-                  let width = Int(parts[0]),
-                  let height = Int(parts[1]) else { return nil }
-            return (width, height)
-        }
+        guard let dim = imetas.first?.dim else { return nil }
+        let parts = dim.split(separator: "x")
+        guard parts.count == 2,
+              let width = Int(parts[0]),
+              let height = Int(parts[1]) else { return nil }
+        return (width, height)
     }
 
     // MARK: - Convenience Tag Methods
 
-    /// Add a tag to the image
-    public mutating func addTag(_ tag: [String]) async {
-        await event.addTag(tag)
-    }
-
     /// Get tags matching a specific tag name
     public func tags(withName tagName: String) -> [[String]] {
-        return event.tags(withName: tagName)
+        return event.tags.filter { $0.first == tagName }
     }
 
     /// Get the first value of a tag with the given name
     public func tagValue(_ tagName: String) -> String? {
-        return event.tagValue(tagName)
+        let matchingTags = tags(withName: tagName)
+        return matchingTags.first?.count ?? 0 > 1 ? matchingTags.first?[1] : nil
     }
 }

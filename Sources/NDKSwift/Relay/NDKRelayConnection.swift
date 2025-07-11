@@ -44,6 +44,9 @@ public actor NDKRelayConnection {
     /// Track if this is an initial connection attempt
     private var isInitialConnection = true
     
+    /// Track pending EVENT messages waiting for OK responses
+    private var pendingEvents: [EventID: CheckedContinuation<Bool, Error>] = [:]
+    
     public init(url: URL) {
         self.url = url
     }
@@ -175,17 +178,78 @@ public actor NDKRelayConnection {
         try await send(json)
     }
     
+    /// Publish an event and wait for OK response
+    public func publishEvent(_ event: NDKEvent, timeout: TimeInterval = 10.0) async throws -> Bool {
+        guard isConnected else {
+            throw NDKError.connectionFailed(relay: url.absoluteString, message: "Not connected")
+        }
+        
+        let eventId = event.id
+        print("[NDKRelayConnection] publishEvent called for event \(eventId)")
+        
+        // Create a continuation holder that we can access from the actor context
+        return try await withThrowingTaskGroup(of: Bool.self) { group in
+            // Add task to handle the OK response
+            group.addTask {
+                try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Bool, Error>) in
+                    // Store the continuation - this is now within the actor context
+                    Task { [weak self] in
+                        await self?.storePendingContinuation(eventId: eventId, continuation: continuation)
+                    }
+                }
+            }
+            
+            // Add task to send the event and handle timeout
+            group.addTask {
+                // Give a tiny delay to ensure continuation is stored first
+                try await Task.sleep(nanoseconds: 10_000_000) // 10ms
+                
+                // Send the event
+                let eventMessage = NostrMessage.event(subscriptionId: nil, event: event)
+                try await self.send(eventMessage)
+                print("[NDKRelayConnection] Event sent, waiting for OK response...")
+                
+                // Wait for timeout
+                try await Task.sleep(nanoseconds: UInt64(timeout * 1_000_000_000))
+                
+                // If we get here, we timed out
+                await self.handleTimeout(eventId: eventId)
+                throw NDKError.timeout(operation: "publishEvent", seconds: Int(timeout))
+            }
+            
+            // Wait for first result (either OK response or timeout)
+            for try await result in group {
+                group.cancelAll()
+                return result
+            }
+            
+            // Should never reach here
+            throw NDKError.internalError("Unexpected error in publishEvent")
+        }
+    }
+    
+    /// Store a pending continuation (actor-isolated)
+    private func storePendingContinuation(eventId: EventID, continuation: CheckedContinuation<Bool, Error>) {
+        pendingEvents[eventId] = continuation
+        print("[NDKRelayConnection] Stored continuation for event \(eventId)")
+    }
+    
+    /// Handle timeout for a pending event (actor-isolated)
+    private func handleTimeout(eventId: EventID) {
+        if let continuation = pendingEvents.removeValue(forKey: eventId) {
+            continuation.resume(throwing: NDKError.timeout(operation: "publishEvent", seconds: 10))
+        }
+    }
+    
     /// Send raw JSON to relay
     public func send(_ json: String) async throws {
         guard isConnected else {
             throw NDKError.connectionFailed(relay: url.absoluteString, message: "Not connected")
         }
         
-        #if DEBUG
-        if json.hasPrefix("[\"REQ\"") {
-            print("🔌 \(url): \(json)")
-        }
-        #endif
+        // Always log WebSocket messages
+        print("\n📤 SENDING TO \(url):")
+        print("   RAW: \(json)")
         
         #if os(iOS) || os(macOS) || os(watchOS) || os(tvOS)
             guard let task = webSocketTask else {
@@ -230,26 +294,31 @@ public actor NDKRelayConnection {
     #endif
     
     private func handleReceivedMessage(_ json: String) async {
-        #if DEBUG
-        print("📥 RECEIVED MESSAGE FROM RELAY \(url):")
-        print("   JSON: \(json)")
-        #endif
+        // Always log incoming WebSocket messages
+        print("\n📥 RECEIVED FROM \(url):")
+        print("   RAW: \(json)")
         
         do {
             let message = try NostrMessage.parse(from: json)
             
-            #if DEBUG
-            switch message {
-            case .eose(let subscriptionId):
-                print("🏁 RECEIVED EOSE from \(url) for subscription: \(subscriptionId)")
-            case .event(let subscriptionId, _):
-                print("📋 RECEIVED EVENT from \(url) for subscription: \(subscriptionId ?? "nil")")
-            case .notice(let notice):
-                print("📢 RECEIVED NOTICE from \(url): \(notice)")
-            default:
-                print("📝 RECEIVED \(type(of: message)) from \(url)")
+            // Handle OK messages for pending events
+            if case let .ok(eventId, accepted, errorMessage) = message {
+                print("[NDKRelayConnection] Got OK for event \(eventId): accepted=\(accepted)")
+                if let continuation = pendingEvents.removeValue(forKey: eventId) {
+                    print("[NDKRelayConnection] Found pending continuation for event \(eventId)")
+                    if accepted {
+                        continuation.resume(returning: true)
+                    } else {
+                        let error = NDKError.publishFailed(
+                            relay: url.absoluteString,
+                            message: errorMessage ?? "Event rejected by relay"
+                        )
+                        continuation.resume(throwing: error)
+                    }
+                } else {
+                    print("[NDKRelayConnection] No pending continuation for event \(eventId)")
+                }
             }
-            #endif
             
             await notifyDelegate { delegate in
                 delegate.relayConnection(self, didReceiveMessage: message)

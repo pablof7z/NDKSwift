@@ -17,6 +17,14 @@ let package = Package(
             name: "NDKSwift",
             targets: ["NDKSwift"]
         ),
+        .executable(
+            name: "HelloWorld",
+            targets: ["HelloWorld"]
+        ),
+        .executable(
+            name: "CashuWallet",
+            targets: ["CashuWallet"]
+        ),
     ],
     dependencies: [
         .package(url: "https://github.com/anquii/CryptoSwiftWrapper.git", from: "1.4.3"),
@@ -39,6 +47,20 @@ let package = Package(
                 "Outbox/README.md",
                 "Outbox/IMPLEMENTATION_SUMMARY.md"
             ]
+        ),
+        .executableTarget(
+            name: "HelloWorld",
+            dependencies: ["NDKSwift"],
+            path: "Examples/HelloWorld"
+        ),
+        .executableTarget(
+            name: "CashuWallet",
+            dependencies: ["NDKSwift"],
+            path: "Examples/CashuWallet"
+        ),
+        .testTarget(
+            name: "NDKSwiftTests",
+            dependencies: ["NDKSwift"]
         ),
     ]
 )

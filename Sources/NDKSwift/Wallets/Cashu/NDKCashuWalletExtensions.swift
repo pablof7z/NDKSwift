@@ -36,8 +36,7 @@ extension NDKCashuWallet {
             
             // Try to load and add the mint
             do {
-                let mint = try await CashuSwift.loadMint(url: discovered.announcement.mintURL)
-                self.addMint(mint)
+                try await self.addMint(url: discovered.announcement.mintURL)
                 addedMints.append(discovered)
                 
                 print("Added mint: \(discovered.announcement.name ?? discovered.announcement.mintURL.absoluteString)")

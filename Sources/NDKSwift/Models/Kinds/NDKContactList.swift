@@ -299,7 +299,7 @@ public extension NDK {
         let events = try await fetchEvents(filters: [filter])
 
         guard let event = events.first else { return nil }
-        return await NDKContactList.fromEvent(event)
+        return NDKContactList.fromEvent(event)
     }
 
     /// Fetch the contact list for the current user

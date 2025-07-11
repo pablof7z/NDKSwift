@@ -26,14 +26,10 @@ extension CashuSwift {
         return T(url: url, keysets: keysetsWithKeys)
     }
     
-    public static func loadInfoFromMint(_ mint:MintRepresenting) async throws -> MintInfo? {
+    public static func loadInfoFromMint(_ mint:MintRepresenting) async throws -> Mint.Info? {
         let mintInfoData = try await Network.get(url: mint.url.appending(path: "v1/info"))!
         
-        if let info = try? JSONDecoder().decode(MintInfo0_16.self, from: mintInfoData) {
-            return info
-        } else if let info = try? JSONDecoder().decode(MintInfo0_15.self, from: mintInfoData) {
-            return info
-        } else if let info = try? JSONDecoder().decode(MintInfo.self, from: mintInfoData) {
+        if let info = try? JSONDecoder().decode(Mint.Info.self, from: mintInfoData) {
             return info
         } else {
             logger.warning("Could not parse mint info of \(mint.url.absoluteString) to any known version.")

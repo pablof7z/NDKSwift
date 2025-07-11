@@ -121,7 +121,7 @@ public enum ContentTagger {
             case "hashtag":
                 let tag = String(match.value.dropFirst()) // Remove #
                 segments.append(.hashtag(tag))
-                tags.append(["t", tag])
+                tags.append(["t", tag.lowercased()]) // NIP-24: hashtags must be lowercase
                 
             case "url":
                 if let url = URL(string: match.value) {
@@ -333,7 +333,7 @@ public enum ContentTagger {
 
         // Add hashtag tags
         let hashtags = generateHashtags(from: modifiedContent)
-        let hashtagTags = hashtags.map { ["t", $0] }
+        let hashtagTags = hashtags.map { ["t", $0.lowercased()] } // NIP-24: hashtags must be lowercase
         tags = mergeTags(tags, hashtagTags)
 
         return ContentTag(tags: tags, content: modifiedContent)

@@ -221,9 +221,26 @@ public final class NDK {
     /// print("Published to \(successfulRelays.count) relays")
     /// ```
     @discardableResult
-    public func publish(_ event: NDKEvent) async throws -> Set<NDKRelay> {
+    public func publish(_ event: NDKEvent, logRawJSON: Bool = false) async throws -> Set<NDKRelay> {
         // Validate event (events must be pre-signed)
         try event.validate()
+        
+        // Log raw JSON if requested
+        if logRawJSON {
+            if let jsonString = try? event.serialize() {
+                // Pretty print the JSON
+                if let jsonData = jsonString.data(using: .utf8),
+                   let jsonObject = try? JSONSerialization.jsonObject(with: jsonData),
+                   let prettyData = try? JSONSerialization.data(withJSONObject: jsonObject, options: .prettyPrinted),
+                   let prettyString = String(data: prettyData, encoding: .utf8) {
+                    print("📤 Publishing event (kind \(event.kind)):")
+                    print(prettyString)
+                } else {
+                    print("📤 Publishing event (kind \(event.kind)):")
+                    print(jsonString)
+                }
+            }
+        }
 
         // Store in cache if available
         if let cache = cache {
@@ -592,7 +609,7 @@ public final class NDK {
     /// Process an event received from a relay (called by relay connections)
     func processEvent(_ event: NDKEvent, from relay: RelayProtocol) async {
         // Mark event as seen on this relay
-        await eventTracker.markSeenOn(event: event, relay: relay.url)
+        await eventTracker.markSeen(eventId: event.id, relay: relay.url)
 
         Task {
             // Get current stats
@@ -947,7 +964,7 @@ public final class NDK {
         // Map events back to their bech32 identifiers
         for event in events {
             let eventId = event.id
-            if let eventId = eventId, let bech32 = eventIdToBech32[eventId] {
+            if let bech32 = eventIdToBech32[eventId] {
                 result[bech32] = event
             }
         }
@@ -978,10 +995,11 @@ public final class NDK {
     
     // MARK: - Wallet Management
     
-    /// Create a Cashu wallet
-    public func createCashuWallet(walletId: String? = nil) -> NDKCashuWallet {
-        return NDKCashuWallet(ndk: self, walletId: walletId)
-    }
+    // TODO: Uncomment when NDKCashuWallet is fixed
+    // /// Create a Cashu wallet
+    // public func createCashuWallet(walletId: String? = nil) -> NDKCashuWallet {
+    //     return NDKCashuWallet(ndk: self, walletId: walletId)
+    // }
 
     // MARK: - Queued Events
 
@@ -1124,11 +1142,19 @@ public actor NDKRelayPool {
             for relay in connectedRelays {
                 group.addTask {
                     do {
-                        let eventMessage = NostrMessage.event(subscriptionId: nil, event: event)
-                        try await relay.send(eventMessage.serialize())
-                        return relay
+                        // Get the relay's connection directly to call publishEvent
+                        guard let connection = await relay.connection else {
+                            return nil
+                        }
+                        
+                        // Publish with OK response handling
+                        let accepted = try await connection.publishEvent(event, timeout: 10.0)
+                        
+                        // Only count as published if relay accepted the event
+                        return accepted ? relay : nil
                     } catch {
                         // Failed to send to this relay
+                        print("[NDKRelayPool] Failed to publish to \(relay.url): \(error)")
                         return nil
                     }
                 }
@@ -1152,7 +1178,7 @@ final class NDKEventRepository: @unchecked Sendable {
     private let queue = DispatchQueue(label: "com.ndkswift.eventrepository", attributes: .concurrent)
 
     func addEvent(_ event: NDKEvent) async {
-        guard let eventId = event.id else { return }
+        let eventId = event.id
 
         queue.async(flags: .barrier) { [weak self] in
             self?.events[eventId] = event
