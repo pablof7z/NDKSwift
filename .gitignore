@@ -21,3 +21,4 @@ test_*.swift
 # Local CashuSwift checkout
 CashuSwift-fixed/
 macadamia
+Examples/NutsackiOS/.build/

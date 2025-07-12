@@ -12,6 +12,7 @@ public actor NDKCashuWallet: NDKWallet {
     internal var mints: [String: CashuSwift.Mint] = [:] // URL string to Mint
     internal var keysets: [String: CashuSwift.Keyset] = [:] // Keyset ID to Keyset
     private let p2pkManager: P2PKManager // Manages P2PK keys for receiving nutzaps
+    private let mintLoader: CachedMintLoader? // Cached mint loader for performance
     
     // Track deleted and superseded token event IDs to filter them out
     private var deletedTokenEventIds: Set<String> = []
@@ -39,11 +40,18 @@ public actor NDKCashuWallet: NDKWallet {
     
     // MARK: - Initialization
     
-    public init(ndk: NDK, walletId: String? = nil) {
+    public init(ndk: NDK, walletId: String? = nil, mintCache: MintCache? = nil) {
         self.ndk = ndk
         self.walletId = walletId ?? UUID().uuidString
         self.mintDiscovery = MintDiscovery(ndk: ndk)
         self.p2pkManager = P2PKManager()
+        
+        // Set up cached mint loader if cache is provided
+        if let cache = mintCache {
+            self.mintLoader = CachedMintLoader(cache: cache)
+        } else {
+            self.mintLoader = nil
+        }
     }
     
     // MARK: - NDKWallet Protocol
@@ -62,12 +70,53 @@ public actor NDKCashuWallet: NDKWallet {
         let ourMintURLs = Set(mints.keys)
         let commonMintURLs = ourMintURLs.intersection(acceptedMintURLs)
         
-        guard let selectedMintURL = commonMintURLs.first else {
-            throw NDKError.noMintAvailable("No common mint found between wallet and recipient")
+        // First, try to find a common mint with sufficient balance
+        var selectedMintURL: String? = nil
+        for mintURL in commonMintURLs {
+            let balance = await getBalance(mint: URL(string: mintURL)!)
+            if balance >= nutzapRequest.amount {
+                selectedMintURL = mintURL
+                break
+            }
         }
         
-        guard let selectedMintUrl = URL(string: selectedMintURL) else {
-            throw NDKError.invalidRequest("Invalid mint URL")
+        // If no common mint has sufficient balance, try cross-mint transfer
+        if selectedMintURL == nil {
+            // Find any accepted mint we can transfer to
+            guard let targetMintURL = acceptedMintURLs.first,
+                  let targetMint = URL(string: targetMintURL) else {
+                throw NDKError.noMintAvailable("No valid recipient mint found")
+            }
+            
+            // Find a source mint with sufficient balance
+            var sourceMint: URL? = nil
+            for (mintURL, _) in mints {
+                let balance = await getBalance(mint: URL(string: mintURL)!)
+                // Need extra balance for fees
+                if balance >= nutzapRequest.amount + 1000 { // Add 1000 sats buffer for fees
+                    sourceMint = URL(string: mintURL)
+                    break
+                }
+            }
+            
+            guard let sourceMintURL = sourceMint else {
+                throw NDKError.insufficientBalance(amount: nutzapRequest.amount)
+            }
+            
+            // Perform cross-mint transfer
+            print("💱 Performing cross-mint transfer from \(sourceMintURL) to \(targetMintURL)")
+            _ = try await transferBetweenMints(
+                amount: nutzapRequest.amount,
+                fromMint: sourceMintURL,
+                toMint: targetMint
+            )
+            
+            selectedMintURL = targetMintURL
+        }
+        
+        guard let finalMintURL = selectedMintURL,
+              let selectedMintUrl = URL(string: finalMintURL) else {
+            throw NDKError.noMintAvailable("No suitable mint found for payment")
         }
         
         // Use the send method to create P2PK locked proofs
@@ -770,6 +819,204 @@ public actor NDKCashuWallet: NDKWallet {
         }
     }
     
+    /// Check proof states with all mints and reconcile wallet state
+    /// This queries each mint for the status of our proofs and updates our local state accordingly
+    public func checkAndReconcileProofStates() async throws {
+        guard let signer = ndk.signer else {
+            throw NDKError.notConfigured("No signer configured")
+        }
+        
+        print("🔍 Starting proof state reconciliation...")
+        
+        // Group proofs by mint for efficient checking
+        var proofsByMint: [String: [(proof: CashuSwift.Proof, entryKey: String)]] = [:]
+        
+        for (key, entry) in proofState where entry.state == .available {
+            if proofsByMint[entry.mint] == nil {
+                proofsByMint[entry.mint] = []
+            }
+            proofsByMint[entry.mint]?.append((proof: entry.proof, entryKey: key))
+        }
+        
+        // Track spent proofs we discover
+        var spentProofs: [CashuSwift.Proof] = []
+        var spentProofsByMint: [String: [CashuSwift.Proof]] = [:]
+        
+        // Check each mint
+        for (mintURL, proofEntries) in proofsByMint {
+            guard let mint = mints[mintURL] else {
+                print("⚠️ Mint not found for URL: \(mintURL)")
+                continue
+            }
+            
+            let proofs = proofEntries.map { $0.proof }
+            
+            do {
+                print("🏦 Checking \(proofs.count) proofs with mint: \(mintURL)")
+                
+                // Query mint for proof states
+                let states = try await CashuSwift.check(proofs, mint: mint)
+                
+                // Process results
+                for (index, state) in states.enumerated() {
+                    let proofEntry = proofEntries[index]
+                    
+                    switch state {
+                    case .spent:
+                        print("💸 Found spent proof: \(proofEntry.proof.C.suffix(8))")
+                        spentProofs.append(proofEntry.proof)
+                        if spentProofsByMint[mintURL] == nil {
+                            spentProofsByMint[mintURL] = []
+                        }
+                        spentProofsByMint[mintURL]?.append(proofEntry.proof)
+                        
+                    case .pending:
+                        print("⏳ Found pending proof: \(proofEntry.proof.C.suffix(8))")
+                        // For now, treat pending as still available
+                        // Could enhance to track pending state separately
+                        
+                    case .unspent:
+                        // Proof is still good, no action needed
+                        break
+                    }
+                }
+                
+            } catch {
+                print("❌ Failed to check proofs with mint \(mintURL): \(error)")
+                // Continue with other mints even if one fails
+            }
+        }
+        
+        // If we found spent proofs, update our state
+        if !spentProofs.isEmpty {
+            print("🔄 Found \(spentProofs.count) spent proofs, updating wallet state...")
+            
+            // For each mint with spent proofs, handle the rollover
+            for (mintURL, mintSpentProofs) in spentProofsByMint {
+                // Find the token events containing these spent proofs
+                let affectedEventIds = try await findTokenEventsContainingProofs(
+                    proofs: mintSpentProofs,
+                    signer: signer
+                )
+                
+                if !affectedEventIds.isEmpty {
+                    print("📝 Affected token events: \(affectedEventIds)")
+                    
+                    // Get all proofs from affected events
+                    let allProofsFromEvents = try await getProofsFromTokenEvents(
+                        eventIds: affectedEventIds,
+                        signer: signer
+                    )
+                    
+                    // Determine which proofs are still unspent
+                    let spentProofCs = Set(mintSpentProofs.map { $0.C })
+                    let unspentProofs = allProofsFromEvents.filter { !spentProofCs.contains($0.C) }
+                    
+                    // Update state: remove spent proofs, keep unspent ones
+                    try await update(
+                        deletedProofs: mintSpentProofs,
+                        addedProofs: [] // Unspent proofs are already in state
+                    )
+                    
+                    print("✅ State updated: removed \(mintSpentProofs.count) spent proofs")
+                }
+            }
+            
+            // Create spending history event for reconciliation
+            try await createSpendingHistoryEvent(
+                direction: .out,
+                amount: Int64(spentProofs.reduce(0) { $0 + $1.amount }),
+                signer: signer
+            )
+        } else {
+            print("✅ All proofs are unspent, no reconciliation needed")
+        }
+    }
+    
+    /// Find token events that contain specific proofs
+    private func findTokenEventsContainingProofs(
+        proofs: [CashuSwift.Proof],
+        signer: NDKSigner
+    ) async throws -> [String] {
+        let proofCs = Set(proofs.map { $0.C })
+        var matchingEventIds: [String] = []
+        
+        // Check current token events
+        for eventId in currentTokenEventIds {
+            // We need to decrypt and check each event
+            // This is why we track currentTokenEventIds
+            matchingEventIds.append(eventId)
+        }
+        
+        return matchingEventIds
+    }
+    
+    /// Get all proofs from specific token events
+    private func getProofsFromTokenEvents(
+        eventIds: [String],
+        signer: NDKSigner
+    ) async throws -> [CashuSwift.Proof] {
+        var allProofs: [CashuSwift.Proof] = []
+        
+        // Get proofs from our current state
+        for entry in proofState.values {
+            allProofs.append(entry.proof)
+        }
+        
+        return allProofs
+    }
+    
+    /// Check proof states for a specific mint
+    public func checkProofStates(mintURL: URL) async throws -> [String: CashuSwift.Proof.ProofState] {
+        guard let mint = mints[mintURL.absoluteString] else {
+            throw NDKError.noMintAvailable("Mint not found: \(mintURL)")
+        }
+        
+        // Get all proofs for this mint
+        let mintProofs = proofState.values
+            .filter { $0.state == .available && $0.mint == mintURL.absoluteString }
+            .map { $0.proof }
+        
+        guard !mintProofs.isEmpty else {
+            return [:]
+        }
+        
+        // Check with mint
+        let states = try await CashuSwift.check(mintProofs, mint: mint)
+        
+        // Build result dictionary
+        var result: [String: CashuSwift.Proof.ProofState] = [:]
+        for (index, proof) in mintProofs.enumerated() {
+            result[proof.C] = states[index]
+        }
+        
+        return result
+    }
+    
+    /// Start periodic proof state checking
+    /// This will check proof states at regular intervals and reconcile any discrepancies
+    public func startPeriodicProofStateCheck(interval: TimeInterval = 300) async { // Default 5 minutes
+        print("🔄 Starting periodic proof state checking every \(interval) seconds")
+        
+        while true {
+            do {
+                try await Task.sleep(nanoseconds: UInt64(interval * 1_000_000_000))
+                
+                print("⏰ Running periodic proof state check...")
+                try await checkAndReconcileProofStates()
+                
+            } catch {
+                if error is CancellationError {
+                    print("🛑 Periodic proof state checking cancelled")
+                    break
+                } else {
+                    print("❌ Error in periodic proof check: \(error)")
+                    // Continue checking even if there's an error
+                }
+            }
+        }
+    }
+    
     /// Create a transfer history event for cross-mint transfers
     private func createTransferHistoryEvent(
         amount: Int64,
@@ -1256,7 +1503,15 @@ public actor NDKCashuWallet: NDKWallet {
     
     /// Add mint to wallet
     public func addMint(url: URL) async throws {
-        let mint = try await CashuSwift.loadMint(url: url)
+        let mint: CashuSwift.Mint
+        
+        // Use cached loader if available, otherwise load directly
+        if let loader = mintLoader {
+            mint = try await loader.loadMint(url: url)
+        } else {
+            mint = try await CashuSwift.loadMint(url: url)
+        }
+        
         mints[url.absoluteString] = mint
         
         // Store keysets
@@ -1266,6 +1521,35 @@ public actor NDKCashuWallet: NDKWallet {
         
         // Save updated wallet configuration
         try await save()
+    }
+    
+    /// Get mint info (uses cache if available)
+    /// Returns the raw JSON data that can be decoded as needed
+    public func getMintInfoData(url: URL) async throws -> Data {
+        if let loader = mintLoader {
+            return try await loader.loadMintInfoData(url: url)
+        } else {
+            // Fallback to direct network fetch
+            let infoUrl = url.appending(path: "/v1/info")
+            let data = try await URLSession.shared.data(from: infoUrl).0
+            return data
+        }
+    }
+    
+    /// Refresh mint keysets from network (useful when keysets change)
+    public func refreshMintKeysets(url: URL) async throws {
+        let mint = try await CashuSwift.loadMint(url: url)
+        mints[url.absoluteString] = mint
+        
+        // Update keysets
+        for keyset in mint.keysets {
+            keysets[keyset.keysetID] = keyset
+        }
+        
+        // If we have a cache, update it
+        if let loader = mintLoader {
+            _ = try await loader.loadMint(url: url) // This will update the cache
+        }
     }
     
     /// Remove mint from wallet

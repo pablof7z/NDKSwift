@@ -1,5 +1,6 @@
 import Foundation
 import GRDB
+import CashuSwift
 
 /// SQLite-backed cache implementation for NDKSwift
 /// Provides efficient storage and querying of Nostr events
@@ -82,6 +83,39 @@ public actor NDKSQLiteCache: NDKCache {
             // Create profile indexes for common searches
             try db.create(index: "idx_profiles_name", on: "profiles", columns: ["name"], ifNotExists: true)
             try db.create(index: "idx_profiles_nip05", on: "profiles", columns: ["nip05"], ifNotExists: true)
+            
+            // Create mint_info table
+            try db.create(table: "mint_info", ifNotExists: true) { t in
+                t.column("url", .text).primaryKey()
+                t.column("name", .text)
+                t.column("pubkey", .text)
+                t.column("version", .text)
+                t.column("description", .text)
+                t.column("description_long", .text)
+                t.column("motd", .text)
+                t.column("icon_url", .text)
+                t.column("tos_url", .text)
+                t.column("nuts_json", .text)
+                t.column("last_updated", .integer).notNull()
+                t.column("json", .text).notNull()
+            }
+            
+            // Create keysets table
+            try db.create(table: "keysets", ifNotExists: true) { t in
+                t.column("keyset_id", .text).primaryKey()
+                t.column("mint_url", .text).notNull().references("mint_info", column: "url", onDelete: .cascade)
+                t.column("unit", .text).notNull()
+                t.column("active", .boolean).defaults(to: true)
+                t.column("input_fee_ppk", .integer).defaults(to: 0)
+                t.column("keys_json", .text).notNull()
+                t.column("last_updated", .integer).notNull()
+                t.column("json", .text).notNull()
+            }
+            
+            // Create indexes for keysets
+            try db.create(index: "idx_keysets_mint", on: "keysets", columns: ["mint_url"], ifNotExists: true)
+            try db.create(index: "idx_keysets_unit", on: "keysets", columns: ["unit"], ifNotExists: true)
+            try db.create(index: "idx_keysets_active", on: "keysets", columns: ["active"], ifNotExists: true)
         }
     }
     
@@ -319,6 +353,205 @@ public actor NDKSQLiteCache: NDKCache {
         }) ?? []
     }
     
+    // MARK: - Mint Operations
+    
+    /// Save raw mint info JSON to cache
+    public func saveMintInfoJSON(_ jsonData: Data, url: String) async throws {
+        let jsonString = String(data: jsonData, encoding: .utf8) ?? "{}"
+        
+        try await dbQueue.write { db in
+            try db.execute(
+                sql: """
+                INSERT OR REPLACE INTO mint_info 
+                (url, name, pubkey, version, description, description_long, motd, icon_url, tos_url, nuts_json, last_updated, json)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                arguments: [
+                    url,
+                    nil, // Just store JSON, don't try to extract fields
+                    nil,
+                    nil,
+                    nil,
+                    nil,
+                    nil,
+                    nil,
+                    nil,
+                    nil,
+                    Int64(Date().timeIntervalSince1970),
+                    jsonString
+                ]
+            )
+        }
+    }
+    
+    /// Get raw mint info JSON from cache
+    public func getMintInfoJSON(url: String) async -> Data? {
+        return try? await dbQueue.read { db in
+            if let row = try Row.fetchOne(db, sql: "SELECT json FROM mint_info WHERE url = ?", arguments: [url]),
+               let jsonString = row["json"] as? String,
+               let jsonData = jsonString.data(using: .utf8) {
+                return jsonData
+            }
+            return nil
+        }
+    }
+    
+    /// Check if mint info is stale (older than 24 hours)
+    public func isMintInfoStale(url: String, maxAge: TimeInterval = 86400) async -> Bool {
+        let staleThreshold = Int64(Date().timeIntervalSince1970 - maxAge)
+        return (try? await dbQueue.read { db in
+            if let lastUpdated = try Int64.fetchOne(db, sql: "SELECT last_updated FROM mint_info WHERE url = ?", arguments: [url]) {
+                return lastUpdated < staleThreshold
+            }
+            return true // If not found, consider it stale
+        }) ?? true
+    }
+    
+    // MARK: - Keyset Operations
+    
+    /// Save keyset to cache
+    public func saveKeyset(_ keyset: CashuSwift.Keyset, mintUrl: String) async throws {
+        let encoder = JSONEncoder()
+        let jsonData = try encoder.encode(keyset)
+        let jsonString = String(data: jsonData, encoding: .utf8) ?? "{}"
+        
+        let keysJsonData = try encoder.encode(keyset.keys)
+        let keysJsonString = String(data: keysJsonData, encoding: .utf8) ?? "{}"
+        
+        try await dbQueue.write { db in
+            try db.execute(
+                sql: """
+                INSERT OR REPLACE INTO keysets 
+                (keyset_id, mint_url, unit, active, input_fee_ppk, keys_json, last_updated, json)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                arguments: [
+                    keyset.keysetID,
+                    mintUrl,
+                    keyset.unit,
+                    keyset.active,
+                    keyset.inputFeePPK,
+                    keysJsonString,
+                    Int64(Date().timeIntervalSince1970),
+                    jsonString
+                ]
+            )
+        }
+    }
+    
+    /// Save multiple keysets at once (batch operation)
+    public func saveKeysets(_ keysets: [CashuSwift.Keyset], mintUrl: String) async throws {
+        let encoder = JSONEncoder()
+        let currentTime = Int64(Date().timeIntervalSince1970)
+        
+        try await dbQueue.write { db in
+            for keyset in keysets {
+                let jsonData = try encoder.encode(keyset)
+                let jsonString = String(data: jsonData, encoding: .utf8) ?? "{}"
+                
+                let keysJsonData = try encoder.encode(keyset.keys)
+                let keysJsonString = String(data: keysJsonData, encoding: .utf8) ?? "{}"
+                
+                try db.execute(
+                    sql: """
+                    INSERT OR REPLACE INTO keysets 
+                    (keyset_id, mint_url, unit, active, input_fee_ppk, keys_json, last_updated, json)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    arguments: [
+                        keyset.keysetID,
+                        mintUrl,
+                        keyset.unit,
+                        keyset.active,
+                        keyset.inputFeePPK,
+                        keysJsonString,
+                        currentTime,
+                        jsonString
+                    ]
+                )
+            }
+        }
+    }
+    
+    /// Get keyset by ID
+    public func getKeyset(id: String) async -> CashuSwift.Keyset? {
+        return try? await dbQueue.read { db in
+            if let row = try Row.fetchOne(db, sql: "SELECT json FROM keysets WHERE keyset_id = ?", arguments: [id]),
+               let jsonString = row["json"] as? String,
+               let jsonData = jsonString.data(using: .utf8) {
+                return try JSONDecoder().decode(CashuSwift.Keyset.self, from: jsonData)
+            }
+            return nil
+        }
+    }
+    
+    /// Get all keysets for a mint
+    public func getKeysets(mintUrl: String) async -> [CashuSwift.Keyset] {
+        return (try? await dbQueue.read { db in
+            let rows = try Row.fetchAll(db, sql: "SELECT json FROM keysets WHERE mint_url = ? ORDER BY keyset_id", arguments: [mintUrl])
+            return rows.compactMap { row in
+                guard let jsonString = row["json"] as? String,
+                      let jsonData = jsonString.data(using: .utf8) else { return nil }
+                return try? JSONDecoder().decode(CashuSwift.Keyset.self, from: jsonData)
+            }
+        }) ?? []
+    }
+    
+    /// Get active keysets for a mint and unit
+    public func getActiveKeysets(mintUrl: String, unit: String) async -> [CashuSwift.Keyset] {
+        return (try? await dbQueue.read { db in
+            let rows = try Row.fetchAll(
+                db, 
+                sql: "SELECT json FROM keysets WHERE mint_url = ? AND unit = ? AND active = 1 ORDER BY keyset_id", 
+                arguments: [mintUrl, unit]
+            )
+            return rows.compactMap { row in
+                guard let jsonString = row["json"] as? String,
+                      let jsonData = jsonString.data(using: .utf8) else { return nil }
+                return try? JSONDecoder().decode(CashuSwift.Keyset.self, from: jsonData)
+            }
+        }) ?? []
+    }
+    
+    /// Check if keysets are stale (older than 1 hour)
+    public func areKeysetsStale(mintUrl: String, maxAge: TimeInterval = 3600) async -> Bool {
+        let staleThreshold = Int64(Date().timeIntervalSince1970 - maxAge)
+        return (try? await dbQueue.read { db in
+            if let oldestUpdate = try Int64.fetchOne(
+                db, 
+                sql: "SELECT MIN(last_updated) FROM keysets WHERE mint_url = ?", 
+                arguments: [mintUrl]
+            ) {
+                return oldestUpdate < staleThreshold
+            }
+            return true // If no keysets found, consider it stale
+        }) ?? true
+    }
+    
+    /// Delete keysets for a mint
+    public func deleteKeysets(mintUrl: String) async throws {
+        try await dbQueue.write { db in
+            try db.execute(sql: "DELETE FROM keysets WHERE mint_url = ?", arguments: [mintUrl])
+        }
+    }
+    
+    // MARK: - Mint Management
+    
+    /// Get all cached mint URLs
+    public func getCachedMintUrls() async -> [String] {
+        return (try? await dbQueue.read { db in
+            try String.fetchAll(db, sql: "SELECT url FROM mint_info ORDER BY url")
+        }) ?? []
+    }
+    
+    /// Delete mint and all associated data
+    public func deleteMint(url: String) async throws {
+        try await dbQueue.write { db in
+            // Keysets will be deleted automatically due to foreign key constraint
+            try db.execute(sql: "DELETE FROM mint_info WHERE url = ?", arguments: [url])
+        }
+    }
+    
     // MARK: - Cache Management
     
     public func clear() async throws {
@@ -326,6 +559,8 @@ public actor NDKSQLiteCache: NDKCache {
             try db.execute(sql: "DELETE FROM events")
             try db.execute(sql: "DELETE FROM tags")
             try db.execute(sql: "DELETE FROM profiles")
+            try db.execute(sql: "DELETE FROM mint_info")
+            try db.execute(sql: "DELETE FROM keysets")
         }
         // VACUUM must be run outside of a transaction
         try await dbQueue.writeWithoutTransaction { db in

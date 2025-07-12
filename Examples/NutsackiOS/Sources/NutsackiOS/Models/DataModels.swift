@@ -17,8 +17,8 @@ final class NostrAccount {
     var createdAt: Date
     var lastUsed: Date
     
-    @Relationship(deleteRule: .cascade, inverse: \CashuWallet.account)
-    var wallets: [CashuWallet]
+    @Relationship(deleteRule: .cascade)
+    var wallets: [CashuWallet] = []
     
     init(publicKey: String, privateKey: String? = nil, displayName: String) {
         self.accountID = UUID()
@@ -38,27 +38,26 @@ final class CashuWallet {
     var walletID: UUID
     
     var name: String
-    var description: String?
+    var walletDescription: String?
     var nip60EventID: String?  // The event ID on Nostr
     var createdAt: Date
     var lastSync: Date?
     
-    @Relationship(inverse: \NostrAccount.wallets)
     var account: NostrAccount?
     
-    @Relationship(deleteRule: .cascade, inverse: \Mint.wallet)
-    var mints: [Mint]
+    @Relationship(deleteRule: .cascade)
+    var mints: [Mint] = []
     
-    @Relationship(deleteRule: .cascade, inverse: \CashuToken.wallet)
-    var tokens: [CashuToken]
+    @Relationship(deleteRule: .cascade)
+    var tokens: [CashuToken] = []
     
-    @Relationship(deleteRule: .cascade, inverse: \Transaction.wallet)
-    var transactions: [Transaction]
+    @Relationship(deleteRule: .cascade)
+    var transactions: [Transaction] = []
     
     init(name: String, description: String? = nil) {
         self.walletID = UUID()
         self.name = name
-        self.description = description
+        self.walletDescription = description
         self.createdAt = Date()
         self.mints = []
         self.tokens = []
@@ -78,7 +77,7 @@ final class Mint {
     
     var url: URL
     var name: String?
-    var description: String?
+    var mintDescription: String?
     var pubkey: String?
     var contactInfo: [String]?
     var motd: String?
@@ -86,11 +85,10 @@ final class Mint {
     var units: [String]
     var lastSync: Date?
     
-    @Relationship(inverse: \CashuWallet.mints)
     var wallet: CashuWallet?
     
-    @Relationship(deleteRule: .nullify, inverse: \CashuToken.mint)
-    var tokens: [CashuToken]
+    @Relationship(deleteRule: .nullify)
+    var tokens: [CashuToken] = []
     
     init(url: URL, units: [String] = ["sat"]) {
         self.mintID = UUID()
@@ -119,13 +117,10 @@ final class CashuToken {
     var spentAt: Date?
     var memo: String?
     
-    @Relationship(inverse: \CashuWallet.tokens)
     var wallet: CashuWallet?
     
-    @Relationship(inverse: \Mint.tokens)
     var mint: Mint?
     
-    @Relationship(inverse: \Transaction.tokens)
     var transaction: Transaction?
     
     init(amount: Int, keysetID: String, C: String, secret: String) {
@@ -159,11 +154,10 @@ final class Transaction {
     var lightningInvoice: String?
     var status: TransactionStatus
     
-    @Relationship(inverse: \CashuWallet.transactions)
     var wallet: CashuWallet?
     
-    @Relationship(deleteRule: .nullify, inverse: \CashuToken.transaction)
-    var tokens: [CashuToken]
+    @Relationship(deleteRule: .nullify)
+    var tokens: [CashuToken] = []
     
     init(type: TransactionType, amount: Int, memo: String? = nil) {
         self.transactionID = UUID()

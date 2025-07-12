@@ -1,12 +1,13 @@
 import SwiftUI
 import SwiftData
 import NDKSwift
-import Popovers
+// import Popovers - Removed for build compatibility
 
 struct ContentView: View {
     @Environment(\.modelContext) private var modelContext
     @EnvironmentObject private var appState: AppState
     @EnvironmentObject private var nostrManager: NostrManager
+    @EnvironmentObject private var walletManager: WalletManager
     
     @Query private var accounts: [NostrAccount]
     
@@ -83,6 +84,20 @@ struct ContentView: View {
             Task {
                 do {
                     try await nostrManager.login(with: privateKey)
+                    
+                    // Load the wallet after successful login
+                    if activeAccount.wallets.isEmpty {
+                        // Create a default wallet if none exists
+                        _ = try await walletManager.createWallet(
+                            name: "Default Wallet",
+                            description: "My Cashu wallet",
+                            account: activeAccount
+                        )
+                    }
+                    
+                    // Load wallet from NIP-60 events
+                    try await walletManager.loadWallet(for: activeAccount)
+                    
                 } catch {
                     logger.error("Failed to auto-login: \(error)")
                     // Clear invalid account
