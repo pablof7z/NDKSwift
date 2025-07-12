@@ -1,0 +1,93 @@
+import Foundation
+import SwiftUI
+
+@MainActor
+class AppState: ObservableObject {
+    private static let conversionUnitKey = "PreferredCurrencyConversionUnit"
+    private static let lastRNackHashKey = "LastReleaseNotesAcknoledgedHash"
+    private static let firstLaunchFlag = "HasLaunchedBefore"
+    private static let activeAccountKey = "ActiveNostrAccountID"
+    
+    struct ExchangeRateResponse: Decodable {
+        let bitcoin: ExchangeRate
+    }
+    
+    struct ExchangeRate: Decodable, Equatable {
+        let usd: Int
+        let eur: Int
+    }
+    
+    @Published var preferredConversionUnit: CurrencyUnit {
+        didSet {
+            UserDefaults.standard.setValue(preferredConversionUnit.rawValue, forKey: AppState.conversionUnitKey)
+        }
+    }
+    
+    @Published var exchangeRates: ExchangeRate?
+    @Published var activeAccountID: String? {
+        didSet {
+            UserDefaults.standard.setValue(activeAccountID, forKey: AppState.activeAccountKey)
+        }
+    }
+    
+    static var showOnboarding: Bool {
+        get {
+            return !UserDefaults.standard.bool(forKey: firstLaunchFlag)
+        } set {
+            UserDefaults.standard.set(!newValue, forKey: firstLaunchFlag)
+        }
+    }
+    
+    init() {
+        if let unit = CurrencyUnit(rawValue: UserDefaults.standard.string(forKey: AppState.conversionUnitKey) ?? "") {
+            preferredConversionUnit = unit
+        } else {
+            preferredConversionUnit = .usd
+        }
+        
+        activeAccountID = UserDefaults.standard.string(forKey: AppState.activeAccountKey)
+        
+        loadExchangeRates()
+    }
+    
+    func loadExchangeRates() {
+        logger.info("Loading exchange rates...")
+        
+        guard let url = URL(string: "https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd,eur") else {
+            logger.warning("Could not fetch exchange rates from API due to an invalid URL.")
+            return
+        }
+        
+        Task {
+            guard let (data, _) = try? await URLSession.shared.data(from: url) else {
+                logger.warning("Unable to load conversion data.")
+                return
+            }
+            
+            guard let prices = try? JSONDecoder().decode(ExchangeRateResponse.self, from: data).bitcoin else {
+                logger.warning("Unable to decode exchange rate data from request response.")
+                return
+            }
+            
+            await MainActor.run {
+                self.exchangeRates = prices
+            }
+        }
+    }
+}
+
+enum CurrencyUnit: String, CaseIterable {
+    case sat
+    case usd
+    case eur
+    case btc
+    
+    var symbol: String {
+        switch self {
+        case .sat: return "sats"
+        case .usd: return "$"
+        case .eur: return "€"
+        case .btc: return "₿"
+        }
+    }
+}

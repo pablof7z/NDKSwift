@@ -27,9 +27,11 @@ final class ContentTaggerTests: XCTestCase {
         let content = "#valid-tag #also_valid #not!valid #no@valid"
         let hashtags = ContentTagger.generateHashtags(from: content)
         
-        XCTAssertEqual(hashtags.count, 2)
+        XCTAssertEqual(hashtags.count, 4)
         XCTAssertEqual(hashtags[0], "valid-tag")
         XCTAssertEqual(hashtags[1], "also_valid")
+        XCTAssertEqual(hashtags[2], "not")  // Extracts valid part before !
+        XCTAssertEqual(hashtags[3], "no")   // Extracts valid part before @
     }
     
     func testHashtagAtStart() {
@@ -43,7 +45,7 @@ final class ContentTaggerTests: XCTestCase {
     // MARK: - Nostr Entity Tests
     
     func testNpubDecoding() throws {
-        let npub = "npub1qqqqqqqqd76xvjgjg3kkzejza2uxzp4ukdsxqw6jw9vv3tqrugssfgvzk6"
+        let npub = "npub1qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqsdty9mx"
         let decoded = try ContentTagger.decodeNostrEntity(npub)
         
         XCTAssertEqual(decoded.type, "npub")
@@ -52,7 +54,7 @@ final class ContentTaggerTests: XCTestCase {
     }
     
     func testNoteDecoding() throws {
-        let note = "note1qqqqqqqqd76xvjgjg3kkzejza2uxzp4ukdsxqw6jw9vv3tqrugsgnx9sc"
+        let note = "note1qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqxawlyf"
         let decoded = try ContentTagger.decodeNostrEntity(note)
         
         XCTAssertEqual(decoded.type, "note")
@@ -72,7 +74,7 @@ final class ContentTaggerTests: XCTestCase {
     }
     
     func testNpubMentionGeneration() {
-        let npub = "npub1qqqqqqqqd76xvjgjg3kkzejza2uxzp4ukdsxqw6jw9vv3tqrugssfgvzk6"
+        let npub = "npub1qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqsdty9mx"
         let content = "Hello @\(npub)!"
         let result = ContentTagger.generateContentTags(from: content)
         
@@ -83,7 +85,8 @@ final class ContentTaggerTests: XCTestCase {
     }
     
     func testNostrPrefixedEntity() {
-        let npub = "npub1qqqqqqqqd76xvjgjg3kkzejza2uxzp4ukdsxqw6jw9vv3tqrugssfgvzk6"
+        // Use a valid bech32 npub
+        let npub = "npub1qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqsdty9mx"
         let content = "Check out nostr:\(npub)"
         let result = ContentTagger.generateContentTags(from: content)
         
@@ -93,8 +96,8 @@ final class ContentTaggerTests: XCTestCase {
     }
     
     func testMixedContent() {
-        let npub = "npub1qqqqqqqqd76xvjgjg3kkzejza2uxzp4ukdsxqw6jw9vv3tqrugssfgvzk6"
-        let note = "note1qqqqqqqqd76xvjgjg3kkzejza2uxzp4ukdsxqw6jw9vv3tqrugsgnx9sc"
+        let npub = "npub1qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqsdty9mx"
+        let note = "note1qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqxawlyf"
         let content = "Hello @\(npub)! Check out nostr:\(note) #nostr #bitcoin"
         
         let result = ContentTagger.generateContentTags(from: content)
@@ -116,7 +119,7 @@ final class ContentTaggerTests: XCTestCase {
     }
     
     func testDuplicateTagHandling() {
-        let npub = "npub1qqqqqqqqd76xvjgjg3kkzejza2uxzp4ukdsxqw6jw9vv3tqrugssfgvzk6"
+        let npub = "npub1qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqsdty9mx"
         let content = "Hello @\(npub) and @\(npub) again #nostr #nostr"
         
         let result = ContentTagger.generateContentTags(from: content)
@@ -161,7 +164,7 @@ final class ContentTaggerTests: XCTestCase {
     // MARK: - Parse Content Segments Tests
     
     func testParseContentSegments() {
-        let npub = "npub1qqqqqqqqd76xvjgjg3kkzejza2uxzp4ukdsxqw6jw9vv3tqrugssfgvzk6"
+        let npub = "npub1qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqsdty9mx"
         let content = "Hello @\(npub) #nostr https://example.com"
         
         let result = ContentTagger.parseContentSegments(from: content)

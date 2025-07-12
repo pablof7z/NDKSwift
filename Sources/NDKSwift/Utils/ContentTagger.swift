@@ -157,8 +157,8 @@ public enum ContentTagger {
     }
     /// Generate hashtags from content
     public static func generateHashtags(from content: String) -> [String] {
-        // Regex pattern for hashtags: #word (no special characters except underscore and hyphen)
-        let hashtagRegex = #"(?<=\s|^)(#[^\s!@#$%^&*()=+./,\[{\]};:'"?><]+)"#
+        // Regex pattern for hashtags: #word (only letters, numbers, underscore and hyphen)
+        let hashtagRegex = #"(?<=\s|^)(#[a-zA-Z0-9_-]+)"#
 
         guard let regex = try? NSRegularExpression(pattern: hashtagRegex, options: []) else {
             return []
