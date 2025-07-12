@@ -22,7 +22,7 @@ struct ImportAccountView: View {
                         HStack {
                             TextField("nsec1...", text: $nsecInput)
                                 .textContentType(.password)
-                                .autocapitalization(.none)
+                                .textInputAutocapitalization(.never)
                                 .font(.system(.body, design: .monospaced))
                             
                             Button(action: { showScanner = true }) {
@@ -99,18 +99,30 @@ struct ImportAccountView: View {
                 }
                 
                 // Fetch profile
-                try await user.fetchProfile()
+                if let ndk = nostrManager.ndk {
+                    let metadataFilter = NDKFilter(
+                        authors: [user.npub],
+                        kinds: [0],
+                        limit: 1
+                    )
+                    if let event = try? await ndk.fetchEvent(metadataFilter),
+                       let contentData = event.content.data(using: .utf8),
+                       let metadata = try? JSONDecoder().decode(NDKUserProfile.self, from: contentData) {
+                        await user.setProfile(metadata)
+                    }
+                }
                 
                 // Save to local database
+                let profile = await user.profile
                 let account = NostrAccount(
-                    publicKey: user.publicKey,
+                    publicKey: user.npub,
                     privateKey: privateKey,
-                    displayName: user.profile?.displayName ?? user.profile?.name ?? "Nostr User"
+                    displayName: profile?.displayName ?? profile?.name ?? "Nostr User"
                 )
                 
-                account.about = user.profile?.about
-                account.picture = user.profile?.picture
-                account.nip05 = user.profile?.nip05
+                account.about = profile?.about
+                account.picture = profile?.picture
+                account.nip05 = profile?.nip05
                 
                 await MainActor.run {
                     modelContext.insert(account)

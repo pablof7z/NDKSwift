@@ -9,12 +9,25 @@ let logger = Logger(subsystem: "Nutsack Wallet", category: "App")
 struct NutsackApp: App {
     @StateObject private var appState = AppState()
     @StateObject private var nostrManager = NostrManager()
+    @StateObject private var walletManager: WalletManager
+    
+    init() {
+        let nostrManager = NostrManager()
+        let walletManager = WalletManager(
+            nostrManager: nostrManager,
+            modelContext: DatabaseManager.shared.container.mainContext
+        )
+        
+        _nostrManager = StateObject(wrappedValue: nostrManager)
+        _walletManager = StateObject(wrappedValue: walletManager)
+    }
     
     var body: some Scene {
         WindowGroup {
             ContentView()
                 .environmentObject(appState)
                 .environmentObject(nostrManager)
+                .environmentObject(walletManager)
                 .preferredColorScheme(.dark)
         }
         .modelContainer(DatabaseManager.shared.container)

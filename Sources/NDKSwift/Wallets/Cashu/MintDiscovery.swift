@@ -9,10 +9,12 @@ public actor MintDiscovery {
     }
     
     /// Discovered mint with reputation information
-    public struct DiscoveredMint: Sendable {
+    public struct DiscoveredMint: Sendable, Identifiable {
         public let announcement: NDKMintAnnouncement
         public let event: NDKEvent
         public let reputation: MintReputation
+        
+        public var id: String { announcement.mintURL.absoluteString }
         
         public init(announcement: NDKMintAnnouncement, event: NDKEvent, reputation: MintReputation) {
             self.announcement = announcement

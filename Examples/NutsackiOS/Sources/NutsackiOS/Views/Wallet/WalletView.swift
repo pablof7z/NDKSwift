@@ -1,12 +1,13 @@
 import SwiftUI
 import SwiftData
 import NDKSwift
-import Popovers
+// import Popovers - Removed for build compatibility
 
 struct WalletView: View {
     @Environment(\.modelContext) private var modelContext
     @EnvironmentObject private var appState: AppState
     @EnvironmentObject private var nostrManager: NostrManager
+    @EnvironmentObject private var walletManager: WalletManager
     
     @Query private var accounts: [NostrAccount]
     @Query private var wallets: [CashuWallet]
@@ -16,6 +17,8 @@ struct WalletView: View {
     @State private var selectedWallet: CashuWallet?
     @State private var showCreateWallet = false
     @State private var navigationDestination: WalletDestination?
+    @State private var currentBalance: Int64 = 0
+    @State private var isLoadingWallet = false
     
     enum WalletDestination: Identifiable, Hashable {
         case mint
@@ -23,6 +26,7 @@ struct WalletView: View {
         case receive(urlString: String?)
         case melt
         case nutzap
+        case swap
         
         var id: String {
             switch self {
@@ -31,6 +35,7 @@ struct WalletView: View {
             case .receive(let url): return "receive_\(url ?? "nil")"
             case .melt: return "melt"
             case .nutzap: return "nutzap"
+            case .swap: return "swap"
             }
         }
     }
@@ -62,7 +67,7 @@ struct WalletView: View {
                             
                             // Balance card
                             if let wallet = selectedWallet ?? activeWallets.first {
-                                BalanceCard(balance: wallet.balance)
+                                BalanceCard(balance: Int(currentBalance))
                                     .padding(.horizontal)
                                 
                                 // Recent transactions
@@ -112,6 +117,8 @@ struct WalletView: View {
                     MeltView(wallet: selectedWallet ?? activeWallets.first!)
                 case .nutzap:
                     NutzapView(wallet: selectedWallet ?? activeWallets.first!)
+                case .swap:
+                    SwapView(wallet: selectedWallet ?? activeWallets.first!)
                 }
             }
             .onAppear {
@@ -126,22 +133,47 @@ struct WalletView: View {
                     urlState = nil
                 }
             }
+            .onChange(of: selectedWallet) { _, _ in
+                updateBalance()
+            }
         }
     }
     
     private func loadWallets() {
+        guard let account = activeAccount else { return }
+        
+        isLoadingWallet = true
+        
         Task {
             do {
-                // Load NIP-60 wallets from Nostr
-                let walletEvents = try await nostrManager.fetchNIP60Wallets()
+                // Load the wallet from NIP-60 events
+                try await walletManager.loadWallet(for: account)
                 
-                // Sync with local database
-                for event in walletEvents {
-                    // Parse wallet data and update local state
-                    logger.info("Found NIP-60 wallet: \(event.id)")
+                // Update balance
+                let balance = try await walletManager.getBalance()
+                
+                await MainActor.run {
+                    currentBalance = balance
+                    isLoadingWallet = false
                 }
             } catch {
-                logger.error("Failed to load NIP-60 wallets: \(error)")
+                logger.error("Failed to load NIP-60 wallet: \(error)")
+                await MainActor.run {
+                    isLoadingWallet = false
+                }
+            }
+        }
+    }
+    
+    private func updateBalance() {
+        Task {
+            do {
+                let balance = try await walletManager.getBalance()
+                await MainActor.run {
+                    currentBalance = balance
+                }
+            } catch {
+                logger.error("Failed to update balance: \(error)")
             }
         }
     }
@@ -184,91 +216,52 @@ struct EmptyWalletView: View {
 // MARK: - Action Buttons
 struct ActionButtonsView: View {
     @Binding var navigationDestination: WalletView.WalletDestination?
+    @State private var showReceiveMenu = false
+    @State private var showSendMenu = false
     
     var body: some View {
         HStack(spacing: 16) {
             // Receive button with menu
-            Templates.Menu(
-                configuration: {
-                    $0.popoverAnchor = .bottom
-                    $0.originAnchor = .top
-                    $0.backgroundColor = Color.black.opacity(0.5)
-                }
-            ) {
-                Templates.MenuItem {
-                    navigationDestination = .receive(urlString: nil)
-                } label: { fade in
-                    MenuButtonLabel(
-                        title: "Redeem",
-                        subtitle: "Claim Ecash from Token",
-                        imageSystemName: "qrcode",
-                        fade: fade
-                    )
+            Menu {
+                Button(action: { navigationDestination = .receive(urlString: nil) }) {
+                    Label("Redeem", systemImage: "qrcode")
                 }
                 
-                Templates.MenuItem {
-                    navigationDestination = .mint
-                } label: { fade in
-                    MenuButtonLabel(
-                        title: "Mint",
-                        subtitle: "Create Lightning Invoice",
-                        imageSystemName: "bolt.fill",
-                        fade: fade
-                    )
+                Button(action: { navigationDestination = .mint }) {
+                    Label("Mint", systemImage: "bolt.fill")
                 }
-            } label: { fade in
+            } label: {
                 ActionButtonLabel(
                     imageName: "arrow.down",
                     text: "Receive",
-                    fade: fade
+                    fade: false
                 )
             }
             
             // Send button with menu
-            Templates.Menu(
-                configuration: {
-                    $0.popoverAnchor = .bottom
-                    $0.originAnchor = .top
-                    $0.backgroundColor = Color.black.opacity(0.5)
-                }
-            ) {
-                Templates.MenuItem {
-                    navigationDestination = .send
-                } label: { fade in
-                    MenuButtonLabel(
-                        title: "Send",
-                        subtitle: "Create Token to Share",
-                        imageSystemName: "banknote",
-                        fade: fade
-                    )
+            Menu {
+                Button(action: { navigationDestination = .send }) {
+                    Label("Send", systemImage: "banknote")
                 }
                 
-                Templates.MenuItem {
-                    navigationDestination = .melt
-                } label: { fade in
-                    MenuButtonLabel(
-                        title: "Melt",
-                        subtitle: "Pay Lightning Invoice",
-                        imageSystemName: "bolt.fill",
-                        fade: fade
-                    )
+                Button(action: { navigationDestination = .melt }) {
+                    Label("Melt", systemImage: "bolt.fill")
                 }
                 
-                Templates.MenuItem {
-                    navigationDestination = .nutzap
-                } label: { fade in
-                    MenuButtonLabel(
-                        title: "Nutzap",
-                        subtitle: "Zap with Ecash",
-                        imageSystemName: "bolt.heart.fill",
-                        fade: fade
-                    )
+                Button(action: { navigationDestination = .nutzap }) {
+                    Label("Nutzap", systemImage: "bolt.heart.fill")
                 }
-            } label: { fade in
+                
+                Divider()
+                
+                Button(action: { navigationDestination = .swap }) {
+                    Label("Transfer Between Mints", systemImage: "arrow.triangle.swap")
+                }
+            } label: {
                 ActionButtonLabel(
                     imageName: "arrow.up",
                     text: "Send",
-                    fade: fade
+                    fade: false
                 )
             }
         }
@@ -290,29 +283,5 @@ struct ActionButtonLabel: View {
             .frame(maxWidth: .infinity)
             .background(Color.secondary.opacity(0.3))
             .cornerRadius(10)
-    }
-}
-
-struct MenuButtonLabel: View {
-    let title: String
-    let subtitle: String
-    let imageSystemName: String
-    let fade: Bool
-    
-    var body: some View {
-        HStack {
-            VStack(alignment: .leading) {
-                Text(title)
-                    .foregroundStyle(.white)
-                    .font(.title3)
-                Text(subtitle)
-                    .font(.caption)
-                    .foregroundStyle(.gray)
-            }
-            Spacer()
-            Image(systemName: imageSystemName)
-        }
-        .opacity(fade ? 0.5 : 1)
-        .padding()
     }
 }

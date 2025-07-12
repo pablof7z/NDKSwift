@@ -26,9 +26,8 @@ class NostrManager: ObservableObject {
     
     private func setupNDK() {
         ndk = NDK(
-            explicitRelayURLs: defaultRelays,
-            cacheAdapter: NDKSQLiteCache(),
-            enableOutboxModel: true
+            relayUrls: defaultRelays,
+            cache: NDKSQLiteCache()
         )
         
         Task {
@@ -39,17 +38,12 @@ class NostrManager: ObservableObject {
     func connectToRelays() async {
         guard let ndk = ndk else { return }
         
-        do {
-            try await ndk.connect()
-            isConnected = true
-            logger.info("Connected to relays")
-            
-            // Monitor relay status
-            await monitorRelayStatus()
-        } catch {
-            logger.error("Failed to connect to relays: \(error)")
-            isConnected = false
-        }
+        await ndk.connect()
+        isConnected = true
+        logger.info("Connected to relays")
+        
+        // Monitor relay status
+        await monitorRelayStatus()
     }
     
     private func monitorRelayStatus() async {
@@ -68,11 +62,20 @@ class NostrManager: ObservableObject {
         ndk.signer = signer
         
         let publicKey = signer.publicKey(hex: true)
-        currentUser = ndk.user(withPublicKey: publicKey)
+        currentUser = NDKUser(withPublicKey: publicKey)
         
         // Fetch user profile
         if let user = currentUser {
-            try await user.fetchProfile()
+            let metadataFilter = NDKFilter(
+                authors: [publicKey],
+                kinds: [0],
+                limit: 1
+            )
+            if let event = try await ndk.fetchEvent(metadataFilter),
+               let contentData = event.content.data(using: .utf8),
+               let metadata = try? JSONDecoder().decode(NDKUserProfile.self, from: contentData) {
+                await user.setProfile(metadata)
+            }
         }
         
         logger.info("Logged in with public key: \(publicKey)")
@@ -88,22 +91,27 @@ class NostrManager: ObservableObject {
         ndk.signer = signer
         
         let publicKey = signer.publicKey(hex: true)
-        currentUser = ndk.user(withPublicKey: publicKey)
+        currentUser = NDKUser(withPublicKey: publicKey)
         
         // Create and publish profile
-        let metadata = UserProfile(
+        let metadata = NDKUserProfile(
             name: displayName,
             displayName: displayName,
-            about: about ?? "Nutsack wallet user",
-            nip05: nil,
-            lud16: nil,
-            website: nil,
-            picture: nil,
-            banner: nil
+            about: about ?? "Nutsack wallet user"
         )
         
         if let user = currentUser {
-            try await user.updateProfile(metadata)
+            // Create metadata event
+            let metadataContent = try JSONEncoder().encode(metadata)
+            let metadataEvent = try await NDKEventBuilder()
+                .content(String(data: metadataContent, encoding: .utf8) ?? "{}")
+                .kind(0)
+                .build(signer: signer)
+            
+            try await ndk.publish(metadataEvent)
+            
+            // Store profile in user object
+            user.profile = metadata
         }
         
         logger.info("Created new account with public key: \(publicKey)")
@@ -123,8 +131,8 @@ class NostrManager: ObservableObject {
         }
         
         let filter = NDKFilter(
+            authors: [currentUser.npub],
             kinds: [37375],
-            authors: [currentUser.publicKey],
             limit: 100
         )
         
@@ -135,8 +143,7 @@ class NostrManager: ObservableObject {
     func publishNIP60Wallet(_ walletEvent: NDKEvent) async throws {
         guard let ndk = ndk else { throw NostrError.ndkNotInitialized }
         
-        try await walletEvent.sign()
-        try await ndk.publish(event: walletEvent)
+        try await ndk.publish(walletEvent)
         logger.info("Published NIP-60 wallet event")
     }
 }

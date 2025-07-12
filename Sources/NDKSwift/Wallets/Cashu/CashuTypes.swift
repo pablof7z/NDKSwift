@@ -120,7 +120,7 @@ public struct NIP60TokenEvent: Codable {
 
 extension CashuProof {
     /// Convert to CashuSwift Proof format
-    func toCashuSwiftProof() -> CashuSwift.Proof {
+    public func toCashuSwiftProof() -> CashuSwift.Proof {
         // Note: We can't convert DLEQ proofs as CashuSwift.DLEQ doesn't have a public initializer
         // This is a limitation of the CashuSwift library
         // For now, we'll create proofs without DLEQ
