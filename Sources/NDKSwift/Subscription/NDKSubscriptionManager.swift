@@ -192,7 +192,7 @@ public actor NDKSubscriptionManager {
         let eventId = event.id
 
         // Check deduplication
-        let now = Timestamp(Date().timeIntervalSince1970)
+        let now = Timestamp.now
         let isUnique = eventDeduplication[eventId] == nil
 
         if !isUnique {
@@ -504,7 +504,7 @@ public actor NDKSubscriptionManager {
     }
 
     private func performCleanup() async {
-        let now = Timestamp(Date().timeIntervalSince1970)
+        let now = Timestamp.now
         let cutoff = now - Int64(deduplicationWindow)
 
         // Clean old event deduplication entries

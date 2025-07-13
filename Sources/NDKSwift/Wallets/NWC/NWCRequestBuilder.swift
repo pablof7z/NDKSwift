@@ -17,9 +17,10 @@ public struct NWCRequestBuilder {
         // Create the request envelope
         let envelope = NWCRequestEnvelope(method: method, params: params)
         
-        // Encode to JSON
+        // Encode to JSON with snake_case keys
         let encoder = JSONEncoder()
         encoder.keyEncodingStrategy = .convertToSnakeCase
+        encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
         let jsonData = try encoder.encode(envelope)
         let jsonString = String(data: jsonData, encoding: .utf8)!
         
@@ -37,7 +38,7 @@ public struct NWCRequestBuilder {
         // Create the event using the builder
         let event = try await NDKEventBuilder()
             .pubkey(signerPubkey)
-            .createdAt(Timestamp(Date().timeIntervalSince1970))
+            .createdAt(Timestamp.now)
             .kind(.nostrWalletConnectReq)
             .content(encryptedContent)
             .tag(["p", walletPubkey])

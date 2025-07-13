@@ -235,6 +235,6 @@ public actor NDKSignatureVerificationSampler {
         }
         
         let hash = jsonString.data(using: .utf8)!.sha256()
-        return hash.toHexString()
+        return hash.hexString
     }
 }

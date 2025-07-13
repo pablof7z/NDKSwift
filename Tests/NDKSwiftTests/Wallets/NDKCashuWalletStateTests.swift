@@ -11,7 +11,7 @@ final class NDKCashuWalletStateTests: XCTestCase {
         try await super.setUp()
         
         // Setup mock signer
-        mockSigner = MockSigner(privateKey: "test_private_key")
+        mockSigner = MockSigner(privateKey: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef")
         
         // Setup NDK with mock relay
         ndk = NDK(relayUrls: ["wss://test.relay"], signer: mockSigner)

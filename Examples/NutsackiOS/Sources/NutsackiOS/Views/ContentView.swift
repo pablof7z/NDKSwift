@@ -58,7 +58,7 @@ struct ContentView: View {
                         }
                         .tag(Tab.settings)
                 }
-                .persistentSystemOverlays(.hidden)
+                .tint(.orange)
                 .background(Color.black)
             } else {
                 // Show auth/onboarding
@@ -85,17 +85,8 @@ struct ContentView: View {
                 do {
                     try await nostrManager.login(with: privateKey)
                     
-                    // Load the wallet after successful login
-                    if activeAccount.wallets.isEmpty {
-                        // Create a default wallet if none exists
-                        _ = try await walletManager.createWallet(
-                            name: "Default Wallet",
-                            description: "My Cashu wallet",
-                            account: activeAccount
-                        )
-                    }
-                    
                     // Load wallet from NIP-60 events
+                    // This will automatically create the wallet event if it doesn't exist
                     try await walletManager.loadWallet(for: activeAccount)
                     
                 } catch {

@@ -17,8 +17,11 @@ final class NostrAccount {
     var createdAt: Date
     var lastUsed: Date
     
-    @Relationship(deleteRule: .cascade)
-    var wallets: [CashuWallet] = []
+    // NIP-60: One wallet per pubkey, no need to track multiple wallets
+    var hasWallet: Bool = false
+    
+    @Relationship(deleteRule: .cascade, inverse: \WalletState.account)
+    var walletState: WalletState?
     
     init(publicKey: String, privateKey: String? = nil, displayName: String) {
         self.accountID = UUID()
@@ -27,45 +30,29 @@ final class NostrAccount {
         self.displayName = displayName
         self.createdAt = Date()
         self.lastUsed = Date()
-        self.wallets = []
+        self.hasWallet = false
+        self.walletState = nil
     }
 }
 
-// MARK: - Cashu Wallet (NIP-60)
+// MARK: - Wallet State (NIP-60)
+// NIP-60 wallets are stored on Nostr, not locally
+// This is just for tracking UI state and cached data
 @Model
-final class CashuWallet {
+final class WalletState {
     @Attribute(.unique)
-    var walletID: UUID
-    
-    var name: String
-    var walletDescription: String?
-    var nip60EventID: String?  // The event ID on Nostr
-    var createdAt: Date
-    var lastSync: Date?
+    var stateID: UUID
     
     var account: NostrAccount?
-    
-    @Relationship(deleteRule: .cascade)
-    var mints: [Mint] = []
-    
-    @Relationship(deleteRule: .cascade)
-    var tokens: [CashuToken] = []
+    var lastSync: Date?
+    var cachedBalance: Int = 0
     
     @Relationship(deleteRule: .cascade)
     var transactions: [Transaction] = []
     
-    init(name: String, description: String? = nil) {
-        self.walletID = UUID()
-        self.name = name
-        self.walletDescription = description
-        self.createdAt = Date()
-        self.mints = []
-        self.tokens = []
+    init() {
+        self.stateID = UUID()
         self.transactions = []
-    }
-    
-    var balance: Int {
-        tokens.filter { $0.state == .unspent }.reduce(0) { $0 + $1.amount }
     }
 }
 
@@ -85,7 +72,7 @@ final class Mint {
     var units: [String]
     var lastSync: Date?
     
-    var wallet: CashuWallet?
+    var account: NostrAccount?
     
     @Relationship(deleteRule: .nullify)
     var tokens: [CashuToken] = []
@@ -116,8 +103,9 @@ final class CashuToken {
     var createdAt: Date
     var spentAt: Date?
     var memo: String?
+    var dleqVerified: Bool? // Whether DLEQ proof was verified
     
-    var wallet: CashuWallet?
+    var account: NostrAccount?
     
     var mint: Mint?
     
@@ -131,6 +119,7 @@ final class CashuToken {
         self.secret = secret
         self.state = .unspent
         self.createdAt = Date()
+        self.dleqVerified = nil
     }
     
     enum TokenState: String, Codable {
@@ -154,7 +143,7 @@ final class Transaction {
     var lightningInvoice: String?
     var status: TransactionStatus
     
-    var wallet: CashuWallet?
+    var account: NostrAccount?
     
     @Relationship(deleteRule: .nullify)
     var tokens: [CashuToken] = []

@@ -3,7 +3,6 @@ import SwiftData
 import NDKSwift
 
 struct ReceiveView: View {
-    let wallet: CashuWallet
     let tokenString: String?
     
     @Environment(\.dismiss) private var dismiss
@@ -65,7 +64,7 @@ struct ReceiveView: View {
             }
         }
         .navigationTitle("Receive Ecash")
-        .navigationBarTitleDisplayMode(.inline)
+        .platformNavigationBarTitleDisplayMode(inline: true)
         .toolbar {
             ToolbarItem(placement: .cancellationAction) {
                 Button("Cancel") { dismiss() }
@@ -116,7 +115,6 @@ struct ReceiveView: View {
                     amount: Int(amount),
                     memo: "Received ecash"
                 )
-                transaction.wallet = wallet
                 transaction.status = .completed
                 
                 await MainActor.run {

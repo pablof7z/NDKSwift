@@ -45,7 +45,7 @@ struct CreateAccountView: View {
                 }
             }
             .navigationTitle("Create Account")
-            .navigationBarTitleDisplayMode(.inline)
+            .platformNavigationBarTitleDisplayMode(inline: true)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") { dismiss() }
@@ -76,7 +76,7 @@ struct CreateAccountView: View {
                 )
                 
                 // Save to local database
-                guard let publicKey = nostrManager.currentUser?.publicKey else {
+                guard let publicKey = nostrManager.currentUser?.pubkey else {
                     throw NostrError.notLoggedIn
                 }
                 
@@ -194,12 +194,12 @@ struct BackupKeyView: View {
             .padding(.bottom, 40)
         }
         .navigationTitle("Backup Key")
-        .navigationBarTitleDisplayMode(.inline)
+        .platformNavigationBarTitleDisplayMode(inline: true)
         .navigationBarBackButtonHidden(true)
     }
     
     private func copyKey() {
-        UIPasteboard.general.string = nsec
+        nsec.copyToPasteboard()
         withAnimation {
             copiedPrivateKey = true
         }

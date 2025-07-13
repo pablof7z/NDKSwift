@@ -16,7 +16,7 @@ import Foundation
 /// ```
 public final class NDKEventBuilder {
     private var pubkey: PublicKey = ""
-    private var createdAt: Timestamp = Timestamp(Date().timeIntervalSince1970)
+    private var createdAt: Timestamp = Timestamp.now
     private var kind: Kind = EventKind.textNote
     private var tags: [Tag] = []
     private var content: String = ""
@@ -63,7 +63,7 @@ public final class NDKEventBuilder {
     /// Set the creation timestamp using Date
     @discardableResult
     public func createdAt(_ date: Date) -> NDKEventBuilder {
-        self.createdAt = Timestamp(date.timeIntervalSince1970)
+        self.createdAt = Timestamp.from(date)
         return self
     }
     
@@ -250,7 +250,7 @@ public final class NDKEventBuilder {
         let serialized = try serializeForID()
         let data = serialized.data(using: .utf8)!
         let hash = data.sha256()
-        return hash.toHexString()
+        return hash.hexString
     }
     
     /// Serialize event for ID generation according to NIP-01

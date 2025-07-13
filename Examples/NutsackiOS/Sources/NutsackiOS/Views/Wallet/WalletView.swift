@@ -10,15 +10,14 @@ struct WalletView: View {
     @EnvironmentObject private var walletManager: WalletManager
     
     @Query private var accounts: [NostrAccount]
-    @Query private var wallets: [CashuWallet]
     
     @Binding var urlState: URLState?
     
-    @State private var selectedWallet: CashuWallet?
-    @State private var showCreateWallet = false
+    @State private var showConfigureMints = false
     @State private var navigationDestination: WalletDestination?
     @State private var currentBalance: Int64 = 0
     @State private var isLoadingWallet = false
+    @State private var hasWallet = false
     
     enum WalletDestination: Identifiable, Hashable {
         case mint
@@ -44,45 +43,37 @@ struct WalletView: View {
         accounts.first { $0.accountID.uuidString == appState.activeAccountID }
     }
     
-    var activeWallets: [CashuWallet] {
-        activeAccount?.wallets ?? []
-    }
-    
     var body: some View {
         NavigationStack {
             VStack {
-                if activeWallets.isEmpty {
-                    EmptyWalletView(showCreateWallet: $showCreateWallet)
+                if !hasWallet || walletManager.activeWallet == nil {
+                    EmptyWalletView(showConfigureMints: $showConfigureMints)
+                } else if isLoadingWallet {
+                    VStack {
+                        Spacer()
+                        ProgressView("Loading wallet...")
+                            .foregroundStyle(.secondary)
+                        Spacer()
+                    }
                 } else {
                     ScrollView {
                         VStack(spacing: 20) {
-                            // Wallet selector
-                            if activeWallets.count > 1 {
-                                WalletSelector(
-                                    wallets: activeWallets,
-                                    selectedWallet: $selectedWallet
-                                )
-                                .padding(.horizontal)
-                            }
-                            
                             // Balance card
-                            if let wallet = selectedWallet ?? activeWallets.first {
-                                BalanceCard(balance: Int(currentBalance))
-                                    .padding(.horizontal)
-                                
-                                // Recent transactions
-                                RecentTransactionsView(wallet: wallet)
-                                    .padding(.horizontal)
-                            }
+                            BalanceCard(balance: Int(currentBalance))
+                                .padding(.horizontal)
+                            
+                            // Recent transactions
+                            RecentTransactionsView()
+                                .padding(.horizontal)
                         }
                         .padding(.top)
                     }
                     
+                    Spacer()
+                    
                     // Action buttons
-                    if selectedWallet != nil || !activeWallets.isEmpty {
-                        ActionButtonsView(navigationDestination: $navigationDestination)
-                            .padding()
-                    }
+                    ActionButtonsView(navigationDestination: $navigationDestination)
+                        .padding()
                 }
             }
             .background(
@@ -94,38 +85,37 @@ struct WalletView: View {
                 )
             )
             .navigationTitle("Wallet")
-            .navigationBarTitleDisplayMode(.inline)
+            .platformNavigationBarTitleDisplayMode(inline: true)
             .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button(action: { showCreateWallet = true }) {
-                        Image(systemName: "plus.circle")
+                ToolbarItem(placement: .primaryAction) {
+                    if hasWallet {
+                        Button(action: { showConfigureMints = true }) {
+                            Image(systemName: "building.columns")
+                        }
                     }
                 }
             }
-            .sheet(isPresented: $showCreateWallet) {
-                CreateWalletView()
+            .sheet(isPresented: $showConfigureMints) {
+                ConfigureMintsView()
             }
             .navigationDestination(item: $navigationDestination) { destination in
                 switch destination {
                 case .mint:
-                    MintView(wallet: selectedWallet ?? activeWallets.first!)
+                    MintView()
                 case .send:
-                    SendView(wallet: selectedWallet ?? activeWallets.first!)
+                    SendView()
                 case .receive(let urlString):
-                    ReceiveView(wallet: selectedWallet ?? activeWallets.first!, tokenString: urlString)
+                    ReceiveView(tokenString: urlString)
                 case .melt:
-                    MeltView(wallet: selectedWallet ?? activeWallets.first!)
+                    MeltView()
                 case .nutzap:
-                    NutzapView(wallet: selectedWallet ?? activeWallets.first!)
+                    NutzapView()
                 case .swap:
-                    SwapView(wallet: selectedWallet ?? activeWallets.first!)
+                    SwapView()
                 }
             }
             .onAppear {
-                if selectedWallet == nil {
-                    selectedWallet = activeWallets.first
-                }
-                loadWallets()
+                loadWallet()
             }
             .onChange(of: urlState) { oldValue, newValue in
                 if let newValue {
@@ -133,13 +123,13 @@ struct WalletView: View {
                     urlState = nil
                 }
             }
-            .onChange(of: selectedWallet) { _, _ in
+            .onChange(of: walletManager.activeWallet) { _, _ in
                 updateBalance()
             }
         }
     }
     
-    private func loadWallets() {
+    private func loadWallet() {
         guard let account = activeAccount else { return }
         
         isLoadingWallet = true
@@ -148,6 +138,10 @@ struct WalletView: View {
             do {
                 // Load the wallet from NIP-60 events
                 try await walletManager.loadWallet(for: account)
+                
+                await MainActor.run {
+                    hasWallet = true
+                }
                 
                 // Update balance
                 let balance = try await walletManager.getBalance()
@@ -160,6 +154,7 @@ struct WalletView: View {
                 logger.error("Failed to load NIP-60 wallet: \(error)")
                 await MainActor.run {
                     isLoadingWallet = false
+                    hasWallet = false
                 }
             }
         }
@@ -181,7 +176,7 @@ struct WalletView: View {
 
 // MARK: - Empty Wallet View
 struct EmptyWalletView: View {
-    @Binding var showCreateWallet: Bool
+    @Binding var showConfigureMints: Bool
     
     var body: some View {
         VStack(spacing: 24) {
@@ -191,17 +186,17 @@ struct EmptyWalletView: View {
                 .font(.system(size: 80))
                 .foregroundStyle(.secondary)
             
-            Text("No Wallets Yet")
+            Text("Wallet Not Configured")
                 .font(.title2)
                 .fontWeight(.semibold)
             
-            Text("Create your first Cashu wallet to start using lightning-fast payments")
+            Text("Configure mints to start using lightning-fast payments")
                 .multilineTextAlignment(.center)
                 .foregroundStyle(.secondary)
                 .padding(.horizontal, 40)
             
-            Button(action: { showCreateWallet = true }) {
-                Label("Create Wallet", systemImage: "plus.circle.fill")
+            Button(action: { showConfigureMints = true }) {
+                Label("Configure Mints", systemImage: "building.columns.fill")
                     .padding()
                     .background(Color.orange)
                     .foregroundColor(.white)

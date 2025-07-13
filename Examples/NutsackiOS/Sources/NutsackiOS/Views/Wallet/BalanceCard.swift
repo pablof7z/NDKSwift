@@ -2,6 +2,7 @@ import SwiftUI
 
 struct BalanceCard: View {
     @EnvironmentObject private var appState: AppState
+    @EnvironmentObject private var walletManager: WalletManager
     
     let balance: Int
     
@@ -39,9 +40,16 @@ struct BalanceCard: View {
                     
                     Spacer()
                     
-                    Text("sats")
-                        .font(.title)
-                        .foregroundColor(Color.gray)
+                    VStack(alignment: .trailing, spacing: 4) {
+                        Text("sats")
+                            .font(.title)
+                            .foregroundColor(Color.gray)
+                        
+                        // DLEQ verification status
+                        if walletManager.activeWallet != nil {
+                            DLEQStatusIndicator()
+                        }
+                    }
                 }
                 
                 Spacer()
@@ -114,46 +122,3 @@ struct BalanceCard: View {
     }
 }
 
-// MARK: - Wallet Selector
-struct WalletSelector: View {
-    let wallets: [CashuWallet]
-    @Binding var selectedWallet: CashuWallet?
-    
-    var body: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 12) {
-                ForEach(wallets) { wallet in
-                    WalletChip(
-                        wallet: wallet,
-                        isSelected: selectedWallet?.walletID == wallet.walletID
-                    ) {
-                        selectedWallet = wallet
-                    }
-                }
-            }
-        }
-    }
-}
-
-struct WalletChip: View {
-    let wallet: CashuWallet
-    let isSelected: Bool
-    let action: () -> Void
-    
-    var body: some View {
-        Button(action: action) {
-            HStack {
-                Image(systemName: "wallet.pass")
-                    .font(.caption)
-                Text(wallet.name)
-                    .font(.caption)
-                    .fontWeight(.medium)
-            }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 8)
-            .background(isSelected ? Color.orange : Color.secondary.opacity(0.3))
-            .foregroundColor(.white)
-            .cornerRadius(20)
-        }
-    }
-}

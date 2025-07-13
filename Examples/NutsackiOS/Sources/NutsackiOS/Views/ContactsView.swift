@@ -13,7 +13,7 @@ struct ContactsView: View {
         }
         return contacts.filter { user in
             // Since profile is async, we'll filter by npub only for now
-            let npub = NostrIdentifier.npub(fromHex: user.npub) ?? user.npub
+            let npub = NostrIdentifier.npub(fromHex: user.pubkey) ?? user.pubkey
             return npub.localizedCaseInsensitiveContains(searchText)
         }
     }
@@ -55,7 +55,7 @@ struct ContactsView: View {
             }
             .searchable(text: $searchText, prompt: "Search contacts")
             .navigationTitle("Contacts")
-            .navigationBarTitleDisplayMode(.inline)
+            .platformNavigationBarTitleDisplayMode(inline: true)
             .refreshable {
                 await loadContacts()
             }
@@ -77,21 +77,20 @@ struct ContactsView: View {
         do {
             // Fetch contact list
             let filter = NDKFilter(
-                authors: [currentUser.publicKey!],
+                authors: [currentUser.pubkey],
                 kinds: [3],  // Contact list
                 limit: 1
             )
             
             if let contactListEvent = try await ndk.fetchEvent(filter) {
                 // Extract pubkeys from tags
-                let pubkeys = contactListEvent.tags
-                    .filter { $0.first == "p" }
-                    .compactMap { $0.count > 1 ? $0[1] : nil }
+                let pTags = contactListEvent.tags.filter { $0.first == "p" }
+                let pubkeys = pTags.compactMap { $0.count > 1 ? $0[1] : nil }
                 
                 // Fetch profiles for contacts
                 var users: [NDKUser] = []
                 for pubkey in pubkeys {
-                    let user = NDKUser(withPublicKey: pubkey)
+                    let user = NDKUser(pubkey: pubkey)
                     // Try to fetch profile
                     do {
                         let metadataFilter = NDKFilter(
@@ -101,8 +100,8 @@ struct ContactsView: View {
                         )
                         if let event = try await ndk.fetchEvent(metadataFilter),
                            let contentData = event.content.data(using: .utf8),
-                           let metadata = try? JSONDecoder().decode(NDKUserProfile.self, from: contentData) {
-                            await user.setProfile(metadata)
+                           let _ = try? JSONDecoder().decode(NDKUserProfile.self, from: contentData) {
+                            // Profile metadata will be available via async property
                         }
                     } catch {
                         logger.error("Failed to fetch profile for \(pubkey): \(error)")
@@ -110,12 +109,18 @@ struct ContactsView: View {
                     users.append(user)
                 }
                 
+                // Sort users by name
+                var sortedUsers: [(user: NDKUser, name: String)] = []
+                for user in users {
+                    let profile = await user.profile
+                    let name = profile?.displayName ?? profile?.name ?? ""
+                    sortedUsers.append((user: user, name: name))
+                }
+                
+                sortedUsers.sort { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
+                
                 await MainActor.run {
-                    self.contacts = users.sorted { (user1, user2) in
-                        let name1 = user1.profile?.displayName ?? user1.profile?.name ?? ""
-                        let name2 = user2.profile?.displayName ?? user2.profile?.name ?? ""
-                        return name1.localizedCaseInsensitiveCompare(name2) == .orderedAscending
-                    }
+                    self.contacts = sortedUsers.map { $0.user }
                     isLoading = false
                 }
             } else {
@@ -142,7 +147,7 @@ struct ContactRow: View {
     }
     
     var npub: String {
-        NostrIdentifier.npub(fromHex: user.npub) ?? user.npub
+        NostrIdentifier.npub(fromHex: user.pubkey) ?? user.pubkey
     }
     
     var body: some View {

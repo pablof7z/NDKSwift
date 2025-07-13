@@ -27,10 +27,3 @@ public extension Data {
     }
 }
 
-// Extension for Foundation.Data (from CryptoSwift)
-public extension Foundation.Data {
-    /// Convert Data to hex string
-    func toHexString() -> String {
-        return map { String(format: "%02x", $0) }.joined()
-    }
-}

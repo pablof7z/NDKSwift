@@ -8,12 +8,12 @@ import AppKit
 #endif
 
 struct MintView: View {
-    let wallet: CashuWallet
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject private var walletManager: WalletManager
     
     @State private var amount = ""
-    @State private var selectedMint: Mint?
+    @State private var selectedMintURL: String = ""
+    @State private var availableMints: [NDKMintInfo] = []
     @State private var isMinting = false
     @State private var showError = false
     @State private var errorMessage = ""
@@ -25,12 +25,14 @@ struct MintView: View {
         Form {
             Section {
                 TextField("Amount in sats", text: $amount)
+                    #if os(iOS)
                     .keyboardType(.numberPad)
+                    #endif
                 
-                if !wallet.mints.isEmpty {
-                    Picker("Mint", selection: $selectedMint) {
-                        ForEach(wallet.mints) { mint in
-                            Text(mint.displayName).tag(mint as Mint?)
+                if !availableMints.isEmpty {
+                    Picker("Mint", selection: $selectedMintURL) {
+                        ForEach(availableMints, id: \.url.absoluteString) { mint in
+                            Text(mint.displayName).tag(mint.url.absoluteString)
                         }
                     }
                 }
@@ -50,11 +52,11 @@ struct MintView: View {
                             .frame(maxWidth: .infinity)
                     }
                 }
-                .disabled(amount.isEmpty || selectedMint == nil || isMinting)
+                .disabled(amount.isEmpty || selectedMintURL.isEmpty || isMinting)
             }
         }
         .navigationTitle("Mint Ecash")
-        .navigationBarTitleDisplayMode(.inline)
+        .platformNavigationBarTitleDisplayMode(inline: true)
         .toolbar {
             ToolbarItem(placement: .cancellationAction) {
                 Button("Cancel") { dismiss() }
@@ -74,18 +76,32 @@ struct MintView: View {
                 )
             }
         }
-        .onAppear {
-            selectedMint = wallet.mints.first
+        .task {
+            await loadMints()
+        }
+        .onChange(of: availableMints) { _, newValue in
+            if selectedMintURL.isEmpty && !newValue.isEmpty {
+                selectedMintURL = newValue.first?.url.absoluteString ?? ""
+            }
         }
         .onDisappear {
             depositTask?.cancel()
         }
     }
     
+    private func loadMints() async {
+        guard let wallet = walletManager.activeWallet else { return }
+        
+        let mints = await wallet.getMints()
+        await MainActor.run {
+            availableMints = mints
+        }
+    }
+    
     private func createMintQuote() {
         guard let amountInt = Int(amount),
               amountInt > 0,
-              let mint = selectedMint else { return }
+              !selectedMintURL.isEmpty else { return }
         
         isMinting = true
         
@@ -94,7 +110,7 @@ struct MintView: View {
                 // Request mint quote from the wallet
                 let quote = try await walletManager.requestMint(
                     amount: Int64(amountInt),
-                    mintURL: mint.url.absoluteString
+                    mintURL: selectedMintURL
                 )
                 
                 await MainActor.run {
@@ -121,7 +137,7 @@ struct MintView: View {
         
         depositTask = Task {
             do {
-                for try await status in walletManager.monitorDeposit(quote: quote) {
+                for try await status in await walletManager.monitorDeposit(quote: quote) {
                     switch status {
                     case .pending:
                         // Still waiting for payment
@@ -188,15 +204,7 @@ struct InvoiceView: View {
                 .padding(.top, 40)
                 
                 // QR Code
-                if let qrImage = generateQRCode(from: invoice) {
-                    Image(uiImage: qrImage)
-                        .interpolation(.none)
-                        .resizable()
-                        .aspectRatio(contentMode: .fit)
-                        .frame(width: 250, height: 250)
-                        .background(Color.white)
-                        .cornerRadius(12)
-                }
+                QRCodeView(content: invoice)
                 
                 // Invoice text
                 VStack(spacing: 12) {
@@ -230,7 +238,7 @@ struct InvoiceView: View {
                 .padding(.bottom, 40)
             }
             .navigationTitle("Lightning Invoice")
-            .navigationBarTitleDisplayMode(.inline)
+            .platformNavigationBarTitleDisplayMode(inline: true)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") { dismiss() }
@@ -240,7 +248,7 @@ struct InvoiceView: View {
     }
     
     private func copyInvoice() {
-        UIPasteboard.general.string = invoice
+        invoice.copyToPasteboard()
         withAnimation {
             copied = true
         }
@@ -252,41 +260,4 @@ struct InvoiceView: View {
         }
     }
     
-    #if os(iOS)
-    private func generateQRCode(from string: String) -> UIImage? {
-        let data = string.data(using: .utf8)
-        
-        if let filter = CIFilter(name: "CIQRCodeGenerator") {
-            filter.setValue(data, forKey: "inputMessage")
-            let transform = CGAffineTransform(scaleX: 10, y: 10)
-            
-            if let output = filter.outputImage?.transformed(by: transform) {
-                let context = CIContext()
-                if let cgImage = context.createCGImage(output, from: output.extent) {
-                    return UIImage(cgImage: cgImage)
-                }
-            }
-        }
-        
-        return nil
-    }
-    #else
-    private func generateQRCode(from string: String) -> NSImage? {
-        let data = string.data(using: .utf8)
-        
-        if let filter = CIFilter(name: "CIQRCodeGenerator") {
-            filter.setValue(data, forKey: "inputMessage")
-            let transform = CGAffineTransform(scaleX: 10, y: 10)
-            
-            if let output = filter.outputImage?.transformed(by: transform) {
-                let rep = NSCIImageRep(ciImage: output)
-                let nsImage = NSImage(size: rep.size)
-                nsImage.addRepresentation(rep)
-                return nsImage
-            }
-        }
-        
-        return nil
-    }
-    #endif
 }

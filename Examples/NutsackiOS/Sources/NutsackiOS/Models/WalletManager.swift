@@ -11,6 +11,7 @@ class WalletManager: ObservableObject {
     
     private let nostrManager: NostrManager
     private let modelContext: ModelContext
+    private let defaultMintURL = URL(string: "https://testnut.cashu.space")!
     
     init(nostrManager: NostrManager, modelContext: ModelContext) {
         self.nostrManager = nostrManager
@@ -19,8 +20,8 @@ class WalletManager: ObservableObject {
     
     // MARK: - Wallet Operations
     
-    /// Create a new NIP-60 wallet
-    func createWallet(name: String, description: String?, account: NostrAccount) async throws -> CashuWallet {
+    /// Ensure wallet exists (called automatically by loadWallet)
+    private func ensureWalletExists(for account: NostrAccount) async throws {
         guard let ndk = nostrManager.ndk else {
             throw WalletError.ndkNotInitialized
         }
@@ -28,32 +29,23 @@ class WalletManager: ObservableObject {
         // Create NDKCashuWallet instance
         let ndkWallet = NDKCashuWallet(ndk: ndk)
         
-        // Add default mint only for new wallets during onboarding
-        if !name.isEmpty {
+        // Try to load existing wallet
+        do {
+            try await ndkWallet.load()
+            // Wallet exists, we're done
+            self.activeWallet = ndkWallet
+            return
+        } catch {
+            // No wallet exists, create one with default mint
             let defaultMintURL = URL(string: "https://testnut.cashu.space")!
             try await ndkWallet.addMint(url: defaultMintURL)
+            
+            // Save wallet to Nostr (creates NIP-60 events)
+            try await ndkWallet.save()
+            
+            // Set as active wallet
+            self.activeWallet = ndkWallet
         }
-        
-        // Save wallet to Nostr (creates NIP-60 events)
-        try await ndkWallet.save()
-        
-        // Create local SwiftData model
-        let wallet = CashuWallet(name: name, description: description)
-        wallet.account = account
-        
-        // Add default mint to local model
-        let mint = Mint(url: defaultMintURL)
-        mint.name = "Testnut"
-        mint.wallet = wallet
-        wallet.mints.append(mint)
-        
-        modelContext.insert(wallet)
-        try modelContext.save()
-        
-        // Set as active wallet
-        self.activeWallet = ndkWallet
-        
-        return wallet
     }
     
     /// Load wallet from NIP-60 events
@@ -65,14 +57,12 @@ class WalletManager: ObservableObject {
         isLoading = true
         defer { isLoading = false }
         
-        // Create NDKCashuWallet instance
-        let ndkWallet = NDKCashuWallet(ndk: ndk)
+        // Ensure wallet exists (creates if needed)
+        try await ensureWalletExists(for: account)
         
-        // Load wallet state from Nostr
-        try await ndkWallet.load()
-        
-        // Set as active wallet
-        self.activeWallet = ndkWallet
+        guard let wallet = activeWallet else {
+            throw WalletError.noActiveWallet
+        }
         
         // Start nutzap monitoring
         Task {
@@ -119,14 +109,14 @@ class WalletManager: ObservableObject {
     }
     
     /// Monitor deposit status
-    func monitorDeposit(quote: CashuMintQuote) -> AsyncThrowingStream<DepositStatus, Error> {
+    func monitorDeposit(quote: CashuMintQuote) async -> AsyncThrowingStream<DepositStatus, Error> {
         guard let wallet = activeWallet else {
             return AsyncThrowingStream { continuation in
                 continuation.finish(throwing: WalletError.noActiveWallet)
             }
         }
         
-        return wallet.monitorDeposit(quote: quote, pollingInterval: 5.0, timeout: 600.0)
+        return await wallet.monitorDeposit(quote: quote, pollingInterval: 5.0, timeout: 600.0)
     }
     
     // MARK: - Send Operations
@@ -275,7 +265,7 @@ class WalletManager: ObservableObject {
         }
         
         // Create recipient user
-        let recipientUser = NDKUser(pubkey: recipient, ndk: nil)
+        let recipientUser = NDKUser(pubkey: recipient)
         
         // Create nutzap request
         let request = NDKNutzapRequest(
@@ -287,7 +277,7 @@ class WalletManager: ObservableObject {
         )
         
         // Send nutzap
-        let confirmation = try await wallet.pay(request)
+        _ = try await wallet.pay(request)
         
         logger.info("Sent nutzap: \(amount) sats to \(recipient)")
     }

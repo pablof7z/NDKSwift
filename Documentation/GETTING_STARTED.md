@@ -31,7 +31,7 @@ import NDKSwift
 // Create NDK instance with relay URLs
 let ndk = NDK(relayUrls: [
     "wss://relay.damus.io",
-    "wss://nos.lol",
+    "wss://relay.primal.net",
     "wss://relay.nostr.band"
 ])
 
@@ -297,7 +297,7 @@ Choose relays appropriate for your use case:
 // General purpose relays
 let generalRelays = [
     "wss://relay.damus.io",
-    "wss://nos.lol",
+    "wss://relay.primal.net",
     "wss://relay.nostr.band"
 ]
 

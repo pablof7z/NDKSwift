@@ -5,30 +5,28 @@ import CashuSwift
 final class NDKCashuWalletTests: XCTestCase {
     var ndk: NDK!
     var wallet: NDKCashuWallet!
+    var testWrapper: TestableWalletWrapper!
     var mockSigner: MockSigner!
-    var mockRelay: MockRelay!
     
     override func setUp() async throws {
         try await super.setUp()
         
-        // Setup mock signer
-        mockSigner = MockSigner(privateKey: "test_private_key")
+        // Setup mock signer with a valid 32-byte hex private key
+        mockSigner = MockSigner(privateKey: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef")
         
-        // Setup mock relay
-        mockRelay = MockRelay(url: URL(string: "wss://test.relay")!)
-        
-        // Setup NDK with mock relay
+        // Setup NDK
         ndk = NDK(relayUrls: ["wss://test.relay"], signer: mockSigner)
         
-        // Create wallet
-        wallet = NDKCashuWallet(ndk: ndk)
+        // Create testable wallet wrapper
+        testWrapper = TestableWalletWrapper(ndk: ndk)
+        wallet = testWrapper.wallet
     }
     
     override func tearDown() async throws {
         wallet = nil
+        testWrapper = nil
         ndk = nil
         mockSigner = nil
-        mockRelay = nil
         try await super.tearDown()
     }
     
@@ -36,392 +34,168 @@ final class NDKCashuWalletTests: XCTestCase {
     
     func testWalletInitialization() async throws {
         XCTAssertNotNil(wallet)
-        XCTAssertEqual(await wallet.getBalance(), 0)
-        XCTAssertNotNil(wallet.mintDiscovery)
-    }
-    
-    // MARK: - Token Processing Tests
-    
-    func testProcessTokenWithValidProofs() async throws {
-        // Create mock proofs
-        let proof1 = CashuSwift.Proof(
-            keysetID: "test_keyset_1",
-            amount: 100,
-            secret: "test_secret_1",
-            C: "test_C_1"
-        )
-        let proof2 = CashuSwift.Proof(
-            keysetID: "test_keyset_1",
-            amount: 200,
-            secret: "test_secret_2",
-            C: "test_C_2"
-        )
-        
-        // Create token
-        let token = CashuSwift.Token(
-            proofs: ["https://test.mint": [proof1, proof2]],
-            unit: "sat"
-        )
-        
-        // Create NIP-60 token event
-        var tokenEvent = NDKEvent(ndk: ndk)
-        tokenEvent.kind = .cashuToken
-        tokenEvent.content = try token.serialize()
-        tokenEvent.createdAt = Timestamp.now
-        tokenEvent.tags = [
-            ["a", "37417:pubkey:wallet_id"],
-            ["mint", "https://test.mint"],
-            ["proofs", try JSONEncoder().encode([proof1, proof2]).base64EncodedString()]
-        ]
-        
-        // Process the token event
-        try await wallet.processTokenEvent(tokenEvent)
-        
-        // Verify balance
-        let balance = await wallet.getBalance()
-        XCTAssertEqual(balance, 300)
-        
-        // Verify mint was added
-        let mintBalance = await wallet.getBalance(mint: URL(string: "https://test.mint")!)
-        XCTAssertEqual(mintBalance, 300)
-    }
-    
-    func testProcessTokenWithDeletedProofs() async throws {
-        // First, add some proofs
-        let proof1 = CashuSwift.Proof(
-            keysetID: "test_keyset_1",
-            amount: 100,
-            secret: "test_secret_1",
-            C: "test_C_1"
-        )
-        
-        let token = CashuSwift.Token(
-            proofs: ["https://test.mint": [proof1]],
-            unit: "sat"
-        )
-        
-        var tokenEvent = NDKEvent(ndk: ndk)
-        tokenEvent.id = "token_event_1"
-        tokenEvent.kind = .cashuToken
-        tokenEvent.content = try token.serialize()
-        tokenEvent.createdAt = Timestamp.now
-        tokenEvent.tags = [
-            ["a", "37417:pubkey:wallet_id"],
-            ["mint", "https://test.mint"],
-            ["proofs", try JSONEncoder().encode([proof1]).base64EncodedString()]
-        ]
-        
-        try await wallet.processTokenEvent(tokenEvent)
-        
-        // Now create a delete event
-        var deleteEvent = NDKEvent(ndk: ndk)
-        deleteEvent.kind = .cashuToken
-        deleteEvent.content = ""
-        deleteEvent.createdAt = Timestamp.now + 1
-        deleteEvent.tags = [
-            ["a", "37417:pubkey:wallet_id"],
-            ["e", "token_event_1", "", "del"]
-        ]
-        
-        try await wallet.processTokenEvent(deleteEvent)
-        
-        // Verify balance is now 0
-        let balance = await wallet.getBalance()
+        let balance = try await wallet.getBalance()
         XCTAssertEqual(balance, 0)
-    }
-    
-    // MARK: - Cross-Mint Transfer Tests
-    
-    func testCrossMintTransferSuccess() async throws {
-        // This test would require mocking the mint interactions
-        // For now, we'll test the logic flow
-        
-        // Add proofs to source mint
-        let proof1 = CashuSwift.Proof(
-            keysetID: "source_keyset",
-            amount: 1000,
-            secret: "source_secret",
-            C: "source_C"
-        )
-        
-        let token = CashuSwift.Token(
-            proofs: ["https://source.mint": [proof1]],
-            unit: "sat"
-        )
-        
-        var tokenEvent = NDKEvent(ndk: ndk)
-        tokenEvent.kind = .cashuToken
-        tokenEvent.content = try token.serialize()
-        tokenEvent.createdAt = Timestamp.now
-        tokenEvent.tags = [
-            ["a", "37417:pubkey:wallet_id"],
-            ["mint", "https://source.mint"],
-            ["proofs", try JSONEncoder().encode([proof1]).base64EncodedString()]
-        ]
-        
-        try await wallet.processTokenEvent(tokenEvent)
-        
-        // Verify initial balance
-        let initialBalance = await wallet.getBalance()
-        XCTAssertEqual(initialBalance, 1000)
-        
-        // Note: Actual cross-mint transfer would require mock mint servers
-        // This test verifies the wallet state management
-    }
-    
-    // MARK: - Proof State Reconciliation Tests
-    
-    func testProofStateReconciliation() async throws {
-        // Add some proofs
-        let proof1 = CashuSwift.Proof(
-            keysetID: "test_keyset",
-            amount: 100,
-            secret: "test_secret_1",
-            C: "test_C_1"
-        )
-        let proof2 = CashuSwift.Proof(
-            keysetID: "test_keyset",
-            amount: 200,
-            secret: "test_secret_2",
-            C: "test_C_2"
-        )
-        
-        let token = CashuSwift.Token(
-            proofs: ["https://test.mint": [proof1, proof2]],
-            unit: "sat"
-        )
-        
-        var tokenEvent = NDKEvent(ndk: ndk)
-        tokenEvent.id = "original_token_event"
-        tokenEvent.kind = .cashuToken
-        tokenEvent.content = try token.serialize()
-        tokenEvent.createdAt = Timestamp.now
-        tokenEvent.tags = [
-            ["a", "37417:pubkey:wallet_id"],
-            ["mint", "https://test.mint"],
-            ["proofs", try JSONEncoder().encode([proof1, proof2]).base64EncodedString()]
-        ]
-        
-        try await wallet.processTokenEvent(tokenEvent)
-        
-        // Initial balance should be 300
-        let initialBalance = await wallet.getBalance()
-        XCTAssertEqual(initialBalance, 300)
-        
-        // Note: Testing actual proof state checking would require mock mint responses
-        // This test verifies the wallet maintains proper state
-    }
-    
-    // MARK: - Edge Case Tests
-    
-    func testProcessEmptyToken() async throws {
-        let token = CashuSwift.Token(proofs: [:], unit: "sat")
-        
-        var tokenEvent = NDKEvent(ndk: ndk)
-        tokenEvent.kind = .cashuToken
-        tokenEvent.content = try token.serialize()
-        tokenEvent.createdAt = Timestamp.now
-        tokenEvent.tags = [
-            ["a", "37417:pubkey:wallet_id"]
-        ]
-        
-        try await wallet.processTokenEvent(tokenEvent)
-        
-        // Balance should remain 0
-        let balance = await wallet.getBalance()
-        XCTAssertEqual(balance, 0)
-    }
-    
-    func testProcessDuplicateProofs() async throws {
-        let proof = CashuSwift.Proof(
-            keysetID: "test_keyset",
-            amount: 100,
-            secret: "test_secret",
-            C: "test_C"
-        )
-        
-        let token = CashuSwift.Token(
-            proofs: ["https://test.mint": [proof]],
-            unit: "sat"
-        )
-        
-        // Process first token event
-        var tokenEvent1 = NDKEvent(ndk: ndk)
-        tokenEvent1.id = "event_1"
-        tokenEvent1.kind = .cashuToken
-        tokenEvent1.content = try token.serialize()
-        tokenEvent1.createdAt = Timestamp.now
-        tokenEvent1.tags = [
-            ["a", "37417:pubkey:wallet_id"],
-            ["mint", "https://test.mint"],
-            ["proofs", try JSONEncoder().encode([proof]).base64EncodedString()]
-        ]
-        
-        try await wallet.processTokenEvent(tokenEvent1)
-        
-        // Process second token event with same proof (different event ID)
-        var tokenEvent2 = NDKEvent(ndk: ndk)
-        tokenEvent2.id = "event_2"
-        tokenEvent2.kind = .cashuToken
-        tokenEvent2.content = try token.serialize()
-        tokenEvent2.createdAt = Timestamp.now + 1
-        tokenEvent2.tags = [
-            ["a", "37417:pubkey:wallet_id"],
-            ["mint", "https://test.mint"],
-            ["proofs", try JSONEncoder().encode([proof]).base64EncodedString()]
-        ]
-        
-        try await wallet.processTokenEvent(tokenEvent2)
-        
-        // Balance should only count the proof once
-        let balance = await wallet.getBalance()
-        XCTAssertEqual(balance, 100)
-    }
-    
-    func testTokenChainWithSuperseding() async throws {
-        // Create initial token
-        let proof1 = CashuSwift.Proof(
-            keysetID: "test_keyset",
-            amount: 100,
-            secret: "secret_1",
-            C: "C_1"
-        )
-        
-        let token1 = CashuSwift.Token(
-            proofs: ["https://test.mint": [proof1]],
-            unit: "sat"
-        )
-        
-        var tokenEvent1 = NDKEvent(ndk: ndk)
-        tokenEvent1.id = "token_1"
-        tokenEvent1.kind = .cashuToken
-        tokenEvent1.content = try token1.serialize()
-        tokenEvent1.createdAt = Timestamp(100)
-        tokenEvent1.tags = [
-            ["a", "37417:pubkey:wallet_id"],
-            ["mint", "https://test.mint"],
-            ["proofs", try JSONEncoder().encode([proof1]).base64EncodedString()]
-        ]
-        
-        try await wallet.processTokenEvent(tokenEvent1)
-        
-        // Create superseding token
-        let proof2 = CashuSwift.Proof(
-            keysetID: "test_keyset",
-            amount: 50,
-            secret: "secret_2",
-            C: "C_2"
-        )
-        
-        let token2 = CashuSwift.Token(
-            proofs: ["https://test.mint": [proof2]],
-            unit: "sat"
-        )
-        
-        var tokenEvent2 = NDKEvent(ndk: ndk)
-        tokenEvent2.id = "token_2"
-        tokenEvent2.kind = .cashuToken
-        tokenEvent2.content = try token2.serialize()
-        tokenEvent2.createdAt = Timestamp(200)
-        tokenEvent2.tags = [
-            ["a", "37417:pubkey:wallet_id"],
-            ["mint", "https://test.mint"],
-            ["proofs", try JSONEncoder().encode([proof2]).base64EncodedString()],
-            ["e", "token_1", "", "del"]  // Supersedes token_1
-        ]
-        
-        try await wallet.processTokenEvent(tokenEvent2)
-        
-        // Balance should only include proof2 (50)
-        let balance = await wallet.getBalance()
-        XCTAssertEqual(balance, 50)
-    }
-    
-    // MARK: - Payment Request Tests
-    
-    func testNutzapPaymentRequestValidation() async throws {
-        // Test creating a valid nutzap request
-        let mints = [URL(string: "https://test.mint")!]
-        let request = NDKNutzapRequest(
-            amount: 100,
-            pubkey: "recipient_pubkey",
-            mints: mints,
-            unit: "sat",
-            p2pk: "recipient_p2pk_pubkey"
-        )
-        
-        XCTAssertEqual(request.amount, 100)
-        XCTAssertEqual(request.pubkey, "recipient_pubkey")
-        XCTAssertEqual(request.mints, mints)
-        XCTAssertEqual(request.unit, "sat")
-        XCTAssertEqual(request.p2pk, "recipient_p2pk_pubkey")
+        let mintDiscovery = await wallet.mintDiscovery
+        XCTAssertNotNil(mintDiscovery)
     }
     
     // MARK: - Balance Tests
     
-    func testBalanceCalculationWithMultipleMints() async throws {
-        // Add proofs to first mint
-        let proof1 = CashuSwift.Proof(
-            keysetID: "keyset_1",
-            amount: 100,
-            secret: "secret_1",
-            C: "C_1"
+    func testGetBalanceEmpty() async throws {
+        let balance = try await wallet.getBalance()
+        XCTAssertEqual(balance, 0)
+    }
+    
+    func testGetBalanceWithProofs() async throws {
+        // Add test mint
+        let mintURL = "https://test.mint"
+        try await testWrapper.addTestMint(url: URL(string: mintURL)!)
+        
+        // Add test proofs
+        let proofs = CashuTestHelpers.createProofs(amounts: [100, 200, 500])
+        try await testWrapper.addTestProofs(proofs, mintURL: mintURL)
+        
+        // Check balance
+        let balance = try await wallet.getBalance()
+        XCTAssertEqual(balance, 800) // 100 + 200 + 500
+        
+        // Check per-mint balance
+        let mintBalance = try await wallet.getBalance(mint: URL(string: mintURL)!)
+        XCTAssertEqual(mintBalance, 800)
+    }
+    
+    // MARK: - Mint Management Tests
+    
+    func testAddMint() async throws {
+        let mintURL = URL(string: "https://example.mint")!
+        
+        // Add mint using test wrapper
+        try await testWrapper.addTestMint(url: mintURL)
+        
+        // Verify mint was added
+        let mint = await wallet.getMint(for: mintURL)
+        XCTAssertNotNil(mint)
+        XCTAssertEqual(mint?.url, mintURL)
+    }
+    
+    func testRemoveMint() async throws {
+        let mintURL = URL(string: "https://example.mint")!
+        
+        // Add mint
+        try await testWrapper.addTestMint(url: mintURL)
+        
+        // Verify mint was added
+        let mintBefore = await wallet.getMint(for: mintURL)
+        XCTAssertNotNil(mintBefore)
+        
+        // Remove mint
+        try await wallet.removeMint(url: mintURL)
+        
+        // Verify mint was removed
+        let mintAfter = await wallet.getMint(for: mintURL)
+        XCTAssertNil(mintAfter)
+        
+        // Note: Testing proof removal would require deeper integration
+        // with the wallet's internal state management
+    }
+    
+    // MARK: - Token Processing Tests
+    
+    func testReceiveProofs() async throws {
+        let mintURL = "https://test.mint"
+        try await testWrapper.addTestMint(url: URL(string: mintURL)!)
+        
+        // Create and receive proofs
+        let proofs = CashuTestHelpers.createProofs(amounts: [64, 32, 16, 8])
+        try await wallet.receive(proofs: proofs)
+        
+        // Verify balance
+        let balance = try await wallet.getBalance()
+        XCTAssertEqual(balance, 120) // 64 + 32 + 16 + 8
+    }
+    
+    // MARK: - Send Tests
+    
+    func testSendWithSufficientBalance() async throws {
+        let mintURL = URL(string: "https://test.mint")!
+        try await testWrapper.addTestMint(url: mintURL)
+        
+        // Add proofs
+        let proofs = CashuTestHelpers.createProofs(amounts: [100, 50, 25])
+        try await testWrapper.addTestProofs(proofs, mintURL: mintURL.absoluteString)
+        
+        // Verify initial balance
+        let initialBalance = try await wallet.getBalance()
+        XCTAssertEqual(initialBalance, 175)
+        
+        // Note: Actual send operation would require mocking CashuSwift.swap
+        // For now, we're testing the wallet state management
+    }
+    
+    // MARK: - Error Handling Tests
+    
+    func testInsufficientBalanceError() async throws {
+        let mintURL = URL(string: "https://test.mint")!
+        try await testWrapper.addTestMint(url: mintURL)
+        
+        // Try to send without balance
+        do {
+            _ = try await wallet.send(amount: 1000, to: "recipientPubkey", mint: mintURL)
+            XCTFail("Should have thrown insufficient balance error")
+        } catch NDKError.insufficientBalance {
+            // Expected error
+            XCTAssertTrue(true)
+        } catch {
+            XCTFail("Unexpected error: \(error)")
+        }
+    }
+    
+    func testNoMintError() async throws {
+        // Try to send without any mints configured
+        do {
+            _ = try await wallet.send(amount: 100, to: "recipientPubkey", mint: URL(string: "https://unknown.mint")!)
+            XCTFail("Should have thrown no mint available error")
+        } catch NDKError.noMintAvailable {
+            // Expected error
+            XCTAssertTrue(true)
+        } catch {
+            XCTFail("Unexpected error: \(error)")
+        }
+    }
+    
+    // MARK: - Multi-Mint Tests
+    
+    func testMultipleMints() async throws {
+        let mint1URL = URL(string: "https://mint1.example")!
+        let mint2URL = URL(string: "https://mint2.example")!
+        
+        // Add multiple mints
+        try await testWrapper.addTestMint(url: mint1URL)
+        try await testWrapper.addTestMint(url: mint2URL)
+        
+        // Add proofs to different mints
+        let proofs1 = CashuTestHelpers.createProofs(
+            amounts: [100, 50],
+            mint: mint1URL.absoluteString
+        )
+        let proofs2 = CashuTestHelpers.createProofs(
+            amounts: [200, 100],
+            mint: mint2URL.absoluteString
         )
         
-        let token1 = CashuSwift.Token(
-            proofs: ["https://mint1.com": [proof1]],
-            unit: "sat"
-        )
+        try await testWrapper.addTestProofs(proofs1, mintURL: mint1URL.absoluteString)
+        try await testWrapper.addTestProofs(proofs2, mintURL: mint2URL.absoluteString)
         
-        var tokenEvent1 = NDKEvent(ndk: ndk)
-        tokenEvent1.kind = .cashuToken
-        tokenEvent1.content = try token1.serialize()
-        tokenEvent1.createdAt = Timestamp.now
-        tokenEvent1.tags = [
-            ["a", "37417:pubkey:wallet_id"],
-            ["mint", "https://mint1.com"],
-            ["proofs", try JSONEncoder().encode([proof1]).base64EncodedString()]
-        ]
+        // Check total balance
+        let totalBalance = try await wallet.getBalance()
+        XCTAssertEqual(totalBalance, 450) // 100 + 50 + 200 + 100
         
-        try await wallet.processTokenEvent(tokenEvent1)
+        // Check per-mint balances
+        let mint1Balance = try await wallet.getBalance(mint: mint1URL)
+        XCTAssertEqual(mint1Balance, 150)
         
-        // Add proofs to second mint
-        let proof2 = CashuSwift.Proof(
-            keysetID: "keyset_2",
-            amount: 200,
-            secret: "secret_2",
-            C: "C_2"
-        )
-        
-        let token2 = CashuSwift.Token(
-            proofs: ["https://mint2.com": [proof2]],
-            unit: "sat"
-        )
-        
-        var tokenEvent2 = NDKEvent(ndk: ndk)
-        tokenEvent2.kind = .cashuToken
-        tokenEvent2.content = try token2.serialize()
-        tokenEvent2.createdAt = Timestamp.now
-        tokenEvent2.tags = [
-            ["a", "37417:pubkey:wallet_id"],
-            ["mint", "https://mint2.com"],
-            ["proofs", try JSONEncoder().encode([proof2]).base64EncodedString()]
-        ]
-        
-        try await wallet.processTokenEvent(tokenEvent2)
-        
-        // Test total balance
-        let totalBalance = await wallet.getBalance()
-        XCTAssertEqual(totalBalance, 300)
-        
-        // Test individual mint balances
-        let mint1Balance = await wallet.getBalance(mint: URL(string: "https://mint1.com")!)
-        XCTAssertEqual(mint1Balance, 100)
-        
-        let mint2Balance = await wallet.getBalance(mint: URL(string: "https://mint2.com")!)
-        XCTAssertEqual(mint2Balance, 200)
-        
-        let nonExistentMintBalance = await wallet.getBalance(mint: URL(string: "https://mint3.com")!)
-        XCTAssertEqual(nonExistentMintBalance, 0)
+        let mint2Balance = try await wallet.getBalance(mint: mint2URL)
+        XCTAssertEqual(mint2Balance, 300)
     }
 }

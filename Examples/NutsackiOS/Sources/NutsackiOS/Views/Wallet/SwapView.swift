@@ -3,7 +3,6 @@ import SwiftData
 import NDKSwift
 
 struct SwapView: View {
-    let wallet: CashuWallet
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject private var walletManager: WalletManager
     
@@ -19,45 +18,48 @@ struct SwapView: View {
     // Fee estimation
     @State private var estimatedFees: (lightningFee: Int64, inputFee: Int64, totalFee: Int64)?
     @State private var isEstimatingFees = false
+    @State private var mints: [Mint] = []
     
     var amountInt: Int64 {
         Int64(amount) ?? 0
     }
     
     var canSwap: Bool {
-        !amount.isEmpty && 
-        amountInt > 0 && 
-        sourceMint != nil && 
-        destinationMint != nil && 
-        sourceMint != destinationMint &&
-        !isSwapping
+        guard !amount.isEmpty else { return false }
+        guard amountInt > 0 else { return false }
+        guard sourceMint != nil else { return false }
+        guard destinationMint != nil else { return false }
+        guard sourceMint != destinationMint else { return false }
+        guard !isSwapping else { return false }
+        return true
+    }
+    
+    @ViewBuilder
+    var amountSection: some View {
+        Section {
+            HStack {
+                TextField("Amount", text: $amount)
+                    #if os(iOS)
+                    .keyboardType(.numberPad)
+                    #endif
+                Text("sats")
+                    .foregroundStyle(.secondary)
+            }
+        } header: {
+            Text("Amount to Transfer")
+        }
     }
     
     var body: some View {
         Form {
-            Section {
-                HStack {
-                    TextField("Amount", text: $amount)
-                        .keyboardType(.numberPad)
-                    Text("sats")
-                        .foregroundStyle(.secondary)
-                }
-            } header: {
-                Text("Amount to Transfer")
-            }
+            amountSection
             
             Section {
                 Picker("From Mint", selection: $sourceMint) {
                     Text("Select mint").tag(nil as Mint?)
-                    ForEach(wallet.mints) { mint in
-                        HStack {
-                            Text(mint.displayName)
-                            Spacer()
-                            Text("\(mintBalance(mint)) sats")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                        }
-                        .tag(mint as Mint?)
+                    ForEach(mints) { mint in
+                        MintPickerRow(mint: mint, balance: mintBalance(mint))
+                            .tag(mint as Mint?)
                     }
                 }
                 
@@ -72,7 +74,7 @@ struct SwapView: View {
                 
                 Picker("To Mint", selection: $destinationMint) {
                     Text("Select mint").tag(nil as Mint?)
-                    ForEach(wallet.mints) { mint in
+                    ForEach(mints) { mint in
                         Text(mint.displayName).tag(mint as Mint?)
                     }
                 }
@@ -128,7 +130,7 @@ struct SwapView: View {
             }
         }
         .navigationTitle("Transfer Between Mints")
-        .navigationBarTitleDisplayMode(.inline)
+        .platformNavigationBarTitleDisplayMode(inline: true)
         .toolbar {
             ToolbarItem(placement: .cancellationAction) {
                 Button("Cancel") { dismiss() }
@@ -156,11 +158,7 @@ struct SwapView: View {
             estimateFees()
         }
         .onAppear {
-            // Select first two different mints by default
-            if wallet.mints.count >= 2 {
-                sourceMint = wallet.mints[0]
-                destinationMint = wallet.mints[1]
-            }
+            loadMints()
         }
     }
     
@@ -233,6 +231,38 @@ struct SwapView: View {
                     isSwapping = false
                 }
             }
+        }
+    }
+    
+    private func loadMints() {
+        Task {
+            if let wallet = walletManager.activeWallet {
+                let loadedMints = await wallet.getMints()
+                await MainActor.run {
+                    mints = loadedMints
+                    // Select first two different mints by default
+                    if mints.count >= 2 {
+                        sourceMint = mints[0]
+                        destinationMint = mints[1]
+                    }
+                }
+            }
+        }
+    }
+}
+
+// MARK: - Helper Views
+struct MintPickerRow: View {
+    let mint: Mint
+    let balance: Int
+    
+    var body: some View {
+        HStack {
+            Text(mint.displayName)
+            Spacer()
+            Text("\(balance) sats")
+                .font(.caption)
+                .foregroundStyle(.secondary)
         }
     }
 }

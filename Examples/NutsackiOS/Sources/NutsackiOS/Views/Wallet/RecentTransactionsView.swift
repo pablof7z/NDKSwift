@@ -2,14 +2,9 @@ import SwiftUI
 import SwiftData
 
 struct RecentTransactionsView: View {
-    let wallet: CashuWallet
+    @EnvironmentObject private var walletManager: WalletManager
     
-    var recentTransactions: [Transaction] {
-        wallet.transactions
-            .sorted { $0.createdAt > $1.createdAt }
-            .prefix(5)
-            .map { $0 }
-    }
+    @State private var recentTransactions: [Transaction] = []
     
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
@@ -17,7 +12,7 @@ struct RecentTransactionsView: View {
                 Text("Recent Activity")
                     .font(.headline)
                 Spacer()
-                NavigationLink(destination: TransactionHistoryView(wallet: wallet)) {
+                NavigationLink(destination: TransactionHistoryView()) {
                     Text("See All")
                         .font(.caption)
                         .foregroundStyle(.orange)
@@ -50,6 +45,15 @@ struct RecentTransactionsView: View {
                 .cornerRadius(12)
             }
         }
+        .task {
+            await loadTransactions()
+        }
+    }
+    
+    private func loadTransactions() async {
+        // TODO: Load transactions from wallet manager when available
+        // For now, just show empty state
+        recentTransactions = []
     }
 }
 
@@ -64,6 +68,20 @@ struct TransactionRow: View {
         case .receive: return "arrow.down"
         case .nutzap: return "bolt.heart.fill"
         }
+    }
+    
+    // Check if all tokens in transaction have verified DLEQ
+    var isDLEQVerified: Bool? {
+        guard !transaction.tokens.isEmpty else { return nil }
+        let verifiedCount = transaction.tokens.filter { $0.dleqVerified == true }.count
+        let unverifiedCount = transaction.tokens.filter { $0.dleqVerified == false }.count
+        
+        if verifiedCount > 0 && unverifiedCount == 0 {
+            return true
+        } else if unverifiedCount > 0 {
+            return false
+        }
+        return nil
     }
     
     var color: Color {
@@ -108,9 +126,17 @@ struct TransactionRow: View {
                     .fontWeight(.medium)
                     .foregroundStyle(color)
                 
-                Text(transaction.createdAt.formatted(.relative(presentation: .abbreviated)))
+                Text(transaction.createdAt.formatted(.relative(presentation: .numeric)))
                     .font(.caption2)
                     .foregroundStyle(.secondary)
+            }
+            
+            // DLEQ verification indicator
+            if let verified = isDLEQVerified {
+                Image(systemName: verified ? "checkmark.shield.fill" : "exclamationmark.shield.fill")
+                    .font(.caption)
+                    .foregroundStyle(verified ? .green : .yellow)
+                    .help(verified ? "Token authenticity verified" : "Token authenticity not verified")
             }
         }
         .padding(.horizontal, 12)
@@ -120,9 +146,10 @@ struct TransactionRow: View {
 
 // MARK: - Transaction History View
 struct TransactionHistoryView: View {
-    let wallet: CashuWallet
+    @EnvironmentObject private var walletManager: WalletManager
     
     @State private var selectedFilter: TransactionFilter = .all
+    @State private var transactions: [Transaction] = []
     
     enum TransactionFilter: String, CaseIterable {
         case all = "All"
@@ -139,7 +166,7 @@ struct TransactionHistoryView: View {
     }
     
     var filteredTransactions: [Transaction] {
-        wallet.transactions
+        transactions
             .filter { selectedFilter.matches($0) }
             .sorted { $0.createdAt > $1.createdAt }
     }
@@ -162,8 +189,17 @@ struct TransactionHistoryView: View {
             }
         }
         .navigationTitle("Transaction History")
-        .navigationBarTitleDisplayMode(.inline)
+        .platformNavigationBarTitleDisplayMode(inline: true)
         .listStyle(.plain)
+        .task {
+            await loadTransactions()
+        }
+    }
+    
+    private func loadTransactions() async {
+        // TODO: Load transactions from wallet manager when available
+        // For now, just show empty state
+        transactions = []
     }
 }
 

@@ -140,7 +140,7 @@ public struct NDKEvent: Codable, Equatable, Hashable, Sendable {
         let serialized = try serializeForID()
         let data = serialized.data(using: .utf8)!
         let hash = data.sha256()
-        return hash.toHexString()
+        return hash.hexString
     }
 
     /// Serialize event for ID generation according to NIP-01
@@ -273,7 +273,13 @@ public struct NDKEvent: Codable, Equatable, Hashable, Sendable {
 
     /// Serialize event to JSON string
     public func serialize() throws -> String {
-        return try JSONCoding.encodeToString(self)
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
+        let data = try encoder.encode(self)
+        guard let string = String(data: data, encoding: .utf8) else {
+            throw NDKError.unknown("Failed to convert JSON data to string")
+        }
+        return string
     }
 
     /// Alias for serialize() - serialize event to JSON string
