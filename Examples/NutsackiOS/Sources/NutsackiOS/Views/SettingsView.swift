@@ -72,18 +72,6 @@ struct SettingsView: View {
                     Text("Preferences")
                 }
                 
-                // Advanced
-                Section {
-                    if let wallet = activeAccount?.wallets.first {
-                        NavigationLink(destination: ProofManagementView(wallet: wallet)) {
-                            Label("Proof Management", systemImage: "doc.text.magnifyingglass")
-                        }
-                    }
-                } header: {
-                    Text("Advanced")
-                } footer: {
-                    Text("Manage proof denominations and consolidation")
-                }
                 
                 // App Info
                 Section {

@@ -7,8 +7,8 @@ struct SwapView: View {
     @EnvironmentObject private var walletManager: WalletManager
     
     @State private var amount = ""
-    @State private var sourceMint: Mint?
-    @State private var destinationMint: Mint?
+    @State private var sourceMint: NDKCashuWallet.MintInfo?
+    @State private var destinationMint: NDKCashuWallet.MintInfo?
     @State private var isSwapping = false
     @State private var showError = false
     @State private var errorMessage = ""
@@ -18,7 +18,7 @@ struct SwapView: View {
     // Fee estimation
     @State private var estimatedFees: (lightningFee: Int64, inputFee: Int64, totalFee: Int64)?
     @State private var isEstimatingFees = false
-    @State private var mints: [Mint] = []
+    @State private var mints: [NDKCashuWallet.MintInfo] = []
     
     var amountInt: Int64 {
         Int64(amount) ?? 0
@@ -29,7 +29,7 @@ struct SwapView: View {
         guard amountInt > 0 else { return false }
         guard sourceMint != nil else { return false }
         guard destinationMint != nil else { return false }
-        guard sourceMint != destinationMint else { return false }
+        guard sourceMint?.url != destinationMint?.url else { return false }
         guard !isSwapping else { return false }
         return true
     }
@@ -50,84 +50,97 @@ struct SwapView: View {
         }
     }
     
+    @ViewBuilder
+    var mintPickerSection: some View {
+        Section {
+            Picker("From Mint", selection: $sourceMint) {
+                Text("Select mint").tag(nil as NDKCashuWallet.MintInfo?)
+                ForEach(mints, id: \.url) { mint in
+                    MintPickerRow(mint: mint, balance: 0)
+                        .tag(mint as NDKCashuWallet.MintInfo?)
+                }
+            }
+            
+            Button(action: swapMints) {
+                HStack {
+                    Image(systemName: "arrow.up.arrow.down")
+                    Text("Swap Direction")
+                }
+                .frame(maxWidth: .infinity)
+            }
+            .disabled(sourceMint == nil || destinationMint == nil)
+            
+            Picker("To Mint", selection: $destinationMint) {
+                Text("Select mint").tag(nil as NDKCashuWallet.MintInfo?)
+                ForEach(mints, id: \.url) { mint in
+                    Text(mint.url.host ?? mint.url.absoluteString)
+                        .tag(mint as NDKCashuWallet.MintInfo?)
+                }
+            }
+        } header: {
+            Text("Transfer Between Mints")
+        }
+    }
+    
+    @ViewBuilder
+    var feesSection: some View {
+        if let fees = estimatedFees {
+            Section {
+                HStack {
+                    Text("Lightning Fee")
+                    Spacer()
+                    Text("\(fees.lightningFee) sats")
+                        .foregroundStyle(.secondary)
+                }
+                HStack {
+                    Text("Input Fee")
+                    Spacer()
+                    Text("\(fees.inputFee) sats")
+                        .foregroundStyle(.secondary)
+                }
+                HStack {
+                    Text("Total Fee")
+                    Spacer()
+                    Text("\(fees.totalFee) sats")
+                        .fontWeight(.medium)
+                }
+                HStack {
+                    Text("You'll Receive")
+                    Spacer()
+                    Text("\(max(0, amountInt - fees.totalFee)) sats")
+                        .fontWeight(.bold)
+                        .foregroundStyle(.orange)
+                }
+            } header: {
+                Text("Estimated Fees")
+            } footer: {
+                Text("Actual fees may vary slightly")
+            }
+        }
+    }
+    
+    @ViewBuilder
+    var actionSection: some View {
+        Section {
+            Button(action: performSwap) {
+                if isSwapping {
+                    ProgressView()
+                        .frame(maxWidth: .infinity)
+                } else {
+                    Text("Transfer")
+                        .frame(maxWidth: .infinity)
+                }
+            }
+            .disabled(!canSwap)
+        }
+    }
+    
     var body: some View {
         Form {
             amountSection
-            
-            Section {
-                Picker("From Mint", selection: $sourceMint) {
-                    Text("Select mint").tag(nil as Mint?)
-                    ForEach(mints) { mint in
-                        MintPickerRow(mint: mint, balance: mintBalance(mint))
-                            .tag(mint as Mint?)
-                    }
-                }
-                
-                Button(action: swapMints) {
-                    HStack {
-                        Image(systemName: "arrow.up.arrow.down")
-                        Text("Swap Direction")
-                    }
-                    .frame(maxWidth: .infinity)
-                }
-                .disabled(sourceMint == nil || destinationMint == nil)
-                
-                Picker("To Mint", selection: $destinationMint) {
-                    Text("Select mint").tag(nil as Mint?)
-                    ForEach(mints) { mint in
-                        Text(mint.displayName).tag(mint as Mint?)
-                    }
-                }
-            } header: {
-                Text("Transfer Between Mints")
-            }
-            
-            if let fees = estimatedFees {
-                Section {
-                    HStack {
-                        Text("Lightning Fee")
-                        Spacer()
-                        Text("\(fees.lightningFee) sats")
-                            .foregroundStyle(.secondary)
-                    }
-                    HStack {
-                        Text("Input Fee")
-                        Spacer()
-                        Text("\(fees.inputFee) sats")
-                            .foregroundStyle(.secondary)
-                    }
-                    HStack {
-                        Text("Total Fee")
-                        Spacer()
-                        Text("\(fees.totalFee) sats")
-                            .fontWeight(.medium)
-                    }
-                    HStack {
-                        Text("You'll Receive")
-                        Spacer()
-                        Text("\(max(0, amountInt - fees.totalFee)) sats")
-                            .fontWeight(.bold)
-                            .foregroundStyle(.orange)
-                    }
-                } header: {
-                    Text("Estimated Fees")
-                } footer: {
-                    Text("Actual fees may vary slightly")
-                }
-            }
-            
-            Section {
-                Button(action: performSwap) {
-                    if isSwapping {
-                        ProgressView()
-                            .frame(maxWidth: .infinity)
-                    } else {
-                        Text("Transfer")
-                            .frame(maxWidth: .infinity)
-                    }
-                }
-                .disabled(!canSwap)
-            }
+            mintPickerSection
+            feesSection
+            actionSection
         }
         .navigationTitle("Transfer Between Mints")
         .platformNavigationBarTitleDisplayMode(inline: true)
@@ -162,9 +175,6 @@ struct SwapView: View {
         }
     }
     
-    private func mintBalance(_ mint: Mint) -> Int {
-        mint.tokens.filter { $0.state == .unspent }.reduce(0) { $0 + $1.amount }
-    }
     
     private func swapMints() {
         let temp = sourceMint
@@ -176,7 +186,7 @@ struct SwapView: View {
         guard amountInt > 0,
               let source = sourceMint,
               let destination = destinationMint,
-              source != destination else {
+              source.url != destination.url else {
             estimatedFees = nil
             return
         }
@@ -253,12 +263,12 @@ struct SwapView: View {
 
 // MARK: - Helper Views
 struct MintPickerRow: View {
-    let mint: Mint
+    let mint: NDKCashuWallet.MintInfo
     let balance: Int
     
     var body: some View {
         HStack {
-            Text(mint.displayName)
+            Text(mint.url.host ?? mint.url.absoluteString)
             Spacer()
             Text("\(balance) sats")
                 .font(.caption)

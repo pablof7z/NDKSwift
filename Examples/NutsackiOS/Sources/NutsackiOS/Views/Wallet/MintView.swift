@@ -1,6 +1,7 @@
 import SwiftUI
 import SwiftData
 import NDKSwift
+import CashuSwift
 #if os(iOS)
 import UIKit
 #elseif os(macOS)
@@ -13,7 +14,7 @@ struct MintView: View {
     
     @State private var amount = ""
     @State private var selectedMintURL: String = ""
-    @State private var availableMints: [NDKMintInfo] = []
+    @State private var availableMints: [NDKCashuWallet.MintInfo] = []
     @State private var isMinting = false
     @State private var showError = false
     @State private var errorMessage = ""
@@ -32,7 +33,7 @@ struct MintView: View {
                 if !availableMints.isEmpty {
                     Picker("Mint", selection: $selectedMintURL) {
                         ForEach(availableMints, id: \.url.absoluteString) { mint in
-                            Text(mint.displayName).tag(mint.url.absoluteString)
+                            Text(mint.url.host ?? mint.url.absoluteString).tag(mint.url.absoluteString)
                         }
                     }
                 }
@@ -79,11 +80,6 @@ struct MintView: View {
         .task {
             await loadMints()
         }
-        .onChange(of: availableMints) { _, newValue in
-            if selectedMintURL.isEmpty && !newValue.isEmpty {
-                selectedMintURL = newValue.first?.url.absoluteString ?? ""
-            }
-        }
         .onDisappear {
             depositTask?.cancel()
         }
@@ -95,6 +91,9 @@ struct MintView: View {
         let mints = await wallet.getMints()
         await MainActor.run {
             availableMints = mints
+            if selectedMintURL.isEmpty && !mints.isEmpty {
+                selectedMintURL = mints.first?.url.absoluteString ?? ""
+            }
         }
     }
     
@@ -141,11 +140,11 @@ struct MintView: View {
                     switch status {
                     case .pending:
                         // Still waiting for payment
-                        logger.info("Deposit pending for quote: \(quote.quoteId)")
+                        print("Deposit pending for quote: \(quote.quoteId)")
                         
                     case .minted(let proofs):
                         // Success! Tokens have been minted
-                        logger.info("Successfully minted \(proofs.count) proofs")
+                        print("Successfully minted \(proofs.count) proofs")
                         
                         await MainActor.run {
                             // Update wallet balance in UI

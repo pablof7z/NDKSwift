@@ -37,7 +37,7 @@ class NostrManager: ObservableObject {
         
         await ndk.connect()
         isConnected = true
-        logger.info("Connected to relays")
+        print("Connected to relays")
         
         // Monitor relay status
         await monitorRelayStatus()
@@ -73,7 +73,7 @@ class NostrManager: ObservableObject {
             }
         }
         
-        logger.info("Logged in with public key: \(publicKey)")
+        print("Logged in with public key: \(publicKey)")
     }
     
     func createNewAccount(displayName: String, about: String? = nil) async throws -> String {
@@ -113,7 +113,7 @@ class NostrManager: ObservableObject {
             // Profile metadata is published
         }
         
-        logger.info("Created new account with public key: \(publicKey)")
+        print("Created new account with public key: \(publicKey)")
         return privateKey
     }
     
@@ -121,7 +121,7 @@ class NostrManager: ObservableObject {
         signer = nil
         ndk?.signer = nil
         currentUser = nil
-        logger.info("Logged out")
+        print("Logged out")
     }
     
     func fetchNIP60Wallets() async throws -> [NDKEvent] {
@@ -143,7 +143,7 @@ class NostrManager: ObservableObject {
         guard let ndk = ndk else { throw NostrError.ndkNotInitialized }
         
         try await ndk.publish(walletEvent)
-        logger.info("Published NIP-60 wallet event")
+        print("Published NIP-60 wallet event")
     }
 }
 

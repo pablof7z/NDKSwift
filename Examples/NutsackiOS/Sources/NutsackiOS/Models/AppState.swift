@@ -51,21 +51,21 @@ class AppState: ObservableObject {
     }
     
     func loadExchangeRates() {
-        logger.info("Loading exchange rates...")
+        print("Loading exchange rates...")
         
         guard let url = URL(string: "https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd,eur") else {
-            logger.warning("Could not fetch exchange rates from API due to an invalid URL.")
+            print("Could not fetch exchange rates from API due to an invalid URL.")
             return
         }
         
         Task {
             guard let (data, _) = try? await URLSession.shared.data(from: url) else {
-                logger.warning("Unable to load conversion data.")
+                print("Unable to load conversion data.")
                 return
             }
             
             guard let prices = try? JSONDecoder().decode(ExchangeRateResponse.self, from: data).bitcoin else {
-                logger.warning("Unable to decode exchange rate data from request response.")
+                print("Unable to decode exchange rate data from request response.")
                 return
             }
             

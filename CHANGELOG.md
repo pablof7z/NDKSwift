@@ -11,6 +11,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.2.0] - TBD
 
+### Fixed
+- **NutsackiOS Balance Display Issue**: Fixed wallet showing "-" balance after successful deposit
+  - Fixed `monitorDeposit` to use proper `update()` method instead of directly appending proofs
+  - Added balance refresh mechanism when returning from MintView
+  - Added periodic balance updates every 5 seconds while wallet view is visible
+  - Added debugging logs to track proof state and balance calculations
+
 ### Added
 - **Improved Mint Caching System** for Cashu wallets with type-safe API
   - Created `NDKMintInfo` public struct to properly handle mint information

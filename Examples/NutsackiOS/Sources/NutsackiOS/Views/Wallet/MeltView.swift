@@ -10,7 +10,7 @@ struct MeltView: View {
     @State private var lightningInvoice = ""
     @State private var decodedAmount: Int64?
     @State private var decodedDescription: String?
-    @State private var selectedMint: Mint?
+    @State private var selectedMint: MintInfo?
     @State private var availableBalance: Int = 0
     @State private var isMelting = false
     @State private var showError = false
@@ -139,7 +139,7 @@ struct MeltView: View {
                         availableBalance = Int(balance)
                     }
                 } catch {
-                    logger.error("Failed to get balance: \(error)")
+                    print("Failed to get balance: \(error)")
                 }
             }
         }
@@ -218,7 +218,7 @@ struct MeltView: View {
                     do {
                         try modelContext.save()
                     } catch {
-                        logger.error("Failed to save transaction: \(error)")
+                        print("Failed to save transaction: \(error)")
                     }
                     
                     showSuccess = true

@@ -1,0 +1,15 @@
+
+Showing Recent Issues
+
+Build target NutsackiOS of project NutsackiOS with configuration Debug
+warning: Run script build phase 'Debug Check' will be run during every build because it does not specify any outputs. To address this issue, either add output dependencies to the script phase, or configure it to run in every build by unchecking "Based on dependency analysis" in the script phase. (in target 'NutsackiOS' from project 'NutsackiOS')
+/Users/pablofernandez/NDKSwift-z94ws0/Examples/NutsackiOS/NutsackiOS.xcodeproj: error: Missing package product 'NDKSwift' (in target 'NutsackiOS' from project 'NutsackiOS')
+
+
+Run script build phase 'Debug Check' will be run during every build because it does not specify any outputs. To address this issue, either add output dependencies to the script phase, or configure it to run in every build by unchecking "Based on dependency analysis" in the script phase.
+
+/Users/pablofernandez/NDKSwift-z94ws0/Examples/NutsackiOS/NutsackiOS.xcodeproj: Missing package product 'NDKSwift'
+
+
+
+Build failed    7/13/25, 8:25 PM    0.9 seconds

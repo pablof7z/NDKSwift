@@ -122,7 +122,7 @@ struct ReceiveView: View {
                     do {
                         try modelContext.save()
                     } catch {
-                        logger.error("Failed to save transaction: \(error)")
+                        print("Failed to save transaction: \(error)")
                     }
                     
                     receivedAmount = Int(amount)
