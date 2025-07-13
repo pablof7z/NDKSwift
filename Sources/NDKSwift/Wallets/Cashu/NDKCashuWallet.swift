@@ -150,10 +150,10 @@ public actor NDKCashuWallet: NDKWallet {
     
     public func getBalance() async throws -> Int64 {
         // Calculate from available proofs in state
-        return Int64(proofState.values
-            .filter { $0.state == .available }
-            .reduce(0) { $0 + $1.proof.amount }
-        )
+        let availableProofs = proofState.values.filter { $0.state == .available }
+        let balance = Int64(availableProofs.reduce(0) { $0 + $1.proof.amount })
+        print("NDKCashuWallet.getBalance() - Total proofs: \(proofState.count), available: \(availableProofs.count), balance: \(balance)")
+        return balance
     }
     
     public func createInvoice(amount: Int64, description: String?) async throws -> String {
@@ -1132,11 +1132,11 @@ public actor NDKCashuWallet: NDKWallet {
                                 // Deposit successful - tokens minted, delete the quote event
                                 try await self.deleteQuoteEvent(quoteId: quote.quoteId)
                                 
-                                // Add proofs to wallet
-                                self.proofs.append(contentsOf: proofs)
-                                
-                                // Save wallet state
-                                try await self.save()
+                                // Update wallet state properly with the new proofs
+                                try await self.update(
+                                    deletedProofs: [],
+                                    addedProofs: proofs
+                                )
                                 
                                 continuation.yield(.minted(proofs: proofs.toNDKProofs()))
                                 continuation.finish()
@@ -1721,7 +1721,8 @@ public actor NDKCashuWallet: NDKWallet {
             .kind(7375)
             .build(signer: signer)
         
-        try await ndk.publish(tokenEvent, logRawJSON: true)
+        let publishedRelays = try await ndk.publish(tokenEvent, logRawJSON: true)
+        print("NDKCashuWallet.saveTokenEvent() - Published token event \(tokenEvent.id) to \(publishedRelays.count) relays")
         
         return tokenEvent.id
     }
@@ -1734,6 +1735,8 @@ public actor NDKCashuWallet: NDKWallet {
         deletedProofs: [CashuSwift.Proof],
         addedProofs: [CashuSwift.Proof]
     ) async throws {
+        print("NDKCashuWallet.update() - Adding \(addedProofs.count) proofs, deleting \(deletedProofs.count) proofs")
+        
         // 1. Update proof states
         for proof in deletedProofs {
             if var entry = proofState[proof.C] {
@@ -1749,6 +1752,7 @@ public actor NDKCashuWallet: NDKWallet {
                 state: .available,
                 mint: mint
             )
+            print("  Added proof: amount=\(proof.amount), C=\(proof.C)")
         }
         
         // 2. Group available proofs by mint
@@ -1771,6 +1775,7 @@ public actor NDKCashuWallet: NDKWallet {
                 deletedEventIds: nil
             )
             newEventIds.insert(eventId)
+            print("NDKCashuWallet.update() - Saved token event: \(eventId) for mint: \(mint)")
         }
         
         // 4. Delete old token events
@@ -1985,7 +1990,7 @@ public actor NDKCashuWallet: NDKWallet {
     // MARK: - Public Types
     
     /// Mint information
-    public struct MintInfo {
+    public struct MintInfo: Hashable, Equatable {
         public let url: URL
     }
     

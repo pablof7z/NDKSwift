@@ -66,12 +66,12 @@ class WalletManager: ObservableObject {
         
         // Start nutzap monitoring
         Task {
-            await ndkWallet.startNutzapMonitor()
+            await wallet.startNutzapMonitor()
         }
         
         // Start periodic proof state checking
         Task {
-            await ndkWallet.startPeriodicProofStateCheck(interval: 300) // 5 minutes
+            await wallet.startPeriodicProofStateCheck(interval: 300) // 5 minutes
         }
     }
     
@@ -246,7 +246,7 @@ class WalletManager: ObservableObject {
             amount: amount
         )
         
-        logger.info("Paid Lightning invoice: \(amount) sats, fee: \(feePaid ?? 0) sats")
+        print("Paid Lightning invoice: \(amount) sats, fee: \(feePaid ?? 0) sats")
         
         return preimage
     }
@@ -279,7 +279,7 @@ class WalletManager: ObservableObject {
         // Send nutzap
         _ = try await wallet.pay(request)
         
-        logger.info("Sent nutzap: \(amount) sats to \(recipient)")
+        print("Sent nutzap: \(amount) sats to \(recipient)")
     }
     
     // MARK: - Mint Management

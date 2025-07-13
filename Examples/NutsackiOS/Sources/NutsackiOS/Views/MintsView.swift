@@ -1,12 +1,13 @@
 import SwiftUI
 import SwiftData
 import NDKSwift
+import CashuSwift
 
 struct MintsView: View {
     @Environment(\.modelContext) private var modelContext
     @EnvironmentObject private var walletManager: WalletManager
     
-    @State private var availableMints: [NDKMintInfo] = []
+    @State private var availableMints: [NDKCashuWallet.MintInfo] = []
     @State private var showAddMint = false
     @State private var showDiscoverMints = false
     @State private var isDiscovering = false
@@ -113,13 +114,13 @@ struct MintsView: View {
                     
                     if !discovered.isEmpty {
                         // TODO: Show discovered mints sheet
-                        logger.info("Discovered \(discovered.count) mints")
+                        print("Discovered \(discovered.count) mints")
                     }
                 }
             } catch {
                 await MainActor.run {
                     isDiscovering = false
-                    logger.error("Failed to discover mints: \(error)")
+                    print("Failed to discover mints: \(error)")
                 }
             }
         }
@@ -127,7 +128,7 @@ struct MintsView: View {
 }
 
 struct MintRow: View {
-    let mintInfo: NDKMintInfo
+    let mintInfo: NDKCashuWallet.MintInfo
     @EnvironmentObject private var walletManager: WalletManager
     @State private var balance: Int64 = 0
     
@@ -135,10 +136,10 @@ struct MintRow: View {
         VStack(alignment: .leading, spacing: 8) {
             HStack {
                 VStack(alignment: .leading, spacing: 4) {
-                    Text(mintInfo.displayName)
+                    Text(mintInfo.url.host ?? mintInfo.url.absoluteString)
                         .font(.headline)
                     
-                    Text(mintInfo.url.host ?? mintInfo.url.absoluteString)
+                    Text(mintInfo.url.absoluteString)
                         .font(.caption)
                         .foregroundStyle(.secondary)
                         .lineLimit(1)
@@ -157,12 +158,6 @@ struct MintRow: View {
                 }
             }
             
-            if let motd = mintInfo.motd {
-                Text(motd)
-                    .font(.caption2)
-                    .foregroundStyle(.tertiary)
-                    .lineLimit(2)
-            }
         }
         .padding(.vertical, 4)
         .task {
@@ -180,7 +175,7 @@ struct MintRow: View {
 }
 
 struct MintDetailView: View {
-    let mintInfo: NDKMintInfo
+    let mintInfo: NDKCashuWallet.MintInfo
     @EnvironmentObject private var walletManager: WalletManager
     @Environment(\.dismiss) private var dismiss
     
@@ -209,30 +204,8 @@ struct MintDetailView: View {
                 LabeledContent("URL", value: mintInfo.url.absoluteString)
                     .textSelection(.enabled)
                 
-                if let pubkey = mintInfo.pubkey {
-                    LabeledContent("Public Key") {
-                        Text(pubkey)
-                            .font(.caption)
-                            .lineLimit(1)
-                            .textSelection(.enabled)
-                    }
-                }
-                
-                LabeledContent("Units") {
-                    Text(mintInfo.units.joined(separator: ", "))
-                }
             }
             
-            if let contactInfo = mintInfo.contact, !contactInfo.isEmpty {
-                Section("Contact") {
-                    ForEach(contactInfo, id: \.self) { contact in
-                        ForEach(contact, id: \.self) { info in
-                            Text(info)
-                                .textSelection(.enabled)
-                        }
-                    }
-                }
-            }
             
             // Actions
             Section("Actions") {
@@ -259,7 +232,7 @@ struct MintDetailView: View {
                 }
             }
         }
-        .navigationTitle(mintInfo.displayName)
+        .navigationTitle(mintInfo.url.host ?? "Mint")
         .platformNavigationBarTitleDisplayMode(inline: true)
         .sheet(isPresented: $showInfo) {
             MintInfoView(mintInfo: mintInfo)
@@ -330,59 +303,17 @@ struct MintDetailView: View {
 
 // MARK: - Mint Info View
 struct MintInfoView: View {
-    let mintInfo: NDKMintInfo
+    let mintInfo: NDKCashuWallet.MintInfo
     @Environment(\.dismiss) private var dismiss
     
     var body: some View {
         NavigationStack {
             List {
-                if let name = mintInfo.name {
-                    LabeledContent("Name", value: name)
-                }
-                
-                if let description = mintInfo.description {
-                    Section("Description") {
-                        Text(description)
-                            .font(.callout)
-                    }
-                }
-                
                 Section("Technical Details") {
                     LabeledContent("URL") {
                         Text(mintInfo.url.absoluteString)
                             .font(.caption)
                             .textSelection(.enabled)
-                    }
-                    
-                    if let pubkey = mintInfo.pubkey {
-                        LabeledContent("Public Key") {
-                            Text(pubkey)
-                                .font(.caption)
-                                .lineLimit(1)
-                                .textSelection(.enabled)
-                        }
-                    }
-                    
-                    LabeledContent("Units") {
-                        Text(mintInfo.units.joined(separator: ", "))
-                    }
-                }
-                
-                if let motd = mintInfo.motd {
-                    Section("Message of the Day") {
-                        Text(motd)
-                            .font(.callout)
-                    }
-                }
-                
-                if let contactInfo = mintInfo.contact, !contactInfo.isEmpty {
-                    Section("Contact Information") {
-                        ForEach(contactInfo, id: \.self) { contact in
-                            ForEach(contact, id: \.self) { info in
-                                Text(info)
-                                    .textSelection(.enabled)
-                            }
-                        }
                     }
                 }
             }

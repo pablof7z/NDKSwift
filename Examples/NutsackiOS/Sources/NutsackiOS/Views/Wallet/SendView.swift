@@ -14,7 +14,7 @@ struct SendView: View {
     
     @State private var amount = ""
     @State private var memo = ""
-    @State private var selectedMint: Mint?
+    @State private var selectedMintURL: URL?
     @State private var isSending = false
     @State private var showError = false
     @State private var errorMessage = ""
@@ -22,7 +22,7 @@ struct SendView: View {
     @State private var showTokenView = false
     
     @State private var availableBalance: Int = 0
-    @State private var mints: [Mint] = []
+    @State private var mints: [NDKCashuWallet.MintInfo] = []
     
     var availableBalanceForMint: Int {
         return availableBalance
@@ -45,10 +45,10 @@ struct SendView: View {
                 }
                 
                 if !mints.isEmpty {
-                    Picker("From Mint", selection: $selectedMint) {
-                        Text("Auto-select").tag(nil as Mint?)
-                        ForEach(mints) { mint in
-                            Text(mint.displayName).tag(mint as Mint?)
+                    Picker("From Mint", selection: $selectedMintURL) {
+                        Text("Auto-select").tag(nil as URL?)
+                        ForEach(mints, id: \.url.absoluteString) { mint in
+                            Text(mint.url.host ?? mint.url.absoluteString).tag(mint.url as URL?)
                         }
                     }
                 }
@@ -106,7 +106,7 @@ struct SendView: View {
             loadMints()
             updateAvailableBalance()
         }
-        .onChange(of: selectedMint) { _, _ in
+        .onChange(of: selectedMintURL) { _, _ in
             updateAvailableBalance()
         }
     }
@@ -122,7 +122,7 @@ struct SendView: View {
                 let tokenString = try await walletManager.send(
                     amount: Int64(amountInt),
                     memo: memo.isEmpty ? nil : memo,
-                    fromMint: selectedMint?.url
+                    fromMint: selectedMintURL
                 )
                 
                 // Create transaction record
@@ -138,7 +138,7 @@ struct SendView: View {
                     do {
                         try modelContext.save()
                     } catch {
-                        logger.error("Failed to save transaction: \(error)")
+                        print("Failed to save transaction: \(error)")
                     }
                     
                     generatedToken = tokenString
@@ -157,8 +157,8 @@ struct SendView: View {
     
     private func updateAvailableBalance() {
         Task {
-            if let mint = selectedMint {
-                let balance = await walletManager.getBalance(for: mint.url)
+            if let mintURL = selectedMintURL {
+                let balance = await walletManager.getBalance(for: mintURL)
                 await MainActor.run {
                     availableBalance = Int(balance)
                 }
@@ -170,7 +170,7 @@ struct SendView: View {
                         availableBalance = Int(totalBalance)
                     }
                 } catch {
-                    logger.error("Failed to get balance: \(error)")
+                    print("Failed to get balance: \(error)")
                 }
             }
         }
@@ -182,7 +182,7 @@ struct SendView: View {
                 let loadedMints = await wallet.getMints()
                 await MainActor.run {
                     mints = loadedMints
-                    selectedMint = mints.first
+                    selectedMintURL = mints.first?.url
                 }
             }
         }

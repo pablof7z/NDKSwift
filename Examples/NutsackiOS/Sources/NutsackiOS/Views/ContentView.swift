@@ -20,6 +20,7 @@ struct ContentView: View {
         case wallet
         case contacts
         case mints
+        case relays
         case settings
     }
     
@@ -51,6 +52,12 @@ struct ContentView: View {
                             Label("Mints", systemImage: "building.columns")
                         }
                         .tag(Tab.mints)
+                    
+                    RelayManagementView()
+                        .tabItem {
+                            Label("Relays", systemImage: "network")
+                        }
+                        .tag(Tab.relays)
                     
                     SettingsView()
                         .tabItem {
@@ -90,7 +97,7 @@ struct ContentView: View {
                     try await walletManager.loadWallet(for: activeAccount)
                     
                 } catch {
-                    logger.error("Failed to auto-login: \(error)")
+                    print("Failed to auto-login: \(error)")
                     // Clear invalid account
                     appState.activeAccountID = nil
                 }
@@ -101,7 +108,7 @@ struct ContentView: View {
     }
     
     private func handleUrl(_ url: URL) {
-        logger.info("URL passed to application: \(url.absoluteString)")
+        print("URL passed to application: \(url.absoluteString)")
         
         if url.scheme == "cashu" || url.scheme == "nostr" {
             selectedTab = .wallet

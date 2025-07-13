@@ -104,7 +104,7 @@ struct ContactsView: View {
                             // Profile metadata will be available via async property
                         }
                     } catch {
-                        logger.error("Failed to fetch profile for \(pubkey): \(error)")
+                        print("Failed to fetch profile for \(pubkey): \(error)")
                     }
                     users.append(user)
                 }
@@ -129,7 +129,7 @@ struct ContactsView: View {
                 }
             }
         } catch {
-            logger.error("Failed to load contacts: \(error)")
+            print("Failed to load contacts: \(error)")
             await MainActor.run {
                 isLoading = false
             }

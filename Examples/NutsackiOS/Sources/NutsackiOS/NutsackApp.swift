@@ -1,9 +1,6 @@
 import SwiftUI
 import SwiftData
 import NDKSwift
-import OSLog
-
-let logger = Logger(subsystem: "Nutsack Wallet", category: "App")
 
 @main
 struct NutsackApp: App {
@@ -15,10 +12,8 @@ struct NutsackApp: App {
     let modelContainer: ModelContainer = {
         let schema = Schema([
             NostrAccount.self,
-            CashuWallet.self,
-            CashuToken.self,
-            Transaction.self,
-            Mint.self
+            WalletState.self,
+            Transaction.self
         ])
         
         let modelConfiguration = ModelConfiguration(
@@ -70,10 +65,8 @@ class DatabaseManager {
         do {
             let schema = Schema([
                 NostrAccount.self,
-                CashuWallet.self,
-                CashuToken.self,
-                Transaction.self,
-                Mint.self
+                WalletState.self,
+                Transaction.self
             ])
             
             let modelConfiguration = ModelConfiguration(
@@ -83,13 +76,13 @@ class DatabaseManager {
             )
             
             container = try ModelContainer(for: schema, configurations: [modelConfiguration])
-            logger.info("Created in-memory ModelContainer")
+            print("Created in-memory ModelContainer")
         } catch {
-            logger.error("Could not create ModelContainer, using mock: \(error)")
+            print("Could not create ModelContainer, using mock: \(error)")
             container = nil
         }
         #else
-        logger.info("Running as executable - SwiftData disabled")
+        print("Running as executable - SwiftData disabled")
         container = nil
         #endif
     }

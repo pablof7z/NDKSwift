@@ -19,7 +19,7 @@ let package = Package(
         .executableTarget(
             name: "NutsackiOS",
             dependencies: [
-                .product(name: "NDKSwift", package: "NDKSwift-z94ws0")
+                .product(name: "NDKSwift", package: "NDKSwift")
             ],
             exclude: ["QR_CODE_IMPROVEMENTS.md", "Info.plist"]
         )

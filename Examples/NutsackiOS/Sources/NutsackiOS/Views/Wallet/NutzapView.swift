@@ -267,7 +267,7 @@ struct NutzapView: View {
                     do {
                         try modelContext.save()
                     } catch {
-                        logger.error("Failed to save transaction: \(error)")
+                        print("Failed to save transaction: \(error)")
                     }
                     
                     showSuccess = true
@@ -315,7 +315,7 @@ struct NutzapView: View {
                 acceptedMints = mints
             }
         } catch {
-            logger.error("Failed to load accepted mints: \(error)")
+            print("Failed to load accepted mints: \(error)")
             await MainActor.run {
                 acceptedMints = []
             }
@@ -364,7 +364,7 @@ struct NutzapView: View {
                     availableBalance = Int(balance)
                 }
             } catch {
-                logger.error("Failed to get balance: \(error)")
+                print("Failed to get balance: \(error)")
             }
         }
     }

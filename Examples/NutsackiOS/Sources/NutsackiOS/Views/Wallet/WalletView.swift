@@ -18,6 +18,7 @@ struct WalletView: View {
     @State private var currentBalance: Int64 = 0
     @State private var isLoadingWallet = false
     @State private var hasWallet = false
+    @State private var balanceTimer: Timer?
     
     enum WalletDestination: Identifiable, Hashable {
         case mint
@@ -116,6 +117,10 @@ struct WalletView: View {
             }
             .onAppear {
                 loadWallet()
+                startBalanceTimer()
+            }
+            .onDisappear {
+                stopBalanceTimer()
             }
             .onChange(of: urlState) { oldValue, newValue in
                 if let newValue {
@@ -123,8 +128,25 @@ struct WalletView: View {
                     urlState = nil
                 }
             }
-            .onChange(of: walletManager.activeWallet) { _, _ in
-                updateBalance()
+            .onChange(of: navigationDestination) { oldValue, newValue in
+                // When returning from a navigation destination (newValue becomes nil),
+                // update the balance in case it changed
+                if oldValue != nil && newValue == nil {
+                    // When returning from any navigation, update balance
+                    Task {
+                        // Small delay to ensure any pending operations complete
+                        try? await Task.sleep(nanoseconds: 200_000_000) // 0.2 seconds
+                        
+                        // Update balance
+                        updateBalance()
+                        
+                        // If returning from mint view, give extra time for events to propagate
+                        if case .mint = oldValue {
+                            try? await Task.sleep(nanoseconds: 1_000_000_000) // 1 second
+                            updateBalance()
+                        }
+                    }
+                }
             }
         }
     }
@@ -145,13 +167,14 @@ struct WalletView: View {
                 
                 // Update balance
                 let balance = try await walletManager.getBalance()
+                print("WalletView - Loaded balance: \(balance)")
                 
                 await MainActor.run {
                     currentBalance = balance
                     isLoadingWallet = false
                 }
             } catch {
-                logger.error("Failed to load NIP-60 wallet: \(error)")
+                print("Failed to load NIP-60 wallet: \(error)")
                 await MainActor.run {
                     isLoadingWallet = false
                     hasWallet = false
@@ -164,13 +187,28 @@ struct WalletView: View {
         Task {
             do {
                 let balance = try await walletManager.getBalance()
+                print("WalletView - Updated balance: \(balance)")
                 await MainActor.run {
                     currentBalance = balance
                 }
             } catch {
-                logger.error("Failed to update balance: \(error)")
+                print("Failed to update balance: \(error)")
             }
         }
+    }
+    
+    private func startBalanceTimer() {
+        // Update balance every 5 seconds when view is visible
+        balanceTimer = Timer.scheduledTimer(withTimeInterval: 5.0, repeats: true) { _ in
+            if hasWallet && !isLoadingWallet {
+                updateBalance()
+            }
+        }
+    }
+    
+    private func stopBalanceTimer() {
+        balanceTimer?.invalidate()
+        balanceTimer = nil
     }
 }
 
