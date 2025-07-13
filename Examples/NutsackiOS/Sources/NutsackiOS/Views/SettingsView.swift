@@ -72,6 +72,19 @@ struct SettingsView: View {
                     Text("Preferences")
                 }
                 
+                // Advanced
+                Section {
+                    if let wallet = activeAccount?.wallets.first {
+                        NavigationLink(destination: ProofManagementView(wallet: wallet)) {
+                            Label("Proof Management", systemImage: "doc.text.magnifyingglass")
+                        }
+                    }
+                } header: {
+                    Text("Advanced")
+                } footer: {
+                    Text("Manage proof denominations and consolidation")
+                }
+                
                 // App Info
                 Section {
                     LabeledContent("Version", value: "1.0.0")
@@ -95,7 +108,9 @@ struct SettingsView: View {
                 }
             }
             .navigationTitle("Settings")
+            #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
+            #endif
         }
     }
     
@@ -184,7 +199,9 @@ struct AccountDetailView: View {
             }
         }
         .navigationTitle("Account")
+        #if os(iOS)
         .navigationBarTitleDisplayMode(.inline)
+        #endif
     }
     
     private func togglePrivateKey() {
@@ -194,7 +211,13 @@ struct AccountDetailView: View {
     }
     
     private func copyPrivateKey() {
+        guard let nsec = nsec else { return }
+        #if os(iOS)
         UIPasteboard.general.string = nsec
+        #else
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(nsec, forType: .string)
+        #endif
         withAnimation {
             copiedKey = true
         }
@@ -234,7 +257,9 @@ struct RelaySettingsView: View {
             }
         }
         .navigationTitle("Relays")
+        #if os(iOS)
         .navigationBarTitleDisplayMode(.inline)
+        #endif
     }
 }
 
@@ -252,7 +277,9 @@ struct BackupView: View {
             }
         }
         .navigationTitle("Backup")
+        #if os(iOS)
         .navigationBarTitleDisplayMode(.inline)
+        #endif
     }
 }
 
@@ -294,6 +321,8 @@ struct AboutView: View {
             }
         }
         .navigationTitle("About")
+        #if os(iOS)
         .navigationBarTitleDisplayMode(.inline)
+        #endif
     }
 }

@@ -26,22 +26,24 @@ final class MintCacheTests: XCTestCase {
     
     func testSaveAndRetrieveMintInfo() async throws {
         let mintUrl = "https://test.mint.com"
-        let mintInfoData = createTestMintInfoData()
+        let mintInfo = createTestMintInfo()
         
         // Test SQLite cache
-        try await cache.saveMintInfoJSON(mintInfoData, url: mintUrl)
+        try await cache.saveMintInfo(mintInfo, url: mintUrl)
         
-        let retrieved = await cache.getMintInfoJSON(url: mintUrl)
+        let retrieved = await cache.getMintInfo(url: mintUrl)
         XCTAssertNotNil(retrieved)
-        XCTAssertEqual(retrieved, mintInfoData)
+        XCTAssertEqual(retrieved?.name, mintInfo.name)
+        XCTAssertEqual(retrieved?.pubkey, mintInfo.pubkey)
+        XCTAssertEqual(retrieved?.version, mintInfo.version)
     }
     
     func testMintInfoStaleness() async throws {
         let mintUrl = "https://test.mint.com"
-        let mintInfoData = createTestMintInfoData()
+        let mintInfo = createTestMintInfo()
         
         // Save mint info
-        try await cache.saveMintInfoJSON(mintInfoData, url: mintUrl)
+        try await cache.saveMintInfo(mintInfo, url: mintUrl)
         
         // Should not be stale immediately
         let isStale = await cache.isMintInfoStale(url: mintUrl, maxAge: 3600) // 1 hour
@@ -136,13 +138,13 @@ final class MintCacheTests: XCTestCase {
         
         // Mock mint info
         let mintUrl = URL(string: "https://test.mint.com")!
-        let mintInfoData = createTestMintInfoData()
-        try await inMemoryCache.saveMintInfoJSON(mintInfoData, url: mintUrl.absoluteString)
+        let mintInfo = createTestMintInfo()
+        try await inMemoryCache.saveMintInfo(mintInfo, url: mintUrl.absoluteString)
         
         // Load should return cached version
-        let loadedData = try await loader.loadMintInfoData(url: mintUrl)
-        XCTAssertNotNil(loadedData)
-        XCTAssertEqual(loadedData, mintInfoData)
+        let loadedInfo = try await loader.loadMintInfo(url: mintUrl)
+        XCTAssertNotNil(loadedInfo)
+        XCTAssertEqual(loadedInfo.name, mintInfo.name)
     }
     
     // MARK: - Mint Management Tests
@@ -155,8 +157,8 @@ final class MintCacheTests: XCTestCase {
         ]
         
         for url in urls {
-            let data = createTestMintInfoData()
-            try await cache.saveMintInfoJSON(data, url: url)
+            let info = createTestMintInfo(name: "Mint at \(url)")
+            try await cache.saveMintInfo(info, url: url)
         }
         
         let cachedUrls = await cache.getCachedMintUrls()
@@ -166,18 +168,18 @@ final class MintCacheTests: XCTestCase {
     
     func testDeleteMint() async throws {
         let mintUrl = "https://test.mint.com"
-        let mintInfoData = createTestMintInfoData()
+        let mintInfo = createTestMintInfo()
         let keysets = [
             createTestKeyset(id: "keyset1"),
             createTestKeyset(id: "keyset2")
         ]
         
         // Save mint and keysets
-        try await cache.saveMintInfoJSON(mintInfoData, url: mintUrl)
+        try await cache.saveMintInfo(mintInfo, url: mintUrl)
         try await cache.saveKeysets(keysets, mintUrl: mintUrl)
         
         // Verify they exist
-        let cachedMintInfo = await cache.getMintInfoJSON(url: mintUrl)
+        let cachedMintInfo = await cache.getMintInfo(url: mintUrl)
         XCTAssertNotNil(cachedMintInfo)
         let cachedKeysets = await cache.getKeysets(mintUrl: mintUrl)
         XCTAssertEqual(cachedKeysets.count, 2)
@@ -186,7 +188,7 @@ final class MintCacheTests: XCTestCase {
         try await cache.deleteMint(url: mintUrl)
         
         // Verify mint and keysets are gone
-        let deletedMintInfo = await cache.getMintInfoJSON(url: mintUrl)
+        let deletedMintInfo = await cache.getMintInfo(url: mintUrl)
         XCTAssertNil(deletedMintInfo)
         let deletedKeysets = await cache.getKeysets(mintUrl: mintUrl)
         XCTAssertEqual(deletedKeysets.count, 0)

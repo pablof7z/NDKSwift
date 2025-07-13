@@ -4,11 +4,10 @@ import PackageDescription
 let package = Package(
     name: "NutsackiOS",
     platforms: [
-        .iOS(.v17),
-        .macOS(.v14)
+        .iOS(.v17)
     ],
     products: [
-        .library(
+        .executable(
             name: "NutsackiOS",
             targets: ["NutsackiOS"]
         )
@@ -17,12 +16,12 @@ let package = Package(
         .package(path: "../..")
     ],
     targets: [
-        .target(
+        .executableTarget(
             name: "NutsackiOS",
             dependencies: [
                 .product(name: "NDKSwift", package: "NDKSwift-z94ws0")
             ],
-            exclude: ["Info.plist"]
+            exclude: ["QR_CODE_IMPROVEMENTS.md", "Info.plist"]
         )
     ]
 )

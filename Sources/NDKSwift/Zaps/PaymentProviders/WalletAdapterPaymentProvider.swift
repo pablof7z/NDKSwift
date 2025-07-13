@@ -70,7 +70,7 @@ public class WalletAdapterPaymentProvider: NDKPaymentProvider {
         } else {
             // Generic confirmation - generate a placeholder preimage
             return LightningPaymentConfirmation(
-                preimage: "legacy_payment_\(Date().timeIntervalSince1970)",
+                preimage: "legacy_payment_\(Timestamp.now)",
                 paymentHash: nil,
                 feePaid: nil
             )

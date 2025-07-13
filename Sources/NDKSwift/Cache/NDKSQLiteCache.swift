@@ -132,9 +132,7 @@ public actor NDKSQLiteCache: NDKCache {
         let tags = event.tags
 
         
-        let encoder = JSONEncoder()
-        let jsonData = try encoder.encode(event)
-        let jsonString = String(data: jsonData, encoding: .utf8) ?? "{}"
+        let jsonString = try JSONCoding.encodeToString(event)
         
         try await dbQueue.write { db in
             // Insert or replace event
@@ -173,7 +171,7 @@ public actor NDKSQLiteCache: NDKCache {
             if let row = try Row.fetchOne(db, sql: "SELECT json FROM events WHERE id = ?", arguments: [id]),
                let jsonString = row["json"] as? String,
                let jsonData = jsonString.data(using: .utf8) {
-                return try JSONDecoder().decode(NDKEvent.self, from: jsonData)
+                return try JSONCoding.decode(NDKEvent.self, from: jsonData)
             }
             return nil
         }
@@ -268,7 +266,7 @@ public actor NDKSQLiteCache: NDKCache {
                 return rows.compactMap { row in
                     guard let jsonString = row["json"] as? String,
                           let jsonData = jsonString.data(using: .utf8) else { return nil }
-                    return try? JSONDecoder().decode(NDKEvent.self, from: jsonData)
+                    return JSONCoding.safeDecode(NDKEvent.self, from: jsonData)
                 }
             }
     }
@@ -282,9 +280,7 @@ public actor NDKSQLiteCache: NDKCache {
     // MARK: - Profile Operations
     
     public func saveProfile(_ profile: NDKUserProfile, pubkey: String) async throws {
-        let encoder = JSONEncoder()
-        let jsonData = try encoder.encode(profile)
-        let jsonString = String(data: jsonData, encoding: .utf8) ?? "{}"
+        let jsonString = try JSONCoding.encodeToString(profile)
         
         try await dbQueue.write { db in
             try db.execute(
@@ -303,7 +299,7 @@ public actor NDKSQLiteCache: NDKCache {
                     profile.lud16,
                     profile.banner,
                     profile.website,
-                    Int64(Date().timeIntervalSince1970),
+                    Int64(Timestamp.now),
                     jsonString
                 ]
             )
@@ -315,7 +311,7 @@ public actor NDKSQLiteCache: NDKCache {
             if let row = try Row.fetchOne(db, sql: "SELECT json FROM profiles WHERE pubkey = ?", arguments: [pubkey]),
                let jsonString = row["json"] as? String,
                let jsonData = jsonString.data(using: .utf8) {
-                return try JSONDecoder().decode(NDKUserProfile.self, from: jsonData)
+                return try JSONCoding.decode(NDKUserProfile.self, from: jsonData)
             }
             return nil
         }
@@ -377,7 +373,7 @@ public actor NDKSQLiteCache: NDKCache {
                     nil,
                     nil,
                     nil,
-                    Int64(Date().timeIntervalSince1970),
+                    Int64(Timestamp.now),
                     jsonString
                 ]
             )
@@ -398,7 +394,7 @@ public actor NDKSQLiteCache: NDKCache {
     
     /// Check if mint info is stale (older than 24 hours)
     public func isMintInfoStale(url: String, maxAge: TimeInterval = 86400) async -> Bool {
-        let staleThreshold = Int64(Date().timeIntervalSince1970 - maxAge)
+        let staleThreshold = Int64(Timestamp.now) - Int64(maxAge)
         return (try? await dbQueue.read { db in
             if let lastUpdated = try Int64.fetchOne(db, sql: "SELECT last_updated FROM mint_info WHERE url = ?", arguments: [url]) {
                 return lastUpdated < staleThreshold
@@ -411,12 +407,8 @@ public actor NDKSQLiteCache: NDKCache {
     
     /// Save keyset to cache
     public func saveKeyset(_ keyset: CashuSwift.Keyset, mintUrl: String) async throws {
-        let encoder = JSONEncoder()
-        let jsonData = try encoder.encode(keyset)
-        let jsonString = String(data: jsonData, encoding: .utf8) ?? "{}"
-        
-        let keysJsonData = try encoder.encode(keyset.keys)
-        let keysJsonString = String(data: keysJsonData, encoding: .utf8) ?? "{}"
+        let jsonString = try JSONCoding.encodeToString(keyset)
+        let keysJsonString = try JSONCoding.encodeToString(keyset.keys)
         
         try await dbQueue.write { db in
             try db.execute(
@@ -432,7 +424,7 @@ public actor NDKSQLiteCache: NDKCache {
                     keyset.active,
                     keyset.inputFeePPK,
                     keysJsonString,
-                    Int64(Date().timeIntervalSince1970),
+                    Int64(Timestamp.now),
                     jsonString
                 ]
             )
@@ -441,16 +433,12 @@ public actor NDKSQLiteCache: NDKCache {
     
     /// Save multiple keysets at once (batch operation)
     public func saveKeysets(_ keysets: [CashuSwift.Keyset], mintUrl: String) async throws {
-        let encoder = JSONEncoder()
-        let currentTime = Int64(Date().timeIntervalSince1970)
+        let currentTime = Int64(Timestamp.now)
         
         try await dbQueue.write { db in
             for keyset in keysets {
-                let jsonData = try encoder.encode(keyset)
-                let jsonString = String(data: jsonData, encoding: .utf8) ?? "{}"
-                
-                let keysJsonData = try encoder.encode(keyset.keys)
-                let keysJsonString = String(data: keysJsonData, encoding: .utf8) ?? "{}"
+                let jsonString = try JSONCoding.encodeToString(keyset)
+                let keysJsonString = try JSONCoding.encodeToString(keyset.keys)
                 
                 try db.execute(
                     sql: """
@@ -479,7 +467,7 @@ public actor NDKSQLiteCache: NDKCache {
             if let row = try Row.fetchOne(db, sql: "SELECT json FROM keysets WHERE keyset_id = ?", arguments: [id]),
                let jsonString = row["json"] as? String,
                let jsonData = jsonString.data(using: .utf8) {
-                return try JSONDecoder().decode(CashuSwift.Keyset.self, from: jsonData)
+                return try JSONCoding.decode(CashuSwift.Keyset.self, from: jsonData)
             }
             return nil
         }
@@ -492,7 +480,7 @@ public actor NDKSQLiteCache: NDKCache {
             return rows.compactMap { row in
                 guard let jsonString = row["json"] as? String,
                       let jsonData = jsonString.data(using: .utf8) else { return nil }
-                return try? JSONDecoder().decode(CashuSwift.Keyset.self, from: jsonData)
+                return JSONCoding.safeDecode(CashuSwift.Keyset.self, from: jsonData)
             }
         }) ?? []
     }
@@ -508,14 +496,14 @@ public actor NDKSQLiteCache: NDKCache {
             return rows.compactMap { row in
                 guard let jsonString = row["json"] as? String,
                       let jsonData = jsonString.data(using: .utf8) else { return nil }
-                return try? JSONDecoder().decode(CashuSwift.Keyset.self, from: jsonData)
+                return JSONCoding.safeDecode(CashuSwift.Keyset.self, from: jsonData)
             }
         }) ?? []
     }
     
     /// Check if keysets are stale (older than 1 hour)
     public func areKeysetsStale(mintUrl: String, maxAge: TimeInterval = 3600) async -> Bool {
-        let staleThreshold = Int64(Date().timeIntervalSince1970 - maxAge)
+        let staleThreshold = Int64(Timestamp.now) - Int64(maxAge)
         return (try? await dbQueue.read { db in
             if let oldestUpdate = try Int64.fetchOne(
                 db, 

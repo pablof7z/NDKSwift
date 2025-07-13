@@ -26,7 +26,7 @@ class NostrClient {
         // Initialize with popular relays
         ndk = NDK(relayUrls: [
             "wss://relay.damus.io",
-            "wss://nos.lol",
+            "wss://relay.primal.net",
             "wss://relay.nostr.band",
             "wss://relay.snort.social"
         ])

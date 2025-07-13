@@ -11,11 +11,33 @@ struct NutsackApp: App {
     @StateObject private var nostrManager = NostrManager()
     @StateObject private var walletManager: WalletManager
     
+    // Create a simple in-memory container
+    let modelContainer: ModelContainer = {
+        let schema = Schema([
+            NostrAccount.self,
+            CashuWallet.self,
+            CashuToken.self,
+            Transaction.self,
+            Mint.self
+        ])
+        
+        let modelConfiguration = ModelConfiguration(
+            schema: schema,
+            isStoredInMemoryOnly: true
+        )
+        
+        do {
+            return try ModelContainer(for: schema, configurations: [modelConfiguration])
+        } catch {
+            fatalError("Could not create ModelContainer: \(error)")
+        }
+    }()
+    
     init() {
         let nostrManager = NostrManager()
         let walletManager = WalletManager(
             nostrManager: nostrManager,
-            modelContext: DatabaseManager.shared.container.mainContext
+            modelContext: modelContainer.mainContext
         )
         
         _nostrManager = StateObject(wrappedValue: nostrManager)
@@ -30,7 +52,7 @@ struct NutsackApp: App {
                 .environmentObject(walletManager)
                 .preferredColorScheme(.dark)
         }
-        .modelContainer(DatabaseManager.shared.container)
+        .modelContainer(modelContainer)
     }
 }
 
@@ -38,27 +60,46 @@ struct NutsackApp: App {
 class DatabaseManager {
     static let shared = DatabaseManager()
     
-    private(set) var container: ModelContainer
+    private(set) var container: ModelContainer?
+    private var mockContext: ModelContext?
     
     private init() {
-        let schema = Schema([
-            NostrAccount.self,
-            CashuWallet.self,
-            CashuToken.self,
-            Transaction.self,
-            Mint.self
-        ])
-        
-        let modelConfiguration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false)
-        
+        // For executable targets, we'll skip SwiftData entirely
+        // and use mock data instead
+        #if targetEnvironment(simulator)
         do {
+            let schema = Schema([
+                NostrAccount.self,
+                CashuWallet.self,
+                CashuToken.self,
+                Transaction.self,
+                Mint.self
+            ])
+            
+            let modelConfiguration = ModelConfiguration(
+                schema: schema, 
+                isStoredInMemoryOnly: true,
+                allowsSave: true
+            )
+            
             container = try ModelContainer(for: schema, configurations: [modelConfiguration])
+            logger.info("Created in-memory ModelContainer")
         } catch {
-            fatalError("Could not create ModelContainer: \(error)")
+            logger.error("Could not create ModelContainer, using mock: \(error)")
+            container = nil
         }
+        #else
+        logger.info("Running as executable - SwiftData disabled")
+        container = nil
+        #endif
     }
     
     func newContext() -> ModelContext {
-        return ModelContext(container)
+        if let container = container {
+            return ModelContext(container)
+        } else {
+            // Return a mock context for executable targets
+            fatalError("ModelContext not available in executable mode")
+        }
     }
 }

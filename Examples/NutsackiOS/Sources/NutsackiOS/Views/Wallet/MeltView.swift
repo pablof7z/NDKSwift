@@ -3,7 +3,6 @@ import SwiftData
 import NDKSwift
 
 struct MeltView: View {
-    let wallet: CashuWallet
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var modelContext
     @EnvironmentObject private var walletManager: WalletManager
@@ -27,7 +26,9 @@ struct MeltView: View {
                         TextField("Lightning invoice", text: $lightningInvoice, axis: .vertical)
                             .lineLimit(3...6)
                             .font(.system(.caption, design: .monospaced))
+                            #if os(iOS)
                             .textInputAutocapitalization(.never)
+                            #endif
                             .autocorrectionDisabled()
                         
                         Button(action: { showScanner = true }) {
@@ -104,7 +105,7 @@ struct MeltView: View {
             }
         }
         .navigationTitle("Pay Lightning")
-        .navigationBarTitleDisplayMode(.inline)
+        .platformNavigationBarTitleDisplayMode(inline: true)
         .toolbar {
             ToolbarItem(placement: .cancellationAction) {
                 Button("Cancel") { dismiss() }
@@ -131,7 +132,16 @@ struct MeltView: View {
             decodeInvoice()
         }
         .onAppear {
-            updateAvailableBalance()
+            Task {
+                do {
+                    let balance = try await walletManager.getBalance()
+                    await MainActor.run {
+                        availableBalance = Int(balance)
+                    }
+                } catch {
+                    logger.error("Failed to get balance: \(error)")
+                }
+            }
         }
     }
     
@@ -174,7 +184,7 @@ struct MeltView: View {
             }
             
             // Parse payment hash and description if available
-            decodedDescription = parseLightningDescription(cleanInvoice) ?? "Lightning payment"
+            decodedDescription = "Lightning payment" // TODO: Add invoice parsing
         } else {
             decodedAmount = nil
             decodedDescription = nil
@@ -189,7 +199,7 @@ struct MeltView: View {
         Task {
             do {
                 // Pay the Lightning invoice
-                let preimage = try await walletManager.payLightning(
+                let _ = try await walletManager.payLightning(
                     invoice: lightningInvoice.trimmingCharacters(in: .whitespacesAndNewlines),
                     amount: amount
                 )
@@ -200,7 +210,6 @@ struct MeltView: View {
                     amount: Int(amount),
                     memo: decodedDescription
                 )
-                transaction.wallet = wallet
                 transaction.lightningInvoice = lightningInvoice
                 transaction.status = .completed
                 
@@ -306,16 +315,4 @@ struct MeltSuccessView: View {
         return nil // For now, return nil as proper decoding requires bech32 decoder
     }
     
-    private func updateAvailableBalance() {
-        Task {
-            do {
-                let balance = try await walletManager.getBalance()
-                await MainActor.run {
-                    availableBalance = Int(balance)
-                }
-            } catch {
-                logger.error("Failed to get balance: \(error)")
-            }
-        }
-    }
 }

@@ -40,7 +40,7 @@ import NDKSwift
 // Create NDK instance
 let ndk = NDK(relayUrls: [
     "wss://relay.damus.io",
-    "wss://nos.lol",
+    "wss://relay.primal.net",
     "wss://relay.nostr.band"
 ])
 

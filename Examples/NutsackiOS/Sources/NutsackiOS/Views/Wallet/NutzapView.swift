@@ -3,7 +3,6 @@ import SwiftData
 import NDKSwift
 
 struct NutzapView: View {
-    let wallet: CashuWallet
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var modelContext
     @EnvironmentObject private var nostrManager: NostrManager
@@ -19,6 +18,8 @@ struct NutzapView: View {
     @State private var errorMessage = ""
     @State private var showSuccess = false
     @State private var acceptedMints: [String] = []
+    @State private var showQRScanner = false
+    @State private var availableBalance: Int = 0
     
     var amountInt: Int {
         Int(amount) ?? 0
@@ -28,9 +29,20 @@ struct NutzapView: View {
         Form {
             Section {
                 VStack(alignment: .leading, spacing: 12) {
-                    TextField("npub, NIP-05, or hex pubkey", text: $recipientInput)
-                        .textInputAutocapitalization(.never)
-                        .autocorrectionDisabled()
+                    HStack {
+                        TextField("npub, NIP-05, or hex pubkey", text: $recipientInput)
+                            #if os(iOS)
+                            .textInputAutocapitalization(.never)
+                            #endif
+                            .autocorrectionDisabled()
+                        
+                        #if os(iOS)
+                        Button(action: { showQRScanner = true }) {
+                            Image(systemName: "qrcode.viewfinder")
+                                .foregroundColor(.orange)
+                        }
+                        #endif
+                    }
                     
                     if isResolving {
                         HStack {
@@ -43,38 +55,16 @@ struct NutzapView: View {
                     } else if let user = resolvedUser {
                         HStack {
                             // Profile picture
-                            if let pictureURL = user.profile?.picture,
-                               let url = URL(string: pictureURL) {
-                                AsyncImage(url: url) { image in
-                                    image
-                                        .resizable()
-                                        .aspectRatio(contentMode: .fill)
-                                } placeholder: {
-                                    Circle()
-                                        .fill(Color.secondary.opacity(0.3))
-                                }
-                                .frame(width: 40, height: 40)
-                                .clipShape(Circle())
-                            } else {
-                                Circle()
-                                    .fill(Color.secondary.opacity(0.3))
-                                    .frame(width: 40, height: 40)
-                            }
+                            UserProfilePicture(user: user)
                             
                             VStack(alignment: .leading) {
-                                Text(user.profile?.displayName ?? user.profile?.name ?? "Nostr User")
+                                UserDisplayName(user: user)
                                     .font(.subheadline)
                                     .fontWeight(.medium)
                                 
-                                if let nip05 = user.profile?.nip05 {
-                                    Text(nip05)
-                                        .font(.caption)
-                                        .foregroundStyle(.secondary)
-                                } else if let npub = user.npub {
-                                    Text(String(npub.prefix(16)) + "...")
-                                        .font(.caption)
-                                        .foregroundStyle(.secondary)
-                                }
+                                UserNIP05(user: user)
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
                             }
                             
                             Spacer()
@@ -92,7 +82,9 @@ struct NutzapView: View {
             Section {
                 HStack {
                     TextField("Amount", text: $amount)
+                        #if os(iOS)
                         .keyboardType(.numberPad)
+                        #endif
                     Text("sats")
                         .foregroundStyle(.secondary)
                 }
@@ -132,11 +124,11 @@ struct NutzapView: View {
                             .frame(maxWidth: .infinity)
                     }
                 }
-                .disabled(resolvedUser == nil || amount.isEmpty || amountInt <= 0 || amountInt > wallet.balance || isSending)
+                .disabled(resolvedUser == nil || amount.isEmpty || amountInt <= 0 || amountInt > availableBalance || isSending)
             }
         }
         .navigationTitle("Nutzap")
-        .navigationBarTitleDisplayMode(.inline)
+        .platformNavigationBarTitleDisplayMode(inline: true)
         .toolbar {
             ToolbarItem(placement: .cancellationAction) {
                 Button("Cancel") { dismiss() }
@@ -158,6 +150,17 @@ struct NutzapView: View {
         .onChange(of: recipientInput) { _, _ in
             resolveRecipient()
         }
+        .onAppear {
+            loadBalance()
+        }
+        #if os(iOS)
+        .sheet(isPresented: $showQRScanner) {
+            QRScannerView { scannedCode in
+                recipientInput = scannedCode
+                showQRScanner = false
+            }
+        }
+        #endif
     }
     
     private func resolveRecipient() {
@@ -190,7 +193,7 @@ struct NutzapView: View {
                 }
                 
                 if let pubkey = pubkey {
-                    let user = NDKUser(withPublicKey: pubkey)
+                    let user = NDKUser(pubkey: pubkey)
                     // Try to fetch profile
                     let metadataFilter = NDKFilter(
                         authors: [pubkey],
@@ -200,7 +203,7 @@ struct NutzapView: View {
                     if let event = try? await ndk.fetchEvent(metadataFilter),
                        let contentData = event.content.data(using: .utf8),
                        let metadata = try? JSONDecoder().decode(NDKUserProfile.self, from: contentData) {
-                        await user.setProfile(metadata)
+                        // Profile will be loaded via async property
                     }
                     
                     await MainActor.run {
@@ -227,8 +230,9 @@ struct NutzapView: View {
     
     private func sendNutzap() {
         guard let recipient = resolvedUser,
-              let recipientPubkey = recipient.publicKey,
               amountInt > 0 else { return }
+        
+        let recipientPubkey = recipient.pubkey
         
         isSending = true
         
@@ -254,9 +258,8 @@ struct NutzapView: View {
                 let transaction = Transaction(
                     type: .nutzap,
                     amount: amountInt,
-                    memo: comment.isEmpty ? "Nutzap to \(recipient.profile?.displayName ?? "user")" : comment
+                    memo: comment.isEmpty ? "Nutzap" : comment
                 )
-                transaction.wallet = wallet
                 transaction.status = .completed
                 
                 await MainActor.run {
@@ -352,6 +355,19 @@ struct NutzapView: View {
         
         return pubkey
     }
+    
+    private func loadBalance() {
+        Task {
+            do {
+                let balance = try await walletManager.getBalance()
+                await MainActor.run {
+                    availableBalance = Int(balance)
+                }
+            } catch {
+                logger.error("Failed to get balance: \(error)")
+            }
+        }
+    }
 }
 
 // MARK: - Errors
@@ -378,10 +394,6 @@ struct NutzapSuccessView: View {
     @State private var animationScale = 0.5
     @State private var showBolt = false
     
-    var displayName: String {
-        user.profile?.displayName ?? user.profile?.name ?? "Nostr User"
-    }
-    
     var body: some View {
         VStack(spacing: 30) {
             Spacer()
@@ -389,23 +401,7 @@ struct NutzapSuccessView: View {
             // Animation
             ZStack {
                 // Profile picture
-                if let pictureURL = user.profile?.picture,
-                   let url = URL(string: pictureURL) {
-                    AsyncImage(url: url) { image in
-                        image
-                            .resizable()
-                            .aspectRatio(contentMode: .fill)
-                    } placeholder: {
-                        Circle()
-                            .fill(Color.secondary.opacity(0.3))
-                    }
-                    .frame(width: 100, height: 100)
-                    .clipShape(Circle())
-                } else {
-                    Circle()
-                        .fill(Color.secondary.opacity(0.3))
-                        .frame(width: 100, height: 100)
-                }
+                UserProfilePicture(user: user, size: 100)
                 
                 // Bolt overlay
                 if showBolt {
@@ -422,7 +418,11 @@ struct NutzapSuccessView: View {
                     .font(.largeTitle)
                     .fontWeight(.bold)
                 
-                Text("\(amount) sats to \(displayName)")
+                HStack(spacing: 4) {
+                    Text("\(amount) sats to")
+                    UserDisplayName(user: user)
+                }
+                    .multilineTextAlignment(.center)
                     .font(.title3)
                     .foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)

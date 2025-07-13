@@ -124,7 +124,7 @@ public class NDKRelayList: NDKList {
         }
 
         // Update timestamp
-        createdAt = Timestamp(Date().timeIntervalSince1970)
+        createdAt = Timestamp.now
     }
 
     /// Add a relay with specified access permissions
@@ -142,7 +142,7 @@ public class NDKRelayList: NDKList {
         tags.append(entry.toTag())
 
         // Update timestamp
-        createdAt = Timestamp(Date().timeIntervalSince1970)
+        createdAt = Timestamp.now
 
         return self
     }
@@ -168,7 +168,7 @@ public class NDKRelayList: NDKList {
         }
 
         // Update timestamp
-        createdAt = Timestamp(Date().timeIntervalSince1970)
+        createdAt = Timestamp.now
 
         return self
     }
@@ -190,7 +190,7 @@ public class NDKRelayList: NDKList {
         }
 
         // Update timestamp
-        createdAt = Timestamp(Date().timeIntervalSince1970)
+        createdAt = Timestamp.now
 
         return self
     }
@@ -232,7 +232,7 @@ public class NDKRelayList: NDKList {
         }
 
         // Update timestamp
-        createdAt = Timestamp(Date().timeIntervalSince1970)
+        createdAt = Timestamp.now
 
         return self
     }

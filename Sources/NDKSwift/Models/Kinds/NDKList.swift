@@ -81,7 +81,7 @@ public class NDKList {
     /// Initialize a new list
     public init(ndk: NDK? = nil) {
         self.ndk = ndk
-        self.createdAt = Timestamp(Date().timeIntervalSince1970)
+        self.createdAt = Timestamp.now
     }
 
     /// Initialize a new list with the specified kind
@@ -300,7 +300,7 @@ public class NDKList {
         }
 
         // Update timestamp
-        createdAt = Timestamp(Date().timeIntervalSince1970)
+        createdAt = Timestamp.now
 
         return self
     }
@@ -328,7 +328,7 @@ public class NDKList {
         }
 
         // Update timestamp
-        createdAt = Timestamp(Date().timeIntervalSince1970)
+        createdAt = Timestamp.now
 
         return self
     }
@@ -371,7 +371,7 @@ public class NDKList {
         }
 
         // Update timestamp
-        createdAt = Timestamp(Date().timeIntervalSince1970)
+        createdAt = Timestamp.now
 
         return self
     }

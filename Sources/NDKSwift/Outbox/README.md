@@ -199,8 +199,8 @@ ndk.signer = try NDKPrivateKeySigner(privateKey: privateKey)
 let userPubkey = await ndk.signer!.publicKey()
 await ndk.setRelaysForUser(
     pubkey: userPubkey,
-    readRelays: ["wss://nos.lol", "wss://relay.damus.io"],
-    writeRelays: ["wss://nos.lol", "wss://relay.nostr.band"]
+    readRelays: ["wss://relay.primal.net", "wss://relay.damus.io"],
+    writeRelays: ["wss://relay.primal.net", "wss://relay.nostr.band"]
 )
 
 // Create event with mentions

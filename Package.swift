@@ -56,11 +56,13 @@ let package = Package(
         .executableTarget(
             name: "CashuWallet",
             dependencies: ["NDKSwift"],
-            path: "Examples/CashuWallet"
+            path: "Examples/CashuWallet",
+            exclude: ["README.md"]
         ),
         .testTarget(
             name: "NDKSwiftTests",
-            dependencies: ["NDKSwift"]
+            dependencies: ["NDKSwift"],
+            exclude: ["Utils/ContentTaggerNostrEntityTests_Results.md"]
         ),
     ]
 )

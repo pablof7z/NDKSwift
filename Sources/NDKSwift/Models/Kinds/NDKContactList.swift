@@ -108,7 +108,7 @@ public class NDKContactList: NDKList {
         }
 
         // Update timestamp
-        createdAt = Timestamp(Date().timeIntervalSince1970)
+        createdAt = Timestamp.now
     }
 
     /// Add a contact to this list
@@ -122,7 +122,7 @@ public class NDKContactList: NDKList {
         tags.append(contact.toTag())
 
         // Update timestamp
-        createdAt = Timestamp(Date().timeIntervalSince1970)
+        createdAt = Timestamp.now
 
         return self
     }
@@ -149,7 +149,7 @@ public class NDKContactList: NDKList {
         }
 
         // Update timestamp
-        createdAt = Timestamp(Date().timeIntervalSince1970)
+        createdAt = Timestamp.now
 
         return self
     }
@@ -208,7 +208,7 @@ public class NDKContactList: NDKList {
         tags[index] = newTag
 
         // Update timestamp
-        createdAt = Timestamp(Date().timeIntervalSince1970)
+        createdAt = Timestamp.now
 
         return self
     }
@@ -231,7 +231,7 @@ public class NDKContactList: NDKList {
         tags[index] = newTag
 
         // Update timestamp
-        createdAt = Timestamp(Date().timeIntervalSince1970)
+        createdAt = Timestamp.now
 
         return self
     }

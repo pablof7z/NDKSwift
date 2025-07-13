@@ -8,7 +8,6 @@ import AppKit
 #endif
 
 struct SendView: View {
-    let wallet: CashuWallet
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var modelContext
     @EnvironmentObject private var walletManager: WalletManager
@@ -23,6 +22,7 @@ struct SendView: View {
     @State private var showTokenView = false
     
     @State private var availableBalance: Int = 0
+    @State private var mints: [Mint] = []
     
     var availableBalanceForMint: Int {
         return availableBalance
@@ -37,15 +37,17 @@ struct SendView: View {
             Section {
                 HStack {
                     TextField("Amount", text: $amount)
+                        #if os(iOS)
                         .keyboardType(.numberPad)
+                        #endif
                     Text("sats")
                         .foregroundStyle(.secondary)
                 }
                 
-                if !wallet.mints.isEmpty {
+                if !mints.isEmpty {
                     Picker("From Mint", selection: $selectedMint) {
                         Text("Auto-select").tag(nil as Mint?)
-                        ForEach(wallet.mints) { mint in
+                        ForEach(mints) { mint in
                             Text(mint.displayName).tag(mint as Mint?)
                         }
                     }
@@ -84,7 +86,7 @@ struct SendView: View {
             }
         }
         .navigationTitle("Send Ecash")
-        .navigationBarTitleDisplayMode(.inline)
+        .platformNavigationBarTitleDisplayMode(inline: true)
         .toolbar {
             ToolbarItem(placement: .cancellationAction) {
                 Button("Cancel") { dismiss() }
@@ -101,7 +103,7 @@ struct SendView: View {
             }
         }
         .onAppear {
-            selectedMint = wallet.mints.first
+            loadMints()
             updateAvailableBalance()
         }
         .onChange(of: selectedMint) { _, _ in
@@ -129,7 +131,6 @@ struct SendView: View {
                     amount: amountInt,
                     memo: memo.isEmpty ? nil : memo
                 )
-                transaction.wallet = wallet
                 transaction.status = .completed
                 
                 await MainActor.run {
@@ -174,6 +175,18 @@ struct SendView: View {
             }
         }
     }
+    
+    private func loadMints() {
+        Task {
+            if let wallet = walletManager.activeWallet {
+                let loadedMints = await wallet.getMints()
+                await MainActor.run {
+                    mints = loadedMints
+                    selectedMint = mints.first
+                }
+            }
+        }
+    }
 }
 
 // MARK: - Token View
@@ -211,19 +224,7 @@ struct TokenView: View {
                     }
                     
                     // QR Code
-                    if let qrImage = generateQRCode(from: token) {
-                        #if os(iOS)
-                        Image(uiImage: qrImage)
-                        #else
-                        Image(nsImage: qrImage)
-                        #endif
-                            .interpolation(.none)
-                            .resizable()
-                            .aspectRatio(contentMode: .fit)
-                            .frame(width: 250, height: 250)
-                            .background(Color.white)
-                            .cornerRadius(12)
-                    }
+                    QRCodeView(content: token)
                     
                     // Token text
                     VStack(spacing: 12) {
@@ -257,7 +258,7 @@ struct TokenView: View {
                 }
             }
             .navigationTitle("Ecash Token")
-            .navigationBarTitleDisplayMode(.inline)
+            .platformNavigationBarTitleDisplayMode(inline: true)
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Done") { dismiss() }
@@ -303,41 +304,4 @@ struct TokenView: View {
         #endif
     }
     
-    #if os(iOS)
-    private func generateQRCode(from string: String) -> UIImage? {
-        let data = string.data(using: .utf8)
-        
-        if let filter = CIFilter(name: "CIQRCodeGenerator") {
-            filter.setValue(data, forKey: "inputMessage")
-            let transform = CGAffineTransform(scaleX: 10, y: 10)
-            
-            if let output = filter.outputImage?.transformed(by: transform) {
-                let context = CIContext()
-                if let cgImage = context.createCGImage(output, from: output.extent) {
-                    return UIImage(cgImage: cgImage)
-                }
-            }
-        }
-        
-        return nil
-    }
-    #else
-    private func generateQRCode(from string: String) -> NSImage? {
-        let data = string.data(using: .utf8)
-        
-        if let filter = CIFilter(name: "CIQRCodeGenerator") {
-            filter.setValue(data, forKey: "inputMessage")
-            let transform = CGAffineTransform(scaleX: 10, y: 10)
-            
-            if let output = filter.outputImage?.transformed(by: transform) {
-                let rep = NSCIImageRep(ciImage: output)
-                let nsImage = NSImage(size: rep.size)
-                nsImage.addRepresentation(rep)
-                return nsImage
-            }
-        }
-        
-        return nil
-    }
-    #endif
 }

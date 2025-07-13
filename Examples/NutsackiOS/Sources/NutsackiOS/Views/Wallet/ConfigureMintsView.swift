@@ -2,7 +2,7 @@ import SwiftUI
 import SwiftData
 import NDKSwift
 
-struct CreateWalletView: View {
+struct ConfigureMintsView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject private var appState: AppState
@@ -11,10 +11,8 @@ struct CreateWalletView: View {
     
     @Query private var accounts: [NostrAccount]
     
-    @State private var walletName = ""
-    @State private var walletDescription = ""
     @State private var selectedMints: Set<String> = []
-    @State private var isCreating = false
+    @State private var isConfiguring = false
     @State private var showError = false
     @State private var errorMessage = ""
     
@@ -40,18 +38,6 @@ struct CreateWalletView: View {
         NavigationStack {
             Form {
                 Section {
-                    TextField("Wallet Name", text: $walletName)
-                        .textContentType(.name)
-                    
-                    TextField("Description (optional)", text: $walletDescription, axis: .vertical)
-                        .lineLimit(2...4)
-                } header: {
-                    Text("Wallet Information")
-                } footer: {
-                    Text("This wallet will be backed up to Nostr using NIP-60")
-                }
-                
-                Section {
                     ForEach(suggestedMints) { mint in
                         MintSelectionRow(
                             mint: mint,
@@ -67,24 +53,24 @@ struct CreateWalletView: View {
                 } header: {
                     Text("Select Mints")
                 } footer: {
-                    Text("You can add more mints later")
+                    Text("You can add or remove mints later")
                 }
                 
                 Section {
-                    Button(action: createWallet) {
-                        if isCreating {
+                    Button(action: configureMints) {
+                        if isConfiguring {
                             ProgressView()
                                 .frame(maxWidth: .infinity)
                         } else {
-                            Text("Create Wallet")
+                            Text("Configure Mints")
                                 .frame(maxWidth: .infinity)
                         }
                     }
-                    .disabled(walletName.isEmpty || selectedMints.isEmpty || isCreating)
+                    .disabled(selectedMints.isEmpty || isConfiguring)
                 }
             }
-            .navigationTitle("New Wallet")
-            .navigationBarTitleDisplayMode(.inline)
+            .navigationTitle("Configure Mints")
+            .platformNavigationBarTitleDisplayMode(inline: true)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") { dismiss() }
@@ -95,52 +81,35 @@ struct CreateWalletView: View {
             } message: {
                 Text(errorMessage)
             }
+            .onAppear {
+                // Pre-select default mint
+                selectedMints.insert("https://testnut.cashu.space")
+            }
         }
     }
     
-    private func createWallet() {
+    private func configureMints() {
         guard let account = activeAccount else {
             errorMessage = "No active account found"
             showError = true
             return
         }
         
-        isCreating = true
+        isConfiguring = true
         
         Task {
             do {
-                // Create NIP-60 wallet through WalletManager
-                let wallet = try await walletManager.createWallet(
-                    name: walletName,
-                    description: walletDescription.isEmpty ? nil : walletDescription,
-                    account: account
-                )
-                
-                // Add additional mints if selected
+                // Add selected mints to the wallet
                 for mintURL in selectedMints {
-                    if let url = URL(string: mintURL),
-                       mintURL != "https://testnut.cashu.space" { // Skip default mint
+                    if let url = URL(string: mintURL) {
                         try await walletManager.addMint(url: url)
-                        
-                        // Update local model
-                        if let mint = Mint(url: url) as Mint? {
-                            mint.wallet = wallet
-                            wallet.mints.append(mint)
-                        }
                     }
                 }
                 
-                // Save local changes
-                await MainActor.run {
-                    do {
-                        try modelContext.save()
-                    } catch {
-                        logger.error("Failed to save local wallet changes: \(error)")
-                    }
+                // Save wallet configuration
+                if let wallet = walletManager.activeWallet {
+                    try await wallet.save()
                 }
-                
-                // Load the wallet to activate it
-                try await walletManager.loadWallet(for: account)
                 
                 await MainActor.run {
                     dismiss()
@@ -149,17 +118,16 @@ struct CreateWalletView: View {
                 await MainActor.run {
                     errorMessage = error.localizedDescription
                     showError = true
-                    isCreating = false
+                    isConfiguring = false
                 }
             }
         }
     }
-    
 }
 
 // MARK: - Helper Views
 struct MintSelectionRow: View {
-    let mint: CreateWalletView.MintSuggestion
+    let mint: ConfigureMintsView.MintSuggestion
     let isSelected: Bool
     let action: () -> Void
     

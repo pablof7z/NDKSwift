@@ -63,7 +63,7 @@ public struct NDKImage {
         self.event = NDKEvent(
             id: "", // Will be set when signed
             pubkey: pubkey,
-            createdAt: Timestamp(Date().timeIntervalSince1970),
+            createdAt: Timestamp.now,
             kind: NDKImage.kind,
             tags: [],
             content: "",

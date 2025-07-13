@@ -1032,7 +1032,7 @@ public actor NDKCashuWallet: NDKWallet {
         encryptedTags.append(["from_mint", fromMint])
         encryptedTags.append(["to_mint", toMint])
         encryptedTags.append(["fee", String(feePaid)])
-        encryptedTags.append(["timestamp", String(Date().timeIntervalSince1970)])
+        encryptedTags.append(["timestamp", String(Timestamp.now)])
         
         // Encrypt the content tags
         let tagsData = try JSONEncoder().encode(encryptedTags)
@@ -1524,31 +1524,43 @@ public actor NDKCashuWallet: NDKWallet {
     }
     
     /// Get mint info (uses cache if available)
-    /// Returns the raw JSON data that can be decoded as needed
-    public func getMintInfoData(url: URL) async throws -> Data {
+    public func getMintInfo(url: URL) async throws -> NDKMintInfo {
         if let loader = mintLoader {
-            return try await loader.loadMintInfoData(url: url)
+            return try await loader.loadMintInfo(url: url)
         } else {
             // Fallback to direct network fetch
             let infoUrl = url.appending(path: "/v1/info")
             let data = try await URLSession.shared.data(from: infoUrl).0
-            return data
+            return try JSONDecoder().decode(NDKMintInfo.self, from: data)
         }
+    }
+    
+    /// Get mint info as raw data (for backward compatibility)
+    public func getMintInfoData(url: URL) async throws -> Data {
+        let mintInfo = try await getMintInfo(url: url)
+        return try mintInfo.toJSONData()
     }
     
     /// Refresh mint keysets from network (useful when keysets change)
     public func refreshMintKeysets(url: URL) async throws {
-        let mint = try await CashuSwift.loadMint(url: url)
-        mints[url.absoluteString] = mint
-        
-        // Update keysets
-        for keyset in mint.keysets {
-            keysets[keyset.keysetID] = keyset
-        }
-        
-        // If we have a cache, update it
+        // If we have a loader, use it with forceRefresh
         if let loader = mintLoader {
-            _ = try await loader.loadMint(url: url) // This will update the cache
+            let mint = try await loader.loadMint(url: url, forceRefresh: true)
+            mints[url.absoluteString] = mint
+            
+            // Update keysets
+            for keyset in mint.keysets {
+                keysets[keyset.keysetID] = keyset
+            }
+        } else {
+            // Direct load without cache
+            let mint = try await CashuSwift.loadMint(url: url)
+            mints[url.absoluteString] = mint
+            
+            // Update keysets
+            for keyset in mint.keysets {
+                keysets[keyset.keysetID] = keyset
+            }
         }
     }
     

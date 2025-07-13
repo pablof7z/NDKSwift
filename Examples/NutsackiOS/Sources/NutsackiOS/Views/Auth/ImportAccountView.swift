@@ -22,7 +22,9 @@ struct ImportAccountView: View {
                         HStack {
                             TextField("nsec1...", text: $nsecInput)
                                 .textContentType(.password)
+                                #if os(iOS)
                                 .textInputAutocapitalization(.never)
+                                #endif
                                 .font(.system(.body, design: .monospaced))
                             
                             Button(action: { showScanner = true }) {
@@ -55,7 +57,7 @@ struct ImportAccountView: View {
                 }
             }
             .navigationTitle("Import Account")
-            .navigationBarTitleDisplayMode(.inline)
+            .platformNavigationBarTitleDisplayMode(inline: true)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") { dismiss() }
@@ -101,21 +103,21 @@ struct ImportAccountView: View {
                 // Fetch profile
                 if let ndk = nostrManager.ndk {
                     let metadataFilter = NDKFilter(
-                        authors: [user.npub],
+                        authors: [user.pubkey],
                         kinds: [0],
                         limit: 1
                     )
                     if let event = try? await ndk.fetchEvent(metadataFilter),
                        let contentData = event.content.data(using: .utf8),
-                       let metadata = try? JSONDecoder().decode(NDKUserProfile.self, from: contentData) {
-                        await user.setProfile(metadata)
+                       let _ = try? JSONDecoder().decode(NDKUserProfile.self, from: contentData) {
+                        // Profile metadata will be available via async property
                     }
                 }
                 
                 // Save to local database
                 let profile = await user.profile
                 let account = NostrAccount(
-                    publicKey: user.npub,
+                    publicKey: user.pubkey,
                     privateKey: privateKey,
                     displayName: profile?.displayName ?? profile?.name ?? "Nostr User"
                 )

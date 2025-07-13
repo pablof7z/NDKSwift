@@ -404,7 +404,7 @@ let ndk = NDK(signer: signer, cacheAdapter: NDKFileCache())
 
 // Connect to relays
 try ndk.addRelay("wss://relay.damus.io")
-try ndk.addRelay("wss://nos.lol")
+try ndk.addRelay("wss://relay.primal.net")
 ndk.connect()
 
 // Create and publish an event

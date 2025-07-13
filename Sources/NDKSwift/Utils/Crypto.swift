@@ -37,16 +37,7 @@ public enum Crypto {
 
     /// Generate a new private key
     public static func generatePrivateKey() -> PrivateKey {
-        var bytes = [UInt8](repeating: 0, count: 32)
-        #if canImport(Security)
-            _ = SecRandomCopyBytes(kSecRandomDefault, 32, &bytes)
-        #else
-            // Fallback for Linux
-            for i in 0 ..< 32 {
-                bytes[i] = UInt8.random(in: 0 ... 255)
-            }
-        #endif
-        return Data(bytes).hexString
+        return randomBytes(count: 32).hexString
     }
 
     /// Derive public key from private key using secp256k1
