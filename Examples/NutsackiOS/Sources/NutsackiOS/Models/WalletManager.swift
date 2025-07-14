@@ -77,10 +77,7 @@ class WalletManager: ObservableObject {
             throw WalletError.noActiveWallet
         }
         
-        // Start nutzap monitoring
-        Task {
-            await wallet.startNutzapMonitor()
-        }
+        // Nutzap monitoring is now handled by the unified wallet subscription in load()
         
         // Start periodic proof state checking
         Task {

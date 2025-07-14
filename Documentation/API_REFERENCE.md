@@ -81,6 +81,9 @@ public func publish(event: NDKEvent, to relayUrls: Set<String>) async throws -> 
 // Optimistic publishing configuration
 public var optimisticPublishingConfig: NDKOptimisticPublishingConfig
 // Configure: enabled, cacheUnpublishedEvents, dispatchToSubscriptions
+
+// Retry publishing unpublished events
+public func retryUnpublishedEvents(maxAge: TimeInterval, limit: Int?) async throws -> [(event: NDKEvent, relays: Set<NDKRelay>)]
 ```
 
 #### Subscriptions
@@ -637,6 +640,7 @@ public protocol NDKCache: Actor {
     func addUnpublishedEvent(_ event: NDKEvent, relays: Set<String>) async throws
     func confirmEvent(eventId: String, onRelay relay: String) async throws
     func getEventConfirmationState(eventId: String) async -> EventConfirmationState?
+    func getUnpublishedEvents(maxAge: TimeInterval, limit: Int?) async -> [(event: NDKEvent, targetRelays: Set<String>)]
     
     // Management
     func clear() async throws

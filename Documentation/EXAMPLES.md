@@ -208,6 +208,163 @@ func createInstantSubscription() -> NDKSubscription {
 }
 ```
 
+### Querying and Retrying Unpublished Events
+
+```swift
+class UnpublishedEventManager {
+    let ndk: NDK
+    
+    func handleOfflineRecovery() async throws {
+        // Query for unpublished events from the last hour
+        guard let cache = ndk.cache else { return }
+        
+        let unpublishedEvents = await cache.getUnpublishedEvents(maxAge: 3600, limit: nil)
+        
+        if unpublishedEvents.isEmpty {
+            print("✅ No unpublished events found")
+            return
+        }
+        
+        print("🔄 Found \(unpublishedEvents.count) unpublished events")
+        
+        // Display unpublished events to user
+        for (event, targetRelays) in unpublishedEvents {
+            print("📝 Unpublished: \(event.content)")
+            print("   Target relays: \(targetRelays.joined(separator: ", "))")
+            
+            // Check current confirmation state
+            let state = await cache.getEventConfirmationState(eventId: event.id)
+            switch state {
+            case .optimistic:
+                print("   Status: Still sending...")
+            case .confirmed(let relay):
+                print("   Status: Confirmed by \(relay)")
+            case nil:
+                print("   Status: Unknown")
+            }
+        }
+    }
+    
+    func retryFailedEvents() async throws {
+        // Retry all unpublished events from the last hour
+        let retriedEvents = try await ndk.retryUnpublishedEvents(maxAge: 3600, limit: nil)
+        
+        print("🔄 Attempted to retry \(retriedEvents.count) events")
+        
+        for (event, successfulRelays) in retriedEvents {
+            if successfulRelays.isEmpty {
+                print("❌ Failed to retry: \(event.content)")
+            } else {
+                let relayUrls = successfulRelays.map { $0.url }.joined(separator: ", ")
+                print("✅ Retried successfully: \(event.content) to \(relayUrls)")
+            }
+        }
+    }
+    
+    func retrySelectiveEvents() async throws {
+        // Get the 10 most recent unpublished events
+        guard let cache = ndk.cache else { return }
+        let recentUnpublished = await cache.getUnpublishedEvents(maxAge: 3600, limit: 10)
+        
+        // Filter for specific criteria (e.g., only text notes)
+        let textNotes = recentUnpublished.filter { $0.event.kind == 1 }
+        
+        print("🔄 Retrying \(textNotes.count) unpublished text notes...")
+        
+        for (event, targetRelays) in textNotes {
+            do {
+                let successfulRelays = try await ndk.publish(event: event, to: targetRelays)
+                print("✅ Retried: \(event.content) to \(successfulRelays.count) relays")
+            } catch {
+                print("❌ Failed to retry: \(event.content) - \(error)")
+            }
+        }
+    }
+    
+    func schedulePeriodicRetry() {
+        // Schedule automatic retry every 5 minutes
+        Timer.scheduledTimer(withTimeInterval: 300, repeats: true) { _ in
+            Task {
+                do {
+                    try await self.retryFailedEvents()
+                } catch {
+                    print("⚠️ Periodic retry failed: \(error)")
+                }
+            }
+        }
+    }
+}
+```
+
+### Monitoring Event Publication Status
+
+```swift
+class EventStatusMonitor: ObservableObject {
+    @Published var eventStatuses: [String: EventStatus] = [:]
+    let ndk: NDK
+    
+    enum EventStatus {
+        case sending
+        case confirmed(relay: String)
+        case failed(error: String)
+    }
+    
+    func publishWithMonitoring(content: String) async throws {
+        let event = NDKEvent(content: content, kind: 1)
+        
+        // Set initial status
+        await MainActor.run {
+            eventStatuses[event.id] = .sending
+        }
+        
+        do {
+            // Publish event
+            try await ndk.publish(event)
+            
+            // Start monitoring confirmation
+            Task {
+                await monitorEventConfirmation(eventId: event.id)
+            }
+            
+        } catch {
+            await MainActor.run {
+                eventStatuses[event.id] = .failed(error: error.localizedDescription)
+            }
+        }
+    }
+    
+    private func monitorEventConfirmation(eventId: String) async {
+        // Poll for confirmation state changes
+        while eventStatuses[eventId] != nil {
+            if let state = await ndk.cache?.getEventConfirmationState(eventId: eventId) {
+                switch state {
+                case .optimistic:
+                    // Still sending, continue polling
+                    try? await Task.sleep(nanoseconds: 1_000_000_000) // 1 second
+                case .confirmed(let relay):
+                    await MainActor.run {
+                        eventStatuses[eventId] = .confirmed(relay: relay)
+                    }
+                    return
+                }
+            } else {
+                // Event not found in cache, might have been cleared
+                await MainActor.run {
+                    eventStatuses.removeValue(forKey: eventId)
+                }
+                return
+            }
+        }
+    }
+    
+    func getUnpublishedEventsCount() async -> Int {
+        guard let cache = ndk.cache else { return 0 }
+        let unpublished = await cache.getUnpublishedEvents(maxAge: 3600, limit: nil)
+        return unpublished.count
+    }
+}
+```
+
 ### Disabling Optimistic Publishing
 
 ```swift

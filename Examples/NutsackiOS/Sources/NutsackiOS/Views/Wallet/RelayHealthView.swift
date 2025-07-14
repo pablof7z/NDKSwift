@@ -1,5 +1,6 @@
 import SwiftUI
 import NDKSwift
+import SwiftData
 
 struct RelayHealthView: View {
     @EnvironmentObject private var walletManager: WalletManager
@@ -29,7 +30,11 @@ struct RelayHealthView: View {
                         
                         Spacer()
                         
-                        Button(action: refreshHealth) {
+                        Button(action: {
+                            Task {
+                                await refreshHealth()
+                            }
+                        }) {
                             Image(systemName: "arrow.clockwise")
                                 .foregroundColor(.blue)
                                 .font(.title2)
@@ -224,14 +229,10 @@ struct RelayHealthView: View {
         isLoading = true
         defer { isLoading = false }
         
-        do {
-            let health = await wallet.getRelayHealth()
-            await MainActor.run {
-                self.relayHealth = health
-                self.lastUpdateTime = Date()
-            }
-        } catch {
-            print("Failed to get relay health: \(error)")
+        let health = await wallet.getRelayHealth()
+        await MainActor.run {
+            self.relayHealth = health
+            self.lastUpdateTime = Date()
         }
     }
 }
@@ -417,7 +418,7 @@ struct RelayRepairSheet: View {
             defer { isRepairing = false }
             
             do {
-                await wallet.repairRelay(relayHealth.relay, missingEventIds: relayHealth.missingEvents)
+                try await wallet.repairRelay(relayHealth.relay, missingEventIds: relayHealth.missingEvents)
                 
                 await MainActor.run {
                     onComplete()
@@ -432,6 +433,13 @@ struct RelayRepairSheet: View {
 }
 
 #Preview {
+    // Create mock objects for preview
+    let nostrManager = NostrManager()
+    let schema = Schema([Transaction.self])
+    let modelConfiguration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: true)
+    let container = try! ModelContainer(for: schema, configurations: [modelConfiguration])
+    let context = container.mainContext
+    
     RelayHealthView()
-        .environmentObject(WalletManager())
+        .environmentObject(WalletManager(nostrManager: nostrManager, modelContext: context))
 }
