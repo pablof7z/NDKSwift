@@ -194,13 +194,12 @@ public actor NDKCashuWallet: NDKWallet {
                 
                 // Add proofs to state
                 for proof in nip60Token.proofs {
-                    let swiftProof = proof.toCashuSwiftProof()
                     // Store proof if we have the corresponding keyset
-                    if keysets[swiftProof.keysetID] != nil {
+                    if keysets[proof.keysetID] != nil {
                         // Find mint for this proof
-                        if let mint = try? findMintForProof(swiftProof) {
-                            proofState[swiftProof.C] = ProofEntry(
-                                proof: swiftProof,
+                        if let mint = try? findMintForProof(proof) {
+                            proofState[proof.C] = ProofEntry(
+                                proof: proof,
                                 state: .available,
                                 mint: mint
                             )
@@ -375,12 +374,9 @@ public actor NDKCashuWallet: NDKWallet {
             mint: selectedMintUrl
         )
         
-        // Convert CashuProof to CashuSwift.Proof for the nutzap event
-        let swiftProofs = lockedProofs.toCashuSwiftProofs()
-        
         // Create nutzap event with the P2PK locked proofs
         let nutzapEvent = try await createNutzapEvent(
-            proofs: swiftProofs,
+            proofs: lockedProofs,
             recipient: nutzapRequest.recipientPubkey,
             amount: nutzapRequest.amount,
             comment: nutzapRequest.comment
