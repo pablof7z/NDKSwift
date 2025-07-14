@@ -5,7 +5,7 @@ actor SubscriptionStateActor {
     private var state: NDKSubscriptionState = .pending
     private var activeRelays: Set<NDKRelay> = []
     private var eoseReceivedFrom: Set<String> = []
-    private var seenEventIds: Set<EventID> = []
+    private var eventStates: [EventID: EventConfirmationState] = [:]
     private var events: [NDKEvent] = []
     private var hasReceivedEOSE: Bool = false
     private var countResults: [String: Int] = [:] // relay URL -> count
@@ -60,16 +60,48 @@ actor SubscriptionStateActor {
         return allEOSEReceived
     }
     
-    func addEventIfNotSeen(_ event: NDKEvent) async -> Bool {
+    func addEventIfNotSeen(_ event: NDKEvent, from source: EventSource) async -> Bool {
         let eventId = event.id
         
-        // Check if already seen
-        guard !seenEventIds.contains(eventId) else { return false }
-        
-        // Add to seen set and events array
-        seenEventIds.insert(eventId)
-        events.append(event)
-        return true
+        switch source {
+        case .optimistic:
+            // For optimistic events, always add and mark as optimistic
+            if eventStates[eventId] == nil {
+                eventStates[eventId] = .optimistic
+                events.append(event)
+                return true
+            }
+            return false
+            
+        case .relay(let relay):
+            // For relay events, check if we've seen this before
+            if let existingState = eventStates[eventId] {
+                if case .optimistic = existingState {
+                    // Upgrade from optimistic to confirmed
+                    eventStates[eventId] = .confirmed(fromRelay: relay.url)
+                    return false // Don't add to events again
+                }
+                return false // Already confirmed
+            } else {
+                // New confirmed event
+                eventStates[eventId] = .confirmed(fromRelay: relay.url)
+                events.append(event)
+                return true
+            }
+            
+        case .cache:
+            // For cache events, add if not already seen
+            if eventStates[eventId] == nil {
+                eventStates[eventId] = .confirmed(fromRelay: "cache")
+                events.append(event)
+                return true
+            }
+            return false
+        }
+    }
+    
+    func getEventConfirmationState(eventId: EventID) -> EventConfirmationState? {
+        return eventStates[eventId]
     }
     
     func getEvents() -> [NDKEvent] {
@@ -151,6 +183,9 @@ public struct NDKSubscriptionOptions: Sendable {
     
     /// Specific relays to use for this subscription
     public var relays: Set<NDKRelay>?
+    
+    /// Whether to skip optimistic events from local publishing
+    public var skipOptimisticEvents: Bool = false
     
     public init() {}
 }
@@ -392,7 +427,7 @@ public final class NDKSubscription: AsyncSequence, Sendable {
         }
         
         for event in cachedEvents {
-            await handleEvent(event, fromRelay: nil)
+            await handleEvent(event, from: .cache)
         }
     }
 
@@ -413,9 +448,21 @@ public final class NDKSubscription: AsyncSequence, Sendable {
 
     // MARK: - Event Handling
 
-    /// Handle an event received from a relay
+    /// Handle an event received from a relay (backwards compatibility)
     public func handleEvent(_ event: NDKEvent, fromRelay relay: RelayProtocol?) async {
+        let source: EventSource = relay != nil ? .relay(relay!) : .cache
+        await handleEvent(event, from: source)
+    }
+    
+    /// Handle an event with source information
+    public func handleEvent(_ event: NDKEvent, from source: EventSource) async {
         guard await stateActor.currentState != .closed else { return }
+        
+        // Check if subscription wants to skip optimistic events
+        let options = await stateActor.getOptions()
+        if case .optimistic = source, options.skipOptimisticEvents {
+            return
+        }
         
         // Check if event matches our filters
         var matchesAny = false
@@ -430,13 +477,13 @@ public final class NDKSubscription: AsyncSequence, Sendable {
         }
         
         // Use actor for thread-safe deduplication and storage
-        let wasAdded = await stateActor.addEventIfNotSeen(event)
-        guard wasAdded else { return } // Already seen
+        let wasAdded = await stateActor.addEventIfNotSeen(event, from: source)
+        guard wasAdded else { return } // Already seen or just confirmed
         
         let currentEventCount = await stateActor.getEventCount()
         
-        // Store in cache if available
-        if let ndk = await stateActor.getNDK(), let cache = ndk.cache {
+        // Store in cache if available (only for confirmed events)
+        if case .relay = source, let ndk = await stateActor.getNDK(), let cache = ndk.cache {
             try? await cache.saveEvent(event)
         }
         
@@ -446,7 +493,6 @@ public final class NDKSubscription: AsyncSequence, Sendable {
         }
         
         // Check limit
-        let options = await stateActor.getOptions()
         if let limit = options.limit, currentEventCount >= limit {
             await close()
         }

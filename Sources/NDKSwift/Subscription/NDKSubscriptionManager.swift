@@ -189,19 +189,35 @@ public actor NDKSubscriptionManager {
 
     /// Process an event from a relay
     public func processEvent(_ event: NDKEvent, from relay: RelayProtocol) async {
+        await processEvent(event, from: .relay(relay))
+    }
+    
+    /// Process an optimistic event from local publishing
+    public func processOptimisticEvent(_ event: NDKEvent) async {
+        await processEvent(event, from: .optimistic)
+    }
+    
+    /// Unified event processing for both relay and optimistic events
+    private func processEvent(_ event: NDKEvent, from source: EventSource) async {
         let eventId = event.id
 
-        // Check deduplication
+        // Check deduplication (skip for optimistic events to allow immediate UI updates)
         let now = Timestamp.now
-        let isUnique = eventDeduplication[eventId] == nil
-
-        if !isUnique {
-            // Already seen this event
-            stats.eventsDeduped += 1
-            return
+        let isUnique: Bool
+        
+        switch source {
+        case .optimistic:
+            // Optimistic events are always considered unique for immediate dispatch
+            isUnique = true
+        case .relay, .cache:
+            // Check normal deduplication for relay/cache events
+            isUnique = eventDeduplication[eventId] == nil
+            if !isUnique {
+                stats.eventsDeduped += 1
+                return
+            }
+            eventDeduplication[eventId] = now
         }
-
-        eventDeduplication[eventId] = now
 
         // Find matching subscriptions and dispatch
         for (subscriptionId, subscription) in activeSubscriptions {
@@ -214,11 +230,19 @@ public actor NDKSubscriptionManager {
             }
             if matches {
                 Task {
+                    let relay: RelayProtocol? = {
+                        switch source {
+                        case .relay(let relay):
+                            return relay
+                        case .optimistic, .cache:
+                            return nil
+                        }
+                    }()
                     await subscription.handleEvent(event, fromRelay: relay)
                 }
 
-                // Track event received
-                if let ndk = ndk {
+                // Track event received (only for relay events)
+                if case .relay(let relay) = source, let ndk = ndk {
                     Task {
                         await ndk.subscriptionTracker.trackEventReceived(
                             subscriptionId: subscriptionId,
@@ -229,8 +253,8 @@ public actor NDKSubscriptionManager {
                     }
                 }
 
-                // Update EOSE tracking
-                if var tracker = eoseTracking[subscriptionId] {
+                // Update EOSE tracking (only for relay events)
+                if case .relay = source, var tracker = eoseTracking[subscriptionId] {
                     tracker.recordEvent()
                     eoseTracking[subscriptionId] = tracker
                 }

@@ -180,6 +180,22 @@ let paymentRequest = NDKPaymentRequest(
     comment: "Thanks!"
 )
 let confirmation = try await wallet.pay(paymentRequest)
+
+// Monitor relay health (NIP-60 relay tags)
+let health = await wallet.getRelayHealth()
+for relay in health {
+    print("Relay \(relay.relay.url): \(relay.isHealthy ? "✅" : "❌")")
+    if !relay.isHealthy {
+        print("  Missing: \(relay.missingEvents.count) events")
+        print("  Extra: \(relay.extraEvents.count) stale events")
+    }
+}
+
+// Repair unhealthy relays by republishing missing events
+for relay in health.filter({ !$0.isHealthy }) {
+    try await wallet.repairRelay(relay.relay, missingEventIds: relay.missingEvents)
+    print("Repaired relay: \(relay.relay.url)")
+}
 ```
 
 #### NWC (Nostr Wallet Connect)

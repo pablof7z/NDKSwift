@@ -740,6 +740,20 @@ public func send(amount: Int, mintUrl: String? = nil, memo: String? = nil) async
 public func receive(token: String) async throws -> ReceiveResponse
 public func swap(proofs: [Proof], mintUrl: String) async throws -> [Proof]
 
+// Relay health monitoring (NIP-60 relay tags)
+public func getRelayHealth() async -> [RelayHealth]
+public func repairRelay(_ targetRelay: NDKRelay, missingEventIds: [String]) async throws
+public func getCurrentWalletEvents() async throws -> [NDKEvent]
+
+// RelayHealth structure
+public struct RelayHealth: Sendable {
+    public let relay: NDKRelay
+    public let knownEvents: Int
+    public let missingEvents: [String]    // Event IDs missing from this relay
+    public let extraEvents: [String]      // Event IDs that shouldn't be on this relay
+    public let isHealthy: Bool            // True if no missing/extra events
+}
+
 // Nutzaps (NIP-61)
 public func nutzap(
     amount: Int,

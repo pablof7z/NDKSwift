@@ -893,6 +893,81 @@ class CashuWalletManager {
         let received = try await wallet.receive(token: tokenString)
         print("Received \(received.amount) sats")
     }
+    
+    // MARK: - Relay Health Monitoring
+    
+    func checkRelayHealth() async {
+        guard let wallet = wallet else { return }
+        
+        // Get health status for all wallet relays
+        let health = await wallet.getRelayHealth()
+        
+        if health.isEmpty {
+            print("No relay tags configured for this wallet")
+            return
+        }
+        
+        print("=== Wallet Relay Health Report ===")
+        
+        let healthyCount = health.filter { $0.isHealthy }.count
+        print("Overall: \(healthyCount)/\(health.count) relays healthy")
+        
+        for relay in health {
+            let status = relay.isHealthy ? "✅ Healthy" : "❌ Issues"
+            print("\(relay.relay.url): \(status)")
+            print("  Events: \(relay.knownEvents)")
+            
+            if !relay.isHealthy {
+                if !relay.missingEvents.isEmpty {
+                    print("  Missing: \(relay.missingEvents.count) events")
+                }
+                if !relay.extraEvents.isEmpty {
+                    print("  Stale: \(relay.extraEvents.count) events")
+                }
+            }
+        }
+    }
+    
+    func repairUnhealthyRelays() async throws {
+        guard let wallet = wallet else { throw WalletError.notInitialized }
+        
+        let health = await wallet.getRelayHealth()
+        let unhealthyRelays = health.filter { !$0.isHealthy }
+        
+        if unhealthyRelays.isEmpty {
+            print("All relays are healthy!")
+            return
+        }
+        
+        print("Repairing \(unhealthyRelays.count) unhealthy relays...")
+        
+        for relay in unhealthyRelays {
+            if !relay.missingEvents.isEmpty {
+                print("Repairing \(relay.relay.url)...")
+                try await wallet.repairRelay(relay.relay, missingEventIds: relay.missingEvents)
+                print("✅ Republished \(relay.missingEvents.count) missing events")
+            }
+        }
+        
+        // Check health again
+        print("\nHealth check after repair:")
+        await checkRelayHealth()
+    }
+    
+    func setupPeriodicHealthCheck() {
+        // Monitor relay health periodically
+        Task {
+            while true {
+                await checkRelayHealth()
+                
+                // Auto-repair if needed
+                try? await repairUnhealthyRelays()
+                
+                // Wait 5 minutes
+                try await Task.sleep(nanoseconds: 5 * 60 * 1_000_000_000)
+            }
+        }
+    }
 }
 ```
 
