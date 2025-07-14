@@ -15,83 +15,9 @@ struct NutzapSettingsView: View {
     
     var body: some View {
         Form {
-            Section {
-                VStack(alignment: .leading, spacing: 12) {
-                    Label("P2PK Public Key", systemImage: "key")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                    
-                    HStack {
-                        Text(p2pkPubkey.isEmpty ? "Loading..." : p2pkPubkey)
-                            .font(.system(.caption, design: .monospaced))
-                            .lineLimit(3)
-                            .multilineTextAlignment(.leading)
-                            .textSelection(.enabled)
-                        
-                        Spacer()
-                        
-                        #if os(iOS)
-                        Button(action: copyPubkey) {
-                            Image(systemName: copiedToClipboard ? "checkmark" : "doc.on.doc")
-                                .foregroundColor(.orange)
-                        }
-                        .buttonStyle(.plain)
-                        #endif
-                    }
-                    .padding()
-                    .background(Color.secondary.opacity(0.1))
-                    .cornerRadius(8)
-                }
-            } header: {
-                Text("Your Nutzap Receiving Key")
-            } footer: {
-                Text("This is your wallet's P2PK public key. Others need this to send you nutzaps.")
-            }
-            
-            Section {
-                AsyncContentView(
-                    operation: { 
-                        if let wallet = walletManager.activeWallet {
-                            return await wallet.getMints()
-                        }
-                        return []
-                    }
-                ) { mints in
-                    ForEach(Array(mints.enumerated()), id: \.offset) { _, mint in
-                        HStack {
-                            Image(systemName: "building.columns")
-                                .foregroundColor(.orange)
-                            
-                            VStack(alignment: .leading) {
-                                Text(mint.url.host ?? mint.url.absoluteString)
-                                    .font(.subheadline)
-                                Text(mint.url.absoluteString)
-                                    .font(.caption2)
-                                    .foregroundStyle(.secondary)
-                            }
-                        }
-                    }
-                }
-            } header: {
-                Text("Accepted Mints")
-            } footer: {
-                Text("People can only send you nutzaps using these mints")
-            }
-            
-            Section {
-                Button(action: publishPreferences) {
-                    if isLoading {
-                        ProgressView()
-                            .frame(maxWidth: .infinity)
-                    } else {
-                        Text("Publish Nutzap Preferences")
-                            .frame(maxWidth: .infinity)
-                    }
-                }
-                .disabled(isLoading || p2pkPubkey.isEmpty)
-            } footer: {
-                Text("Publishes your wallet configuration so others can send you nutzaps. This needs to be done at least once.")
-            }
+            publicKeySection
+            mintsSection
+            publishSection
         }
         .navigationTitle("Nutzap Settings")
         .platformNavigationBarTitleDisplayMode(inline: true)
@@ -107,6 +33,90 @@ struct NutzapSettingsView: View {
         }
         .task {
             await loadP2PKPubkey()
+        }
+    }
+    
+    private var publicKeySection: some View {
+        Section {
+            VStack(alignment: .leading, spacing: 12) {
+                Label("P2PK Public Key", systemImage: "key")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                
+                HStack {
+                    Text(p2pkPubkey.isEmpty ? "Loading..." : p2pkPubkey)
+                        .font(.system(.caption, design: .monospaced))
+                        .lineLimit(3)
+                        .multilineTextAlignment(.leading)
+                        .textSelection(.enabled)
+                    
+                    Spacer()
+                    
+                    #if os(iOS)
+                    Button(action: copyPubkey) {
+                        Image(systemName: copiedToClipboard ? "checkmark" : "doc.on.doc")
+                            .foregroundColor(.orange)
+                    }
+                    .buttonStyle(.plain)
+                    #endif
+                }
+                .padding()
+                .background(Color.secondary.opacity(0.1))
+                .cornerRadius(8)
+            }
+        } header: {
+            Text("Your Nutzap Receiving Key")
+        } footer: {
+            Text("This is your wallet's P2PK public key. Others need this to send you nutzaps.")
+        }
+    }
+    
+    private var mintsSection: some View {
+        Section {
+            AsyncContentView(
+                operation: { 
+                    if let wallet = walletManager.activeWallet {
+                        return await wallet.getMints()
+                    }
+                    return []
+                }
+            ) { (mints: [NDKCashuWallet.MintInfo]) in
+                ForEach(Array(mints.enumerated()), id: \.offset) { (index, mint) in
+                    HStack {
+                        Image(systemName: "building.columns")
+                            .foregroundColor(.orange)
+                        
+                        VStack(alignment: .leading) {
+                            Text(mint.url.host ?? mint.url.absoluteString)
+                                .font(.subheadline)
+                            Text(mint.url.absoluteString)
+                                .font(.caption2)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                }
+            }
+        } header: {
+            Text("Accepted Mints")
+        } footer: {
+            Text("People can only send you nutzaps using these mints")
+        }
+    }
+    
+    private var publishSection: some View {
+        Section {
+            Button(action: publishPreferences) {
+                if isLoading {
+                    ProgressView()
+                        .frame(maxWidth: .infinity)
+                } else {
+                    Text("Publish Nutzap Preferences")
+                        .frame(maxWidth: .infinity)
+                }
+            }
+            .disabled(isLoading || p2pkPubkey.isEmpty)
+        } footer: {
+            Text("Publishes your wallet configuration so others can send you nutzaps. This needs to be done at least once.")
         }
     }
     

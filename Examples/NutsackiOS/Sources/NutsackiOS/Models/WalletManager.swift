@@ -24,8 +24,17 @@ class WalletManager: ObservableObject {
     
     // MARK: - Wallet Operations
     
+    /// Load wallet for currently authenticated user
+    func loadWalletForCurrentUser() async throws {
+        guard nostrManager.isAuthenticated else {
+            throw WalletError.notAuthenticated
+        }
+        
+        try await loadWallet()
+    }
+    
     /// Ensure wallet exists (called automatically by loadWallet)
-    private func ensureWalletExists(for account: NostrAccount) async throws {
+    private func ensureWalletExists() async throws {
         guard let ndk = nostrManager.ndk else {
             throw WalletError.ndkNotInitialized
         }
@@ -53,7 +62,7 @@ class WalletManager: ObservableObject {
     }
     
     /// Load wallet from NIP-60 events
-    func loadWallet(for account: NostrAccount) async throws {
+    func loadWallet() async throws {
         guard let ndk = nostrManager.ndk else {
             throw WalletError.ndkNotInitialized
         }
@@ -62,7 +71,7 @@ class WalletManager: ObservableObject {
         defer { isLoading = false }
         
         // Ensure wallet exists (creates if needed)
-        try await ensureWalletExists(for: account)
+        try await ensureWalletExists()
         
         guard let wallet = activeWallet else {
             throw WalletError.noActiveWallet
@@ -550,6 +559,7 @@ class WalletManager: ObservableObject {
 enum WalletError: LocalizedError {
     case ndkNotInitialized
     case noActiveWallet
+    case notAuthenticated
     case insufficientBalance
     case invalidToken
     case encodingError
@@ -560,6 +570,8 @@ enum WalletError: LocalizedError {
             return "NDK is not initialized"
         case .noActiveWallet:
             return "No active wallet"
+        case .notAuthenticated:
+            return "User not authenticated"
         case .insufficientBalance:
             return "Insufficient balance"
         case .invalidToken:

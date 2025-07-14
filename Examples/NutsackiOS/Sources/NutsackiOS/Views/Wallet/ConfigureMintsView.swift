@@ -9,8 +9,6 @@ struct ConfigureMintsView: View {
     @EnvironmentObject private var nostrManager: NostrManager
     @EnvironmentObject private var walletManager: WalletManager
     
-    @Query private var accounts: [NostrAccount]
-    
     @State private var selectedMints: Set<String> = []
     @State private var showError = false
     @State private var errorMessage = ""
@@ -29,9 +27,6 @@ struct ConfigureMintsView: View {
         let description: String
     }
     
-    var activeAccount: NostrAccount? {
-        accounts.first { $0.accountID.uuidString == appState.activeAccountID }
-    }
     
     var body: some View {
         NavigationStack {

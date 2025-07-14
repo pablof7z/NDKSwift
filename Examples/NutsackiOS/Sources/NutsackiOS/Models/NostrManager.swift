@@ -9,7 +9,7 @@ class NostrManager: ObservableObject {
     @Published var isConnected = false
     @Published var relayStatus: [String: Bool] = [:]
     
-    private var signer: NDKPrivateKeySigner?
+    private var ndkAuthManager: NDKAuthManager
     var cache: NDKSQLiteCache?
     
     // Default relays for the app
@@ -22,6 +22,7 @@ class NostrManager: ObservableObject {
     ]
     
     init() {
+        self.ndkAuthManager = NDKAuthManager.shared
         Task {
             await setupNDK()
         }
@@ -37,6 +38,11 @@ class NostrManager: ObservableObject {
             print("Failed to initialize SQLite cache: \(error). Continuing without cache.")
             // Fall back to no cache if initialization fails
             ndk = NDK(relayUrls: defaultRelays)
+        }
+        
+        // Set NDK on auth manager
+        if let ndk = ndk {
+            ndkAuthManager.setNDK(ndk)
         }
         
         Task {
@@ -65,7 +71,6 @@ class NostrManager: ObservableObject {
         guard let ndk = ndk else { throw NostrError.ndkNotInitialized }
         
         let signer = try NDKPrivateKeySigner(privateKey: privateKey)
-        self.signer = signer
         ndk.signer = signer
         
         let publicKey = try await signer.pubkey
@@ -97,20 +102,26 @@ class NostrManager: ObservableObject {
         }
     }
     
-    func createNewAccount(displayName: String, about: String? = nil) async throws -> String {
+    func createNewAccount(displayName: String, about: String? = nil) async throws -> NDKSession {
         guard let ndk = ndk else { throw NostrError.ndkNotInitialized }
         
         // Generate new private key
         let privateKeyHex = Crypto.generatePrivateKey()
         let signer = try NDKPrivateKeySigner(privateKey: privateKeyHex)
-        self.signer = signer
-        ndk.signer = signer
         
-        // Store the private key for return
-        let privateKey = privateKeyHex
+        // Create session with auth manager
+        let session = try await ndkAuthManager.createSession(
+            with: signer,
+            displayName: displayName,
+            requiresBiometric: false,
+            isHardwareBacked: false
+        )
         
-        let publicKey = try await signer.pubkey
-        currentUser = NDKUser(pubkey: publicKey)
+        // Switch to this session
+        try await ndkAuthManager.switchToSession(session)
+        
+        // Update current user from auth manager
+        currentUser = try await ndkAuthManager.activeSigner?.user()
         
         // Create and publish profile
         let metadata = NDKUserProfile(
@@ -129,20 +140,65 @@ class NostrManager: ObservableObject {
             
             try await ndk.publish(metadataEvent)
             
-            // Store profile in user object
-            // Profile is set - will be available via async property
-            // Profile metadata is published
+            // Update session with profile
+            try await ndkAuthManager.updateActiveSessionProfile(metadata)
         }
         
-        print("Created new account with public key: \(publicKey)")
-        return privateKey
+        print("Created new account with public key: \(session.pubkey)")
+        return session
     }
     
     func logout() {
-        signer = nil
-        ndk?.signer = nil
+        ndkAuthManager.logout()
         currentUser = nil
         print("Logged out")
+    }
+    
+    // MARK: - Auth State Management
+    
+    /// Check if user is authenticated via NDKAuth
+    var isAuthenticated: Bool {
+        ndkAuthManager.isAuthenticated
+    }
+    
+    /// Get auth manager for use in UI
+    var authManager: NDKAuthManager {
+        return ndkAuthManager
+    }
+    
+    /// Create account using existing nsec
+    func createAccountFromNsec(_ nsec: String, displayName: String) async throws -> NDKSession {
+        guard let ndk = ndk else { throw NostrError.ndkNotInitialized }
+        
+        let signer = try NDKPrivateKeySigner(nsec: nsec)
+        
+        // Create session with auth manager
+        let session = try await ndkAuthManager.createSession(
+            with: signer,
+            displayName: displayName,
+            requiresBiometric: false,
+            isHardwareBacked: false
+        )
+        
+        // Switch to this session
+        try await ndkAuthManager.switchToSession(session)
+        
+        // Update current user from auth manager
+        currentUser = try await ndkAuthManager.activeSigner?.user()
+        
+        print("Created account from nsec with public key: \(session.pubkey)")
+        return session
+    }
+    
+    /// Update current user from auth manager state
+    func updateCurrentUserFromAuthState() {
+        Task {
+            if ndkAuthManager.isAuthenticated {
+                currentUser = try? await ndkAuthManager.activeSigner?.user()
+            } else {
+                currentUser = nil
+            }
+        }
     }
     
     func fetchNIP60Wallets() async throws -> [NDKEvent] {

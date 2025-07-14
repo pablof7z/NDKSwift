@@ -6,7 +6,6 @@ class AppState: ObservableObject {
     private static let conversionUnitKey = "PreferredCurrencyConversionUnit"
     private static let lastRNackHashKey = "LastReleaseNotesAcknoledgedHash"
     private static let firstLaunchFlag = "HasLaunchedBefore"
-    private static let activeAccountKey = "ActiveNostrAccountID"
     
     struct ExchangeRateResponse: Decodable {
         let bitcoin: ExchangeRate
@@ -24,11 +23,6 @@ class AppState: ObservableObject {
     }
     
     @Published var exchangeRates: ExchangeRate?
-    @Published var activeAccountID: String? {
-        didSet {
-            UserDefaults.standard.setValue(activeAccountID, forKey: AppState.activeAccountKey)
-        }
-    }
     
     static var showOnboarding: Bool {
         get {
@@ -44,8 +38,6 @@ class AppState: ObservableObject {
         } else {
             preferredConversionUnit = .usd
         }
-        
-        activeAccountID = UserDefaults.standard.string(forKey: AppState.activeAccountKey)
         
         loadExchangeRates()
     }
