@@ -55,12 +55,8 @@ class DatabaseManager {
     static let shared = DatabaseManager()
     
     private(set) var container: ModelContainer?
-    private var mockContext: ModelContext?
     
     private init() {
-        // For executable targets, we'll skip SwiftData entirely
-        // and use mock data instead
-        #if targetEnvironment(simulator)
         do {
             let schema = Schema([
                 NostrAccount.self,
@@ -76,21 +72,15 @@ class DatabaseManager {
             container = try ModelContainer(for: schema, configurations: [modelConfiguration])
             print("Created in-memory ModelContainer")
         } catch {
-            print("Could not create ModelContainer, using mock: \(error)")
+            print("Could not create ModelContainer: \(error)")
             container = nil
         }
-        #else
-        print("Running as executable - SwiftData disabled")
-        container = nil
-        #endif
     }
     
     func newContext() -> ModelContext {
-        if let container = container {
-            return ModelContext(container)
-        } else {
-            // Return a mock context for executable targets
-            fatalError("ModelContext not available in executable mode")
+        guard let container = container else {
+            fatalError("ModelContainer not available")
         }
+        return ModelContext(container)
     }
 }

@@ -54,7 +54,7 @@ struct WalletView: View {
                                 .padding(.horizontal)
                             
                             // Mint allocation pie chart
-                            MintAllocationChart()
+                            MintAllocationPieChart()
                                 .padding(.horizontal)
                             
                             // Recent transactions
