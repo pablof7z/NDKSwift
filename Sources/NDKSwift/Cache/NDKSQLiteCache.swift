@@ -160,6 +160,24 @@ public actor NDKSQLiteCache: NDKCache, MintCache {
             }
         }
         
+        // v4: Add optimistic publishing support
+        migrator.registerMigration("v4-optimistic-publishing") { db in
+            // Create event_confirmations table to track optimistic publishing states
+            try db.create(table: "event_confirmations") { t in
+                t.column("event_id", .text).primaryKey().references("events", onDelete: .cascade)
+                t.column("state", .text).notNull() // "optimistic" or "confirmed"
+                t.column("relay_url", .text) // null for optimistic, relay URL for confirmed
+                t.column("target_relays", .text) // JSON array of target relay URLs
+                t.column("created_at", .integer).notNull().defaults(sql: "(CAST(strftime('%s', 'now') AS INTEGER))")
+                t.column("confirmed_at", .integer) // null until confirmed
+            }
+            
+            // Create indexes for efficient querying
+            try db.create(index: "idx_confirmations_state", on: "event_confirmations", columns: ["state"])
+            try db.create(index: "idx_confirmations_relay", on: "event_confirmations", columns: ["relay_url"])
+            try db.create(index: "idx_confirmations_created", on: "event_confirmations", columns: ["created_at"])
+        }
+        
         try await migrator.migrate(dbQueue)
     }
     
@@ -751,6 +769,148 @@ public actor NDKSQLiteCache: NDKCache, MintCache {
             }
         } catch {
             return 0
+        }
+    }
+    
+    // MARK: - Optimistic Publishing Support
+    
+    public func addUnpublishedEvent(_ event: NDKEvent, relays: Set<String>) async throws {
+        let eventId = event.id
+        let targetRelaysJson = try JSONCoding.encodeToString(Array(relays))
+        let currentTime = Int64(Date().timeIntervalSince1970)
+        
+        try await dbQueue.write { db in
+            // First save the event if it doesn't exist
+            try db.execute(
+                sql: """
+                INSERT OR IGNORE INTO events (id, pubkey, created_at, kind, content, sig, json)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+                """,
+                arguments: [
+                    eventId,
+                    event.pubkey,
+                    event.createdAt,
+                    event.kind,
+                    event.content,
+                    event.sig,
+                    try JSONCoding.encodeToString(event)
+                ]
+            )
+            
+            // Save tags if event was newly inserted
+            let eventExists = try Int.fetchOne(db, sql: "SELECT COUNT(*) FROM tags WHERE event_id = ?", arguments: [eventId]) ?? 0
+            if eventExists == 0 {
+                for (index, tag) in event.tags.enumerated() {
+                    guard tag.count >= 2 else { continue }
+                    
+                    try db.execute(
+                        sql: "INSERT INTO tags (event_id, tag_name, tag_value, tag_index) VALUES (?, ?, ?, ?)",
+                        arguments: [eventId, tag[0], tag[1], index]
+                    )
+                }
+            }
+            
+            // Record the optimistic confirmation state
+            try db.execute(
+                sql: """
+                INSERT OR REPLACE INTO event_confirmations 
+                (event_id, state, relay_url, target_relays, created_at, confirmed_at)
+                VALUES (?, ?, ?, ?, ?, ?)
+                """,
+                arguments: [eventId, "optimistic", nil, targetRelaysJson, currentTime, nil]
+            )
+        }
+    }
+    
+    public func confirmEvent(eventId: String, onRelay relay: String) async throws {
+        let confirmedTime = Int64(Date().timeIntervalSince1970)
+        
+        try await dbQueue.write { db in
+            try db.execute(
+                sql: """
+                UPDATE event_confirmations 
+                SET state = ?, relay_url = ?, confirmed_at = ?
+                WHERE event_id = ?
+                """,
+                arguments: ["confirmed", relay, confirmedTime, eventId]
+            )
+        }
+    }
+    
+    public func getEventConfirmationState(eventId: String) async -> EventConfirmationState? {
+        do {
+            return try await dbQueue.read { db in
+                if let row = try Row.fetchOne(
+                    db,
+                    sql: "SELECT state, relay_url FROM event_confirmations WHERE event_id = ?",
+                    arguments: [eventId]
+                ) {
+                    let state = row["state"] as? String ?? ""
+                    let relayUrl = row["relay_url"] as? String
+                    
+                    switch state {
+                    case "optimistic":
+                        return .optimistic
+                    case "confirmed":
+                        if let relay = relayUrl {
+                            return .confirmed(fromRelay: relay)
+                        } else {
+                            return .optimistic // Fallback if relay_url is missing
+                        }
+                    default:
+                        return nil
+                    }
+                }
+                return nil
+            }
+        } catch {
+            if debugMode {
+                print("NDKSQLiteCache: Failed to get confirmation state for \(eventId). Error: \(error)")
+            }
+            return nil
+        }
+    }
+    
+    public func getUnpublishedEvents(maxAge: TimeInterval = 3600, limit: Int? = nil) async -> [(event: NDKEvent, targetRelays: Set<String>)] {
+        let cutoffTime = Int64(Date().timeIntervalSince1970 - maxAge)
+        
+        do {
+            return try await dbQueue.read { db in
+                var sql = """
+                    SELECT e.json, ec.target_relays 
+                    FROM events e
+                    JOIN event_confirmations ec ON e.id = ec.event_id
+                    WHERE ec.state = 'optimistic' AND ec.created_at >= ?
+                    ORDER BY ec.created_at DESC
+                    """
+                
+                var arguments: StatementArguments = [cutoffTime]
+                
+                if let limit = limit, limit > 0 {
+                    sql += " LIMIT ?"
+                    arguments += [limit]
+                }
+                
+                let rows = try Row.fetchAll(db, sql: sql, arguments: arguments)
+                
+                return rows.compactMap { row in
+                    guard let jsonString = row["json"] as? String,
+                          let jsonData = jsonString.data(using: .utf8),
+                          let event = JSONCoding.safeDecode(NDKEvent.self, from: jsonData),
+                          let targetRelaysJson = row["target_relays"] as? String,
+                          let targetRelaysData = targetRelaysJson.data(using: .utf8),
+                          let targetRelaysArray = try? JSONDecoder().decode([String].self, from: targetRelaysData) else {
+                        return nil
+                    }
+                    
+                    return (event: event, targetRelays: Set(targetRelaysArray))
+                }
+            }
+        } catch {
+            if debugMode {
+                print("NDKSQLiteCache: Failed to get unpublished events. Error: \(error)")
+            }
+            return []
         }
     }
 }

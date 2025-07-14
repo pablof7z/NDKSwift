@@ -1,5 +1,6 @@
 import SwiftUI
 import NDKSwift
+import SwiftData
 
 /// Compact relay health indicator for the main wallet view
 struct RelayStatusIndicator: View {
@@ -94,7 +95,14 @@ struct RelayStatusIndicator: View {
 }
 
 #Preview {
+    // Create mock objects for preview
+    let nostrManager = NostrManager()
+    let schema = Schema([Transaction.self])
+    let modelConfiguration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: true)
+    let container = try! ModelContainer(for: schema, configurations: [modelConfiguration])
+    let context = container.mainContext
+    
     RelayStatusIndicator()
-        .environmentObject(WalletManager())
+        .environmentObject(WalletManager(nostrManager: nostrManager, modelContext: context))
         .padding()
 }

@@ -8,6 +8,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Unified Wallet Subscription**: NDKCashuWallet now maintains real-time state synchronization
+  - New `startWalletSubscription()` method consolidates all event monitoring
+  - Single subscription handles tokens, quotes, history, config, deletes, and nutzaps
+  - Real-time updates ensure multiple wallet clients stay synchronized
+  - Integrated relay health tracking within unified subscription
+  - Automatic restart when wallet configuration changes
+  
 - **Optimistic Publishing**: Events now appear immediately in subscriptions when published locally
   - New `EventSource` enum to track event origins (optimistic, relay, cache)
   - New `EventConfirmationState` enum to track confirmation status
@@ -18,6 +25,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - UI can show "sending..." vs "sent" indicators using confirmation states
 
 ### Enhanced
+- **NDKCashuWallet**: Major refactoring for real-time state synchronization
+  - Removed fragmented subscription methods (`startNutzapMonitor`, `startDeleteEventMonitor`, `startRealtimeMonitoring`)
+  - Added unified `processWalletEvent()` router for all event types
+  - `load()` method now starts real-time subscription automatically
+  - Wallet state updates immediately when changes occur in other clients
+  
 - **NDKCache Protocol**: Added optimistic publishing support methods
   - `addUnpublishedEvent(_:relays:)` - Cache events optimistically
   - `confirmEvent(eventId:onRelay:)` - Mark events as confirmed  

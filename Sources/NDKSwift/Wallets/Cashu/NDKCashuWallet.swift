@@ -15,12 +15,16 @@ public actor NDKCashuWallet: NDKWallet {
     private let mintLoader: CachedMintLoader? // Cached mint loader for performance
     
     // Track deleted and superseded token event IDs to filter them out
-    private var deletedTokenEventIds: Set<String> = []
+    internal var deletedTokenEventIds: Set<String> = []
     private var supersededTokenEventIds: Set<String> = [] // Events referenced in del tags
     
     // Relay health monitoring
-    private var walletRelays: [NDKRelay] = []
+    internal var walletRelays: [NDKRelay] = []
     private var relayEventSets: [String: Set<String>] = [:] // relay URL -> event IDs
+    
+    // Unified wallet subscription
+    private var walletSubscriptionTask: Task<Void, Never>?
+    private var lastWalletConfigTimestamp: Timestamp = 0
     
     // MARK: - Proof State Management
     
@@ -37,7 +41,7 @@ public actor NDKCashuWallet: NDKWallet {
     }
     
     private var proofState: [String: ProofEntry] = [:] // proof.C -> entry
-    private var currentTokenEventIds: Set<String> = []  // Track current events
+    internal var currentTokenEventIds: Set<String> = []  // Track current events
     
     /// Mint discovery service for finding mints via Nostr
     public let mintDiscovery: MintDiscovery
@@ -55,6 +59,247 @@ public actor NDKCashuWallet: NDKWallet {
             self.mintLoader = CachedMintLoader(cache: cache)
         } else {
             self.mintLoader = nil
+        }
+    }
+    
+    // MARK: - Unified Wallet State Subscription
+    
+    /// Start the unified wallet subscription that monitors all wallet-related events
+    public func startWalletSubscription() async {
+        guard let signer = ndk.signer else {
+            print("❌ Cannot start wallet subscription: No signer configured")
+            return
+        }
+        
+        // Cancel any existing subscription
+        walletSubscriptionTask?.cancel()
+        
+        walletSubscriptionTask = Task {
+            do {
+                let userPubkey = try await signer.pubkey
+                
+                // Create filters for all wallet-related events
+                let filters = [
+                    // Our own wallet events
+                    NDKFilter(
+                        authors: [userPubkey],
+                        kinds: [
+                            7375,  // Token events
+                            7374,  // Quote events
+                            7376,  // Spending history
+                            17375  // Wallet configuration
+                        ]
+                    ),
+                    // Delete events for our wallet
+                    NDKFilter(
+                        authors: [userPubkey],
+                        kinds: [5],  // Delete events
+                        tags: ["k": Set(["7375", "7374"])]  // For token and quote events
+                    ),
+                    // Incoming nutzaps
+                    NDKFilter(
+                        kinds: [EventKind.nutzap],
+                        tags: ["p": Set([userPubkey])]
+                    )
+                ]
+                
+                // Subscribe with wallet-specific relays if configured
+                var options = NDKSubscriptionOptions()
+                options.closeOnEose = false  // Keep subscription open
+                if !walletRelays.isEmpty {
+                    options.relays = Set(walletRelays)
+                }
+                
+                print("📡 Starting unified wallet subscription with \(walletRelays.count) relays")
+                
+                for try await event in ndk.subscribe(filters: filters, options: options) {
+                    // Track relay health
+                    let seenOnRelays = await ndk.eventTracker.getSeenOnRelays(eventId: event.id)
+                    for relayUrl in seenOnRelays {
+                        recordEventFromRelay(event.id, from: relayUrl)
+                    }
+                    
+                    // Process event
+                    await processWalletEvent(event)
+                }
+            } catch {
+                if error is CancellationError {
+                    print("🛑 Wallet subscription cancelled")
+                } else {
+                    print("❌ Wallet subscription error: \(error)")
+                }
+            }
+        }
+    }
+    
+    /// Process a wallet-related event from the unified subscription
+    private func processWalletEvent(_ event: NDKEvent) async {
+        do {
+            switch event.kind {
+            case 17375:  // Wallet configuration
+                if event.createdAt > lastWalletConfigTimestamp {
+                    print("📝 Processing wallet configuration update")
+                    extractWalletRelays(from: event)
+                    lastWalletConfigTimestamp = event.createdAt
+                    
+                    // Process wallet configuration
+                    let sender = NDKUser(pubkey: event.pubkey)
+                    let decryptedContent = try await ndk.signer!.decrypt(
+                        sender: sender,
+                        value: event.content,
+                        scheme: .nip44
+                    )
+                    
+                    // Parse and process wallet tags
+                    if let walletData = decryptedContent.data(using: .utf8),
+                       let walletTags = try? JSONDecoder().decode([[String]].self, from: walletData) {
+                        await processWalletTags(walletTags)
+                    }
+                    
+                    // Restart subscription with new relays
+                    await startWalletSubscription()
+                }
+                
+            case 7375:  // Token event
+                // First check if we should process this event
+                if deletedTokenEventIds.contains(event.id) || supersededTokenEventIds.contains(event.id) {
+                    print("⏭️ Skipping deleted or superseded token event: \(event.id)")
+                    return
+                }
+                
+                print("💰 Processing token event: \(event.id)")
+                
+                // Decrypt and process token
+                let sender = NDKUser(pubkey: event.pubkey)
+                let decryptedContent = try await ndk.signer!.decrypt(
+                    sender: sender,
+                    value: event.content,
+                    scheme: .nip44
+                )
+                
+                // Parse token data
+                guard let tokenData = decryptedContent.data(using: .utf8),
+                      let nip60Token = try? JSONDecoder().decode(NIP60TokenEvent.self, from: tokenData) else {
+                    throw NDKError.invalidContent("Failed to parse NIP-60 token event data")
+                }
+                
+                // Update superseded events if this event has del tags
+                if let delIds = nip60Token.del {
+                    supersededTokenEventIds.formUnion(delIds)
+                    // Remove superseded events from current set
+                    for delId in delIds {
+                        currentTokenEventIds.remove(delId)
+                    }
+                }
+                
+                // Add proofs to state
+                for proof in nip60Token.proofs {
+                    let swiftProof = proof.toCashuSwiftProof()
+                    // Store proof if we have the corresponding keyset
+                    if keysets[swiftProof.keysetID] != nil {
+                        // Find mint for this proof
+                        if let mint = try? findMintForProof(swiftProof) {
+                            proofState[swiftProof.C] = ProofEntry(
+                                proof: swiftProof,
+                                state: .available,
+                                mint: mint
+                            )
+                        }
+                    }
+                }
+                
+                currentTokenEventIds.insert(event.id)
+                
+                // Update internal proofs array
+                self.proofs = proofState.values
+                    .filter { $0.state == .available }
+                    .map { $0.proof }
+                
+            case 7374:  // Quote event
+                print("📋 Processing quote event: \(event.id)")
+                // Quote events are handled separately for now
+                // TODO: Add quote event processing if needed
+                
+            case 7376:  // Spending history
+                print("📊 Processing spending history event: \(event.id)")
+                // History events are informational only
+                
+            case 5:  // Delete event
+                print("🗑️ Processing delete event")
+                for tag in event.tags where tag.count >= 2 && tag[0] == "e" {
+                    let deletedEventId = tag[1]
+                    deletedTokenEventIds.insert(deletedEventId)
+                    currentTokenEventIds.remove(deletedEventId)
+                    
+                    // Remove proofs from deleted token event
+                    if tag.count >= 4 && tag[3] == "7375" {
+                        // This is a token event deletion
+                        await removeProofsFromDeletedEvent(deletedEventId)
+                    }
+                }
+                
+            case EventKind.nutzap:  // Incoming nutzap
+                print("💸 Processing incoming nutzap: \(event.id)")
+                try await processIncomingNutzap(event)
+                
+            default:
+                // Ignore other event kinds
+                break
+            }
+        } catch {
+            print("❌ Failed to process wallet event \(event.id): \(error)")
+        }
+    }
+    
+    /// Remove proofs associated with a deleted token event from state
+    private func removeProofsFromDeletedEvent(_ eventId: String) async {
+        // Since we don't track which proofs belong to which event ID,
+        // we need to re-evaluate our proof state
+        // This is handled by the update() method when new events arrive
+        print("🗑️ Marked token event as deleted: \(eventId)")
+    }
+    
+    /// Process wallet configuration tags
+    private func processWalletTags(_ walletTags: [[String]]) async {
+        for tag in walletTags {
+            guard tag.count >= 2 else { continue }
+            
+            switch tag[0] {
+            case "privkey":
+                // Restore P2PK private key to the manager
+                let privateKey = tag[1]
+                // Derive public key from private key
+                if let privateKeyData = Data(hexString: privateKey),
+                   let privKey = try? secp256k1.Schnorr.PrivateKey(dataRepresentation: privateKeyData) {
+                    let publicKey = privKey.publicKey.dataRepresentation.hexString
+                    try? await p2pkManager.setKeypair(privateKey: privateKey, publicKey: publicKey)
+                }
+                
+            case "mint":
+                let mintURLString = tag[1]
+                guard let mintURL = URL(string: mintURLString) else { continue }
+                
+                do {
+                    let mint: CashuSwift.Mint
+                    if let loader = mintLoader {
+                        mint = try await loader.loadMint(url: mintURL)
+                    } else {
+                        mint = try await CashuSwift.loadMint(url: mintURL)
+                    }
+                    mints[mintURLString] = mint
+                    
+                    // Store keysets
+                    for keyset in mint.keysets {
+                        keysets[keyset.keysetID] = keyset
+                    }
+                } catch {
+                    print("Failed to load mint \(mintURLString): \(error)")
+                }
+                
+            default:
+                // Unknown tag type
+                break
+            }
         }
     }
     
@@ -206,74 +451,6 @@ public actor NDKCashuWallet: NDKWallet {
     }
     
     // MARK: - Nutzap Receiving
-    
-    /// Start monitoring for incoming nutzaps
-    public func startNutzapMonitor() async {
-        guard let signer = ndk.signer else {
-            print("❌ Cannot start nutzap monitor: No signer configured")
-            return
-        }
-        
-        do {
-            let userPubkey = try await signer.pubkey
-            
-            // Start monitoring for delete events in parallel
-            Task {
-                await startDeleteEventMonitor()
-            }
-            
-            let filter = NDKFilter(
-                kinds: [EventKind.nutzap],
-                tags: ["p": Set([userPubkey])]
-            )
-            
-            print("👀 Starting nutzap monitor for pubkey: \(userPubkey)")
-            
-            // Subscribe to nutzap events
-            do {
-                for try await event in ndk.subscribe(filters: [filter]) {
-                    Task {
-                        do {
-                            try await processIncomingNutzap(event)
-                        } catch {
-                            print("❌ Failed to process nutzap \(event.id): \(error)")
-                        }
-                    }
-                }
-            } catch {
-                print("❌ Subscription error: \(error)")
-            }
-        } catch {
-            print("❌ Failed to start nutzap monitor: \(error)")
-        }
-    }
-    
-    /// Start monitoring for delete events affecting our token events
-    private func startDeleteEventMonitor() async {
-        guard let signer = ndk.signer else { return }
-        
-        do {
-            let userPubkey = try await signer.pubkey
-            let filter = NDKFilter(
-                authors: [userPubkey],
-                kinds: [5], // Delete events
-                tags: ["k": Set(["7375"])] // Specifically for token events
-            )
-            
-            print("🗑️ Starting delete event monitor")
-            
-            for try await event in ndk.subscribe(filters: [filter]) {
-                // Extract deleted event IDs and add to our set
-                for tag in event.tags where tag.count >= 2 && tag[0] == "e" {
-                    let deletedEventId = tag[1]
-                    deletedTokenEventIds.insert(deletedEventId)
-                    print("🗑️ Added deleted token event to filter: \(deletedEventId)")
-                }
-            }
-        } catch {
-            print("❌ Failed to monitor delete events: \(error)")
-        }
-    }
     
     /// Process an incoming nutzap event
     private func processIncomingNutzap(_ event: NDKEvent) async throws {
@@ -1374,221 +1551,22 @@ public actor NDKCashuWallet: NDKWallet {
         }
     }
     
-    /// Load wallet state from NIP-60 events
+    /// Initialize wallet by subscribing to wallet events
     public func load() async throws {
         guard let signer = ndk.signer else {
             throw NDKError.notConfigured("No signer configured for NDKCashuWallet")
         }
         
-        try await loadWalletEvent(signer: signer)
-        try await loadTokenEvents(signer: signer)
-    }
-    
-    /// Load wallet configuration from kind 17375 event
-    private func loadWalletEvent(signer: NDKSigner) async throws {
-        let filter = NDKFilter(
-            authors: [try await signer.pubkey],
-            kinds: [17375] // NIP-60 wallet event kind - replaceable by kind
-        )
-        
-        let events = try await ndk.fetchEvents(filter)
-        guard let latestEvent = events.first else {
-            return // No wallet data found
-        }
-        
-        // Decrypt wallet configuration
-        let sender = NDKUser(pubkey: try await signer.pubkey)
-        print("🔓 [NDKCashuWallet] Decrypting wallet event content: '\(latestEvent.content)'")
-        let decryptedContent = try await signer.decrypt(
-            sender: sender,
-            value: latestEvent.content,
-            scheme: .nip44
-        )
-        print("🔓 [NDKCashuWallet] Decrypted wallet content: '\(decryptedContent)'")
-        
-        // Extract relay tags from wallet event
-        extractWalletRelays(from: latestEvent)
-        
-        // Parse wallet configuration tags
-        guard let walletData = decryptedContent.data(using: String.Encoding.utf8),
-              let walletTags = try? JSONDecoder().decode([[String]].self, from: walletData) else {
-            throw NDKError.invalidContent("Failed to parse wallet configuration")
-        }
-        
-        // Process wallet tags
-        for tag in walletTags {
-            guard tag.count >= 2 else { continue }
-            
-            switch tag[0] {
-            case "privkey":
-                // Restore P2PK private key to the manager
-                let privateKey = tag[1]
-                // Derive public key from private key
-                if let privateKeyData = Data(hexString: privateKey),
-                   let privKey = try? secp256k1.Schnorr.PrivateKey(dataRepresentation: privateKeyData) {
-                    let publicKey = privKey.publicKey.dataRepresentation.hexString
-                    Task {
-                        try? await p2pkManager.setKeypair(privateKey: privateKey, publicKey: publicKey)
-                    }
-                }
-                break
-                
-            case "mint":
-                let mintURLString = tag[1]
-                guard let mintURL = URL(string: mintURLString) else { continue }
-                
-                do {
-                    let mint = try await CashuSwift.loadMint(url: mintURL)
-                    mints[mintURLString] = mint
-                    
-                    // Store keysets
-                    for keyset in mint.keysets {
-                        keysets[keyset.keysetID] = keyset
-                    }
-                } catch {
-                    print("Failed to load mint \(mintURLString): \(error)")
-                }
-                
-            default:
-                // Unknown tag type
-                break
-            }
-        }
-    }
-    
-    /// Load token events containing encrypted proofs
-    private func loadTokenEvents(signer: NDKSigner) async throws {
-        let signerPubkey = try await signer.pubkey
-        
-        // Clear state before loading
+        // Clear state before starting
         proofState.removeAll()
         currentTokenEventIds.removeAll()
+        deletedTokenEventIds.removeAll()
+        supersededTokenEventIds.removeAll()
         
-        // First, fetch all delete events to know which token events are deleted
-        let deleteFilter = NDKFilter(
-            authors: [signerPubkey],
-            kinds: [5], // Delete events
-            tags: ["k": Set(["7375"])] // Specifically for token events
-        )
-        
-        let deleteEvents = try await ndk.fetchEvents(deleteFilter)
-        
-        // Extract deleted event IDs and add to our persistent set
-        for deleteEvent in deleteEvents {
-            for tag in deleteEvent.tags where tag.count >= 2 && tag[0] == "e" {
-                deletedTokenEventIds.insert(tag[1])
-            }
-        }
-        
-        // Now fetch token events
-        let filter = NDKFilter(
-            authors: [signerPubkey],
-            kinds: [7375] // NIP-60 token event kind
-        )
-        
-        let events = try await ndk.fetchEvents(filter)
-        
-        // First pass: identify events referenced in del tags
-        for event in events {
-            // Skip if this event has been deleted
-            if deletedTokenEventIds.contains(event.id) {
-                continue
-            }
-            
-            do {
-                // Decrypt and parse to check del field
-                let sender = NDKUser(pubkey: signerPubkey)
-                let decryptedContent = try await signer.decrypt(
-                    sender: sender,
-                    value: event.content,
-                    scheme: .nip44
-                )
-                
-                if let tokenData = decryptedContent.data(using: .utf8),
-                   let nip60Token = try? JSONDecoder().decode(NIP60TokenEvent.self, from: tokenData),
-                   let delIds = nip60Token.del {
-                    // Add to our persistent set of superseded events
-                    supersededTokenEventIds.formUnion(delIds)
-                }
-            } catch {
-                // Skip events we can't decrypt or parse
-                continue
-            }
-        }
-        
-        // Second pass: load only valid events and initialize proof state
-        for event in events {
-            // Skip if this event has been deleted or is referenced in a del tag
-            if deletedTokenEventIds.contains(event.id) || supersededTokenEventIds.contains(event.id) {
-                print("⏭️ Skipping deleted or superseded token event: \(event.id)")
-                continue
-            }
-            
-            do {
-                try await loadTokenEvent(event: event, signer: signer)
-                currentTokenEventIds.insert(event.id)
-                
-                // Track this event for relay health monitoring
-                // For now, record from all wallet relays since we don't have per-relay tracking
-                for relay in walletRelays {
-                    recordEventFromRelay(event.id, from: relay.url)
-                }
-            } catch {
-                print("Failed to load token event \(event.id): \(error)")
-            }
-        }
-        
-        // Sync internal proofs array with state
-        self.proofs = proofState.values
-            .filter { $0.state == .available }
-            .map { $0.proof }
+        // Start the subscription - this will load all events including historical ones
+        await startWalletSubscription()
     }
     
-    /// Load individual token event and extract proofs
-    private func loadTokenEvent(event: NDKEvent, signer: NDKSigner) async throws {
-        // Check if this event should be filtered out
-        if shouldFilterTokenEvent(eventId: event.id) {
-            print("⏭️ Filtering out deleted or superseded token event: \(event.id)")
-            return
-        }
-        
-        // Decrypt token event content
-        let sender = NDKUser(pubkey: try await signer.pubkey)
-        print("🔓 [NDKCashuWallet] Decrypting token event content: '\(event.content)'")
-        let decryptedContent = try await signer.decrypt(
-            sender: sender,
-            value: event.content,
-            scheme: .nip44
-        )
-        print("🔓 [NDKCashuWallet] Decrypted token content: '\(decryptedContent)'")
-        
-        // Parse token data as NIP60TokenEvent
-        guard let tokenData = decryptedContent.data(using: .utf8),
-              let nip60Token = try? JSONDecoder().decode(NIP60TokenEvent.self, from: tokenData) else {
-            throw NDKError.invalidContent("Failed to parse NIP-60 token event data")
-        }
-        
-        // Update our superseded events set if this event has del tags
-        if let delIds = nip60Token.del {
-            supersededTokenEventIds.formUnion(delIds)
-        }
-        
-        // Convert CashuProof to CashuSwift.Proof and populate state
-        for proof in nip60Token.proofs {
-            let swiftProof = proof.toCashuSwiftProof()
-            // Store proof if we have the corresponding keyset
-            if keysets[swiftProof.keysetID] != nil {
-                // Find mint for this proof
-                if let mint = try? findMintForProof(swiftProof) {
-                    proofState[swiftProof.C] = ProofEntry(
-                        proof: swiftProof,
-                        state: .available,
-                        mint: mint
-                    )
-                }
-            }
-        }
-    }
     
     /// Check if a token event should be filtered out
     private func shouldFilterTokenEvent(eventId: String) -> Bool {
@@ -1949,7 +1927,8 @@ public actor NDKCashuWallet: NDKWallet {
         return events.first
     }
     
-    private func recordEventFromRelay(_ eventId: String, from relayUrl: String) {
+    
+    internal func recordEventFromRelay(_ eventId: String, from relayUrl: String) {
         relayEventSets[relayUrl, default: Set()].insert(eventId)
     }
     

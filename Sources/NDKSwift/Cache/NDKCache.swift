@@ -46,6 +46,13 @@ public protocol NDKCache: Actor {
     /// - Returns: The confirmation state, or nil if not found
     func getEventConfirmationState(eventId: String) async -> EventConfirmationState?
     
+    /// Query for unpublished events (optimistic events not yet confirmed)
+    /// - Parameters:
+    ///   - maxAge: Maximum age of events to include (default: 1 hour)
+    ///   - limit: Maximum number of events to return
+    /// - Returns: Array of unpublished events with their target relays
+    func getUnpublishedEvents(maxAge: TimeInterval, limit: Int?) async -> [(event: NDKEvent, targetRelays: Set<String>)]
+    
     // MARK: - Cache Management
     
     /// Clear all cached data
@@ -96,5 +103,10 @@ public extension NDKCache {
     /// Default implementation that returns nil
     func getEventConfirmationState(eventId: String) async -> EventConfirmationState? {
         return nil
+    }
+    
+    /// Default implementation that returns empty array
+    func getUnpublishedEvents(maxAge: TimeInterval = 3600, limit: Int? = nil) async -> [(event: NDKEvent, targetRelays: Set<String>)] {
+        return []
     }
 }

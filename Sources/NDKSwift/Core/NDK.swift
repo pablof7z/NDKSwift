@@ -416,6 +416,82 @@ public final class NDK {
         let relays = try await publish(event)
         return (event, relays)
     }
+    
+    /// Retry publishing unpublished events
+    /// 
+    /// Queries the cache for events that were published optimistically but not yet confirmed
+    /// by relays, and attempts to publish them again. This is useful for handling network
+    /// failures or disconnected relays.
+    /// 
+    /// - Parameters:
+    ///   - maxAge: Maximum age of events to retry (default: 1 hour)
+    ///   - limit: Maximum number of events to retry (default: nil for no limit)
+    /// 
+    /// - Returns: Array of (event, successful relays) for events that were successfully retried
+    /// 
+    /// ## Example
+    /// ```swift
+    /// // Retry all unpublished events from the last hour
+    /// let retriedEvents = try await ndk.retryUnpublishedEvents()
+    /// print("Retried \(retriedEvents.count) events")
+    /// 
+    /// // Retry only the 10 most recent unpublished events
+    /// let recentRetries = try await ndk.retryUnpublishedEvents(maxAge: 3600, limit: 10)
+    /// ```
+    public func retryUnpublishedEvents(maxAge: TimeInterval = 3600, limit: Int? = nil) async throws -> [(event: NDKEvent, relays: Set<NDKRelay>)] {
+        guard let cache = cache else {
+            if debugMode {
+                print("🔄 No cache available for retry operation")
+            }
+            return []
+        }
+        
+        // Get unpublished events from cache
+        let unpublishedEvents = await cache.getUnpublishedEvents(maxAge: maxAge, limit: limit)
+        
+        if unpublishedEvents.isEmpty {
+            if debugMode {
+                print("🔄 No unpublished events found to retry")
+            }
+            return []
+        }
+        
+        if debugMode {
+            print("🔄 Found \(unpublishedEvents.count) unpublished events to retry")
+        }
+        
+        var results: [(event: NDKEvent, relays: Set<NDKRelay>)] = []
+        
+        for (event, targetRelays) in unpublishedEvents {
+            do {
+                // Try to publish to the original target relays
+                let successfulRelays = try await publish(event: event, to: targetRelays)
+                
+                if !successfulRelays.isEmpty {
+                    results.append((event: event, relays: successfulRelays))
+                    
+                    if debugMode {
+                        let relayUrls = successfulRelays.map { $0.url }.joined(separator: ", ")
+                        print("🔄 Retried event \(event.id) successfully to \(successfulRelays.count) relay(s): \(relayUrls)")
+                    }
+                } else {
+                    if debugMode {
+                        print("🔄 Failed to retry event \(event.id) - no relays succeeded")
+                    }
+                }
+            } catch {
+                if debugMode {
+                    print("🔄 Error retrying event \(event.id): \(error)")
+                }
+            }
+        }
+        
+        if debugMode {
+            print("🔄 Successfully retried \(results.count) out of \(unpublishedEvents.count) events")
+        }
+        
+        return results
+    }
 
     // MARK: - Subscriptions
 

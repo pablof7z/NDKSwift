@@ -5,6 +5,8 @@ public actor SimpleMemoryCache: NDKCache {
     private var events: [String: NDKEvent] = [:]
     private var profiles: [String: NDKUserProfile] = [:]
     private var eventConfirmations: [String: EventConfirmationState] = [:]
+    private var unpublishedEventRelays: [String: Set<String>] = [:]
+    private var eventCreationTimes: [String: Date] = [:]
     
     public init() {}
     
@@ -96,6 +98,8 @@ public actor SimpleMemoryCache: NDKCache {
         let eventId = event.id
         events[eventId] = event
         eventConfirmations[eventId] = .optimistic
+        unpublishedEventRelays[eventId] = relays
+        eventCreationTimes[eventId] = Date()
         print("[SimpleMemoryCache] Added unpublished event \(eventId) for relays: \(relays.joined(separator: ", "))")
     }
     
@@ -117,6 +121,42 @@ public actor SimpleMemoryCache: NDKCache {
     
     public func getEventConfirmationState(eventId: String) async -> EventConfirmationState? {
         return eventConfirmations[eventId]
+    }
+    
+    public func getUnpublishedEvents(maxAge: TimeInterval = 3600, limit: Int? = nil) async -> [(event: NDKEvent, targetRelays: Set<String>)] {
+        let cutoffTime = Date().addingTimeInterval(-maxAge)
+        var results: [(event: NDKEvent, targetRelays: Set<String>)] = []
+        
+        for (eventId, confirmationState) in eventConfirmations {
+            // Only include optimistic events
+            guard case .optimistic = confirmationState else { continue }
+            
+            // Check age constraint
+            if let creationTime = eventCreationTimes[eventId], creationTime < cutoffTime {
+                continue
+            }
+            
+            // Get the event and relays
+            guard let event = events[eventId],
+                  let targetRelays = unpublishedEventRelays[eventId] else { continue }
+            
+            results.append((event: event, targetRelays: targetRelays))
+        }
+        
+        // Sort by creation time (newest first)
+        results.sort { lhs, rhs in
+            let lhsTime = eventCreationTimes[lhs.event.id] ?? Date.distantPast
+            let rhsTime = eventCreationTimes[rhs.event.id] ?? Date.distantPast
+            return lhsTime > rhsTime
+        }
+        
+        // Apply limit if specified
+        if let limit = limit, limit > 0 {
+            results = Array(results.prefix(limit))
+        }
+        
+        print("[SimpleMemoryCache] Found \(results.count) unpublished events (maxAge: \(maxAge)s)")
+        return results
     }
     
     // MARK: - Debug Helpers
