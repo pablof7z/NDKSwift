@@ -4,7 +4,8 @@ import PackageDescription
 let package = Package(
     name: "NutsackiOS",
     platforms: [
-        .iOS(.v17)
+        .iOS(.v17),
+        .macOS(.v14)
     ],
     products: [
         .executable(
@@ -13,7 +14,7 @@ let package = Package(
         )
     ],
     dependencies: [
-        .package(path: "../..")
+        .package(name: "NDKSwift", path: "../..")
     ],
     targets: [
         .executableTarget(
@@ -21,7 +22,7 @@ let package = Package(
             dependencies: [
                 .product(name: "NDKSwift", package: "NDKSwift")
             ],
-            exclude: ["QR_CODE_IMPROVEMENTS.md", "Info.plist"]
+            exclude: ["QR_CODE_IMPROVEMENTS.md", "Info.plist", "LaunchScreen.storyboard", "NutsackiOS.xcconfig"]
         )
     ]
 )

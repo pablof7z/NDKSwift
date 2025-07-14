@@ -240,6 +240,11 @@ public struct NDKEvent: Codable, Equatable, Hashable, Sendable {
     public var isParameterizedReplaceable: Bool {
         return kind >= 30000 && kind < 40000
     }
+    
+    /// Check if this event is protected (NIP-70)
+    public var isProtected: Bool {
+        return tags.contains { $0.first == "-" }
+    }
 
     /// Get the tag address for replaceable events
     public var tagAddress: String {

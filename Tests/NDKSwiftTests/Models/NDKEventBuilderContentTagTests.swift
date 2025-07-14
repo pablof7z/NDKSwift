@@ -24,7 +24,7 @@ final class NDKEventBuilderContentTagTests: XCTestCase {
     }
     
     func testNpubMentionGeneration() async throws {
-        let npub = "npub1qqqqqqqqd76xvjgjg3kkzejza2uxzp4ukdsxqw6jw9vv3tqrugssfgvzk6"
+        let npub = TestEntities.validNpub
         let content = "Hello @\(npub)!"
         
         let event = try await NDKEventBuilder()
@@ -43,7 +43,7 @@ final class NDKEventBuilderContentTagTests: XCTestCase {
     
     func testDisableContentTagGeneration() async throws {
         let event = try await NDKEventBuilder()
-            .content("Hello #nostr @npub1qqqqqqqqd76xvjgjg3kkzejza2uxzp4ukdsxqw6jw9vv3tqrugssfgvzk6")
+            .content("Hello #nostr @" + TestEntities.validNpub)
             .kind(EventKind.textNote)
             .build(signer: mockSigner, generateContentTags: false)
         
@@ -57,7 +57,7 @@ final class NDKEventBuilderContentTagTests: XCTestCase {
     // MARK: - Mixed Content Tests
     
     func testMixedContentWithExistingTags() async throws {
-        let npub = "npub1qqqqqqqqd76xvjgjg3kkzejza2uxzp4ukdsxqw6jw9vv3tqrugssfgvzk6"
+        let npub = TestEntities.validNpub
         let content = "Reply to @\(npub) #nostr"
         
         let event = try await NDKEventBuilder()
@@ -78,7 +78,7 @@ final class NDKEventBuilderContentTagTests: XCTestCase {
     }
     
     func testEventMentionGeneration() async throws {
-        let note = "note1qqqqqqqqd76xvjgjg3kkzejza2uxzp4ukdsxqw6jw9vv3tqrugsgnx9sc"
+        let note = TestEntities.validNote
         let content = "Check out this note: nostr:\(note)"
         
         let event = try await NDKEventBuilder()
@@ -113,7 +113,7 @@ final class NDKEventBuilderContentTagTests: XCTestCase {
     }
     
     func testContentNormalization() async throws {
-        let npub = "npub1qqqqqqqqd76xvjgjg3kkzejza2uxzp4ukdsxqw6jw9vv3tqrugssfgvzk6"
+        let npub = TestEntities.validNpub
         let content = "Multiple mentions: @\(npub) and nostr:\(npub)"
         
         let event = try await NDKEventBuilder()
@@ -142,7 +142,7 @@ final class NDKEventBuilderContentTagTests: XCTestCase {
     }
     
     func testReplyFactoryWithContentTags() async throws {
-        let npub = "npub1qqqqqqqqd76xvjgjg3kkzejza2uxzp4ukdsxqw6jw9vv3tqrugssfgvzk6"
+        let npub = TestEntities.validNpub
         let event = try await NDKEventBuilder
             .reply("Thanks @\(npub) #grateful", to: "eventId123", author: "authorPubkey")
             .build(signer: mockSigner)
@@ -202,8 +202,10 @@ final class NDKEventBuilderContentTagTests: XCTestCase {
             .build(signer: mockSigner)
         
         let tTags = event.tags.filter { $0[0] == "t" }
-        XCTAssertEqual(tTags.count, 2)
+        XCTAssertEqual(tTags.count, 4) // Captures parts before special chars
         XCTAssertTrue(tTags.contains(["t", "valid-tag"]))
         XCTAssertTrue(tTags.contains(["t", "also_valid"]))
+        XCTAssertTrue(tTags.contains(["t", "not"])) // Part before !
+        XCTAssertTrue(tTags.contains(["t", "emoji😀"])) // Emoji is included
     }
 }

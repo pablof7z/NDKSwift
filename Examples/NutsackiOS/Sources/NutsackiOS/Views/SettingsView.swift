@@ -5,6 +5,7 @@ struct SettingsView: View {
     @Environment(\.modelContext) private var modelContext
     @EnvironmentObject private var appState: AppState
     @EnvironmentObject private var nostrManager: NostrManager
+    @EnvironmentObject private var walletManager: WalletManager
     
     @Query private var accounts: [NostrAccount]
     
@@ -70,6 +71,17 @@ struct SettingsView: View {
                     }
                 } header: {
                     Text("Preferences")
+                }
+                
+                // Nutzap Settings
+                Section {
+                    NavigationLink(destination: NutzapSettingsView()) {
+                        Label("Nutzap Settings", systemImage: "bolt.heart")
+                    }
+                } header: {
+                    Text("Wallet")
+                } footer: {
+                    Text("Configure how others can send nutzaps to your wallet")
                 }
                 
                 

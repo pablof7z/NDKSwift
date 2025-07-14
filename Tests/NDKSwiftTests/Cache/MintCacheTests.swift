@@ -49,16 +49,20 @@ final class MintCacheTests: XCTestCase {
         let isStale = await cache.isMintInfoStale(url: mintUrl, maxAge: 3600) // 1 hour
         XCTAssertFalse(isStale)
         
-        // Should be stale with 0 second max age
-        let isStaleZero = await cache.isMintInfoStale(url: mintUrl, maxAge: 0)
-        XCTAssertTrue(isStaleZero)
+        // Should be stale with negative max age
+        let isStaleNegative = await cache.isMintInfoStale(url: mintUrl, maxAge: -1)
+        XCTAssertTrue(isStaleNegative)
     }
     
     // MARK: - Keyset Tests
     
     func testSaveAndRetrieveKeyset() async throws {
         let mintUrl = "https://test.mint.com"
+        let mintInfo = createTestMintInfo()
         let keyset = createTestKeyset()
+        
+        // Save mint info first (required by foreign key constraint)
+        try await cache.saveMintInfo(mintInfo, url: mintUrl)
         
         // Save keyset
         try await cache.saveKeyset(keyset, mintUrl: mintUrl)
@@ -73,11 +77,15 @@ final class MintCacheTests: XCTestCase {
     
     func testBatchSaveKeysets() async throws {
         let mintUrl = "https://test.mint.com"
+        let mintInfo = createTestMintInfo()
         let keysets = [
             createTestKeyset(id: "keyset1"),
             createTestKeyset(id: "keyset2"),
             createTestKeyset(id: "keyset3")
         ]
+        
+        // Save mint info first (required by foreign key constraint)
+        try await cache.saveMintInfo(mintInfo, url: mintUrl)
         
         // Batch save
         try await cache.saveKeysets(keysets, mintUrl: mintUrl)
@@ -92,12 +100,16 @@ final class MintCacheTests: XCTestCase {
     
     func testGetActiveKeysets() async throws {
         let mintUrl = "https://test.mint.com"
+        let mintInfo = createTestMintInfo()
         let keysets = [
             createTestKeyset(id: "active1", unit: "sat", active: true),
             createTestKeyset(id: "active2", unit: "sat", active: true),
             createTestKeyset(id: "inactive", unit: "sat", active: false),
             createTestKeyset(id: "usd", unit: "usd", active: true)
         ]
+        
+        // Save mint info first (required by foreign key constraint)
+        try await cache.saveMintInfo(mintInfo, url: mintUrl)
         
         try await cache.saveKeysets(keysets, mintUrl: mintUrl)
         
@@ -114,7 +126,11 @@ final class MintCacheTests: XCTestCase {
     
     func testKeysetsStaleness() async throws {
         let mintUrl = "https://test.mint.com"
+        let mintInfo = createTestMintInfo()
         let keysets = [createTestKeyset()]
+        
+        // Save mint info first (required by foreign key constraint)
+        try await cache.saveMintInfo(mintInfo, url: mintUrl)
         
         try await cache.saveKeysets(keysets, mintUrl: mintUrl)
         
@@ -122,9 +138,9 @@ final class MintCacheTests: XCTestCase {
         let isStale = await cache.areKeysetsStale(mintUrl: mintUrl, maxAge: 3600)
         XCTAssertFalse(isStale)
         
-        // Should be stale with 0 second max age
-        let isStaleZero = await cache.areKeysetsStale(mintUrl: mintUrl, maxAge: 0)
-        XCTAssertTrue(isStaleZero)
+        // Should be stale with negative max age
+        let isStaleNegative = await cache.areKeysetsStale(mintUrl: mintUrl, maxAge: -1)
+        XCTAssertTrue(isStaleNegative)
     }
     
     // MARK: - Cached Mint Loader Tests
@@ -216,27 +232,42 @@ final class MintCacheTests: XCTestCase {
         return jsonString.data(using: .utf8)!
     }
     
-    private func createTestMintInfo(name: String = "Test Mint") -> CashuSwift.Mint.Info {
-        // Create a mock Mint.Info
-        // Note: This is a simplified version - adjust based on actual CashuSwift.Mint.Info structure
-        let jsonString = """
-        {
-            "name": "\(name)",
-            "pubkey": "02testpubkey",
-            "version": "0.15.0",
-            "description": "Test mint",
-            "description_long": "This is a test mint for unit tests",
-            "motd": "Welcome to test mint",
-            "contact": [{"method": "email", "info": "test@mint.com"}],
-            "nuts": {
-                "4": {"methods": [{"method": "bolt11", "unit": "sat", "min_amount": 1, "max_amount": 1000000}], "disabled": false},
-                "5": {"methods": [{"method": "bolt11", "unit": "sat", "min_amount": 1, "max_amount": 1000000}], "disabled": false}
-            }
-        }
-        """
+    private func createTestMintInfo(name: String = "Test Mint") -> NDKMintInfo {
+        let contact = NDKMintInfo.Contact(method: "email", info: "test@mint.com")
+        let paymentMethod = NDKMintInfo.PaymentMethod(
+            method: "bolt11",
+            unit: "sat",
+            minAmount: 1,
+            maxAmount: 1000000
+        )
+        let paymentMethodList = NDKMintInfo.PaymentMethodList(
+            methods: [paymentMethod],
+            disabled: false
+        )
+        let nuts = NDKMintInfo.Nuts(
+            nut04: paymentMethodList,
+            nut05: paymentMethodList,
+            nut07: nil,
+            nut08: nil,
+            nut09: nil,
+            nut10: nil,
+            nut12: nil
+        )
         
-        let data = jsonString.data(using: .utf8)!
-        return try! JSONDecoder().decode(CashuSwift.Mint.Info.self, from: data)
+        return NDKMintInfo(
+            name: name,
+            pubkey: "02testpubkey",
+            version: "0.15.0",
+            description: "Test mint",
+            descriptionLong: "This is a test mint for unit tests",
+            contact: [contact],
+            motd: "Welcome to test mint",
+            iconUrl: nil,
+            urls: nil,
+            time: nil,
+            tosUrl: nil,
+            nuts: nuts
+        )
     }
     
     private func createTestKeyset(

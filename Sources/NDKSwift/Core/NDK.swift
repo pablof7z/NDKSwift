@@ -10,8 +10,10 @@ public final class NDK {
 
     /// Active user (derived from signer)
     public var activeUser: NDKUser? {
-        // This will need to be async or cached
-        return nil
+        get async {
+            guard let signer = signer else { return nil }
+            return try? await signer.user()
+        }
     }
 
     /// Relay pool (thread-safe actor)

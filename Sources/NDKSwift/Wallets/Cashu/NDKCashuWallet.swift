@@ -440,6 +440,70 @@ public actor NDKCashuWallet: NDKWallet {
         return try await p2pkManager.getCashuPublicKey()
     }
     
+    /// Publish nutzap preferences (kind 10019) so others know how to send nutzaps to this wallet
+    public func publishNutzapPreferences(relays: [String]? = nil) async throws {
+        guard let signer = ndk.signer else {
+            throw NDKError.notConfigured("No signer configured")
+        }
+        
+        // Get the P2PK pubkey from the manager
+        let p2pkPubkey = try await p2pkManager.getCashuPublicKey()
+        
+        // Get the relays to publish to (use user's relays if not specified)
+        let publishRelays = relays ?? []
+        
+        var tags: [[String]] = []
+        
+        // Add relay tags where the user will be reading nutzap events from
+        if publishRelays.isEmpty {
+            // If no relays specified, use the NDK's current relays
+            let currentRelays = await ndk.pool.relays
+            for relay in currentRelays {
+                tags.append(["relay", relay.url])
+            }
+        } else {
+            for relay in publishRelays {
+                tags.append(["relay", relay])
+            }
+        }
+        
+        // Add mint tags for all configured mints
+        for mintURL in mints.keys {
+            tags.append(["mint", mintURL])
+        }
+        
+        // Add the P2PK pubkey tag - CRITICAL: This must be the wallet's P2PK key, not the user's Nostr key
+        tags.append(["pubkey", p2pkPubkey])
+        
+        // Create the nutzap preferences event (kind 10019)
+        let preferencesEvent = try await NDKEventBuilder()
+            .kind(EventKind.nutzapPreferences)
+            .tags(tags)
+            .build(signer: signer)
+        
+        // Publish the event
+        try await ndk.publish(preferencesEvent)
+        
+        print("📢 Published nutzap preferences with P2PK pubkey: \(p2pkPubkey)")
+    }
+    
+    /// Check if nutzap preferences have been published
+    public func hasPublishedNutzapPreferences() async throws -> Bool {
+        guard let signer = ndk.signer else {
+            throw NDKError.notConfigured("No signer configured")
+        }
+        
+        let userPubkey = try await signer.pubkey
+        let filter = NDKFilter(
+            authors: [userPubkey],
+            kinds: [EventKind.nutzapPreferences],
+            limit: 1
+        )
+        
+        let events = try await ndk.fetchEvents(filter)
+        return !events.isEmpty
+    }
+    
     /// Get balance for a specific mint
     public func getBalance(mint mintURL: URL) async -> Int64 {
         return Int64(proofState.values
@@ -1133,10 +1197,27 @@ public actor NDKCashuWallet: NDKWallet {
                                 try await self.deleteQuoteEvent(quoteId: quote.quoteId)
                                 
                                 // Update wallet state properly with the new proofs
-                                try await self.update(
+                                let createdEventIds = try await self.update(
                                     deletedProofs: [],
                                     addedProofs: proofs
                                 )
+                                
+                                // Create history event for the lightning deposit
+                                if let signer = self.ndk.signer {
+                                    Task {
+                                        do {
+                                            try await self.createSpendingHistoryEvent(
+                                                direction: .in,
+                                                amount: Int64(quote.amount),
+                                                createdEventIds: createdEventIds,
+                                                signer: signer
+                                            )
+                                            print("✅ Created NIP-60 history event for lightning deposit of \(quote.amount) sats")
+                                        } catch {
+                                            print("⚠️ Failed to create history event for deposit: \(error)")
+                                        }
+                                    }
+                                }
                                 
                                 continuation.yield(.minted(proofs: proofs.toNDKProofs()))
                                 continuation.finish()
@@ -1734,7 +1815,7 @@ public actor NDKCashuWallet: NDKWallet {
     private func update(
         deletedProofs: [CashuSwift.Proof],
         addedProofs: [CashuSwift.Proof]
-    ) async throws {
+    ) async throws -> [String] {
         print("NDKCashuWallet.update() - Adding \(addedProofs.count) proofs, deleting \(deletedProofs.count) proofs")
         
         // 1. Update proof states
@@ -1789,6 +1870,9 @@ public actor NDKCashuWallet: NDKWallet {
         
         // 6. Update internal proofs array for compatibility
         self.proofs = availableByMint.values.flatMap { $0 }
+        
+        // Return the newly created event IDs
+        return Array(newEventIds)
     }
     
     /// Reserve proofs for concurrent operations

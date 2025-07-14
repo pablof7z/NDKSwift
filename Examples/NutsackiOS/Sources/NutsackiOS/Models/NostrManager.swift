@@ -10,6 +10,7 @@ class NostrManager: ObservableObject {
     @Published var relayStatus: [String: Bool] = [:]
     
     private var signer: NDKPrivateKeySigner?
+    var cache: NDKSQLiteCache?
     
     // Default relays for the app
     let defaultRelays = [
@@ -21,11 +22,22 @@ class NostrManager: ObservableObject {
     ]
     
     init() {
-        setupNDK()
+        Task {
+            await setupNDK()
+        }
     }
     
-    private func setupNDK() {
-        ndk = NDK(relayUrls: defaultRelays)
+    private func setupNDK() async {
+        // Initialize SQLite cache for better performance and offline access
+        do {
+            cache = try await NDKSQLiteCache()
+            ndk = NDK(relayUrls: defaultRelays, cache: cache)
+            print("NDK initialized with SQLite cache")
+        } catch {
+            print("Failed to initialize SQLite cache: \(error). Continuing without cache.")
+            // Fall back to no cache if initialization fails
+            ndk = NDK(relayUrls: defaultRelays)
+        }
         
         Task {
             await connectToRelays()
@@ -59,21 +71,30 @@ class NostrManager: ObservableObject {
         let publicKey = try await signer.pubkey
         currentUser = NDKUser(pubkey: publicKey)
         
-        // Fetch user profile
-        if currentUser != nil {
+        print("Logged in with public key: \(publicKey)")
+        
+        // Start profile subscription in background (non-blocking)
+        Task {
+            guard let currentUser = currentUser else { return }
+            
             let metadataFilter = NDKFilter(
                 authors: [publicKey],
                 kinds: [0],
                 limit: 1
             )
-            if let event = try await ndk.fetchEvent(metadataFilter),
-               let contentData = event.content.data(using: .utf8),
-               let _ = try? JSONDecoder().decode(NDKUserProfile.self, from: contentData) {
-                // Profile metadata is published and will be available via async property
+            
+            // Subscribe to profile updates
+            let subscription = ndk.subscribe(filters: [metadataFilter])
+            
+            for try await event in subscription {
+                if let contentData = event.content.data(using: .utf8),
+                   let _ = try? JSONDecoder().decode(NDKUserProfile.self, from: contentData) {
+                    // Profile is automatically cached by NDK's SQLite cache
+                    print("Profile metadata received and cached for \(publicKey)")
+                    break // Only need first profile event
+                }
             }
         }
-        
-        print("Logged in with public key: \(publicKey)")
     }
     
     func createNewAccount(displayName: String, about: String? = nil) async throws -> String {
@@ -135,6 +156,7 @@ class NostrManager: ObservableObject {
             limit: 100
         )
         
+        // Fetch events - will use cache if available and fetch from relays if needed
         let events = try await ndk.fetchEvents(filter)
         return Array(events)
     }

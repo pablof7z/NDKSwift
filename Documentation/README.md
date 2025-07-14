@@ -11,10 +11,19 @@ Welcome to the NDKSwift documentation. This directory contains comprehensive gui
 
 ### Architecture & Design
 - [Architecture Overview](ARCHITECTURE.md) - System design, patterns, and internals
+- [Nostr Protocol Guide](NOSTR_PROTOCOL_GUIDE.md) - Comprehensive guide to the Nostr protocol
 
 ### Feature Guides
 - [NIP-44 Encryption Guide](NIP44_ENCRYPTION_GUIDE.md) - End-to-end encryption implementation
 - [Signature Verification Sampling](SIGNATURE_VERIFICATION_SAMPLING.md) - Performance optimization for signature verification
+
+### Development Resources
+Located in the [Development](Development/) subdirectory:
+- [NIP-29 Implementation Plan](Development/NIP-29-Implementation-Plan.md) - Community moderation implementation
+- [NIP-60/61 Implementation Plan](Development/NIP-60-61-Implementation-Plan.md) - Wallet protocol implementation
+- [Technical Debt](Development/TECHNICAL_DEBT.md) - Known technical debt and improvement areas
+- [Test Coverage Analysis](Development/TEST_COVERAGE_ANALYSIS.md) - Current test coverage report
+- [Test Implementation Plan](Development/TEST_IMPLEMENTATION_PLAN.md) - Testing strategy and roadmap
 
 ## 🚀 Quick Links
 

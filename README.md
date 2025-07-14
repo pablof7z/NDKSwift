@@ -7,7 +7,7 @@ NDKSwift provides a comprehensive toolkit for building Nostr applications with S
 ## Features
 
 - **Modern Swift Design**: Built with async/await, AsyncSequence, and actors for thread-safe concurrency
-- **Comprehensive NIP Support**: Implements NIP-01, NIP-04, NIP-19, NIP-44, NIP-46, NIP-47, NIP-57, NIP-65, and more
+- **Comprehensive NIP Support**: Extensive protocol coverage (see supported NIPs below)
 - **Flexible Architecture**: Protocol-oriented design allowing custom implementations
 - **Outbox Model**: Intelligent relay selection and event routing (enabled by default)
 - **Built-in Caching**: Optional caching with SQLite implementation
@@ -194,6 +194,40 @@ let eventZap = try await event.zap(
 // Fetch zaps
 let zaps = try await event.fetchZaps(includeNutzaps: true)
 ```
+
+## Supported NIPs
+
+NDKSwift implements the following Nostr Implementation Possibilities:
+
+### Core Protocol
+- **NIP-01**: Basic protocol flow description
+- **NIP-02**: Contact List and Petnames
+- **NIP-09**: Event Deletion
+- **NIP-10**: Reply conventions
+- **NIP-18**: Reposts
+- **NIP-19**: bech32-encoded entities
+- **NIP-25**: Reactions
+- **NIP-65**: Relay List Metadata (Outbox Model)
+
+### Encryption & Security
+- **NIP-04**: Encrypted Direct Messages (deprecated, use NIP-44)
+- **NIP-44**: Versioned Encryption
+- **NIP-46**: Nostr Connect (Remote Signing)
+
+### Payments & Wallet
+- **NIP-47**: Wallet Connect
+- **NIP-57**: Lightning Zaps
+- **NIP-60**: Cashu Ecash Wallet
+- **NIP-61**: Nutzaps
+
+### Storage & Files
+- **Blossom**: Decentralized file storage protocol
+
+### Additional Features
+- Content tagging and parsing
+- Relay pool management
+- Event caching and persistence
+- Subscription management with AsyncSequence
 
 ## Documentation
 

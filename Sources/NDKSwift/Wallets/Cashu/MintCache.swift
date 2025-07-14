@@ -34,27 +34,6 @@ public protocol MintCache {
     func areKeysetsStale(mintUrl: String, maxAge: TimeInterval) async -> Bool
 }
 
-/// Extension to make NDKSQLiteCache conform to MintCache
-extension NDKSQLiteCache: MintCache {
-    public func saveMintInfo(_ info: NDKMintInfo, url: String) async throws {
-        let jsonData = try info.toJSONData()
-        try await saveMintInfoJSON(jsonData, url: url)
-    }
-    
-    public func getMintInfo(url: String) async -> NDKMintInfo? {
-        guard let jsonData = await getMintInfoJSON(url: url) else {
-            return nil
-        }
-        return try? NDKMintInfo(from: jsonData)
-    }
-    
-    public func invalidateMintCache(url: String) async throws {
-        // NDKSQLiteCache doesn't have a direct invalidate method
-        // We can achieve this by saving empty data or relying on staleness checks
-        // For now, we'll do nothing as the staleness check will handle it
-    }
-}
-
 /// A simple wrapper that provides mint caching with automatic refresh
 public actor CachedMintLoader {
     private let cache: MintCache

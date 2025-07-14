@@ -1,6 +1,6 @@
 # NDKSwift API Reference
 
-Complete API documentation for NDKSwift v0.6.1+
+Complete API documentation for NDKSwift v0.3.0+
 
 ## Table of Contents
 
@@ -133,6 +133,34 @@ public func getUser(_ pubkey: PublicKey) -> NDKUser
 public func getUser(npub: String) -> NDKUser?
 ```
 
+#### Interactions (NIP-18, NIP-25, NIP-09)
+
+```swift
+// NIP-18: Reposts
+// Repost an event
+public func repost(_ event: NDKEvent) async throws -> NDKEvent
+
+// Quote repost an event with a comment
+public func quoteRepost(_ event: NDKEvent, comment: String) async throws -> NDKEvent
+
+// NIP-25: Reactions
+// React to an event
+public func react(to event: NDKEvent, with content: String) async throws -> NDKEvent
+
+// Like an event (+ reaction)
+public func like(_ event: NDKEvent) async throws -> NDKEvent
+
+// Dislike an event (- reaction)
+public func dislike(_ event: NDKEvent) async throws -> NDKEvent
+
+// NIP-09: Event Deletion
+// Delete one or more events
+public func deleteEvents(_ events: [NDKEvent], reason: String = "") async throws -> NDKEvent
+
+// Delete a single event
+public func deleteEvent(_ event: NDKEvent, reason: String = "") async throws -> NDKEvent
+```
+
 #### Statistics
 
 ```swift
@@ -216,11 +244,26 @@ public func rawEvent() -> [String: Any]
 // Encode to bech32 (NIP-19)
 public func encode(includeRelays: Bool = false) throws -> String
 
-// Create a reaction
-public func react(
-    content: String = "+",
-    publish: Bool = true
-) async throws -> NDKEvent
+// NIP-18: Reposts
+// Create a repost of this event
+public func repost(signer: NDKSigner) async throws -> NDKEvent
+
+// Create a quote repost of this event (kind 1 with q tag)
+public func quoteRepost(comment: String, signer: NDKSigner) async throws -> NDKEvent
+
+// NIP-25: Reactions
+// Create a reaction to this event
+public func react(with content: String, signer: NDKSigner) async throws -> NDKEvent
+
+// Create a like reaction (+)
+public func like(signer: NDKSigner) async throws -> NDKEvent
+
+// Create a dislike reaction (-)
+public func dislike(signer: NDKSigner) async throws -> NDKEvent
+
+// NIP-09: Event Deletion
+// Create a deletion request for this event
+public func createDeletionRequest(reason: String = "", signer: NDKSigner) async throws -> NDKEvent
 
 // Create a reply
 public func createReply(
@@ -655,6 +698,54 @@ public func getBalance() async throws -> GetBalanceResponse
 public func listTransactions(params: ListTransactionsRequest?) async throws -> ListTransactionsResponse
 ```
 
+#### NDKCashuWallet
+
+Cashu wallet implementation (NIP-60/61):
+
+```swift
+// Initialize wallet
+public init(signer: NDKSigner, ndk: NDK)
+
+// Connection
+public func connect() async
+public func disconnect() async
+
+// Balance and state
+public var totalBalance: Int { get async }
+public var mints: [String] { get async }
+
+// Mint management
+public func addMint(url: String) async throws
+public func removeMint(url: String) async throws
+
+// Token operations
+public func mintQuote(amount: Int, mintUrl: String? = nil) async throws -> MintQuote
+public func mint(quote: MintQuote) async throws -> [Proof]
+public func meltQuote(invoice: String, mintUrl: String? = nil) async throws -> MeltQuote
+public func melt(quote: MeltQuote) async throws -> MeltResponse
+
+// Cashu transactions
+public func send(amount: Int, mintUrl: String? = nil, memo: String? = nil) async throws -> CashuToken
+public func receive(token: String) async throws -> ReceiveResponse
+public func swap(proofs: [Proof], mintUrl: String) async throws -> [Proof]
+
+// Nutzaps (NIP-61)
+public func nutzap(
+    amount: Int,
+    comment: String? = nil,
+    recipient: NDKUser,
+    eventId: String? = nil,
+    mintUrl: String? = nil
+) async throws -> NDKEvent
+
+// P2PK operations
+public func createP2PKLockedToken(
+    amount: Int,
+    recipientPubkey: String,
+    mintUrl: String? = nil
+) async throws -> CashuToken
+```
+
 ## Types and Enums
 
 ### Basic Types
@@ -689,7 +780,11 @@ public struct EventKind {
     public static let fileMetadata = 1063        // File metadata
     public static let liveChatMessage = 1311     // Live chat
     public static let zap = 9735                 // Zap receipt
+    public static let cashuWallet = 7375         // Cashu wallet (NIP-60)
+    public static let cashuToken = 7376          // Cashu token (NIP-60)
+    public static let nutzap = 9321              // Nutzap (NIP-61)
     public static let relayList = 10002          // Relay list (NIP-65)
+    public static let cashuMintList = 10019      // Mint preferences
     public static let clientAuthentication = 22242 // Client auth
     public static let walletInfo = 13194         // Wallet info
     public static let walletRequest = 23194      // Wallet request
@@ -701,6 +796,7 @@ public struct EventKind {
     public static let badgeDefinition = 30009    // Badge definition
     public static let article = 30023            // Long-form content
     public static let applicationData = 30078    // App-specific data
+    public static let mintAnnouncement = 38000   // Mint announcement (NIP-60)
 }
 ```
 
