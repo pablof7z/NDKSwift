@@ -247,7 +247,7 @@ struct SwapView: View {
     private func loadMints() {
         Task {
             if let wallet = walletManager.activeWallet {
-                let loadedMints = await wallet.getMints()
+                let loadedMints = await wallet.getMintsInfo()
                 await MainActor.run {
                     mints = loadedMints
                     // Select first two different mints by default

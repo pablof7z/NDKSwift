@@ -53,6 +53,8 @@ public struct NDKAuthView<AuthenticatedContent: View, AuthenticationContent: Vie
     @State private var showingAccountPicker = false
     @State private var showingBiometricPrompt = false
     @State private var biometricError: Error?
+    @State private var sessionSwitchError: Error?
+    @State private var switchingSession: NDKSession?
     
     // MARK: - Initialization
     
@@ -144,6 +146,15 @@ public struct NDKAuthView<AuthenticatedContent: View, AuthenticationContent: Vie
                 Text(error.localizedDescription)
             }
         }
+        .alert("Failed to Switch Account", isPresented: .constant(sessionSwitchError != nil)) {
+            Button("OK") {
+                sessionSwitchError = nil
+            }
+        } message: {
+            if let error = sessionSwitchError {
+                Text(error.localizedDescription)
+            }
+        }
     }
     
     // MARK: - State Views
@@ -197,46 +208,71 @@ public struct NDKAuthView<AuthenticatedContent: View, AuthenticationContent: Vie
     
     private var sessionSelectionView: some View {
         VStack(spacing: 30) {
-            VStack(spacing: 16) {
-                Image(systemName: "person.2.circle")
-                    .font(.system(size: 60))
-                    .foregroundStyle(.blue)
-                
-                Text("Welcome Back")
-                    .font(.largeTitle)
-                    .fontWeight(.bold)
-                
-                Text("Choose an account to continue")
-                    .font(.body)
-                    .foregroundStyle(.secondary)
-            }
-            
-            LazyVStack(spacing: 12) {
-                ForEach(authManager.availableSessions.prefix(3)) { session in
-                    SessionRowView(session: session) {
-                        Task {
-                            try await authManager.switchToSession(session)
-                        }
-                    }
-                }
-                
-                if authManager.availableSessions.count > 3 {
-                    Button("View All Accounts (\(authManager.availableSessions.count))") {
-                        showingAccountPicker = true
-                    }
-                    .foregroundStyle(.blue)
-                }
-            }
-            
-            Button("Add New Account") {
-                // Switch to authentication content
-                authManager.logout()
-            }
-            .foregroundStyle(.secondary)
+            sessionSelectionHeader
+            sessionsList
+            addAccountButton
         }
         .padding(40)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(.regularMaterial)
+    }
+    
+    private var sessionSelectionHeader: some View {
+        VStack(spacing: 16) {
+            Image(systemName: "person.2.circle")
+                .font(.system(size: 60))
+                .foregroundStyle(.blue)
+            
+            Text("Welcome Back")
+                .font(.largeTitle)
+                .fontWeight(.bold)
+            
+            Text("Choose an account to continue")
+                .font(.body)
+                .foregroundStyle(.secondary)
+        }
+    }
+    
+    private var sessionsList: some View {
+        LazyVStack(spacing: 12) {
+            ForEach(authManager.availableSessions.prefix(3)) { session in
+                SessionRowView(
+                    session: session,
+                    isLoading: switchingSession?.id == session.id
+                ) {
+                    handleSessionSwitch(session)
+                }
+            }
+            
+            if authManager.availableSessions.count > 3 {
+                Button("View All Accounts (\(authManager.availableSessions.count))") {
+                    showingAccountPicker = true
+                }
+                .foregroundStyle(.blue)
+            }
+        }
+    }
+    
+    private var addAccountButton: some View {
+        Button("Add New Account") {
+            // Switch to authentication content
+            authManager.logout()
+        }
+        .foregroundStyle(.secondary)
+    }
+    
+    private func handleSessionSwitch(_ session: NDKSession) {
+        Task {
+            switchingSession = session
+            sessionSwitchError = nil
+            do {
+                try await authManager.switchToSession(session)
+                switchingSession = nil
+            } catch {
+                sessionSwitchError = error
+                switchingSession = nil
+            }
+        }
     }
     
     private func errorView(_ error: Error) -> some View {
@@ -357,7 +393,14 @@ public struct NDKAuthView<AuthenticatedContent: View, AuthenticationContent: Vie
 
 private struct SessionRowView: View {
     let session: NDKSession
+    let isLoading: Bool
     let action: () -> Void
+    
+    init(session: NDKSession, isLoading: Bool = false, action: @escaping () -> Void) {
+        self.session = session
+        self.isLoading = isLoading
+        self.action = action
+    }
     
     var body: some View {
         Button(action: action) {
@@ -407,9 +450,14 @@ private struct SessionRowView: View {
                 
                 Spacer()
                 
-                Image(systemName: "chevron.right")
-                    .font(.caption)
-                    .foregroundStyle(.tertiary)
+                if isLoading {
+                    ProgressView()
+                        .scaleEffect(0.8)
+                } else {
+                    Image(systemName: "chevron.right")
+                        .font(.caption)
+                        .foregroundStyle(.tertiary)
+                }
             }
             .padding()
             .background(.background, in: RoundedRectangle(cornerRadius: 12))
@@ -419,6 +467,8 @@ private struct SessionRowView: View {
             )
         }
         .buttonStyle(.plain)
+        .disabled(isLoading)
+        .opacity(isLoading ? 0.6 : 1.0)
     }
 }
 
@@ -427,37 +477,55 @@ private struct SessionRowView: View {
 private struct AccountPickerView: View {
     @Bindable var authManager: NDKAuthManager
     @Environment(\.dismiss) private var dismiss
+    @State private var switchingSession: NDKSession?
     
     var body: some View {
         NavigationView {
-            List {
-                ForEach(authManager.availableSessions) { session in
-                    SessionRowView(session: session) {
-                        Task {
-                            try await authManager.switchToSession(session)
+            accountList
+                .navigationTitle("Accounts")
+                #if os(iOS)
+                .navigationBarTitleDisplayMode(.inline)
+                #endif
+                .toolbar {
+                    ToolbarItem(placement: .cancellationAction) {
+                        Button("Cancel") {
+                            dismiss()
+                        }
+                    }
+                    
+                    ToolbarItem(placement: .primaryAction) {
+                        Button("Add Account") {
+                            authManager.logout()
                             dismiss()
                         }
                     }
                 }
-                .onDelete(perform: deleteSessions)
+        }
+    }
+    
+    private var accountList: some View {
+        List {
+            ForEach(authManager.availableSessions) { session in
+                SessionRowView(
+                    session: session,
+                    isLoading: switchingSession?.id == session.id
+                ) {
+                    handleAccountSwitch(session)
+                }
             }
-            .navigationTitle("Accounts")
-            #if os(iOS)
-            .navigationBarTitleDisplayMode(.inline)
-            #endif
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") {
-                        dismiss()
-                    }
-                }
-                
-                ToolbarItem(placement: .primaryAction) {
-                    Button("Add Account") {
-                        authManager.logout()
-                        dismiss()
-                    }
-                }
+            .onDelete(perform: deleteSessions)
+        }
+    }
+    
+    private func handleAccountSwitch(_ session: NDKSession) {
+        Task {
+            switchingSession = session
+            do {
+                try await authManager.switchToSession(session)
+                dismiss()
+            } catch {
+                // Error will be shown by parent view
+                switchingSession = nil
             }
         }
     }

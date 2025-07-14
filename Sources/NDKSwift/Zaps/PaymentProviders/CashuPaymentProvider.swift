@@ -70,10 +70,10 @@ public class CashuPaymentProvider: NDKPaymentProvider {
     private func fulfillNutzapRequest(_ request: NutzapFundingRequest) async throws -> PaymentConfirmation {
         // Get our wallet's mints
         let walletMints = await cashuWallet.getMints()
-        let walletMintURLs = Set(walletMints.map { $0.url })
+        let walletMintURLs = Set(walletMints.keys)
         
         // Find intersection with recipient's accepted mints
-        let acceptedMintURLs = Set(request.acceptedMints)
+        let acceptedMintURLs = Set(request.acceptedMints.map { $0.absoluteString })
         let commonMints = walletMintURLs.intersection(acceptedMintURLs)
         
         // Select optimal mint
@@ -81,14 +81,14 @@ public class CashuPaymentProvider: NDKPaymentProvider {
         if !commonMints.isEmpty {
             // Prefer same-mint transfer (free and instant)
             selectedMint = try await selectOptimalMint(
-                from: Array(commonMints),
+                from: commonMints.compactMap { URL(string: $0) },
                 forAmount: request.amountSats
             )
         } else {
             // No common mints - need to use Lightning bridge
             // Get wallet mint URLs for error message
-            let walletMintStrings = walletMintURLs.map { $0.absoluteString }
-            let recipientMintStrings = acceptedMintURLs.map { $0.absoluteString }
+            let walletMintStrings = Array(walletMintURLs)
+            let recipientMintStrings = Array(acceptedMintURLs)
             throw ZapError.noCommonMints(
                 wallet: walletMintStrings,
                 recipient: recipientMintStrings
@@ -111,7 +111,7 @@ public class CashuPaymentProvider: NDKPaymentProvider {
     
     private func fulfillCashuRequest(_ request: CashuProofRequest) async throws -> PaymentConfirmation {
         // Direct Cashu proof request - check if we have balance on this mint
-        let walletMints = await cashuWallet.getMints()
+        let walletMints = await cashuWallet.getMintsInfo()
         guard walletMints.contains(where: { $0.url == request.mintURL }) else {
             throw PaymentError.mintNotAvailable
         }

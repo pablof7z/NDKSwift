@@ -10,7 +10,7 @@ public actor SimpleMemoryCache: NDKCache {
     private var decryptedContent: LRUCache<String, String>
     
     public init() {
-        // Initialize LRU cache with 1000 item limit
+        // Initialize LRU cache with 1000 item limit for decrypted content
         self.decryptedContent = LRUCache(capacity: 1000)
     }
     
@@ -166,18 +166,29 @@ public actor SimpleMemoryCache: NDKCache {
     
     // MARK: - Decrypted Content Cache
     
-    public func getDecryptedContent(for eventId: String) async -> String? {
-        return await decryptedContent.get(eventId)
+    public func getDecryptedContent(for eventId: String, viewerPubkey: String) async -> String? {
+        let key = "\(eventId):\(viewerPubkey)"
+        return await decryptedContent.get(key)
     }
     
-    public func storeDecryptedContent(_ content: String, for eventId: String) async {
-        await decryptedContent.set(eventId, value: content)
-        print("[SimpleMemoryCache] Cached decrypted content for event \(eventId)")
+    public func storeDecryptedContent(_ content: String, for eventId: String, viewerPubkey: String) async {
+        let key = "\(eventId):\(viewerPubkey)"
+        await decryptedContent.set(key, value: content)
+        print("[SimpleMemoryCache] Cached decrypted content for event \(eventId) viewer \(viewerPubkey)")
     }
     
     public func clearDecryptedContent() async {
         await decryptedContent.clear()
         print("[SimpleMemoryCache] Cleared all decrypted content")
+    }
+    
+    public func clearDecryptedContent(for viewerPubkey: String) async {
+        // Get all keys that end with the viewer pubkey
+        let allItems = await decryptedContent.allItems()
+        for (key, _) in allItems where key.hasSuffix(":\(viewerPubkey)") {
+            await decryptedContent.remove(key)
+        }
+        print("[SimpleMemoryCache] Cleared decrypted content for viewer \(viewerPubkey)")
     }
     
     // MARK: - Debug Helpers

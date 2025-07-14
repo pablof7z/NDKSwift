@@ -6,7 +6,7 @@ import SwiftUI
 class NostrManager: ObservableObject {
     @Published var ndk: NDK?
     @Published var isConnected = false
-    @Published var relayStatus: [String: Bool] = []
+    @Published var relayStatus: [String: Bool] = [:]
     
     private var ndkAuthManager: NDKAuthManager
     var cache: NDKSQLiteCache?

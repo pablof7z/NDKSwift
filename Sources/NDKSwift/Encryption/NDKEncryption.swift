@@ -109,10 +109,19 @@ public extension NDKEvent {
     /// - Parameters:
     ///   - signer: The signer to use for decryption
     ///   - senderPubkey: The sender's public key (optional, will extract from event if not provided)
+    ///   - ndk: The NDK instance (optional, used for caching)
     /// - Returns: The decrypted message content
-    func decryptedContent(signer: NDKSigner, senderPubkey: PublicKey? = nil) async throws -> String {
+    func decryptedContent(signer: NDKSigner, senderPubkey: PublicKey? = nil, ndk: NDK? = nil) async throws -> String {
         guard kind == 4 else {
             throw NDKEncryptionError.invalidFormat
+        }
+        
+        // Get viewer pubkey for cache
+        let viewerPubkey = try await signer.pubkey
+        
+        // Check cache first (if available)
+        if let cached = await ndk?.cache?.getDecryptedContent(for: id, viewerPubkey: viewerPubkey) {
+            return cached
         }
         
         let pubkey: PublicKey
@@ -131,6 +140,11 @@ public extension NDKEvent {
             scheme = .nip44
         }
         
-        return try await signer.decrypt(sender: sender, value: content, scheme: scheme)
+        let decrypted = try await signer.decrypt(sender: sender, value: content, scheme: scheme)
+        
+        // Store in cache (if available)
+        await ndk?.cache?.storeDecryptedContent(decrypted, for: id, viewerPubkey: viewerPubkey)
+        
+        return decrypted
     }
 }

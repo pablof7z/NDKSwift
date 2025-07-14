@@ -95,7 +95,7 @@ struct ContentView: View {
                         selectedTab = .wallet
                     }
                 }
-            } authenticationView: {
+            } authenticationContent: {
                 // Custom authentication UI
                 AuthenticationView()
             }

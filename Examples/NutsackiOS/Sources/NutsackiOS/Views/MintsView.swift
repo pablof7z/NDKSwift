@@ -95,7 +95,7 @@ struct MintsView: View {
             return
         }
         
-        let mints = await wallet.getMints()
+        let mints = await wallet.getMintsInfo()
         await MainActor.run {
             availableMints = mints
             isLoading = false

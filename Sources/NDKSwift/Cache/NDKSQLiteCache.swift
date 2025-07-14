@@ -180,14 +180,17 @@ public actor NDKSQLiteCache: NDKCache, MintCache {
         
         // v5: Add decrypted content caching
         migrator.registerMigration("v5-decrypted-content") { db in
-            // Create decrypted_content table
+            // Create decrypted_content table with composite key
             try db.create(table: "decrypted_content") { t in
-                t.column("event_id", .text).primaryKey()
+                t.column("cache_key", .text).primaryKey() // Format: "eventId:viewerPubkey"
+                t.column("event_id", .text).notNull()
+                t.column("viewer_pubkey", .text).notNull()
                 t.column("content", .text).notNull()
                 t.column("decrypted_at", .integer).notNull().defaults(sql: "(CAST(strftime('%s', 'now') AS INTEGER))")
             }
             
-            // Create index on decrypted_at for potential age-based cleanup
+            // Create indexes for efficient lookups and cleanup
+            try db.create(index: "idx_decrypted_content_viewer", on: "decrypted_content", columns: ["viewer_pubkey"])
             try db.create(index: "idx_decrypted_content_time", on: "decrypted_content", columns: ["decrypted_at"])
         }
         
@@ -749,10 +752,11 @@ public actor NDKSQLiteCache: NDKCache, MintCache {
     
     // MARK: - Decrypted Content Cache
     
-    public func getDecryptedContent(for eventId: String) async -> String? {
+    public func getDecryptedContent(for eventId: String, viewerPubkey: String) async -> String? {
         do {
+            let cacheKey = "\(eventId):\(viewerPubkey)"
             return try await dbQueue.read { db in
-                try String.fetchOne(db, sql: "SELECT content FROM decrypted_content WHERE event_id = ?", arguments: [eventId])
+                try String.fetchOne(db, sql: "SELECT content FROM decrypted_content WHERE cache_key = ?", arguments: [cacheKey])
             }
         } catch {
             if debugMode {
@@ -762,16 +766,17 @@ public actor NDKSQLiteCache: NDKCache, MintCache {
         }
     }
     
-    public func storeDecryptedContent(_ content: String, for eventId: String) async {
+    public func storeDecryptedContent(_ content: String, for eventId: String, viewerPubkey: String) async {
         do {
+            let cacheKey = "\(eventId):\(viewerPubkey)"
             try await dbQueue.write { db in
                 try db.execute(
-                    sql: "INSERT OR REPLACE INTO decrypted_content (event_id, content) VALUES (?, ?)",
-                    arguments: [eventId, content]
+                    sql: "INSERT OR REPLACE INTO decrypted_content (cache_key, event_id, viewer_pubkey, content) VALUES (?, ?, ?, ?)",
+                    arguments: [cacheKey, eventId, viewerPubkey, content]
                 )
             }
             if debugMode {
-                print("[NDKSQLiteCache] Stored decrypted content for event \(eventId)")
+                print("[NDKSQLiteCache] Stored decrypted content for event \(eventId) viewer \(viewerPubkey)")
             }
         } catch {
             if debugMode {
@@ -791,6 +796,24 @@ public actor NDKSQLiteCache: NDKCache, MintCache {
         } catch {
             if debugMode {
                 print("[NDKSQLiteCache] Error clearing decrypted content: \(error)")
+            }
+        }
+    }
+    
+    public func clearDecryptedContent(for viewerPubkey: String) async {
+        do {
+            try await dbQueue.write { db in
+                try db.execute(
+                    sql: "DELETE FROM decrypted_content WHERE viewer_pubkey = ?",
+                    arguments: [viewerPubkey]
+                )
+            }
+            if debugMode {
+                print("[NDKSQLiteCache] Cleared decrypted content for viewer \(viewerPubkey)")
+            }
+        } catch {
+            if debugMode {
+                print("[NDKSQLiteCache] Error clearing decrypted content for viewer: \(error)")
             }
         }
     }

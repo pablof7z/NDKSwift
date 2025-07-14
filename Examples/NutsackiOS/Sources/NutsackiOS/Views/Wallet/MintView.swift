@@ -88,7 +88,7 @@ struct MintView: View {
     private func loadMints() async {
         guard let wallet = walletManager.activeWallet else { return }
         
-        let mints = await wallet.getMints()
+        let mints = await wallet.getMintsInfo()
         await MainActor.run {
             availableMints = mints
             if selectedMintURL.isEmpty && !mints.isEmpty {

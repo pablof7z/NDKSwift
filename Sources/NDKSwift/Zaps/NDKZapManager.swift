@@ -1,6 +1,5 @@
 import Foundation
-// FIXME: Temporarily disabled due to CashuSwift build issues
-// import CashuSwift
+import CashuSwift
 import CryptoKit
 
 /// Manages zapping functionality with decoupled protocol and payment handling
@@ -175,7 +174,7 @@ public actor NDKZapManager {
                 }
                 
                 // Mint tokens using the paid invoice
-                let proofs: [CashuProof]
+                let proofs: [CashuSwift.Proof]
                 do {
                     proofs = try await mintTokensWithQuote(
                         quote: quote,
@@ -218,7 +217,7 @@ public actor NDKZapManager {
     private func mintTokensWithQuote(
         quote: MintQuote,
         recipientP2PK: String
-    ) async throws -> [CashuProof] {
+    ) async throws -> [CashuSwift.Proof] {
         // FIXME: CashuSwift functionality temporarily disabled due to build issues
         throw ZapError.paymentFailed("CashuSwift temporarily disabled due to build issues")
         

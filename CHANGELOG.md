@@ -2,57 +2,42 @@
 
 All notable changes to NDKSwift will be documented in this file.
 
-The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.2.0] - 2025-07-14
+
+### Changed
+- **BREAKING**: Major refactoring of NDKCashuWallet to improve architecture and maintainability
+  - Reduced NDKCashuWallet from 2,298 lines to 1,367 lines (40.5% reduction)
+  - Extracted proof state management into dedicated ProofStateManager actor
+  - Extracted event operations into WalletEventManager actor
+  - Extracted payment operations into PaymentProcessor actor
+  - Extracted nutzap operations into NutzapProcessor actor
+  - Extracted health monitoring into WalletHealthMonitor actor
+  - Improved thread safety using Swift actors for all state management
+  - Enhanced separation of concerns following SRP, DRY, KISS, and YAGNI principles
+  - Moved RelayHealth type from NDKCashuWallet to WalletHealthMonitor
 
 ### Added
-- **Unified Wallet Subscription**: NDKCashuWallet now maintains real-time state synchronization
-  - New `startWalletSubscription()` method consolidates all event monitoring
-  - Single subscription handles tokens, quotes, history, config, deletes, and nutzaps
-  - Real-time updates ensure multiple wallet clients stay synchronized
-  - Integrated relay health tracking within unified subscription
-  - Automatic restart when wallet configuration changes
-  
-- **Optimistic Publishing**: Events now appear immediately in subscriptions when published locally
-  - New `EventSource` enum to track event origins (optimistic, relay, cache)
-  - New `EventConfirmationState` enum to track confirmation status
-  - New `NDKOptimisticPublishingConfig` for granular configuration
-  - Events are immediately dispatched to matching subscriptions during publish
-  - Cache tracks unpublished events with confirmation states
-  - Sophisticated deduplication prevents duplicate events when relay confirms
-  - UI can show "sending..." vs "sent" indicators using confirmation states
+- ProofStateManager: Thread-safe proof state tracking with reservation system
+- WalletEventManager: Centralized NIP-60 event creation and management
+- PaymentProcessor: Handles Lightning payments and cross-mint transfers
+- NutzapProcessor: Dedicated handler for nutzap sending and receiving
+- WalletHealthMonitor: Relay synchronization and proof state reconciliation
+- **CLI-Nutsack**: New command-line NIP-60 wallet calculator example
+  - Full navigatable menu system with arrow key support
+  - Balance tracking across multiple mints
+  - Send/receive nutzaps (NIP-61)
+  - Transaction history with table view
+  - Mint management interface
+  - Proof statistics and management
 
-### Enhanced
-- **NDKCashuWallet**: Major refactoring for real-time state synchronization
-  - Removed fragmented subscription methods (`startNutzapMonitor`, `startDeleteEventMonitor`, `startRealtimeMonitoring`)
-  - Added unified `processWalletEvent()` router for all event types
-  - `load()` method now starts real-time subscription automatically
-  - Wallet state updates immediately when changes occur in other clients
-  
-- **NDKCache Protocol**: Added optimistic publishing support methods
-  - `addUnpublishedEvent(_:relays:)` - Cache events optimistically
-  - `confirmEvent(eventId:onRelay:)` - Mark events as confirmed  
-  - `getEventConfirmationState(eventId:)` - Get confirmation status
-- **NDKSubscriptionOptions**: Added `skipOptimisticEvents` flag to opt-out of optimistic events
-- **NDK Core**: Enhanced `publish()` method with optimistic dispatch before relay publishing
-- **SimpleMemoryCache**: Implemented optimistic publishing support with confirmation state tracking
+### Fixed
+- Improved concurrent operation safety with actor-based state management
+- Better error handling and recovery in payment operations
+- More reliable proof state tracking and reconciliation
+- CashuSwift API compatibility issues
+- Build errors in NutsackiOS example app related to refactored types
 
-### Configuration
-- Optimistic publishing is **enabled by default** for better UX
-- `NDKOptimisticPublishingConfig.disabled` available for traditional behavior
-- Per-subscription opt-out via `NDKSubscriptionOptions.skipOptimisticEvents`
-
-### Performance
-- Minimal overhead - only affects the publish path
-- Events are processed once optimistically, then deduplicated when arriving from relays
-- Memory usage slightly increased due to confirmation state tracking
-
-### Breaking Changes
-- None - Full backwards compatibility maintained
-- Existing code works without changes
-- Default behavior provides instant feedback while maintaining reliability
-
-## [0.6.2] - Previous Release
-<!-- Previous changelog entries would go here -->
+## [0.1.0] - Previous version
