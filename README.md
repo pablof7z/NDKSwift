@@ -7,10 +7,11 @@ NDKSwift provides a comprehensive toolkit for building Nostr applications with S
 ## Features
 
 - **Modern Swift Design**: Built with async/await, AsyncSequence, and actors for thread-safe concurrency
+- **Optimistic Publishing**: Instant UI updates with events appearing immediately in subscriptions
 - **Comprehensive NIP Support**: Extensive protocol coverage (see supported NIPs below)
 - **Flexible Architecture**: Protocol-oriented design allowing custom implementations
 - **Outbox Model**: Intelligent relay selection and event routing (enabled by default)
-- **Built-in Caching**: Optional caching with SQLite implementation
+- **Built-in Caching**: Optional caching with SQLite implementation and optimistic event tracking
 - **Wallet Integration**: Nostr Wallet Connect (NWC) support for payments
 - **File Storage**: Blossom protocol support for decentralized file storage
 - **Type Safety**: Strongly typed events, filters, and relay management
@@ -57,12 +58,12 @@ for await event in subscription {
     print("\(event.pubkey): \(event.content)")
 }
 
-// Publish an event
+// Publish an event (appears instantly in subscriptions!)
 let signer = try NDKPrivateKeySigner.generate()
 ndk.signer = signer
 
 let event = NDKEvent(content: "Hello, Nostr!", tags: [])
-try await ndk.publish(event)
+try await ndk.publish(event) // Event appears immediately in active subscriptions
 ```
 
 ## Core Concepts
@@ -77,8 +78,13 @@ let event = NDKEvent(
     tags: [["t", "nostr"], ["t", "swift"]]
 )
 
-// Sign and publish
+// Sign and publish (with optimistic publishing for instant UI feedback)
 try await ndk.publish(event)
+
+// Configure optimistic publishing behavior
+ndk.optimisticPublishingConfig.enabled = true // default
+ndk.optimisticPublishingConfig.cacheUnpublishedEvents = true
+ndk.optimisticPublishingConfig.dispatchToSubscriptions = true
 ```
 
 ### Subscriptions
@@ -86,14 +92,20 @@ try await ndk.publish(event)
 Subscribe to events using modern AsyncSequence patterns:
 
 ```swift
-// Real-time subscription
+// Real-time subscription (receives optimistic events immediately)
 let subscription = ndk.subscribe(filters: [
     NDKFilter(authors: [bobPubkey], kinds: [1])
 ])
 
 for await event in subscription {
-    // Process each event as it arrives
+    // Process each event as it arrives (including optimistic events!)
+    // You can check event confirmation state if needed
 }
+
+// Skip optimistic events if desired
+var options = NDKSubscriptionOptions()
+options.skipOptimisticEvents = true
+let strictSubscription = ndk.subscribe(filters: [filter], options: options)
 
 // One-shot fetch
 let events = try await ndk.fetchEvents(
@@ -118,15 +130,28 @@ let bunkerSigner = NDKBunkerSigner(remotePubkey: "bunker-pubkey", relayUrls: ["w
 
 ### Caching
 
-Enable caching for better performance:
+Enable caching for better performance and optimistic publishing:
 
 ```swift
 let cache = NDKSQLiteCache()
 let ndk = NDK(relayUrls: relayUrls, cache: cache)
 
 // Events are automatically cached
+// Optimistic events are tracked with confirmation states
+// Deletion events (NIP-09) are automatically processed
 // Queries check cache first
 let cachedEvents = try await ndk.fetchEvents(filter, useCache: true)
+
+// Check event confirmation state (for UI feedback)
+let confirmationState = await cache.getEventConfirmationState(eventId: event.id)
+switch confirmationState {
+case .optimistic:
+    // Show "sending..." indicator
+case .confirmed(let relay):
+    // Show "sent via \(relay)" indicator
+case nil:
+    // Event not found or no tracking
+}
 ```
 
 ### Wallets & Payments
@@ -244,6 +269,7 @@ The [Examples](Examples/) directory contains runnable demos:
 
 - `SimpleDemo.swift` - Basic usage example
 - `StandaloneDemo.swift` - Self-contained demo (no compilation needed)
+- `OptimisticPublishingDemo.swift` - Optimistic publishing demonstration
 - `NWCDemo.swift` - Wallet integration example
 - `BlossomDemo.swift` - File storage example
 - `OutboxDemo.swift` - Outbox model demonstration

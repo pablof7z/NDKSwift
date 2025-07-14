@@ -48,6 +48,7 @@ public var outboxConfig: NDKOutboxConfig         // Outbox configuration
 public var outbox: NDKOutboxManager { get }      // Simplified outbox API
 public var subscriptionTracker: NDKSubscriptionTracker { get }
 public var signatureVerificationConfig: NDKSignatureVerificationConfig { get }
+public var optimisticPublishingConfig: NDKOptimisticPublishingConfig // Optimistic publishing configuration
 public var relays: [NDKRelay] { get }           // All configured relays
 public var pool: NDKRelayPool { get }           // Relay pool manager
 ```
@@ -71,11 +72,15 @@ public func removeRelay(_ url: RelayURL)
 #### Event Publishing
 
 ```swift
-// Publish event (uses outbox model if enabled)
+// Publish event (uses outbox model if enabled, optimistic publishing by default)
 public func publish(_ event: NDKEvent) async throws -> Set<NDKRelay>
 
 // Publish to specific relays
 public func publish(event: NDKEvent, to relayUrls: Set<String>) async throws -> Set<NDKRelay>
+
+// Optimistic publishing configuration
+public var optimisticPublishingConfig: NDKOptimisticPublishingConfig
+// Configure: enabled, cacheUnpublishedEvents, dispatchToSubscriptions
 ```
 
 #### Subscriptions
@@ -390,6 +395,7 @@ public struct NDKSubscriptionOptions {
     public var limit: Int?                       // Max events to receive
     public var timeout: TimeInterval?            // Subscription timeout
     public var relays: Set<NDKRelay>?           // Specific relays to use
+    public var skipOptimisticEvents: Bool = false // Skip optimistic events (default: false)
 }
 ```
 
@@ -627,6 +633,11 @@ public protocol NDKCache: Actor {
     func saveProfile(_ profile: NDKUserProfile, pubkey: String) async throws
     func getProfile(pubkey: String) async -> NDKUserProfile?
     
+    // Optimistic publishing support
+    func addUnpublishedEvent(_ event: NDKEvent, relays: Set<String>) async throws
+    func confirmEvent(eventId: String, onRelay relay: String) async throws
+    func getEventConfirmationState(eventId: String) async -> EventConfirmationState?
+    
     // Management
     func clear() async throws
 }
@@ -829,6 +840,41 @@ public enum RelayPublishStatus {
     case pending
     case success
     case failed(Error)
+}
+```
+
+### Optimistic Publishing Types
+
+#### EventSource
+
+```swift
+public enum EventSource: Sendable {
+    case optimistic                              // Locally published event
+    case relay(RelayProtocol)                   // Event from relay
+    case cache                                  // Event from cache
+}
+```
+
+#### EventConfirmationState
+
+```swift
+public enum EventConfirmationState: Equatable, Sendable {
+    case optimistic                             // Event published optimistically
+    case confirmed(fromRelay: String)           // Event confirmed by relay
+    
+    public var isConfirmed: Bool { get }        // True if confirmed
+}
+```
+
+#### NDKOptimisticPublishingConfig
+
+```swift
+public struct NDKOptimisticPublishingConfig: Sendable {
+    public var enabled: Bool = true                      // Enable optimistic publishing
+    public var cacheUnpublishedEvents: Bool = true      // Cache unpublished events
+    public var dispatchToSubscriptions: Bool = true     // Dispatch to subscriptions
+    
+    public static let disabled: NDKOptimisticPublishingConfig // Disabled configuration
 }
 ```
 
