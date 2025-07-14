@@ -27,7 +27,7 @@ public class CashuPaymentProvider: NDKPaymentProvider {
         // 2. Nutzap funding requests (choosing optimal mint)
         // 3. Lightning invoices (via mint's Lightning gateway)
         
-        if request is CashuProofRequest || request is NutzapFundingRequest {
+        if request is CashuProofRequest || request is NutzapPaymentRequest {
             return await isAvailable()
         }
         
@@ -44,7 +44,7 @@ public class CashuPaymentProvider: NDKPaymentProvider {
     
     public func fulfill(_ request: PaymentRequest) async throws -> PaymentConfirmation {
         // Handle Nutzap funding request
-        if let nutzapRequest = request as? NutzapFundingRequest {
+        if let nutzapRequest = request as? NutzapPaymentRequest {
             return try await fulfillNutzapRequest(nutzapRequest)
         }
         
@@ -67,7 +67,7 @@ public class CashuPaymentProvider: NDKPaymentProvider {
     
     // MARK: - Private Methods
     
-    private func fulfillNutzapRequest(_ request: NutzapFundingRequest) async throws -> PaymentConfirmation {
+    private func fulfillNutzapRequest(_ request: NutzapPaymentRequest) async throws -> PaymentConfirmation {
         // Get our wallet's mints
         let walletMints = await cashuWallet.getMints()
         let walletMintURLs = Set(walletMints.keys)
@@ -138,7 +138,10 @@ public class CashuPaymentProvider: NDKPaymentProvider {
         )
         
         return LightningPaymentConfirmation(
+            amountSats: request.amountSats,
+            timestamp: Date(),
             preimage: result.preimage,
+            paymentHash: nil,
             feePaid: result.feePaid
         )
     }

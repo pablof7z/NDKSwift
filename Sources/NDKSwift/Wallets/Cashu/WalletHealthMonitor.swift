@@ -221,6 +221,7 @@ public actor WalletHealthMonitor {
                 let availableByMint = await proofStateManager.getAvailableProofsByMint()
                 _ = try await eventManager.updateTokenEvents(
                     availableProofsByMint: availableByMint,
+                    proofStateManager: proofStateManager,
                     signer: signer
                 )
             }

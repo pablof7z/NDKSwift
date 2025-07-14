@@ -15,7 +15,6 @@ public actor WalletEventManager {
     private let ndk: NDK
     private var currentTokenEventIds: Set<String> = []
     private var deletedTokenEventIds: Set<String> = []
-    private var supersededTokenEventIds: Set<String> = []
     
     // Wallet event tracking
     private var lastWalletConfigTimestamp: Timestamp = 0
@@ -31,6 +30,7 @@ public actor WalletEventManager {
     /// Create or update token events based on proof state changes
     public func updateTokenEvents(
         availableProofsByMint: [String: [CashuSwift.Proof]],
+        proofStateManager: ProofStateManager,
         signer: NDKSigner
     ) async throws -> [String] {
         // Create new token events for each mint
@@ -49,6 +49,11 @@ public actor WalletEventManager {
             )
             newEventIds.insert(eventId)
             print("WalletEventManager - Saved token event: \(eventId) for mint: \(mint)")
+            
+            // Update proof ownership to this event
+            // We don't have the timestamp here, but these are new events we're creating
+            // so they will have the current timestamp which should be newer than any existing
+            await proofStateManager.updateProofOwnership(proofs, eventId: eventId, timestamp: Timestamp(Date().timeIntervalSince1970))
         }
         
         // Delete old token events that are no longer needed
@@ -235,21 +240,15 @@ public actor WalletEventManager {
         deletedTokenEventIds.insert(eventId)
     }
     
-    /// Track superseded events from del tags
-    public func markEventsSuperseded(_ eventIds: [String]) {
-        supersededTokenEventIds.formUnion(eventIds)
-    }
-    
     /// Check if an event should be filtered
     public func shouldFilterEvent(_ eventId: String) -> Bool {
-        return deletedTokenEventIds.contains(eventId) || supersededTokenEventIds.contains(eventId)
+        return deletedTokenEventIds.contains(eventId)
     }
     
     /// Clear all tracked event IDs
     public func clearTrackedEvents() {
         currentTokenEventIds.removeAll()
         deletedTokenEventIds.removeAll()
-        supersededTokenEventIds.removeAll()
     }
     
     /// Get current token event IDs

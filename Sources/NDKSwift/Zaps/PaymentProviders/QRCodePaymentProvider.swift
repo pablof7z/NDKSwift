@@ -58,6 +58,8 @@ public class QRCodePaymentProvider: NDKPaymentProvider {
         }
         
         return LightningPaymentConfirmation(
+            amountSats: request.amountSats,
+            timestamp: Date(),
             preimage: preimage,
             paymentHash: nil,
             feePaid: nil

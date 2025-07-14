@@ -7,7 +7,7 @@ struct ReceiveView: View {
     
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var modelContext
-    @EnvironmentObject private var walletManager: WalletManager
+    @Environment(WalletManager.self) private var walletManager
     
     @State private var inputToken = ""
     @State private var isProcessing = false

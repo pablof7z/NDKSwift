@@ -9,7 +9,6 @@ public actor NutzapProcessor {
     private let proofStateManager: ProofStateManager
     private let eventManager: WalletEventManager
     private let p2pkManager: P2PKManager
-    private weak var wallet: NDKCashuWallet?
     private let ndk: NDK
     
     // MARK: - Initialization
@@ -23,19 +22,15 @@ public actor NutzapProcessor {
         self.proofStateManager = proofStateManager
         self.eventManager = eventManager
         self.p2pkManager = p2pkManager
-        self.wallet = nil
         self.ndk = ndk
     }
     
-    /// Set the wallet reference after initialization
-    public func setWallet(_ wallet: NDKCashuWallet) {
-        self.wallet = wallet
-    }
     
     // MARK: - Sending Nutzaps
     
     /// Send a nutzap to a recipient
     public func sendNutzap(
+        wallet: NDKCashuWallet,
         amount: Int64,
         to recipient: PublicKey,
         comment: String? = nil,
@@ -43,10 +38,6 @@ public actor NutzapProcessor {
         mints: [String: CashuSwift.Mint],
         signer: NDKSigner
     ) async throws -> NDKEvent {
-        guard let wallet = wallet else {
-            throw NDKError.notConfigured("Wallet reference lost")
-        }
-        
         // Find a mint with sufficient balance
         var selectedMint: (url: String, mint: CashuSwift.Mint)?
         for (mintURL, mint) in mints {
@@ -85,6 +76,7 @@ public actor NutzapProcessor {
             
             // Create nutzap event
             let nutzapEvent = try await createNutzapEvent(
+                wallet: wallet,
                 proofs: lockedProofs,
                 recipient: recipient,
                 amount: amount,
@@ -105,9 +97,7 @@ public actor NutzapProcessor {
             }
             
             // Update token events
-            if let wallet = self.wallet {
-                _ = try await wallet.update(deletedProofs: selectedProofs, addedProofs: change ?? [])
-            }
+            _ = try await wallet.update(deletedProofs: selectedProofs, addedProofs: change ?? [])
             
             // Create spending history
             try await eventManager.createSpendingHistoryEvent(
@@ -132,6 +122,7 @@ public actor NutzapProcessor {
     
     /// Process an incoming nutzap event
     public func processIncomingNutzap(
+        wallet: NDKCashuWallet,
         _ event: NDKEvent,
         mints: [String: CashuSwift.Mint],
         keysets: [String: CashuSwift.Keyset],
@@ -195,9 +186,7 @@ public actor NutzapProcessor {
         guard totalReceived > 0 else { return }
         
         // Update wallet state
-        if let wallet = self.wallet {
-            _ = try await wallet.update(deletedProofs: [], addedProofs: redeemedProofs)
-        }
+        _ = try await wallet.update(deletedProofs: [], addedProofs: redeemedProofs)
         
         // Create spending history for received nutzap
         if let signer = ndk.signer {
@@ -243,6 +232,7 @@ public actor NutzapProcessor {
     }
     
     private func createNutzapEvent(
+        wallet: NDKCashuWallet,
         proofs: [CashuSwift.Proof],
         recipient: PublicKey,
         amount: Int64,
@@ -250,10 +240,6 @@ public actor NutzapProcessor {
         eventId: String?,
         signer: NDKSigner
     ) async throws -> NDKEvent {
-        guard let wallet = wallet else {
-            throw NDKError.notConfigured("Wallet reference lost")
-        }
-        
         // Get mints reference
         let mints = await wallet.getMints()
         

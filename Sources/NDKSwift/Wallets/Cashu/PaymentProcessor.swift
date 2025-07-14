@@ -8,7 +8,6 @@ public actor PaymentProcessor {
     
     private let proofStateManager: ProofStateManager
     private let eventManager: WalletEventManager
-    private weak var wallet: NDKCashuWallet?
     
     // MARK: - Initialization
     
@@ -18,18 +17,14 @@ public actor PaymentProcessor {
     ) {
         self.proofStateManager = proofStateManager
         self.eventManager = eventManager
-        self.wallet = nil
     }
     
-    /// Set the wallet reference after initialization
-    public func setWallet(_ wallet: NDKCashuWallet) {
-        self.wallet = wallet
-    }
     
     // MARK: - Lightning Payments
     
     /// Pay a Lightning invoice from the wallet
     public func payLightning(
+        wallet: NDKCashuWallet,
         invoice: String,
         amount: Int64,
         mints: [String: CashuSwift.Mint],
@@ -49,6 +44,7 @@ public actor PaymentProcessor {
             
             do {
                 return try await payLightningFromMint(
+                    wallet: wallet,
                     invoice: invoice,
                     amount: invoiceAmount,
                     mintURL: mintURL,
@@ -67,6 +63,7 @@ public actor PaymentProcessor {
     
     /// Pay Lightning invoice from a specific mint
     private func payLightningFromMint(
+        wallet: NDKCashuWallet,
         invoice: String,
         amount: Int64,
         mintURL: String,
@@ -147,19 +144,17 @@ public actor PaymentProcessor {
             }
             
             // Update wallet state
-            if let wallet = self.wallet {
-                let newEventIds = try await wallet.update(deletedProofs: selectedProofs, addedProofs: change ?? [])
-                
-                // Create spending history
-                try await eventManager.createSpendingHistoryEvent(
-                    direction: .out,
-                    amount: amount,
-                    destroyedEventIds: nil,
-                    createdEventIds: newEventIds,
-                    redeemedEventId: nil,
-                    signer: signer
-                )
-            }
+            let newEventIds = try await wallet.update(deletedProofs: selectedProofs, addedProofs: change ?? [])
+            
+            // Create spending history
+            try await eventManager.createSpendingHistoryEvent(
+                direction: .out,
+                amount: amount,
+                destroyedEventIds: nil,
+                createdEventIds: newEventIds,
+                redeemedEventId: nil,
+                signer: signer
+            )
             
             let actualFeePaid = lightningFee + Int64(inputFee)
             return (preimage: quote.quote, feePaid: actualFeePaid)
@@ -175,6 +170,7 @@ public actor PaymentProcessor {
     
     /// Transfer tokens between mints using Lightning as a bridge
     func transferBetweenMints(
+        wallet: NDKCashuWallet,
         from sourceMintURL: URL,
         to destinationMintURL: URL,
         amount: Int64,
@@ -204,6 +200,7 @@ public actor PaymentProcessor {
         
         // Step 2: Pay invoice from source mint
         let (preimage, feePaid) = try await payLightning(
+            wallet: wallet,
             invoice: invoice,
             amount: amount,
             mints: mints,
@@ -227,9 +224,7 @@ public actor PaymentProcessor {
             await proofStateManager.addProof(proof, mint: destinationMintURL.absoluteString)
         }
         
-        if let wallet = self.wallet {
-            _ = try await wallet.update(deletedProofs: [], addedProofs: newProofs)
-        }
+        _ = try await wallet.update(deletedProofs: [], addedProofs: newProofs)
         
         return PaymentTransferResult(
             proofs: newProofs,
@@ -242,6 +237,7 @@ public actor PaymentProcessor {
     
     /// Send P2PK-locked proofs to a recipient
     public func sendP2PK(
+        wallet: NDKCashuWallet,
         amount: Int64,
         to recipientP2PK: String,
         mint mintURL: URL,
@@ -295,9 +291,7 @@ public actor PaymentProcessor {
             }
             
             // Update wallet state
-            if let wallet = self.wallet {
-                _ = try await wallet.update(deletedProofs: selectedProofs, addedProofs: changeProofs ?? [])
-            }
+            _ = try await wallet.update(deletedProofs: selectedProofs, addedProofs: changeProofs ?? [])
             
             return (proofs: lockedProofs, change: changeProofs)
             

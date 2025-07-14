@@ -3,10 +3,11 @@ import NDKSwift
 
 struct TransactionView {
     static func showHistory(ndk: NDK, wallet: NDKCashuWallet) async throws {
-        guard let pubkey = try await ndk.signer?.publicKey() else {
+        guard let signer = ndk.signer else {
             print("❌ No signer available")
             return
         }
+        let pubkey = try await signer.pubkey
         
         print("📜 Transaction History")
         print("=".repeated(80))
@@ -14,8 +15,8 @@ struct TransactionView {
         
         // Fetch spending history events (kind 7376)
         let filter = NDKFilter(
-            kinds: [7376],
-            authors: [pubkey]
+            authors: [pubkey],
+            kinds: [7376]
         )
         
         let events = try await ndk.fetchEvents(filter)
@@ -39,7 +40,7 @@ struct TransactionView {
                    value: event.content,
                    scheme: .nip44
                ),
-               let data = decrypted.data(using: .utf8),
+               let data = decrypted.data(using: String.Encoding.utf8),
                let tags = try? JSONDecoder().decode([[String]].self, from: data) {
                 
                 // Parse from decrypted tags
@@ -50,7 +51,7 @@ struct TransactionView {
                 let txType = event.tags.first(where: { $0.first == "type" })?.dropFirst().first ?? "cashu"
                 
                 transactions.append((
-                    date: Date(timeIntervalSince1970: TimeInterval(event.createdAt ?? 0)),
+                    date: Date(timeIntervalSince1970: TimeInterval(event.createdAt)),
                     direction: direction,
                     amount: amount,
                     type: txType,
@@ -103,7 +104,7 @@ struct TransactionView {
         print("📋 Transaction Details")
         print("=".repeated(50))
         
-        let date = Date(timeIntervalSince1970: TimeInterval(event.createdAt ?? 0))
+        let date = Date(timeIntervalSince1970: TimeInterval(event.createdAt))
         let dateFormatter = DateFormatter()
         dateFormatter.dateFormat = "yyyy-MM-dd HH:mm:ss"
         
@@ -130,8 +131,8 @@ struct TransactionView {
             if let nutzapId = redeemedTag.dropFirst().first {
                 // Try to fetch the nutzap event
                 if let nutzapEvent = try? await ndk.fetchEvent(nutzapId) {
-                    let senderNpub = try? NDKUser.npub(from: nutzapEvent.pubkey)
-                    print("👤 From: \(senderNpub ?? nutzapEvent.pubkey)")
+                    let sender = NDKUser(pubkey: nutzapEvent.pubkey)
+                    print("👤 From: \(sender.npub)")
                 }
             }
         }

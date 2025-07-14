@@ -56,7 +56,6 @@ public actor NDKOutboxManager {
                 relayObjects.append(relay)
             } else {
                 let newRelay = await ndk.relayPool.addRelay(url)
-                newRelay.ndk = ndk
                 relayObjects.append(newRelay)
             }
         }

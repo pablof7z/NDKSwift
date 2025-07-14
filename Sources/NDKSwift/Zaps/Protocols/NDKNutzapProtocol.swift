@@ -40,9 +40,9 @@ public class NDKNutzapProtocol: NDKZapProtocol {
         
         // 3. Create payment request with ALL accepted mints
         // Payment provider will choose the optimal one
-        let paymentRequest = NutzapFundingRequest(
+        let paymentRequest = NutzapPaymentRequest(
             amountSats: amountSats,
-            recipientP2PK: await preferences.p2pkPubkey,
+            recipientPubkey: await preferences.p2pkPubkey,
             acceptedMints: acceptedMints,
             comment: comment
         )

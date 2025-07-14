@@ -32,25 +32,6 @@ public extension NDKRelayPool {
 
 /// Extensions to NDKRelay for outbox model support
 public extension NDKRelay {
-    /// Publish an event and wait for response
-    func publish(_ event: NDKEvent) async throws -> (success: Bool, message: String?) {
-        // Send the event
-        let message = NostrMessage.event(subscriptionId: nil, event: event)
-        try await send(message.serialize())
-
-        // Wait for OK response (this would need proper implementation)
-        // For now, return success
-        // In a real implementation, would need to wait for ["OK", event.id, success, message]
-        return (success: true, message: nil)
-    }
-
-    /// Fetch events with a filter
-    func fetchEvents(filter _: NDKFilter) async throws -> [NDKEvent] {
-        // This would need proper implementation with subscription handling
-        // For now, return empty array
-        return []
-    }
-
     /// Subscribe to events on this relay
     func subscribe(
         filters: [NDKFilter],

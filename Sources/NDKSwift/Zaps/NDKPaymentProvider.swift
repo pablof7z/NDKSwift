@@ -1,28 +1,9 @@
 import Foundation
 import CashuSwift
 
-// MARK: - Payment Request Types
+// Payment types are now unified in ZapTypes.swift
 
-/// An abstract request for payment, created by a Zap Protocol handler
-public protocol PaymentRequest { 
-    /// The amount in satoshis
-    var amountSats: Int64 { get }
-}
-
-/// A concrete request to pay a BOLT11 invoice
-public struct LightningInvoiceRequest: PaymentRequest {
-    public let invoice: String
-    public let amountSats: Int64
-    public let recipient: String // For display/logging
-    
-    public init(invoice: String, amountSats: Int64, recipient: String) {
-        self.invoice = invoice
-        self.amountSats = amountSats
-        self.recipient = recipient
-    }
-}
-
-/// A concrete request to generate Cashu proofs for a nutzap
+/// Legacy type for Cashu-specific proof requests (to be refactored)
 public struct CashuProofRequest: PaymentRequest {
     public let amountSats: Int64
     public let mintURL: URL
@@ -37,46 +18,17 @@ public struct CashuProofRequest: PaymentRequest {
     }
 }
 
-/// A request for funding a Nutzap - includes all accepted mints so payment provider can choose
-public struct NutzapFundingRequest: PaymentRequest {
-    public let amountSats: Int64
-    public let recipientP2PK: String
-    public let acceptedMints: [URL]  // All mints the recipient accepts
-    public let comment: String?
-    
-    public init(amountSats: Int64, recipientP2PK: String, acceptedMints: [URL], comment: String? = nil) {
-        self.amountSats = amountSats
-        self.recipientP2PK = recipientP2PK
-        self.acceptedMints = acceptedMints
-        self.comment = comment
-    }
-}
-
-// MARK: - Payment Confirmation Types
-
-/// An abstract confirmation of payment, returned by a Payment Provider
-public protocol PaymentConfirmation { }
-
-/// A concrete confirmation for a Lightning payment
-public struct LightningPaymentConfirmation: PaymentConfirmation {
-    public let preimage: String
-    public let paymentHash: String?
-    public let feePaid: Int64?
-    
-    public init(preimage: String, paymentHash: String? = nil, feePaid: Int64? = nil) {
-        self.preimage = preimage
-        self.paymentHash = paymentHash
-        self.feePaid = feePaid
-    }
-}
-
-/// A concrete confirmation for a Cashu payment
+/// Legacy Cashu payment confirmation with proof details (to be refactored)
 public struct CashuPaymentConfirmation: PaymentConfirmation {
+    public let amountSats: Int64
+    public let timestamp: Date
     public let proofs: [CashuSwift.Proof]
     public let change: [CashuSwift.Proof]?
     public let mintURL: URL  // The mint that was actually used
     
     public init(proofs: [CashuSwift.Proof], change: [CashuSwift.Proof]? = nil, mintURL: URL) {
+        self.amountSats = proofs.reduce(Int64(0)) { $0 + Int64($1.amount) }
+        self.timestamp = Date()
         self.proofs = proofs
         self.change = change
         self.mintURL = mintURL

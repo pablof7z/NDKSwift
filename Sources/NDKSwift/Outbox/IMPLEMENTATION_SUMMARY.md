@@ -34,9 +34,6 @@ The outbox model has been successfully implemented for NDKSwift with the followi
 // Publish with outbox model
 let result = try await ndk.publishWithOutbox(event)
 
-// Fetch with optimal relays
-let events = try await ndk.fetchEventsWithOutbox(filter: filter)
-
 // Track user preferences
 await ndk.setRelaysForUser(pubkey: pubkey, readRelays: [...], writeRelays: [...])
 ```

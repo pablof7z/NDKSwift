@@ -19,7 +19,7 @@ class WalletManager {
         
         // Connect to relays
         print("📡 Connecting to relays...")
-        try await ndk.connect()
+        await ndk.connect()
         print("✅ Connected successfully!")
         
         // Load or create wallet
@@ -32,9 +32,10 @@ class WalletManager {
     }
     
     private func loadOrCreateWallet() async throws -> NDKCashuWallet {
-        guard let pubkey = try await ndk.signer?.publicKey() else {
+        guard let signer = ndk.signer else {
             throw WalletError.noSigner
         }
+        let pubkey = try await signer.pubkey
         
         print("🔍 Looking for existing wallet...")
         
@@ -123,8 +124,8 @@ class WalletManager {
         
         // Check if recipient accepts nutzaps
         let filter = NDKFilter(
-            kinds: [10019], // nutzapPreferences
-            authors: [recipientPubkey]
+            authors: [recipientPubkey],
+            kinds: [10019] // nutzapPreferences
         )
         
         let preferences = try await ndk.fetchEvents(filter)
@@ -133,9 +134,10 @@ class WalletManager {
         }
         
         // Extract accepted mints
-        let acceptedMints = prefEvent.tags
-            .filter { $0.first == "mint" && $0.count > 1 }
-            .compactMap { URL(string: $0[1]) }
+        let mintTags = prefEvent.tags.filter { $0.first == "mint" && $0.count > 1 }
+        let acceptedMints = mintTags.compactMap { tag in
+            URL(string: tag[1])
+        }
         
         guard !acceptedMints.isEmpty else {
             throw WalletError.recipientDoesNotAcceptNutzaps
@@ -148,11 +150,15 @@ class WalletManager {
         }
         
         // Create nutzap request
+        let recipient = NDKUser(pubkey: recipientPubkey)
+        let p2pkPubkey = prefEvent.tags.first(where: { $0.first == "pubkey" && $0.count > 1 })?[1] ?? recipientPubkey
+        
         let request = NDKNutzapRequest(
-            recipientPubkey: recipientPubkey,
+            recipient: recipient,
             amount: Int64(amount),
-            comment: comment,
-            mints: acceptedMints
+            mints: acceptedMints,
+            recipientPubkey: p2pkPubkey,
+            comment: comment
         )
         
         // Send nutzap

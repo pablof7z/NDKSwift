@@ -4,7 +4,7 @@ import NDKSwift
 
 struct CreateAccountView: View {
     @Environment(\.dismiss) private var dismiss
-    @EnvironmentObject private var nostrManager: NostrManager
+    @Environment(NostrManager.self) private var nostrManager
     
     @State private var displayName = ""
     @State private var about = ""
@@ -13,6 +13,7 @@ struct CreateAccountView: View {
     @State private var errorMessage = ""
     @State private var createdSession: NDKSession?
     @State private var showBackupView = false
+    @State private var accountCreated = false
     
     var body: some View {
         NavigationStack {
@@ -56,7 +57,13 @@ struct CreateAccountView: View {
             }
             .navigationDestination(isPresented: $showBackupView) {
                 if let session = createdSession {
-                    BackupKeyView(session: session)
+                    BackupKeyView(session: session, accountCreated: $accountCreated)
+                }
+            }
+            .onChange(of: accountCreated) { _, created in
+                if created && !showBackupView {
+                    // Account was created and backup view was dismissed
+                    dismiss()
                 }
             }
         }
@@ -78,6 +85,7 @@ struct CreateAccountView: View {
                     createdSession = session
                     showBackupView = true
                     isCreating = false
+                    accountCreated = true
                 }
             } catch {
                 await MainActor.run {
@@ -93,8 +101,9 @@ struct CreateAccountView: View {
 // MARK: - Backup Key View
 struct BackupKeyView: View {
     @Environment(\.dismiss) private var dismiss
-    @EnvironmentObject private var nostrManager: NostrManager
+    @Environment(NostrManager.self) private var nostrManager
     let session: NDKSession
+    @Binding var accountCreated: Bool
     
     @State private var copiedPrivateKey = false
     @State private var savedKey = false
@@ -163,7 +172,7 @@ struct BackupKeyView: View {
             .toggleStyle(CheckboxToggleStyle())
             .padding(.horizontal)
             
-            Button(action: { dismiss() }) {
+            Button(action: continueToWallet) {
                 Text("Continue to Wallet")
                     .frame(maxWidth: .infinity)
                     .padding()
@@ -214,6 +223,11 @@ struct BackupKeyView: View {
                 copiedPrivateKey = false
             }
         }
+    }
+    
+    private func continueToWallet() {
+        // Dismiss the backup view
+        dismiss()
     }
 }
 

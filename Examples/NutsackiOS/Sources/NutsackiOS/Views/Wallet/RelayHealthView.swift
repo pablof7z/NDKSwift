@@ -3,7 +3,7 @@ import NDKSwift
 import SwiftData
 
 struct RelayHealthView: View {
-    @EnvironmentObject private var walletManager: WalletManager
+    @Environment(WalletManager.self) private var walletManager
     @State private var relayHealth: [WalletHealthMonitor.RelayHealth] = []
     @State private var isLoading = true
     @State private var lastUpdateTime: Date?
@@ -323,7 +323,7 @@ struct RelayRepairSheet: View {
     let relayHealth: WalletHealthMonitor.RelayHealth
     let onComplete: () -> Void
     @Environment(\.dismiss) private var dismiss
-    @EnvironmentObject private var walletManager: WalletManager
+    @Environment(WalletManager.self) private var walletManager
     @State private var isRepairing = false
     
     var body: some View {

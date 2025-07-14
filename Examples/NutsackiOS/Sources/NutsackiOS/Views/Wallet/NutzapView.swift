@@ -5,8 +5,8 @@ import NDKSwift
 struct NutzapView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var modelContext
-    @EnvironmentObject private var nostrManager: NostrManager
-    @EnvironmentObject private var walletManager: WalletManager
+    @Environment(NostrManager.self) private var nostrManager
+    @Environment(WalletManager.self) private var walletManager
     
     @State private var recipientInput = ""
     @State private var resolvedUser: NDKUser?
@@ -189,7 +189,8 @@ struct NutzapView: View {
                 }
                 // Try as NIP-05
                 else if recipientInput.contains("@") {
-                    pubkey = try await resolveNIP05(recipientInput)
+                    let user = try await NDKUser.fromNip05(recipientInput, ndk: ndk)
+                    pubkey = user.publicKey
                 }
                 
                 if let pubkey = pubkey {
@@ -306,40 +307,6 @@ struct NutzapView: View {
                 acceptedMints = []
             }
         }
-    }
-    
-    private func resolveNIP05(_ identifier: String) async throws -> String? {
-        // Parse NIP-05 identifier
-        let parts = identifier.split(separator: "@")
-        guard parts.count == 2 else {
-            throw NutzapError.invalidRecipient
-        }
-        
-        let name = String(parts[0])
-        let domain = String(parts[1])
-        
-        // Construct well-known URL
-        let urlString = "https://\(domain)/.well-known/nostr.json?name=\(name)"
-        guard let url = URL(string: urlString) else {
-            throw NutzapError.invalidRecipient
-        }
-        
-        // Fetch NIP-05 data
-        let (data, _) = try await URLSession.shared.data(from: url)
-        
-        // Parse response
-        struct NIP05Response: Codable {
-            let names: [String: String]
-        }
-        
-        let response = try JSONDecoder().decode(NIP05Response.self, from: data)
-        
-        // Get pubkey for name
-        guard let pubkey = response.names[name.lowercased()] else {
-            throw NutzapError.invalidRecipient
-        }
-        
-        return pubkey
     }
     
     private func loadBalance() {

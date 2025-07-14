@@ -17,7 +17,9 @@ public final class NDK {
     }
 
     /// Relay pool (thread-safe actor)
-    let relayPool: NDKRelayPool
+    lazy var relayPool: NDKRelayPool = {
+        NDKRelayPool(ndk: self)
+    }()
 
     /// Event repository
     private let eventRepository: NDKEventRepository
@@ -125,7 +127,6 @@ public final class NDK {
     ) {
         self.signer = signer
         self.cache = cache
-        self.relayPool = NDKRelayPool()
         self.eventRepository = NDKEventRepository()
         self.signatureVerificationConfig = signatureVerificationConfig
         self.signatureVerificationSampler = NDKSignatureVerificationSampler(config: signatureVerificationConfig)
@@ -152,12 +153,12 @@ public final class NDK {
         // This needs to be async now but we can't change the API
         // Create a task to handle the async operation
         let relay = NDKRelay(url: URLNormalizer.tryNormalizeRelayUrl(url) ?? url)
-        relay.ndk = self
+        relay.setNDK(self)
         
         Task {
             // Add to pool (will return existing if already present)
             let actualRelay = await relayPool.addRelay(url)
-            actualRelay.ndk = self
+            actualRelay.setNDK(self)
             
             // Set up connection state observer to publish queued events
             await actualRelay.observeConnectionState { [weak self] state in
@@ -346,7 +347,7 @@ public final class NDK {
             } else {
                 // Add relay to pool
                 let relay = await relayPool.addRelay(normalizedUrl)
-                relay.ndk = self
+                relay.setNDK(self)
                 targetRelays.insert(relay)
             }
         }
@@ -1168,6 +1169,15 @@ public final class NDK {
 /// the application.
 public actor NDKRelayPool {
     private var relaysByUrl: [RelayURL: NDKRelay] = [:]
+    private weak var ndk: NDK?
+    
+    init(ndk: NDK? = nil) {
+        self.ndk = ndk
+    }
+    
+    func setNDK(_ ndk: NDK) {
+        self.ndk = ndk
+    }
 
     func addRelay(_ url: RelayURL) -> NDKRelay {
         // Normalize the URL before storing
@@ -1177,6 +1187,7 @@ public actor NDKRelayPool {
             return existing
         }
         let relay = NDKRelay(url: normalizedUrl)
+        relay.setNDK(ndk)
         relaysByUrl[normalizedUrl] = relay
         return relay
     }

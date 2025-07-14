@@ -5,8 +5,8 @@ import NDKSwift
 @main
 struct NutsackApp: App {
     @StateObject private var appState = AppState()
-    @StateObject private var nostrManager = NostrManager()
-    @StateObject private var walletManager: WalletManager
+    @State private var nostrManager = NostrManager()
+    @State private var walletManager: WalletManager
     
     // Create a simple in-memory container
     let modelContainer: ModelContainer = {
@@ -27,22 +27,22 @@ struct NutsackApp: App {
     }()
     
     init() {
-        let nostrManager = NostrManager()
-        let walletManager = WalletManager(
-            nostrManager: nostrManager,
+        let nm = NostrManager()
+        let wm = WalletManager(
+            nostrManager: nm,
             modelContext: modelContainer.mainContext
         )
         
-        _nostrManager = StateObject(wrappedValue: nostrManager)
-        _walletManager = StateObject(wrappedValue: walletManager)
+        _nostrManager = State(initialValue: nm)
+        _walletManager = State(initialValue: wm)
     }
     
     var body: some Scene {
         WindowGroup {
             ContentView()
                 .environmentObject(appState)
-                .environmentObject(nostrManager)
-                .environmentObject(walletManager)
+                .environment(nostrManager)
+                .environment(walletManager)
                 .preferredColorScheme(.dark)
         }
         .modelContainer(modelContainer)

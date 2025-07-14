@@ -5,7 +5,7 @@ import CashuSwift
 
 struct MintsView: View {
     @Environment(\.modelContext) private var modelContext
-    @EnvironmentObject private var walletManager: WalletManager
+    @Environment(WalletManager.self) private var walletManager
     
     @State private var availableMints: [NDKCashuWallet.MintInfo] = []
     @State private var showAddMint = false
@@ -129,7 +129,7 @@ struct MintsView: View {
 
 struct MintRow: View {
     let mintInfo: NDKCashuWallet.MintInfo
-    @EnvironmentObject private var walletManager: WalletManager
+    @Environment(WalletManager.self) private var walletManager
     @State private var balance: Int64 = 0
     
     var body: some View {
@@ -176,7 +176,7 @@ struct MintRow: View {
 
 struct MintDetailView: View {
     let mintInfo: NDKCashuWallet.MintInfo
-    @EnvironmentObject private var walletManager: WalletManager
+    @Environment(WalletManager.self) private var walletManager
     @Environment(\.dismiss) private var dismiss
     
     @State private var showInfo = false
@@ -331,7 +331,7 @@ struct MintInfoView: View {
 // MARK: - Add Mint View
 struct AddMintView: View {
     @Environment(\.dismiss) private var dismiss
-    @EnvironmentObject private var walletManager: WalletManager
+    @Environment(WalletManager.self) private var walletManager
     
     @State private var mintURL = ""
     @State private var isAdding = false

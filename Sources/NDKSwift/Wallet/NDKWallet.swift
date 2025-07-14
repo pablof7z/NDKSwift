@@ -1,6 +1,8 @@
 import Foundation
 
-/// Payment request protocol
+// MARK: - Deprecated Types (to be removed in future version)
+
+@available(*, deprecated, renamed: "PaymentRequest", message: "Use PaymentRequest from ZapTypes instead")
 public protocol NDKPaymentRequest {
     var recipient: NDKUser { get }
     var amount: Int64 { get }
@@ -9,7 +11,7 @@ public protocol NDKPaymentRequest {
     var unit: String { get }
 }
 
-/// Standard payment request
+@available(*, deprecated, message: "Use LightningInvoiceRequest or NutzapPaymentRequest from ZapTypes instead")
 public struct NDKStandardPaymentRequest: NDKPaymentRequest {
     public let recipient: NDKUser
     public let amount: Int64 // in satoshis
@@ -25,14 +27,14 @@ public struct NDKStandardPaymentRequest: NDKPaymentRequest {
     }
 }
 
-/// Payment confirmation details
+@available(*, deprecated, renamed: "PaymentConfirmation", message: "Use PaymentConfirmation from ZapTypes instead")
 public protocol NDKPaymentConfirmation {
     var amount: Int64 { get }
     var recipient: String { get } // pubkey
     var timestamp: Date { get }
 }
 
-/// Lightning payment confirmation
+@available(*, deprecated, renamed: "LightningPaymentConfirmation", message: "Use LightningPaymentConfirmation from ZapTypes instead")
 public struct NDKLightningPaymentConfirmation: NDKPaymentConfirmation {
     public let amount: Int64
     public let recipient: String
@@ -49,7 +51,7 @@ public struct NDKLightningPaymentConfirmation: NDKPaymentConfirmation {
     }
 }
 
-/// Cashu payment confirmation
+@available(*, deprecated, renamed: "NutzapConfirmation", message: "Use NutzapConfirmation from ZapTypes instead")
 public struct NDKCashuPaymentConfirmation: NDKPaymentConfirmation {
     public let amount: Int64
     public let recipient: String
@@ -67,7 +69,7 @@ public struct NDKCashuPaymentConfirmation: NDKPaymentConfirmation {
 /// Base wallet protocol
 public protocol NDKWallet {
     /// Pay a payment request
-    func pay(_ request: NDKPaymentRequest) async throws -> NDKPaymentConfirmation
+    func pay(_ request: PaymentRequest) async throws -> PaymentConfirmation
 
     /// Get wallet balance
     func getBalance() async throws -> Int64
@@ -79,7 +81,7 @@ public protocol NDKWallet {
     func supports(method: NDKPaymentMethod) -> Bool
 }
 
-/// Nutzap payment request details (NIP-61)
+@available(*, deprecated, renamed: "NutzapPaymentRequest", message: "Use NutzapPaymentRequest from ZapTypes instead")
 public struct NDKNutzapRequest: NDKPaymentRequest {
     public let recipient: NDKUser
     public let amount: Int64 // in satoshis
@@ -102,7 +104,6 @@ public struct NDKNutzapRequest: NDKPaymentRequest {
 /// Payment methods
 public enum NDKPaymentMethod: String {
     case lightning = "nip57"
-    case nwc = "nip47"
     case nutzap = "nip61"
 }
 

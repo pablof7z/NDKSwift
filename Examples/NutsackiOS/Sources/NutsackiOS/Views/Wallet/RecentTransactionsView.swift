@@ -2,7 +2,7 @@ import SwiftUI
 import SwiftData
 
 struct RecentTransactionsView: View {
-    @EnvironmentObject private var walletManager: WalletManager
+    @Environment(WalletManager.self) private var walletManager
     
     // Use reactive transactions from wallet manager
     private var recentTransactions: [Transaction] {
@@ -119,7 +119,7 @@ struct TransactionRow: View {
 
 // MARK: - Transaction History View
 struct TransactionHistoryView: View {
-    @EnvironmentObject private var walletManager: WalletManager
+    @Environment(WalletManager.self) private var walletManager
     
     @State private var selectedFilter: TransactionFilter = .all
     

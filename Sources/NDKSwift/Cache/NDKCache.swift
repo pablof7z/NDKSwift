@@ -1,4 +1,5 @@
 import Foundation
+import CashuSwift
 
 /// The primary cache protocol for NDKSwift
 /// 
@@ -75,6 +76,38 @@ public protocol NDKCache: Actor {
     /// Clear decrypted content for a specific viewer
     /// - Parameter viewerPubkey: The public key of the viewer whose content should be cleared
     func clearDecryptedContent(for viewerPubkey: String) async
+    
+    // MARK: - Mint Cache Operations
+    
+    /// Save mint info to cache
+    func saveMintInfo(_ info: NDKMintInfo, url: String) async throws
+    
+    /// Get mint info from cache
+    func getMintInfo(url: String) async -> NDKMintInfo?
+    
+    /// Check if mint info needs refresh
+    func isMintInfoStale(url: String, maxAge: TimeInterval) async -> Bool
+    
+    /// Invalidate mint cache (forces refresh on next load)
+    func invalidateMintCache(url: String) async throws
+    
+    /// Save keyset to cache
+    func saveKeyset(_ keyset: CashuSwift.Keyset, mintUrl: String) async throws
+    
+    /// Save multiple keysets at once
+    func saveKeysets(_ keysets: [CashuSwift.Keyset], mintUrl: String) async throws
+    
+    /// Get keyset by ID
+    func getKeyset(id: String) async -> CashuSwift.Keyset?
+    
+    /// Get all keysets for a mint
+    func getKeysets(mintUrl: String) async -> [CashuSwift.Keyset]
+    
+    /// Get active keysets for a mint and unit
+    func getActiveKeysets(mintUrl: String, unit: String) async -> [CashuSwift.Keyset]
+    
+    /// Check if keysets need refresh
+    func areKeysetsStale(mintUrl: String, maxAge: TimeInterval) async -> Bool
     
     // MARK: - Cache Management
     
@@ -153,5 +186,57 @@ public extension NDKCache {
     /// Default implementation that does nothing
     func clearDecryptedContent(for viewerPubkey: String) async {
         // Default implementation - cache implementations can override
+    }
+    
+    // MARK: - Default Mint Cache Implementation
+    
+    /// Default implementation that throws not implemented
+    func saveMintInfo(_ info: NDKMintInfo, url: String) async throws {
+        // Default implementation - cache implementations should override
+    }
+    
+    /// Default implementation that returns nil
+    func getMintInfo(url: String) async -> NDKMintInfo? {
+        return nil
+    }
+    
+    /// Default implementation that returns true (always stale)
+    func isMintInfoStale(url: String, maxAge: TimeInterval) async -> Bool {
+        return true
+    }
+    
+    /// Default implementation that does nothing
+    func invalidateMintCache(url: String) async throws {
+        // Default implementation - cache implementations should override
+    }
+    
+    /// Default implementation that throws not implemented
+    func saveKeyset(_ keyset: CashuSwift.Keyset, mintUrl: String) async throws {
+        // Default implementation - cache implementations should override
+    }
+    
+    /// Default implementation that throws not implemented
+    func saveKeysets(_ keysets: [CashuSwift.Keyset], mintUrl: String) async throws {
+        // Default implementation - cache implementations should override
+    }
+    
+    /// Default implementation that returns nil
+    func getKeyset(id: String) async -> CashuSwift.Keyset? {
+        return nil
+    }
+    
+    /// Default implementation that returns empty array
+    func getKeysets(mintUrl: String) async -> [CashuSwift.Keyset] {
+        return []
+    }
+    
+    /// Default implementation that returns empty array
+    func getActiveKeysets(mintUrl: String, unit: String) async -> [CashuSwift.Keyset] {
+        return []
+    }
+    
+    /// Default implementation that returns true (always stale)
+    func areKeysetsStale(mintUrl: String, maxAge: TimeInterval) async -> Bool {
+        return true
     }
 }

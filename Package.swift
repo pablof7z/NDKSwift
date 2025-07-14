@@ -17,6 +17,10 @@ let package = Package(
             name: "NDKSwift",
             targets: ["NDKSwift"]
         ),
+        .executable(
+            name: "CLI-Nutsack",
+            targets: ["CLI-Nutsack"]
+        ),
     ],
     dependencies: [
         .package(url: "https://github.com/anquii/CryptoSwiftWrapper.git", from: "1.4.3"),
@@ -44,6 +48,11 @@ let package = Package(
             name: "NDKSwiftTests",
             dependencies: ["NDKSwift"],
             exclude: ["Utils/ContentTaggerNostrEntityTests_Results.md"]
+        ),
+        .executableTarget(
+            name: "CLI-Nutsack",
+            dependencies: ["NDKSwift"],
+            path: "Examples/CLI-Nutsack/Sources/CLI-Nutsack"
         ),
     ]
 )

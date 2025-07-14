@@ -46,7 +46,7 @@ final class OptimisticPublishingTests: XCTestCase {
             kind: 1,
             tags: [],
             content: "Test optimistic event",
-            signature: "test_signature"
+            sig: "test_signature"
         )
         
         // Publish the event (this should trigger optimistic dispatch)
@@ -74,7 +74,7 @@ final class OptimisticPublishingTests: XCTestCase {
             kind: 1,
             tags: [],
             content: "Test confirmation",
-            signature: "test_signature"
+            sig: "test_signature"
         )
         
         // Publish the event
@@ -108,7 +108,7 @@ final class OptimisticPublishingTests: XCTestCase {
             kind: 1,
             tags: [],
             content: "Test skip optimistic",
-            signature: "test_signature"
+            sig: "test_signature"
         )
         
         // Publish the event
@@ -138,7 +138,7 @@ final class OptimisticPublishingTests: XCTestCase {
             kind: 1,
             tags: [],
             content: "Test disabled optimistic",
-            signature: "test_signature"
+            sig: "test_signature"
         )
         
         // Publish the event
@@ -155,7 +155,7 @@ final class OptimisticPublishingTests: XCTestCase {
     
     func testEventSourceTypes() async throws {
         // Test EventSource enum
-        let relaySource = EventSource.relay(MockRelay())
+        let relaySource = EventSource.relay(MockRelay(url: "wss://test.relay.com"))
         let optimisticSource = EventSource.optimistic
         let cacheSource = EventSource.cache
         
@@ -198,19 +198,3 @@ final class OptimisticPublishingTests: XCTestCase {
     }
 }
 
-// Mock relay for testing
-class MockRelay: RelayProtocol {
-    let url: String = "wss://test.relay.com"
-    
-    func send(_ message: String) async throws {
-        // Mock implementation
-    }
-    
-    func getSignatureStats() async -> SignatureStats {
-        return SignatureStats()
-    }
-    
-    func updateSignatureStats(_ updater: @escaping (inout SignatureStats) -> Void) async {
-        // Mock implementation
-    }
-}

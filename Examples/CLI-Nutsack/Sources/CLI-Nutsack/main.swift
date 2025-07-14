@@ -1,7 +1,6 @@
 import Foundation
 import NDKSwift
 
-@main
 @MainActor
 struct CLINutsack {
     static func main() async throws {
@@ -10,7 +9,7 @@ struct CLINutsack {
         print()
         
         // Get private key
-        let privateKey = try getPrivateKey()
+        let privateKey = try await getPrivateKey()
         
         // Initialize wallet manager
         let walletManager = try WalletManager()
@@ -24,7 +23,7 @@ struct CLINutsack {
         )
     }
     
-    static func getPrivateKey() throws -> String {
+    static func getPrivateKey() async throws -> String {
         // Check for environment variable first
         if let nsec = ProcessInfo.processInfo.environment["NOSTR_NSEC"] {
             return nsec
@@ -39,16 +38,17 @@ struct CLINutsack {
         
         // Generate new key
         print("🔑 Generating new wallet key...")
-        let signer = try NDKPrivateKeySigner.generate()
-        let publicKey = try signer.publicKey()
+        let privateKey = Crypto.generatePrivateKey()
+        let signer = try NDKPrivateKeySigner(privateKey: privateKey)
+        let publicKey = try await signer.pubkey
         print("✅ Generated new key:")
         print("   Public key: \(publicKey)")
-        print("   Private key: \(signer.privateKeyHex!)")
+        print("   Private key: \(privateKey)")
         print("\n⚠️  Save your private key securely!")
         print("\nPress Enter to continue...")
         _ = readLine()
         
-        return signer.privateKeyHex!
+        return privateKey
     }
     
     static func createMainMenu(walletManager: WalletManager) -> [MenuItem] {
@@ -134,13 +134,7 @@ struct CLINutsack {
             }
         }
         
-        // Check pending nutzaps
-        if let processor = walletManager.getNutzapProcessor() {
-            let pending = await processor.getPendingCount()
-            if pending > 0 {
-                print("\n⏳ Pending Nutzaps: \(pending)")
-            }
-        }
+        // Balance display is sufficient, no need for pending count
     }
     
     static func viewMints(walletManager: WalletManager) async throws {
@@ -401,7 +395,8 @@ struct CLINutsack {
     
     static func showWalletInfo(walletManager: WalletManager) async throws {
         guard let wallet = walletManager.getWallet() else { return }
-        guard let pubkey = try await walletManager.getNDK().signer?.publicKey() else { return }
+        guard let signer = walletManager.getNDK().signer else { return }
+        let pubkey = try await signer.pubkey
         
         print("🔑 WALLET INFO")
         print("=".repeated(50))
@@ -454,3 +449,14 @@ enum CLIError: Error, LocalizedError {
         }
     }
 }
+
+// Entry point
+Task {
+    do {
+        try await CLINutsack.main()
+    } catch {
+        print("Error: \(error)")
+        exit(1)
+    }
+}
+RunLoop.main.run()

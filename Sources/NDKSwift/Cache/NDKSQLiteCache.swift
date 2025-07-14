@@ -5,7 +5,7 @@ import CashuSwift
 
 /// SQLite-backed cache implementation for NDKSwift
 /// Provides efficient storage and querying of Nostr events with proper migration support
-public actor NDKSQLiteCache: NDKCache, MintCache {
+public actor NDKSQLiteCache: NDKCache {
     private let dbQueue: DatabaseQueue
     private let dbPath: String
     private let debugMode: Bool

@@ -4,7 +4,7 @@ import SwiftData
 
 /// Compact relay health indicator for the main wallet view
 struct RelayStatusIndicator: View {
-    @EnvironmentObject private var walletManager: WalletManager
+    @Environment(WalletManager.self) private var walletManager
     @State private var relayHealth: [WalletHealthMonitor.RelayHealth] = []
     @State private var isLoading = false
     

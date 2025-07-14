@@ -1,12 +1,14 @@
 import Foundation
 import NDKSwift
 import SwiftUI
+import Observation
 
 @MainActor
-class NostrManager: ObservableObject {
-    @Published var ndk: NDK?
-    @Published var isConnected = false
-    @Published var relayStatus: [String: Bool] = [:]
+@Observable
+class NostrManager {
+    var ndk: NDK?
+    var isConnected = false
+    var relayStatus: [String: Bool] = [:]
     
     private var ndkAuthManager: NDKAuthManager
     var cache: NDKSQLiteCache?

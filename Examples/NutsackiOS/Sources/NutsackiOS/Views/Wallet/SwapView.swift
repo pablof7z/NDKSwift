@@ -4,7 +4,7 @@ import NDKSwift
 
 struct SwapView: View {
     @Environment(\.dismiss) private var dismiss
-    @EnvironmentObject private var walletManager: WalletManager
+    @Environment(WalletManager.self) private var walletManager
     
     @State private var amount = ""
     @State private var sourceMint: NDKCashuWallet.MintInfo?

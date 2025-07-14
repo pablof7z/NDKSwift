@@ -4,7 +4,7 @@ import CashuSwift
 
 final class MintCacheTests: XCTestCase {
     var cache: NDKSQLiteCache!
-    var inMemoryCache: InMemoryMintCache!
+    var inMemoryCache: FullInMemoryCache!
     
     override func setUp() async throws {
         try await super.setUp()
@@ -14,7 +14,7 @@ final class MintCacheTests: XCTestCase {
         cache = try await NDKSQLiteCache(path: tempPath)
         
         // Create in-memory cache
-        inMemoryCache = InMemoryMintCache()
+        inMemoryCache = FullInMemoryCache()
     }
     
     override func tearDown() async throws {

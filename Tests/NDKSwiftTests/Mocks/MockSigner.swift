@@ -2,7 +2,9 @@ import Foundation
 @testable import NDKSwift
 
 /// Mock signer for testing
-class MockSigner: NDKSigner {
+final class MockSigner: NDKSigner {
+    static var signerType: String { "mock" }
+    
     let privateKey: PrivateKey
     
     var pubkey: PublicKey {
@@ -59,6 +61,20 @@ class MockSigner: NDKSigner {
         case .nip44:
             return try Crypto.nip44Decrypt(encrypted: value, privateKey: privateKey, publicKey: sender.pubkey)
         }
+    }
+    
+    // MARK: - Serialization
+    
+    func serialize() async throws -> Data {
+        // For testing, just serialize the private key
+        return Data(privateKey.utf8)
+    }
+    
+    static func deserialize(_ data: Data, ndk: NDK?) throws -> MockSigner {
+        guard let privateKey = String(data: data, encoding: .utf8) else {
+            throw NSError(domain: "MockSigner", code: 1, userInfo: [NSLocalizedDescriptionKey: "Failed to deserialize mock signer"])
+        }
+        return MockSigner(privateKey: privateKey)
     }
 }
 
