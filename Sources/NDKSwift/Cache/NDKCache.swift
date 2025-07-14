@@ -55,19 +55,26 @@ public protocol NDKCache: Actor {
     
     // MARK: - Decrypted Content Cache
     
-    /// Retrieve decrypted content for an event
-    /// - Parameter eventId: The event ID to look up
+    /// Retrieve decrypted content for an event and viewer
+    /// - Parameters:
+    ///   - eventId: The event ID to look up
+    ///   - viewerPubkey: The public key of the viewer who decrypted this content
     /// - Returns: The decrypted content string, or nil if not cached
-    func getDecryptedContent(for eventId: String) async -> String?
+    func getDecryptedContent(for eventId: String, viewerPubkey: String) async -> String?
     
-    /// Store decrypted content for an event
+    /// Store decrypted content for an event and viewer
     /// - Parameters:
     ///   - content: The decrypted content to cache
     ///   - eventId: The event ID to associate with
-    func storeDecryptedContent(_ content: String, for eventId: String) async
+    ///   - viewerPubkey: The public key of the viewer who decrypted this content
+    func storeDecryptedContent(_ content: String, for eventId: String, viewerPubkey: String) async
     
     /// Clear all decrypted content from cache
     func clearDecryptedContent() async
+    
+    /// Clear decrypted content for a specific viewer
+    /// - Parameter viewerPubkey: The public key of the viewer whose content should be cleared
+    func clearDecryptedContent(for viewerPubkey: String) async
     
     // MARK: - Cache Management
     
@@ -129,17 +136,22 @@ public extension NDKCache {
     // MARK: - Default Decrypted Content Implementation
     
     /// Default implementation that returns nil (no caching)
-    func getDecryptedContent(for eventId: String) async -> String? {
+    func getDecryptedContent(for eventId: String, viewerPubkey: String) async -> String? {
         return nil
     }
     
     /// Default implementation that does nothing (no caching)
-    func storeDecryptedContent(_ content: String, for eventId: String) async {
+    func storeDecryptedContent(_ content: String, for eventId: String, viewerPubkey: String) async {
         // Default implementation - cache implementations can override for actual caching
     }
     
     /// Default implementation that does nothing
     func clearDecryptedContent() async {
+        // Default implementation - cache implementations can override
+    }
+    
+    /// Default implementation that does nothing
+    func clearDecryptedContent(for viewerPubkey: String) async {
         // Default implementation - cache implementations can override
     }
 }

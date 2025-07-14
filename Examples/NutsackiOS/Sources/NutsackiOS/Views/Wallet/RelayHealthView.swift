@@ -4,11 +4,11 @@ import SwiftData
 
 struct RelayHealthView: View {
     @EnvironmentObject private var walletManager: WalletManager
-    @State private var relayHealth: [NDKCashuWallet.RelayHealth] = []
+    @State private var relayHealth: [WalletHealthMonitor.RelayHealth] = []
     @State private var isLoading = true
     @State private var lastUpdateTime: Date?
     @State private var showingRepairSheet = false
-    @State private var selectedUnhealthyRelay: NDKCashuWallet.RelayHealth?
+    @State private var selectedUnhealthyRelay: WalletHealthMonitor.RelayHealth?
     
     var body: some View {
         NavigationView {
@@ -238,7 +238,7 @@ struct RelayHealthView: View {
 }
 
 struct RelayHealthRow: View {
-    let relayHealth: NDKCashuWallet.RelayHealth
+    let relayHealth: WalletHealthMonitor.RelayHealth
     let onRepairTapped: () -> Void
     
     private var displayURL: String {
@@ -320,7 +320,7 @@ struct RelayHealthRow: View {
 }
 
 struct RelayRepairSheet: View {
-    let relayHealth: NDKCashuWallet.RelayHealth
+    let relayHealth: WalletHealthMonitor.RelayHealth
     let onComplete: () -> Void
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject private var walletManager: WalletManager

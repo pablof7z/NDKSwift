@@ -1,4 +1,5 @@
 import Foundation
+import CashuSwift
 
 /// NIP-61 Nutzap (kind: 9321)
 /// A Nutzap is a P2PK Cashu token event where the payment itself is the receipt.
@@ -13,7 +14,7 @@ public struct NDKNutzap {
     public static func create(
         ndk: NDK,
         recipient: NDKUser,
-        proofs: [CashuProof],
+        proofs: [CashuSwift.Proof],
         mint: URL,
         comment: String? = nil,
         zappedEvent: NDKEvent? = nil
@@ -61,14 +62,14 @@ public struct NDKNutzap {
     }
     
     /// Cashu proofs
-    public var proofs: [CashuProof] {
+    public var proofs: [CashuSwift.Proof] {
         let tags = event.tags
         return tags
             .filter { $0.first == "proof" }
             .compactMap { tag in
                 guard let proofJSON = tag[safe: 1],
                       let data = proofJSON.data(using: .utf8),
-                      let proof = try? JSONDecoder().decode(CashuProof.self, from: data) else {
+                      let proof = try? JSONDecoder().decode(CashuSwift.Proof.self, from: data) else {
                     return nil
                 }
                 return proof

@@ -331,11 +331,13 @@ class WalletManager: ObservableObject {
             let mints = await wallet.getMints()
             var selectedMint: URL?
             
-            for mint in mints {
-                let balance = await wallet.getBalance(mint: mint.url)
-                if balance >= amount {
-                    selectedMint = mint.url
-                    break
+            for (mintURLString, _) in mints {
+                if let mintURL = URL(string: mintURLString) {
+                    let balance = await wallet.getBalance(mint: mintURL)
+                    if balance >= amount {
+                        selectedMint = mintURL
+                        break
+                    }
                 }
             }
             
@@ -357,7 +359,7 @@ class WalletManager: ObservableObject {
         
         // Create token from proofs
         let token = CashuSwift.Token(
-            proofs: [mintURL.absoluteString: proofs.toCashuSwiftProofs()],
+            proofs: [mintURL.absoluteString: proofs],
             unit: "sat",
             memo: memo
         )
@@ -605,9 +607,3 @@ enum WalletError: LocalizedError {
 }
 
 // MARK: - Extensions
-
-extension Array where Element == CashuProof {
-    func toCashuSwiftProofs() -> [CashuSwift.Proof] {
-        return self.map { $0.toCashuSwiftProof() }
-    }
-}

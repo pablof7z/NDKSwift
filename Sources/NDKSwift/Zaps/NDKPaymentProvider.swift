@@ -1,4 +1,5 @@
 import Foundation
+import CashuSwift
 
 // MARK: - Payment Request Types
 
@@ -71,11 +72,11 @@ public struct LightningPaymentConfirmation: PaymentConfirmation {
 
 /// A concrete confirmation for a Cashu payment
 public struct CashuPaymentConfirmation: PaymentConfirmation {
-    public let proofs: [CashuProof]
-    public let change: [CashuProof]?
+    public let proofs: [CashuSwift.Proof]
+    public let change: [CashuSwift.Proof]?
     public let mintURL: URL  // The mint that was actually used
     
-    public init(proofs: [CashuProof], change: [CashuProof]? = nil, mintURL: URL) {
+    public init(proofs: [CashuSwift.Proof], change: [CashuSwift.Proof]? = nil, mintURL: URL) {
         self.proofs = proofs
         self.change = change
         self.mintURL = mintURL

@@ -76,7 +76,7 @@ struct NutzapSettingsView: View {
             AsyncContentView(
                 operation: { 
                     if let wallet = walletManager.activeWallet {
-                        return await wallet.getMints()
+                        return await wallet.getMintsInfo()
                     }
                     return []
                 }

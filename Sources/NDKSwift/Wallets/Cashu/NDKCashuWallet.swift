@@ -14,34 +14,19 @@ public actor NDKCashuWallet: NDKWallet {
     private let p2pkManager: P2PKManager // Manages P2PK keys for receiving nutzaps
     private let mintLoader: CachedMintLoader? // Cached mint loader for performance
     
-    // Track deleted and superseded token event IDs to filter them out
-    internal var deletedTokenEventIds: Set<String> = []
-    private var supersededTokenEventIds: Set<String> = [] // Events referenced in del tags
-    
     // Relay health monitoring
     internal var walletRelays: [NDKRelay] = []
-    private var relayEventSets: [String: Set<String>] = [:] // relay URL -> event IDs
     
     // Unified wallet subscription
     private var walletSubscriptionTask: Task<Void, Never>?
-    private var lastWalletConfigTimestamp: Timestamp = 0
     
-    // MARK: - Proof State Management
+    // MARK: - Managers
     
-    enum ProofState {
-        case available
-        case reserved   // For concurrent operations
-        case deleted    // Spent proofs
-    }
-    
-    private struct ProofEntry {
-        let proof: CashuSwift.Proof
-        var state: ProofState
-        let mint: String
-    }
-    
-    private var proofState: [String: ProofEntry] = [:] // proof.C -> entry
-    internal var currentTokenEventIds: Set<String> = []  // Track current events
+    private let proofStateManager = ProofStateManager()
+    private let eventManager: WalletEventManager
+    private let paymentProcessor: PaymentProcessor
+    private let nutzapProcessor: NutzapProcessor
+    private let healthMonitor: WalletHealthMonitor
     
     /// Mint discovery service for finding mints via Nostr
     public let mintDiscovery: MintDiscovery
@@ -53,12 +38,35 @@ public actor NDKCashuWallet: NDKWallet {
         self.walletId = walletId ?? UUID().uuidString
         self.mintDiscovery = MintDiscovery(ndk: ndk)
         self.p2pkManager = P2PKManager()
+        self.eventManager = WalletEventManager(ndk: ndk)
+        
+        // Initialize processors
+        self.paymentProcessor = PaymentProcessor(
+            proofStateManager: proofStateManager,
+            eventManager: eventManager
+        )
+        self.nutzapProcessor = NutzapProcessor(
+            proofStateManager: proofStateManager,
+            eventManager: eventManager,
+            p2pkManager: p2pkManager,
+            ndk: ndk
+        )
+        self.healthMonitor = WalletHealthMonitor(
+            eventManager: eventManager,
+            ndk: ndk
+        )
         
         // Set up cached mint loader if cache is provided
         if let cache = mintCache {
             self.mintLoader = CachedMintLoader(cache: cache)
         } else {
             self.mintLoader = nil
+        }
+        
+        // Complete initialization by setting wallet references
+        Task {
+            await paymentProcessor.setWallet(self)
+            await nutzapProcessor.setWallet(self)
         }
     }
     
@@ -116,7 +124,7 @@ public actor NDKCashuWallet: NDKWallet {
                     // Track relay health
                     let seenOnRelays = await ndk.eventTracker.getSeenOnRelays(eventId: event.id)
                     for relayUrl in seenOnRelays {
-                        recordEventFromRelay(event.id, from: relayUrl)
+                        await recordEventFromRelay(event.id, from: relayUrl)
                     }
                     
                     // Process event
@@ -137,10 +145,11 @@ public actor NDKCashuWallet: NDKWallet {
         do {
             switch event.kind {
             case 17375:  // Wallet configuration
-                if event.createdAt > lastWalletConfigTimestamp {
+                let lastTimestamp = await eventManager.getLastWalletConfigTimestamp()
+                if event.createdAt > lastTimestamp {
                     print("📝 Processing wallet configuration update")
                     extractWalletRelays(from: event)
-                    lastWalletConfigTimestamp = event.createdAt
+                    await eventManager.updateLastWalletConfigTimestamp(event.createdAt)
                     
                     // Process wallet configuration
                     let sender = NDKUser(pubkey: event.pubkey)
@@ -162,7 +171,7 @@ public actor NDKCashuWallet: NDKWallet {
                 
             case 7375:  // Token event
                 // First check if we should process this event
-                if deletedTokenEventIds.contains(event.id) || supersededTokenEventIds.contains(event.id) {
+                if await eventManager.shouldFilterEvent(event.id) {
                     print("⏭️ Skipping deleted or superseded token event: \(event.id)")
                     return
                 }
@@ -185,10 +194,11 @@ public actor NDKCashuWallet: NDKWallet {
                 
                 // Update superseded events if this event has del tags
                 if let delIds = nip60Token.del {
-                    supersededTokenEventIds.formUnion(delIds)
+                    await eventManager.markEventsSuperseded(delIds)
                     // Remove superseded events from current set
                     for delId in delIds {
-                        currentTokenEventIds.remove(delId)
+                        let current = await eventManager.getCurrentTokenEventIds()
+                        await eventManager.setCurrentTokenEventIds(current.subtracting([delId]))
                     }
                 }
                 
@@ -197,22 +207,23 @@ public actor NDKCashuWallet: NDKWallet {
                     // Store proof if we have the corresponding keyset
                     if keysets[proof.keysetID] != nil {
                         // Find mint for this proof
-                        if let mint = try? findMintForProof(proof) {
-                            proofState[proof.C] = ProofEntry(
-                                proof: proof,
-                                state: .available,
-                                mint: mint
-                            )
+                        var foundMint: String?
+                        for (mintUrl, mint) in mints {
+                            if mint.keysets.contains(where: { $0.keysetID == proof.keysetID }) {
+                                foundMint = mintUrl
+                                break
+                            }
+                        }
+                        if let mint = foundMint {
+                            await proofStateManager.addProof(proof, mint: mint)
                         }
                     }
                 }
                 
-                currentTokenEventIds.insert(event.id)
+                await eventManager.addCurrentTokenEventId(event.id)
                 
                 // Update internal proofs array
-                self.proofs = proofState.values
-                    .filter { $0.state == .available }
-                    .map { $0.proof }
+                self.proofs = await proofStateManager.getAvailableProofs()
                 
             case 7374:  // Quote event
                 print("📋 Processing quote event: \(event.id)")
@@ -227,8 +238,9 @@ public actor NDKCashuWallet: NDKWallet {
                 print("🗑️ Processing delete event")
                 for tag in event.tags where tag.count >= 2 && tag[0] == "e" {
                     let deletedEventId = tag[1]
-                    deletedTokenEventIds.insert(deletedEventId)
-                    currentTokenEventIds.remove(deletedEventId)
+                    await eventManager.markEventDeleted(deletedEventId)
+                    let current = await eventManager.getCurrentTokenEventIds()
+                    await eventManager.setCurrentTokenEventIds(current.subtracting([deletedEventId]))
                     
                     // Remove proofs from deleted token event
                     if tag.count >= 4 && tag[3] == "7375" {
@@ -305,7 +317,7 @@ public actor NDKCashuWallet: NDKWallet {
     // MARK: - NDKWallet Protocol
     
     public func pay(_ request: NDKPaymentRequest) async throws -> NDKPaymentConfirmation {
-        guard ndk.signer != nil else {
+        guard let signer = ndk.signer else {
             throw NDKError.notConfigured("No signer configured for NDKCashuWallet")
         }
         
@@ -362,28 +374,15 @@ public actor NDKCashuWallet: NDKWallet {
             selectedMintURL = targetMintURL
         }
         
-        guard let finalMintURL = selectedMintURL,
-              let selectedMintUrl = URL(string: finalMintURL) else {
-            throw NDKError.noMintAvailable("No suitable mint found for payment")
-        }
-        
-        // Use the send method to create P2PK locked proofs
-        let (lockedProofs, _) = try await send(
+        // Send nutzap using the processor
+        let nutzapEvent = try await nutzapProcessor.sendNutzap(
             amount: nutzapRequest.amount,
             to: nutzapRequest.recipientPubkey,
-            mint: selectedMintUrl
+            comment: nutzapRequest.comment,
+            eventId: nil,
+            mints: mints,
+            signer: signer
         )
-        
-        // Create nutzap event with the P2PK locked proofs
-        let nutzapEvent = try await createNutzapEvent(
-            proofs: lockedProofs,
-            recipient: nutzapRequest.recipientPubkey,
-            amount: nutzapRequest.amount,
-            comment: nutzapRequest.comment
-        )
-        
-        // Publish the nutzap event
-        try await ndk.publish(nutzapEvent)
         
         return NDKCashuPaymentConfirmation(
             amount: nutzapRequest.amount,
@@ -394,10 +393,8 @@ public actor NDKCashuWallet: NDKWallet {
     }
     
     public func getBalance() async throws -> Int64 {
-        // Calculate from available proofs in state
-        let availableProofs = proofState.values.filter { $0.state == .available }
-        let balance = Int64(availableProofs.reduce(0) { $0 + $1.proof.amount })
-        print("NDKCashuWallet.getBalance() - Total proofs: \(proofState.count), available: \(availableProofs.count), balance: \(balance)")
+        let balance = await proofStateManager.getTotalBalance()
+        print("NDKCashuWallet.getBalance() - balance: \(balance)")
         return balance
     }
     
@@ -409,7 +406,7 @@ public actor NDKCashuWallet: NDKWallet {
         }
         
         // Select proofs for the amount from the first available mint
-        let selectedProofs = selectProofs(amount: amount, mint: mint.url.absoluteString)
+        let selectedProofs = await proofStateManager.selectProofs(amount: amount, mint: mint.url.absoluteString)
         guard !selectedProofs.isEmpty else {
             throw NDKError.insufficientBalance(amount: amount)
         }
@@ -450,111 +447,18 @@ public actor NDKCashuWallet: NDKWallet {
     
     /// Process an incoming nutzap event
     private func processIncomingNutzap(_ event: NDKEvent) async throws {
-        print("💸 Processing incoming nutzap: \(event.id)")
-        
-        // Check if we've already processed this nutzap
-        if await hasProcessedNutzap(eventId: event.id) {
-            print("⏭️ Nutzap already processed: \(event.id)")
-            return
+        guard let signer = ndk.signer else {
+            throw NDKError.notConfigured("No signer configured")
         }
         
-        // Parse the nutzap content as a Cashu token
-        guard let tokenData = event.content.data(using: .utf8),
-              let token = try? JSONDecoder().decode(CashuSwift.Token.self, from: tokenData) else {
-            throw NDKError.invalidContent("Failed to parse nutzap token")
-        }
-        
-        // Get our P2PK private key
-        let p2pkPrivateKey = try await p2pkManager.getOrCreatePrivateKey()
-        
-        var totalReceived: Int64 = 0
-        var receivedProofs: [CashuSwift.Proof] = []
-        
-        // Process proofs from each mint
-        for (mintURL, proofs) in token.proofsByMint {
-            print("🏦 Processing \(proofs.count) proofs from mint: \(mintURL)")
-            
-            // Ensure we have this mint loaded
-            if mints[mintURL] == nil {
-                guard let url = URL(string: mintURL) else {
-                    print("⚠️ Invalid mint URL: \(mintURL)")
-                    continue
-                }
-                
-                do {
-                    try await addMint(url: url)
-                } catch {
-                    print("⚠️ Failed to load mint \(mintURL): \(error)")
-                    continue
-                }
-            }
-            
-            guard let mint = mints[mintURL] else {
-                continue
-            }
-            
-            // Unlock the P2PK-locked proofs
-            let unlockedProofs = try await unlockProofs(
-                proofs: proofs,
-                mint: mint,
-                privateKey: p2pkPrivateKey
-            )
-            
-            // Add to our wallet
-            self.proofs.append(contentsOf: unlockedProofs)
-            receivedProofs.append(contentsOf: unlockedProofs)
-            
-            // Calculate total
-            let mintTotal = unlockedProofs.reduce(0) { $0 + Int64($1.amount) }
-            totalReceived += mintTotal
-            
-            print("✅ Unlocked \(mintTotal) sats from \(unlockedProofs.count) proofs")
-        }
-        
-        // Mark nutzap as processed
-        try await markNutzapProcessed(eventId: event.id, amount: totalReceived)
-        
-        // Save updated wallet state
-        try await save()
-        
-        // Create spending history for received nutzap
-        if let signer = ndk.signer {
-            try await createSpendingHistoryEvent(
-                direction: .in,
-                amount: totalReceived,
-                redeemedEventId: event.id,
-                signer: signer
-            )
-        }
-        
-        print("💰 Successfully received nutzap: \(totalReceived) sats total")
-        
-        // Emit notification (optional - could add a delegate or notification)
-        await emitNutzapReceived(event: event, amount: totalReceived)
+        try await nutzapProcessor.processIncomingNutzap(
+            event,
+            mints: mints,
+            keysets: keysets,
+            signer: signer
+        )
     }
     
-    /// Unlock P2PK-locked proofs
-    private func unlockProofs(
-        proofs: [CashuSwift.Proof],
-        mint: CashuSwift.Mint,
-        privateKey: String
-    ) async throws -> [CashuSwift.Proof] {
-        // Create a token with the locked proofs
-        let lockedToken = CashuSwift.Token(
-            proofs: [mint.url.absoluteString: proofs],
-            unit: "sat"
-        )
-        
-        // Use CashuSwift's receive function to unlock
-        let (unlockedProofs, _, _) = try await CashuSwift.receive(
-            token: lockedToken,
-            of: mint,
-            seed: nil,
-            privateKey: privateKey
-        )
-        
-        return unlockedProofs
-    }
     
     /// Check if a nutzap has already been processed
     private func hasProcessedNutzap(eventId: String) async -> Bool {
@@ -594,17 +498,11 @@ public actor NDKCashuWallet: NDKWallet {
         try await ndk.publish(markerEvent)
     }
     
-    /// Emit notification for received nutzap
-    private func emitNutzapReceived(event: NDKEvent, amount: Int64) async {
-        // This could emit a notification, call a delegate, or update UI
-        // For now, just log it
-        print("📨 Nutzap received notification: \(amount) sats from event \(event.id)")
-    }
     
     // MARK: - Additional Methods
     
     /// Get available mints in this wallet
-    public func getMints() async -> [MintInfo] {
+    public func getMintsInfo() async -> [MintInfo] {
         return mints.values.map { mint in
             MintInfo(
                 url: mint.url
@@ -683,12 +581,7 @@ public actor NDKCashuWallet: NDKWallet {
     
     /// Get balance for a specific mint
     public func getBalance(mint mintURL: URL) async -> Int64 {
-        return Int64(proofState.values
-            .filter { entry in
-                entry.state == .available && entry.mint == mintURL.absoluteString
-            }
-            .reduce(0) { $0 + $1.proof.amount }
-        )
+        return await proofStateManager.getBalance(mint: mintURL.absoluteString)
     }
     
     /// Send P2PK-locked proofs to a recipient
@@ -697,166 +590,31 @@ public actor NDKCashuWallet: NDKWallet {
         to recipientP2PK: String,
         mint mintURL: URL
     ) async throws -> (proofs: [CashuSwift.Proof], change: [CashuSwift.Proof]?) {
-        // Get the mint
-        guard let mint = mints[mintURL.absoluteString] else {
-            throw NDKError.noMintAvailable("Mint not found: \(mintURL)")
+        guard let signer = ndk.signer else {
+            throw NDKError.notConfigured("No signer configured")
         }
         
-        // Get available proofs for fee calculation
-        let availableProofs = proofState.values
-            .filter { $0.state == .available && $0.mint == mintURL.absoluteString }
-            .map { $0.proof }
-        
-        // Select proofs for the amount (with some extra for fees)
-        let inputFee = try CashuSwift.calculateFee(for: availableProofs, of: mint)
-        let totalNeeded = amount + Int64(inputFee)
-        
-        let selectedProofs = selectProofs(amount: totalNeeded, mint: mintURL.absoluteString)
-        guard !selectedProofs.isEmpty else {
-            throw NDKError.insufficientBalance(amount: totalNeeded)
-        }
-        
-        // Reserve proofs for this operation
-        try await reserveProofs(selectedProofs)
-        
-        do {
-            // Use CashuSwift's send function with P2PK locking
-            let (token, changeProofs, _) = try await CashuSwift.send(
-                inputs: selectedProofs,
-                mint: mint,
-                amount: Int(amount),
-                seed: nil, // No deterministic derivation for P2PK locked proofs
-                memo: nil,
-                lockToPublicKey: recipientP2PK
-            )
-            
-            // Extract proofs from the token
-            var lockedProofs: [CashuSwift.Proof] = []
-            for (_, proofs) in token.proofsByMint {
-                lockedProofs.append(contentsOf: proofs)
-            }
-            
-            // Update state (this handles EVERYTHING - token event creation/deletion)
-            try await update(
-                deletedProofs: selectedProofs,
-                addedProofs: changeProofs
-            )
-            
-            // Convert change proofs
-            let ndkChangeProofs = changeProofs.isEmpty ? nil : changeProofs.toNDKProofs()
-            
-            return (proofs: lockedProofs, change: ndkChangeProofs)
-            
-        } catch {
-            // Release reservation on failure
-            await releaseProofs(selectedProofs)
-            throw error
-        }
+        return try await paymentProcessor.sendP2PK(
+            amount: amount,
+            to: recipientP2PK,
+            mint: mintURL,
+            mints: mints,
+            signer: signer
+        )
     }
     
     /// Pay a Lightning invoice through a mint
     public func payLightning(invoice: String, amount: Int64) async throws -> (preimage: String, feePaid: Int64?) {
-        // Find a mint that can handle the payment
-        guard let (mintURL, mint) = mints.first else {
-            throw NDKError.noMintAvailable("No mint configured")
+        guard let signer = ndk.signer else {
+            throw NDKError.notConfigured("No signer configured")
         }
         
-        // Create melt quote request
-        let quoteRequest = CashuSwift.Bolt11.RequestMeltQuote(
-            unit: "sat",
-            request: invoice,
-            options: nil
+        return try await paymentProcessor.payLightning(
+            invoice: invoice,
+            amount: amount,
+            mints: mints,
+            signer: signer
         )
-        
-        // Get melt quote from mint
-        let quote = try await CashuSwift.getQuote(
-            mint: mint,
-            quoteRequest: quoteRequest
-        ) as! CashuSwift.Bolt11.MeltQuote
-        
-        // Get available proofs for this mint
-        let availableProofs = proofState.values
-            .filter { $0.state == .available && $0.mint == mintURL }
-            .map { $0.proof }
-        
-        // Calculate total amount needed (invoice amount + fees)
-        let lightningFee = Int64(quote.feeReserve)
-        let inputFee = try CashuSwift.calculateFee(for: availableProofs, of: mint)
-        let totalNeeded = amount + lightningFee + Int64(inputFee)
-        
-        // Select proofs to cover the payment
-        let selectedProofs = selectProofs(amount: totalNeeded, mint: mintURL)
-        guard !selectedProofs.isEmpty else {
-            throw NDKError.insufficientBalance(amount: totalNeeded)
-        }
-        
-        // Reserve proofs for this operation
-        try await reserveProofs(selectedProofs)
-        
-        do {
-            // Generate blank outputs for potential change
-            let (outputs, blindingFactors, secrets) = try CashuSwift.generateBlankOutputs(
-                quote: quote,
-                proofs: selectedProofs,
-                mint: mint,
-                unit: "sat",
-                seed: nil
-            )
-            
-            let blankOutputs = (
-                outputs: outputs,
-                blindingFactors: blindingFactors,
-                secrets: secrets
-            )
-            
-            // Execute the melt operation
-            let (paid, change, dleqValid) = try await CashuSwift.melt(
-                with: quote,
-                mint: mint,
-                proofs: selectedProofs,
-                blankOutputs: blankOutputs
-            )
-            
-            guard paid else {
-                // Payment failed, release reserved proofs
-                await releaseProofs(selectedProofs)
-                throw NDKError.paymentFailed(reason: "Lightning payment was not successful")
-            }
-            
-            guard dleqValid else {
-                throw NDKError.invalidProof("DLEQ verification failed")
-            }
-            
-            // Update wallet state (removes spent proofs, adds change)
-            try await update(
-                deletedProofs: selectedProofs,
-                addedProofs: change ?? []
-            )
-            
-            // Calculate actual fee paid
-            let totalSpent = selectedProofs.reduce(0) { $0 + Int64($1.amount) }
-            let changeAmount = (change ?? []).reduce(0) { $0 + Int64($1.amount) }
-            let actualFeePaid = totalSpent - amount - changeAmount
-            
-            // Create spending history for the Lightning payment
-            if let signer = ndk.signer {
-                try await createSpendingHistoryEvent(
-                    direction: .out,
-                    amount: amount,
-                    signer: signer
-                )
-            }
-            
-            // Return preimage and fee
-            // Note: CashuSwift melt doesn't return preimage directly, 
-            // but payment confirmation is in the 'paid' status
-            return (preimage: quote.quote, feePaid: actualFeePaid)
-            
-        } catch {
-            // Release reservation on failure
-            await releaseProofs(selectedProofs)
-            throw error
-        }
     }
     
     /// Estimate fees for a cross-mint transfer
@@ -894,9 +652,7 @@ public actor NDKCashuWallet: NDKWallet {
         ) as! CashuSwift.Bolt11.MeltQuote
         
         // Get available proofs for fee calculation
-        let availableProofs = proofState.values
-            .filter { $0.state == .available && $0.mint == sourceMintURL.absoluteString }
-            .map { $0.proof }
+        let availableProofs = await proofStateManager.getAvailableProofs(mint: sourceMintURL.absoluteString)
         
         // Calculate fees
         let lightningFee = Int64(meltQuote.feeReserve)
@@ -913,152 +669,27 @@ public actor NDKCashuWallet: NDKWallet {
         fromMint sourceMintURL: URL,
         toMint destinationMintURL: URL
     ) async throws -> TransferResult {
-        // Validate mints exist
-        guard let sourceMint = mints[sourceMintURL.absoluteString] else {
-            throw NDKError.invalidRequest("Source mint not found in wallet")
-        }
-        guard let destinationMint = mints[destinationMintURL.absoluteString] else {
-            throw NDKError.invalidRequest("Destination mint not found in wallet")
+        guard let signer = ndk.signer else {
+            throw NDKError.notConfigured("No signer configured")
         }
         
-        // Step 1: Request a mint quote from destination mint
-        let mintQuote = try await requestMint(
+        let result = try await paymentProcessor.transferBetweenMints(
+            from: sourceMintURL,
+            to: destinationMintURL,
             amount: amount,
-            mintURL: destinationMintURL.absoluteString,
-            persistQuote: false // Don't persist intermediate quotes
+            mints: mints,
+            signer: signer
         )
-        
-        // Step 2: Pay the Lightning invoice from source mint
-        let (preimage, feePaid) = try await payLightningFromMint(
-            invoice: mintQuote.invoice,
-            amount: amount,
-            mintURL: sourceMintURL
-        )
-        
-        // Step 3: Claim the tokens from destination mint
-        let newProofs = try await checkAndMintTokens(quote: mintQuote)
-        
-        // Step 4: Update wallet state with new proofs
-        try await update(
-            deletedProofs: [], // Already handled by payLightningFromMint
-            addedProofs: newProofs
-        )
-        
-        // Step 5: Create transfer history event
-        if let signer = ndk.signer {
-            try await createTransferHistoryEvent(
-                amount: amount,
-                fromMint: sourceMintURL.absoluteString,
-                toMint: destinationMintURL.absoluteString,
-                feePaid: feePaid ?? 0,
-                signer: signer
-            )
-        }
         
         return TransferResult(
             amountTransferred: amount,
-            feePaid: feePaid ?? 0,
-            preimage: preimage,
+            feePaid: result.feePaid,
+            preimage: result.preimage,
             sourceMint: sourceMintURL,
             destinationMint: destinationMintURL
         )
     }
     
-    /// Pay a Lightning invoice from a specific mint
-    private func payLightningFromMint(
-        invoice: String,
-        amount: Int64,
-        mintURL: URL
-    ) async throws -> (preimage: String, feePaid: Int64?) {
-        guard let mint = mints[mintURL.absoluteString] else {
-            throw NDKError.noMintAvailable("Mint not found: \(mintURL)")
-        }
-        
-        // Create melt quote request
-        let quoteRequest = CashuSwift.Bolt11.RequestMeltQuote(
-            unit: "sat",
-            request: invoice,
-            options: nil
-        )
-        
-        // Get melt quote from mint
-        let quote = try await CashuSwift.getQuote(
-            mint: mint,
-            quoteRequest: quoteRequest
-        ) as! CashuSwift.Bolt11.MeltQuote
-        
-        // Get available proofs for this specific mint
-        let availableProofs = proofState.values
-            .filter { $0.state == .available && $0.mint == mintURL.absoluteString }
-            .map { $0.proof }
-        
-        // Calculate total amount needed (invoice amount + fees)
-        let lightningFee = Int64(quote.feeReserve)
-        let inputFee = try CashuSwift.calculateFee(for: availableProofs, of: mint)
-        let totalNeeded = amount + lightningFee + Int64(inputFee)
-        
-        // Select proofs to cover the payment from this specific mint
-        let selectedProofs = selectProofs(amount: totalNeeded, mint: mintURL.absoluteString)
-        guard !selectedProofs.isEmpty else {
-            throw NDKError.insufficientBalance(amount: totalNeeded)
-        }
-        
-        // Reserve proofs for this operation
-        try await reserveProofs(selectedProofs)
-        
-        do {
-            // Generate blank outputs for potential change
-            let (outputs, blindingFactors, secrets) = try CashuSwift.generateBlankOutputs(
-                quote: quote,
-                proofs: selectedProofs,
-                mint: mint,
-                unit: "sat",
-                seed: nil
-            )
-            
-            let blankOutputs = (
-                outputs: outputs,
-                blindingFactors: blindingFactors,
-                secrets: secrets
-            )
-            
-            // Execute the melt operation
-            let (paid, change, dleqValid) = try await CashuSwift.melt(
-                with: quote,
-                mint: mint,
-                proofs: selectedProofs,
-                blankOutputs: blankOutputs
-            )
-            
-            guard paid else {
-                // Payment failed, release reserved proofs
-                await releaseProofs(selectedProofs)
-                throw NDKError.paymentFailed(reason: "Lightning payment was not successful")
-            }
-            
-            guard dleqValid else {
-                throw NDKError.invalidProof("DLEQ verification failed")
-            }
-            
-            // Update wallet state (removes spent proofs, adds change)
-            try await update(
-                deletedProofs: selectedProofs,
-                addedProofs: change ?? []
-            )
-            
-            // Calculate actual fee paid
-            let totalSpent = selectedProofs.reduce(0) { $0 + Int64($1.amount) }
-            let changeAmount = (change ?? []).reduce(0) { $0 + Int64($1.amount) }
-            let actualFeePaid = totalSpent - amount - changeAmount
-            
-            return (preimage: quote.quote, feePaid: actualFeePaid)
-            
-        } catch {
-            // Release reservation on failure
-            await releaseProofs(selectedProofs)
-            throw error
-        }
-    }
     
     /// Check proof states with all mints and reconcile wallet state
     /// This queries each mint for the status of our proofs and updates our local state accordingly
@@ -1067,145 +698,25 @@ public actor NDKCashuWallet: NDKWallet {
             throw NDKError.notConfigured("No signer configured")
         }
         
-        print("🔍 Starting proof state reconciliation...")
+        let result = try await healthMonitor.checkAndReconcileProofStates(
+            proofStateManager: proofStateManager,
+            mints: mints,
+            signer: signer
+        )
         
-        // Group proofs by mint for efficient checking
-        var proofsByMint: [String: [(proof: CashuSwift.Proof, entryKey: String)]] = [:]
-        
-        for (key, entry) in proofState where entry.state == .available {
-            if proofsByMint[entry.mint] == nil {
-                proofsByMint[entry.mint] = []
-            }
-            proofsByMint[entry.mint]?.append((proof: entry.proof, entryKey: key))
-        }
-        
-        // Track spent proofs we discover
-        var spentProofs: [CashuSwift.Proof] = []
-        var spentProofsByMint: [String: [CashuSwift.Proof]] = [:]
-        
-        // Check each mint
-        for (mintURL, proofEntries) in proofsByMint {
-            guard let mint = mints[mintURL] else {
-                print("⚠️ Mint not found for URL: \(mintURL)")
-                continue
-            }
-            
-            let proofs = proofEntries.map { $0.proof }
-            
-            do {
-                print("🏦 Checking \(proofs.count) proofs with mint: \(mintURL)")
-                
-                // Query mint for proof states
-                let states = try await CashuSwift.check(proofs, mint: mint)
-                
-                // Process results
-                for (index, state) in states.enumerated() {
-                    let proofEntry = proofEntries[index]
-                    
-                    switch state {
-                    case .spent:
-                        print("💸 Found spent proof: \(proofEntry.proof.C.suffix(8))")
-                        spentProofs.append(proofEntry.proof)
-                        if spentProofsByMint[mintURL] == nil {
-                            spentProofsByMint[mintURL] = []
-                        }
-                        spentProofsByMint[mintURL]?.append(proofEntry.proof)
-                        
-                    case .pending:
-                        print("⏳ Found pending proof: \(proofEntry.proof.C.suffix(8))")
-                        // For now, treat pending as still available
-                        // Could enhance to track pending state separately
-                        
-                    case .unspent:
-                        // Proof is still good, no action needed
-                        break
-                    }
-                }
-                
-            } catch {
-                print("❌ Failed to check proofs with mint \(mintURL): \(error)")
-                // Continue with other mints even if one fails
-            }
-        }
-        
-        // If we found spent proofs, update our state
-        if !spentProofs.isEmpty {
-            print("🔄 Found \(spentProofs.count) spent proofs, updating wallet state...")
-            
-            // For each mint with spent proofs, handle the rollover
-            for (mintURL, mintSpentProofs) in spentProofsByMint {
-                // Find the token events containing these spent proofs
-                let affectedEventIds = try await findTokenEventsContainingProofs(
-                    proofs: mintSpentProofs,
-                    signer: signer
-                )
-                
-                if !affectedEventIds.isEmpty {
-                    print("📝 Affected token events: \(affectedEventIds)")
-                    
-                    // Get all proofs from affected events
-                    let allProofsFromEvents = try await getProofsFromTokenEvents(
-                        eventIds: affectedEventIds,
-                        signer: signer
-                    )
-                    
-                    // Determine which proofs are still unspent
-                    let spentProofCs = Set(mintSpentProofs.map { $0.C })
-                    let unspentProofs = allProofsFromEvents.filter { !spentProofCs.contains($0.C) }
-                    
-                    // Update state: remove spent proofs, keep unspent ones
-                    try await update(
-                        deletedProofs: mintSpentProofs,
-                        addedProofs: [] // Unspent proofs are already in state
-                    )
-                    
-                    print("✅ State updated: removed \(mintSpentProofs.count) spent proofs")
-                }
-            }
-            
-            // Create spending history event for reconciliation
-            try await createSpendingHistoryEvent(
-                direction: .out,
-                amount: Int64(spentProofs.reduce(0) { $0 + $1.amount }),
-                signer: signer
-            )
-        } else {
-            print("✅ All proofs are unspent, no reconciliation needed")
-        }
+        print("🔍 Reconciliation complete - Checked: \(result.totalChecked), Spent: \(result.spentProofs.count), Pending: \(result.pendingProofs.count), Errors: \(result.errors)")
     }
     
-    /// Find token events that contain specific proofs
-    private func findTokenEventsContainingProofs(
-        proofs: [CashuSwift.Proof],
-        signer: NDKSigner
-    ) async throws -> [String] {
-        let proofCs = Set(proofs.map { $0.C })
-        var matchingEventIds: [String] = []
-        
-        // Check current token events
-        for eventId in currentTokenEventIds {
-            // We need to decrypt and check each event
-            // This is why we track currentTokenEventIds
-            matchingEventIds.append(eventId)
-        }
-        
-        return matchingEventIds
+    /// Get the health status of wallet relays
+    public func getRelayHealthStatus() async -> WalletHealthMonitor.WalletHealthStatus {
+        return await healthMonitor.getWalletHealthStatus(walletRelays: walletRelays)
     }
     
-    /// Get all proofs from specific token events
-    private func getProofsFromTokenEvents(
-        eventIds: [String],
-        signer: NDKSigner
-    ) async throws -> [CashuSwift.Proof] {
-        var allProofs: [CashuSwift.Proof] = []
-        
-        // Get proofs from our current state
-        for entry in proofState.values {
-            allProofs.append(entry.proof)
-        }
-        
-        return allProofs
+    /// Check the health of specific relays
+    public func checkRelayHealth() async -> [WalletHealthMonitor.RelayHealth] {
+        return await healthMonitor.checkRelayHealth(walletRelays: walletRelays)
     }
+    
     
     /// Check proof states for a specific mint
     public func checkProofStates(mintURL: URL) async throws -> [String: CashuSwift.Proof.ProofState] {
@@ -1214,9 +725,7 @@ public actor NDKCashuWallet: NDKWallet {
         }
         
         // Get all proofs for this mint
-        let mintProofs = proofState.values
-            .filter { $0.state == .available && $0.mint == mintURL.absoluteString }
-            .map { $0.proof }
+        let mintProofs = await proofStateManager.getAvailableProofs(mint: mintURL.absoluteString)
         
         guard !mintProofs.isEmpty else {
             return [:]
@@ -1347,7 +856,10 @@ public actor NDKCashuWallet: NDKWallet {
         
         // If persistQuote is true, save it as a NIP-60 quote event (kind 7374)
         if persistQuote {
-            try await saveQuoteEvent(quote: quote)
+            guard let signer = ndk.signer else {
+                throw NDKError.notConfigured("No signer configured")
+            }
+            try await eventManager.saveQuoteEvent(quote: quote, signer: signer)
         }
         
         return quote
@@ -1371,7 +883,10 @@ public actor NDKCashuWallet: NDKWallet {
                             
                             if !proofs.isEmpty {
                                 // Deposit successful - tokens minted, delete the quote event
-                                try await self.deleteQuoteEvent(quoteId: quote.quoteId)
+                                guard let signer = self.ndk.signer else {
+                                    throw NDKError.notConfigured("No signer configured")
+                                }
+                                try await self.eventManager.deleteQuoteEvent(quoteId: quote.quoteId, signer: signer)
                                 
                                 // Update wallet state properly with the new proofs
                                 let createdEventIds = try await self.update(
@@ -1383,7 +898,7 @@ public actor NDKCashuWallet: NDKWallet {
                                 if let signer = self.ndk.signer {
                                     Task {
                                         do {
-                                            try await self.createSpendingHistoryEvent(
+                                            try await self.eventManager.createSpendingHistoryEvent(
                                                 direction: .in,
                                                 amount: Int64(quote.amount),
                                                 createdEventIds: createdEventIds,
@@ -1396,7 +911,7 @@ public actor NDKCashuWallet: NDKWallet {
                                     }
                                 }
                                 
-                                continuation.yield(.minted(proofs: proofs.toNDKProofs()))
+                                continuation.yield(.minted(proofs: proofs))
                                 continuation.finish()
                                 return
                             }
@@ -1418,7 +933,10 @@ public actor NDKCashuWallet: NDKWallet {
                     }
                     
                     // Timeout reached - persist quote and mark as expired
-                    try await self.saveQuoteEvent(quote: quote)
+                    guard let signer = self.ndk.signer else {
+                        throw NDKError.notConfigured("No signer configured")
+                    }
+                    try await self.eventManager.saveQuoteEvent(quote: quote, signer: signer)
                     continuation.yield(.expired)
                     continuation.finish()
                     
@@ -1476,76 +994,6 @@ public actor NDKCashuWallet: NDKWallet {
         return proofs
     }
     
-    /// Save quote event (kind 7374)
-    private func saveQuoteEvent(quote: CashuMintQuote) async throws {
-        guard let signer = ndk.signer else {
-            throw NDKError.notConfigured("No signer configured")
-        }
-        
-        // According to NIP-60: encrypt only the quote ID
-        let signerPubkey = try await signer.pubkey
-        let recipient = NDKUser(pubkey: signerPubkey)
-        print("🔐 [NDKCashuWallet] Encrypting quote ID: '\(quote.quoteId)'")
-        let encryptedContent = try await signer.encrypt(
-            recipient: recipient,
-            value: quote.quoteId,
-            scheme: .nip44
-        )
-        print("🔐 [NDKCashuWallet] Encrypted result: '\(encryptedContent)'")
-        
-        // Calculate expiration (2 weeks as per NIP-60)
-        let expirationTimestamp = Int(Date().addingTimeInterval(14 * 24 * 60 * 60).timeIntervalSince1970)
-        
-        // Create quote event (kind 7374) - following NIP-60 exactly
-        let quoteEvent = try await NDKEventBuilder()
-            .content(encryptedContent)
-            .kind(7374)
-            .tags([
-                ["expiration", String(expirationTimestamp)],
-                ["mint", quote.mintURL]  // As per NIP-60, mint URL is in clear
-            ])
-            .build(signer: signer)
-        
-        try await ndk.publish(quoteEvent, logRawJSON: true)
-    }
-    
-    /// Delete quote event when payment is complete or cancelled
-    private func deleteQuoteEvent(quoteId: String) async throws {
-        guard let signer = ndk.signer else {
-            throw NDKError.notConfigured("No signer configured")
-        }
-        
-        // Find the quote event
-        let filter = NDKFilter(
-            authors: [try await signer.pubkey],
-            kinds: [7374]
-        )
-        
-        let events = try await ndk.fetchEvents(filter)
-        
-        // Find the event with matching quote ID by decrypting content
-        let sender = NDKUser(pubkey: try await signer.pubkey)
-        for event in events {
-            do {
-                print("🔓 [NDKCashuWallet] Decrypting quote event content: '\(event.content)'")
-                let decryptedQuoteId = try await signer.decrypt(
-                    sender: sender,
-                    value: event.content,
-                    scheme: .nip44
-                )
-                print("🔓 [NDKCashuWallet] Decrypted quote ID: '\(decryptedQuoteId)'")
-                
-                if decryptedQuoteId == quoteId {
-                    // Create delete event
-                    try await createDeleteEvent(eventId: event.id, signer: signer)
-                    return
-                }
-            } catch {
-                // Skip events we can't decrypt
-                continue
-            }
-        }
-    }
     
     /// Initialize wallet by subscribing to wallet events
     public func load() async throws {
@@ -1554,20 +1002,14 @@ public actor NDKCashuWallet: NDKWallet {
         }
         
         // Clear state before starting
-        proofState.removeAll()
-        currentTokenEventIds.removeAll()
-        deletedTokenEventIds.removeAll()
-        supersededTokenEventIds.removeAll()
+        await proofStateManager.clear()
+        await eventManager.clearTrackedEvents()
         
         // Start the subscription - this will load all events including historical ones
         await startWalletSubscription()
     }
     
     
-    /// Check if a token event should be filtered out
-    private func shouldFilterTokenEvent(eventId: String) -> Bool {
-        return deletedTokenEventIds.contains(eventId) || supersededTokenEventIds.contains(eventId)
-    }
     
     /// Add mint to wallet
     public func addMint(url: URL) async throws {
@@ -1674,9 +1116,26 @@ public actor NDKCashuWallet: NDKWallet {
             throw NDKError.notConfigured("No signer configured for NDKCashuWallet")
         }
         
+        // Build wallet configuration tags
+        var walletTags: [[String]] = []
+        
+        // Add P2PK private key
+        let (p2pkPrivateKey, _) = try await p2pkManager.getOrCreateKeypair()
+        walletTags.append(["privkey", p2pkPrivateKey])
+        
+        // Add mint URLs
+        for mintURL in mints.keys {
+            walletTags.append(["mint", mintURL])
+        }
+        
+        // If no mints, add a default mint
+        if mints.isEmpty {
+            walletTags.append(["mint", "https://testnut.cashu.space"])
+        }
+        
         // Only save wallet configuration event
         // Token events are now managed by the update() method
-        try await saveWalletEvent(signer: signer)
+        try await eventManager.saveWalletEvent(signer: signer, walletTags: walletTags)
     }
     
     /// Save wallet state to NIP-60 events with specific relays
@@ -1686,9 +1145,26 @@ public actor NDKCashuWallet: NDKWallet {
             throw NDKError.notConfigured("No signer configured for NDKCashuWallet")
         }
         
+        // Build wallet configuration tags
+        var walletTags: [[String]] = []
+        
+        // Add P2PK private key
+        let (p2pkPrivateKey, _) = try await p2pkManager.getOrCreateKeypair()
+        walletTags.append(["privkey", p2pkPrivateKey])
+        
+        // Add mint URLs
+        for mintURL in mints.keys {
+            walletTags.append(["mint", mintURL])
+        }
+        
+        // If no mints, add a default mint
+        if mints.isEmpty {
+            walletTags.append(["mint", "https://testnut.cashu.space"])
+        }
+        
         // Only save wallet configuration event
         // Token events are now managed by the update() method
-        try await saveWalletEvent(signer: signer, relays: relays)
+        try await eventManager.saveWalletEvent(signer: signer, relays: relays, walletTags: walletTags)
     }
     
     /// Process a new token event (used when monitoring real-time events)
@@ -1707,173 +1183,12 @@ public actor NDKCashuWallet: NDKWallet {
         try await processIncomingTokenEvent(event)
     }
     
-    /// Save wallet configuration event (kind 17375)
-    private func saveWalletEvent(signer: NDKSigner, relays: [String]? = nil) async throws {
-        print("🔍 Preparing wallet event...")
-        print("   Mints in wallet: \(mints.count)")
-        
-        // Create wallet configuration tags
-        var walletTags: [[String]] = []
-        
-        // Add P2PK private key (get from manager)
-        let (p2pkPrivateKey, _) = try await p2pkManager.getOrCreateKeypair()
-        walletTags.append(["privkey", p2pkPrivateKey])
-        print("   Added privkey tag")
-        
-        // Add mint URLs
-        for mintURL in mints.keys {
-            walletTags.append(["mint", mintURL])
-            print("   Added mint tag: \(mintURL)")
-        }
-        
-        // If no mints, add a default mint
-        if mints.isEmpty {
-            walletTags.append(["mint", "https://testnut.cashu.space"])
-            print("   Added default mint: https://testnut.cashu.space")
-        }
-        
-        // Encrypt the wallet configuration
-        let walletDataJSON = try JSONEncoder().encode(walletTags)
-        guard let plaintext = String(data: walletDataJSON, encoding: .utf8) else {
-            throw NDKError.encodingError("Failed to encode wallet data")
-        }
-        
-        let signerPubkey = try await signer.pubkey
-        let recipient = NDKUser(pubkey: signerPubkey)
-        print("🔐 [NDKCashuWallet] Encrypting wallet data: '\(plaintext)'")
-        let encryptedContent = try await signer.encrypt(
-            recipient: recipient, 
-            value: plaintext, 
-            scheme: .nip44
-        )
-        print("🔐 [NDKCashuWallet] Encrypted wallet result: '\(encryptedContent)'")
-        
-        // Get relay tags for the wallet event
-        let relayTags = try await getRelayTags(providedRelays: relays, signer: signer)
-        
-        // Create wallet event (kind 17375) - replaceable by kind
-        let walletEvent = try await NDKEventBuilder()
-            .content(encryptedContent)
-            .kind(17375)
-            .tags(relayTags)
-            .build(signer: signer)
-        
-        // Log event ID
-        print("📝 Wallet event ID: \(walletEvent.id)")
-        
-        // Extract relay tags from the wallet event before publishing
-        extractWalletRelays(from: walletEvent)
-        
-        let publishedRelays = try await ndk.publish(walletEvent, logRawJSON: true)
-        print("📡 Published to \(publishedRelays.count) relays")
-    }
-    
-    
-    /// Save individual token event
-    internal func saveTokenEvent(token: CashuSwift.Token, signer: NDKSigner, deletedEventIds: [String]? = nil) async throws -> String {
-        // Extract mint URL from token
-        guard let mintURL = token.proofsByMint.keys.first else {
-            throw NDKError.invalidRequest("Token has no mint URL")
-        }
-        
-        // Convert CashuSwift.Token proofs to our CashuProof format
-        let proofs = token.proofsByMint[mintURL]?.toNDKProofs() ?? []
-        
-        // Create NIP-60 compliant token event structure
-        let nip60Token = NIP60TokenEvent(
-            mint: mintURL,
-            proofs: proofs,
-            del: deletedEventIds
-        )
-        
-        // Encode token to JSON
-        let tokenData = try JSONEncoder().encode(nip60Token)
-        guard let plaintext = String(data: tokenData, encoding: .utf8) else {
-            throw NDKError.encodingError("Failed to encode token data")
-        }
-        
-        let signerPubkey = try await signer.pubkey
-        let recipient = NDKUser(pubkey: signerPubkey)
-        print("🔐 [NDKCashuWallet] Encrypting token data: '\(plaintext)'")
-        let encryptedContent = try await signer.encrypt(
-            recipient: recipient,
-            value: plaintext,
-            scheme: .nip44
-        )
-        print("🔐 [NDKCashuWallet] Encrypted token result: '\(encryptedContent)'")
-        
-        // Create token event (kind 7375) - no relay tags for token events
-        let tokenEvent = try await NDKEventBuilder()
-            .content(encryptedContent)
-            .kind(7375)
-            .build(signer: signer)
-        
-        let publishedRelays = try await ndk.publish(tokenEvent, logRawJSON: true)
-        print("NDKCashuWallet.saveTokenEvent() - Published token event \(tokenEvent.id) to \(publishedRelays.count) relays")
-        
-        return tokenEvent.id
-    }
-    
-    /// Get relay tags for wallet events according to NIP-60 PR #1839
-    /// If no relays provided, use outbox write relays; if no outbox relays, return empty array
-    private func getRelayTags(providedRelays: [String]?, signer: NDKSigner) async throws -> [[String]] {
-        var relayTags: [[String]] = []
-        
-        if let relays = providedRelays {
-            // Use provided relays
-            for relay in relays {
-                relayTags.append(["relay", relay])
-            }
-            print("   Added \(relays.count) provided relay tags")
-        } else {
-            // Fallback to user's outbox write relays from NIP-65
-            do {
-                let userPubkey = try await signer.pubkey
-                let user = ndk.getUser(userPubkey)
-                
-                // Use the NDKUser method that returns [NDKRelayInfo] (not NDKRelayList)
-                let relayInfoList: [NDKRelayInfo] = try await user.fetchRelayList()
-                let writeRelays = relayInfoList.filter { $0.write }
-                
-                for relay in writeRelays {
-                    relayTags.append(["relay", relay.url])
-                }
-                
-                if !writeRelays.isEmpty {
-                    print("   Added \(writeRelays.count) outbox write relay tags")
-                } else {
-                    print("   No outbox write relays configured, no relay tags added")
-                }
-            } catch {
-                print("   Failed to fetch outbox relays: \(error), no relay tags added")
-            }
-        }
-        
-        return relayTags
-    }
     
     // MARK: - Relay Health Monitoring
     
     /// Get current relay health from existing monitoring data
-    public func getRelayHealth() async -> [RelayHealth] {
-        guard !walletRelays.isEmpty else { return [] }
-        
-        // Calculate the canonical event set (what healthy relays should have)
-        let canonicalEvents = calculateCanonicalEventSet()
-        
-        return walletRelays.map { relay in
-            let knownEvents = relayEventSets[relay.url] ?? Set()
-            let missing = canonicalEvents.subtracting(knownEvents)
-            let extra = knownEvents.intersection(deletedTokenEventIds)
-            
-            return RelayHealth(
-                relay: relay,
-                knownEvents: knownEvents.count,
-                missingEvents: Array(missing),
-                extraEvents: Array(extra),
-                isHealthy: missing.isEmpty && extra.isEmpty
-            )
-        }
+    public func getRelayHealth() async -> [WalletHealthMonitor.RelayHealth] {
+        return await checkRelayHealth()
     }
     
     /// Republish missing events to a specific relay
@@ -1904,13 +1219,15 @@ public actor NDKCashuWallet: NDKWallet {
         )
         
         let events = try await ndk.fetchEvents(filter)
-        return events.filter { !deletedTokenEventIds.contains($0.id) }
+        var filtered: [NDKEvent] = []
+        for event in events {
+            if !(await eventManager.shouldFilterEvent(event.id)) {
+                filtered.append(event)
+            }
+        }
+        return filtered
     }
     
-    private func calculateCanonicalEventSet() -> Set<String> {
-        // Current wallet state = what we have locally that's not deleted
-        return currentTokenEventIds.subtracting(deletedTokenEventIds)
-    }
     
     private func findWalletEvent(_ eventId: String, signer: NDKSigner) async throws -> NDKEvent? {
         let userPubkey = try await signer.pubkey
@@ -1924,17 +1241,10 @@ public actor NDKCashuWallet: NDKWallet {
     }
     
     
-    internal func recordEventFromRelay(_ eventId: String, from relayUrl: String) {
-        relayEventSets[relayUrl, default: Set()].insert(eventId)
+    internal func recordEventFromRelay(_ eventId: String, from relayUrl: String) async {
+        await healthMonitor.trackEventOnRelay(eventId: eventId, relay: relayUrl)
     }
     
-    private func markEventDeleted(_ eventId: String) {
-        deletedTokenEventIds.insert(eventId)
-        // Remove from all relay tracking since it should no longer exist
-        for relayUrl in relayEventSets.keys {
-            relayEventSets[relayUrl]?.remove(eventId)
-        }
-    }
     
     private func extractWalletRelays(from walletEvent: NDKEvent) {
         walletRelays = walletEvent.tags
@@ -1951,61 +1261,46 @@ public actor NDKCashuWallet: NDKWallet {
     // MARK: - Centralized State Management
     
     /// The heart of the system - handles all proof state changes
-    private func update(
+    internal func update(
         deletedProofs: [CashuSwift.Proof],
         addedProofs: [CashuSwift.Proof]
     ) async throws -> [String] {
         print("NDKCashuWallet.update() - Adding \(addedProofs.count) proofs, deleting \(deletedProofs.count) proofs")
         
         // 1. Update proof states
-        for proof in deletedProofs {
-            if var entry = proofState[proof.C] {
-                entry.state = .deleted
-                proofState[proof.C] = entry
-            }
-        }
+        await proofStateManager.markProofsAsDeleted(deletedProofs)
         
         for proof in addedProofs {
-            let mint = try findMintForProof(proof)
-            proofState[proof.C] = ProofEntry(
-                proof: proof,
-                state: .available,
-                mint: mint
-            )
+            // Find mint for this proof
+            var foundMint: String?
+            for (mintUrl, mint) in mints {
+                if mint.keysets.contains(where: { $0.keysetID == proof.keysetID }) {
+                    foundMint = mintUrl
+                    break
+                }
+            }
+            guard let mint = foundMint else {
+                throw NDKError.invalidProof("Proof with unknown keyset: \(proof.keysetID)")
+            }
+            await proofStateManager.addProof(proof, mint: mint)
             print("  Added proof: amount=\(proof.amount), C=\(proof.C)")
         }
         
         // 2. Group available proofs by mint
-        var availableByMint: [String: [CashuSwift.Proof]] = [:]
-        for entry in proofState.values where entry.state == .available {
-            availableByMint[entry.mint, default: []].append(entry.proof)
+        let availableByMint = await proofStateManager.getAvailableProofsByMint()
+        
+        // 3. Update token events through the event manager
+        guard let signer = ndk.signer else {
+            throw NDKError.notConfigured("No signer configured")
         }
         
-        // 3. Create new token events for each mint
-        var newEventIds: Set<String> = []
-        for (mint, proofs) in availableByMint {
-            let token = CashuSwift.Token(
-                proofs: [mint: proofs],
-                unit: "sat"
-            )
-            
-            let eventId = try await saveTokenEvent(
-                token: token,
-                signer: ndk.signer!,
-                deletedEventIds: nil
-            )
-            newEventIds.insert(eventId)
-            print("NDKCashuWallet.update() - Saved token event: \(eventId) for mint: \(mint)")
-        }
+        let newEventIds = try await eventManager.updateTokenEvents(
+            availableProofsByMint: availableByMint,
+            signer: signer
+        )
         
-        // 4. Delete old token events
-        let eventsToDelete = currentTokenEventIds.subtracting(newEventIds)
-        for eventId in eventsToDelete {
-            try await createDeleteEvent(eventId: eventId, signer: ndk.signer!)
-        }
-        
-        // 5. Update tracking
-        currentTokenEventIds = newEventIds
+        // 4. Update tracking
+        await eventManager.setCurrentTokenEventIds(Set(newEventIds))
         
         // 6. Update internal proofs array for compatibility
         self.proofs = availableByMint.values.flatMap { $0 }
@@ -2014,220 +1309,11 @@ public actor NDKCashuWallet: NDKWallet {
         return Array(newEventIds)
     }
     
-    /// Reserve proofs for concurrent operations
-    private func reserveProofs(_ proofs: [CashuSwift.Proof]) async throws {
-        for proof in proofs {
-            guard var entry = proofState[proof.C], entry.state == .available else {
-                throw NDKError.invalidProof("Proof not available for reservation: \(proof.C)")
-            }
-            entry.state = .reserved
-            proofState[proof.C] = entry
-        }
-    }
-    
-    /// Release reserved proofs back to available
-    private func releaseProofs(_ proofs: [CashuSwift.Proof]) async {
-        for proof in proofs {
-            if var entry = proofState[proof.C], entry.state == .reserved {
-                entry.state = .available
-                proofState[proof.C] = entry
-            }
-        }
-    }
-    
-    /// Find mint URL for a proof based on its keyset ID
-    private func findMintForProof(_ proof: CashuSwift.Proof) throws -> String {
-        for (mintUrl, mint) in mints {
-            if mint.keysets.contains(where: { $0.keysetID == proof.keysetID }) {
-                return mintUrl
-            }
-        }
-        throw NDKError.invalidProof("Proof with unknown keyset: \(proof.keysetID)")
-    }
-    
-    // MARK: - Private Helper Methods
-    
-    /// Split amount into base 2 numbers
-    private func splitIntoBase2(_ n: Int) -> [Int] {
-        return (0 ..< Int.bitWidth - n.leadingZeroBitCount)
-            .map { 1 << $0 }
-            .filter { $0 & n > 0 }
-    }
     
     
-    /// Select proofs for a given amount from a specific mint
-    private func selectProofs(amount: Int64, mint: String) -> [CashuSwift.Proof] {
-        var selected: [CashuSwift.Proof] = []
-        var total: Int64 = 0
-        
-        // Get available proofs from state, filtered by mint
-        let availableProofs = proofState.values
-            .filter { $0.state == .available && $0.mint == mint }
-            .map { $0.proof }
-        
-        // Sort proofs by amount (ascending) to minimize change
-        let sortedProofs = availableProofs.sorted { $0.amount < $1.amount }
-        
-        for proof in sortedProofs {
-            if total >= amount {
-                break
-            }
-            selected.append(proof)
-            total += Int64(proof.amount)
-        }
-        
-        return total >= amount ? selected : []
-    }
     
-    
-    /// Create a delete event for a spent token event (NIP-09)
-    private func createDeleteEvent(eventId: String, signer: NDKSigner) async throws {
-        // Add to our deleted set immediately
-        deletedTokenEventIds.insert(eventId)
-        
-        let deleteEvent = try await NDKEventBuilder()
-            .content("Spent")
-            .kind(5) // Delete event kind
-            .tags([
-                ["e", eventId],
-                ["k", "7375"] // Deleting token events
-            ])
-            .build(signer: signer)
-        
-        try await ndk.publish(deleteEvent)
-    }
-    
-    /// Create spending history event (kind 7376)
-    private func createSpendingHistoryEvent(
-        direction: SpendingDirection,
-        amount: Int64,
-        destroyedEventIds: [String]? = nil,
-        createdEventIds: [String]? = nil,
-        redeemedEventId: String? = nil,
-        signer: NDKSigner
-    ) async throws {
-        // Build encrypted tags
-        var encryptedTags: [[String]] = []
-        encryptedTags.append(["direction", direction.rawValue])
-        encryptedTags.append(["amount", String(amount)])
-        
-        // Add encrypted event references
-        if let createdIds = createdEventIds {
-            for eventId in createdIds {
-                encryptedTags.append(["e", eventId, "", "created"])
-            }
-        }
-        
-        if let destroyedIds = destroyedEventIds {
-            for eventId in destroyedIds {
-                encryptedTags.append(["e", eventId, "", "destroyed"])
-            }
-        }
-        
-        // Build clear tags (unencrypted)
-        var clearTags: [[String]] = []
-        
-        // Redeemed tags should be unencrypted according to NIP-60
-        if let redeemedId = redeemedEventId {
-            clearTags.append(["e", redeemedId, "", "redeemed"])
-        }
-        
-        // Encrypt the content tags
-        let tagsData = try JSONEncoder().encode(encryptedTags)
-        guard let plaintext = String(data: tagsData, encoding: .utf8) else {
-            throw NDKError.encodingError("Failed to encode spending history tags")
-        }
-        
-        let signerPubkey = try await signer.pubkey
-        let recipient = NDKUser(pubkey: signerPubkey)
-        let encryptedContent = try await signer.encrypt(
-            recipient: recipient,
-            value: plaintext,
-            scheme: .nip44
-        )
-        
-        // Create spending history event
-        let historyEvent = try await NDKEventBuilder()
-            .content(encryptedContent)
-            .kind(7376)
-            .tags(clearTags)
-            .build(signer: signer)
-        
-        try await ndk.publish(historyEvent)
-    }
-    
-    /// Spending direction for history events
-    private enum SpendingDirection: String {
-        case `in` = "in"   // Received funds
-        case out = "out"   // Sent funds
-    }
-    
-    /// Create nutzap event
-    private func createNutzapEvent(
-        proofs: [CashuSwift.Proof],
-        recipient: PublicKey,
-        amount: Int64,
-        comment: String?
-    ) async throws -> NDKEvent {
-        guard let signer = ndk.signer else {
-            throw NDKError.notConfigured("No signer configured")
-        }
-        
-        // Create token for the proofs
-        let token = CashuSwift.Token(
-            proofs: Dictionary(grouping: proofs) { proof in
-                // Find mint URL for this proof
-                for (mintURL, mint) in mints {
-                    if mint.keysets.contains(where: { $0.keysetID == proof.keysetID }) {
-                        return mintURL
-                    }
-                }
-                return ""
-            }.filter { !$0.key.isEmpty },
-            unit: "sat",
-            memo: comment
-        )
-        
-        // Serialize token
-        let tokenData = try JSONEncoder().encode(token)
-        guard let tokenString = String(data: tokenData, encoding: .utf8) else {
-            throw NDKError.encodingError("Failed to encode token")
-        }
-        
-        // Create nutzap event (kind 9321)
-        let eventBuilder = NDKEventBuilder()
-            .content(tokenString)
-            .kind(EventKind.nutzap)
-            .tagUser(recipient)
-            .tag(["amount", String(amount)])
-        
-        if let comment = comment {
-            _ = eventBuilder.tag(["comment", comment])
-        }
-        
-        let nutzapEvent = try await eventBuilder.build(signer: signer)
-        
-        return nutzapEvent
-    }
     
     // MARK: - Public Types
-    
-    /// Relay health information for wallet state monitoring
-    public struct RelayHealth: Sendable {
-        public let relay: NDKRelay
-        public let knownEvents: Int
-        public let missingEvents: [String]
-        public let extraEvents: [String]  // Events that were deleted but relay still has
-        public let isHealthy: Bool
-        
-        public init(relay: NDKRelay, knownEvents: Int, missingEvents: [String], extraEvents: [String], isHealthy: Bool) {
-            self.relay = relay
-            self.knownEvents = knownEvents
-            self.missingEvents = missingEvents
-            self.extraEvents = extraEvents
-            self.isHealthy = isHealthy
-        }
-    }
     
     /// Mint information
     public struct MintInfo: Hashable, Equatable {
@@ -2240,6 +1326,11 @@ public actor NDKCashuWallet: NDKWallet {
         public let recipient: PublicKey
         public let timestamp: Date
         public let nutzap: NDKEvent
+    }
+    
+    /// Get the mints dictionary for processors to use
+    public func getMints() -> [String: CashuSwift.Mint] {
+        return mints
     }
 }
 
@@ -2267,7 +1358,7 @@ public struct CashuMintQuote: Codable {
 /// Deposit status for monitoring Lightning deposits to mint
 public enum DepositStatus {
     case pending
-    case minted(proofs: [CashuProof])  // Tokens successfully minted after deposit
+    case minted(proofs: [CashuSwift.Proof])  // Tokens successfully minted after deposit
     case expired
     case cancelled
 }

@@ -33,11 +33,9 @@ struct SettingsView: View {
                                     Text(userProfile?.displayName ?? userProfile?.name ?? "Nostr User")
                                         .font(.headline)
                                     
-                                    if let npub = currentUser.npub {
-                                        Text(String(npub.prefix(16)) + "...")
-                                            .font(.caption)
-                                            .foregroundStyle(.secondary)
-                                    }
+                                    Text(String(currentUser.npub.prefix(16)) + "...")
+                                        .font(.caption)
+                                        .foregroundStyle(.secondary)
                                 }
                                 
                                 Spacer()
@@ -136,14 +134,10 @@ struct SettingsView: View {
                 return
             }
             
-            do {
-                let profile = try await user.profile
-                await MainActor.run {
-                    currentUser = user
-                    userProfile = profile
-                }
-            } catch {
-                print("Failed to load user profile: \(error)")
+            let profile = await user.profile
+            await MainActor.run {
+                currentUser = user
+                userProfile = profile
             }
         }
     }
@@ -362,23 +356,25 @@ struct UnpublishedEventsBadge: View {
     @State private var timer: Timer?
     
     var body: some View {
-        if unpublishedCount > 0 {
-            Text("\(unpublishedCount)")
-                .font(.caption)
-                .foregroundColor(.white)
-                .padding(.horizontal, 8)
-                .padding(.vertical, 4)
-                .background(Color.orange)
-                .clipShape(Capsule())
+        Group {
+            if unpublishedCount > 0 {
+                Text("\(unpublishedCount)")
+                    .font(.caption)
+                    .foregroundColor(.white)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 4)
+                    .background(Color.orange)
+                    .clipShape(Capsule())
+            }
         }
-    }
-    .onAppear {
-        updateUnpublishedCount()
-        startPeriodicUpdate()
-    }
-    .onDisappear {
-        timer?.invalidate()
-        timer = nil
+        .onAppear {
+            updateUnpublishedCount()
+            startPeriodicUpdate()
+        }
+        .onDisappear {
+            timer?.invalidate()
+            timer = nil
+        }
     }
     
     private func updateUnpublishedCount() {
@@ -616,7 +612,7 @@ struct UnpublishedEventRow: View {
             
             // Metadata
             HStack {
-                Text("Created: \(event.createdAt, style: .relative)")
+                Text("Created: \(Date(timeIntervalSince1970: TimeInterval(event.createdAt)), style: .relative)")
                     .font(.caption2)
                     .foregroundStyle(.tertiary)
                 
