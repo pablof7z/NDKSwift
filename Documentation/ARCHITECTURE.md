@@ -195,6 +195,107 @@ func verifySignature(_ event: NDKEvent) -> Bool {
 }
 ```
 
+### Optimistic Publishing
+
+NDKSwift implements optimistic publishing for instant UI feedback:
+
+```swift
+// Publishing flow with optimistic publishing
+@discardableResult
+public func publish(_ event: NDKEvent) async throws -> Set<NDKRelay> {
+    // 1. Validate event
+    try event.validate()
+    
+    // 2. Optimistic cache addition
+    if optimisticPublishingConfig.enabled && optimisticPublishingConfig.cacheUnpublishedEvents {
+        try? await cache?.addUnpublishedEvent(event, relays: targetRelays)
+    }
+    
+    // 3. Optimistic subscription dispatch
+    if optimisticPublishingConfig.enabled && optimisticPublishingConfig.dispatchToSubscriptions {
+        await subscriptionManager.processOptimisticEvent(event)
+    }
+    
+    // 4. Regular relay publishing
+    return try await publishToRelays(event)
+}
+```
+
+#### Event Source Tracking
+
+Events are tagged with their source for proper handling:
+
+```swift
+public enum EventSource: Sendable {
+    case optimistic                    // Locally published
+    case relay(RelayProtocol)         // From relay
+    case cache                        // From cache
+}
+
+// Unified event processing
+private func processEvent(_ event: NDKEvent, from source: EventSource) async {
+    switch source {
+    case .optimistic:
+        // Skip deduplication for immediate dispatch
+        isUnique = true
+    case .relay, .cache:
+        // Normal deduplication logic
+        isUnique = eventDeduplication[eventId] == nil
+    }
+    // ... dispatch to matching subscriptions
+}
+```
+
+#### Confirmation State Management
+
+The cache tracks event confirmation states:
+
+```swift
+public enum EventConfirmationState: Equatable, Sendable {
+    case optimistic                   // Pending confirmation
+    case confirmed(fromRelay: String) // Confirmed by relay
+    
+    public var isConfirmed: Bool {
+        switch self {
+        case .optimistic: return false
+        case .confirmed: return true
+        }
+    }
+}
+
+// Cache integration
+func addUnpublishedEvent(_ event: NDKEvent, relays: Set<String>) async throws
+func confirmEvent(eventId: String, onRelay relay: String) async throws  
+func getEventConfirmationState(eventId: String) async -> EventConfirmationState?
+```
+
+#### Deduplication Strategy
+
+Sophisticated deduplication prevents duplicate events while allowing state transitions:
+
+```swift
+func addEventIfNotSeen(_ event: NDKEvent, from source: EventSource) async -> Bool {
+    switch source {
+    case .optimistic:
+        // Add if not already seen
+        if eventStates[eventId] == nil {
+            eventStates[eventId] = .optimistic
+            events.append(event)
+            return true
+        }
+        
+    case .relay(let relay):
+        // Check if upgrading from optimistic to confirmed
+        if let existingState = eventStates[eventId] {
+            if case .optimistic = existingState {
+                eventStates[eventId] = .confirmed(fromRelay: relay.url)
+                return false // Don't add to events again
+            }
+        }
+    }
+}
+```
+
 ## Caching Strategy
 
 ### Cache Protocol
@@ -223,6 +324,25 @@ public protocol NDKCache: Actor {
 4. Store new events in cache
 5. Deduplicate using event IDs
 ```
+
+### Deletion Event Processing
+
+NDKSwift automatically handles NIP-09 deletion events:
+
+```swift
+// Automatic deletion processing flow
+Event (kind 5) → NDKSubscriptionManager → processDeletionEvent()
+                                       ↓
+                        Extract 'e' tags → Validate author
+                                       ↓
+                        Database transaction → Delete events
+```
+
+**Key Features**:
+- **Author Validation**: Only event authors can delete their events
+- **Timestamp Validation**: Deletion must be newer than deleted event
+- **Atomic Operations**: Database transactions prevent partial deletions
+- **Immediate Processing**: Deletions happen as soon as events are received
 
 ## Protocol Design
 

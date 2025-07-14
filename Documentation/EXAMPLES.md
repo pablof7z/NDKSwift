@@ -5,6 +5,7 @@ Practical code examples for common Nostr use cases with NDKSwift.
 ## Table of Contents
 
 - [Basic Operations](#basic-operations)
+- [Optimistic Publishing](#optimistic-publishing)
 - [Social Features](#social-features)
 - [Messaging](#messaging)
 - [Content Management](#content-management)
@@ -63,6 +64,161 @@ func login(with nsec: String) throws {
     // Get user info
     let user = try await signer.user()
     print("Logged in as: \(user.npub)")
+}
+```
+
+## Optimistic Publishing
+
+### Basic Optimistic Publishing
+
+Optimistic publishing provides instant UI feedback by immediately dispatching events to subscriptions while sending them to relays in the background.
+
+```swift
+class OptimisticPublishingExample {
+    let ndk: NDK
+    
+    init() {
+        // Optimistic publishing is enabled by default
+        ndk = NDK(relayUrls: ["wss://relay.damus.io"])
+        
+        // Configure optimistic behavior (optional)
+        ndk.optimisticPublishingConfig.enabled = true
+        ndk.optimisticPublishingConfig.cacheUnpublishedEvents = true
+        ndk.optimisticPublishingConfig.dispatchToSubscriptions = true
+    }
+    
+    func publishWithInstantFeedback() async throws {
+        // Create subscription for real-time updates
+        let subscription = ndk.subscribe(filters: [
+            NDKFilter(kinds: [1], limit: 10)
+        ])
+        
+        // Process events (including optimistic ones)
+        Task {
+            for await event in subscription {
+                print("📝 New note: \(event.content)")
+                // Event appears immediately when published locally!
+            }
+        }
+        
+        await ndk.connect()
+        
+        // Publish an event - appears instantly in subscription above
+        let event = NDKEvent(content: "Hello with instant feedback!", kind: 1)
+        try await ndk.publish(event)
+        
+        print("✅ Event published and visible immediately!")
+    }
+}
+```
+
+### UI State Management with Confirmation States
+
+```swift
+class NoteComposer: ObservableObject {
+    @Published var notes: [NoteViewModel] = []
+    let ndk: NDK
+    
+    func publishNote(content: String) async throws {
+        let event = NDKEvent(content: content, kind: 1)
+        
+        // Create view model with initial "sending" state
+        let noteVM = NoteViewModel(
+            id: event.id,
+            content: content,
+            state: .sending
+        )
+        
+        await MainActor.run {
+            notes.insert(noteVM, at: 0)
+        }
+        
+        // Publish event (optimistic dispatch happens automatically)
+        try await ndk.publish(event)
+        
+        // Monitor for confirmation in background
+        Task {
+            await monitorConfirmation(for: event.id)
+        }
+    }
+    
+    private func monitorConfirmation(for eventId: String) async {
+        // Poll for confirmation state changes
+        var isConfirmed = false
+        while !isConfirmed {
+            if let state = await ndk.cache?.getEventConfirmationState(eventId: eventId) {
+                switch state {
+                case .optimistic:
+                    // Still pending
+                    try? await Task.sleep(nanoseconds: 500_000_000)
+                case .confirmed(let relay):
+                    // Update UI to show confirmed
+                    await MainActor.run {
+                        if let index = notes.firstIndex(where: { $0.id == eventId }) {
+                            notes[index].state = .sent(relay: relay)
+                        }
+                    }
+                    isConfirmed = true
+                }
+            } else {
+                try? await Task.sleep(nanoseconds: 500_000_000)
+            }
+        }
+    }
+}
+
+struct NoteViewModel {
+    let id: String
+    let content: String
+    var state: NoteState
+    
+    enum NoteState {
+        case sending
+        case sent(relay: String)
+        case failed(error: String)
+    }
+}
+```
+
+### Subscription with Optimistic Event Filtering
+
+```swift
+func createSelectiveSubscription() -> NDKSubscription {
+    var options = NDKSubscriptionOptions()
+    
+    // Skip optimistic events if you only want confirmed events
+    options.skipOptimisticEvents = true
+    
+    return ndk.subscribe(
+        filters: [NDKFilter(kinds: [1])],
+        options: options
+    )
+}
+
+func createInstantSubscription() -> NDKSubscription {
+    var options = NDKSubscriptionOptions()
+    
+    // Receive optimistic events (default behavior)
+    options.skipOptimisticEvents = false
+    
+    return ndk.subscribe(
+        filters: [NDKFilter(kinds: [1])],
+        options: options
+    )
+}
+```
+
+### Disabling Optimistic Publishing
+
+```swift
+func configureTraditionalPublishing() {
+    // Disable optimistic publishing for traditional behavior
+    ndk.optimisticPublishingConfig = .disabled
+    
+    // Or configure granularly
+    ndk.optimisticPublishingConfig.enabled = false
+    ndk.optimisticPublishingConfig.cacheUnpublishedEvents = false
+    ndk.optimisticPublishingConfig.dispatchToSubscriptions = false
 }
 ```
 
@@ -278,6 +434,47 @@ func fetchArticles(by author: String) async throws -> [Article] {
             summary: event.tagValue("summary") ?? "",
             publishedAt: event.createdAt
         )
+    }
+}
+```
+
+### Event Deletion (NIP-09)
+
+```swift
+// Delete a single event
+func deleteEvent(_ event: NDKEvent, reason: String = "Deleted by user") async throws {
+    let user = ndk.getUser(event.pubkey)
+    let deletionEvent = try await user.deleteEvent(event, reason: reason)
+    print("Deleted event \(event.id) with reason: \(reason)")
+    
+    // The event is automatically removed from cache when deletion is processed
+}
+
+// Delete multiple events at once
+func deleteEvents(_ events: [NDKEvent], reason: String = "Batch deletion") async throws {
+    let user = ndk.getUser(events.first?.pubkey ?? "")
+    let deletionEvent = try await user.deleteEvents(events, reason: reason)
+    print("Deleted \(events.count) events")
+}
+
+// Example: Delete all posts containing a specific word
+func deletePostsContaining(_ word: String) async throws {
+    guard let activeUser = await ndk.activeUser else { 
+        throw NDKError.notConfigured("No active user") 
+    }
+    
+    // Find user's posts containing the word
+    let userPosts = try await ndk.fetchEvents(
+        NDKFilter(
+            authors: [activeUser.pubkey],
+            kinds: [EventKind.textNote]
+        )
+    )
+    
+    let postsToDelete = userPosts.filter { $0.content.contains(word) }
+    
+    if !postsToDelete.isEmpty {
+        try await deleteEvents(Array(postsToDelete), reason: "Removed posts containing '\(word)'")
     }
 }
 ```

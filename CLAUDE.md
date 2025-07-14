@@ -81,6 +81,12 @@ swift package generate-xcodeproj
 - Subscriptions (`NDKSubscription`) filter incoming events
 - Cache adapters intercept events for storage
 
+**Event Processing Flow**:
+- Events → `NDKSubscriptionManager.processEvent()` → `NDKSubscription.handleEvent()` → Cache
+- Kind 5 deletion events are automatically processed by `NDKSubscriptionManager`
+- Referenced events are removed from cache with proper NIP-09 author validation
+- Database transactions ensure atomic deletion operations
+
 **Signer Architecture**:
 - `NDKSigner` protocol defines signing interface
 - `NDKPrivateKeySigner` implements local signing
