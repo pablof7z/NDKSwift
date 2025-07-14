@@ -9,13 +9,14 @@ struct SettingsView: View {
     @EnvironmentObject private var walletManager: WalletManager
     
     @State private var userProfile: NDKUserProfile?
+    @State private var currentUser: NDKUser?
     
     var body: some View {
         NavigationStack {
             List {
                 // Account section
                 Section {
-                    if let currentUser = nostrManager.currentUser {
+                    if let currentUser = currentUser {
                         NavigationLink(destination: AccountDetailView(user: currentUser, profile: userProfile)) {
                             HStack {
                                 // Profile picture placeholder
@@ -69,6 +70,14 @@ struct SettingsView: View {
                     NavigationLink(destination: BackupView()) {
                         Label("Backup", systemImage: "lock.shield")
                     }
+                    
+                    NavigationLink(destination: UnpublishedEventsView()) {
+                        HStack {
+                            Label("Unpublished Events", systemImage: "clock.arrow.circlepath")
+                            Spacer()
+                            UnpublishedEventsBadge()
+                        }
+                    }
                 } header: {
                     Text("Preferences")
                 }
@@ -114,22 +123,23 @@ struct SettingsView: View {
             .onAppear {
                 loadUserProfile()
             }
-            .onChange(of: nostrManager.currentUser) { _, _ in
-                loadUserProfile()
-            }
         }
     }
     
     private func loadUserProfile() {
-        guard let currentUser = nostrManager.currentUser else {
-            userProfile = nil
-            return
-        }
-        
         Task {
-            do {
-                let profile = try await currentUser.profile
+            guard let user = await nostrManager.currentUser else {
                 await MainActor.run {
+                    currentUser = nil
+                    userProfile = nil
+                }
+                return
+            }
+            
+            do {
+                let profile = try await user.profile
+                await MainActor.run {
+                    currentUser = user
                     userProfile = profile
                 }
             } catch {
@@ -140,6 +150,7 @@ struct SettingsView: View {
     
     private func logout() {
         nostrManager.logout()
+        currentUser = nil
         userProfile = nil
     }
 }
@@ -341,5 +352,330 @@ struct AboutView: View {
         #if os(iOS)
         .navigationBarTitleDisplayMode(.inline)
         #endif
+    }
+}
+
+// MARK: - Unpublished Events Badge
+struct UnpublishedEventsBadge: View {
+    @EnvironmentObject private var nostrManager: NostrManager
+    @State private var unpublishedCount = 0
+    @State private var timer: Timer?
+    
+    var body: some View {
+        if unpublishedCount > 0 {
+            Text("\(unpublishedCount)")
+                .font(.caption)
+                .foregroundColor(.white)
+                .padding(.horizontal, 8)
+                .padding(.vertical, 4)
+                .background(Color.orange)
+                .clipShape(Capsule())
+        }
+    }
+    .onAppear {
+        updateUnpublishedCount()
+        startPeriodicUpdate()
+    }
+    .onDisappear {
+        timer?.invalidate()
+        timer = nil
+    }
+    
+    private func updateUnpublishedCount() {
+        Task {
+            guard let cache = nostrManager.cache else { return }
+            let unpublishedEvents = await cache.getUnpublishedEvents(maxAge: 3600, limit: nil)
+            await MainActor.run {
+                unpublishedCount = unpublishedEvents.count
+            }
+        }
+    }
+    
+    private func startPeriodicUpdate() {
+        timer = Timer.scheduledTimer(withTimeInterval: 30, repeats: true) { _ in
+            updateUnpublishedCount()
+        }
+    }
+}
+
+// MARK: - Unpublished Events View
+struct UnpublishedEventsView: View {
+    @EnvironmentObject private var nostrManager: NostrManager
+    @State private var unpublishedEvents: [(event: NDKEvent, targetRelays: Set<String>)] = []
+    @State private var isLoading = true
+    @State private var isRetrying = false
+    @State private var lastRetryTime: Date?
+    @State private var showRetrySuccess = false
+    @State private var retriedCount = 0
+    
+    var body: some View {
+        NavigationView {
+            List {
+                // Status Section
+                Section {
+                    HStack {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("Unpublished Events")
+                                .font(.headline)
+                            if isLoading {
+                                Text("Checking...")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            } else {
+                                Text("\(unpublishedEvents.count) events pending")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
+                        
+                        Spacer()
+                        
+                        if isLoading {
+                            ProgressView()
+                                .scaleEffect(0.8)
+                        } else if unpublishedEvents.count > 0 {
+                            Button(action: retryAllEvents) {
+                                if isRetrying {
+                                    ProgressView()
+                                        .scaleEffect(0.8)
+                                } else {
+                                    Text("Retry All")
+                                        .foregroundColor(.orange)
+                                }
+                            }
+                            .disabled(isRetrying)
+                        }
+                    }
+                    .padding(.vertical, 4)
+                    
+                    if let lastRetryTime = lastRetryTime {
+                        Text("Last retry: \(lastRetryTime, style: .relative)")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                } header: {
+                    Text("Status")
+                }
+                
+                // Events List
+                if !unpublishedEvents.isEmpty {
+                    Section {
+                        ForEach(Array(unpublishedEvents.enumerated()), id: \.offset) { index, eventInfo in
+                            UnpublishedEventRow(
+                                event: eventInfo.event,
+                                targetRelays: eventInfo.targetRelays,
+                                onRetry: {
+                                    retryEvent(at: index)
+                                }
+                            )
+                        }
+                    } header: {
+                        Text("Pending Events")
+                    } footer: {
+                        Text("These events were published optimistically but haven't been confirmed by relays yet. You can retry individual events or all at once.")
+                    }
+                } else if !isLoading {
+                    Section {
+                        VStack(spacing: 16) {
+                            Image(systemName: "checkmark.circle.fill")
+                                .font(.system(size: 48))
+                                .foregroundColor(.green)
+                            
+                            Text("All events published successfully!")
+                                .font(.headline)
+                                .multilineTextAlignment(.center)
+                            
+                            Text("Your events have been confirmed by the relays.")
+                                .font(.subheadline)
+                                .foregroundStyle(.secondary)
+                                .multilineTextAlignment(.center)
+                        }
+                        .padding(.vertical, 20)
+                        .frame(maxWidth: .infinity)
+                    }
+                }
+            }
+            .navigationTitle("Unpublished Events")
+            #if os(iOS)
+            .navigationBarTitleDisplayMode(.inline)
+            #endif
+            .refreshable {
+                await loadUnpublishedEvents()
+            }
+            .onAppear {
+                Task {
+                    await loadUnpublishedEvents()
+                }
+            }
+            .alert("Retry Successful", isPresented: $showRetrySuccess) {
+                Button("OK") { }
+            } message: {
+                Text("Successfully retried \(retriedCount) events")
+            }
+        }
+    }
+    
+    private func loadUnpublishedEvents() async {
+        guard let cache = nostrManager.cache else { 
+            await MainActor.run {
+                isLoading = false
+            }
+            return 
+        }
+        
+        let events = await cache.getUnpublishedEvents(maxAge: 3600, limit: nil)
+        await MainActor.run {
+            unpublishedEvents = events
+            isLoading = false
+        }
+    }
+    
+    private func retryAllEvents() {
+        guard let ndk = nostrManager.ndk else { return }
+        
+        isRetrying = true
+        
+        Task {
+            do {
+                let retriedEvents = try await ndk.retryUnpublishedEvents(maxAge: 3600, limit: nil)
+                await MainActor.run {
+                    isRetrying = false
+                    lastRetryTime = Date()
+                    retriedCount = retriedEvents.count
+                    showRetrySuccess = true
+                }
+                
+                // Reload the list
+                await loadUnpublishedEvents()
+            } catch {
+                await MainActor.run {
+                    isRetrying = false
+                }
+                print("Failed to retry events: \(error)")
+            }
+        }
+    }
+    
+    private func retryEvent(at index: Int) {
+        guard let ndk = nostrManager.ndk, index < unpublishedEvents.count else { return }
+        
+        let eventInfo = unpublishedEvents[index]
+        
+        Task {
+            do {
+                _ = try await ndk.publish(eventInfo.event)
+                
+                // Reload the list
+                await loadUnpublishedEvents()
+            } catch {
+                print("Failed to retry individual event: \(error)")
+            }
+        }
+    }
+}
+
+// MARK: - Unpublished Event Row
+struct UnpublishedEventRow: View {
+    let event: NDKEvent
+    let targetRelays: Set<String>
+    let onRetry: () -> Void
+    
+    @State private var isRetrying = false
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            // Event content preview
+            HStack {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(eventKindName)
+                        .font(.subheadline)
+                        .fontWeight(.medium)
+                    
+                    if !event.content.isEmpty {
+                        Text(event.content)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .lineLimit(3)
+                    }
+                }
+                
+                Spacer()
+                
+                Button(action: retryEvent) {
+                    if isRetrying {
+                        ProgressView()
+                            .scaleEffect(0.7)
+                    } else {
+                        Image(systemName: "arrow.clockwise")
+                            .foregroundColor(.orange)
+                    }
+                }
+                .disabled(isRetrying)
+                .buttonStyle(.plain)
+            }
+            
+            // Metadata
+            HStack {
+                Text("Created: \(event.createdAt, style: .relative)")
+                    .font(.caption2)
+                    .foregroundStyle(.tertiary)
+                
+                Spacer()
+                
+                Text("\(targetRelays.count) relays")
+                    .font(.caption2)
+                    .foregroundStyle(.tertiary)
+            }
+            
+            // Target relays (abbreviated)
+            if !targetRelays.isEmpty {
+                Text("Targets: \(abbreviatedRelayList)")
+                    .font(.caption2)
+                    .foregroundStyle(.tertiary)
+                    .lineLimit(1)
+            }
+        }
+        .padding(.vertical, 4)
+    }
+    
+    private var eventKindName: String {
+        switch event.kind {
+        case 0: return "Profile"
+        case 1: return "Note"
+        case 3: return "Contacts"
+        case 4: return "Direct Message"
+        case 5: return "Deletion"
+        case 6: return "Repost"
+        case 7: return "Reaction"
+        case 37375: return "NIP-60 Wallet"
+        default: return "Event \(event.kind)"
+        }
+    }
+    
+    private var abbreviatedRelayList: String {
+        let sorted = targetRelays.sorted()
+        if sorted.count <= 2 {
+            return sorted.map { shortRelayName($0) }.joined(separator: ", ")
+        } else {
+            let first = sorted.prefix(2).map { shortRelayName($0) }
+            return first.joined(separator: ", ") + " +\(sorted.count - 2)"
+        }
+    }
+    
+    private func shortRelayName(_ url: String) -> String {
+        guard let host = URL(string: url)?.host else { return url }
+        // Remove common prefixes and show just the domain
+        return host.replacingOccurrences(of: "www.", with: "")
+            .replacingOccurrences(of: "relay.", with: "")
+    }
+    
+    private func retryEvent() {
+        isRetrying = true
+        onRetry()
+        
+        // Reset retry state after a delay
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
+            isRetrying = false
+        }
     }
 }

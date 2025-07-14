@@ -204,23 +204,8 @@ struct MeltView: View {
                     amount: amount
                 )
                 
-                // Create transaction record
-                let transaction = Transaction(
-                    type: .melt,
-                    amount: Int(amount),
-                    memo: decodedDescription
-                )
-                transaction.lightningInvoice = lightningInvoice
-                transaction.status = .completed
-                
+                // Transaction will be recorded automatically via NIP-60 history events
                 await MainActor.run {
-                    modelContext.insert(transaction)
-                    do {
-                        try modelContext.save()
-                    } catch {
-                        print("Failed to save transaction: \(error)")
-                    }
-                    
                     showSuccess = true
                     isMelting = false
                 }

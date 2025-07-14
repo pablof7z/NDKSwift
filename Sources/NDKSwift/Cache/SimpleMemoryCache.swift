@@ -7,8 +7,12 @@ public actor SimpleMemoryCache: NDKCache {
     private var eventConfirmations: [String: EventConfirmationState] = [:]
     private var unpublishedEventRelays: [String: Set<String>] = [:]
     private var eventCreationTimes: [String: Date] = [:]
+    private var decryptedContent: LRUCache<String, String>
     
-    public init() {}
+    public init() {
+        // Initialize LRU cache with 1000 item limit
+        self.decryptedContent = LRUCache(capacity: 1000)
+    }
     
     // MARK: - Event Operations
     
@@ -89,6 +93,7 @@ public actor SimpleMemoryCache: NDKCache {
         events.removeAll()
         profiles.removeAll()
         eventConfirmations.removeAll()
+        await decryptedContent.clear()
         print("[SimpleMemoryCache] Cleared all cache data")
     }
     
@@ -157,6 +162,22 @@ public actor SimpleMemoryCache: NDKCache {
         
         print("[SimpleMemoryCache] Found \(results.count) unpublished events (maxAge: \(maxAge)s)")
         return results
+    }
+    
+    // MARK: - Decrypted Content Cache
+    
+    public func getDecryptedContent(for eventId: String) async -> String? {
+        return await decryptedContent.get(eventId)
+    }
+    
+    public func storeDecryptedContent(_ content: String, for eventId: String) async {
+        await decryptedContent.set(eventId, value: content)
+        print("[SimpleMemoryCache] Cached decrypted content for event \(eventId)")
+    }
+    
+    public func clearDecryptedContent() async {
+        await decryptedContent.clear()
+        print("[SimpleMemoryCache] Cleared all decrypted content")
     }
     
     // MARK: - Debug Helpers

@@ -53,6 +53,22 @@ public protocol NDKCache: Actor {
     /// - Returns: Array of unpublished events with their target relays
     func getUnpublishedEvents(maxAge: TimeInterval, limit: Int?) async -> [(event: NDKEvent, targetRelays: Set<String>)]
     
+    // MARK: - Decrypted Content Cache
+    
+    /// Retrieve decrypted content for an event
+    /// - Parameter eventId: The event ID to look up
+    /// - Returns: The decrypted content string, or nil if not cached
+    func getDecryptedContent(for eventId: String) async -> String?
+    
+    /// Store decrypted content for an event
+    /// - Parameters:
+    ///   - content: The decrypted content to cache
+    ///   - eventId: The event ID to associate with
+    func storeDecryptedContent(_ content: String, for eventId: String) async
+    
+    /// Clear all decrypted content from cache
+    func clearDecryptedContent() async
+    
     // MARK: - Cache Management
     
     /// Clear all cached data
@@ -108,5 +124,22 @@ public extension NDKCache {
     /// Default implementation that returns empty array
     func getUnpublishedEvents(maxAge: TimeInterval = 3600, limit: Int? = nil) async -> [(event: NDKEvent, targetRelays: Set<String>)] {
         return []
+    }
+    
+    // MARK: - Default Decrypted Content Implementation
+    
+    /// Default implementation that returns nil (no caching)
+    func getDecryptedContent(for eventId: String) async -> String? {
+        return nil
+    }
+    
+    /// Default implementation that does nothing (no caching)
+    func storeDecryptedContent(_ content: String, for eventId: String) async {
+        // Default implementation - cache implementations can override for actual caching
+    }
+    
+    /// Default implementation that does nothing
+    func clearDecryptedContent() async {
+        // Default implementation - cache implementations can override
     }
 }

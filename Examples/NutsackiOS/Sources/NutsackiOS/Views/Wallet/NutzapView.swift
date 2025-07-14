@@ -254,22 +254,8 @@ struct NutzapView: View {
                     acceptedMints: mintURLs
                 )
                 
-                // Create transaction record
-                let transaction = Transaction(
-                    type: .nutzap,
-                    amount: amountInt,
-                    memo: comment.isEmpty ? "Nutzap" : comment
-                )
-                transaction.status = .completed
-                
+                // Transaction will be recorded automatically via NIP-60 history events
                 await MainActor.run {
-                    modelContext.insert(transaction)
-                    do {
-                        try modelContext.save()
-                    } catch {
-                        print("Failed to save transaction: \(error)")
-                    }
-                    
                     showSuccess = true
                     isSending = false
                 }
