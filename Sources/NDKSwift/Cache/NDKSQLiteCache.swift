@@ -804,6 +804,7 @@ public actor NDKSQLiteCache: NDKCache, MintCache {
             try db.execute(sql: "DELETE FROM profiles")
             try db.execute(sql: "DELETE FROM mint_info")
             try db.execute(sql: "DELETE FROM keysets")
+            try db.execute(sql: "DELETE FROM decrypted_content")
         }
         // VACUUM must be run outside of a transaction
         try await dbQueue.writeWithoutTransaction { db in

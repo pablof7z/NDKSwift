@@ -696,7 +696,7 @@ public actor NDKCashuWallet: NDKWallet {
         amount: Int64,
         to recipientP2PK: String,
         mint mintURL: URL
-    ) async throws -> (proofs: [CashuProof], change: [CashuProof]?) {
+    ) async throws -> (proofs: [CashuSwift.Proof], change: [CashuSwift.Proof]?) {
         // Get the mint
         guard let mint = mints[mintURL.absoluteString] else {
             throw NDKError.noMintAvailable("Mint not found: \(mintURL)")
@@ -731,9 +731,9 @@ public actor NDKCashuWallet: NDKWallet {
             )
             
             // Extract proofs from the token
-            var lockedProofs: [CashuProof] = []
+            var lockedProofs: [CashuSwift.Proof] = []
             for (_, proofs) in token.proofsByMint {
-                lockedProofs.append(contentsOf: proofs.toNDKProofs())
+                lockedProofs.append(contentsOf: proofs)
             }
             
             // Update state (this handles EVERYTHING - token event creation/deletion)
