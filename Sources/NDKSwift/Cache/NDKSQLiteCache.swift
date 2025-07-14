@@ -178,6 +178,19 @@ public actor NDKSQLiteCache: NDKCache, MintCache {
             try db.create(index: "idx_confirmations_created", on: "event_confirmations", columns: ["created_at"])
         }
         
+        // v5: Add decrypted content caching
+        migrator.registerMigration("v5-decrypted-content") { db in
+            // Create decrypted_content table
+            try db.create(table: "decrypted_content") { t in
+                t.column("event_id", .text).primaryKey()
+                t.column("content", .text).notNull()
+                t.column("decrypted_at", .integer).notNull().defaults(sql: "(CAST(strftime('%s', 'now') AS INTEGER))")
+            }
+            
+            // Create index on decrypted_at for potential age-based cleanup
+            try db.create(index: "idx_decrypted_content_time", on: "decrypted_content", columns: ["decrypted_at"])
+        }
+        
         try await migrator.migrate(dbQueue)
     }
     
@@ -731,6 +744,54 @@ public actor NDKSQLiteCache: NDKCache, MintCache {
             }
         } catch {
             return (0, 0, 0, 0)
+        }
+    }
+    
+    // MARK: - Decrypted Content Cache
+    
+    public func getDecryptedContent(for eventId: String) async -> String? {
+        do {
+            return try await dbQueue.read { db in
+                try String.fetchOne(db, sql: "SELECT content FROM decrypted_content WHERE event_id = ?", arguments: [eventId])
+            }
+        } catch {
+            if debugMode {
+                print("[NDKSQLiteCache] Error fetching decrypted content for \(eventId): \(error)")
+            }
+            return nil
+        }
+    }
+    
+    public func storeDecryptedContent(_ content: String, for eventId: String) async {
+        do {
+            try await dbQueue.write { db in
+                try db.execute(
+                    sql: "INSERT OR REPLACE INTO decrypted_content (event_id, content) VALUES (?, ?)",
+                    arguments: [eventId, content]
+                )
+            }
+            if debugMode {
+                print("[NDKSQLiteCache] Stored decrypted content for event \(eventId)")
+            }
+        } catch {
+            if debugMode {
+                print("[NDKSQLiteCache] Error storing decrypted content for \(eventId): \(error)")
+            }
+        }
+    }
+    
+    public func clearDecryptedContent() async {
+        do {
+            try await dbQueue.write { db in
+                try db.execute(sql: "DELETE FROM decrypted_content")
+            }
+            if debugMode {
+                print("[NDKSQLiteCache] Cleared all decrypted content")
+            }
+        } catch {
+            if debugMode {
+                print("[NDKSQLiteCache] Error clearing decrypted content: \(error)")
+            }
         }
     }
     
