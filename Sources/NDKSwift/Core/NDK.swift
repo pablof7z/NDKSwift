@@ -105,6 +105,11 @@ public final class NDK {
 
         public static let `default` = SubscriptionTrackingConfig()
     }
+    
+    // MARK: - Optimistic Publishing
+    
+    /// Configuration for optimistic publishing
+    public var optimisticPublishingConfig: NDKOptimisticPublishingConfig = NDKOptimisticPublishingConfig()
 
     // MARK: - Profile Management
     // Profile management will be added later
@@ -244,7 +249,29 @@ public final class NDK {
             }
         }
 
-        // Store in cache if available
+        // OPTIMISTIC PUBLISHING - Step 1: Add to cache as unpublished
+        if optimisticPublishingConfig.enabled && optimisticPublishingConfig.cacheUnpublishedEvents {
+            if let cache = cache {
+                // Get target relays for this event
+                let targetRelays: Set<String>
+                if outboxEnabled {
+                    targetRelays = await outbox.getRecommendedRelaysForSubscription(filters: [
+                        NDKFilter(authors: [event.pubkey], kinds: [event.kind], limit: 1)
+                    ])
+                } else {
+                    targetRelays = Set(await relayPool.relayURLs)
+                }
+                
+                try? await cache.addUnpublishedEvent(event, relays: targetRelays)
+            }
+        }
+        
+        // OPTIMISTIC PUBLISHING - Step 2: Dispatch to subscriptions
+        if optimisticPublishingConfig.enabled && optimisticPublishingConfig.dispatchToSubscriptions {
+            await subscriptionManager.processOptimisticEvent(event)
+        }
+
+        // Store in cache if available (regular save)
         if let cache = cache {
             try? await cache.saveEvent(event)
         }
@@ -677,6 +704,11 @@ public final class NDK {
         // Update publish status based on OK response
         if accepted {
             await eventTracker.updatePublishStatus(eventId: eventId, relay: relay.url, status: .succeeded)
+            
+            // Confirm event in cache if optimistic publishing is enabled
+            if optimisticPublishingConfig.enabled, let cache = cache {
+                try? await cache.confirmEvent(eventId: eventId, onRelay: relay.url)
+            }
         } else {
             let reason = message ?? "Rejected by relay"
             await eventTracker.updatePublishStatus(eventId: eventId, relay: relay.url, status: .failed(.custom(reason)))

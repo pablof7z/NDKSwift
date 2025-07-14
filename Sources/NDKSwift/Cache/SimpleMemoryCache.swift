@@ -4,6 +4,7 @@ import Foundation
 public actor SimpleMemoryCache: NDKCache {
     private var events: [String: NDKEvent] = [:]
     private var profiles: [String: NDKUserProfile] = [:]
+    private var eventConfirmations: [String: EventConfirmationState] = [:]
     
     public init() {}
     
@@ -85,7 +86,37 @@ public actor SimpleMemoryCache: NDKCache {
     public func clear() async throws {
         events.removeAll()
         profiles.removeAll()
+        eventConfirmations.removeAll()
         print("[SimpleMemoryCache] Cleared all cache data")
+    }
+    
+    // MARK: - Optimistic Publishing Support
+    
+    public func addUnpublishedEvent(_ event: NDKEvent, relays: Set<String>) async throws {
+        let eventId = event.id
+        events[eventId] = event
+        eventConfirmations[eventId] = .optimistic
+        print("[SimpleMemoryCache] Added unpublished event \(eventId) for relays: \(relays.joined(separator: ", "))")
+    }
+    
+    public func confirmEvent(eventId: String, onRelay relay: String) async throws {
+        if let existingState = eventConfirmations[eventId] {
+            switch existingState {
+            case .optimistic:
+                eventConfirmations[eventId] = .confirmed(fromRelay: relay)
+                print("[SimpleMemoryCache] Confirmed event \(eventId) on relay \(relay)")
+            case .confirmed:
+                print("[SimpleMemoryCache] Event \(eventId) already confirmed")
+            }
+        } else {
+            // Event not found, might have been confirmed directly
+            eventConfirmations[eventId] = .confirmed(fromRelay: relay)
+            print("[SimpleMemoryCache] Marked event \(eventId) as confirmed on relay \(relay)")
+        }
+    }
+    
+    public func getEventConfirmationState(eventId: String) async -> EventConfirmationState? {
+        return eventConfirmations[eventId]
     }
     
     // MARK: - Debug Helpers
@@ -96,5 +127,9 @@ public actor SimpleMemoryCache: NDKCache {
     
     public func profileCount() async -> Int {
         return profiles.count
+    }
+    
+    public func unconfirmedEventCount() async -> Int {
+        return eventConfirmations.values.filter { !$0.isConfirmed }.count
     }
 }
