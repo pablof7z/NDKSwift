@@ -16,6 +16,8 @@ public actor ProofStateManager {
         let proof: CashuSwift.Proof
         var state: ProofState
         let mint: String
+        var ownerEventId: String? // Which event currently owns this proof
+        var ownerTimestamp: Timestamp? // Timestamp of the owner event
     }
     
     // MARK: - Properties
@@ -25,11 +27,24 @@ public actor ProofStateManager {
     // MARK: - Public Methods
     
     /// Add a proof to the state manager
-    func addProof(_ proof: CashuSwift.Proof, mint: String, state: ProofState = .available) {
+    func addProof(_ proof: CashuSwift.Proof, mint: String, state: ProofState = .available, eventId: String? = nil, timestamp: Timestamp? = nil) {
+        // Check if proof already exists
+        if let existing = proofState[proof.C] {
+            // Only update if the new event is newer (higher timestamp)
+            if let newTimestamp = timestamp, let existingTimestamp = existing.ownerTimestamp {
+                if newTimestamp <= existingTimestamp {
+                    // Existing owner is newer or same age, don't update ownership
+                    return
+                }
+            }
+        }
+        
         proofState[proof.C] = ProofEntry(
             proof: proof,
             state: state,
-            mint: mint
+            mint: mint,
+            ownerEventId: eventId,
+            ownerTimestamp: timestamp
         )
     }
     
@@ -38,6 +53,23 @@ public actor ProofStateManager {
         if var entry = proofState[proofC] {
             entry.state = state
             proofState[proofC] = entry
+        }
+    }
+    
+    /// Update ownership of existing proofs to a new event
+    func updateProofOwnership(_ proofs: [CashuSwift.Proof], eventId: String, timestamp: Timestamp) {
+        for proof in proofs {
+            if var entry = proofState[proof.C] {
+                // Only update if the new event is newer
+                if let existingTimestamp = entry.ownerTimestamp {
+                    if timestamp <= existingTimestamp {
+                        continue // Don't update, existing owner is newer
+                    }
+                }
+                entry.ownerEventId = eventId
+                entry.ownerTimestamp = timestamp
+                proofState[proof.C] = entry
+            }
         }
     }
     
@@ -141,6 +173,23 @@ public actor ProofStateManager {
                 proofState[proof.C] = entry
             }
         }
+    }
+    
+    /// Mark proofs owned by a deleted event as deleted
+    func markProofsOwnedByEventAsDeleted(_ eventId: String) -> [CashuSwift.Proof] {
+        var deletedProofs: [CashuSwift.Proof] = []
+        
+        for (proofC, entry) in proofState {
+            // Only delete if this event still owns the proof
+            if entry.ownerEventId == eventId && entry.state != .deleted {
+                var updatedEntry = entry
+                updatedEntry.state = .deleted
+                proofState[proofC] = updatedEntry
+                deletedProofs.append(entry.proof)
+            }
+        }
+        
+        return deletedProofs
     }
     
     /// Remove deleted proofs from state

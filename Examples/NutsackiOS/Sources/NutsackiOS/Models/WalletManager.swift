@@ -2,13 +2,15 @@ import Foundation
 import NDKSwift
 import CashuSwift
 import SwiftData
+import Observation
 
 @MainActor
-class WalletManager: ObservableObject {
-    @Published var activeWallet: NDKCashuWallet?
-    @Published var isLoading = false
-    @Published var error: Error?
-    @Published var transactions: [Transaction] = []
+@Observable
+class WalletManager {
+    var activeWallet: NDKCashuWallet?
+    var isLoading = false
+    var error: Error?
+    var transactions: [Transaction] = []
     
     private let nostrManager: NostrManager
     private let modelContext: ModelContext
@@ -16,6 +18,9 @@ class WalletManager: ObservableObject {
     
     // Subscription for history events
     private var historySubscription: NDKSubscription?
+    
+    // Task for periodic proof state checking
+    private var proofStateCheckTask: Task<Void, Never>?
     
     init(nostrManager: NostrManager, modelContext: ModelContext) {
         self.nostrManager = nostrManager
@@ -80,9 +85,7 @@ class WalletManager: ObservableObject {
         // Nutzap monitoring is now handled by the unified wallet subscription in load()
         
         // Start periodic proof state checking
-        Task {
-            await wallet.startPeriodicProofStateCheck(interval: 300) // 5 minutes
-        }
+        startPeriodicProofStateCheck(for: wallet, interval: 300) // 5 minutes
         
         // Publish nutzap preferences if needed (in case they haven't been published)
         Task {
@@ -509,7 +512,9 @@ class WalletManager: ObservableObject {
             throw WalletError.noActiveWallet
         }
         
-        return try await wallet.mintDiscovery.discoverMints()
+        // Mint discovery should be handled at the application layer
+        let mintDiscovery = MintDiscovery(ndk: ndk)
+        return try await mintDiscovery.discoverMints()
     }
     
     // MARK: - Cross-mint Operations
@@ -602,6 +607,38 @@ enum WalletError: LocalizedError {
             return "Invalid token format"
         case .encodingError:
             return "Failed to encode data"
+        }
+    }
+    
+    // MARK: - Private Methods
+    
+    /// Start periodic proof state checking for the wallet
+    private func startPeriodicProofStateCheck(for wallet: NDKCashuWallet, interval: TimeInterval) {
+        // Cancel any existing task
+        proofStateCheckTask?.cancel()
+        
+        // Start new periodic check task
+        proofStateCheckTask = Task {
+            print("🔄 Starting periodic proof state checking every \(interval) seconds")
+            
+            while !Task.isCancelled {
+                do {
+                    try await Task.sleep(nanoseconds: UInt64(interval * 1_000_000_000))
+                    
+                    if !Task.isCancelled {
+                        print("⏰ Running periodic proof state check...")
+                        try await wallet.checkAndReconcileProofStates()
+                    }
+                } catch {
+                    if error is CancellationError {
+                        print("🛑 Periodic proof state checking cancelled")
+                        break
+                    } else {
+                        print("❌ Error in periodic proof check: \(error)")
+                        // Continue checking even if there's an error
+                    }
+                }
+            }
         }
     }
 }

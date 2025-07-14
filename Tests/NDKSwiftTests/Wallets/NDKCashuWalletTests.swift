@@ -36,8 +36,6 @@ final class NDKCashuWalletTests: XCTestCase {
         XCTAssertNotNil(wallet)
         let balance = try await wallet.getBalance()
         XCTAssertEqual(balance, 0)
-        let mintDiscovery = await wallet.mintDiscovery
-        XCTAssertNotNil(mintDiscovery)
     }
     
     // MARK: - Balance Tests

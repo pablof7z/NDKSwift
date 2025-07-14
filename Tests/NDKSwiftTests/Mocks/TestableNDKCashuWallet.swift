@@ -56,17 +56,20 @@ class TestableWalletWrapper {
 extension NDKCashuWallet {
     /// Test helper to directly set a mint
     func setTestMint(_ mint: CashuSwift.Mint, for url: URL) async {
-        mints[url.absoluteString] = mint
+        // Access mint manager to set test mint
+        await mintManager.setTestMint(mint, for: url)
     }
     
     /// Test helper to directly set a keyset
     func setTestKeyset(_ keyset: CashuSwift.Keyset) async {
-        keysets[keyset.keysetID] = keyset
+        // Access mint manager to set test keyset
+        await mintManager.setTestKeyset(keyset)
     }
     
     /// Test helper to get a mint
     func getMint(for url: URL) async -> CashuSwift.Mint? {
-        return mints[url.absoluteString]
+        // Access mint manager to get mint
+        return try? await mintManager.getMint(for: url)
     }
 }
 

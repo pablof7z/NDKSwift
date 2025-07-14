@@ -1,7 +1,7 @@
 import SwiftUI
 
 struct DLEQStatusIndicator: View {
-    @EnvironmentObject private var walletManager: WalletManager
+    @Environment(WalletManager.self) private var walletManager
     
     @State private var proofStats: (verified: Int, unverified: Int, unknown: Int) = (0, 0, 0)
     

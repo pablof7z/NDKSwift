@@ -4,7 +4,7 @@ import NDKSwift
 
 struct ImportAccountView: View {
     @Environment(\.dismiss) private var dismiss
-    @EnvironmentObject private var nostrManager: NostrManager
+    @Environment(NostrManager.self) private var nostrManager
     
     @State private var nsecInput = ""
     @State private var displayName = ""

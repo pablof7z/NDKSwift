@@ -5,8 +5,8 @@ import NDKSwift
 struct SettingsView: View {
     @Environment(\.modelContext) private var modelContext
     @EnvironmentObject private var appState: AppState
-    @EnvironmentObject private var nostrManager: NostrManager
-    @EnvironmentObject private var walletManager: WalletManager
+    @Environment(NostrManager.self) private var nostrManager
+    @Environment(WalletManager.self) private var walletManager
     
     @State private var userProfile: NDKUserProfile?
     @State private var currentUser: NDKUser?

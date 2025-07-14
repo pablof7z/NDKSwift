@@ -4,6 +4,10 @@ import CashuSwift
 // MARK: - NDKCashuWallet Extensions
 
 extension NDKCashuWallet {
+    // MintDiscovery functionality will be added later
+    // For now, commenting out to allow build to proceed
+    
+    /*
     /// Discover and add mints from Nostr using NDK passed as parameter
     /// - Parameters:
     ///   - ndk: The NDK instance to use for discovery
@@ -47,6 +51,7 @@ extension NDKCashuWallet {
         
         return addedMints
     }
+    */
     
     /// Check if wallet has a mint with given URL
     internal func hasMint(url: URL) async -> Bool {

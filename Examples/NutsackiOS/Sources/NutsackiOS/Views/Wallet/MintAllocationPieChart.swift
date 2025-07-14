@@ -2,7 +2,7 @@ import SwiftUI
 import Foundation
 
 struct MintAllocationPieChart: View {
-    @EnvironmentObject private var walletManager: WalletManager
+    @Environment(WalletManager.self) private var walletManager
     @State private var mintBalances: [(mint: String, balance: Int64, percentage: Double)] = []
     @State private var selectedSlice: String?
     @State private var animationProgress: Double = 0

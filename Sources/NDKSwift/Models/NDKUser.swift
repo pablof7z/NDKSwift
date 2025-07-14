@@ -334,17 +334,6 @@ public final class NDKUser: Equatable, Hashable, Sendable {
             }
         }
 
-        // Check for NWC support (kind 13194 - NWC info event)
-        let nwcFilter = NDKFilter(
-            authors: [pubkey],
-            kinds: [13194], // NIP-47 NWC info event
-            limit: 1
-        )
-        
-        if let _ = try? await ndk?.fetchEvent(nwcFilter) {
-            methods.insert(.nwc)
-        }
-
         return methods
     }
 }

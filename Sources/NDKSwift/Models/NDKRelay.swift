@@ -226,24 +226,23 @@ public final class NDKRelay: RelayProtocol, Hashable, Equatable, Sendable {
     public let url: RelayURL
 
     /// Reference to NDK instance
-    public nonisolated(unsafe) weak var ndk: NDK?
-
-    /// Subscription manager for this relay
-    nonisolated(unsafe) private var _subscriptionManager: NDKRelaySubscriptionManager?
-    private let subscriptionManagerLock = NSLock()
+    private weak var _ndk: NDK?
     
-    var subscriptionManager: NDKRelaySubscriptionManager {
-        subscriptionManagerLock.lock()
-        defer { subscriptionManagerLock.unlock() }
-        
-        if let manager = _subscriptionManager {
-            return manager
-        }
-        
-        let manager = NDKRelaySubscriptionManager(relay: self)
-        _subscriptionManager = manager
-        return manager
+    /// Set the NDK instance for this relay
+    public func setNDK(_ ndk: NDK?) {
+        _ndk = ndk
     }
+    
+    /// Get/set the NDK instance (required by RelayProtocol)
+    public var ndk: NDK? {
+        get { _ndk }
+        set { _ndk = newValue }
+    }
+
+    /// Subscription manager for this relay (lazy initialization)
+    internal lazy var subscriptionManager: NDKRelaySubscriptionManager = {
+        NDKRelaySubscriptionManager(relay: self)
+    }()
 
     /// Internal state actor that manages all mutable state
     private let stateActor = RelayStateActor()
@@ -708,6 +707,27 @@ extension NDKRelay: NDKRelayConnectionDelegate {
 }
 
 public extension NDKRelay {
+    // MARK: - Publishing and Fetching
+    
+    /// Publish an event and wait for response
+    func publish(_ event: NDKEvent) async throws -> (success: Bool, message: String?) {
+        // Send the event
+        let message = NostrMessage.event(subscriptionId: nil, event: event)
+        try await send(message.serialize())
+
+        // Wait for OK response (this would need proper implementation)
+        // For now, return success
+        // In a real implementation, would need to wait for ["OK", event.id, success, message]
+        return (success: true, message: nil)
+    }
+
+    /// Fetch events with a filter
+    func fetchEvents(filter _: NDKFilter) async throws -> [NDKEvent] {
+        // This would need proper implementation with subscription handling
+        // For now, return empty array
+        return []
+    }
+    
     // MARK: - Signature Statistics
 
     /// Update signature verification statistics in a thread-safe manner

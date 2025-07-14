@@ -40,6 +40,18 @@ public protocol RelayProtocol: AnyObject, Sendable {
     
     /// Observe connection state changes
     func observeConnectionState(_ observer: @escaping @Sendable (NDKRelayConnectionState) -> Void) async
+    
+    /// Publish an event to the relay and wait for response
+    /// - Parameter event: The event to publish
+    /// - Returns: A tuple containing success status and optional message from the relay
+    /// - Throws: If the relay is not connected or other network errors occur
+    func publish(_ event: NDKEvent) async throws -> (success: Bool, message: String?)
+    
+    /// Fetch events from the relay matching the given filter
+    /// - Parameter filter: The filter to match events against
+    /// - Returns: Array of events matching the filter
+    /// - Throws: If the relay is not connected or other network errors occur
+    func fetchEvents(filter: NDKFilter) async throws -> [NDKEvent]
 }
 
 /// Extension to provide default implementations

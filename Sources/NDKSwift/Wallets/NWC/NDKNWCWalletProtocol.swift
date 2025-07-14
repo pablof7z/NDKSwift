@@ -60,10 +60,23 @@ public enum NWCConnectionStatus: Equatable {
 
 extension NDKNWCWalletProtocol {
     /// Default implementation of NDKWallet.pay using NWC payInvoice
-    public func pay(_ request: NDKPaymentRequest) async throws -> NDKPaymentConfirmation {
-        // For NWC, we need to get the invoice from somewhere
-        // This is a simplified implementation - in practice you'd need to fetch the invoice
-        throw NDKError.notImplemented("Direct payment requests not supported. Use payInvoice with a bolt11 invoice.")
+    public func pay(_ request: PaymentRequest) async throws -> PaymentConfirmation {
+        // NWC wallets only support Lightning payments
+        guard let lightningRequest = request as? LightningInvoiceRequest else {
+            throw NDKError.invalidRequest("NWC wallets only support Lightning invoice payments")
+        }
+        
+        // Pay the invoice
+        let response = try await payInvoice(lightningRequest.invoice, amount: lightningRequest.amountSats)
+        
+        // Convert to unified payment confirmation
+        return LightningPaymentConfirmation(
+            amountSats: lightningRequest.amountSats,
+            timestamp: Date(),
+            preimage: response.preimage,
+            paymentHash: nil,
+            feePaid: nil
+        )
     }
     
     // Note: getBalance() -> Int64 must be implemented by conforming types
@@ -81,7 +94,7 @@ extension NDKNWCWalletProtocol {
     
     /// Default implementation of NDKWallet.supports
     public func supports(method: NDKPaymentMethod) -> Bool {
-        return method == .nwc || method == .lightning
+        return method == .lightning
     }
 }
 

@@ -2,8 +2,8 @@ import SwiftUI
 import NDKSwift
 
 struct NutzapSettingsView: View {
-    @EnvironmentObject private var walletManager: WalletManager
-    @EnvironmentObject private var nostrManager: NostrManager
+    @Environment(WalletManager.self) private var walletManager
+    @Environment(NostrManager.self) private var nostrManager
     
     @State private var p2pkPubkey: String = ""
     @State private var isLoading = false

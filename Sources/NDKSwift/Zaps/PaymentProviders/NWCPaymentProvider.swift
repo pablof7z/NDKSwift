@@ -64,6 +64,8 @@ public class NWCPaymentProvider: NDKPaymentProvider {
         
         // Convert NWC response to our confirmation type
         return LightningPaymentConfirmation(
+            amountSats: lightningRequest.amountSats,
+            timestamp: Date(),
             preimage: response.preimage,
             paymentHash: nil,
             feePaid: response.feesPaid

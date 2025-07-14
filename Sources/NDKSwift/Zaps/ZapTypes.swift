@@ -6,6 +6,88 @@ public enum ZapType {
     case nutzap
 }
 
+// MARK: - Unified Payment Types
+
+/// Payment request protocol - represents any payment request in the system
+public protocol PaymentRequest {
+    /// The amount in satoshis
+    var amountSats: Int64 { get }
+    /// Optional comment/message with the payment
+    var comment: String? { get }
+}
+
+/// Lightning invoice payment request
+public struct LightningInvoiceRequest: PaymentRequest {
+    public let invoice: String
+    public let amountSats: Int64
+    public let recipient: String // For display/logging
+    public let comment: String?
+    
+    public init(invoice: String, amountSats: Int64, recipient: String, comment: String? = nil) {
+        self.invoice = invoice
+        self.amountSats = amountSats
+        self.recipient = recipient
+        self.comment = comment
+    }
+}
+
+/// Nutzap payment request - includes accepted mints
+public struct NutzapPaymentRequest: PaymentRequest {
+    public let amountSats: Int64
+    public let recipientPubkey: String
+    public let recipientP2PK: String  // Alias for compatibility
+    public let acceptedMints: [URL]  // All mints the recipient accepts
+    public let comment: String?
+    
+    public init(amountSats: Int64, recipientPubkey: String, acceptedMints: [URL], comment: String? = nil) {
+        self.amountSats = amountSats
+        self.recipientPubkey = recipientPubkey
+        self.recipientP2PK = recipientPubkey  // Same value
+        self.acceptedMints = acceptedMints
+        self.comment = comment
+    }
+}
+
+/// Payment confirmation protocol - represents confirmation of a completed payment
+public protocol PaymentConfirmation {
+    /// Amount paid in satoshis
+    var amountSats: Int64 { get }
+    /// Timestamp of the payment
+    var timestamp: Date { get }
+}
+
+/// Lightning payment confirmation
+public struct LightningPaymentConfirmation: PaymentConfirmation {
+    public let amountSats: Int64
+    public let timestamp: Date
+    public let preimage: String
+    public let paymentHash: String?
+    public let feePaid: Int64?
+    
+    public init(amountSats: Int64, timestamp: Date, preimage: String, paymentHash: String? = nil, feePaid: Int64? = nil) {
+        self.amountSats = amountSats
+        self.timestamp = timestamp
+        self.preimage = preimage
+        self.paymentHash = paymentHash
+        self.feePaid = feePaid
+    }
+}
+
+/// Nutzap payment confirmation
+public struct NutzapConfirmation: PaymentConfirmation {
+    public let amountSats: Int64
+    public let timestamp: Date
+    public let nutzapEvent: NDKEvent
+    public let mintUsed: URL
+    
+    public init(amountSats: Int64, timestamp: Date, nutzapEvent: NDKEvent, mintUsed: URL) {
+        self.amountSats = amountSats
+        self.timestamp = timestamp
+        self.nutzapEvent = nutzapEvent
+        self.mintUsed = mintUsed
+    }
+}
+
 /// Errors that can occur during zapping
 public enum ZapError: LocalizedError {
     case recipientDoesNotSupportZaps

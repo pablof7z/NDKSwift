@@ -6,8 +6,8 @@ import NDKSwift
 struct ContentView: View {
     @Environment(\.modelContext) private var modelContext
     @EnvironmentObject private var appState: AppState
-    @EnvironmentObject private var nostrManager: NostrManager
-    @EnvironmentObject private var walletManager: WalletManager
+    @Environment(NostrManager.self) private var nostrManager
+    @Environment(WalletManager.self) private var walletManager
     
     
     @State private var selectedTab: Tab = .wallet
@@ -215,9 +215,11 @@ struct AuthenticationView: View {
             )
             .navigationDestination(isPresented: $showCreateAccount) {
                 CreateAccountView()
+                    .environment(nostrManager)
             }
             .navigationDestination(isPresented: $showImportAccount) {
                 ImportAccountView()
+                    .environment(nostrManager)
             }
         }
     }
@@ -227,7 +229,7 @@ struct AuthenticationView: View {
 struct LightningInvoicePreviewView: View {
     let invoice: String
     @Environment(\.dismiss) private var dismiss
-    @EnvironmentObject private var walletManager: WalletManager
+    @Environment(WalletManager.self) private var walletManager
     @Environment(\.modelContext) private var modelContext
     
     @State private var decodedAmount: Int64?

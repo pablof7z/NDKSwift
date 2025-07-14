@@ -127,8 +127,8 @@ public class NDKAuthManager {
         // Check biometric availability
         updateBiometricAvailability()
         
-        // Start session restoration
-        restoreSession()
+        // Don't restore session until NDK is set
+        // Session restoration will be triggered by setNDK or manually
     }
     
     /// Set the NDK instance for signer operations
@@ -139,6 +139,11 @@ public class NDKAuthManager {
         // If we have an active signer, set it on NDK
         if let activeSigner = activeSigner {
             ndk.signer = activeSigner
+        }
+        
+        // Start session restoration now that NDK is available
+        if authenticationState == .unauthenticated {
+            restoreSession()
         }
     }
     
@@ -185,7 +190,9 @@ public class NDKAuthManager {
                 
             } catch {
                 print("Session restoration failed: \(error)")
-                authenticationState = .authenticationFailed(error)
+                // Don't show error to user for session restoration failures
+                // Just treat it as unauthenticated
+                authenticationState = .unauthenticated
             }
         }
     }

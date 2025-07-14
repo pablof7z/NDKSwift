@@ -18,9 +18,6 @@ public class WalletAdapterPaymentProvider: NDKPaymentProvider {
         if wallet.supports(method: .lightning) {
             methods.insert(.lightning)
         }
-        if wallet.supports(method: .nwc) {
-            methods.insert(.nwc)
-        }
         self.supportedMethods = methods
     }
     
@@ -37,7 +34,7 @@ public class WalletAdapterPaymentProvider: NDKPaymentProvider {
     public func canFulfill(_ request: PaymentRequest) async -> Bool {
         // Can only handle Lightning invoices if wallet supports Lightning
         if request is LightningInvoiceRequest {
-            return supportedMethods.contains(.lightning) || supportedMethods.contains(.nwc)
+            return supportedMethods.contains(.lightning)
         }
         
         // Future: Could support Cashu if wallet implements it
@@ -45,36 +42,11 @@ public class WalletAdapterPaymentProvider: NDKPaymentProvider {
     }
     
     public func fulfill(_ request: PaymentRequest) async throws -> PaymentConfirmation {
-        guard let lightningRequest = request as? LightningInvoiceRequest else {
-            throw PaymentError.cannotFulfillRequest
-        }
+        // The wallet now expects the new PaymentRequest types directly
+        let confirmation = try await wallet.pay(request)
         
-        // Create legacy payment request
-        let recipient = NDKUser(pubkey: lightningRequest.recipient)
-        let paymentRequest = NDKStandardPaymentRequest(
-            recipient: recipient,
-            amount: lightningRequest.amountSats,
-            comment: nil
-        )
-        
-        // Pay using legacy wallet
-        let confirmation = try await wallet.pay(paymentRequest)
-        
-        // Convert to new confirmation type
-        if let lightningConfirmation = confirmation as? NDKLightningPaymentConfirmation {
-            return LightningPaymentConfirmation(
-                preimage: lightningConfirmation.preimage,
-                paymentHash: nil,
-                feePaid: nil
-            )
-        } else {
-            // Generic confirmation - generate a placeholder preimage
-            return LightningPaymentConfirmation(
-                preimage: "legacy_payment_\(Timestamp.now)",
-                paymentHash: nil,
-                feePaid: nil
-            )
-        }
+        // The confirmation is already in the new format
+        return confirmation
     }
     
     public func getBalance() async throws -> Int64? {

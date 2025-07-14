@@ -1,45 +1,5 @@
-# Ignore build artifacts
-.build/
-build/
-DerivedData/
-*.xcworkspace/
-*.xcodeproj/
-.swiftpm/
-
-# Ignore all tests
-Tests/
-**/*Tests/
-**/*Test.*
-
-# Ignore documentation
-*.md
-docs/
+Examples
+Libraries
+.tenex
 Documentation/
-
-# Ignore git
-.git/
-
-# Ignore most of the codebase except the specific issue
-Sources/NDKSwift/Blossom/
-Sources/NDKSwift/Cache/
-Sources/NDKSwift/Encryption/
-Sources/NDKSwift/Models/Kinds/
-Sources/NDKSwift/Outbox/
-Sources/NDKSwift/Relay/
-Sources/NDKSwift/Utils/
-Sources/NDKSwift/Wallet/
-Sources/NDKSwift/Zaps/
-Sources/NDKSwift/Signers/
-Sources/SimpleCashuTest/
-
-# Focus on the problematic areas
-!Libraries/CashuSwift/Sources/cashu-swift/Models/APITypes.swift
-!Libraries/CashuSwift/Sources/cashu-swift/Models/Swap.swift
-!Libraries/CashuSwift/Sources/cashu-swift/Models/Restore.swift
-!Libraries/CashuSwift/Sources/cashu-swift/Operations/swap.swift
-!Libraries/CashuSwift/Sources/cashu-swift/Operations/restore.swift
-!Libraries/CashuSwift/Package.swift
-!Examples/Package.swift
-!Examples2/Package.swift
-!Examples2/Sources/
-!Package.swift
+Tests

@@ -36,12 +36,12 @@ final class CashuRelayHealthSimpleTest: XCTestCase {
         // (This would normally happen in loadTokenEvents)
         let seenOnRelays1 = await ndk.eventTracker.getSeenOnRelays(eventId: eventId1)
         for relayUrl in seenOnRelays1 {
-            wallet.recordEventFromRelay(eventId1, from: relayUrl)
+            await wallet.recordEventFromRelay(eventId1, from: relayUrl)
         }
         
         let seenOnRelays2 = await ndk.eventTracker.getSeenOnRelays(eventId: eventId2)
         for relayUrl in seenOnRelays2 {
-            wallet.recordEventFromRelay(eventId2, from: relayUrl)
+            await wallet.recordEventFromRelay(eventId2, from: relayUrl)
         }
         
         // Set these as current token events
@@ -100,6 +100,22 @@ extension NDKCashuWallet {
     }
     
     func setCurrentTokenEventsForTesting(_ eventIds: [String]) async {
-        currentTokenEventIds = Set(eventIds)
+        // For testing, we'll create mock token events and process them
+        // This simulates having these events as current tokens
+        for eventId in eventIds {
+            // Create a mock token event with minimal data
+            let mockEvent = NDKEvent(
+                id: eventId,
+                pubkey: "test",
+                createdAt: Timestamp(Date().timeIntervalSince1970),
+                kind: 7375,
+                tags: [],
+                content: "cashuA", // minimal valid token
+                sig: "mock_signature"
+            )
+            
+            // Process it to register it as a current token
+            try? await processIncomingTokenEvent(mockEvent)
+        }
     }
 }

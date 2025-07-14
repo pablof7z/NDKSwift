@@ -6,8 +6,8 @@ import NDKSwift
 struct WalletView: View {
     @Environment(\.modelContext) private var modelContext
     @EnvironmentObject private var appState: AppState
-    @EnvironmentObject private var nostrManager: NostrManager
-    @EnvironmentObject private var walletManager: WalletManager
+    @Environment(NostrManager.self) private var nostrManager
+    @Environment(WalletManager.self) private var walletManager
     
     @Binding var urlState: URLState?
     

@@ -2,7 +2,7 @@ import SwiftUI
 
 struct BalanceCard: View {
     @EnvironmentObject private var appState: AppState
-    @EnvironmentObject private var walletManager: WalletManager
+    @Environment(WalletManager.self) private var walletManager
     
     let balance: Int
     

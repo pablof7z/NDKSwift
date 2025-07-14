@@ -2,7 +2,7 @@ import SwiftUI
 import NDKSwift
 
 struct ContactsView: View {
-    @EnvironmentObject private var nostrManager: NostrManager
+    @Environment(NostrManager.self) private var nostrManager
     @State private var contacts: [NDKUser] = []
     @State private var searchText = ""
     @State private var isLoading = true

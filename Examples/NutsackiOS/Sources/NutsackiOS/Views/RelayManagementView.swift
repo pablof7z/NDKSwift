@@ -2,7 +2,7 @@ import SwiftUI
 import NDKSwift
 
 struct RelayManagementView: View {
-    @EnvironmentObject private var nostrManager: NostrManager
+    @Environment(NostrManager.self) private var nostrManager
     @State private var relays: [RelayInfo] = []
     @State private var isLoading = true
     @State private var showAddRelay = false
@@ -285,7 +285,7 @@ struct StatItem: View {
 struct RelayDetailView: View {
     let relayInfo: RelayManagementView.RelayInfo
     @Environment(\.dismiss) private var dismiss
-    @EnvironmentObject private var nostrManager: NostrManager
+    @Environment(NostrManager.self) private var nostrManager
     @State private var showDisconnectAlert = false
     
     var body: some View {
@@ -442,7 +442,7 @@ struct RelayDetailView: View {
 
 struct AddRelayView: View {
     @Environment(\.dismiss) private var dismiss
-    @EnvironmentObject private var nostrManager: NostrManager
+    @Environment(NostrManager.self) private var nostrManager
     
     @State private var relayURL = ""
     @State private var isAdding = false

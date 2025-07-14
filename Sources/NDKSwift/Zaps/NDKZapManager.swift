@@ -105,7 +105,7 @@ public actor NDKZapManager {
         // If this is a Nutzap, try Lightning fallback
         if zapProtocol.type == .nutzap,
            let nutzapProtocol = zapProtocol as? NDKNutzapProtocol,
-           let nutzapRequest = prepared.paymentRequest as? NutzapFundingRequest {
+           let nutzapRequest = prepared.paymentRequest as? NutzapPaymentRequest {
             
             // Try Lightning-based funding
             return try await fundNutzapViaLightning(
@@ -124,7 +124,7 @@ public actor NDKZapManager {
     private func fundNutzapViaLightning(
         nutzapProtocol: NDKNutzapProtocol,
         prepared: PreparedZap,
-        nutzapRequest: NutzapFundingRequest,
+        nutzapRequest: NutzapPaymentRequest,
         preferredProvider: String?
     ) async throws -> ZapResult {
         // Try each accepted mint
@@ -314,13 +314,10 @@ public actor NDKZapManager {
     /// Fetch zaps for an event or user
     public func fetchZaps(
         for event: NDKEvent? = nil,
-        user: NDKUser? = nil,
-        includeNutzaps: Bool = true
+        user: NDKUser? = nil
     ) async throws -> [ZapInfo] {
         var kinds = [EventKind.zapReceipt]
-        if includeNutzaps {
-            kinds.append(EventKind.nutzap)
-        }
+        kinds.append(EventKind.nutzap)
         
         var filter = NDKFilter()
         filter.kinds = kinds
@@ -514,14 +511,13 @@ extension NDKUser {
     }
     
     /// Fetch zaps sent to this user
-    public func fetchZaps(includeNutzaps: Bool = true) async throws -> [ZapInfo] {
+    public func fetchZaps() async throws -> [ZapInfo] {
         guard let ndk = self.ndk else {
             throw NDKError.notConfigured("NDK not available")
         }
         
         return try await ndk.zapManager.fetchZaps(
-            user: self,
-            includeNutzaps: includeNutzaps
+            user: self
         )
     }
 }
@@ -548,10 +544,9 @@ extension NDKEvent {
     }
     
     /// Fetch zaps for this event (requires NDK instance)
-    public func fetchZaps(with ndk: NDK, includeNutzaps: Bool = true) async throws -> [ZapInfo] {
+    public func fetchZaps(with ndk: NDK) async throws -> [ZapInfo] {
         return try await ndk.zapManager.fetchZaps(
-            for: self,
-            includeNutzaps: includeNutzaps
+            for: self
         )
     }
     
