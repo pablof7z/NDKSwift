@@ -8,10 +8,14 @@ class WalletManager: ObservableObject {
     @Published var activeWallet: NDKCashuWallet?
     @Published var isLoading = false
     @Published var error: Error?
+    @Published var transactions: [Transaction] = []
     
     private let nostrManager: NostrManager
     private let modelContext: ModelContext
     private let defaultMintURL = URL(string: "https://testnut.cashu.space")!
+    
+    // Subscription for history events
+    private var historySubscription: NDKSubscription?
     
     init(nostrManager: NostrManager, modelContext: ModelContext) {
         self.nostrManager = nostrManager
@@ -26,8 +30,8 @@ class WalletManager: ObservableObject {
             throw WalletError.ndkNotInitialized
         }
         
-        // Create NDKCashuWallet instance
-        let ndkWallet = NDKCashuWallet(ndk: ndk)
+        // Create NDKCashuWallet instance with mint cache if available
+        let ndkWallet = NDKCashuWallet(ndk: ndk, mintCache: nostrManager.cache)
         
         // Try to load existing wallet
         do {
@@ -73,6 +77,142 @@ class WalletManager: ObservableObject {
         Task {
             await wallet.startPeriodicProofStateCheck(interval: 300) // 5 minutes
         }
+        
+        // Publish nutzap preferences if needed (in case they haven't been published)
+        Task {
+            do {
+                try await wallet.publishNutzapPreferences()
+            } catch {
+                print("Failed to publish nutzap preferences: \(error)")
+                // Non-critical error, wallet can still function
+            }
+        }
+        
+        // Start monitoring transaction history
+        startHistoryEventMonitoring()
+    }
+    
+    /// Start monitoring NIP-60 history events (kind 7376)
+    private func startHistoryEventMonitoring() {
+        guard let ndk = nostrManager.ndk else { return }
+        
+        // Close existing subscription if any
+        Task {
+            await historySubscription?.close()
+        }
+        
+        Task {
+            guard let signer = ndk.signer else { return }
+            let userPubkey = try? await signer.pubkey
+            guard let pubkey = userPubkey else { return }
+            
+            // Create filter for history events
+            let historyFilter = NDKFilter(
+                authors: [pubkey],
+                kinds: [7376]  // NIP-60 history events
+            )
+            
+            // Subscribe to history events
+            historySubscription = ndk.subscribe(filters: [historyFilter])
+            
+            guard let subscription = historySubscription else { return }
+            
+            // Process events as they arrive
+            for try await event in subscription {
+                await processHistoryEvent(event)
+            }
+        }
+    }
+    
+    /// Process incoming history event
+    private func processHistoryEvent(_ event: NDKEvent) async {
+        guard let signer = nostrManager.ndk?.signer else { return }
+        
+        do {
+            // Decrypt the event content
+            let sender = NDKUser(pubkey: event.pubkey)
+            let decryptedContent = try await signer.decrypt(
+                sender: sender,
+                value: event.content,
+                scheme: .nip44
+            )
+            
+            // Parse the tags from decrypted content
+            guard let tagsData = decryptedContent.data(using: .utf8),
+                  let tags = try? JSONDecoder().decode([[String]].self, from: tagsData) else {
+                print("Failed to parse history event tags")
+                return
+            }
+            
+            // Extract transaction info from tags
+            var direction: String?
+            var amount: Int64?
+            var memo: String?
+            
+            for tag in tags {
+                guard tag.count >= 2 else { continue }
+                switch tag[0] {
+                case "direction":
+                    direction = tag[1]
+                case "amount":
+                    amount = Int64(tag[1])
+                case "memo":
+                    memo = tag[1]
+                default:
+                    break
+                }
+            }
+            
+            // Create transaction object
+            guard let dir = direction,
+                  let amt = amount ?? extractAmountFromTags(event.tags) else {
+                return
+            }
+            
+            let transactionType: Transaction.TransactionType
+            switch dir {
+            case "in": 
+                transactionType = .mint  // Lightning deposits
+            case "out": 
+                transactionType = .melt  // Lightning payments
+            default: 
+                return
+            }
+            
+            let transaction = Transaction(
+                type: transactionType,
+                amount: Int(amt),
+                memo: memo
+            )
+            transaction.createdAt = Date(timeIntervalSince1970: TimeInterval(event.createdAt))
+            transaction.status = .completed
+            
+            // Add to published transactions array
+            await MainActor.run {
+                // Check if we already have this transaction
+                if !self.transactions.contains(where: { 
+                    $0.createdAt == transaction.createdAt && 
+                    $0.amount == transaction.amount 
+                }) {
+                    self.transactions.append(transaction)
+                    
+                    // Sort by date (newest first)
+                    self.transactions.sort { $0.createdAt > $1.createdAt }
+                }
+            }
+        } catch {
+            print("Failed to process history event: \(error)")
+        }
+    }
+    
+    /// Extract amount from clear tags if not in encrypted content
+    private func extractAmountFromTags(_ tags: [[String]]) -> Int64? {
+        for tag in tags {
+            if tag.count >= 2 && tag[0] == "amount" {
+                return Int64(tag[1])
+            }
+        }
+        return nil
     }
     
     /// Get current balance
@@ -91,6 +231,30 @@ class WalletManager: ObservableObject {
         }
         
         return await wallet.getBalance(mint: mintURL)
+    }
+    
+    /// Create and configure a new wallet with selected mints
+    func createAndConfigureWallet(with mintURLs: [URL]) async throws {
+        guard let ndk = nostrManager.ndk else {
+            throw WalletError.ndkNotInitialized
+        }
+        
+        // Create a new wallet instance with mint cache if available
+        let ndkWallet = NDKCashuWallet(ndk: ndk, mintCache: nostrManager.cache)
+        
+        // Add all selected mints
+        for mintURL in mintURLs {
+            try await ndkWallet.addMint(url: mintURL)
+        }
+        
+        // Save wallet to Nostr (creates NIP-60 events)
+        try await ndkWallet.save()
+        
+        // Publish nutzap preferences so others can send nutzaps to this wallet
+        try await ndkWallet.publishNutzapPreferences()
+        
+        // Set as active wallet
+        self.activeWallet = ndkWallet
     }
     
     // MARK: - Mint Operations
@@ -360,6 +524,24 @@ class WalletManager: ObservableObject {
         }
         
         try await wallet.checkAndReconcileProofStates()
+    }
+    
+    /// Publish nutzap preferences
+    func publishNutzapPreferences() async throws {
+        guard let wallet = activeWallet else {
+            throw WalletError.noActiveWallet
+        }
+        
+        try await wallet.publishNutzapPreferences()
+    }
+    
+    /// Get wallet's P2PK pubkey
+    func getP2PKPubkey() async throws -> String {
+        guard let wallet = activeWallet else {
+            throw WalletError.noActiveWallet
+        }
+        
+        return try await wallet.getP2PKPubkey()
     }
 }
 

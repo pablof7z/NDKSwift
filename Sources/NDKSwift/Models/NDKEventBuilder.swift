@@ -302,12 +302,13 @@ public final class NDKEventBuilder {
     }
     
     /// Create a reaction event
-    public static func reaction(_ content: String, to eventId: EventID, author: PublicKey) -> NDKEventBuilder {
+    public static func reaction(_ content: String, to event: NDKEvent) -> NDKEventBuilder {
         return NDKEventBuilder()
             .content(content)
             .kind(EventKind.reaction)
-            .tagEvent(eventId)
-            .tagUser(author)
+            .tagEvent(event.id)
+            .tagUser(event.pubkey)
+            .tag(["k", String(event.kind)])
     }
     
     /// Create a reply event
@@ -319,25 +320,51 @@ public final class NDKEventBuilder {
             .tagUser(author)
     }
     
-    /// Create a repost event
-    public static func repost(_ eventId: EventID, author: PublicKey, relay: String? = nil) -> NDKEventBuilder {
-        return NDKEventBuilder()
-            .kind(EventKind.repost)
-            .tagEvent(eventId, relay: relay)
-            .tagUser(author)
+    /// Create a repost event (automatically chooses kind 6 for text notes, kind 16 for others)
+    public static func repost(_ event: NDKEvent, includeContent: Bool = true) -> NDKEventBuilder {
+        // Determine repost kind based on original event kind
+        let repostKind = event.kind == EventKind.textNote ? EventKind.repost : EventKind.genericRepost
+        
+        // Set content to JSON stringified event (unless it's protected)
+        let content: String
+        if includeContent && !event.isProtected {
+            content = (try? event.serialize()) ?? ""
+        } else {
+            content = ""
+        }
+        
+        var builder = NDKEventBuilder()
+            .content(content)
+            .kind(repostKind)
+            .tagEvent(event.id)
+            .tagUser(event.pubkey)
+        
+        // For non-text events, add k tag with original kind
+        if event.kind != EventKind.textNote {
+            builder = builder.tag(["k", String(event.kind)])
+        }
+        
+        return builder
     }
     
-    /// Create a deletion event
-    public static func deletion(eventIds: [EventID], reason: String = "") -> NDKEventBuilder {
+    /// Create a deletion event for multiple events with their kinds
+    public static func deletion(events: [(id: EventID, kind: Kind)], reason: String = "") -> NDKEventBuilder {
         var builder = NDKEventBuilder()
             .content(reason)
             .kind(EventKind.deletion)
         
-        for eventId in eventIds {
-            builder = builder.tagEvent(eventId)
+        for event in events {
+            builder = builder
+                .tagEvent(event.id)
+                .tag(["k", String(event.kind)])
         }
         
         return builder
+    }
+    
+    /// Create a deletion event for a single event
+    public static func deletion(event: NDKEvent, reason: String = "") -> NDKEventBuilder {
+        return deletion(events: [(event.id, event.kind)], reason: reason)
     }
     
     /// Create a parameterized replaceable event

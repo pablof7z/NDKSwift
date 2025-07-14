@@ -87,19 +87,20 @@ struct ContentView: View {
         // Check if we have an active account
         if let activeAccount = activeAccount,
            let privateKey = activeAccount.privateKey {
-            // Try to login with stored credentials
+            // Start login process in background (non-blocking)
             Task {
                 do {
                     try await nostrManager.login(with: privateKey)
                     
-                    // Load wallet from NIP-60 events
-                    // This will automatically create the wallet event if it doesn't exist
+                    // Start wallet loading in background (non-blocking)
                     try await walletManager.loadWallet(for: activeAccount)
                     
                 } catch {
                     print("Failed to auto-login: \(error)")
                     // Clear invalid account
-                    appState.activeAccountID = nil
+                    await MainActor.run {
+                        appState.activeAccountID = nil
+                    }
                 }
             }
         } else if accounts.isEmpty && AppState.showOnboarding {

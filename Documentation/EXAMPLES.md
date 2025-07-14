@@ -627,6 +627,78 @@ extension Array {
 }
 ```
 
+## Cashu Wallet Integration (NIP-60/61)
+
+```swift
+class CashuWalletManager {
+    let ndk: NDK
+    var wallet: NDKCashuWallet?
+    
+    init(ndk: NDK) {
+        self.ndk = ndk
+    }
+    
+    func setupWallet(signer: NDKSigner) async throws {
+        // Initialize Cashu wallet
+        wallet = NDKCashuWallet(signer: signer, ndk: ndk)
+        await wallet?.connect()
+        
+        // Configure mints
+        let mints = [
+            "https://mint.minibits.cash/Bitcoin",
+            "https://mint.coinos.io"
+        ]
+        
+        for mintUrl in mints {
+            try await wallet?.addMint(url: mintUrl)
+        }
+    }
+    
+    func checkBalance() async -> Int {
+        await wallet?.totalBalance ?? 0
+    }
+    
+    func sendNutzap(
+        to recipient: NDKUser,
+        amount: Int,
+        comment: String,
+        eventId: String? = nil
+    ) async throws {
+        guard let wallet = wallet else { throw WalletError.notInitialized }
+        
+        // Send nutzap (NIP-61)
+        let nutzap = try await wallet.nutzap(
+            amount: amount,
+            comment: comment,
+            recipient: recipient,
+            eventId: eventId
+        )
+        
+        print("Sent nutzap: \(nutzap.id)")
+    }
+    
+    func mintTokens(amount: Int) async throws {
+        guard let wallet = wallet else { throw WalletError.notInitialized }
+        
+        // Get mint quote
+        let quote = try await wallet.mintQuote(amount: amount)
+        print("Pay this invoice: \(quote.request)")
+        
+        // After payment is confirmed...
+        let tokens = try await wallet.mint(quote: quote)
+        print("Minted \(tokens.count) tokens")
+    }
+    
+    func receiveToken(_ tokenString: String) async throws {
+        guard let wallet = wallet else { throw WalletError.notInitialized }
+        
+        // Receive Cashu token
+        let received = try await wallet.receive(token: tokenString)
+        print("Received \(received.amount) sats")
+    }
+}
+```
+
 ## Running the Examples
 
 Many of these examples are available as runnable demos in the [Examples directory](../Examples/):

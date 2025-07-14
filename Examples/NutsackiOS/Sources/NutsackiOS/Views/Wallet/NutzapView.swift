@@ -287,16 +287,16 @@ struct NutzapView: View {
         guard let ndk = nostrManager.ndk else { return }
         
         do {
-            // Fetch NIP-60 wallet event (kind 37375)
+            // Fetch nutzap preferences event (kind 10019) - NIP-61
             let filter = NDKFilter(
                 authors: [pubkey],
-                kinds: [37375],
+                kinds: [EventKind.nutzapPreferences],
                 limit: 1
             )
             
             let events = try await ndk.fetchEvents(filter)
-            guard let walletEvent = events.first else {
-                // If recipient has no wallet, they can't receive nutzaps
+            guard let preferencesEvent = events.first else {
+                // If recipient has no nutzap preferences, they can't receive nutzaps
                 await MainActor.run {
                     acceptedMints = []
                 }
@@ -305,7 +305,7 @@ struct NutzapView: View {
             
             // Parse mints from event tags
             var mints: [String] = []
-            for tag in walletEvent.tags where tag.count >= 2 && tag[0] == "mint" {
+            for tag in preferencesEvent.tags where tag.count >= 2 && tag[0] == "mint" {
                 mints.append(tag[1])
             }
             

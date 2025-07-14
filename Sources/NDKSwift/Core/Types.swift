@@ -50,6 +50,7 @@ public enum EventKind {
     public static let repost = 6
     public static let reaction = 7
     public static let badgeAward = 8
+    public static let genericRepost = 16
     public static let image = 20
     public static let channelCreation = 40
     public static let channelMetadata = 41

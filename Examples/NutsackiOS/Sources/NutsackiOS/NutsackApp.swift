@@ -12,7 +12,6 @@ struct NutsackApp: App {
     let modelContainer: ModelContainer = {
         let schema = Schema([
             NostrAccount.self,
-            WalletState.self,
             Transaction.self
         ])
         
@@ -65,7 +64,6 @@ class DatabaseManager {
         do {
             let schema = Schema([
                 NostrAccount.self,
-                WalletState.self,
                 Transaction.self
             ])
             

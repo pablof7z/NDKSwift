@@ -12,7 +12,6 @@ struct ConfigureMintsView: View {
     @Query private var accounts: [NostrAccount]
     
     @State private var selectedMints: Set<String> = []
-    @State private var isConfiguring = false
     @State private var showError = false
     @State private var errorMessage = ""
     
@@ -58,15 +57,10 @@ struct ConfigureMintsView: View {
                 
                 Section {
                     Button(action: configureMints) {
-                        if isConfiguring {
-                            ProgressView()
-                                .frame(maxWidth: .infinity)
-                        } else {
-                            Text("Configure Mints")
-                                .frame(maxWidth: .infinity)
-                        }
+                        Text("Configure Mints")
+                            .frame(maxWidth: .infinity)
                     }
-                    .disabled(selectedMints.isEmpty || isConfiguring)
+                    .disabled(selectedMints.isEmpty)
                 }
             }
             .navigationTitle("Configure Mints")
@@ -89,39 +83,27 @@ struct ConfigureMintsView: View {
     }
     
     private func configureMints() {
-        guard let account = activeAccount else {
-            errorMessage = "No active account found"
+        guard selectedMints.isEmpty == false else {
+            errorMessage = "Please select at least one mint"
             showError = true
             return
         }
         
-        isConfiguring = true
+        // Convert selected mint URLs to URL objects
+        let mintURLs = selectedMints.compactMap { URL(string: $0) }
         
+        // Create and configure the wallet immediately (non-blocking)
         Task {
             do {
-                // Add selected mints to the wallet
-                for mintURL in selectedMints {
-                    if let url = URL(string: mintURL) {
-                        try await walletManager.addMint(url: url)
-                    }
-                }
-                
-                // Save wallet configuration
-                if let wallet = walletManager.activeWallet {
-                    try await wallet.save()
-                }
-                
-                await MainActor.run {
-                    dismiss()
-                }
+                try await walletManager.createAndConfigureWallet(with: mintURLs)
             } catch {
-                await MainActor.run {
-                    errorMessage = error.localizedDescription
-                    showError = true
-                    isConfiguring = false
-                }
+                print("Failed to save wallet configuration: \(error)")
+                // Don't show error to user - wallet is already created locally
             }
         }
+        
+        // Dismiss immediately - wallet is created
+        dismiss()
     }
 }
 

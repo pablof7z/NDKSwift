@@ -4,7 +4,10 @@ import SwiftData
 struct RecentTransactionsView: View {
     @EnvironmentObject private var walletManager: WalletManager
     
-    @State private var recentTransactions: [Transaction] = []
+    // Use reactive transactions from wallet manager
+    private var recentTransactions: [Transaction] {
+        Array(walletManager.transactions.prefix(5))
+    }
     
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
@@ -45,15 +48,6 @@ struct RecentTransactionsView: View {
                 .cornerRadius(12)
             }
         }
-        .task {
-            await loadTransactions()
-        }
-    }
-    
-    private func loadTransactions() async {
-        // TODO: Load transactions from wallet manager when available
-        // For now, just show empty state
-        recentTransactions = []
     }
 }
 
@@ -70,19 +64,6 @@ struct TransactionRow: View {
         }
     }
     
-    // Check if all tokens in transaction have verified DLEQ
-    var isDLEQVerified: Bool? {
-        guard !transaction.tokens.isEmpty else { return nil }
-        let verifiedCount = transaction.tokens.filter { $0.dleqVerified == true }.count
-        let unverifiedCount = transaction.tokens.filter { $0.dleqVerified == false }.count
-        
-        if verifiedCount > 0 && unverifiedCount == 0 {
-            return true
-        } else if unverifiedCount > 0 {
-            return false
-        }
-        return nil
-    }
     
     var color: Color {
         switch transaction.type {
@@ -130,14 +111,6 @@ struct TransactionRow: View {
                     .font(.caption2)
                     .foregroundStyle(.secondary)
             }
-            
-            // DLEQ verification indicator
-            if let verified = isDLEQVerified {
-                Image(systemName: verified ? "checkmark.shield.fill" : "exclamationmark.shield.fill")
-                    .font(.caption)
-                    .foregroundStyle(verified ? .green : .yellow)
-                    .help(verified ? "Token authenticity verified" : "Token authenticity not verified")
-            }
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 8)
@@ -149,7 +122,6 @@ struct TransactionHistoryView: View {
     @EnvironmentObject private var walletManager: WalletManager
     
     @State private var selectedFilter: TransactionFilter = .all
-    @State private var transactions: [Transaction] = []
     
     enum TransactionFilter: String, CaseIterable {
         case all = "All"
@@ -166,7 +138,7 @@ struct TransactionHistoryView: View {
     }
     
     var filteredTransactions: [Transaction] {
-        transactions
+        walletManager.transactions
             .filter { selectedFilter.matches($0) }
             .sorted { $0.createdAt > $1.createdAt }
     }
@@ -191,15 +163,6 @@ struct TransactionHistoryView: View {
         .navigationTitle("Transaction History")
         .platformNavigationBarTitleDisplayMode(inline: true)
         .listStyle(.plain)
-        .task {
-            await loadTransactions()
-        }
-    }
-    
-    private func loadTransactions() async {
-        // TODO: Load transactions from wallet manager when available
-        // For now, just show empty state
-        transactions = []
     }
 }
 

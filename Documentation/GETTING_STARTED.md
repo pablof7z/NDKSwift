@@ -61,7 +61,8 @@ For one-time queries, use the fetch methods:
 
 ```swift
 // Fetch user profile
-let profile = try await ndk.fetchProfile("npub1...")
+let user = ndk.getUser(npub: "npub1...")
+let profile = try await user?.fetchProfile()
 
 // Fetch recent notes
 let events = try await ndk.fetchEvents(
@@ -315,6 +316,33 @@ let regionalRelays = [
 ]
 ```
 
+### 5. Cashu Wallet Integration (NIP-60/61)
+
+NDKSwift includes built-in support for Cashu wallets:
+
+```swift
+// Initialize Cashu wallet
+let cashuWallet = NDKCashuWallet(signer: signer, ndk: ndk)
+await cashuWallet.connect()
+
+// Check balance
+let balance = await cashuWallet.totalBalance
+
+// Send a nutzap (NIP-61)
+let recipient = ndk.getUser(pubkey: "recipientPubkey")
+let nutzap = try await cashuWallet.nutzap(
+    amount: 100,
+    comment: "Great post!",
+    recipient: recipient,
+    eventId: "eventToZap"
+)
+
+// Mint new tokens
+let mintQuote = try await cashuWallet.mintQuote(amount: 1000)
+// Pay the Lightning invoice...
+let tokens = try await cashuWallet.mint(quote: mintQuote)
+```
+
 ## Next Steps
 
 - Check out the [API Reference](API_REFERENCE.md) for detailed documentation
@@ -333,10 +361,8 @@ If relays aren't connecting:
 ndk.debugMode = true
 
 // Monitor relay connections
-for relay in ndk.relays {
-    relay.observeConnectionState { state in
-        print("Relay \(relay.url): \(state)")
-    }
+for await relay in ndk.pool.relays {
+    print("Relay \(relay.url): \(relay.connectionState)")
 }
 ```
 

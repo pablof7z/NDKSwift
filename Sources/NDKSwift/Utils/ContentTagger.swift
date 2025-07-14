@@ -157,8 +157,8 @@ public enum ContentTagger {
     }
     /// Generate hashtags from content
     public static func generateHashtags(from content: String) -> [String] {
-        // Regex pattern for hashtags: #word (only letters, numbers, underscore and hyphen)
-        let hashtagRegex = #"(?<=\s|^)(#[a-zA-Z0-9_-]+)"#
+        // Regex pattern for hashtags: #word (matches until special characters)
+        let hashtagRegex = #"(?<=\s|^)(#[^\s!@#$%^&*()=+./,\[{\]};:'"?><]+)"#
 
         guard let regex = try? NSRegularExpression(pattern: hashtagRegex, options: []) else {
             return []
@@ -321,8 +321,11 @@ public enum ContentTagger {
                         addTagIfNew(tag, to: &tags)
                     }
 
-                    // Replace the match with normalized nostr: format
-                    modifiedContent.replaceSubrange(range, with: "nostr:\(entity)")
+                    // Replace the match with normalized nostr: format only if it wasn't already in that format
+                    if fullMatch.hasPrefix("@") {
+                        modifiedContent.replaceSubrange(range, with: "nostr:\(entity)")
+                    }
+                    // Note: Tags are still generated even for nostr: prefixed entities
 
                 } catch {
                     // If decoding fails, leave the original text

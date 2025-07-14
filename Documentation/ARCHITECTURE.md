@@ -453,6 +453,52 @@ The library maintains compatibility through:
 2. **Protocol Evolution**: New protocol methods with default implementations
 3. **Deprecation Warnings**: Clear migration paths for API changes
 
+## Cashu Wallet Architecture (NIP-60/61)
+
+### Overview
+
+NDKSwift includes comprehensive support for Cashu ecash wallets through NIP-60 (wallet events) and NIP-61 (nutzaps):
+
+```swift
+// Wallet state management
+actor ProofStateManager {
+    // Centralized proof tracking
+    // Handles spent/unspent states
+    // Cross-mint operations
+}
+
+// Token event tracking
+class NDKCashuWallet {
+    // Publishes token events to Nostr
+    // Tracks deleted/spent tokens
+    // Manages mint connections
+}
+```
+
+### Key Components
+
+1. **Proof State Management**
+   - Actor-based for thread safety
+   - Tracks all proofs across mints
+   - Handles spent detection
+
+2. **Token Event System**
+   - Kind 7375: Wallet state
+   - Kind 7376: Token storage
+   - Kind 5: Token deletion
+
+3. **Nutzap Flow**
+   - Creates P2PK locked tokens
+   - Publishes nutzap events (kind 9321)
+   - Handles redemption automatically
+
+### Integration Points
+
+- **NDK Event System**: Publishes wallet events
+- **Signer**: Signs token events and nutzaps
+- **Cache**: Stores proof states locally
+- **Relay Pool**: Distributes wallet events
+
 ## Summary
 
 NDKSwift's architecture prioritizes:
@@ -462,5 +508,6 @@ NDKSwift's architecture prioritizes:
 - **Flexibility**: Protocol-oriented design
 - **Modern Swift**: AsyncSequence, async/await throughout
 - **Developer Experience**: Simple APIs hiding complexity
+- **Wallet Integration**: Native Cashu and NWC support
 
 This architecture enables building robust Nostr applications while maintaining flexibility for future protocol evolution.

@@ -7,9 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-> **Suggested version**: 0.2.0 (Minor version bump due to new features and breaking changes in MintCache protocol)
+> **Suggested version**: 0.3.0 (Minor version bump due to new features)
 
-## [0.2.0] - TBD
+## [0.3.0] - 2025-01-14
 
 ### Fixed
 - **NutsackiOS Balance Display Issue**: Fixed wallet showing "-" balance after successful deposit
@@ -48,6 +48,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `getMintInfo(url:)` - Returns typed `NDKMintInfo` instead of internal CashuSwift types
   - Proper error handling with debug logging
   - Fallback to network fetch when cache is unavailable
+
+- **NIP-18 Repost Support**:
+  - `NDKEvent.repost(signer:)` - Create reposts with automatic kind selection (6 for text notes, 16 for others)
+  - `NDKEvent.quoteRepost(comment:signer:)` - Create quote reposts with NIP-19 references
+  - `NDK.repost(_:)` and `NDK.quoteRepost(_:comment:)` - High-level APIs with automatic publishing
+  - Proper handling of NIP-70 protected events (empty content in reposts)
+  - Builder factory method `NDKEventBuilder.repost(_:includeContent:)`
+
+- **NIP-25 Reaction Support**:
+  - `NDKEvent.react(with:signer:)` - Create reactions with any content
+  - `NDKEvent.like(signer:)` and `NDKEvent.dislike(signer:)` - Convenience methods for +/- reactions
+  - `NDK.react(to:with:)`, `NDK.like(_:)`, and `NDK.dislike(_:)` - High-level APIs with automatic publishing
+  - Automatic k tag inclusion for kind reference
+  - Builder factory method `NDKEventBuilder.reaction(_:to:)`
+
+- **NIP-09 Event Deletion Support**:
+  - `NDKEvent.createDeletionRequest(reason:signer:)` - Create deletion requests for individual events
+  - `NDK.deleteEvent(_:reason:)` and `NDK.deleteEvents(_:reason:)` - High-level APIs for single and bulk deletions
+  - Automatic k tag inclusion for deleted event kinds
+  - Builder factory methods `NDKEventBuilder.deletion(event:reason:)` and `deletion(events:reason:)`
+
+### Changed
+- **Unified SQLite Cache Implementation**:
+  - Merged `NDKSQLiteCacheMigrated` into `NDKSQLiteCache` as the single implementation
+  - Now includes proper database migration support using GRDB's DatabaseMigrator
+  - Maintains backward compatibility with existing cache databases
+  - Cleaner API with just one cache class to use
 
 ### Changed
 - **BREAKING**: `MintCache` protocol now uses typed `NDKMintInfo` instead of raw `Data`
