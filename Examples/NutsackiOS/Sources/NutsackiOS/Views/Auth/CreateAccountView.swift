@@ -3,9 +3,7 @@ import SwiftData
 import NDKSwift
 
 struct CreateAccountView: View {
-    @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
-    @EnvironmentObject private var appState: AppState
     @EnvironmentObject private var nostrManager: NostrManager
     
     @State private var displayName = ""
@@ -13,7 +11,7 @@ struct CreateAccountView: View {
     @State private var isCreating = false
     @State private var showError = false
     @State private var errorMessage = ""
-    @State private var generatedPrivateKey: String?
+    @State private var createdSession: NDKSession?
     @State private var showBackupView = false
     
     var body: some View {
@@ -57,8 +55,8 @@ struct CreateAccountView: View {
                 Text(errorMessage)
             }
             .navigationDestination(isPresented: $showBackupView) {
-                if let privateKey = generatedPrivateKey {
-                    BackupKeyView(privateKey: privateKey, displayName: displayName)
+                if let session = createdSession {
+                    BackupKeyView(session: session)
                 }
             }
         }
@@ -69,39 +67,16 @@ struct CreateAccountView: View {
         
         Task {
             do {
-                // Create account on Nostr
-                let privateKey = try await nostrManager.createNewAccount(
+                // Create account using NDKAuth system
+                let session = try await nostrManager.createNewAccount(
                     displayName: displayName,
                     about: about.isEmpty ? nil : about
                 )
                 
-                // Save to local database
-                guard let publicKey = nostrManager.currentUser?.pubkey else {
-                    throw NostrError.notLoggedIn
-                }
-                
-                let account = NostrAccount(
-                    publicKey: publicKey,
-                    privateKey: privateKey,
-                    displayName: displayName
-                )
-                account.about = about.isEmpty ? nil : about
-                
                 await MainActor.run {
-                    modelContext.insert(account)
-                    do {
-                        try modelContext.save()
-                        appState.activeAccountID = account.accountID.uuidString
-                        AppState.showOnboarding = false
-                        
-                        // Show backup view
-                        generatedPrivateKey = privateKey
-                        showBackupView = true
-                    } catch {
-                        errorMessage = "Failed to save account: \(error.localizedDescription)"
-                        showError = true
-                    }
-                    
+                    // Show backup view with session
+                    createdSession = session
+                    showBackupView = true
                     isCreating = false
                 }
             } catch {
@@ -118,14 +93,16 @@ struct CreateAccountView: View {
 // MARK: - Backup Key View
 struct BackupKeyView: View {
     @Environment(\.dismiss) private var dismiss
-    let privateKey: String
-    let displayName: String
+    @EnvironmentObject private var nostrManager: NostrManager
+    let session: NDKSession
     
     @State private var copiedPrivateKey = false
     @State private var savedKey = false
+    @State private var privateKey: String?
+    @State private var nsec: String?
     
-    var nsec: String {
-        NostrIdentifier.nsec(fromHex: privateKey) ?? privateKey
+    var displayName: String {
+        session.bestDisplayName
     }
     
     var body: some View {
@@ -154,21 +131,26 @@ struct BackupKeyView: View {
                     .font(.headline)
                 
                 VStack {
-                    Text(nsec)
-                        .font(.system(.body, design: .monospaced))
-                        .padding()
-                        .background(Color.secondary.opacity(0.2))
-                        .cornerRadius(8)
-                        .textSelection(.enabled)
-                    
-                    Button(action: copyKey) {
-                        Label(
-                            copiedPrivateKey ? "Copied!" : "Copy to Clipboard",
-                            systemImage: copiedPrivateKey ? "checkmark.circle.fill" : "doc.on.doc"
-                        )
+                    if let nsec = nsec {
+                        Text(nsec)
+                            .font(.system(.body, design: .monospaced))
+                            .padding()
+                            .background(Color.secondary.opacity(0.2))
+                            .cornerRadius(8)
+                            .textSelection(.enabled)
+                        
+                        Button(action: copyKey) {
+                            Label(
+                                copiedPrivateKey ? "Copied!" : "Copy to Clipboard",
+                                systemImage: copiedPrivateKey ? "checkmark.circle.fill" : "doc.on.doc"
+                            )
+                        }
+                        .buttonStyle(.bordered)
+                        .tint(copiedPrivateKey ? .green : .orange)
+                    } else {
+                        ProgressView("Loading private key...")
+                            .padding()
                     }
-                    .buttonStyle(.bordered)
-                    .tint(copiedPrivateKey ? .green : .orange)
                 }
             }
             
@@ -196,9 +178,32 @@ struct BackupKeyView: View {
         .navigationTitle("Backup Key")
         .platformNavigationBarTitleDisplayMode(inline: true)
         .navigationBarBackButtonHidden(true)
+        .onAppear {
+            loadPrivateKey()
+        }
+    }
+    
+    private func loadPrivateKey() {
+        Task {
+            do {
+                if let signer = nostrManager.authManager.activeSigner as? NDKPrivateKeySigner {
+                    let privateKeyHex = signer.privateKeyValue
+                    let nsecString = try signer.nsec
+                    
+                    await MainActor.run {
+                        privateKey = privateKeyHex
+                        nsec = nsecString
+                    }
+                }
+            } catch {
+                print("Failed to load private key: \(error)")
+            }
+        }
     }
     
     private func copyKey() {
+        guard let nsec = nsec else { return }
+        
         nsec.copyToPasteboard()
         withAnimation {
             copiedPrivateKey = true

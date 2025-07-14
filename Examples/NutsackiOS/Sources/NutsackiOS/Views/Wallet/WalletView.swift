@@ -9,8 +9,6 @@ struct WalletView: View {
     @EnvironmentObject private var nostrManager: NostrManager
     @EnvironmentObject private var walletManager: WalletManager
     
-    @Query private var accounts: [NostrAccount]
-    
     @Binding var urlState: URLState?
     
     @State private var showConfigureMints = false
@@ -24,6 +22,7 @@ struct WalletView: View {
         case melt
         case nutzap
         case swap
+        case relayHealth
         
         var id: String {
             switch self {
@@ -33,13 +32,11 @@ struct WalletView: View {
             case .melt: return "melt"
             case .nutzap: return "nutzap"
             case .swap: return "swap"
+            case .relayHealth: return "relayHealth"
             }
         }
     }
     
-    var activeAccount: NostrAccount? {
-        accounts.first { $0.accountID.uuidString == appState.activeAccountID }
-    }
     
     var body: some View {
         NavigationStack {
@@ -52,6 +49,13 @@ struct WalletView: View {
                             // Balance card
                             BalanceCard(balance: Int(currentBalance))
                                 .padding(.horizontal)
+                            
+                            // Relay status indicator
+                            RelayStatusIndicator()
+                                .padding(.horizontal)
+                                .onTapGesture {
+                                    navigationDestination = .relayHealth
+                                }
                             
                             // Mint allocation pie chart
                             MintAllocationPieChart()
@@ -82,10 +86,16 @@ struct WalletView: View {
             .navigationTitle("Wallet")
             .platformNavigationBarTitleDisplayMode(inline: true)
             .toolbar {
-                ToolbarItem(placement: .primaryAction) {
-                    if walletManager.activeWallet != nil {
+                if walletManager.activeWallet != nil {
+                    ToolbarItem(placement: .topBarTrailing) {
                         Button(action: { showConfigureMints = true }) {
                             Image(systemName: "building.columns")
+                        }
+                    }
+                    
+                    ToolbarItem(placement: .topBarTrailing) {
+                        Button(action: { navigationDestination = .relayHealth }) {
+                            Image(systemName: "antenna.radiowaves.left.and.right")
                         }
                     }
                 }
@@ -107,9 +117,12 @@ struct WalletView: View {
                     NutzapView()
                 case .swap:
                     SwapView()
+                case .relayHealth:
+                    RelayHealthView()
                 }
             }
             .onAppear {
+                loadWalletIfNeeded()
                 updateBalance()
             }
             .onChange(of: navigationDestination) { oldValue, newValue in
@@ -123,6 +136,24 @@ struct WalletView: View {
                     navigationDestination = .receive(urlString: newValue.url)
                     urlState = nil
                 }
+            }
+            .onChange(of: nostrManager.isAuthenticated) { oldValue, newValue in
+                if newValue && walletManager.activeWallet == nil {
+                    loadWalletIfNeeded()
+                }
+            }
+        }
+    }
+    
+    private func loadWalletIfNeeded() {
+        guard nostrManager.isAuthenticated else { return }
+        guard walletManager.activeWallet == nil else { return }
+        
+        Task {
+            do {
+                try await walletManager.loadWalletForCurrentUser()
+            } catch {
+                print("Failed to load wallet: \(error)")
             }
         }
     }

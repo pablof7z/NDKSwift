@@ -136,7 +136,7 @@ public final class NDKPrivateKeySigner: NDKSigner {
         return privateKey
     }
 
-    /// Serialize the signer to a payload string
+    /// Serialize the signer to a payload string (deprecated)
     public func toPayload() -> String {
         let payload: [String: Any] = [
             "type": "privatekey",
@@ -144,5 +144,32 @@ public final class NDKPrivateKeySigner: NDKSigner {
         ]
         let data = try! JSONSerialization.data(withJSONObject: payload)
         return String(data: data, encoding: .utf8)!
+    }
+    
+    // MARK: - Serialization (NDKSigner Protocol)
+    
+    public static var signerType: String {
+        return "privatekey"
+    }
+    
+    public func serialize() async throws -> Data {
+        let payload: [String: Any] = [
+            "privateKey": privateKey
+        ]
+        return try NDKSignerSerialization.createContainer(type: Self.signerType, payload: payload)
+    }
+    
+    public static func deserialize(_ data: Data, ndk: NDK?) throws -> NDKPrivateKeySigner {
+        let (type, payload) = try NDKSignerSerialization.extractPayload(from: data)
+        
+        guard type == signerType else {
+            throw NDKSignerRegistryError.deserializationError("Expected \(signerType), got \(type)")
+        }
+        
+        guard let privateKey = payload["privateKey"] as? String else {
+            throw NDKSignerRegistryError.deserializationError("Missing or invalid privateKey")
+        }
+        
+        return try NDKPrivateKeySigner(privateKey: privateKey)
     }
 }

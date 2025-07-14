@@ -11,7 +11,6 @@ struct NutsackApp: App {
     // Create a simple in-memory container
     let modelContainer: ModelContainer = {
         let schema = Schema([
-            NostrAccount.self,
             Transaction.self
         ])
         
@@ -59,7 +58,6 @@ class DatabaseManager {
     private init() {
         do {
             let schema = Schema([
-                NostrAccount.self,
                 Transaction.self
             ])
             

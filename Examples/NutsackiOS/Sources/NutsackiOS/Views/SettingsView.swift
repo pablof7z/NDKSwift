@@ -1,5 +1,6 @@
 import SwiftUI
 import SwiftData
+import NDKSwift
 
 struct SettingsView: View {
     @Environment(\.modelContext) private var modelContext
@@ -7,35 +8,31 @@ struct SettingsView: View {
     @EnvironmentObject private var nostrManager: NostrManager
     @EnvironmentObject private var walletManager: WalletManager
     
-    @Query private var accounts: [NostrAccount]
-    
-    var activeAccount: NostrAccount? {
-        accounts.first { $0.accountID.uuidString == appState.activeAccountID }
-    }
+    @State private var userProfile: NDKUserProfile?
     
     var body: some View {
         NavigationStack {
             List {
                 // Account section
                 Section {
-                    if let account = activeAccount {
-                        NavigationLink(destination: AccountDetailView(account: account)) {
+                    if let currentUser = nostrManager.currentUser {
+                        NavigationLink(destination: AccountDetailView(user: currentUser, profile: userProfile)) {
                             HStack {
                                 // Profile picture placeholder
                                 Circle()
                                     .fill(Color.secondary.opacity(0.3))
                                     .overlay(
-                                        Text(account.displayName.prefix(1).uppercased())
+                                        Text((userProfile?.displayName ?? userProfile?.name ?? "User").prefix(1).uppercased())
                                             .font(.headline)
                                             .foregroundColor(.white)
                                     )
                                     .frame(width: 50, height: 50)
                                 
                                 VStack(alignment: .leading, spacing: 4) {
-                                    Text(account.displayName)
+                                    Text(userProfile?.displayName ?? userProfile?.name ?? "Nostr User")
                                         .font(.headline)
                                     
-                                    if let npub = NostrIdentifier.npub(fromHex: account.publicKey) {
+                                    if let npub = currentUser.npub {
                                         Text(String(npub.prefix(16)) + "...")
                                             .font(.caption)
                                             .foregroundStyle(.secondary)
@@ -49,6 +46,9 @@ struct SettingsView: View {
                                     .foregroundStyle(.tertiary)
                             }
                         }
+                    } else {
+                        Text("No user logged in")
+                            .foregroundStyle(.secondary)
                     }
                 } header: {
                     Text("Account")
@@ -62,7 +62,7 @@ struct SettingsView: View {
                         }
                     }
                     
-                    NavigationLink(destination: RelaySettingsView()) {
+                    NavigationLink(destination: RelayManagementView()) {
                         Label("Relays", systemImage: "network")
                     }
                     
@@ -111,44 +111,65 @@ struct SettingsView: View {
             #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
             #endif
+            .onAppear {
+                loadUserProfile()
+            }
+            .onChange(of: nostrManager.currentUser) { _, _ in
+                loadUserProfile()
+            }
+        }
+    }
+    
+    private func loadUserProfile() {
+        guard let currentUser = nostrManager.currentUser else {
+            userProfile = nil
+            return
+        }
+        
+        Task {
+            do {
+                let profile = try await currentUser.profile
+                await MainActor.run {
+                    userProfile = profile
+                }
+            } catch {
+                print("Failed to load user profile: \(error)")
+            }
         }
     }
     
     private func logout() {
-        // Clear active account
-        appState.activeAccountID = nil
         nostrManager.logout()
+        userProfile = nil
     }
 }
 
 // MARK: - Account Detail View
 struct AccountDetailView: View {
-    let account: NostrAccount
+    let user: NDKUser
+    let profile: NDKUserProfile?
+    @EnvironmentObject private var nostrManager: NostrManager
     @State private var showPrivateKey = false
     @State private var copiedKey = false
+    @State private var nsecKey: String?
     
     var npub: String {
-        NostrIdentifier.npub(fromHex: account.publicKey) ?? account.publicKey
-    }
-    
-    var nsec: String? {
-        guard let privateKey = account.privateKey else { return nil }
-        return NostrIdentifier.nsec(fromHex: privateKey)
+        user.npub ?? user.pubkey
     }
     
     var body: some View {
         List {
             Section {
-                LabeledContent("Display Name", value: account.displayName)
+                LabeledContent("Display Name", value: profile?.displayName ?? profile?.name ?? "Nostr User")
                 
-                if let about = account.about {
+                if let about = profile?.about {
                     LabeledContent("About") {
                         Text(about)
                             .font(.caption)
                     }
                 }
                 
-                if let nip05 = account.nip05 {
+                if let nip05 = profile?.nip05 {
                     LabeledContent("NIP-05", value: nip05)
                 }
             } header: {
@@ -163,7 +184,7 @@ struct AccountDetailView: View {
                         .textSelection(.enabled)
                 }
                 
-                if let nsec = nsec {
+                if let nsecKey = nsecKey {
                     VStack(alignment: .leading, spacing: 8) {
                         HStack {
                             Text("Private Key (nsec)")
@@ -175,7 +196,7 @@ struct AccountDetailView: View {
                         }
                         
                         if showPrivateKey {
-                            Text(nsec)
+                            Text(nsecKey)
                                 .font(.caption)
                                 .textSelection(.enabled)
                             
@@ -190,6 +211,10 @@ struct AccountDetailView: View {
                             .tint(copiedKey ? .green : .orange)
                         }
                     }
+                } else {
+                    Text("Private key access through secure authentication")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
                 }
             } header: {
                 Text("Keys")
@@ -202,6 +227,30 @@ struct AccountDetailView: View {
         #if os(iOS)
         .navigationBarTitleDisplayMode(.inline)
         #endif
+        .onAppear {
+            loadPrivateKey()
+        }
+    }
+    
+    private func loadPrivateKey() {
+        guard let signer = nostrManager.authManager.activeSigner as? NDKPrivateKeySigner else {
+            nsecKey = nil
+            return
+        }
+        
+        Task {
+            do {
+                let nsec = try signer.nsec
+                await MainActor.run {
+                    nsecKey = nsec
+                }
+            } catch {
+                print("Failed to load private key: \(error)")
+                await MainActor.run {
+                    nsecKey = nil
+                }
+            }
+        }
     }
     
     private func togglePrivateKey() {
@@ -211,7 +260,7 @@ struct AccountDetailView: View {
     }
     
     private func copyPrivateKey() {
-        guard let nsec = nsec else { return }
+        guard let nsec = nsecKey else { return }
         #if os(iOS)
         UIPasteboard.general.string = nsec
         #else
@@ -230,38 +279,6 @@ struct AccountDetailView: View {
     }
 }
 
-// MARK: - Relay Settings View
-struct RelaySettingsView: View {
-    @EnvironmentObject private var nostrManager: NostrManager
-    
-    var body: some View {
-        List {
-            Section {
-                ForEach(nostrManager.defaultRelays, id: \.self) { relay in
-                    HStack {
-                        Text(relay)
-                            .font(.caption)
-                            .lineLimit(1)
-                        
-                        Spacer()
-                        
-                        Image(systemName: "circle.fill")
-                            .font(.caption2)
-                            .foregroundStyle(nostrManager.relayStatus[relay] == true ? .green : .red)
-                    }
-                }
-            } header: {
-                Text("Connected Relays")
-            } footer: {
-                Text("These are the default relays. Custom relay management coming soon.")
-            }
-        }
-        .navigationTitle("Relays")
-        #if os(iOS)
-        .navigationBarTitleDisplayMode(.inline)
-        #endif
-    }
-}
 
 // MARK: - Backup View
 struct BackupView: View {

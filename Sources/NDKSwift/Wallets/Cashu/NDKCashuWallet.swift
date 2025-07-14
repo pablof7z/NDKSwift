@@ -18,6 +18,10 @@ public actor NDKCashuWallet: NDKWallet {
     private var deletedTokenEventIds: Set<String> = []
     private var supersededTokenEventIds: Set<String> = [] // Events referenced in del tags
     
+    // Relay health monitoring
+    private var walletRelays: [NDKRelay] = []
+    private var relayEventSets: [String: Set<String>] = [:] // relay URL -> event IDs
+    
     // MARK: - Proof State Management
     
     enum ProofState {
@@ -1402,6 +1406,9 @@ public actor NDKCashuWallet: NDKWallet {
         )
         print("🔓 [NDKCashuWallet] Decrypted wallet content: '\(decryptedContent)'")
         
+        // Extract relay tags from wallet event
+        extractWalletRelays(from: latestEvent)
+        
         // Parse wallet configuration tags
         guard let walletData = decryptedContent.data(using: String.Encoding.utf8),
               let walletTags = try? JSONDecoder().decode([[String]].self, from: walletData) else {
@@ -1520,6 +1527,12 @@ public actor NDKCashuWallet: NDKWallet {
             do {
                 try await loadTokenEvent(event: event, signer: signer)
                 currentTokenEventIds.insert(event.id)
+                
+                // Track this event for relay health monitoring
+                // For now, record from all wallet relays since we don't have per-relay tracking
+                for relay in walletRelays {
+                    recordEventFromRelay(event.id, from: relay.url)
+                }
             } catch {
                 print("Failed to load token event \(event.id): \(error)")
             }
@@ -1692,6 +1705,18 @@ public actor NDKCashuWallet: NDKWallet {
         try await saveWalletEvent(signer: signer)
     }
     
+    /// Save wallet state to NIP-60 events with specific relays
+    /// If relays is nil, falls back to user's outbox write relays
+    public func save(relays: [String]?) async throws {
+        guard let signer = ndk.signer else {
+            throw NDKError.notConfigured("No signer configured for NDKCashuWallet")
+        }
+        
+        // Only save wallet configuration event
+        // Token events are now managed by the update() method
+        try await saveWalletEvent(signer: signer, relays: relays)
+    }
+    
     /// Process a new token event (used when monitoring real-time events)
     public func processIncomingTokenEvent(_ event: NDKEvent) async throws {
         guard let signer = ndk.signer else {
@@ -1709,7 +1734,7 @@ public actor NDKCashuWallet: NDKWallet {
     }
     
     /// Save wallet configuration event (kind 17375)
-    private func saveWalletEvent(signer: NDKSigner) async throws {
+    private func saveWalletEvent(signer: NDKSigner, relays: [String]? = nil) async throws {
         print("🔍 Preparing wallet event...")
         print("   Mints in wallet: \(mints.count)")
         
@@ -1749,14 +1774,21 @@ public actor NDKCashuWallet: NDKWallet {
         )
         print("🔐 [NDKCashuWallet] Encrypted wallet result: '\(encryptedContent)'")
         
+        // Get relay tags for the wallet event
+        let relayTags = try await getRelayTags(providedRelays: relays, signer: signer)
+        
         // Create wallet event (kind 17375) - replaceable by kind
         let walletEvent = try await NDKEventBuilder()
             .content(encryptedContent)
             .kind(17375)
+            .tags(relayTags)
             .build(signer: signer)
         
         // Log event ID
         print("📝 Wallet event ID: \(walletEvent.id)")
+        
+        // Extract relay tags from the wallet event before publishing
+        extractWalletRelays(from: walletEvent)
         
         let publishedRelays = try await ndk.publish(walletEvent, logRawJSON: true)
         print("📡 Published to \(publishedRelays.count) relays")
@@ -1796,7 +1828,7 @@ public actor NDKCashuWallet: NDKWallet {
         )
         print("🔐 [NDKCashuWallet] Encrypted token result: '\(encryptedContent)'")
         
-        // Create token event (kind 7375)
+        // Create token event (kind 7375) - no relay tags for token events
         let tokenEvent = try await NDKEventBuilder()
             .content(encryptedContent)
             .kind(7375)
@@ -1806,6 +1838,138 @@ public actor NDKCashuWallet: NDKWallet {
         print("NDKCashuWallet.saveTokenEvent() - Published token event \(tokenEvent.id) to \(publishedRelays.count) relays")
         
         return tokenEvent.id
+    }
+    
+    /// Get relay tags for wallet events according to NIP-60 PR #1839
+    /// If no relays provided, use outbox write relays; if no outbox relays, return empty array
+    private func getRelayTags(providedRelays: [String]?, signer: NDKSigner) async throws -> [[String]] {
+        var relayTags: [[String]] = []
+        
+        if let relays = providedRelays {
+            // Use provided relays
+            for relay in relays {
+                relayTags.append(["relay", relay])
+            }
+            print("   Added \(relays.count) provided relay tags")
+        } else {
+            // Fallback to user's outbox write relays from NIP-65
+            do {
+                let userPubkey = try await signer.pubkey
+                let user = ndk.getUser(userPubkey)
+                
+                // Use the NDKUser method that returns [NDKRelayInfo] (not NDKRelayList)
+                let relayInfoList: [NDKRelayInfo] = try await user.fetchRelayList()
+                let writeRelays = relayInfoList.filter { $0.write }
+                
+                for relay in writeRelays {
+                    relayTags.append(["relay", relay.url])
+                }
+                
+                if !writeRelays.isEmpty {
+                    print("   Added \(writeRelays.count) outbox write relay tags")
+                } else {
+                    print("   No outbox write relays configured, no relay tags added")
+                }
+            } catch {
+                print("   Failed to fetch outbox relays: \(error), no relay tags added")
+            }
+        }
+        
+        return relayTags
+    }
+    
+    // MARK: - Relay Health Monitoring
+    
+    /// Get current relay health from existing monitoring data
+    public func getRelayHealth() async -> [RelayHealth] {
+        guard !walletRelays.isEmpty else { return [] }
+        
+        // Calculate the canonical event set (what healthy relays should have)
+        let canonicalEvents = calculateCanonicalEventSet()
+        
+        return walletRelays.map { relay in
+            let knownEvents = relayEventSets[relay.url] ?? Set()
+            let missing = canonicalEvents.subtracting(knownEvents)
+            let extra = knownEvents.intersection(deletedTokenEventIds)
+            
+            return RelayHealth(
+                relay: relay,
+                knownEvents: knownEvents.count,
+                missingEvents: Array(missing),
+                extraEvents: Array(extra),
+                isHealthy: missing.isEmpty && extra.isEmpty
+            )
+        }
+    }
+    
+    /// Republish missing events to a specific relay
+    public func repairRelay(_ targetRelay: NDKRelay, missingEventIds: [String]) async throws {
+        guard let signer = ndk.signer else {
+            throw NDKError.notConfigured("No signer configured")
+        }
+        
+        for eventId in missingEventIds {
+            // Find the event in our current state
+            if let event = try await findWalletEvent(eventId, signer: signer) {
+                try await ndk.publish(event)
+                print("📡 Republished event \(eventId)")
+            }
+        }
+    }
+    
+    /// Get all current wallet events for manual repair operations
+    public func getCurrentWalletEvents() async throws -> [NDKEvent] {
+        guard let signer = ndk.signer else {
+            throw NDKError.notConfigured("No signer configured")
+        }
+        
+        let userPubkey = try await signer.pubkey
+        let filter = NDKFilter(
+            authors: [userPubkey],
+            kinds: [17375, 7375, 7374, 7376] // All wallet-related kinds
+        )
+        
+        let events = try await ndk.fetchEvents(filter)
+        return events.filter { !deletedTokenEventIds.contains($0.id) }
+    }
+    
+    private func calculateCanonicalEventSet() -> Set<String> {
+        // Current wallet state = what we have locally that's not deleted
+        return currentTokenEventIds.subtracting(deletedTokenEventIds)
+    }
+    
+    private func findWalletEvent(_ eventId: String, signer: NDKSigner) async throws -> NDKEvent? {
+        let userPubkey = try await signer.pubkey
+        let filter = NDKFilter(
+            ids: [eventId],
+            authors: [userPubkey]
+        )
+        
+        let events = try await ndk.fetchEvents(filter)
+        return events.first
+    }
+    
+    private func recordEventFromRelay(_ eventId: String, from relayUrl: String) {
+        relayEventSets[relayUrl, default: Set()].insert(eventId)
+    }
+    
+    private func markEventDeleted(_ eventId: String) {
+        deletedTokenEventIds.insert(eventId)
+        // Remove from all relay tracking since it should no longer exist
+        for relayUrl in relayEventSets.keys {
+            relayEventSets[relayUrl]?.remove(eventId)
+        }
+    }
+    
+    private func extractWalletRelays(from walletEvent: NDKEvent) {
+        walletRelays = walletEvent.tags
+            .filter { $0.first == "relay" && $0.count > 1 }
+            .compactMap { tag in
+                guard tag.count > 1 else { return nil }
+                let url = tag[1]
+                return NDKRelay(url: url)
+            }
+        print("📡 Extracted \(walletRelays.count) wallet relays from wallet event")
     }
     
     
@@ -2072,6 +2236,23 @@ public actor NDKCashuWallet: NDKWallet {
     }
     
     // MARK: - Public Types
+    
+    /// Relay health information for wallet state monitoring
+    public struct RelayHealth: Sendable {
+        public let relay: NDKRelay
+        public let knownEvents: Int
+        public let missingEvents: [String]
+        public let extraEvents: [String]  // Events that were deleted but relay still has
+        public let isHealthy: Bool
+        
+        public init(relay: NDKRelay, knownEvents: Int, missingEvents: [String], extraEvents: [String], isHealthy: Bool) {
+            self.relay = relay
+            self.knownEvents = knownEvents
+            self.missingEvents = missingEvents
+            self.extraEvents = extraEvents
+            self.isHealthy = isHealthy
+        }
+    }
     
     /// Mint information
     public struct MintInfo: Hashable, Equatable {

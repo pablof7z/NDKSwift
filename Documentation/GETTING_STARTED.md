@@ -341,6 +341,15 @@ let nutzap = try await cashuWallet.nutzap(
 let mintQuote = try await cashuWallet.mintQuote(amount: 1000)
 // Pay the Lightning invoice...
 let tokens = try await cashuWallet.mint(quote: mintQuote)
+
+// Monitor relay health (NIP-60 relay tags)
+let health = await cashuWallet.getRelayHealth()
+print("Wallet relays: \(health.filter { $0.isHealthy }.count)/\(health.count) healthy")
+
+// Auto-repair unhealthy relays
+for relay in health.filter({ !$0.isHealthy }) {
+    try await cashuWallet.repairRelay(relay.relay, missingEventIds: relay.missingEvents)
+}
 ```
 
 ## Next Steps

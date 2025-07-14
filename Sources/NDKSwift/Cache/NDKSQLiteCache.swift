@@ -492,6 +492,15 @@ public actor NDKSQLiteCache: NDKCache, MintCache {
         let currentTime = Int64(Date().timeIntervalSince1970)
         
         try await dbQueue.write { db in
+            // Ensure mint_info exists first to avoid foreign key constraint violation
+            try db.execute(
+                sql: """
+                INSERT OR IGNORE INTO mint_info (url, json, last_updated, last_accessed)
+                VALUES (?, '{}', ?, ?)
+                """,
+                arguments: [mintUrl, currentTime, currentTime]
+            )
+            
             try db.execute(
                 sql: """
                 INSERT OR REPLACE INTO keysets 
@@ -517,6 +526,15 @@ public actor NDKSQLiteCache: NDKCache, MintCache {
         let currentTime = Int64(Date().timeIntervalSince1970)
         
         try await dbQueue.write { db in
+            // Ensure mint_info exists first to avoid foreign key constraint violation
+            try db.execute(
+                sql: """
+                INSERT OR IGNORE INTO mint_info (url, json, last_updated, last_accessed)
+                VALUES (?, '{}', ?, ?)
+                """,
+                arguments: [mintUrl, currentTime, currentTime]
+            )
+            
             for keyset in keysets {
                 let jsonString = try JSONCoding.encodeToString(keyset)
                 let keysJsonString = try JSONCoding.encodeToString(keyset.keys)

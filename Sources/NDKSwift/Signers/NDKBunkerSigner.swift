@@ -87,6 +87,17 @@ public actor NDKBunkerSigner: NDKSigner, Sendable {
         case bunker(String)
         case nostrConnect(relay: String, options: NostrConnectOptions?)
         case nip05(String)
+        
+        var rawValue: String {
+            switch self {
+            case .bunker:
+                return "bunker"
+            case .nostrConnect:
+                return "nostrConnect"
+            case .nip05:
+                return "nip05"
+            }
+        }
     }
 
     private let connectionType: ConnectionType
@@ -553,5 +564,65 @@ public actor NDKBunkerSigner: NDKSigner, Sendable {
         subscription = nil
         rpcClient = nil
         isConnected = false
+    }
+    
+    // MARK: - Serialization (NDKSigner Protocol)
+    
+    public static var signerType: String {
+        return "bunker"
+    }
+    
+    public func serialize() async throws -> Data {
+        let payload: [String: Any] = [
+            "bunkerPubkey": bunkerPubkey ?? "",
+            "userPubkey": userPubkey ?? "",
+            "relayUrls": relayUrls,
+            "secret": secret ?? "",
+            "localSignerData": try await localSigner.serialize(),
+            "connectionType": connectionType.rawValue
+        ]
+        return try NDKSignerSerialization.createContainer(type: Self.signerType, payload: payload)
+    }
+    
+    public static func deserialize(_ data: Data, ndk: NDK?) throws -> NDKBunkerSigner {
+        let (type, payload) = try NDKSignerSerialization.extractPayload(from: data)
+        
+        guard type == signerType else {
+            throw NDKSignerRegistryError.deserializationError("Expected \(signerType), got \(type)")
+        }
+        
+        guard let ndk = ndk else {
+            throw NDKSignerRegistryError.deserializationError("NDK instance required for bunker signer")
+        }
+        
+        guard let bunkerPubkey = payload["bunkerPubkey"] as? String,
+              let userPubkey = payload["userPubkey"] as? String,
+              let relayUrls = payload["relayUrls"] as? [String],
+              let secret = payload["secret"] as? String,
+              let localSignerData = payload["localSignerData"] as? Data,
+              let connectionTypeRaw = payload["connectionType"] as? String else {
+            throw NDKSignerRegistryError.deserializationError("Missing required bunker signer data")
+        }
+        
+        // Deserialize local signer
+        let localSigner = try NDKPrivateKeySigner.deserialize(localSignerData, ndk: ndk)
+        
+        // Create appropriate connection type
+        let connectionType: ConnectionType
+        switch connectionTypeRaw {
+        case "bunker":
+            // Reconstruct bunker URL
+            let bunkerUrl = "bunker://\(bunkerPubkey)?pubkey=\(userPubkey)&secret=\(secret)" + 
+                           relayUrls.map { "&relay=\($0)" }.joined()
+            connectionType = .bunker(bunkerUrl)
+        case "nostrConnect":
+            connectionType = .nostrConnect(relay: relayUrls.first ?? "", options: nil)
+        case "nip05":
+            connectionType = .nip05(userPubkey)
+        default:
+            throw NDKSignerRegistryError.deserializationError("Unknown connection type: \(connectionTypeRaw)")
+        }
+        
+        return NDKBunkerSigner(ndk: ndk, connectionType: connectionType, localSigner: localSigner)
     }
 }
