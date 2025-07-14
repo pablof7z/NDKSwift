@@ -1707,8 +1707,8 @@ public actor NDKCashuWallet: NDKWallet {
             return
         }
         
-        // Load the token event if it's not filtered
-        try await loadTokenEvent(event: event, signer: signer)
+        // Process the token event if it's not filtered
+        try await processIncomingTokenEvent(event)
     }
     
     /// Save wallet configuration event (kind 17375)

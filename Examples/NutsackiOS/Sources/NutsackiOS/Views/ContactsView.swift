@@ -68,9 +68,11 @@ struct ContactsView: View {
     private func loadContacts() async {
         isLoading = true
         
-        guard let currentUser = nostrManager.currentUser,
+        guard let currentUser = await nostrManager.currentUser,
               let ndk = nostrManager.ndk else {
-            isLoading = false
+            await MainActor.run {
+                isLoading = false
+            }
             return
         }
         

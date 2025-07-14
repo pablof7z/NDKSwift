@@ -61,9 +61,9 @@ public enum ProofState {
 /// Token entry in a Cashu token
 public struct TokenEntry: Codable {
     public let mint: String
-    public let proofs: [CashuProof]
+    public let proofs: [CashuSwift.Proof]
     
-    public init(mint: String, proofs: [CashuProof]) {
+    public init(mint: String, proofs: [CashuSwift.Proof]) {
         self.mint = mint
         self.proofs = proofs
     }
@@ -106,10 +106,10 @@ public struct CashuMintList: Codable {
 /// NIP-60 compliant token event content
 public struct NIP60TokenEvent: Codable {
     public let mint: String
-    public let proofs: [CashuProof]
+    public let proofs: [CashuSwift.Proof]
     public let del: [String]?  // Token event IDs that were destroyed in creating this token
     
-    public init(mint: String, proofs: [CashuProof], del: [String]? = nil) {
+    public init(mint: String, proofs: [CashuSwift.Proof], del: [String]? = nil) {
         self.mint = mint
         self.proofs = proofs
         self.del = del

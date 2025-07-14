@@ -5,9 +5,8 @@ import SwiftUI
 @MainActor
 class NostrManager: ObservableObject {
     @Published var ndk: NDK?
-    @Published var currentUser: NDKUser?
     @Published var isConnected = false
-    @Published var relayStatus: [String: Bool] = [:]
+    @Published var relayStatus: [String: Bool] = []
     
     private var ndkAuthManager: NDKAuthManager
     var cache: NDKSQLiteCache?
@@ -74,14 +73,10 @@ class NostrManager: ObservableObject {
         ndk.signer = signer
         
         let publicKey = try await signer.pubkey
-        currentUser = NDKUser(pubkey: publicKey)
-        
         print("Logged in with public key: \(publicKey)")
         
         // Start profile subscription in background (non-blocking)
         Task {
-            guard let currentUser = currentUser else { return }
-            
             let metadataFilter = NDKFilter(
                 authors: [publicKey],
                 kinds: [0],
@@ -120,9 +115,6 @@ class NostrManager: ObservableObject {
         // Switch to this session
         try await ndkAuthManager.switchToSession(session)
         
-        // Update current user from auth manager
-        currentUser = try await ndkAuthManager.activeSigner?.user()
-        
         // Create and publish profile
         let metadata = NDKUserProfile(
             name: displayName,
@@ -130,7 +122,7 @@ class NostrManager: ObservableObject {
             about: about ?? "Nutsack wallet user"
         )
         
-        if currentUser != nil {
+        if ndkAuthManager.isAuthenticated {
             // Create metadata event
             let metadataContent = try JSONEncoder().encode(metadata)
             let metadataEvent = try await NDKEventBuilder()
@@ -150,7 +142,6 @@ class NostrManager: ObservableObject {
     
     func logout() {
         ndkAuthManager.logout()
-        currentUser = nil
         print("Logged out")
     }
     
@@ -183,31 +174,27 @@ class NostrManager: ObservableObject {
         // Switch to this session
         try await ndkAuthManager.switchToSession(session)
         
-        // Update current user from auth manager
-        currentUser = try await ndkAuthManager.activeSigner?.user()
-        
         print("Created account from nsec with public key: \(session.pubkey)")
         return session
     }
     
-    /// Update current user from auth manager state
-    func updateCurrentUserFromAuthState() {
-        Task {
-            if ndkAuthManager.isAuthenticated {
-                currentUser = try? await ndkAuthManager.activeSigner?.user()
-            } else {
-                currentUser = nil
-            }
+    /// Get current user from auth manager
+    var currentUser: NDKUser? {
+        get async {
+            guard ndkAuthManager.isAuthenticated else { return nil }
+            return try? await ndkAuthManager.activeSigner?.user()
         }
     }
     
     func fetchNIP60Wallets() async throws -> [NDKEvent] {
-        guard let ndk = ndk, let currentUser = currentUser else {
+        guard let ndk = ndk,
+              ndkAuthManager.isAuthenticated,
+              let user = await currentUser else {
             throw NostrError.notLoggedIn
         }
         
         let filter = NDKFilter(
-            authors: [currentUser.npub],
+            authors: [user.npub],
             kinds: [37375],
             limit: 100
         )

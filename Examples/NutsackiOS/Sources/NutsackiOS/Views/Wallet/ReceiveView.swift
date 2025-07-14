@@ -109,22 +109,8 @@ struct ReceiveView: View {
                     tokenString: inputToken.trimmingCharacters(in: .whitespacesAndNewlines)
                 )
                 
-                // Create transaction record
-                let transaction = Transaction(
-                    type: .receive,
-                    amount: Int(amount),
-                    memo: "Received ecash"
-                )
-                transaction.status = .completed
-                
+                // Transaction will be recorded automatically via NIP-60 history events
                 await MainActor.run {
-                    modelContext.insert(transaction)
-                    do {
-                        try modelContext.save()
-                    } catch {
-                        print("Failed to save transaction: \(error)")
-                    }
-                    
                     receivedAmount = Int(amount)
                     showSuccess = true
                     isProcessing = false

@@ -125,22 +125,8 @@ struct SendView: View {
                     fromMint: selectedMintURL
                 )
                 
-                // Create transaction record
-                let transaction = Transaction(
-                    type: .send,
-                    amount: amountInt,
-                    memo: memo.isEmpty ? nil : memo
-                )
-                transaction.status = .completed
-                
+                // Transaction will be recorded automatically via NIP-60 history events
                 await MainActor.run {
-                    modelContext.insert(transaction)
-                    do {
-                        try modelContext.save()
-                    } catch {
-                        print("Failed to save transaction: \(error)")
-                    }
-                    
                     generatedToken = tokenString
                     showTokenView = true
                     isSending = false

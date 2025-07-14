@@ -169,19 +169,44 @@ class WalletManager: ObservableObject {
                 }
             }
             
-            // Create transaction object
-            guard let dir = direction,
-                  let amt = amount ?? extractAmountFromTags(event.tags) else {
-                return
+            // Determine transaction type from tags
+            let transactionType: Transaction.TransactionType
+            
+            // Check for specific type in clear tags (e.g., nutzap, cross_mint_transfer)
+            if let typeTag = event.tags.first(where: { $0.count >= 2 && $0[0] == "type" }) {
+                switch typeTag[1] {
+                case "nutzap":
+                    transactionType = .nutzap
+                case "cross_mint_transfer":
+                    // For transfers, determine if it's send or receive based on direction
+                    transactionType = direction == "out" ? .send : .receive
+                default:
+                    // Fall back to direction-based type
+                    guard let dir = direction else { return }
+                    switch dir {
+                    case "in": 
+                        transactionType = .receive
+                    case "out": 
+                        transactionType = .send
+                    default: 
+                        return
+                    }
+                }
+            } else {
+                // Use direction to determine type
+                guard let dir = direction else { return }
+                switch dir {
+                case "in": 
+                    transactionType = .mint  // Lightning deposits or received ecash
+                case "out": 
+                    transactionType = .melt  // Lightning payments or sent ecash
+                default: 
+                    return
+                }
             }
             
-            let transactionType: Transaction.TransactionType
-            switch dir {
-            case "in": 
-                transactionType = .mint  // Lightning deposits
-            case "out": 
-                transactionType = .melt  // Lightning payments
-            default: 
+            // Get amount from encrypted tags or clear tags
+            guard let amt = amount ?? extractAmountFromTags(event.tags) else {
                 return
             }
             

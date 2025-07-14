@@ -95,10 +95,6 @@ struct ContentView: View {
                         selectedTab = .wallet
                     }
                 }
-                .onAppear {
-                    // Update NostrManager's current user when auth state changes
-                    nostrManager.updateCurrentUserFromAuthState()
-                }
             } authenticationView: {
                 // Custom authentication UI
                 AuthenticationView()
@@ -492,22 +488,8 @@ struct LightningInvoicePreviewView: View {
                     amount: amount
                 )
                 
-                let transaction = Transaction(
-                    type: .melt,
-                    amount: Int(amount),
-                    memo: decodedDescription
-                )
-                transaction.lightningInvoice = invoice
-                transaction.status = .completed
-                
+                // Transaction will be recorded automatically via NIP-60 history events
                 await MainActor.run {
-                    modelContext.insert(transaction)
-                    do {
-                        try modelContext.save()
-                    } catch {
-                        print("Failed to save transaction: \(error)")
-                    }
-                    
                     showSuccess = true
                     isPaying = false
                 }
