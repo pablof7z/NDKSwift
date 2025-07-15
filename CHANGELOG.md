@@ -5,6 +5,94 @@ All notable changes to NDKSwift will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.0] - 2025-07-16
+
+### Changed
+- **BREAKING**: Removed `fetchEvents(_ filter: NDKFilter)` method - use `fetchEvents(_ filters: [NDKFilter])` instead. This simplifies the API by having only one method that accepts an array of filters, which can contain a single filter.
+
+## [0.3.3] - 2025-07-16
+
+### Added
+- Comprehensive network traffic logging system via `NDKLogger`
+  - Configurable log levels: `.off`, `.error`, `.warning`, `.info`, `.debug`, `.trace`
+  - Configurable log categories: `.network`, `.relay`, `.subscription`, `.event`, `.cache`, `.auth`, `.general`
+  - Pretty-printed network messages showing parsed message types, event IDs, kinds, authors, etc.
+  - Raw JSON output for debugging protocol issues
+  - Enable/disable network traffic logging with `NDKLogger.shared.logNetworkTraffic`
+  - Enable/disable pretty printing with `NDKLogger.shared.prettyPrintNetworkMessages`
+- New example: `NetworkLoggingDemo.swift` demonstrating logging configuration
+
+### Changed
+- Updated `NDKRelayConnection` to use the new logging system instead of raw print statements
+- Network traffic now shows both formatted and raw messages for easier debugging
+
+### Documentation
+- Added "Logging and Debugging" section to API Reference documentation
+- Documented all NDKLogger configuration options and output format
+
+## [0.3.2] - 2025-07-15
+
+### Added
+- New Cashu event types: `NDKCashuTokenEvent`, `NDKCashuQuoteEvent`, `NDKCashuSpendingHistory`, `NDKCashuWalletEvent`, and `NDKCashuMintList` that encapsulate encryption and publishing logic
+- New EventKind constants: `cashuQuote` (7374), `cashuToken` (7375), `cashuSpendingHistory` (7376), and `cashuWalletConfig` (17375)
+- Added `delete()` method to `NDKEvent` extension that creates and publishes deletion events
+- Added `isLockedTo(pubkey:)` method to `CashuSwift.Proof` extension for checking P2PK locks
+- Added `NIP60WalletEvent` type for wallet configuration events with proper data modeling
+- New `NIP60Wallet.setup()` method that properly configures wallet with mints, relays, and optionally publishes mint list (kind 10019)
+- Added `NDKCashuMintList` to wrap kind 10019 events for advertising accepted mints
+
+### Changed
+- Fixed `NDK` initializer to use `SimpleMemoryCache()` instead of non-existent `NDKInMemoryCache()`
+- Consolidated tag utility functions from `TagHelpers.swift` into `ContentTagger.swift`
+- Updated `NDKUser.pay()` to return `PaymentConfirmation` instead of deprecated `NDKPaymentConfirmation`
+- Updated example apps to use new payment types (`NutzapPaymentRequest` instead of deprecated `NDKNutzapRequest`)
+- Updated Outbox documentation to clarify it's the default behavior, not an advanced feature
+- Removed references to non-existent `publishWithOutbox()`, `fetchEventsWithOutbox()`, and `subscribeWithOutbox()` methods from documentation
+- Renamed `NDKCashuWallet` to `NIP60Wallet` to better reflect it implements the NIP-60 specification
+- Moved wallet directory from `Sources/NDKSwift/Wallets/Cashu/` to `Sources/NDKSwift/Wallets/NIP60/`
+- Refactored `WalletEventManager` to use new object-oriented event types instead of procedural helper methods
+- Updated all Cashu wallet code to use EventKind constants instead of hardcoded numbers
+- **BREAKING**: Removed `NIP60Wallet.save()` method - use `setup()` instead
+- **BREAKING**: Removed `NIP60Wallet.publishNutzapPreferences()` method - mint list publishing is handled by `setup()` with `publishMintList: true`
+- **BREAKING**: Removed `NIP60Wallet.hasPublishedNutzapPreferences()` method - no longer needed
+- **BREAKING**: Removed `NIP60Wallet.addMint()` and `removeMint()` methods - mint configuration is now event-driven through `NDKCashuWalletEvent.createAndPublish()`
+- **BREAKING**: Removed `WalletEventManager.saveWalletEvent()` - use `NDKCashuWalletEvent.createAndPublish()` directly
+
+### Fixed
+- Fixed authentication flow in NDKAuthView to prevent returning to login screen after successful authentication
+- Fixed ImportAccountView to use `ndk.fetchProfile()` instead of removed `user.fetchProfile()` method
+
+### Documentation
+- Added comprehensive [Authentication Guide](Documentation/AUTHENTICATION.md) covering NDKAuthManager, NDKAuthView, session management, and biometric authentication
+- Updated documentation index to include authentication guide
+- Enhanced examples documentation with link to authentication guide
+
+### Removed
+- Removed deprecated code from `TagHelpers.swift` and consolidated remaining utilities into `ContentTagger.swift`
+- Removed `TagHelpers.swift` file after consolidation
+- Removed all deprecated payment types from `NDKWallet.swift` (`NDKPaymentRequest`, `NDKPaymentConfirmation`, etc.)
+
+## [0.3.1] - 2025-07-16
+
+### Added
+- Enhanced `RelayProtocol` with `publish` and `fetchEvents` methods for better testability
+- New `subscribeToZaps()` method in `NDKZapManager` for reactive, event-driven zap loading
+- Comprehensive documentation on event-driven patterns in `EVENT_DRIVEN_PATTERNS.md`
+- Audit document `FETCHEVENTS_AUDIT.md` analyzing all `fetchEvents` usage in the codebase
+
+### Changed
+- Updated `fetchEvents` documentation with clear warnings about when to use it vs subscriptions
+- Improved `RelayProtocol` abstraction by moving essential methods from extensions into the protocol
+- Added deprecation warnings to blocking methods that have event-driven alternatives
+
+### Fixed
+- **NDKCashuWallet**: Removed broken `processIncomingTokenEvent` method that contained a recursive call bug causing stack overflow. Token events are now processed through the unified wallet subscription via `WalletEventProcessor`
+
+### Documentation
+- Added extensive guidance on when to use `fetchEvents` vs subscriptions
+- Created examples demonstrating proper event-driven patterns for common use cases
+- Documented anti-patterns to avoid (e.g., sequential fetching in loops)
+
 ## [0.3.0] - 2025-07-15
 
 ### Changed

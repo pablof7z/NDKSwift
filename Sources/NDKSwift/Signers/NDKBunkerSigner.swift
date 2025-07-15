@@ -241,7 +241,7 @@ public actor NDKBunkerSigner: NDKSigner, Sendable {
         if !relayUrls.isEmpty {
             print("[BunkerSigner] Adding and connecting to bunker relays...")
             for relayUrl in relayUrls {
-                let relay = ndk.addRelay(relayUrl)
+                let relay = await ndk.addRelay(relayUrl)
                 print("[BunkerSigner] Added relay: \(relayUrl), current state: \(await relay.connectionState)")
 
                 // Connect to the relay if not already connected
@@ -306,10 +306,11 @@ public actor NDKBunkerSigner: NDKSigner, Sendable {
                 allRelays.first { $0.url == url }
             }
             options.relays = Set(relayObjects)
-            subscription = ndk.subscribe(filters: [filter], options: options)
+            let relayUrlSet = Set(relayUrls)
+            subscription = await ndk.subscribe(filters: [filter], relays: relayUrlSet)
             print("[BunkerSigner] Subscription created for specific relays: \(relayUrls)")
         } else {
-            subscription = ndk.subscribe(filters: [filter])
+            subscription = await ndk.subscribe(filters: [filter])
             print("[BunkerSigner] Subscription created for all relays")
         }
 
@@ -585,10 +586,10 @@ public actor NDKBunkerSigner: NDKSigner, Sendable {
     }
     
     public static func deserialize(_ data: Data, ndk: NDK?) throws -> NDKBunkerSigner {
-        let (type, payload) = try NDKSignerSerialization.extractPayload(from: data)
-        
-        guard type == signerType else {
-            throw NDKSignerRegistryError.deserializationError("Expected \(signerType), got \(type)")
+        // The registry already extracted the payload, so we decode it directly
+        let payloadDict = try JSONSerialization.jsonObject(with: data) as? [String: Any]
+        guard let payload = payloadDict else {
+            throw NDKSignerRegistryError.deserializationError("Invalid payload format")
         }
         
         guard let ndk = ndk else {
@@ -604,7 +605,7 @@ public actor NDKBunkerSigner: NDKSigner, Sendable {
             throw NDKSignerRegistryError.deserializationError("Missing required bunker signer data")
         }
         
-        // Deserialize local signer
+        // Deserialize local signer (it also expects just the payload data)
         let localSigner = try NDKPrivateKeySigner.deserialize(localSignerData, ndk: ndk)
         
         // Create appropriate connection type

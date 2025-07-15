@@ -25,7 +25,7 @@ public actor FullInMemoryCache: NDKCache {
     public func queryEvents(_ filter: NDKFilter) async throws -> [NDKEvent] {
         var results: [NDKEvent] = []
         for event in events.values {
-            if await filter.matches(event: event) {
+            if filter.matches(event: event) {
                 results.append(event)
             }
         }

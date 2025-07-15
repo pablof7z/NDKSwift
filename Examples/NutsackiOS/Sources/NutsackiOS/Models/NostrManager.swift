@@ -22,7 +22,8 @@ class NostrManager {
         "wss://relay.primal.net"
     ]
     
-    init() {
+    init(from: String) {
+        print("🏚️ [NostrManager] Initializing...", from)
         self.ndkAuthManager = NDKAuthManager.shared
         Task {
             await setupNDK()
@@ -30,6 +31,7 @@ class NostrManager {
     }
     
     private func setupNDK() async {
+        print("🏚️ [NostrManager] Setting up NDK...")
         // Initialize SQLite cache for better performance and offline access
         do {
             cache = try await NDKSQLiteCache()
@@ -43,6 +45,7 @@ class NostrManager {
         
         // Set NDK on auth manager
         if let ndk = ndk {
+            print("🏚️ [NostrManager] Setting NDK on auth manager")
             ndkAuthManager.setNDK(ndk)
         }
         
@@ -54,25 +57,30 @@ class NostrManager {
     func connectToRelays() async {
         guard let ndk = ndk else { return }
         
+        print("NostrManager - Connecting to relays: \(defaultRelays)")
         await ndk.connect()
         isConnected = true
-        print("Connected to relays")
+        print("NostrManager - Connected to relays")
+        
+        // Check actual connected relays
+        // Note: pool is internal, so we can't access it directly
+        print("NostrManager - Connected to NDK with relays: \(defaultRelays)")
         
         // Monitor relay status
         await monitorRelayStatus()
     }
     
     private func monitorRelayStatus() async {
-        guard let ndk = ndk else { return }
+        guard ndk != nil else { return }
         
         // Relay status monitoring not available in current API
     }
     
     func login(with privateKey: String) async throws {
-        guard let ndk = ndk else { throw NostrError.ndkNotInitialized }
+        guard ndk != nil else { throw NostrError.ndkNotInitialized }
         
         let signer = try NDKPrivateKeySigner(privateKey: privateKey)
-        ndk.signer = signer
+        ndk?.signer = signer
         
         let publicKey = try await signer.pubkey
         print("Logged in with public key: \(publicKey)")
@@ -86,21 +94,28 @@ class NostrManager {
             )
             
             // Subscribe to profile updates
-            let subscription = ndk.subscribe(filters: [metadataFilter])
-            
-            for try await event in subscription {
-                if let contentData = event.content.data(using: .utf8),
-                   let _ = try? JSONDecoder().decode(NDKUserProfile.self, from: contentData) {
-                    // Profile is automatically cached by NDK's SQLite cache
-                    print("Profile metadata received and cached for \(publicKey)")
-                    break // Only need first profile event
+            if let subscription = await ndk?.subscribe(filters: [metadataFilter]) {
+                for try await event in subscription {
+                    if let contentData = event.content.data(using: .utf8),
+                       let _ = try? JSONDecoder().decode(NDKUserProfile.self, from: contentData) {
+                        // Profile is automatically cached by NDK's SQLite cache
+                        print("Profile metadata received and cached for \(publicKey)")
+                        break // Only need first profile event
+                    }
                 }
             }
         }
     }
     
     func createNewAccount(displayName: String, about: String? = nil) async throws -> NDKSession {
-        guard let ndk = ndk else { throw NostrError.ndkNotInitialized }
+        print("🏚️ [NostrManager] createNewAccount() called with displayName: \(displayName)")
+        print("🏚️ [NostrManager] NDK instance: \(ndk != nil ? "exists" : "nil")")
+        print("🏚️ [NostrManager] Is connected: \(isConnected)")
+        
+        guard let ndk = ndk else { 
+            print("🏚️ [NostrManager] ERROR: NDK is not initialized!")
+            throw NostrError.ndkNotInitialized 
+        }
         
         // Generate new private key
         let privateKeyHex = Crypto.generatePrivateKey()
@@ -115,6 +130,7 @@ class NostrManager {
         )
         
         // Switch to this session
+        print("🏚️ [NostrManager] Switching to new session...")
         try await ndkAuthManager.switchToSession(session)
         
         // Create and publish profile
@@ -125,6 +141,7 @@ class NostrManager {
         )
         
         if ndkAuthManager.isAuthenticated {
+            print("🏚️ [NostrManager] User is authenticated, publishing metadata...")
             // Create metadata event
             let metadataContent = try JSONEncoder().encode(metadata)
             let metadataEvent = try await NDKEventBuilder()
@@ -132,13 +149,13 @@ class NostrManager {
                 .kind(0)
                 .build(signer: signer)
             
-            try await ndk.publish(metadataEvent)
+            _ = try await ndk.publish(metadataEvent)
             
             // Update session with profile
             try await ndkAuthManager.updateActiveSessionProfile(metadata)
         }
         
-        print("Created new account with public key: \(session.pubkey)")
+        print("🏚️ [NostrManager] createNewAccount() completed successfully with pubkey: \(session.pubkey)")
         return session
     }
     
@@ -161,7 +178,8 @@ class NostrManager {
     
     /// Create account using existing nsec
     func createAccountFromNsec(_ nsec: String, displayName: String) async throws -> NDKSession {
-        guard let ndk = ndk else { throw NostrError.ndkNotInitialized }
+        print("🏚️ [NostrManager] createAccountFromNsec() called with displayName: \(displayName)")
+        guard ndk != nil else { throw NostrError.ndkNotInitialized }
         
         let signer = try NDKPrivateKeySigner(nsec: nsec)
         
@@ -174,9 +192,10 @@ class NostrManager {
         )
         
         // Switch to this session
+        print("🏚️ [NostrManager] Switching to imported session...")
         try await ndkAuthManager.switchToSession(session)
         
-        print("Created account from nsec with public key: \(session.pubkey)")
+        print("🏚️ [NostrManager] createAccountFromNsec() completed successfully with pubkey: \(session.pubkey)")
         return session
     }
     
@@ -197,19 +216,19 @@ class NostrManager {
         
         let filter = NDKFilter(
             authors: [user.npub],
-            kinds: [37375],
+            kinds: [EventKind.walletInfo],
             limit: 100
         )
         
         // Fetch events - will use cache if available and fetch from relays if needed
-        let events = try await ndk.fetchEvents(filter)
+        let events = try await ndk.fetchEvents([filter])
         return Array(events)
     }
     
     func publishNIP60Wallet(_ walletEvent: NDKEvent) async throws {
-        guard let ndk = ndk else { throw NostrError.ndkNotInitialized }
+        guard ndk != nil else { throw NostrError.ndkNotInitialized }
         
-        try await ndk.publish(walletEvent)
+        _ = try await ndk?.publish(walletEvent)
         print("Published NIP-60 wallet event")
     }
 }

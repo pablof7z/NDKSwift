@@ -391,7 +391,7 @@ public struct PaymentNotification: Codable {
 
 // MARK: - Helper for Any Codable
 
-public struct AnyCodable: Codable {
+public struct AnyCodable: Codable, @unchecked Sendable {
     let value: Any
     
     public init(_ value: Any) {

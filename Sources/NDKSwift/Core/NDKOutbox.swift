@@ -23,17 +23,6 @@ extension NDK {
         return _relayRanker!
     }
 
-    /// Relay selector for choosing optimal relays
-    var relaySelector: NDKRelaySelector {
-        if _relaySelector == nil {
-            _relaySelector = NDKRelaySelector(
-                ndk: self,
-                tracker: outboxTracker,
-                ranker: relayRanker
-            )
-        }
-        return _relaySelector!
-    }
 
     /// Publishing strategy for outbox model
     var publishingStrategy: NDKPublishingStrategy {

@@ -6,18 +6,14 @@ struct NutzapSettingsView: View {
     @Environment(NostrManager.self) private var nostrManager
     
     @State private var p2pkPubkey: String = ""
-    @State private var isLoading = false
     @State private var showError = false
     @State private var errorMessage = ""
-    @State private var showSuccess = false
-    @State private var successMessage = ""
     @State private var copiedToClipboard = false
     
     var body: some View {
         Form {
             publicKeySection
             mintsSection
-            publishSection
         }
         .navigationTitle("Nutzap Settings")
         .platformNavigationBarTitleDisplayMode(inline: true)
@@ -25,11 +21,6 @@ struct NutzapSettingsView: View {
             Button("OK") { }
         } message: {
             Text(errorMessage)
-        }
-        .alert("Success", isPresented: $showSuccess) {
-            Button("OK") { }
-        } message: {
-            Text(successMessage)
         }
         .task {
             await loadP2PKPubkey()
@@ -75,12 +66,12 @@ struct NutzapSettingsView: View {
         Section {
             AsyncContentView(
                 operation: { 
-                    if let wallet = walletManager.activeWallet {
-                        return await wallet.getMintsInfo()
-                    }
-                    return []
+                    guard let wallet = walletManager.activeWallet else { return [] }
+                    let mintStrings = await wallet.mints.getMintURLs()
+                    let mintURLs = mintStrings.compactMap { URL(string: $0) }
+                    return mintURLs.map { MintInfo(url: $0) }
                 }
-            ) { (mints: [NDKCashuWallet.MintInfo]) in
+            ) { (mints: [MintInfo]) in
                 ForEach(Array(mints.enumerated()), id: \.offset) { (index, mint) in
                     HStack {
                         Image(systemName: "building.columns")
@@ -103,22 +94,6 @@ struct NutzapSettingsView: View {
         }
     }
     
-    private var publishSection: some View {
-        Section {
-            Button(action: publishPreferences) {
-                if isLoading {
-                    ProgressView()
-                        .frame(maxWidth: .infinity)
-                } else {
-                    Text("Publish Nutzap Preferences")
-                        .frame(maxWidth: .infinity)
-                }
-            }
-            .disabled(isLoading || p2pkPubkey.isEmpty)
-        } footer: {
-            Text("Publishes your wallet configuration so others can send you nutzaps. This needs to be done at least once.")
-        }
-    }
     
     private func loadP2PKPubkey() async {
         do {
@@ -134,27 +109,6 @@ struct NutzapSettingsView: View {
         }
     }
     
-    private func publishPreferences() {
-        isLoading = true
-        
-        Task {
-            do {
-                try await walletManager.publishNutzapPreferences()
-                
-                await MainActor.run {
-                    isLoading = false
-                    successMessage = "Successfully published nutzap preferences! Others can now send nutzaps to your wallet."
-                    showSuccess = true
-                }
-            } catch {
-                await MainActor.run {
-                    isLoading = false
-                    errorMessage = "Failed to publish preferences: \(error.localizedDescription)"
-                    showError = true
-                }
-            }
-        }
-    }
     
     #if os(iOS)
     private func copyPubkey() {

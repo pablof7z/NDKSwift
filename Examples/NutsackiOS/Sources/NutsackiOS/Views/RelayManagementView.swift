@@ -527,7 +527,7 @@ struct AddRelayView: View {
         Task {
             do {
                 // Add relay to NDK
-                nostrManager.ndk?.addRelay(relayURL)
+                await nostrManager.ndk?.addRelay(relayURL)
                 
                 // Connect to the relay
                 // Connect to the newly added relay

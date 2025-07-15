@@ -1,156 +1,136 @@
 # NDKSwift Codebase Analysis
 
-## 1. Broken Functionality / Failing Tests
+## Executive Summary
 
-### Current Issues:
-- **CashuRelayHealthSimpleTest.swift** - Compilation errors:
-  - Missing `await` keywords for async methods (`recordEventFromRelay`)
-  - Reference to undefined property `currentTokenEventIds` in test extension
-  
-- **MockSigner.swift** - Does not conform to NDKSigner protocol:
-  - Missing static `signerType` property
-  - Missing `serialize()` method
-  - Missing static `deserialize(_:ndk:)` method
+The NDKSwift codebase is in an active refactoring state with significant wallet-related changes in progress. While the core architecture is solid and follows modern Swift patterns, there are several areas that need attention including incomplete features, test failures, and technical debt.
 
-### Action Items:
-- Fix test compilation errors by adding missing `await` keywords
-- Update MockSigner to fully implement NDKSigner protocol
-- Run full test suite to identify other failing tests
+## Current State Overview
 
-## 2. Duplicate Code Patterns
+### 1. Major Refactoring in Progress
+- **Wallet System Overhaul**: The codebase shows a major wallet refactoring from `NDKCashuWallet` to `NIP60Wallet`
+- **Deleted Files**: Over 20 wallet-related files have been deleted, indicating a significant architectural change
+- **Payment System Unification**: Payment protocols are being consolidated into a cleaner, unified system
 
-### Payment Request/Confirmation Protocols
-- `NDKPaymentRequest` and `PaymentRequest` protocols in different files
-- `NDKPaymentConfirmation` and `PaymentConfirmation` protocols duplicated
-- Location: `/Wallet/NDKWallet.swift` and `/Zaps/NDKPaymentProvider.swift`
-- **Impact**: Confusion about which protocol to implement, potential type mismatches
+### 2. Code Quality Issues
 
-### Event Processing
-- Multiple implementations of event fetching logic across:
-  - `NDKOutboxManager`
-  - `NDKRelayPoolExtensions`
-  - Main `NDK` class
+#### a) TODO/FIXME Items (High Priority)
+- **NIP60Wallet.swift:100**: Missing relay health tracking implementation
+- **NDKZapManager.swift:215**: CashuSwift functionality temporarily disabled due to build issues
+- **MeltView.swift:187**: Lightning invoice parsing not implemented
+- **WalletManager.swift:512**: Mint discovery feature missing
+- **RelayHealthView.swift:176,429**: Navigation and error handling incomplete
 
-### Cache Operations
-- Similar cache patterns repeated across different cache implementations
-- Could benefit from shared base implementation
+#### b) Compilation Warnings
+- **Unused Results**: Multiple `publish()` calls ignore return values (NIP60Wallet.swift:319, 467)
+- **Swift 6 Compatibility**: Main actor isolation warnings in NDKAuthView.swift
+- **DEBUG Code**: Excessive conditional compilation blocks in NDKRelaySubscriptionManager
 
-## 3. Single Responsibility Principle (SRP) Violations
+#### c) Duplicated/Inconsistent Code
+- Event handling spread across multiple managers (WalletEventManager, WalletEventProcessor, eventProcessor)
+- Relay health monitoring implementation duplicated between components
+- Cache interface recently unified but still shows signs of previous separation
 
-### NDK.swift (1,326 lines)
-The main NDK class has grown too large and handles:
-- Relay pool management
-- Event publishing/fetching
-- Subscription management
-- Profile management
-- Cache coordination
-- Authentication
-- Wallet integration
-- Zap management
+### 3. Missing Functionality
 
-**Recommendation**: Break into focused components:
-- `NDKEventManager` - Event operations
-- `NDKRelayCoordinator` - Relay management
-- `NDKSubscriptionCoordinator` - Subscription handling
+#### a) Core Features
+- **Relay Health Tracking**: TODO indicates public API missing for relay health
+- **Mint Discovery**: Not implemented in wallet examples
+- **Lightning Invoice Parsing**: Placeholder implementation only
+- **Error Recovery**: Multiple TODOs for error handling and alerts
 
-### NDKCashuWallet.swift (961 lines)
-Handles too many responsibilities:
-- Token management
-- Mint interactions
-- Event processing
-- Relay health monitoring
-- Balance tracking
-- Transaction processing
-- Event subscription
+#### b) Test Coverage Gaps
+- Only 21 test files for a large codebase
+- Wallet refactoring likely broke existing tests
+- No tests for new NIP60 wallet implementation
+- Missing integration tests for complex workflows
 
-**Recommendation**: Extract to separate components:
-- `CashuTokenManager`
-- `CashuMintInteractor`
-- `CashuEventProcessor`
+### 4. Performance Concerns
 
-### NDKRelay.swift (812 lines)
-Combines multiple concerns:
-- WebSocket connection management
-- Message parsing/serialization
-- Subscription tracking
-- Connection state management
-- Error handling
+#### a) Subscription Management
+- Multiple parallel subscriptions created without proper resource management
+- No rate limiting or backpressure handling visible
+- Potential memory leaks from uncanceled tasks
 
-**Recommendation**: Separate into:
-- `RelayConnection` - WebSocket handling
-- `RelayMessageProcessor` - Message parsing
-- `RelaySubscriptionTracker` - Subscription management
+#### b) Event Processing
+- Event deduplication logic scattered across components
+- No visible batching for database operations
+- Synchronous signature verification could block event processing
 
-## 4. Over-Engineered Components
+### 5. Architecture Issues
 
-### Excessive Handler Pattern
-The wallet system uses many small handler structs:
-- `NutzapHandler`
-- `WalletConfigHandler`
-- `DeleteEventHandler`
-- `TokenEventHandler`
-- `QuoteEventHandler`
-- `SpendingHistoryHandler`
+#### a) Layer Violations
+- Direct NDK access from UI components (violates MVVM)
+- Business logic mixed with UI code in example apps
+- Wallet managers directly manipulating relay connections
 
-**Issue**: Each handler is a separate type for what could be simple methods. This creates unnecessary complexity and indirection.
+#### b) Protocol Design
+- Some protocols have grown too large (NDKCache now includes mint operations)
+- Mixing of concerns in wallet components
+- Unclear boundaries between managers
 
-**Recommendation**: Consolidate into a single `WalletEventProcessor` with methods for each event type.
+### 6. Documentation Problems
 
-### Wrapper Types
-- `WalletAdapterPaymentProvider` - Unnecessary wrapper around wallet functionality
+#### a) Outdated Documentation
+- ARCHITECTURE.md shows old component structure
+- References to deleted components (NDKCashuWallet)
+- Missing documentation for new NIP60 implementation
 
-### Protocol Proliferation
-Several protocols appear to have single implementations:
-- `MintCache` protocol with likely single implementation
-- `WalletEventHandler` protocol used only internally
+#### b) Incomplete Examples
+- CashuSwift integration temporarily disabled
+- Example apps contain TODOs and incomplete features
+- No examples for new wallet architecture
 
-**Recommendation**: Remove protocols that don't provide value through multiple implementations or testing benefits.
+### 7. Dependency Management
+- Using branch dependency for secp256k1 (should use tagged version)
+- Local path dependency for CashuSwift (should be published)
+- No lock file committed for reproducible builds
 
-### Complex Extension Chains
-- 70+ extensions across 41 files
-- Many extensions could be consolidated into their primary types
+### 8. Swift Best Practices Violations
 
-## 5. Other Observations
+#### a) Force Unwrapping/Fatal Errors
+- `fatalError` in NIP60Wallet init if no signer
+- Potential force unwraps in event processing
 
-### Large Files Requiring Attention:
-1. **NDKSQLiteCache.swift** (1,000 lines) - Consider breaking into query builders and data mappers
-2. **NDKSubscriptionManager.swift** (551 lines) - Extract subscription filtering logic
-3. **NDKZapManager.swift** (572 lines) - Separate zap creation from payment processing
+#### b) Actor Isolation Issues
+- Warnings about MainActor isolation
+- Potential race conditions in wallet state management
 
-### Positive Patterns Found:
-- Good use of Swift concurrency (async/await, actors)
-- Consistent error handling patterns
-- Well-structured protocol definitions for core abstractions
+#### c) Error Handling
+- Inconsistent error propagation
+- Silent failures in some paths
+- Missing error recovery strategies
 
-## Recommendations Summary
+## Priority Recommendations
 
-1. **Immediate Fixes**:
-   - Fix test compilation errors (DONE - fixed await keywords and MockSigner)
-   - Update MockSigner implementation (DONE - added missing protocol requirements)
-   - Remove duplicate protocol definitions (PaymentRequest vs NDKPaymentRequest)
+### Immediate (P0)
+1. **Fix Build Issues**: Resolve CashuSwift integration blocking functionality
+2. **Complete Wallet Refactoring**: Finish NIP60 implementation with tests
+3. **Fix Compilation Warnings**: Address Swift 6 compatibility issues
 
-2. **Refactoring Priorities**:
-   - Break down NDK.swift into focused managers
-   - Consolidate wallet event handlers
-   - Simplify NDKRelay into separate concerns
+### Short Term (P1)
+1. **Implement Missing TODOs**: Especially relay health tracking and error handling
+2. **Update Documentation**: Reflect new architecture and remove outdated content
+3. **Add Test Coverage**: Especially for new wallet implementation
 
-3. **Simplification Opportunities**:
-   - Remove single-implementation protocols
-   - Consolidate related extensions
-   - Eliminate unnecessary wrapper types like WalletAdapterPaymentProvider
+### Medium Term (P2)
+1. **Performance Optimization**: Implement proper subscription management and batching
+2. **Architecture Cleanup**: Fix layer violations and clarify component boundaries
+3. **Dependency Management**: Move to tagged versions and publish local dependencies
 
-4. **Architecture Improvements**:
-   - Implement clear separation of concerns
-   - Reduce class/struct sizes to under 300 lines
-   - Use composition over complex inheritance/protocol chains
+### Long Term (P3)
+1. **Comprehensive Testing**: Add integration and performance tests
+2. **Documentation Overhaul**: Create up-to-date architecture and API docs
+3. **Example Modernization**: Update all examples to use best practices
 
-## Additional Findings
+## Positive Aspects
 
-### Type Naming Inconsistencies
-- Some types use NDK prefix (NDKEvent, NDKFilter) while others don't (PaymentRequest, CashuProofRequest)
-- This creates confusion about which types are part of the core NDK API
+Despite the issues, the codebase shows:
+- Modern Swift patterns (async/await, actors)
+- Good protocol-oriented design foundation
+- Comprehensive NIP support
+- Active development and maintenance
+- Clear separation of concerns in newer code
 
-### Testing Infrastructure Issues
-- Tests have duplicate MockRelay implementations causing compilation conflicts
-- Missing mock implementations for various protocols
-- Test helpers accessing private properties instead of using public APIs
+## Conclusion
+
+The NDKSwift codebase is undergoing significant improvements but is currently in a transitional state. The wallet refactoring represents a major architectural improvement but needs to be completed. With focused effort on the priority items, the codebase can achieve its potential as a robust, modern Nostr development kit for Apple platforms.

@@ -160,13 +160,10 @@ public final class NDKPrivateKeySigner: NDKSigner {
     }
     
     public static func deserialize(_ data: Data, ndk: NDK?) throws -> NDKPrivateKeySigner {
-        let (type, payload) = try NDKSignerSerialization.extractPayload(from: data)
+        // The registry already extracted the payload, so we just need to decode it directly
+        let payload = try JSONDecoder().decode([String: String].self, from: data)
         
-        guard type == signerType else {
-            throw NDKSignerRegistryError.deserializationError("Expected \(signerType), got \(type)")
-        }
-        
-        guard let privateKey = payload["privateKey"] as? String else {
+        guard let privateKey = payload["privateKey"] else {
             throw NDKSignerRegistryError.deserializationError("Missing or invalid privateKey")
         }
         

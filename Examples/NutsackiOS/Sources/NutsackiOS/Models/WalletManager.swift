@@ -7,10 +7,11 @@ import Observation
 @MainActor
 @Observable
 class WalletManager {
-    var activeWallet: NDKCashuWallet?
+    var activeWallet: NIP60Wallet?
     var isLoading = false
     var error: Error?
     var transactions: [Transaction] = []
+    var availableMints: [String] = []
     
     private let nostrManager: NostrManager
     private let modelContext: ModelContext
@@ -19,8 +20,9 @@ class WalletManager {
     // Subscription for history events
     private var historySubscription: NDKSubscription?
     
-    // Task for periodic proof state checking
-    private var proofStateCheckTask: Task<Void, Never>?
+    // Task for monitoring wallet events
+    private var walletEventTask: Task<Void, Never>?
+    
     
     init(nostrManager: NostrManager, modelContext: ModelContext) {
         self.nostrManager = nostrManager
@@ -44,25 +46,45 @@ class WalletManager {
             throw WalletError.ndkNotInitialized
         }
         
-        // Create NDKCashuWallet instance with mint cache if available
-        let ndkWallet = NDKCashuWallet(ndk: ndk, mintCache: nostrManager.cache)
+        // Wait for signer to be available before creating wallet
+        guard ndk.signer != nil else {
+            throw WalletError.signerNotAvailable
+        }
         
-        // Try to load existing wallet
-        do {
-            try await ndkWallet.load()
-            // Wallet exists, we're done
-            self.activeWallet = ndkWallet
-            return
-        } catch {
-            // No wallet exists, create one with default mint
-            let defaultMintURL = URL(string: "https://testnut.cashu.space")!
-            try await ndkWallet.addMint(url: defaultMintURL)
+        // Create NIP60Wallet instance with mint cache if available
+        let ndkWallet = NIP60Wallet(ndk: ndk, cache: nostrManager.cache)
+        
+        // Set as active wallet
+        self.activeWallet = ndkWallet
+        
+        // Start monitoring wallet events
+        startWalletEventMonitoring()
+        
+        // Load wallet - this will fetch initial config and subscribe to wallet events
+        print("WalletManager - Loading wallet...")
+        try await ndkWallet.load()
+        print("WalletManager - Wallet loading finished")
+        
+        // Check if wallet has mints configured
+        let mintURLs = await ndkWallet.mints.getMintURLs()
+        if mintURLs.isEmpty {
+            print("WalletManager - No mints configured, setting up default mint")
             
-            // Save wallet to Nostr (creates NIP-60 events)
-            try await ndkWallet.save()
+            // No wallet exists or no mints configured, create one with default mint
+            let defaultMints = ["https://testnut.cashu.space"]
+            let relays = await getRelaysForWallet()
             
-            // Set as active wallet
-            self.activeWallet = ndkWallet
+            // Setup wallet with default mint
+            try await ndkWallet.setup(
+                mints: defaultMints,
+                relays: relays,
+                publishMintList: true
+            )
+            print("WalletManager - Default wallet setup completed")
+        } else {
+            print("WalletManager - Wallet loaded with \(mintURLs.count) mints")
+            // Update our local state
+            self.availableMints = mintURLs
         }
     }
     
@@ -84,21 +106,39 @@ class WalletManager {
         
         // Nutzap monitoring is now handled by the unified wallet subscription in load()
         
-        // Start periodic proof state checking
-        startPeriodicProofStateCheck(for: wallet, interval: 300) // 5 minutes
-        
-        // Publish nutzap preferences if needed (in case they haven't been published)
-        Task {
-            do {
-                try await wallet.publishNutzapPreferences()
-            } catch {
-                print("Failed to publish nutzap preferences: \(error)")
-                // Non-critical error, wallet can still function
-            }
-        }
-        
         // Start monitoring transaction history
         startHistoryEventMonitoring()
+    }
+    
+    /// Start monitoring wallet configuration changes
+    private func startWalletEventMonitoring() {
+        walletEventTask?.cancel()
+        
+        walletEventTask = Task {
+            guard let wallet = activeWallet else { return }
+            
+            for await event in await wallet.events {
+                switch event.type {
+                case .configurationUpdated(let mints):
+                    print("WalletManager - Configuration updated with \(mints.count) mints")
+                    await MainActor.run {
+                        self.availableMints = mints
+                    }
+                    
+                case .mintsAdded(let addedMints):
+                    print("WalletManager - Mints added: \(addedMints)")
+                    
+                case .mintsRemoved(let removedMints):
+                    print("WalletManager - Mints removed: \(removedMints)")
+                    
+                case .balanceChanged(let newBalance):
+                    print("WalletManager - Balance changed: \(newBalance)")
+                    
+                case .nutzapReceived(let amount, let from):
+                    print("WalletManager - Nutzap received: \(amount) sats from \(from ?? "unknown")")
+                }
+            }
+        }
     }
     
     /// Start monitoring NIP-60 history events (kind 7376)
@@ -118,11 +158,11 @@ class WalletManager {
             // Create filter for history events
             let historyFilter = NDKFilter(
                 authors: [pubkey],
-                kinds: [7376]  // NIP-60 history events
+                kinds: [EventKind.cashuSpendingHistory]  // NIP-60 history events
             )
             
             // Subscribe to history events
-            historySubscription = ndk.subscribe(filters: [historyFilter])
+            historySubscription = await ndk.subscribe(filters: [historyFilter])
             
             guard let subscription = historySubscription else { return }
             
@@ -255,7 +295,7 @@ class WalletManager {
             throw WalletError.noActiveWallet
         }
         
-        return try await wallet.getBalance()
+        return try await wallet.getBalance() ?? 0
     }
     
     /// Get balance for specific mint
@@ -269,26 +309,72 @@ class WalletManager {
     
     /// Create and configure a new wallet with selected mints
     func createAndConfigureWallet(with mintURLs: [URL]) async throws {
-        guard let ndk = nostrManager.ndk else {
-            throw WalletError.ndkNotInitialized
+        guard let wallet = activeWallet else {
+            throw WalletError.noActiveWallet
         }
         
-        // Create a new wallet instance with mint cache if available
-        let ndkWallet = NDKCashuWallet(ndk: ndk, mintCache: nostrManager.cache)
+        print("WalletManager - Configuring wallet with \(mintURLs.count) mints")
         
-        // Add all selected mints
-        for mintURL in mintURLs {
-            try await ndkWallet.addMint(url: mintURL)
+        // Convert URLs to strings
+        let mintStrings = mintURLs.map { $0.absoluteString }
+        
+        // Get relays from the user's relay list or use defaults
+        let relays = await getRelaysForWallet()
+        
+        // Setup wallet with mints, relays, and publish mint list
+        print("WalletManager - Publishing wallet configuration")
+        try await wallet.setup(
+            mints: mintStrings,
+            relays: relays,
+            publishMintList: true
+        )
+        print("WalletManager - Wallet configuration published")
+        
+        // The wallet event monitoring will update availableMints when the event is processed
+        // For now, optimistically update the UI
+        self.availableMints = mintStrings
+    }
+    
+    /// Get relays for wallet configuration
+    private func getRelaysForWallet() async -> [String] {
+        print("getRelaysForWallet")
+        guard let ndk = nostrManager.ndk,
+              let signer = ndk.signer,
+              let userPubkey = try? await signer.pubkey else {
+            // Return default relays if we can't get user's relays
+            return [
+                "wss://relay.damus.io",
+                "wss://relay.nostr.band",
+                "wss://relay.primal.net",
+                "wss://relay.snort.social"
+            ]
+        }
+        print("getRelaysForWallet guard ok")
+        
+        // Try to get user's relay list
+        let user = ndk.getUser(userPubkey)
+        do {
+            // Use the method from NDKUser.swift that returns [NDKRelayInfo]
+            print("getRelaysForWallet fetchRelayList")
+            let relayInfoList: [NDKRelayInfo] = try await user.fetchRelayList()
+            let writeRelays = relayInfoList
+                .filter { $0.write }
+                .map { $0.url }
+            print("getRelaysForWallet fetchRelayList done")
+            if !writeRelays.isEmpty {
+                return writeRelays
+            }
+        } catch {
+            print("WalletManager - Failed to fetch user's relay list: \(error)")
         }
         
-        // Save wallet to Nostr (creates NIP-60 events)
-        try await ndkWallet.save()
-        
-        // Publish nutzap preferences so others can send nutzaps to this wallet
-        try await ndkWallet.publishNutzapPreferences()
-        
-        // Set as active wallet
-        self.activeWallet = ndkWallet
+        // Fallback to default relays
+        return [
+            "wss://relay.damus.io",
+            "wss://relay.nostr.band",  
+            "wss://relay.primal.net",
+            "wss://relay.snort.social"
+        ]
     }
     
     // MARK: - Mint Operations
@@ -331,16 +417,15 @@ class WalletManager {
             mintURL = fromMint
         } else {
             // Auto-select mint with sufficient balance
-            let mints = await wallet.getMints()
+            let mintURLs = await wallet.mints.getMintURLs()
+            let mints = mintURLs.compactMap { URL(string: $0) }
             var selectedMint: URL?
             
-            for (mintURLString, _) in mints {
-                if let mintURL = URL(string: mintURLString) {
-                    let balance = await wallet.getBalance(mint: mintURL)
-                    if balance >= amount {
-                        selectedMint = mintURL
-                        break
-                    }
+            for mintURL in mints {
+                let balance = await wallet.getBalance(mint: mintURL)
+                if balance >= amount {
+                    selectedMint = mintURL
+                    break
                 }
             }
             
@@ -418,12 +503,7 @@ class WalletManager {
         
         // Process proofs from each mint
         for (mintURL, proofs) in token.proofsByMint {
-            // Ensure we have this mint
-            if let url = URL(string: mintURL) {
-                try await wallet.addMint(url: url)
-            }
-            
-            // Receive the proofs
+            // Receive the proofs - wallet can handle proofs from any mint
             try await wallet.receive(proofs: proofs)
             
             // Calculate total
@@ -468,11 +548,10 @@ class WalletManager {
         let recipientUser = NDKUser(pubkey: recipient)
         
         // Create nutzap request
-        let request = NDKNutzapRequest(
-            recipient: recipientUser,
-            amount: amount,
-            mints: acceptedMints,
+        let request = NutzapPaymentRequest(
+            amountSats: amount,
             recipientPubkey: recipient,
+            acceptedMints: acceptedMints,
             comment: comment
         )
         
@@ -486,35 +565,85 @@ class WalletManager {
     
     /// Add a new mint
     func addMint(url: URL) async throws {
-        guard let wallet = activeWallet else {
+        guard let wallet = activeWallet,
+              let ndk = nostrManager.ndk,
+              let signer = ndk.signer else {
             throw WalletError.noActiveWallet
         }
         
-        try await wallet.addMint(url: url)
+        print("WalletManager - Adding mint: \(url)")
         
-        // Note: SwiftData model should be updated by the view that calls this
+        // Get current mints and add the new one
+        let mintURLs = await wallet.mints.getMintURLs()
+        let currentMints = mintURLs.compactMap { URL(string: $0) }
+        var mintStrings = currentMints.map { $0.absoluteString }
+        mintStrings.append(url.absoluteString)
+        
+        // Get P2PK private key
+        let p2pkPrivateKey = try await wallet.getP2PKPrivateKey()
+        
+        // Get relays
+        let relays = await getRelaysForWallet()
+        
+        // Publish updated wallet configuration
+        try await NDKCashuWalletEvent.createAndPublish(
+            ndk: ndk,
+            mints: mintStrings,
+            relays: relays,
+            p2pkPrivateKey: p2pkPrivateKey,
+            signer: signer
+        )
+        
+        print("WalletManager - Published updated wallet configuration with new mint: \(url)")
+        
+        // The wallet will update itself when it receives the event
     }
     
     /// Remove a mint
     func removeMint(url: URL) async throws {
-        guard let wallet = activeWallet else {
+        guard let wallet = activeWallet,
+              let ndk = nostrManager.ndk,
+              let signer = ndk.signer else {
             throw WalletError.noActiveWallet
         }
         
-        try await wallet.removeMint(url: url)
+        print("WalletManager - Removing mint: \(url)")
         
-        // Note: SwiftData model should be updated by the view that calls this
+        // Get current mints and remove the specified one
+        let mintURLs = await wallet.mints.getMintURLs()
+        let currentMints = mintURLs.compactMap { URL(string: $0) }
+        let mintStrings = currentMints
+            .filter { $0 != url }
+            .map { $0.absoluteString }
+        
+        // Get P2PK private key
+        let p2pkPrivateKey = try await wallet.getP2PKPrivateKey()
+        
+        // Get relays
+        let relays = await getRelaysForWallet()
+        
+        // Publish updated wallet configuration
+        try await NDKCashuWalletEvent.createAndPublish(
+            ndk: ndk,
+            mints: mintStrings,
+            relays: relays,
+            p2pkPrivateKey: p2pkPrivateKey,
+            signer: signer
+        )
+        
+        print("WalletManager - Published updated wallet configuration without mint: \(url)")
+        
+        // The wallet will update itself when it receives the event
     }
     
     /// Discover mints via NIP-60
-    func discoverMints() async throws -> [MintDiscovery.DiscoveredMint] {
+    func discoverMints() async throws -> [MintDiscovery] {
         guard let wallet = activeWallet else {
             throw WalletError.noActiveWallet
         }
         
-        // Mint discovery should be handled at the application layer
-        let mintDiscovery = MintDiscovery(ndk: ndk)
-        return try await mintDiscovery.discoverMints()
+        // TODO: Implement mint discovery
+        return []
     }
     
     // MARK: - Cross-mint Operations
@@ -546,11 +675,14 @@ class WalletManager {
             throw WalletError.noActiveWallet
         }
         
-        return try await wallet.estimateCrossMintTransferFees(
-            amount: amount,
-            fromMint: fromMint,
-            toMint: toMint
-        )
+        // Estimate fees for cross-mint transfer
+        // Lightning fee is typically 0.5% + 1 sat
+        let lightningFee = max(1, Int64(Double(amount) * 0.005) + 1)
+        // Input fee is typically 0.2%
+        let inputFee = max(1, Int64(Double(amount) * 0.002))
+        let totalFee = lightningFee + inputFee
+        
+        return (lightningFee: lightningFee, inputFee: inputFee, totalFee: totalFee)
     }
     
     // MARK: - State Management
@@ -564,14 +696,6 @@ class WalletManager {
         try await wallet.checkAndReconcileProofStates()
     }
     
-    /// Publish nutzap preferences
-    func publishNutzapPreferences() async throws {
-        guard let wallet = activeWallet else {
-            throw WalletError.noActiveWallet
-        }
-        
-        try await wallet.publishNutzapPreferences()
-    }
     
     /// Get wallet's P2PK pubkey
     func getP2PKPubkey() async throws -> String {
@@ -581,6 +705,19 @@ class WalletManager {
         
         return try await wallet.getP2PKPubkey()
     }
+    
+    // MARK: - Mint Management
+    
+    /// Get mints info as MintInfo array
+    func getMintsInfo() async -> [MintInfo] {
+        // Use the availableMints property which is updated via event monitoring
+        let mintURLs = availableMints.compactMap { URL(string: $0) }
+        return mintURLs.map { url in
+            MintInfo(url: url)
+        }
+    }
+    
+    // MARK: - Private Methods
 }
 
 // MARK: - Errors
@@ -592,6 +729,7 @@ enum WalletError: LocalizedError {
     case insufficientBalance
     case invalidToken
     case encodingError
+    case signerNotAvailable
     
     var errorDescription: String? {
         switch self {
@@ -607,38 +745,8 @@ enum WalletError: LocalizedError {
             return "Invalid token format"
         case .encodingError:
             return "Failed to encode data"
-        }
-    }
-    
-    // MARK: - Private Methods
-    
-    /// Start periodic proof state checking for the wallet
-    private func startPeriodicProofStateCheck(for wallet: NDKCashuWallet, interval: TimeInterval) {
-        // Cancel any existing task
-        proofStateCheckTask?.cancel()
-        
-        // Start new periodic check task
-        proofStateCheckTask = Task {
-            print("🔄 Starting periodic proof state checking every \(interval) seconds")
-            
-            while !Task.isCancelled {
-                do {
-                    try await Task.sleep(nanoseconds: UInt64(interval * 1_000_000_000))
-                    
-                    if !Task.isCancelled {
-                        print("⏰ Running periodic proof state check...")
-                        try await wallet.checkAndReconcileProofStates()
-                    }
-                } catch {
-                    if error is CancellationError {
-                        print("🛑 Periodic proof state checking cancelled")
-                        break
-                    } else {
-                        print("❌ Error in periodic proof check: \(error)")
-                        // Continue checking even if there's an error
-                    }
-                }
-            }
+        case .signerNotAvailable:
+            return "Signer not available yet"
         }
     }
 }

@@ -39,8 +39,13 @@ struct NutzapView: View {
                         #if os(iOS)
                         Button(action: { showQRScanner = true }) {
                             Image(systemName: "qrcode.viewfinder")
-                                .foregroundColor(.orange)
+                                .font(.title2)
+                                .foregroundColor(.white)
+                                .frame(width: 44, height: 44)
+                                .background(Color.orange)
+                                .cornerRadius(10)
                         }
+                        .buttonStyle(.plain)
                         #endif
                     }
                     
@@ -190,7 +195,7 @@ struct NutzapView: View {
                 // Try as NIP-05
                 else if recipientInput.contains("@") {
                     let user = try await NDKUser.fromNip05(recipientInput, ndk: ndk)
-                    pubkey = user.publicKey
+                    pubkey = user.pubkey
                 }
                 
                 if let pubkey = pubkey {
@@ -281,7 +286,7 @@ struct NutzapView: View {
                 limit: 1
             )
             
-            let events = try await ndk.fetchEvents(filter)
+            let events = try await ndk.fetchEvents([filter])
             guard let preferencesEvent = events.first else {
                 // If recipient has no nutzap preferences, they can't receive nutzaps
                 await MainActor.run {

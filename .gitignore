@@ -23,3 +23,6 @@ CashuSwift-fixed/
 macadamia
 Examples/NutsackiOS/.build/
 .swiftpm
+
+**/.build
+**/build

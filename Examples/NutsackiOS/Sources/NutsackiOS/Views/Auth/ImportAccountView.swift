@@ -7,8 +7,7 @@ struct ImportAccountView: View {
     @Environment(NostrManager.self) private var nostrManager
     
     @State private var nsecInput = ""
-    @State private var displayName = ""
-    @State private var isImporting = false
+    @State private var isLoggingIn = false
     @State private var showError = false
     @State private var errorMessage = ""
     @State private var showScanner = false
@@ -32,7 +31,7 @@ struct ImportAccountView: View {
                             }
                         }
                         
-                        Text("Enter your private key (nsec) to import your account")
+                        Text("Enter your private key (nsec) to log in to your account")
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }
@@ -43,28 +42,19 @@ struct ImportAccountView: View {
                 }
                 
                 Section {
-                    TextField("Display Name", text: $displayName)
-                        .textContentType(.name)
-                } header: {
-                    Text("Account Name")
-                } footer: {
-                    Text("You can change this later")
-                }
-                
-                Section {
-                    Button(action: importAccount) {
-                        if isImporting {
+                    Button(action: loginWithAccount) {
+                        if isLoggingIn {
                             ProgressView()
                                 .frame(maxWidth: .infinity)
                         } else {
-                            Text("Import Account")
+                            Text("Log In")
                                 .frame(maxWidth: .infinity)
                         }
                     }
-                    .disabled(nsecInput.isEmpty || displayName.isEmpty || isImporting)
+                    .disabled(nsecInput.isEmpty || isLoggingIn)
                 }
             }
-            .navigationTitle("Import Account")
+            .navigationTitle("Log In")
             .platformNavigationBarTitleDisplayMode(inline: true)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
@@ -85,33 +75,51 @@ struct ImportAccountView: View {
         }
     }
     
-    private func importAccount() {
-        guard !displayName.isEmpty else {
-            errorMessage = "Please enter a display name"
-            showError = true
-            return
-        }
-        
-        isImporting = true
+    private func loginWithAccount() {
+        print("🔑 [ImportAccountView] loginWithAccount() called")
+        isLoggingIn = true
         
         Task {
             do {
-                // Create account using NDKAuth system
+                print("🔑 [ImportAccountView] Logging in with nsec...")
+                // Create signer to get pubkey and fetch profile
+                let signer = try NDKPrivateKeySigner(nsec: nsecInput)
+                let pubkey = try await signer.pubkey
+                
+                // Fetch the user's profile (kind 0) to get their display name
+                print("🔑 [ImportAccountView] Fetching profile for pubkey: \(pubkey)")
+                let profile = try await nostrManager.ndk?.fetchProfile(for: pubkey)
+                
+                // Use the profile name if available, otherwise use a default
+                let displayName = profile?.name ?? profile?.displayName ?? "Nostr User"
+                print("🔑 [ImportAccountView] Using display name: \(displayName)")
+                
+                // Create session using NDKAuth system
+                print("🔑 [ImportAccountView] Creating session...")
                 let session = try await nostrManager.createAccountFromNsec(
                     nsecInput,
                     displayName: displayName
                 )
+                print("🔑 [ImportAccountView] Session created successfully: \(session.id)")
                 
                 await MainActor.run {
-                    // Account created successfully, dismiss
-                    dismiss()
-                    isImporting = false
+                    print("🔑 [ImportAccountView] Login successful, waiting for auth state to stabilize...")
+                    isLoggingIn = false
+                    // Ensure the auth state is fully propagated before dismissing
+                    // This prevents the "Welcome Back" screen from briefly appearing
+                    Task {
+                        // Wait a moment for the auth state to stabilize
+                        try? await Task.sleep(nanoseconds: 100_000_000) // 0.1 seconds
+                        print("🔑 [ImportAccountView] Dismissing view")
+                        dismiss()
+                    }
                 }
             } catch {
+                print("🔑 [ImportAccountView] Login error: \(error)")
                 await MainActor.run {
                     errorMessage = error.localizedDescription
                     showError = true
-                    isImporting = false
+                    isLoggingIn = false
                 }
             }
         }

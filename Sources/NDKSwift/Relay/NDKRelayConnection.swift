@@ -66,16 +66,16 @@ public actor NDKRelayConnection {
     
     /// Connect to the relay (async version that properly waits)
     public func connect() async throws {
-        print("[NDKRelayConnection] connect() async called for \(url)")
+        NDKLogger.shared.log(.debug, category: .relay, "connect() async called for \(url)")
         
         guard !isConnected else {
-            print("[NDKRelayConnection] Already connected to \(url)")
+            NDKLogger.shared.log(.debug, category: .relay, "Already connected to \(url)")
             return
         }
         
         // If there's already a connection attempt in progress, wait for it
         if connectionContinuation != nil {
-            print("[NDKRelayConnection] Connection already in progress for \(url)")
+            NDKLogger.shared.log(.debug, category: .relay, "Connection already in progress for \(url)")
             try await withCheckedThrowingContinuation { continuation in
                 self.connectionContinuation = continuation
             }
@@ -90,7 +90,7 @@ public actor NDKRelayConnection {
                     await self._connect()
                 }
             }
-            print("[NDKRelayConnection] connect() async completed for \(url)")
+            NDKLogger.shared.log(.debug, category: .relay, "connect() async completed for \(url)")
         } catch {
             // For initial connection failures, don't auto-retry (as per Gemini's suggestion)
             if isInitialConnection {
@@ -118,7 +118,7 @@ public actor NDKRelayConnection {
                 return
             }
             
-            print("[NDKRelayConnection] Connecting to \(url)")
+            NDKLogger.shared.log(.info, category: .relay, "Connecting to \(url)")
             
             // Create WebSocket request
             var request = URLRequest(url: url)
@@ -128,7 +128,7 @@ public actor NDKRelayConnection {
             webSocketTask = Self.sharedURLSession.webSocketTask(with: request)
             webSocketTask?.resume()
             
-            print("[NDKRelayConnection] WebSocket task created and resumed")
+            NDKLogger.shared.log(.debug, category: .relay, "WebSocket task created and resumed")
             
             // Start receiving messages
             Task {
@@ -139,7 +139,7 @@ public actor NDKRelayConnection {
             await sendPing()
         #else
             // Mock connection for Linux
-            print("Mock WebSocket connection to \(url) (Linux doesn't support WebSockets)")
+            NDKLogger.shared.log(.info, category: .relay, "Mock WebSocket connection to \(url) (Linux doesn't support WebSockets)")
             isConnected = true
             connectedAt = Date()
             connectionContinuation?.resume()
@@ -185,7 +185,7 @@ public actor NDKRelayConnection {
         }
         
         let eventId = event.id
-        print("[NDKRelayConnection] publishEvent called for event \(eventId)")
+        NDKLogger.shared.log(.debug, category: .relay, "publishEvent called for event \(eventId)")
         
         // Create a continuation holder that we can access from the actor context
         return try await withThrowingTaskGroup(of: Bool.self) { group in
@@ -207,7 +207,7 @@ public actor NDKRelayConnection {
                 // Send the event
                 let eventMessage = NostrMessage.event(subscriptionId: nil, event: event)
                 try await self.send(eventMessage)
-                print("[NDKRelayConnection] Event sent, waiting for OK response...")
+                NDKLogger.shared.log(.debug, category: .relay, "Event sent, waiting for OK response...")
                 
                 // Wait for timeout
                 try await Task.sleep(nanoseconds: UInt64(timeout * 1_000_000_000))
@@ -231,7 +231,7 @@ public actor NDKRelayConnection {
     /// Store a pending continuation (actor-isolated)
     private func storePendingContinuation(eventId: EventID, continuation: CheckedContinuation<Bool, Error>) {
         pendingEvents[eventId] = continuation
-        print("[NDKRelayConnection] Stored continuation for event \(eventId)")
+        NDKLogger.shared.log(.trace, category: .relay, "Stored continuation for event \(eventId)")
     }
     
     /// Handle timeout for a pending event (actor-isolated)
@@ -247,9 +247,9 @@ public actor NDKRelayConnection {
             throw NDKError.connectionFailed(relay: url.absoluteString, message: "Not connected")
         }
         
-        // Always log WebSocket messages
-        print("\n📤 SENDING TO \(url):")
-        print("   RAW: \(json)")
+        // Log network traffic
+        let parsed = try? NostrMessage.parse(from: json)
+        NDKLogger.shared.logNetworkSend(to: url, message: json, parsed: parsed)
         
         #if os(iOS) || os(macOS) || os(watchOS) || os(tvOS)
             guard let task = webSocketTask else {
@@ -260,7 +260,7 @@ public actor NDKRelayConnection {
             try await task.send(message)
         #else
             // Mock sending for Linux
-            print("Mock send to \(url): \(json)")
+            NDKLogger.shared.log(.debug, category: .relay, "Mock send to \(url): \(json)")
         #endif
         
         messagesSent += 1
@@ -294,18 +294,15 @@ public actor NDKRelayConnection {
     #endif
     
     private func handleReceivedMessage(_ json: String) async {
-        // Always log incoming WebSocket messages
-        print("\n📥 RECEIVED FROM \(url):")
-        print("   RAW: \(json)")
-        
         do {
             let message = try NostrMessage.parse(from: json)
             
+            // Log received message
+            NDKLogger.shared.logNetworkReceive(from: url, message: json, parsed: message)
+            
             // Handle OK messages for pending events
             if case let .ok(eventId, accepted, errorMessage) = message {
-                print("[NDKRelayConnection] Got OK for event \(eventId): accepted=\(accepted)")
                 if let continuation = pendingEvents.removeValue(forKey: eventId) {
-                    print("[NDKRelayConnection] Found pending continuation for event \(eventId)")
                     if accepted {
                         continuation.resume(returning: true)
                     } else {
@@ -315,8 +312,6 @@ public actor NDKRelayConnection {
                         )
                         continuation.resume(throwing: error)
                     }
-                } else {
-                    print("[NDKRelayConnection] No pending continuation for event \(eventId)")
                 }
             }
             
@@ -324,9 +319,8 @@ public actor NDKRelayConnection {
                 delegate.relayConnection(self, didReceiveMessage: message)
             }
         } catch {
-            // Log parsing error but continue
-            print("❌ Failed to parse message from \(url): \(error)")
-            print("   Raw JSON: \(json)")
+            // Log parsing error
+            NDKLogger.shared.logNetworkParseError(from: url, message: json, error: error)
         }
     }
     
@@ -349,11 +343,11 @@ public actor NDKRelayConnection {
                     }
                     
                     if let error = error {
-                        print("[NDKRelayConnection] Ping failed for \(self.url): \(error)")
+                        NDKLogger.shared.log(.error, category: .relay, "Ping failed for \(self.url): \(error)")
                         await self.resumeContinuationWithError(error)
                         await self.handleConnectionError(error)
                     } else {
-                        print("[NDKRelayConnection] Ping successful for \(self.url)")
+                        NDKLogger.shared.log(.debug, category: .relay, "Ping successful for \(self.url)")
                         await self.markAsConnected()
                     }
                     continuation.resume()
@@ -374,7 +368,7 @@ public actor NDKRelayConnection {
         connectedAt = Date()
         retryPolicy.reset()
         
-        print("[NDKRelayConnection] Marked as connected: \(url)")
+        NDKLogger.shared.log(.info, category: .relay, "Marked as connected: \(url)")
         
         // Resume the connection continuation if waiting
         connectionContinuation?.resume()

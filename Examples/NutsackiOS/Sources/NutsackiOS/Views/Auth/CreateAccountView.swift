@@ -13,7 +13,6 @@ struct CreateAccountView: View {
     @State private var errorMessage = ""
     @State private var createdSession: NDKSession?
     @State private var showBackupView = false
-    @State private var accountCreated = false
     
     var body: some View {
         NavigationStack {
@@ -55,21 +54,26 @@ struct CreateAccountView: View {
             } message: {
                 Text(errorMessage)
             }
-            .navigationDestination(isPresented: $showBackupView) {
+            .fullScreenCover(isPresented: $showBackupView) {
                 if let session = createdSession {
-                    BackupKeyView(session: session, accountCreated: $accountCreated)
-                }
-            }
-            .onChange(of: accountCreated) { _, created in
-                if created && !showBackupView {
-                    // Account was created and backup view was dismissed
-                    dismiss()
+                    NavigationStack {
+                        BackupKeyView(session: session, onComplete: {
+                            // Dismiss both the backup view and this create account view
+                            showBackupView = false
+                            dismiss()
+                        })
+                    }
                 }
             }
         }
     }
     
     private func createAccount() {
+        
+        guard !displayName.isEmpty else {
+            return
+        }
+        
         isCreating = true
         
         Task {
@@ -85,11 +89,17 @@ struct CreateAccountView: View {
                     createdSession = session
                     showBackupView = true
                     isCreating = false
-                    accountCreated = true
+                    // Don't set accountCreated here - let BackupKeyView handle it
                 }
             } catch {
+                
                 await MainActor.run {
-                    errorMessage = error.localizedDescription
+                    // Add more context to error message
+                    if let nostrError = error as? NostrError {
+                        errorMessage = "Nostr Error: \(nostrError)"
+                    } else {
+                        errorMessage = "Failed to create account: \(error.localizedDescription)"
+                    }
                     showError = true
                     isCreating = false
                 }
@@ -103,7 +113,7 @@ struct BackupKeyView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(NostrManager.self) private var nostrManager
     let session: NDKSession
-    @Binding var accountCreated: Bool
+    var onComplete: (() -> Void)? = nil
     
     @State private var copiedPrivateKey = false
     @State private var savedKey = false
@@ -226,8 +236,20 @@ struct BackupKeyView: View {
     }
     
     private func continueToWallet() {
-        // Dismiss the backup view
-        dismiss()
+        // Since the user is now authenticated via NDKAuthManager,
+        // ensure state is stable before dismissing to prevent "Welcome Back" screen
+        Task {
+            // Brief delay to ensure auth state propagation
+            try? await Task.sleep(nanoseconds: 100_000_000) // 0.1 seconds
+            
+            await MainActor.run {
+                if let onComplete = onComplete {
+                    onComplete()
+                } else {
+                    dismiss()
+                }
+            }
+        }
     }
 }
 

@@ -211,6 +211,11 @@ public actor NDKSignatureVerificationSampler {
         }
     }
     
+    /// Check if a relay is blacklisted
+    public func isRelayBlacklisted(_ relayUrl: String) -> Bool {
+        return blacklistedRelays.contains(relayUrl)
+    }
+    
     /// Calculate the event ID according to NIP-01
     private func calculateEventID(
         pubkey: String,

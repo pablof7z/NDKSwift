@@ -270,7 +270,7 @@ public extension NDK {
     /// Fetch the relay list for a specific user
     func fetchRelayList(for user: NDKUser) async throws -> NDKRelayList? {
         let filter = NDKFilter(authors: [user.pubkey], kinds: [10002], limit: 1)
-        let events = try await fetchEvents(filters: [filter])
+        let events = try await fetchEvents([filter])
 
         guard let event = events.first else { return nil }
         return await NDKRelayList.fromEvent(event)

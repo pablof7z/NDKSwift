@@ -434,12 +434,12 @@ struct RelayRepairSheet: View {
 
 #Preview {
     // Create mock objects for preview
-    let nostrManager = NostrManager()
+    let nostrManager = NostrManager(from: "Health")
     let schema = Schema([Transaction.self])
     let modelConfiguration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: true)
     let container = try! ModelContainer(for: schema, configurations: [modelConfiguration])
     let context = container.mainContext
     
     RelayHealthView()
-        .environmentObject(WalletManager(nostrManager: nostrManager, modelContext: context))
+        .environment(WalletManager(nostrManager: nostrManager, modelContext: context))
 }

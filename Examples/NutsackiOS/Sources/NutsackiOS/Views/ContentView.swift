@@ -28,7 +28,7 @@ struct ContentView: View {
         ZStack {
             Color.black.ignoresSafeArea()
             
-            NDKAuthView(authManager: nostrManager.authManager) {
+            NDKAuthView(authManager: nostrManager.authManager, ndk: nostrManager.ndk) {
                 // Main app interface - shown when authenticated
                 TabView(selection: $selectedTab) {
                     WalletView(urlState: $urlState)
@@ -46,30 +46,12 @@ struct ContentView: View {
                     // Scanner "tab" - doesn't show content, just triggers action
                     Color.clear
                         .tabItem {
-                            VStack {
-                                ZStack {
-                                    Circle()
-                                        .fill(
-                                            LinearGradient(
-                                                gradient: Gradient(colors: [Color.orange, Color.orange.opacity(0.8)]),
-                                                startPoint: .topLeading,
-                                                endPoint: .bottomTrailing
-                                            )
-                                        )
-                                        .frame(width: 50, height: 50)
-                                        .shadow(color: .orange.opacity(0.4), radius: 8, x: 0, y: 4)
-                                    
-                                    Image(systemName: "qrcode.viewfinder")
-                                        .font(.system(size: 24, weight: .medium))
-                                        .foregroundColor(.white)
-                                }
-                                .scaleEffect(1.3) // Make it more prominent
-                                .offset(y: -8) // Lift it up more
-                                
+                            Label {
                                 Text("Scan")
-                                    .font(.caption2)
-                                    .foregroundColor(.orange)
-                                    .fontWeight(.medium)
+                                    .fontWeight(.bold)
+                            } icon: {
+                                Image(systemName: selectedTab == .scanner ? "qrcode.viewfinder" : "viewfinder.circle.fill")
+                                    .symbolRenderingMode(.hierarchical)
                             }
                         }
                         .tag(Tab.scanner)
@@ -154,10 +136,12 @@ struct URLState: Equatable {
 
 // MARK: - Authentication View
 struct AuthenticationView: View {
-    @EnvironmentObject private var nostrManager: NostrManager
+    @Environment(NostrManager.self) private var nostrManager
     
     @State private var showCreateAccount = false
     @State private var showImportAccount = false
+    @State private var navigationPath = NavigationPath()
+    @State private var isAuthenticating = false
     
     var body: some View {
         NavigationStack {
@@ -193,7 +177,7 @@ struct AuthenticationView: View {
                     }
                     
                     Button(action: { showImportAccount = true }) {
-                        Label("Import with nsec", systemImage: "key.fill")
+                        Label("Log In with nsec", systemImage: "key.fill")
                             .frame(maxWidth: .infinity)
                             .padding()
                             .background(Color.secondary.opacity(0.3))

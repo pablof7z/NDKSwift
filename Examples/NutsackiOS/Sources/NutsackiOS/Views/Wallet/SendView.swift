@@ -22,7 +22,7 @@ struct SendView: View {
     @State private var showTokenView = false
     
     @State private var availableBalance: Int = 0
-    @State private var mints: [NDKCashuWallet.MintInfo] = []
+    @State private var mints: [MintInfo] = []
     
     var availableBalanceForMint: Int {
         return availableBalance
@@ -164,12 +164,10 @@ struct SendView: View {
     
     private func loadMints() {
         Task {
-            if let wallet = walletManager.activeWallet {
-                let loadedMints = await wallet.getMintsInfo()
-                await MainActor.run {
-                    mints = loadedMints
-                    selectedMintURL = mints.first?.url
-                }
+            let loadedMints = await walletManager.getMintsInfo()
+            await MainActor.run {
+                mints = loadedMints
+                selectedMintURL = mints.first?.url
             }
         }
     }

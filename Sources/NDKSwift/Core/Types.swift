@@ -61,10 +61,12 @@ public enum EventKind {
     public static let zapRequest = 9734
     public static let zap = 9735
     public static let zapReceipt = 9735  // Alias for clarity
-    public static let cashuWallet = 7375
-    public static let cashuToken = 7376
+    public static let cashuQuote = 7374
+    public static let cashuToken = 7375  // Token event (NIP-60)
+    public static let cashuSpendingHistory = 7376  // Spending history (NIP-60)
     public static let nutzap = 9321
     public static let nutzapRedemption = 7376
+    public static let cashuWalletConfig = 17375  // Wallet configuration (NIP-60)
     public static let muteList = 10000
     public static let pinList = 10001
     public static let relayList = 10002

@@ -5,7 +5,7 @@ import NDKSwift
 @main
 struct NutsackApp: App {
     @StateObject private var appState = AppState()
-    @State private var nostrManager = NostrManager()
+    @State private var nostrManager: NostrManager
     @State private var walletManager: WalletManager
     
     // Create a simple in-memory container
@@ -27,7 +27,7 @@ struct NutsackApp: App {
     }()
     
     init() {
-        let nm = NostrManager()
+        let nm = NostrManager(from: "App")
         let wm = WalletManager(
             nostrManager: nm,
             modelContext: modelContainer.mainContext

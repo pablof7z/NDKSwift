@@ -14,6 +14,7 @@ Welcome to the NDKSwift documentation. This directory contains comprehensive gui
 - [Nostr Protocol Guide](NOSTR_PROTOCOL_GUIDE.md) - Comprehensive guide to the Nostr protocol
 
 ### Feature Guides
+- [Authentication Guide](AUTHENTICATION.md) - Complete guide to authentication, sessions, and multi-account support
 - [NIP-44 Encryption Guide](NIP44_ENCRYPTION_GUIDE.md) - End-to-end encryption implementation
 - [Signature Verification Sampling](SIGNATURE_VERIFICATION_SAMPLING.md) - Performance optimization for signature verification
 

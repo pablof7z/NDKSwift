@@ -1,8 +1,19 @@
 import Foundation
 
+/// Connection status for NWC wallets
+public enum NWCConnectionStatus: Equatable {
+    case disconnected
+    case connecting
+    case connected
+    case error(String)
+}
+
 /// Concrete implementation of Nostr Wallet Connect (NWC) wallet
-public actor NDKNWCWallet: NDKNWCWalletProtocol {
+public actor NDKNWCWallet: NDKPaymentProvider {
     // MARK: - Properties
+    
+    public let id = "nwc_wallet"
+    public let displayName = "Nostr Wallet Connect"
     
     public let ndk: NDK
     nonisolated public let connectionURI: NWCConnectionURI
@@ -247,15 +258,81 @@ public actor NDKNWCWallet: NDKNWCWalletProtocol {
         return response
     }
     
-    /// Implementation of NDKWallet.getBalance() -> Int64
+    
+    // MARK: - NDKPaymentProvider Protocol
+    
+    /// Check if NWC wallet is available
+    public func isAvailable() async -> Bool {
+        do {
+            _ = try await getInfo()
+            return true
+        } catch {
+            return false
+        }
+    }
+    
+    /// Check if NWC wallet can fulfill a payment request
+    public func canFulfill(_ request: PaymentRequest) async -> Bool {
+        // NWC is a Lightning wallet - it can only pay Lightning invoices directly
+        guard request is LightningInvoiceRequest else {
+            return false
+        }
+        
+        // Check if available
+        guard await isAvailable() else {
+            return false
+        }
+        
+        // Check balance if we can
+        if let balance = try? await getBalance() {
+            return balance >= request.amountSats
+        }
+        
+        // If we can't check balance, assume we can pay
+        return true
+    }
+    
+    /// Fulfill a payment request using NWC
+    public func fulfill(_ request: PaymentRequest) async throws -> PaymentConfirmation {
+        // NWC only handles Lightning invoices
+        guard let lightningRequest = request as? LightningInvoiceRequest else {
+            throw PaymentError.cannotFulfillRequest
+        }
+        
+        // Check balance if needed
+        if let balance = try? await getBalance(),
+           balance < lightningRequest.amountSats {
+            throw PaymentError.insufficientBalance(
+                available: balance,
+                required: lightningRequest.amountSats
+            )
+        }
+        
+        // Pay the invoice using NWC
+        let response = try await payInvoice(
+            lightningRequest.invoice,
+            amount: nil // Amount is in the invoice
+        )
+        
+        // Convert NWC response to our confirmation type
+        return LightningPaymentConfirmation(
+            amountSats: lightningRequest.amountSats,
+            timestamp: Date(),
+            preimage: response.preimage,
+            paymentHash: nil,
+            feePaid: response.feesPaid
+        )
+    }
+    
+    /// Implementation of NDKPaymentProvider.getBalance() -> Int64?
     /// Returns balance in satoshis (converts from millisatoshis)
-    public func getBalance() async throws -> Int64 {
+    public func getBalance() async throws -> Int64? {
         let response = try await fetchBalance()
         return response.balance / 1000  // Convert msat to sats
     }
     
-    /// NWC-specific getBalance that returns full response
-    public func getBalance() async throws -> GetBalanceResponse {
+    /// NWC-specific getBalance that returns full response with millisatoshi precision
+    public func getBalanceResponse() async throws -> GetBalanceResponse {
         return try await fetchBalance()
     }
     

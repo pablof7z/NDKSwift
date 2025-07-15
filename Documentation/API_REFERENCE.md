@@ -1069,6 +1069,91 @@ public struct SubscriptionTrackingConfig {
 }
 ```
 
+## Logging and Debugging
+
+### NDKLogger
+
+Configurable logging system for debugging network traffic and NDK operations.
+
+#### Configuration
+
+```swift
+// Enable/disable network traffic logging
+NDKLogger.shared.logNetworkTraffic = true          // Default: true
+
+// Enable/disable pretty printing of messages
+NDKLogger.shared.prettyPrintNetworkMessages = true // Default: true
+
+// Set overall log level
+NDKLogger.shared.logLevel = .info                  // Default: .info
+// Options: .off, .error, .warning, .info, .debug, .trace
+
+// Enable specific log categories
+NDKLogger.shared.enabledCategories = [.network, .relay, .event]
+```
+
+#### Log Levels
+
+```swift
+public enum NDKLogLevel: Int, Comparable {
+    case off = 0      // No logging
+    case error = 1    // Only errors
+    case warning = 2  // Errors and warnings
+    case info = 3     // Informational messages (default)
+    case debug = 4    // Debug information
+    case trace = 5    // Detailed trace logging
+}
+```
+
+#### Log Categories
+
+```swift
+public enum NDKLogCategory: String {
+    case network      // Network traffic (send/receive)
+    case relay        // Relay connection events
+    case subscription // Subscription lifecycle
+    case event        // Event processing
+    case cache        // Cache operations
+    case auth         // Authentication
+    case general      // General logging
+}
+```
+
+#### Network Traffic Output
+
+When `logNetworkTraffic` is enabled, you'll see formatted output like:
+
+```
+📤 SENDING TO relay.damus.io:
+   TYPE: REQ
+   SUBSCRIPTION: sub_12345
+   FILTERS: 1
+     FILTER 1:
+       KINDS: [1]
+       AUTHORS: 2 pubkeys
+       LIMIT: 10
+   RAW: ["REQ","sub_12345",{"kinds":[1],"authors":["..."],"limit":10}]
+
+📥 RECEIVED FROM relay.damus.io:
+   TYPE: EVENT
+   SUBSCRIPTION: sub_12345
+   EVENT ID: 4a5e8f...
+   KIND: 1
+   AUTHOR: 3bf0c6...
+   CONTENT: Hello Nostr!
+   RAW: ["EVENT","sub_12345",{"id":"4a5e8f...","pubkey":"3bf0c6...","created_at":1234567890,"kind":1,"tags":[],"content":"Hello Nostr!","sig":"..."}]
+```
+
+#### Custom Logging
+
+```swift
+// Log custom messages
+NDKLogger.shared.log(.debug, category: .general, "Custom debug message")
+NDKLogger.shared.log(.error, category: .network, "Connection failed: \(error)")
+```
+
+See [NetworkLoggingDemo.swift](../Examples/NetworkLoggingDemo.swift) for a complete example.
+
 ## Best Practices
 
 1. **Always use async/await** - All network operations are asynchronous
@@ -1079,6 +1164,7 @@ public struct SubscriptionTrackingConfig {
 6. **Verify signatures when needed** - But consider performance impact
 7. **Use outbox model** - Better relay selection and routing (enabled by default)
 8. **Close subscriptions when done** - Prevents resource leaks
+9. **Configure logging appropriately** - Use `.debug` or `.trace` for development, `.error` for production
 
 ## Migration from Callbacks
 

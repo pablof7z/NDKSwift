@@ -44,157 +44,14 @@ public actor NDKSQLiteCache: NDKCache {
     private func migrateDatabase() async throws {
         var migrator = DatabaseMigrator()
         
-        // v1: Initial schema - events and profiles
-        migrator.registerMigration("v1-initial") { db in
-            // Create events table
-            try db.create(table: "events") { t in
-                t.column("id", .text).primaryKey()
-                t.column("pubkey", .text).notNull()
-                t.column("created_at", .integer).notNull()
-                t.column("kind", .integer).notNull()
-                t.column("content", .text)
-                t.column("sig", .text).notNull()
-                t.column("seen_at", .integer).defaults(sql: "(CAST(strftime('%s', 'now') AS INTEGER))")
-                t.column("json", .text).notNull()
-            }
-            
-            // Create indexes
-            try db.create(index: "idx_pubkey_kind_time", on: "events", columns: ["pubkey", "kind", "created_at"])
-            try db.create(index: "idx_kind_time", on: "events", columns: ["kind", "created_at"])
-            try db.create(index: "idx_created_at", on: "events", columns: ["created_at"])
-            
-            // Create tags table
-            try db.create(table: "tags") { t in
-                t.column("event_id", .text).notNull().references("events", onDelete: .cascade)
-                t.column("tag_name", .text).notNull()
-                t.column("tag_value", .text).notNull()
-                t.column("tag_index", .integer).notNull()
-            }
-            
-            // Create tag indexes
-            try db.create(index: "idx_tags_name_value", on: "tags", columns: ["tag_name", "tag_value"])
-            try db.create(index: "idx_tags_event", on: "tags", columns: ["event_id"])
-            
-            // Create profiles table
-            try db.create(table: "profiles") { t in
-                t.column("pubkey", .text).primaryKey()
-                t.column("name", .text)
-                t.column("about", .text)
-                t.column("picture", .text)
-                t.column("nip05", .text)
-                t.column("lud06", .text)
-                t.column("lud16", .text)
-                t.column("banner", .text)
-                t.column("website", .text)
-                t.column("updated_at", .integer)
-                t.column("json", .text).notNull()
-            }
-            
-            // Create profile indexes
-            try db.create(index: "idx_profiles_name", on: "profiles", columns: ["name"])
-            try db.create(index: "idx_profiles_nip05", on: "profiles", columns: ["nip05"])
-        }
+        // Register all migrations
+        Self.registerV1InitialMigration(&migrator)
+        Self.registerV2MintCachingMigration(&migrator)
+        Self.registerV3StructuredMintDataMigration(&migrator)
+        Self.registerV4OptimisticPublishingMigration(&migrator)
+        Self.registerV5DecryptedContentMigration(&migrator)
         
-        // v2: Add mint caching with JSON storage
-        migrator.registerMigration("v2-mint-caching-json") { db in
-            // Create mint_info table with JSON storage
-            try db.create(table: "mint_info") { t in
-                t.column("url", .text).primaryKey()
-                t.column("json", .text).notNull()
-                t.column("last_updated", .integer).notNull()
-                t.column("last_accessed", .integer).notNull()
-            }
-            
-            // Create keysets table
-            try db.create(table: "keysets") { t in
-                t.column("keyset_id", .text).primaryKey()
-                t.column("mint_url", .text).notNull().references("mint_info", column: "url", onDelete: .cascade)
-                t.column("unit", .text).notNull()
-                t.column("active", .boolean).defaults(to: true)
-                t.column("input_fee_ppk", .integer).defaults(to: 0)
-                t.column("keys_json", .text).notNull()
-                t.column("last_updated", .integer).notNull()
-                t.column("last_accessed", .integer).notNull()
-                t.column("json", .text).notNull()
-            }
-            
-            // Create indexes for keysets
-            try db.create(index: "idx_keysets_mint", on: "keysets", columns: ["mint_url"])
-            try db.create(index: "idx_keysets_unit", on: "keysets", columns: ["unit"])
-            try db.create(index: "idx_keysets_active", on: "keysets", columns: ["active"])
-        }
-        
-        // v3: Add structured mint data columns for better querying
-        migrator.registerMigration("v3-structured-mint-data") { db in
-            // Add structured columns to mint_info
-            try db.alter(table: "mint_info") { t in
-                t.add(column: "name", .text)
-                t.add(column: "pubkey", .text)
-                t.add(column: "version", .text)
-                t.add(column: "units", .text) // JSON array of supported units
-            }
-            
-            // Create index for mint name searches
-            try db.create(index: "idx_mint_info_name", on: "mint_info", columns: ["name"])
-            
-            // Migrate existing JSON data to structured columns
-            let cursor = try Row.fetchCursor(db, sql: "SELECT url, json FROM mint_info")
-            while let row = try cursor.next() {
-                if let url = row["url"] as? String,
-                   let jsonString = row["json"] as? String,
-                   let jsonData = jsonString.data(using: .utf8),
-                   let info = try? JSONDecoder().decode(NDKMintInfo.self, from: jsonData) {
-                    
-                    let unitsJson = (try? JSONEncoder().encode(info.nuts?.nut04?.methods?.map { $0.unit } ?? [])) ?? Data()
-                    let unitsString = String(data: unitsJson, encoding: .utf8)
-                    
-                    try db.execute(
-                        sql: """
-                        UPDATE mint_info 
-                        SET name = ?, pubkey = ?, version = ?, units = ?
-                        WHERE url = ?
-                        """,
-                        arguments: [info.name, info.pubkey, info.version, unitsString, url]
-                    )
-                }
-            }
-        }
-        
-        // v4: Add optimistic publishing support
-        migrator.registerMigration("v4-optimistic-publishing") { db in
-            // Create event_confirmations table to track optimistic publishing states
-            try db.create(table: "event_confirmations") { t in
-                t.column("event_id", .text).primaryKey().references("events", onDelete: .cascade)
-                t.column("state", .text).notNull() // "optimistic" or "confirmed"
-                t.column("relay_url", .text) // null for optimistic, relay URL for confirmed
-                t.column("target_relays", .text) // JSON array of target relay URLs
-                t.column("created_at", .integer).notNull().defaults(sql: "(CAST(strftime('%s', 'now') AS INTEGER))")
-                t.column("confirmed_at", .integer) // null until confirmed
-            }
-            
-            // Create indexes for efficient querying
-            try db.create(index: "idx_confirmations_state", on: "event_confirmations", columns: ["state"])
-            try db.create(index: "idx_confirmations_relay", on: "event_confirmations", columns: ["relay_url"])
-            try db.create(index: "idx_confirmations_created", on: "event_confirmations", columns: ["created_at"])
-        }
-        
-        // v5: Add decrypted content caching
-        migrator.registerMigration("v5-decrypted-content") { db in
-            // Create decrypted_content table with composite key
-            try db.create(table: "decrypted_content") { t in
-                t.column("cache_key", .text).primaryKey() // Format: "eventId:viewerPubkey"
-                t.column("event_id", .text).notNull()
-                t.column("viewer_pubkey", .text).notNull()
-                t.column("content", .text).notNull()
-                t.column("decrypted_at", .integer).notNull().defaults(sql: "(CAST(strftime('%s', 'now') AS INTEGER))")
-            }
-            
-            // Create indexes for efficient lookups and cleanup
-            try db.create(index: "idx_decrypted_content_viewer", on: "decrypted_content", columns: ["viewer_pubkey"])
-            try db.create(index: "idx_decrypted_content_time", on: "decrypted_content", columns: ["decrypted_at"])
-        }
-        
-        try await migrator.migrate(dbQueue)
+        try migrator.migrate(dbQueue)
     }
     
     // MARK: - Event Operations (NDKCache protocol)
@@ -260,7 +117,10 @@ public actor NDKSQLiteCache: NDKCache {
     }
     
     public func queryEvents(_ filter: NDKFilter) async throws -> [NDKEvent] {
+        print("[NDKSQLiteCache.queryEvents] Starting query with filter: ids=\(filter.ids?.joined(separator: ",") ?? "nil"), authors=\(filter.authors?.joined(separator: ",") ?? "nil"), kinds=\(filter.kinds?.map { String($0) }.joined(separator: ",") ?? "nil")")
+        
         return try await dbQueue.read { db in
+            print("[NDKSQLiteCache.queryEvents] Inside dbQueue.read block")
             var sql = "SELECT DISTINCT e.json FROM events e"
             var arguments = StatementArguments()
             var whereClauses: [String] = []
@@ -271,6 +131,7 @@ public actor NDKSQLiteCache: NDKCache {
             
             // IDs filter
             if let ids = filter.ids, !ids.isEmpty {
+                print("[NDKSQLiteCache.queryEvents] Adding IDs filter for \(ids.count) IDs")
                 let placeholders = ids.map { _ in "?" }.joined(separator: ", ")
                 whereClauses.append("e.id IN (\(placeholders))")
                 for id in ids {
@@ -280,6 +141,7 @@ public actor NDKSQLiteCache: NDKCache {
             
             // Authors filter
             if let authors = filter.authors, !authors.isEmpty {
+                print("[NDKSQLiteCache.queryEvents] Adding authors filter for \(authors.count) authors")
                 let placeholders = authors.map { _ in "?" }.joined(separator: ", ")
                 whereClauses.append("e.pubkey IN (\(placeholders))")
                 for author in authors {
@@ -343,13 +205,20 @@ public actor NDKSQLiteCache: NDKCache {
             }
             
             // Execute query
-            let rows = try Row.fetchAll(db, sql: sql, arguments: arguments)
+            print("[NDKSQLiteCache.queryEvents] Executing SQL: \(sql)")
             
-            return rows.compactMap { row in
+            let rows = try Row.fetchAll(db, sql: sql, arguments: arguments)
+            print("[NDKSQLiteCache.queryEvents] Query returned \(rows.count) rows")
+            
+            let events: [NDKEvent] = rows.compactMap { row in
                 guard let jsonString = row["json"] as? String,
                       let jsonData = jsonString.data(using: .utf8) else { return nil }
                 return JSONCoding.safeDecode(NDKEvent.self, from: jsonData)
             }
+            
+            print("[NDKSQLiteCache.queryEvents] Decoded \(events.count) events")
+            print("[NDKSQLiteCache.queryEvents] Exiting dbQueue.read block")
+            return events
         }
     }
     

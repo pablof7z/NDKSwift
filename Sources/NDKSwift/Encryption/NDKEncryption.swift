@@ -120,7 +120,8 @@ public extension NDKEvent {
         let viewerPubkey = try await signer.pubkey
         
         // Check cache first (if available)
-        if let cached = await ndk?.cache?.getDecryptedContent(for: id, viewerPubkey: viewerPubkey) {
+        if let cache = ndk?.cache,
+           let cached = await cache.getDecryptedContent(for: id, viewerPubkey: viewerPubkey) {
             return cached
         }
         
@@ -143,7 +144,9 @@ public extension NDKEvent {
         let decrypted = try await signer.decrypt(sender: sender, value: content, scheme: scheme)
         
         // Store in cache (if available)
-        await ndk?.cache?.storeDecryptedContent(decrypted, for: id, viewerPubkey: viewerPubkey)
+        if let cache = ndk?.cache {
+            await cache.storeDecryptedContent(decrypted, for: id, viewerPubkey: viewerPubkey)
+        }
         
         return decrypted
     }

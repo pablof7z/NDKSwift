@@ -178,12 +178,29 @@ public actor NDKProfileManager {
             throw NDKError.notConfigured("NDK instance not available")
         }
         
-        let user = ndk.getUser(pubkey)
-        let profile = try await user.fetchProfile(forceRefresh: true)
+        // Create filter for kind 0 events (user metadata)
+        let filter = NDKFilter(
+            authors: [pubkey],
+            kinds: [0],
+            limit: 1
+        )
         
-        if let profile = profile {
-            updateCache(pubkey: pubkey, profile: profile)
+        // Fetch the event
+        guard let event = try await ndk.subscriptionCoordinator.fetchEvent(filter) else {
+            return nil
         }
+        
+        // Parse the profile from event content
+        guard let profileData = event.content.data(using: .utf8),
+              let profile = try? JSONDecoder().decode(NDKUserProfile.self, from: profileData) else {
+            return nil
+        }
+        
+        // Update cache
+        updateCache(pubkey: pubkey, profile: profile)
+        
+        // Also save to persistent cache
+        try? await ndk.cache.saveProfile(profile, pubkey: pubkey)
         
         return profile
     }
@@ -207,11 +224,12 @@ public actor NDKProfileManager {
             )
             
             // Fetch events
-            let events = try await ndk.fetchEvents(filters: [filter])
+            let events = try await ndk.subscriptionCoordinator.fetchEvents([filter])
             
             // Process events
             for event in events {
-                guard let profile = JSONCoding.safeDecode(NDKUserProfile.self, from: event.content) else {
+                guard let profileData = event.content.data(using: String.Encoding.utf8),
+                      let profile = try? JSONDecoder().decode(NDKUserProfile.self, from: profileData) else {
                     continue
                 }
                 
@@ -219,9 +237,8 @@ public actor NDKProfileManager {
                 results[eventPubkey] = profile
                 updateCache(pubkey: eventPubkey, profile: profile)
                 
-                // Update the user object if available
-                let user = ndk.getUser(eventPubkey)
-                await user.updateProfile(profile)
+                // Save to persistent cache
+                try? await ndk.cache.saveProfile(profile, pubkey: eventPubkey)
             }
         }
         

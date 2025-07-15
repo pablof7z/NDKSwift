@@ -190,18 +190,17 @@ struct MintAllocationPieChart: View {
         
         guard let wallet = walletManager.activeWallet else { return }
         
-        let mints = await wallet.getMints()
+        let mintStrings = await wallet.mints.getMintURLs()
+        let mints = mintStrings.compactMap { URL(string: $0) }
         var balances: [(mint: String, balance: Int64, percentage: Double)] = []
         var totalBalance: Int64 = 0
         
         // Get balance for each mint
-        for (mintURL, _) in mints {
-            if let url = URL(string: mintURL) {
-                let balance = await wallet.getBalance(mint: url)
-                if balance > 0 {
-                    balances.append((mint: mintURL, balance: balance, percentage: 0))
-                    totalBalance += balance
-                }
+        for url in mints {
+            let balance = await wallet.getBalance(mint: url)
+            if balance > 0 {
+                balances.append((mint: url.absoluteString, balance: balance, percentage: 0))
+                totalBalance += balance
             }
         }
         

@@ -52,18 +52,17 @@ public actor NDKOutboxManager {
         // Convert URLs to NDKRelay objects
         var relayObjects: [NDKRelay] = []
         for url in relays {
-            if let relay = await ndk.relayPool.getRelay(for: url) {
+            if let relay = await ndk.pool.getRelay(for: url) {
                 relayObjects.append(relay)
             } else {
-                let newRelay = await ndk.relayPool.addRelay(url)
+                let newRelay = await ndk.pool.addRelay(url)
                 relayObjects.append(newRelay)
             }
         }
         
         // Use standard fetchEvents with selected relays
-        var options = NDKSubscriptionOptions()
-        options.relays = Set(relayObjects)
-        let events = try await ndk.fetchEvents(filter, relays: options.relays)
+        let relayUrls = Set(relayObjects.map { $0.url })
+        let events = try await ndk.fetchEvents([filter], relays: relayUrls)
         return Array(events)
     }
     

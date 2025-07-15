@@ -154,13 +154,7 @@ public actor NDKSubscriptionManager {
             await ndk.subscriptionTracker.trackSubscription(
                 subscription,
                 filter: subscription.filters.first ?? NDKFilter(),
-                relayUrls: {
-                    if let relays = await subscription.options.relays {
-                        return relays.map { $0.url }
-                    } else {
-                        return (await ndk.relays).map { $0.url }
-                    }
-                }()
+                relayUrls: []
             )
         }
 
@@ -223,7 +217,7 @@ public actor NDKSubscriptionManager {
         for (subscriptionId, subscription) in activeSubscriptions {
             var matches = false
             for filter in subscription.filters {
-                if await filter.matches(event: event) {
+                if filter.matches(event: event) {
                     matches = true
                     break
                 }
@@ -286,12 +280,8 @@ public actor NDKSubscriptionManager {
                 await subscription.handleEOSE(fromRelay: relay)
             }
 
-            Task {
-                let options = await subscription.options
-                if options.closeOnEose {
-                    removeSubscription(subscriptionId)
-                }
-            }
+            // closeOnEose is handled internally by the subscription
+            // No need to check it here
         }
     }
     
@@ -484,7 +474,8 @@ public actor NDKSubscriptionManager {
     }
 
     private func executeCacheQuery(_ plan: ExecutionPlan) async {
-        guard let ndk = ndk, let cache = ndk.cache else { return }
+        guard let ndk = ndk else { return }
+        let cache = ndk.cache
 
         for subscription in plan.subscriptions {
             var cachedEvents: [NDKEvent] = []
@@ -539,7 +530,7 @@ public actor NDKSubscriptionManager {
         // Clean closed subscriptions
         var closedSubscriptions: [(String, NDKSubscription)] = []
         for (id, subscription) in activeSubscriptions {
-            if await subscription.isClosed {
+            if subscription.isClosed {
                 closedSubscriptions.append((id, subscription))
             }
         }

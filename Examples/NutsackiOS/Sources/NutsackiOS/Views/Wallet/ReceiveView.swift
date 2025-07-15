@@ -29,6 +29,10 @@ struct ReceiveView: View {
                         Button(action: { showScanner = true }) {
                             Image(systemName: "qrcode.viewfinder")
                                 .font(.title2)
+                                .foregroundColor(.white)
+                                .frame(width: 44, height: 44)
+                                .background(Color.orange)
+                                .cornerRadius(10)
                         }
                         .buttonStyle(.plain)
                     }

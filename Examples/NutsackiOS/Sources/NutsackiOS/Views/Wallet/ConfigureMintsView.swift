@@ -51,7 +51,10 @@ struct ConfigureMintsView: View {
                 }
                 
                 Section {
-                    Button(action: configureMints) {
+                    Button(action: {
+                        print("ConfigureMintsView - Button tapped")
+                        configureMints()
+                    }) {
                         Text("Configure Mints")
                             .frame(maxWidth: .infinity)
                     }
@@ -78,22 +81,32 @@ struct ConfigureMintsView: View {
     }
     
     private func configureMints() {
+        print("ConfigureMintsView - configureMints() called")
+        
         guard selectedMints.isEmpty == false else {
             errorMessage = "Please select at least one mint"
             showError = true
             return
         }
         
+        print("ConfigureMintsView - Selected mints: \(selectedMints)")
+        
         // Convert selected mint URLs to URL objects
         let mintURLs = selectedMints.compactMap { URL(string: $0) }
+        print("ConfigureMintsView - Mint URLs: \(mintURLs)")
         
         // Create and configure the wallet immediately (non-blocking)
         Task {
             do {
+                print("ConfigureMintsView - Calling walletManager.createAndConfigureWallet")
                 try await walletManager.createAndConfigureWallet(with: mintURLs)
+                print("ConfigureMintsView - Wallet created successfully")
             } catch {
-                print("Failed to save wallet configuration: \(error)")
-                // Don't show error to user - wallet is already created locally
+                print("ConfigureMintsView - Failed to save wallet configuration: \(error)")
+                await MainActor.run {
+                    errorMessage = "Failed to create wallet: \(error.localizedDescription)"
+                    showError = true
+                }
             }
         }
         

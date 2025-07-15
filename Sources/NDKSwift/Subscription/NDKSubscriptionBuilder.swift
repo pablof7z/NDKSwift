@@ -110,7 +110,7 @@ public class NDKSubscriptionBuilder {
     // MARK: - Build and Start
     
     /// Build and optionally start the subscription
-    public func build() -> NDKSubscription {
+    public func build() async -> NDKSubscription {
         // Add the current filter if we have one
         if let filter = currentFilter {
             filters.append(filter)
@@ -121,7 +121,14 @@ public class NDKSubscriptionBuilder {
             filters.append(NDKFilter())
         }
         
-        let subscription = ndk.subscribe(filters: filters, options: options)
+        let relayUrls = options.relays?.compactMap { $0.url }
+        let relaySet = relayUrls.map { Set($0) }
+        
+        let subscription = await ndk.subscribe(
+            filters: filters,
+            relays: relaySet,
+            closeOnEose: options.closeOnEose
+        )
         
         if autoStart {
             Task {
@@ -133,8 +140,8 @@ public class NDKSubscriptionBuilder {
     }
     
     /// Build and start the subscription (alias for build when autoStart is true)
-    public func start() -> NDKSubscription {
-        return build()
+    public func start() async -> NDKSubscription {
+        return await build()
     }
 }
 
@@ -154,7 +161,14 @@ extension NDK {
         var options = NDKSubscriptionOptions()
         options.closeOnEose = true
         
-        let subscription = subscribe(filters: [filter], options: options)
+        let relayUrls = options.relays?.compactMap { $0.url }
+        let relaySet = relayUrls.map { Set($0) }
+        
+        let subscription = await subscribe(
+            filters: [filter],
+            relays: relaySet,
+            closeOnEose: options.closeOnEose
+        )
         var events: [NDKEvent] = []
         
         // Collect events asynchronously
@@ -197,7 +211,14 @@ extension NDK {
         var options = NDKSubscriptionOptions()
         options.closeOnEose = true
         
-        let subscription = subscribe(filters: filters, options: options)
+        let relayUrls = options.relays?.compactMap { $0.url }
+        let relaySet = relayUrls.map { Set($0) }
+        
+        let subscription = await subscribe(
+            filters: filters,
+            relays: relaySet,
+            closeOnEose: options.closeOnEose
+        )
         var events: [NDKEvent] = []
         
         // Collect events asynchronously
@@ -240,13 +261,15 @@ extension NDK {
     /// Create a streaming subscription for multiple filters
     public func stream(_ filters: [NDKFilter]) -> AsyncStream<NDKEvent> {
         AsyncStream { continuation in
-            let subscription = subscribe(filters: filters)
-            
             // Handle subscription updates asynchronously
-            Task { [weak subscription] in
-                guard let subscription = subscription else {
-                    continuation.finish()
-                    return
+            _ = Task {
+                let subscription = await subscribe(filters: filters)
+                
+                // Set up termination handler
+                continuation.onTermination = { _ in
+                    Task {
+                        await subscription.close()
+                    }
                 }
                 
                 // Start the subscription
@@ -259,12 +282,6 @@ extension NDK {
                     continuation.finish()
                 } catch {
                     continuation.finish()
-                }
-            }
-            
-            continuation.onTermination = { _ in
-                Task {
-                    await subscription.close()
                 }
             }
         }
@@ -285,7 +302,7 @@ extension NDK {
         let events = try await fetch(filter, timeout: 3.0)
         
         if let profileEvent = events.first,
-           let profileData = (await profileEvent.content).data(using: .utf8),
+           let profileData = profileEvent.content.data(using: .utf8),
            let profile = try? JSONCoding.decoder.decode(NDKUserProfile.self, from: profileData) {
             return profile
         }
@@ -303,9 +320,9 @@ extension NDK {
         var profiles: [PublicKey: NDKUserProfile] = [:]
         
         for event in events {
-            if let profileData = (await event.content).data(using: .utf8),
+            if let profileData = event.content.data(using: .utf8),
                let profile = try? JSONCoding.decoder.decode(NDKUserProfile.self, from: profileData) {
-                profiles[await event.pubkey] = profile
+                profiles[event.pubkey] = profile
             }
         }
         
@@ -326,23 +343,19 @@ public class NDKSubscriptionGroup {
     
     /// Add a subscription to the group
     @discardableResult
-    public func subscribe(_ filter: NDKFilter) -> NDKSubscription {
-        let subscription = ndk.subscribe(filters: [filter])
+    public func subscribe(_ filter: NDKFilter) async -> NDKSubscription {
+        let subscription = await ndk.subscribe(filters: [filter])
         subscriptions.append(subscription)
-        Task {
-            await subscription.start()
-        }
+        await subscription.start()
         return subscription
     }
     
     /// Add multiple filters as a single subscription
     @discardableResult
-    public func subscribe(filters: [NDKFilter]) -> NDKSubscription {
-        let subscription = ndk.subscribe(filters: filters)
+    public func subscribe(filters: [NDKFilter]) async -> NDKSubscription {
+        let subscription = await ndk.subscribe(filters: filters)
         subscriptions.append(subscription)
-        Task {
-            await subscription.start()
-        }
+        await subscription.start()
         return subscription
     }
     

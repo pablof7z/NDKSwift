@@ -48,13 +48,22 @@ public class NDKAuthManager {
     // MARK: - Observable State
     
     /// Currently active session
-    public private(set) var activeSession: NDKSession?
+    public private(set) var activeSession: NDKSession? {
+        didSet {
+        }
+    }
     
     /// All available sessions
-    public private(set) var availableSessions: [NDKSession] = []
+    public private(set) var availableSessions: [NDKSession] = [] {
+        didSet {
+        }
+    }
     
     /// Current authentication state
-    public private(set) var authenticationState: AuthenticationState = .unauthenticated
+    public private(set) var authenticationState: AuthenticationState = .unauthenticated {
+        didSet {
+        }
+    }
     
     /// Currently active signer (derived from active session)
     public private(set) var activeSigner: (any NDKSigner)?
@@ -189,7 +198,6 @@ public class NDKAuthManager {
                 }
                 
             } catch {
-                print("Session restoration failed: \(error)")
                 // Don't show error to user for session restoration failures
                 // Just treat it as unauthenticated
                 authenticationState = .unauthenticated
@@ -200,48 +208,68 @@ public class NDKAuthManager {
     /// Restore a specific session as the active session
     /// - Parameter session: The session to restore
     private func restoreActiveSession(_ session: NDKSession) async throws {
-        // Check if biometric authentication is required
-        if session.requiresBiometric {
-            let biometricSuccess = await authenticateWithBiometrics(reason: "Access your account")
-            if !biometricSuccess {
-                authenticationState = .biometricRequired
-                return
+        do {
+            // Check if biometric authentication is required
+            if session.requiresBiometric {
+                let biometricSuccess = await authenticateWithBiometrics(reason: "Access your account")
+                if !biometricSuccess {
+                    authenticationState = .biometricRequired
+                    return
+                }
             }
-        }
-        
-        // Load the signer data
-        let signerData = try await keychainManager.retrieveSignerData(identifier: session.id.uuidString)
-        
-        // Deserialize the signer
-        let signer = try signerRegistry.createSigner(from: signerData, ndk: ndk)
-        
-        // Update state
-        var updatedSession = session
-        updatedSession.markAsActive()
-        updatedSession.updateLastUsed()
-        
-        // Update other sessions to inactive
-        availableSessions = availableSessions.map { existingSession in
-            var updated = existingSession
-            if updated.id == session.id {
-                updated = updatedSession
-            } else {
-                updated.markAsInactive()
+            
+            // Load the signer data
+            let signerData = try await keychainManager.retrieveSignerData(identifier: session.id.uuidString)
+            
+            // Deserialize the signer
+            let signer = try signerRegistry.createSigner(from: signerData, ndk: ndk)
+            
+            // Update state
+            var updatedSession = session
+            updatedSession.markAsActive()
+            updatedSession.updateLastUsed()
+            
+            // Update other sessions to inactive
+            availableSessions = availableSessions.map { existingSession in
+                var updated = existingSession
+                if updated.id == session.id {
+                    updated = updatedSession
+                } else {
+                    updated.markAsInactive()
+                }
+                return updated
             }
-            return updated
+            
+            activeSession = updatedSession
+            activeSigner = signer
+            authenticationState = .authenticated
+            
+            // Set signer on NDK if available
+            ndk?.signer = signer
+            
+            // Save updated session metadata
+            try await saveSessionMetadata(updatedSession)
+            
+            print("Session restored for user: \(updatedSession.bestDisplayName)")
+        } catch {
+            // If we fail to restore a session due to corrupted data, clean it up
+            print("Failed to restore session \(session.id): \(error)")
+            
+            // Remove from available sessions
+            availableSessions.removeAll { $0.id == session.id }
+            
+            // Try to clean up keychain data
+            do {
+                try await keychainManager.deleteSignerData(identifier: session.id.uuidString)
+                try await keychainManager.deleteSessionMetadata(identifier: session.id.uuidString)
+                print("Cleaned up corrupted session data for \(session.id)")
+            } catch {
+                print("Failed to clean up corrupted session: \(error)")
+            }
+            
+            // Re-throw the original error
+            throw error
         }
-        
-        activeSession = updatedSession
-        activeSigner = signer
-        authenticationState = .authenticated
-        
-        // Set signer on NDK if available
-        ndk?.signer = signer
-        
-        // Save updated session metadata
-        try await saveSessionMetadata(updatedSession)
-        
-        print("Session restored for user: \(updatedSession.bestDisplayName)")
     }
     
     /// Create a new session with a signer
@@ -257,6 +285,7 @@ public class NDKAuthManager {
         requiresBiometric: Bool = false,
         isHardwareBacked: Bool = false
     ) async throws -> NDKSession {
+        
         // Get pubkey from signer
         let pubkey = try await signer.pubkey
         
@@ -289,16 +318,19 @@ public class NDKAuthManager {
         // Add to available sessions
         availableSessions.append(session)
         
-        print("Created new session for user: \(displayName)")
         return session
     }
     
     /// Switch to a different session
     /// - Parameter session: The session to switch to
     public func switchToSession(_ session: NDKSession) async throws {
+        
         guard availableSessions.contains(where: { $0.id == session.id }) else {
             throw NDKAuthError.sessionNotFound
         }
+        
+        // Set to authenticating first to prevent UI flicker
+        authenticationState = .authenticating
         
         // Clear current active state
         activeSigner = nil
@@ -328,6 +360,7 @@ public class NDKAuthManager {
     
     /// Logout from the current session
     public func logout() {
+        
         activeSession = nil
         activeSigner = nil
         authenticationState = .unauthenticated
@@ -340,7 +373,6 @@ public class NDKAuthManager {
             return updated
         }
         
-        print("User logged out")
     }
     
     // MARK: - Biometric Authentication
@@ -433,6 +465,26 @@ public enum NDKAuthError: LocalizedError {
             return "Invalid session data"
         case .sessionExpired:
             return "Session has expired"
+        }
+    }
+}
+
+// MARK: - Equatable conformance for testing
+
+extension NDKAuthError: Equatable {
+    public static func == (lhs: NDKAuthError, rhs: NDKAuthError) -> Bool {
+        switch (lhs, rhs) {
+        case (.noActiveSession, .noActiveSession),
+             (.sessionNotFound, .sessionNotFound),
+             (.biometricAuthenticationFailed, .biometricAuthenticationFailed),
+             (.invalidSession, .invalidSession),
+             (.sessionExpired, .sessionExpired):
+            return true
+        case (.signerCreationFailed(let lhsError), .signerCreationFailed(let rhsError)),
+             (.keychainError(let lhsError), .keychainError(let rhsError)):
+            return lhsError.localizedDescription == rhsError.localizedDescription
+        default:
+            return false
         }
     }
 }

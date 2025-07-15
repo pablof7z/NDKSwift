@@ -123,7 +123,7 @@ public struct NDKNutzap {
         let recipientP2PKPubkey = await recipientPreferences.p2pkPubkey
         let proofs = self.proofs
         for proof in proofs {
-            guard proof.isLockedTo(pubkey: recipientP2PKPubkey) else {
+            guard CashuHelpers.isProofLockedTo(proof: proof, pubkey: recipientP2PKPubkey) else {
                 return false
             }
         }
