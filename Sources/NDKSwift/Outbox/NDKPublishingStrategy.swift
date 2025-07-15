@@ -79,8 +79,7 @@ actor NDKPublishingStrategy {
                 overallStatus: .unknown,
                 relayStatuses: [:],
                 successCount: 0,
-                failureCount: 0,
-                powDifficulty: 0
+                failureCount: 0
             )
         }
 
@@ -89,8 +88,7 @@ actor NDKPublishingStrategy {
             overallStatus: await item.overallStatus,
             relayStatuses: await item.relayStatuses,
             successCount: await item.successCount,
-            failureCount: await item.failureCount,
-            powDifficulty: await item.currentPowDifficulty
+            failureCount: await item.failureCount
         )
     }
 
@@ -192,16 +190,6 @@ actor NDKPublishingStrategy {
                 await updateOverallStatus(for: item)
                 return
 
-            case let .requiresPow(difficulty):
-                // Handle POW requirement
-                if await handlePowRequirement(item: item, difficulty: difficulty) {
-                    // Retry with new event (POW added)
-                    attempts = 0 // Reset attempts for POW retry
-                    continue
-                } else {
-                    await item.updateRelayStatus(relayURL, status: .failed(.powGenerationFailed))
-                    return
-                }
 
             case .rateLimited:
                 await item.updateRelayStatus(relayURL, status: .rateLimited)
@@ -251,11 +239,7 @@ actor NDKPublishingStrategy {
             if response.success {
                 return .success
             } else if let message = response.message {
-                if message.contains("pow:") {
-                    // Extract difficulty
-                    let difficulty = extractPowDifficulty(from: message) ?? 20
-                    return .requiresPow(difficulty: difficulty)
-                } else if message.contains("rate") {
+                if message.contains("rate") {
                     return .rateLimited
                 } else if message.contains("auth") {
                     return .authRequired
@@ -271,26 +255,6 @@ actor NDKPublishingStrategy {
         }
     }
 
-    private func handlePowRequirement(item: OutboxItem, difficulty: Int) async -> Bool {
-        // Update required difficulty
-        let currentDifficulty = await item.currentPowDifficulty ?? 0
-        await item.setCurrentPowDifficulty(max(currentDifficulty, difficulty))
-
-        // Check if we should generate POW
-        let config = item.config
-        guard config.enablePow,
-              let maxDifficulty = config.maxPowDifficulty,
-              difficulty <= maxDifficulty
-        else {
-            return false
-        }
-
-        // POW generation is computationally expensive and not currently implemented.
-        // Relays requiring POW will be marked as failed.
-        // Future implementations could add POW support using a worker pool or
-        // delegating to native code for better performance.
-        return false
-    }
 
     private func handleAuthChallenge(relay _: NDKRelay) async -> Bool {
         // This would implement NIP-42 auth
@@ -302,12 +266,12 @@ actor NDKPublishingStrategy {
         let normalizedUrl = URLNormalizer.tryNormalizeRelayUrl(url) ?? url
         
         // First check if already connected
-        if let relay = await ndk.relayPool.getRelay(for: normalizedUrl) {
+        if let relay = await ndk.pool.getRelay(for: normalizedUrl) {
             return relay
         }
 
         // Try to connect
-        let relay = await ndk.relayPool.addRelay(normalizedUrl)
+        let relay = await ndk.pool.addRelay(normalizedUrl)
         relay.ndk = ndk
         try? await relay.connect()
         return relay
@@ -337,21 +301,6 @@ actor NDKPublishingStrategy {
         await item.setLastUpdated(Date())
     }
 
-    private func extractPowDifficulty(from message: String) -> Int? {
-        // Extract difficulty from message like "pow: difficulty 20 required"
-        let pattern = #"pow:.*?(\d+)"#
-        guard let regex = try? NSRegularExpression(pattern: pattern),
-              let match = regex.firstMatch(
-                  in: message,
-                  range: NSRange(message.startIndex..., in: message)
-              ),
-              let range = Range(match.range(at: 1), in: message)
-        else {
-            return nil
-        }
-
-        return Int(message[range])
-    }
 }
 
 // MARK: - Supporting Types
@@ -364,8 +313,6 @@ public struct OutboxPublishConfig: Sendable {
     public let initialBackoffInterval: TimeInterval
     public let backoffMultiplier: Double
     public let publishInBackground: Bool
-    public let enablePow: Bool
-    public let maxPowDifficulty: Int?
 
     public init(
         selectionConfig: PublishingConfig = .default,
@@ -373,9 +320,7 @@ public struct OutboxPublishConfig: Sendable {
         maxRetries: Int = 3,
         initialBackoffInterval: TimeInterval = 1.0,
         backoffMultiplier: Double = 2.0,
-        publishInBackground: Bool = false,
-        enablePow: Bool = true,
-        maxPowDifficulty: Int? = 24
+        publishInBackground: Bool = false
     ) {
         self.selectionConfig = selectionConfig
         self.minSuccessfulRelays = minSuccessfulRelays
@@ -383,8 +328,6 @@ public struct OutboxPublishConfig: Sendable {
         self.initialBackoffInterval = initialBackoffInterval
         self.backoffMultiplier = backoffMultiplier
         self.publishInBackground = publishInBackground
-        self.enablePow = enablePow
-        self.maxPowDifficulty = maxPowDifficulty
     }
 
     public static let `default` = OutboxPublishConfig()
@@ -400,7 +343,6 @@ actor OutboxItem {
     public var overallStatus: PublishStatus = .pending
     public var successCount: Int = 0
     public var failureCount: Int = 0
-    public var currentPowDifficulty: Int?
     public var lastUpdated: Date = .init()
 
     init(
@@ -456,9 +398,6 @@ actor OutboxItem {
         failureCount = count
     }
     
-    func setCurrentPowDifficulty(_ difficulty: Int?) {
-        currentPowDifficulty = difficulty
-    }
     
     func setLastUpdated(_ date: Date) {
         lastUpdated = date
@@ -542,7 +481,6 @@ public enum PublishFailureReason: Equatable, Codable, Sendable {
     case authFailed
     case invalid(String)
     case maxRetriesExceeded
-    case powGenerationFailed
     case custom(String)
 
     enum CodingKeys: String, CodingKey {
@@ -563,8 +501,6 @@ public enum PublishFailureReason: Equatable, Codable, Sendable {
             try container.encode(message, forKey: .message)
         case .maxRetriesExceeded:
             try container.encode("maxRetriesExceeded", forKey: .type)
-        case .powGenerationFailed:
-            try container.encode("powGenerationFailed", forKey: .type)
         case let .custom(message):
             try container.encode("custom", forKey: .type)
             try container.encode(message, forKey: .message)
@@ -585,8 +521,6 @@ public enum PublishFailureReason: Equatable, Codable, Sendable {
             self = .invalid(message)
         case "maxRetriesExceeded":
             self = .maxRetriesExceeded
-        case "powGenerationFailed":
-            self = .powGenerationFailed
         case "custom":
             let message = try container.decode(String.self, forKey: .message)
             self = .custom(message)
@@ -599,7 +533,6 @@ public enum PublishFailureReason: Equatable, Codable, Sendable {
 /// Result of a publish attempt
 private enum PublishAttemptResult {
     case success
-    case requiresPow(difficulty: Int)
     case rateLimited
     case authRequired
     case permanentFailure(reason: PublishFailureReason)
@@ -613,7 +546,6 @@ public struct PublishResult: Sendable {
     public let relayStatuses: [String: RelayPublishStatus]
     public let successCount: Int
     public let failureCount: Int
-    public let powDifficulty: Int?
 
     public var isComplete: Bool {
         overallStatus == .succeeded || overallStatus == .failed || overallStatus == .cancelled

@@ -165,6 +165,62 @@ public final class NDKEventBuilder {
         return self
     }
     
+    // MARK: - Encryption
+    
+    /// Encrypt the event content and build the event
+    /// 
+    /// This method encrypts the current content, sets it as the event content,
+    /// and then builds and signs the event. This is a convenience method that
+    /// combines encryption and building in one step.
+    /// 
+    /// - Parameters:
+    ///   - recipient: The recipient to encrypt for (optional, defaults to signer's pubkey)
+    ///   - signer: The signer to use for encryption and signing
+    ///   - scheme: The encryption scheme to use (default: .nip44)
+    /// 
+    /// - Returns: A signed, immutable NDKEvent with encrypted content
+    /// 
+    /// - Throws: Encryption errors, signing errors, or validation errors
+    /// 
+    /// ## Usage
+    /// ```swift
+    /// // Encrypt to a specific recipient
+    /// let event = try await NDKEventBuilder()
+    ///     .content("Secret message")
+    ///     .kind(EventKind.encryptedDirectMessage)
+    ///     .encrypt(recipient: recipientUser, signer: signer)
+    /// 
+    /// // Encrypt to self (signer's pubkey)
+    /// let event = try await NDKEventBuilder()
+    ///     .content("Private note")
+    ///     .kind(EventKind.cashuSpendingHistory)
+    ///     .encrypt(signer: signer)
+    /// ```
+    @discardableResult
+    public func encrypt(recipient: NDKUser? = nil, signer: NDKSigner, scheme: NDKEncryptionScheme = .nip44) async throws -> NDKEvent {
+        // Use provided recipient or create one from signer's pubkey
+        let encryptionRecipient: NDKUser
+        if let recipient = recipient {
+            encryptionRecipient = recipient
+        } else {
+            let signerPubkey = try await signer.pubkey
+            encryptionRecipient = NDKUser(pubkey: signerPubkey)
+        }
+        
+        // Encrypt the current content
+        let encryptedContent = try await signer.encrypt(
+            recipient: encryptionRecipient,
+            value: content,
+            scheme: scheme
+        )
+        
+        // Update content with encrypted value
+        self.content = encryptedContent
+        
+        // Build and return the event (don't generate content tags for encrypted content)
+        return try await build(signer: signer, generateContentTags: false)
+    }
+    
     // MARK: - Event Building
     
     /// Build and sign the event

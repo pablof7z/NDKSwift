@@ -153,7 +153,7 @@ struct SettingsView: View {
 struct AccountDetailView: View {
     let user: NDKUser
     let profile: NDKUserProfile?
-    @EnvironmentObject private var nostrManager: NostrManager
+    @Environment(NostrManager.self) private var nostrManager
     @State private var showPrivateKey = false
     @State private var copiedKey = false
     @State private var nsecKey: String?
@@ -351,7 +351,7 @@ struct AboutView: View {
 
 // MARK: - Unpublished Events Badge
 struct UnpublishedEventsBadge: View {
-    @EnvironmentObject private var nostrManager: NostrManager
+    @Environment(NostrManager.self) private var nostrManager
     @State private var unpublishedCount = 0
     @State private var timer: Timer?
     
@@ -396,7 +396,7 @@ struct UnpublishedEventsBadge: View {
 
 // MARK: - Unpublished Events View
 struct UnpublishedEventsView: View {
-    @EnvironmentObject private var nostrManager: NostrManager
+    @Environment(NostrManager.self) private var nostrManager
     @State private var unpublishedEvents: [(event: NDKEvent, targetRelays: Set<String>)] = []
     @State private var isLoading = true
     @State private var isRetrying = false

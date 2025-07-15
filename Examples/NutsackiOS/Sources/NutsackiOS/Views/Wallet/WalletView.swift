@@ -14,6 +14,9 @@ struct WalletView: View {
     @State private var showConfigureMints = false
     @State private var navigationDestination: WalletDestination?
     @State private var currentBalance: Int64 = 0
+    @State private var showScanner = false
+    @State private var scannedInvoice: String?
+    @State private var showInvoicePreview = false
     
     enum WalletDestination: Identifiable, Hashable {
         case mint
@@ -103,6 +106,16 @@ struct WalletView: View {
             .sheet(isPresented: $showConfigureMints) {
                 ConfigureMintsView()
             }
+            .sheet(isPresented: $showScanner) {
+                QRScannerView { scannedValue in
+                    handleScannedValue(scannedValue)
+                }
+            }
+            .sheet(isPresented: $showInvoicePreview) {
+                if let invoice = scannedInvoice {
+                    LightningInvoicePreviewView(invoice: invoice)
+                }
+            }
             .navigationDestination(item: $navigationDestination) { destination in
                 switch destination {
                 case .mint:
@@ -122,6 +135,8 @@ struct WalletView: View {
                 }
             }
             .onAppear {
+                print("WalletView - onAppear called")
+                print("WalletView - activeWallet: \(walletManager.activeWallet != nil)")
                 loadWalletIfNeeded()
                 updateBalance()
             }
@@ -142,6 +157,16 @@ struct WalletView: View {
                     loadWalletIfNeeded()
                 }
             }
+            .task {
+                // Monitor for signer availability when authenticated
+                while nostrManager.isAuthenticated && walletManager.activeWallet == nil {
+                    if nostrManager.ndk?.signer != nil {
+                        loadWalletIfNeeded()
+                        break
+                    }
+                    try? await Task.sleep(nanoseconds: 100_000_000) // 0.1 seconds
+                }
+            }
         }
     }
     
@@ -152,6 +177,17 @@ struct WalletView: View {
         Task {
             do {
                 try await walletManager.loadWalletForCurrentUser()
+            } catch WalletError.signerNotAvailable {
+                // Signer not ready yet, retry after a short delay
+                print("Signer not available yet, retrying...")
+                try? await Task.sleep(nanoseconds: 500_000_000) // 0.5 seconds
+                
+                // Retry once more
+                do {
+                    try await walletManager.loadWalletForCurrentUser()
+                } catch {
+                    print("Failed to load wallet after retry: \(error)")
+                }
             } catch {
                 print("Failed to load wallet: \(error)")
             }
@@ -164,18 +200,40 @@ struct WalletView: View {
             do {
                 let balance = try await wallet.getBalance()
                 await MainActor.run {
-                    currentBalance = balance
+                    currentBalance = balance ?? 0
                 }
             } catch {
                 print("Failed to update balance: \(error)")
             }
         }
     }
+    
+    private func handleScannedValue(_ scannedValue: String) {
+        showScanner = false
+        
+        // Check if it's a lightning invoice
+        if isLightningInvoice(scannedValue) {
+            scannedInvoice = scannedValue
+            showInvoicePreview = true
+        } else if scannedValue.lowercased().starts(with: "cashu") {
+            // Handle cashu token directly
+            navigationDestination = .receive(urlString: scannedValue)
+        } else {
+            // Handle other QR codes
+            urlState = URLState(url: scannedValue, timestamp: Date())
+        }
+    }
+    
+    private func isLightningInvoice(_ text: String) -> Bool {
+        let cleanText = text.lowercased().replacingOccurrences(of: "lightning:", with: "")
+        return cleanText.starts(with: "lnbc") || cleanText.starts(with: "lntb") || cleanText.starts(with: "lnbcrt")
+    }
 }
 
 // MARK: - Empty Wallet View
 struct EmptyWalletView: View {
     @Binding var showConfigureMints: Bool
+    @Environment(NostrManager.self) private var nostrManager
     
     var body: some View {
         VStack(spacing: 24) {
@@ -202,7 +260,39 @@ struct EmptyWalletView: View {
                     .cornerRadius(12)
             }
             
+            // Test button to verify NDK publishing works
+            Button(action: testPublishEvent) {
+                Text("Test Publish Simple Event")
+                    .font(.caption)
+                    .foregroundColor(.blue)
+            }
+            .padding(.top, 10)
+            
             Spacer()
+        }
+    }
+    
+    private func testPublishEvent() {
+        Task {
+            guard let ndk = nostrManager.ndk,
+                  let signer = ndk.signer else {
+                print("Test: NDK or signer not available")
+                return
+            }
+            
+            do {
+                print("Test: Creating test event")
+                let testEvent = try await NDKEventBuilder()
+                    .content("Test event from Nutsack wallet - " + UUID().uuidString)
+                    .kind(1) // Regular text note
+                    .build(signer: signer)
+                
+                print("Test: Publishing test event...")
+                let relays = try await ndk.publish(testEvent)
+                print("Test: Published to \(relays.count) relays: \(relays.map { $0.url })")
+            } catch {
+                print("Test: Failed to publish test event: \(error)")
+            }
         }
     }
 }

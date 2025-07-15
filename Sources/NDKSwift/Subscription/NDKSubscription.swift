@@ -258,24 +258,35 @@ public final class NDKSubscription: AsyncSequence, Sendable {
     public let filters: [NDKFilter]
     
     /// Thread-safe state management
-    internal let stateActor: SubscriptionStateActor
+    private let stateActor: SubscriptionStateActor
     
     /// The async stream of events
     private let stream: AsyncThrowingStream<NDKEvent, Error>
     
-    // All state is now async-only for thread safety
-    public var isActive: Bool {
-        get async { await stateActor.isActive }
+    // Cached state for synchronous access
+    private let _isActive = AtomicValue<Bool>(false)
+    private let _isClosed = AtomicValue<Bool>(false)
+    private let _eoseReceived = AtomicValue<Bool>(false)
+    private let _eventCount = AtomicValue<Int>(0)
+    
+    /// Whether the subscription is currently active
+    public var isActive: Bool { _isActive.value }
+    
+    /// Whether the subscription has been closed
+    public var isClosed: Bool { _isClosed.value }
+    
+    /// Whether EOSE (End of Stored Events) has been received
+    public var eoseReceived: Bool { _eoseReceived.value }
+    
+    /// Number of events received
+    public var eventCount: Int { _eventCount.value }
+    
+    /// Current subscription state
+    public var state: NDKSubscriptionState {
+        get async { await stateActor.currentState }
     }
     
-    public var isClosed: Bool {
-        get async { await stateActor.isClosed }
-    }
-    
-    public var eoseReceived: Bool {
-        get async { await stateActor.eoseReceived }
-    }
-    
+    /// Get all events received (async for thread safety)
     public var events: [NDKEvent] {
         get async { await stateActor.getEvents() }
     }
@@ -283,11 +294,6 @@ public final class NDKSubscription: AsyncSequence, Sendable {
     /// Count results from relays (NIP-45)
     public var countResults: [String: Int] {
         get async { await stateActor.getCountResults() }
-    }
-    
-    /// Current subscription state (public read-only)
-    public var state: NDKSubscriptionState {
-        get async { await stateActor.currentState }
     }
     
     /// Subscription options
@@ -351,10 +357,13 @@ public final class NDKSubscription: AsyncSequence, Sendable {
     }
     
     public func makeAsyncIterator() -> AsyncIterator {
+        print("[NDKSubscription.makeAsyncIterator] Creating iterator for subscription \(id)")
         // Auto-start subscription when iteration begins
         Task {
             let currentState = await stateActor.currentState
+            print("[NDKSubscription.makeAsyncIterator] Current state: \(currentState)")
             if currentState == .pending {
+                print("[NDKSubscription.makeAsyncIterator] Starting subscription from makeAsyncIterator")
                 await start()
             }
         }
@@ -372,18 +381,29 @@ public final class NDKSubscription: AsyncSequence, Sendable {
 
     /// Start the subscription
     public func start() async {
+        print("[NDKSubscription.start] Starting subscription \(id)")
         let shouldStart = await stateActor.transitionToActive()
-        guard shouldStart else { return }
+        guard shouldStart else {
+            print("[NDKSubscription.start] Subscription \(id) already active or closed")
+            return
+        }
+        
+        // Update cached state
+        _isActive.value = true
+        print("[NDKSubscription.start] Subscription \(id) now active")
         
         let options = await stateActor.getOptions()
         
         // Start with cache if needed
         if options.useCache {
+            print("[NDKSubscription.start] Checking cache for subscription \(id)")
             await checkCache()
         }
         
         // Query relays
+        print("[NDKSubscription.start] Querying relays for subscription \(id)")
         await queryRelays()
+        print("[NDKSubscription.start] Finished starting subscription \(id)")
     }
     
     /// Update the relays for this subscription (used by outbox model)
@@ -404,6 +424,10 @@ public final class NDKSubscription: AsyncSequence, Sendable {
         let (shouldClose, relays) = await stateActor.transitionToClosed()
         guard shouldClose else { return }
         
+        // Update cached state
+        _isActive.value = false
+        _isClosed.value = true
+        
         // Close on all active relays
         for relay in relays {
             await relay.subscriptionManager.removeSubscription(id)
@@ -417,33 +441,52 @@ public final class NDKSubscription: AsyncSequence, Sendable {
     // MARK: - Cache Handling
 
     private func checkCache() async {
-        guard let ndk = await stateActor.getNDK(), let cache = ndk.cache else { return }
+        print("[NDKSubscription.checkCache] Starting cache check for subscription \(id)")
+        guard let ndk = await stateActor.getNDK() else { 
+            print("[NDKSubscription.checkCache] No NDK reference, returning")
+            return 
+        }
+        let cache = ndk.cache
         
         var cachedEvents: [NDKEvent] = []
+        print("[NDKSubscription.checkCache] Querying cache for \(filters.count) filters")
         for filter in filters {
+            print("[NDKSubscription.checkCache] Querying cache with filter")
             if let events = try? await cache.queryEvents(filter) {
+                print("[NDKSubscription.checkCache] Found \(events.count) events in cache")
                 cachedEvents.append(contentsOf: events)
             }
         }
         
+        print("[NDKSubscription.checkCache] Total cached events: \(cachedEvents.count)")
         for event in cachedEvents {
             await handleEvent(event, from: .cache)
         }
+        print("[NDKSubscription.checkCache] Finished processing cached events")
     }
 
     // MARK: - Relay Handling
 
     private func queryRelays() async {
-        guard let ndk = await stateActor.getNDK() else { return }
+        print("[NDKSubscription.queryRelays] Starting relay query for subscription \(id)")
+        guard let ndk = await stateActor.getNDK() else {
+            print("[NDKSubscription.queryRelays] No NDK reference, returning")
+            return
+        }
         
         let options = await stateActor.getOptions()
+        print("[NDKSubscription.queryRelays] Getting relays from NDK")
         let ndkRelays = await ndk.relays
+        print("[NDKSubscription.queryRelays] NDK has \(ndkRelays.count) relays")
         let relaysToUse = options.relays ?? Set(ndkRelays)
+        print("[NDKSubscription.queryRelays] Will use \(relaysToUse.count) relays")
         
         for relay in relaysToUse {
+            print("[NDKSubscription.queryRelays] Adding relay \(relay.url)")
             await stateActor.addRelay(relay)
             // Note: The main subscription manager handles the actual subscription
         }
+        print("[NDKSubscription.queryRelays] Finished adding relays for subscription \(id)")
     }
 
     // MARK: - Event Handling
@@ -481,10 +524,11 @@ public final class NDKSubscription: AsyncSequence, Sendable {
         guard wasAdded else { return } // Already seen or just confirmed
         
         let currentEventCount = await stateActor.getEventCount()
+        _eventCount.value = currentEventCount
         
         // Store in cache if available (only for confirmed events)
-        if case .relay = source, let ndk = await stateActor.getNDK(), let cache = ndk.cache {
-            try? await cache.saveEvent(event)
+        if case .relay = source, let ndk = await stateActor.getNDK() {
+            try? await ndk.cache.saveEvent(event)
         }
         
         // Send event to stream
@@ -517,8 +561,11 @@ public final class NDKSubscription: AsyncSequence, Sendable {
             expectedRelays: expectedRelays
         )
         
-        if shouldComplete && options.closeOnEose {
-            await close()
+        if shouldComplete {
+            _eoseReceived.value = true
+            if options.closeOnEose {
+                await close()
+            }
         }
     }
 

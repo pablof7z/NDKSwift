@@ -122,54 +122,9 @@ public final class NDKUser: Equatable, Hashable, Sendable {
     }
 
     // MARK: - Profile Management
-
-    /// Fetch user's profile
-    /// - Parameter forceRefresh: If true, bypasses cache and fetches fresh data from relays
-    /// - Returns: The user's profile, or nil if not found
-    @discardableResult
-    public func fetchProfile(forceRefresh: Bool = false) async throws -> NDKUserProfile? {
-        guard let ndk = ndk else {
-            throw NDKError.notConfigured("NDK instance not set")
-        }
-
-        // Check cache first unless force refresh is requested
-        if !forceRefresh {
-            if let cached = await ndk.cache?.getProfile(pubkey: pubkey) {
-                await stateActor.setProfile(cached)
-                return cached
-            }
-        }
-
-        // Create filter for kind 0 events
-        let filter = NDKFilter(
-            authors: [pubkey],
-            kinds: [EventKind.metadata],
-            limit: 1
-        )
-
-        // Fetch the profile event
-        if let event = try await ndk.fetchEvent(filter) {
-            // Parse the profile from the event content
-            let eventContent = event.content
-            guard let profileData = eventContent.data(using: .utf8),
-                  let profile = try? JSONDecoder().decode(NDKUserProfile.self, from: profileData) else {
-                throw NDKError.invalidInput(message: "Invalid profile data")
-            }
-            
-            // Update our local profile
-            await stateActor.setProfile(profile)
-            
-            // Save to cache
-            try? await ndk.cache?.saveProfile(profile, pubkey: pubkey)
-            
-            return profile
-        }
-        
-        return nil
-    }
-
-    /// Update profile with new metadata
-    public func updateProfile(_ profile: NDKUserProfile) async {
+    
+    /// Update the user's profile
+    internal func updateProfile(_ profile: NDKUserProfile) async {
         await stateActor.setProfile(profile)
     }
     
@@ -184,7 +139,7 @@ public final class NDKUser: Equatable, Hashable, Sendable {
                 
                 // Save to cache if available
                 if let ndk = ndk {
-                    try? await ndk.cache?.saveProfile(profile, pubkey: pubkey)
+                    try? await ndk.cache.saveProfile(profile, pubkey: pubkey)
                 }
             }
         }
@@ -308,7 +263,7 @@ public final class NDKUser: Equatable, Hashable, Sendable {
     ///   - comment: Optional comment for the payment
     ///   - tags: Optional additional tags
     /// - Returns: Payment confirmation
-    public func pay(amount: Int64, comment: String? = nil, tags: [[String]]? = nil) async throws -> NDKPaymentConfirmation {
+    public func pay(amount: Int64, comment: String? = nil, tags: [[String]]? = nil) async throws -> PaymentConfirmation {
         guard ndk != nil else {
             throw NDKError.notConfigured("NDK instance not set")
         }
@@ -320,17 +275,36 @@ public final class NDKUser: Equatable, Hashable, Sendable {
     /// Get available payment methods for this user
     /// - Returns: Set of payment methods this user supports
     public func getPaymentMethods() async throws -> Set<NDKPaymentMethod> {
-        guard ndk != nil else {
+        guard let ndk = ndk else {
             throw NDKError.notConfigured("NDK instance not set")
         }
 
         var methods = Set<NDKPaymentMethod>()
 
-        // Check for Lightning support (NIP-57)
-        let userProfile = try? await fetchProfile()
-        if let userProfile = userProfile {
-            if userProfile.lud06 != nil || userProfile.lud16 != nil {
-                methods.insert(.lightning)
+        // IMPORTANT: Always batch multiple kinds in a single filter!
+        // NEVER make sequential requests for different event kinds - that's network inefficient
+        // NDKFilter accepts arrays specifically to enable batching
+        let filter = NDKFilter(
+            authors: [pubkey],
+            kinds: [EventKind.metadata, EventKind.nutzapPreferences]  // Fetch BOTH in one request
+        )
+        
+        let events = try await ndk.fetchEvents([filter])
+        
+        for event in events {
+            switch event.kind {
+            case EventKind.metadata:
+                // Check for Lightning support (lud06/lud16)
+                if let profileData = try? JSONDecoder().decode(NDKUserProfile.self, from: event.content.data(using: String.Encoding.utf8) ?? Data()) {
+                    if profileData.lud06 != nil || profileData.lud16 != nil {
+                        methods.insert(.lightning)
+                    }
+                }
+            case EventKind.nutzapPreferences:
+                // User has nutzap preference announcement
+                methods.insert(.nutzap)
+            default:
+                break
             }
         }
 

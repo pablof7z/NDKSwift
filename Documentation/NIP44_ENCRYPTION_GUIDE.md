@@ -46,14 +46,30 @@ let decrypted = try await signer.decrypt(
 
 ## Creating Encrypted Events
 
-For direct messages, you'll typically use event kind 14 (proposed for NIP-44 DMs):
+For direct messages, you'll typically use event kind 4 (traditional DMs) or kind 14 (proposed for NIP-44 DMs):
+
+### Using NDKEventBuilder (Recommended)
 
 ```swift
 // Initialize NDK with a signer
 let ndk = NDK()
 ndk.signer = signer
 
-// Encrypt content
+// Create and encrypt a direct message in one step
+let dmEvent = try await NDKEventBuilder()
+    .content("Private message content")
+    .kind(EventKind.encryptedDirectMessage)
+    .tagUser(recipient.pubkey)
+    .encrypt(recipient: recipient, signer: signer, scheme: .nip44)
+
+// Publish the encrypted event
+try await ndk.publish(dmEvent)
+```
+
+### Manual Encryption
+
+```swift
+// Encrypt content manually
 let encryptedContent = try await signer.encrypt(
     recipient: recipient,
     value: "Private message content",
@@ -61,18 +77,13 @@ let encryptedContent = try await signer.encrypt(
 )
 
 // Create encrypted event
-let dmEvent = NDKEvent(
-    pubkey: try await signer.pubkey,
-    createdAt: Timestamp(Date().timeIntervalSince1970),
-    kind: 14, // NIP-44 encrypted direct message
-    tags: [
-        ["p", recipient.pubkey] // Tag the recipient
-    ],
-    content: encryptedContent
-)
+let dmEvent = try await NDKEventBuilder()
+    .content(encryptedContent)
+    .kind(EventKind.encryptedDirectMessage)
+    .tagUser(recipient.pubkey)
+    .build(signer: signer)
 
-// Sign and publish
-try await dmEvent.sign(using: signer)
+// Publish
 try await ndk.publish(dmEvent)
 ```
 

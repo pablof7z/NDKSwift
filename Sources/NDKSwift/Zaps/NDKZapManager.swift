@@ -37,26 +37,20 @@ public actor NDKZapManager {
     
     /// Configure with default providers based on available wallets
     public func configureDefaults(
-        cashuWallet: NDKCashuWallet? = nil,
-        nwcWallet: NDKNWCWallet? = nil,
-        legacyWallet: NDKWallet? = nil
+        cashuWallet: NIP60Wallet? = nil,
+        nwcWallet: NDKNWCWallet? = nil
     ) {
         // Clear existing providers
         paymentProviders.removeAll()
         
         // Add Cashu provider if available (highest priority for privacy)
         if let cashuWallet = cashuWallet {
-            register(provider: CashuPaymentProvider(cashuWallet: cashuWallet))
+            register(provider: cashuWallet)
         }
         
         // Add NWC provider if available
         if let nwcWallet = nwcWallet {
-            register(provider: NWCPaymentProvider(nwcWallet: nwcWallet))
-        }
-        
-        // Add legacy wallet adapter if available
-        if let wallet = legacyWallet {
-            register(provider: WalletAdapterPaymentProvider(wallet: wallet))
+            register(provider: nwcWallet)
         }
         
         // Always add QR code as fallback
@@ -218,10 +212,6 @@ public actor NDKZapManager {
         quote: MintQuote,
         recipientP2PK: String
     ) async throws -> [CashuSwift.Proof] {
-        // FIXME: CashuSwift functionality temporarily disabled due to build issues
-        throw ZapError.paymentFailed("CashuSwift temporarily disabled due to build issues")
-        
-        /*
         // Connect to the mint and load keysets
         let cashuMint = try await CashuSwift.loadMint(url: quote.mint)
         
@@ -284,8 +274,8 @@ public actor NDKZapManager {
                 )
             }
             
-            // Convert CashuSwift proofs to our format
-            return mintProofs.map { $0.toNDKProof() }
+            // Return the locked proofs directly
+            return mintProofs
             
         } catch {
             throw ZapError.mintTokenCreationFailed(
@@ -293,7 +283,6 @@ public actor NDKZapManager {
                 reason: error.localizedDescription
             )
         }
-        */
     }
     
     /// Get available payment providers for a given payment request
@@ -311,7 +300,87 @@ public actor NDKZapManager {
         return available
     }
     
-    /// Fetch zaps for an event or user
+    /// Subscribe to zaps for an event or user (reactive, event-driven approach)
+    /// 
+    /// This method returns immediately with an AsyncSequence that yields zaps as they arrive.
+    /// Perfect for UIs that should update progressively as zaps are received.
+    /// 
+    /// - Parameters:
+    ///   - event: The event to get zaps for
+    ///   - user: The user to get zaps for (if event is nil)
+    /// - Returns: AsyncSequence of ZapInfo objects
+    /// 
+    /// ## Example:
+    /// ```swift
+    /// for try await zap in zapManager.subscribeToZaps(for: event) {
+    ///     // Update UI with each zap as it arrives
+    ///     updateZapDisplay(zap)
+    /// }
+    /// ```
+    public func subscribeToZaps(
+        for event: NDKEvent? = nil,
+        user: NDKUser? = nil
+    ) -> AsyncThrowingStream<ZapInfo, Error> {
+        AsyncThrowingStream { continuation in
+            Task {
+                do {
+                    var kinds = [EventKind.zapReceipt]
+                    kinds.append(EventKind.nutzap)
+                    
+                    var filter = NDKFilter()
+                    filter.kinds = kinds
+                    
+                    if let event = event {
+                        let eventId = event.id
+                        filter.addTagFilter("e", values: [eventId])
+                    } else if let user = user {
+                        filter.addTagFilter("p", values: [user.pubkey])
+                    } else {
+                        continuation.finish(throwing: NDKError.invalidInput(message: "Must specify either event or user"))
+                        return
+                    }
+                    
+                    let subscription = await ndk.subscribe(filters: [filter])
+                    
+                    do {
+                        for try await event in subscription {
+                            let eventKind = event.kind
+                            if eventKind == EventKind.zapReceipt {
+                                let receipt = NDKZapReceipt(event: event)
+                                if let zapInfo = try? await self.validateAndParseZapReceipt(receipt) {
+                                    continuation.yield(zapInfo)
+                                }
+                            } else if eventKind == EventKind.nutzap {
+                                let nutzap = NDKNutzap(event: event)
+                                let totalAmount = nutzap.totalAmount
+                                
+                                let zapInfo = ZapInfo(
+                                    type: .nutzap,
+                                    amountSats: Int64(totalAmount),
+                                    sender: event.pubkey,
+                                    recipient: nutzap.recipientPubkey ?? "",
+                                    comment: nutzap.comment,
+                                    timestamp: Date(timeIntervalSince1970: TimeInterval(event.createdAt)),
+                                    event: event
+                                )
+                                continuation.yield(zapInfo)
+                            }
+                        }
+                        continuation.finish()
+                    } catch {
+                        continuation.finish(throwing: error)
+                    }
+                }
+            }
+        }
+    }
+    
+    /// Fetch zaps for an event or user (blocking approach)
+    /// 
+    /// ⚠️ **WARNING**: This blocks until all zaps are received. Consider using `subscribeToZaps` instead
+    /// for reactive UIs that should update as zaps arrive.
+    /// 
+    /// Use this only when you need all zaps before proceeding (e.g., calculating totals for a static report).
     public func fetchZaps(
         for event: NDKEvent? = nil,
         user: NDKUser? = nil
@@ -331,7 +400,7 @@ public actor NDKZapManager {
             throw NDKError.invalidInput(message: "Must specify either event or user")
         }
         
-        let events = try await ndk.fetchEvents(filter)
+        let events = try await ndk.fetchEvents([filter])
         
         var zaps: [ZapInfo] = []
         
@@ -422,7 +491,7 @@ public actor NDKZapManager {
     
     private func validateAndParseZapReceipt(_ receipt: NDKZapReceipt) async throws -> ZapInfo? {
         // Get the recipient to fetch their LNURL provider pubkey
-        let recipientPubkey = await receipt.recipientPubkey
+        let recipientPubkey = receipt.recipientPubkey
         guard let recipientPubkey = recipientPubkey else {
             return nil
         }
@@ -432,22 +501,22 @@ public actor NDKZapManager {
         
         // Try to get provider pubkey from recipient's profile
         var providerPubkey: String?
-        if let profile = try? await recipient.fetchProfile(),
+        if let profile = try? await ndk.profileManager.fetchProfile(for: recipientPubkey),
            profile.lud16 != nil || profile.lud06 != nil {
             // In a real implementation, we'd resolve the LNURL to get the provider pubkey
             // For now, we'll use the receipt's pubkey as a placeholder
-            providerPubkey = await receipt.event.pubkey
+            providerPubkey = receipt.event.pubkey
         }
         
         guard let providerPubkey = providerPubkey,
-              await receipt.validate(lnurlProviderPubkey: providerPubkey) else {
+              receipt.validate(lnurlProviderPubkey: providerPubkey) else {
             return nil
         }
         
-        let amountSats = await receipt.amountSats ?? 0
-        let senderPubkey = await receipt.senderPubkey
-        let comment = await receipt.comment
-        let createdAt = await receipt.event.createdAt
+        let amountSats = receipt.amountSats ?? 0
+        let senderPubkey = receipt.senderPubkey
+        let comment = receipt.comment
+        let createdAt = receipt.event.createdAt
         
         return ZapInfo(
             type: .lightning,

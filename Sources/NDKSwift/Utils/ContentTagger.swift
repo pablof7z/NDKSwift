@@ -1,5 +1,66 @@
 import Foundation
 
+// MARK: - Safe Array Access
+
+extension Array {
+    /// Safe subscript that returns nil for out-of-bounds indices
+    func at(_ index: Int) -> Element? {
+        return indices.contains(index) ? self[index] : nil
+    }
+    
+    /// Safe subscript that returns nil for out-of-bounds indices
+    subscript(safe index: Int) -> Element? {
+        return indices.contains(index) ? self[index] : nil
+    }
+}
+
+// MARK: - Tag Validation
+
+extension Tag {
+    /// Validates common tag formats according to Nostr protocol
+    var isValid: Bool {
+        guard !isEmpty else { return false }
+        let tagType = self[0]
+        
+        switch tagType {
+        case "e", "p":
+            // Event and pubkey tags must have 64-character hex IDs
+            return count >= 2 && self[1].count == 64 && self[1].allSatisfy { $0.isHexDigit }
+        case "a":
+            // Addressable event references: kind:pubkey:d-tag
+            guard count >= 2 else { return false }
+            let parts = self[1].split(separator: ":")
+            return parts.count >= 3 && Int(parts[0]) != nil && parts[1].count == 64
+        case "d", "t", "r":
+            // Identifier, hashtag, and URL tags just need a value
+            return count >= 2
+        default:
+            // Unknown tags are considered valid
+            return true
+        }
+    }
+    
+    /// Returns the tag name (first element)
+    var name: String? {
+        return self.first
+    }
+    
+    /// Returns the primary value (second element)
+    var value: String? {
+        return count > 1 ? self[1] : nil
+    }
+    
+    /// Returns the relay hint (third element) if present
+    var relayHint: String? {
+        return count > 2 ? self[2] : nil
+    }
+    
+    /// Returns the marker (fourth element) if present
+    var marker: String? {
+        return count > 3 ? self[3] : nil
+    }
+}
+
 /// Content tagging result
 public struct ContentTag {
     public let tags: [Tag]
@@ -440,5 +501,97 @@ public enum ContentTagger {
     private static func kindFromBytes(_ bytes: [UInt8]) -> Int {
         guard bytes.count == 4 else { return 0 }
         return Int(UInt32(bytes[0]) << 24 | UInt32(bytes[1]) << 16 | UInt32(bytes[2]) << 8 | UInt32(bytes[3]))
+    }
+}
+
+// MARK: - Tag Builder
+
+/// A builder for constructing complex tag sets
+public struct TagBuilder {
+    private var tags: [Tag] = []
+    
+    public init() {}
+    
+    /// Adds an event reference
+    @discardableResult
+    public mutating func event(_ id: EventID, relay: String? = nil, marker: String? = nil) -> Self {
+        var tag = ["e", id]
+        if let relay = relay {
+            tag.append(relay)
+        } else if marker != nil {
+            tag.append("") // Empty relay hint
+        }
+        if let marker = marker {
+            tag.append(marker)
+        }
+        tags.append(tag)
+        return self
+    }
+    
+    /// Adds a pubkey reference
+    @discardableResult
+    public mutating func pubkey(_ pubkey: PublicKey, relay: String? = nil, petname: String? = nil) -> Self {
+        var tag = ["p", pubkey]
+        if let relay = relay {
+            tag.append(relay)
+        }
+        if let petname = petname {
+            if relay == nil {
+                tag.append("") // Empty relay hint
+            }
+            tag.append(petname)
+        }
+        tags.append(tag)
+        return self
+    }
+    
+    /// Adds a hashtag
+    @discardableResult
+    public mutating func hashtag(_ text: String) -> Self {
+        let clean = text.hasPrefix("#") ? String(text.dropFirst()) : text
+        tags.append(["t", clean.lowercased()])
+        return self
+    }
+    
+    /// Adds a URL reference
+    @discardableResult
+    public mutating func url(_ url: String, petname: String? = nil) -> Self {
+        var tag = ["r", url]
+        if let petname = petname {
+            tag.append(petname)
+        }
+        tags.append(tag)
+        return self
+    }
+    
+    /// Adds a custom tag
+    @discardableResult
+    public mutating func custom(_ tag: Tag) -> Self {
+        tags.append(tag)
+        return self
+    }
+    
+    /// Builds the final tag array
+    public func build() -> [Tag] {
+        return tags
+    }
+}
+
+// MARK: - Filter Tag Helpers
+
+extension NDKFilter {
+    /// Adds a hashtag filter
+    public mutating func addHashtagFilter(_ hashtags: String...) {
+        addTagFilter("t", values: hashtags.map { $0.lowercased() })
+    }
+    
+    /// Adds a URL filter
+    public mutating func addURLFilter(_ urls: String...) {
+        addTagFilter("r", values: urls)
+    }
+    
+    /// Checks if this filter includes a specific tag type
+    public func hasTagFilter(_ tagName: String) -> Bool {
+        return tagFilter(tagName) != nil
     }
 }

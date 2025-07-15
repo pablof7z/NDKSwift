@@ -32,7 +32,7 @@ public actor SimpleMemoryCache: NDKCache {
         var results: [NDKEvent] = []
         
         for event in events.values {
-            if await filter.matches(event: event) {
+            if filter.matches(event: event) {
                 results.append(event)
             }
         }

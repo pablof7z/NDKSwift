@@ -34,7 +34,7 @@ public class NDKLightningZapProtocol: NDKZapProtocol {
     
     public func canZap(user: NDKUser) async throws -> Bool {
         // Check if user has Lightning address configured
-        guard let profile = try? await user.fetchProfile(),
+        guard let profile = try? await ndk.profileManager.fetchProfile(for: user.pubkey),
               profile.lud06 != nil || profile.lud16 != nil else {
             return false
         }
@@ -166,7 +166,7 @@ public class NDKLightningZapProtocol: NDKZapProtocol {
         }
         
         // Subscribe with timeout
-        let subscription = ndk.subscribe(filters: [filter])
+        let subscription = await ndk.subscribe(filters: [filter])
         
         // Create timeout task
         let timeoutTask = Task {
@@ -209,7 +209,7 @@ public class NDKLightningZapProtocol: NDKZapProtocol {
     }
     
     private func resolveLNURL(for user: NDKUser) async throws -> LNURLPayEndpoint {
-        guard let profile = try? await user.fetchProfile() else {
+        guard let profile = try? await ndk.profileManager.fetchProfile(for: user.pubkey) else {
             throw ZapError.noLNURL
         }
         

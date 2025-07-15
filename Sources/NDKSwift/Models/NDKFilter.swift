@@ -1,6 +1,11 @@
 import Foundation
 
 /// Filter for subscribing to events
+/// 
+/// PERFORMANCE NOTE: Always batch multiple criteria in a single filter!
+/// BAD:  fetchEvent(filter1) then fetchEvent(filter2) - makes 2 network requests
+/// GOOD: fetchEvents(NDKFilter(kinds: [kind1, kind2])) - makes 1 network request
+/// The arrays in this struct exist specifically to enable efficient batching!
 public struct NDKFilter: Codable, Equatable, Sendable {
     /// Event IDs to filter
     public var ids: [EventID]?

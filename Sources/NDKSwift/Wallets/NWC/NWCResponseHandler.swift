@@ -44,7 +44,12 @@ public struct NWCResponseHandler {
         options.relays = Set(connectedRelays)
         options.closeOnEose = false // Keep subscription open to catch the response
         
-        let subscription = ndk.subscribe(filters: [filter], options: options)
+        let relayUrls = options.relays?.map { $0.url }
+        let subscription = await ndk.subscribe(
+            filters: [filter], 
+            relays: relayUrls.map { Set($0) },
+            closeOnEose: options.closeOnEose
+        )
         
         // Collect response in a task
         let responseTask = Task { () -> T in
@@ -148,7 +153,7 @@ public struct NWCResponseHandler {
         filter.addTagFilter("e", values: [requestId])
         
         // Get connected relays that match our wallet relays
-        let allConnected = await ndk.relayPool.connectedRelays()
+        let allConnected = await ndk.pool.connectedRelays()
         let connectedRelays = allConnected.filter { relay in
             relayURLs.contains(relay.url)
         }
@@ -158,9 +163,10 @@ public struct NWCResponseHandler {
         }
         
         // Create subscription
-        let subscription = ndk.subscribe(
+        let relayUrls = Set(connectedRelays.map { $0.url })
+        let subscription = await ndk.subscribe(
             filters: [filter],
-            options: NDKSubscriptionOptions()
+            relays: relayUrls
         )
         
         var responses: [String: Result<T, NDKError>] = [:]
@@ -251,9 +257,10 @@ public struct NWCResponseHandler {
                 }
                 
                 // Create subscription
-                let subscription = ndk.subscribe(
+                let relayUrls = Set(connectedRelays.map { $0.url })
+                let subscription = await ndk.subscribe(
                     filters: [filter],
-                    options: NDKSubscriptionOptions()
+                    relays: relayUrls
                 )
                 
                 let task = Task {

@@ -17,10 +17,6 @@ let package = Package(
             name: "NDKSwift",
             targets: ["NDKSwift"]
         ),
-        .executable(
-            name: "CLI-Nutsack",
-            targets: ["CLI-Nutsack"]
-        ),
     ],
     dependencies: [
         .package(url: "https://github.com/anquii/CryptoSwiftWrapper.git", from: "1.4.3"),
@@ -38,21 +34,11 @@ let package = Package(
                 .product(name: "secp256k1", package: "swift-secp256k1"),
                 .product(name: "GRDB", package: "GRDB.swift"),
                 .product(name: "CashuSwift", package: "CashuSwift"),
-            ],
-            exclude: [
-                "Outbox/README.md",
-                "Outbox/IMPLEMENTATION_SUMMARY.md"
             ]
         ),
         .testTarget(
             name: "NDKSwiftTests",
-            dependencies: ["NDKSwift"],
-            exclude: ["Utils/ContentTaggerNostrEntityTests_Results.md"]
-        ),
-        .executableTarget(
-            name: "CLI-Nutsack",
-            dependencies: ["NDKSwift"],
-            path: "Examples/CLI-Nutsack/Sources/CLI-Nutsack"
+            dependencies: ["NDKSwift"]
         ),
     ]
 )

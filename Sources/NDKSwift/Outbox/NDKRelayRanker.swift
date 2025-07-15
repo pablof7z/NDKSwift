@@ -48,7 +48,7 @@ actor NDKRelayRanker {
         var rankedRelays: [RankedRelay] = []
 
         // Get connected relays for preferential treatment
-        let connectedRelayURLs = await ndk.relayPool.connectedRelays().map { $0.url }
+        let connectedRelayURLs = await ndk.pool.connectedRelays().map { $0.url }
         let connectedSet = Set(connectedRelayURLs)
 
         for relayURL in relayURLs {
@@ -107,7 +107,7 @@ actor NDKRelayRanker {
     /// Get score for a relay and pubkey combination
     func getScore(relay: String, pubkey: String) async -> Double {
         let preferences = RelayPreferences.default
-        let isConnected = await ndk.relayPool.connectedRelays().contains { $0.url == relay }
+        let isConnected = await ndk.pool.connectedRelays().contains { $0.url == relay }
         return await calculateRelayScore(relay, for: [pubkey], isConnected: isConnected, preferences: preferences)
     }
 

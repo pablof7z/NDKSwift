@@ -64,8 +64,9 @@ public struct NDKAuthView<AuthenticatedContent: View, AuthenticationContent: Vie
     ///   - ndk: Optional NDK instance
     ///   - authenticatedContent: Content to show when authenticated
     ///   - authenticationContent: Content to show when not authenticated
+    @MainActor
     public init(
-        authManager: NDKAuthManager = NDKAuthManager.shared,
+        authManager: NDKAuthManager,
         ndk: NDK? = nil,
         @ViewBuilder authenticatedContent: @escaping () -> AuthenticatedContent,
         @ViewBuilder authenticationContent: @escaping () -> AuthenticationContent
@@ -76,13 +77,29 @@ public struct NDKAuthView<AuthenticatedContent: View, AuthenticationContent: Vie
         self.authenticationContent = authenticationContent
     }
     
+    /// Convenience initializer with default auth manager
+    @MainActor
+    public init(
+        ndk: NDK? = nil,
+        @ViewBuilder authenticatedContent: @escaping () -> AuthenticatedContent,
+        @ViewBuilder authenticationContent: @escaping () -> AuthenticationContent
+    ) {
+        self.init(
+            authManager: .shared,
+            ndk: ndk,
+            authenticatedContent: authenticatedContent,
+            authenticationContent: authenticationContent
+        )
+    }
+    
     /// Initialize NDKAuthView with default authentication UI
     /// - Parameters:
     ///   - authManager: The authentication manager to use
     ///   - ndk: Optional NDK instance
     ///   - authenticatedContent: Content to show when authenticated
+    @MainActor
     public init(
-        authManager: NDKAuthManager = NDKAuthManager.shared,
+        authManager: NDKAuthManager,
         ndk: NDK? = nil,
         @ViewBuilder authenticatedContent: @escaping () -> AuthenticatedContent
     ) where AuthenticationContent == DefaultAuthenticationView {
@@ -92,18 +109,27 @@ public struct NDKAuthView<AuthenticatedContent: View, AuthenticationContent: Vie
         self.authenticationContent = { DefaultAuthenticationView() }
     }
     
+    /// Convenience initializer with default auth manager and default authentication UI
+    @MainActor
+    public init(
+        ndk: NDK? = nil,
+        @ViewBuilder authenticatedContent: @escaping () -> AuthenticatedContent
+    ) where AuthenticationContent == DefaultAuthenticationView {
+        self.init(
+            authManager: .shared,
+            ndk: ndk,
+            authenticatedContent: authenticatedContent
+        )
+    }
+    
     // MARK: - Body
     
     public var body: some View {
         Group {
             switch authManager.authenticationState {
             case .authenticated:
-                if authManager.isAuthenticated {
-                    authenticatedContent()
-                        .transition(.opacity.combined(with: .scale(scale: 0.95)))
-                } else {
-                    authenticationStateView
-                }
+                authenticatedContent()
+                    .transition(.opacity.combined(with: .scale(scale: 0.95)))
                 
             case .authenticating:
                 authenticatingView
@@ -112,7 +138,9 @@ public struct NDKAuthView<AuthenticatedContent: View, AuthenticationContent: Vie
                 biometricRequiredView
                 
             case .unauthenticated:
-                if authManager.hasSessions {
+                // Only show session selection if we have sessions AND we're not in the process of authenticating
+                // This prevents the "Welcome Back" screen from appearing during login/signup flow
+                if authManager.hasSessions && !isActivelyAuthenticating() {
                     sessionSelectionView
                 } else {
                     authenticationContent()
@@ -150,9 +178,21 @@ public struct NDKAuthView<AuthenticatedContent: View, AuthenticationContent: Vie
             Button("OK") {
                 sessionSwitchError = nil
             }
+            if sessionSwitchError?.localizedDescription.contains("couldn't be read") == true ||
+               sessionSwitchError?.localizedDescription.contains("missing") == true {
+                Button("Remove Account") {
+                    sessionSwitchError = nil
+                    // Account has already been cleaned up in handleSessionSwitch
+                }
+            }
         } message: {
             if let error = sessionSwitchError {
-                Text(error.localizedDescription)
+                if error.localizedDescription.contains("couldn't be read") || 
+                   error.localizedDescription.contains("missing") {
+                    Text("This account's data appears to be corrupted and has been removed. Please add the account again.")
+                } else {
+                    Text(error.localizedDescription)
+                }
             }
         }
     }
@@ -269,6 +309,22 @@ public struct NDKAuthView<AuthenticatedContent: View, AuthenticationContent: Vie
                 try await authManager.switchToSession(session)
                 switchingSession = nil
             } catch {
+                // If we get a decoding error, it likely means corrupted session data
+                if error.localizedDescription.contains("couldn't be read") || 
+                   error.localizedDescription.contains("missing") ||
+                   (error as? DecodingError) != nil {
+                    print("Corrupted session data detected for \(session.id), cleaning up...")
+                    
+                    // Try to delete the corrupted session
+                    do {
+                        try await authManager.deleteSession(session)
+                        // After cleanup, logout to allow fresh login
+                        authManager.logout()
+                    } catch {
+                        print("Failed to clean up corrupted session: \(error)")
+                    }
+                }
+                
                 sessionSwitchError = error
                 switchingSession = nil
             }
@@ -328,15 +384,6 @@ public struct NDKAuthView<AuthenticatedContent: View, AuthenticationContent: Vie
         .background(.regularMaterial)
     }
     
-    private var authenticationStateView: some View {
-        VStack(spacing: 20) {
-            ProgressView()
-            Text("Preparing...")
-                .foregroundStyle(.secondary)
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(.regularMaterial)
-    }
     
     // MARK: - Biometric Support
     
@@ -374,6 +421,18 @@ public struct NDKAuthView<AuthenticatedContent: View, AuthenticationContent: Vie
         if let ndk = ndk {
             authManager.setNDK(ndk)
         }
+    }
+    
+    /// Check if we're actively in an authentication flow
+    /// This helps prevent showing session selection during login/signup
+    private func isActivelyAuthenticating() -> Bool {
+        // If we have an active session that was just created (within last 2 seconds)
+        // we're likely in the middle of an auth flow
+        if let activeSession = authManager.activeSession,
+           Date().timeIntervalSince(activeSession.lastUsed) < 2.0 {
+            return true
+        }
+        return false
     }
     
     private func retryBiometricAuth() {
@@ -524,8 +583,25 @@ private struct AccountPickerView: View {
                 try await authManager.switchToSession(session)
                 dismiss()
             } catch {
-                // Error will be shown by parent view
-                switchingSession = nil
+                // If we get a decoding error, it likely means corrupted session data
+                if error.localizedDescription.contains("couldn't be read") || 
+                   error.localizedDescription.contains("missing") ||
+                   (error as? DecodingError) != nil {
+                    print("Corrupted session data detected for \(session.id), cleaning up...")
+                    
+                    // Try to delete the corrupted session
+                    do {
+                        try await authManager.deleteSession(session)
+                        // After cleanup, dismiss and logout to allow fresh login
+                        dismiss()
+                        authManager.logout()
+                    } catch {
+                        print("Failed to clean up corrupted session: \(error)")
+                    }
+                } else {
+                    // Error will be shown by parent view
+                    switchingSession = nil
+                }
             }
         }
     }

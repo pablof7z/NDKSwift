@@ -23,7 +23,7 @@ struct CLINutsackSimple {
         
         // Create wallet
         print("💰 Creating wallet...")
-        let wallet = NDKCashuWallet(ndk: ndk)
+        let wallet = NIP60Wallet(ndk: ndk)
         
         // Add test mints
         try await wallet.addMint(url: URL(string: "https://testnut.cashu.space")!)

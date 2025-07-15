@@ -7,7 +7,7 @@ struct MintsView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(WalletManager.self) private var walletManager
     
-    @State private var availableMints: [NDKCashuWallet.MintInfo] = []
+    @State private var availableMints: [MintInfo] = []
     @State private var showAddMint = false
     @State private var showDiscoverMints = false
     @State private var isDiscovering = false
@@ -88,14 +88,7 @@ struct MintsView: View {
     }
     
     private func loadMints() async {
-        guard let wallet = walletManager.activeWallet else {
-            await MainActor.run {
-                isLoading = false
-            }
-            return
-        }
-        
-        let mints = await wallet.getMintsInfo()
+        let mints = await walletManager.getMintsInfo()
         await MainActor.run {
             availableMints = mints
             isLoading = false
@@ -128,7 +121,7 @@ struct MintsView: View {
 }
 
 struct MintRow: View {
-    let mintInfo: NDKCashuWallet.MintInfo
+    let mintInfo: MintInfo
     @Environment(WalletManager.self) private var walletManager
     @State private var balance: Int64 = 0
     
@@ -175,7 +168,7 @@ struct MintRow: View {
 }
 
 struct MintDetailView: View {
-    let mintInfo: NDKCashuWallet.MintInfo
+    let mintInfo: MintInfo
     @Environment(WalletManager.self) private var walletManager
     @Environment(\.dismiss) private var dismiss
     
@@ -269,7 +262,7 @@ struct MintDetailView: View {
         
         Task {
             do {
-                try await walletManager.activeWallet?.refreshMintKeysets(url: mintInfo.url)
+                try await walletManager.activeWallet?.mints.refreshMintKeysets(url: mintInfo.url)
                 
                 await MainActor.run {
                     isSyncing = false
@@ -303,7 +296,7 @@ struct MintDetailView: View {
 
 // MARK: - Mint Info View
 struct MintInfoView: View {
-    let mintInfo: NDKCashuWallet.MintInfo
+    let mintInfo: MintInfo
     @Environment(\.dismiss) private var dismiss
     
     var body: some View {
@@ -401,7 +394,7 @@ struct AddMintView: View {
                 }
             } catch {
                 await MainActor.run {
-                    errorMessage = error.localizedDescription
+                    errorMessage = "Failed to add mint: \(error.localizedDescription)"
                     showError = true
                     isAdding = false
                 }

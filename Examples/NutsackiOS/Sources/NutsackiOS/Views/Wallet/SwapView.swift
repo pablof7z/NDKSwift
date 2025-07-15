@@ -7,8 +7,8 @@ struct SwapView: View {
     @Environment(WalletManager.self) private var walletManager
     
     @State private var amount = ""
-    @State private var sourceMint: NDKCashuWallet.MintInfo?
-    @State private var destinationMint: NDKCashuWallet.MintInfo?
+    @State private var sourceMint: MintInfo?
+    @State private var destinationMint: MintInfo?
     @State private var isSwapping = false
     @State private var showError = false
     @State private var errorMessage = ""
@@ -18,7 +18,7 @@ struct SwapView: View {
     // Fee estimation
     @State private var estimatedFees: (lightningFee: Int64, inputFee: Int64, totalFee: Int64)?
     @State private var isEstimatingFees = false
-    @State private var mints: [NDKCashuWallet.MintInfo] = []
+    @State private var mints: [MintInfo] = []
     
     var amountInt: Int64 {
         Int64(amount) ?? 0
@@ -54,10 +54,10 @@ struct SwapView: View {
     var mintPickerSection: some View {
         Section {
             Picker("From Mint", selection: $sourceMint) {
-                Text("Select mint").tag(nil as NDKCashuWallet.MintInfo?)
+                Text("Select mint").tag(nil as MintInfo?)
                 ForEach(mints, id: \.url) { mint in
                     MintPickerRow(mint: mint, balance: 0)
-                        .tag(mint as NDKCashuWallet.MintInfo?)
+                        .tag(mint as MintInfo?)
                 }
             }
             
@@ -71,10 +71,10 @@ struct SwapView: View {
             .disabled(sourceMint == nil || destinationMint == nil)
             
             Picker("To Mint", selection: $destinationMint) {
-                Text("Select mint").tag(nil as NDKCashuWallet.MintInfo?)
+                Text("Select mint").tag(nil as MintInfo?)
                 ForEach(mints, id: \.url) { mint in
                     Text(mint.url.host ?? mint.url.absoluteString)
-                        .tag(mint as NDKCashuWallet.MintInfo?)
+                        .tag(mint as MintInfo?)
                 }
             }
         } header: {
@@ -246,15 +246,16 @@ struct SwapView: View {
     
     private func loadMints() {
         Task {
-            if let wallet = walletManager.activeWallet {
-                let loadedMints = await wallet.getMintsInfo()
-                await MainActor.run {
-                    mints = loadedMints
-                    // Select first two different mints by default
-                    if mints.count >= 2 {
-                        sourceMint = mints[0]
-                        destinationMint = mints[1]
-                    }
+            guard let wallet = walletManager.activeWallet else { return }
+            let mintStrings = await wallet.mints.getMintURLs()
+            let mintURLs = mintStrings.compactMap { URL(string: $0) }
+            let loadedMints = mintURLs.map { MintInfo(url: $0) }
+            await MainActor.run {
+                mints = loadedMints
+                // Select first two different mints by default
+                if mints.count >= 2 {
+                    sourceMint = mints[0]
+                    destinationMint = mints[1]
                 }
             }
         }
@@ -263,7 +264,7 @@ struct SwapView: View {
 
 // MARK: - Helper Views
 struct MintPickerRow: View {
-    let mint: NDKCashuWallet.MintInfo
+    let mint: MintInfo
     let balance: Int
     
     var body: some View {

@@ -1,5 +1,11 @@
 import Foundation
 
+private extension Array where Element: Hashable {
+    var set: Set<Element> {
+        Set(self)
+    }
+}
+
 /// Provides scoped subscription management with automatic cleanup
 public extension NDK {
     /// Execute a block with a subscription that automatically closes when the block exits
@@ -8,7 +14,12 @@ public extension NDK {
         options: NDKSubscriptionOptions = NDKSubscriptionOptions(),
         handler: (NDKSubscription) async throws -> T
     ) async rethrows -> T {
-        let subscription = subscribe(filters: [filter], options: options)
+        let subscription = await subscribe(
+            filters: [filter], 
+            relays: options.relays?.compactMap { $0.url }.set,
+            id: nil,
+            closeOnEose: options.closeOnEose
+        )
         await subscription.start()
         
         defer {
@@ -28,7 +39,12 @@ public extension NDK {
     ) async rethrows -> T {
         var subscriptions: [NDKSubscription] = []
         for filter in filters {
-            let sub = subscribe(filters: [filter], options: options)
+            let sub = await subscribe(
+                filters: [filter], 
+                relays: options.relays?.compactMap { $0.url }.set,
+                id: nil,
+                closeOnEose: options.closeOnEose
+            )
             await sub.start()
             subscriptions.append(sub)
         }
@@ -108,8 +124,13 @@ extension NDK {
     public func autoSubscribe(
         filters: [NDKFilter],
         options: NDKSubscriptionOptions = NDKSubscriptionOptions()
-    ) -> AutoClosingSubscription {
-        let subscription = subscribe(filters: filters, options: options)
+    ) async -> AutoClosingSubscription {
+        let subscription = await subscribe(
+            filters: filters, 
+            relays: options.relays?.compactMap { $0.url }.set,
+            id: nil,
+            closeOnEose: options.closeOnEose
+        )
         return AutoClosingSubscription(subscription)
     }
     
@@ -117,8 +138,8 @@ extension NDK {
     public func autoSubscribe(
         filter: NDKFilter,
         options: NDKSubscriptionOptions = NDKSubscriptionOptions()
-    ) -> AutoClosingSubscription {
-        return autoSubscribe(filters: [filter], options: options)
+    ) async -> AutoClosingSubscription {
+        return await autoSubscribe(filters: [filter], options: options)
     }
 }
 
@@ -138,7 +159,7 @@ public struct SubscriptionHandle {
     /// Check if the subscription is still active
     public var isActive: Bool {
         get async {
-            return await subscription.state != .closed
+            return !subscription.isClosed
         }
     }
 }

@@ -47,6 +47,8 @@ class NostrClient {
 
 ### User Authentication
 
+NDKSwift provides a comprehensive authentication system with NDKAuthManager and NDKAuthView. For simple key management:
+
 ```swift
 // Generate new identity
 func createNewIdentity() throws -> NDKPrivateKeySigner {
@@ -66,6 +68,8 @@ func login(with nsec: String) throws {
     print("Logged in as: \(user.npub)")
 }
 ```
+
+For a complete authentication system with session management, biometric authentication, and multi-account support, see the [Authentication Guide](AUTHENTICATION.md).
 
 ## Optimistic Publishing
 
@@ -475,28 +479,36 @@ struct UserProfileView {
 
 ## Messaging
 
-### Direct Messages (NIP-04)
+### Direct Messages
+
+#### Modern Approach (Recommended)
 
 ```swift
 func sendDirectMessage(to recipientPubkey: String, message: String) async throws {
     guard let signer = ndk.signer else { throw NDKError.signerRequired }
     
-    // Encrypt message
     let recipient = ndk.getUser(recipientPubkey)
-    let encrypted = try await signer.encrypt(
-        recipient: recipient,
-        value: message,
-        scheme: .nip04
-    )
     
-    // Create DM event
-    let dm = NDKEvent(
-        kind: EventKind.encryptedDirectMessage,
-        tags: [["p", recipientPubkey]],
-        content: encrypted
-    )
+    // Create and encrypt in one step
+    let dmEvent = try await NDKEventBuilder()
+        .content(message)
+        .kind(EventKind.encryptedDirectMessage)
+        .tagUser(recipientPubkey)
+        .encrypt(recipient: recipient, signer: signer, scheme: .nip44)  // Use .nip04 for legacy
     
-    try await ndk.publish(dm)
+    try await ndk.publish(dmEvent)
+}
+
+// For Cashu tokens or other encrypted content
+func sendEncryptedToken(token: String, to recipient: NDKUser) async throws {
+    guard let signer = ndk.signer else { throw NDKError.signerRequired }
+    
+    let event = try await NDKEventBuilder()
+        .content(token)
+        .kind(EventKind.cashuToken)
+        .encrypt(recipient: recipient, signer: signer)  // Defaults to .nip44
+    
+    try await ndk.publish(event)
 }
 
 func receiveDirectMessages() async throws {

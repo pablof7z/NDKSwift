@@ -2,6 +2,37 @@ import Foundation
 import SwiftData
 import NDKSwift
 
+// MARK: - MintInfo
+// Local replacement for the removed NIP60Wallet.MintInfo type
+struct MintInfo: Identifiable, Equatable, Hashable {
+    let id: String
+    let url: URL
+    let name: String?
+    let description: String?
+    let isActive: Bool
+    
+    init(url: URL, name: String? = nil, description: String? = nil, isActive: Bool = true) {
+        self.id = url.absoluteString
+        self.url = url
+        self.name = name
+        self.description = description
+        self.isActive = isActive
+    }
+}
+
+// MARK: - MintDiscovery
+// Local replacement for missing MintDiscovery type
+struct MintDiscovery {
+    let url: URL
+    let name: String?
+    let description: String?
+    let contact: String?
+    let pubkey: String?
+}
+
+// Note: MintInfo is now defined at the top level of this file
+// References to NIP60Wallet.MintInfo should be changed to just MintInfo
+
 // MARK: - Transaction
 @Model
 final class Transaction {

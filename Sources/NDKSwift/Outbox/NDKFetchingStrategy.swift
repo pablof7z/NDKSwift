@@ -253,9 +253,10 @@ actor NDKFetchingStrategy {
         var options = NDKSubscriptionOptions()
         options.relays = Set([relay])
 
-        let relaySubscription = ndk.subscribe(
+        let relayUrls = options.relays?.map { $0.url }
+        let relaySubscription = await ndk.subscribe(
             filters: subscription.filters,
-            options: options
+            relays: relayUrls.map { Set($0) }
         )
 
         // Start async event handling
@@ -290,12 +291,12 @@ actor NDKFetchingStrategy {
         let normalizedUrl = URLNormalizer.tryNormalizeRelayUrl(url) ?? url
         
         // First check if already connected
-        if let relay = await ndk.relayPool.getRelay(for: normalizedUrl) {
+        if let relay = await ndk.pool.getRelay(for: normalizedUrl) {
             return relay
         }
 
         // Try to connect
-        let relay = await ndk.relayPool.addRelay(normalizedUrl)
+        let relay = await ndk.pool.addRelay(normalizedUrl)
         relay.ndk = ndk
         try? await relay.connect()
         return relay

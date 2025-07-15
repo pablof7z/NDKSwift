@@ -296,7 +296,7 @@ public extension NDK {
     /// Fetch the contact list for a specific user
     func fetchContactList(for user: NDKUser) async throws -> NDKContactList? {
         let filter = NDKFilter(authors: [user.pubkey], kinds: [3], limit: 1)
-        let events = try await fetchEvents(filters: [filter])
+        let events = try await fetchEvents([filter])
 
         guard let event = events.first else { return nil }
         return NDKContactList.fromEvent(event)

@@ -48,21 +48,13 @@ public protocol RelayProtocol: AnyObject, Sendable {
     func publish(_ event: NDKEvent) async throws -> (success: Bool, message: String?)
     
     /// Fetch events from the relay matching the given filter
+    /// 
+    /// ⚠️ **WARNING**: This blocks until EOSE. See NDK.fetchEvents for guidance on when to use this.
+    /// Consider using subscriptions for most use cases instead.
+    /// 
     /// - Parameter filter: The filter to match events against
     /// - Returns: Array of events matching the filter
     /// - Throws: If the relay is not connected or other network errors occur
     func fetchEvents(filter: NDKFilter) async throws -> [NDKEvent]
 }
 
-/// Extension to provide default implementations
-public extension RelayProtocol {
-    /// Default implementation for adding subscriptions
-    func addSubscription(_ subscription: NDKSubscription) async {
-        // Default implementation - can be overridden
-    }
-    
-    /// Default implementation for removing subscriptions
-    func removeSubscription(byId id: String) async {
-        // Default implementation - can be overridden
-    }
-}

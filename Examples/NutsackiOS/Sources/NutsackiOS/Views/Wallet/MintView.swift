@@ -14,13 +14,14 @@ struct MintView: View {
     
     @State private var amount = ""
     @State private var selectedMintURL: String = ""
-    @State private var availableMints: [NDKCashuWallet.MintInfo] = []
+    @State private var availableMints: [MintInfo] = []
     @State private var isMinting = false
     @State private var showError = false
     @State private var errorMessage = ""
     @State private var mintQuote: CashuMintQuote?
     @State private var showInvoice = false
     @State private var depositTask: Task<Void, Never>?
+    @State private var loadMintTask: Task<Void, Never>?
     
     var body: some View {
         Form {
@@ -30,7 +31,14 @@ struct MintView: View {
                     .keyboardType(.numberPad)
                     #endif
                 
-                if !availableMints.isEmpty {
+                if availableMints.isEmpty {
+                    HStack {
+                        ProgressView()
+                            .scaleEffect(0.8)
+                        Text("Loading mints...")
+                            .foregroundStyle(.secondary)
+                    }
+                } else {
                     Picker("Mint", selection: $selectedMintURL) {
                         ForEach(availableMints, id: \.url.absoluteString) { mint in
                             Text(mint.url.host ?? mint.url.absoluteString).tag(mint.url.absoluteString)
@@ -78,21 +86,41 @@ struct MintView: View {
             }
         }
         .task {
-            await loadMints()
+            await startMintLoading()
         }
         .onDisappear {
             depositTask?.cancel()
+            loadMintTask?.cancel()
         }
     }
     
     private func loadMints() async {
-        guard let wallet = walletManager.activeWallet else { return }
-        
-        let mints = await wallet.getMintsInfo()
+        let mints = await walletManager.getMintsInfo()
         await MainActor.run {
             availableMints = mints
             if selectedMintURL.isEmpty && !mints.isEmpty {
                 selectedMintURL = mints.first?.url.absoluteString ?? ""
+            }
+        }
+    }
+    
+    private func startMintLoading() async {
+        // Initial load
+        await loadMints()
+        
+        // If no mints found, periodically check until they're available
+        if availableMints.isEmpty {
+            loadMintTask = Task {
+                var attempts = 0
+                while attempts < 10 && !Task.isCancelled {
+                    try? await Task.sleep(nanoseconds: 1_000_000_000) // 1 second
+                    await loadMints()
+                    
+                    if !availableMints.isEmpty {
+                        break
+                    }
+                    attempts += 1
+                }
             }
         }
     }

@@ -1,7 +1,7 @@
 import Foundation
 
-/// Extensions to NDKRelayPool for outbox model support
-public extension NDKRelayPool {
+/// Extensions to NDKPool for outbox model support
+public extension NDKPool {
     /// Get relay by URL
     func relay(for url: String) async -> NDKRelay? {
         return await getRelay(for: url)
@@ -9,8 +9,8 @@ public extension NDKRelayPool {
 
     /// Add a relay and optionally connect to it
     @discardableResult
-    func addRelay(url: String) async -> NDKRelay? {
-        let relay = addRelay(url)
+    func addRelayAndConnect(url: String) async -> NDKRelay? {
+        let relay = await addRelay(url)
 
         // Try to connect
         do {
