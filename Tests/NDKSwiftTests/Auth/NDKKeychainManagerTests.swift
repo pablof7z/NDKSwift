@@ -123,7 +123,6 @@ final class NDKKeychainManagerTests: XCTestCase {
         let metadata = [
             "id": testSessionId.uuidString,
             "pubkey": "d30effaa4e7090322e07b7b95b2c2f42c23bb16b12582d358fb088993a26e53f",
-            "displayName": "Test User",
             "signerType": "privatekey",
             "createdAt": Date().timeIntervalSince1970
         ] as [String: Any]
@@ -141,7 +140,6 @@ final class NDKKeychainManagerTests: XCTestCase {
         
         XCTAssertEqual(retrievedMetadata["id"] as? String, testSessionId.uuidString)
         XCTAssertEqual(retrievedMetadata["pubkey"] as? String, "d30effaa4e7090322e07b7b95b2c2f42c23bb16b12582d358fb088993a26e53f")
-        XCTAssertEqual(retrievedMetadata["displayName"] as? String, "Test User")
         XCTAssertEqual(retrievedMetadata["signerType"] as? String, "privatekey")
     }
     
@@ -152,7 +150,6 @@ final class NDKKeychainManagerTests: XCTestCase {
         let metadata1 = [
             "id": id1.uuidString,
             "pubkey": "pubkey1",
-            "displayName": "User 1",
             "signerType": "privatekey",
             "createdAt": Date().timeIntervalSince1970
         ] as [String: Any]
@@ -160,7 +157,6 @@ final class NDKKeychainManagerTests: XCTestCase {
         let metadata2 = [
             "id": id2.uuidString,
             "pubkey": "pubkey2",
-            "displayName": "User 2",
             "signerType": "nip46",
             "createdAt": Date().timeIntervalSince1970
         ] as [String: Any]
@@ -182,7 +178,6 @@ final class NDKKeychainManagerTests: XCTestCase {
         let originalMetadata = [
             "id": testSessionId.uuidString,
             "pubkey": "pubkey",
-            "displayName": "Original Name",
             "signerType": "privatekey",
             "createdAt": createdAt
         ] as [String: Any]
@@ -196,7 +191,7 @@ final class NDKKeychainManagerTests: XCTestCase {
         let updatedMetadata = [
             "id": testSessionId.uuidString,
             "pubkey": "pubkey",
-            "displayName": "Updated Name",
+            "profileName": "Updated Name",
             "signerType": "privatekey",
             "createdAt": createdAt
         ] as [String: Any]
@@ -212,7 +207,7 @@ final class NDKKeychainManagerTests: XCTestCase {
         )
         let retrievedMetadata = try JSONSerialization.jsonObject(with: retrievedData) as! [String: Any]
         
-        XCTAssertEqual(retrievedMetadata["displayName"] as? String, "Updated Name")
+        XCTAssertEqual(retrievedMetadata["profileName"] as? String, "Updated Name")
     }
     
     func testDeleteSessionMetadata() async throws {
@@ -221,7 +216,6 @@ final class NDKKeychainManagerTests: XCTestCase {
         let metadata1 = [
             "id": id1.uuidString,
             "pubkey": "pubkey1",
-            "displayName": "User 1",
             "signerType": "privatekey",
             "createdAt": Date().timeIntervalSince1970
         ] as [String: Any]
@@ -229,7 +223,6 @@ final class NDKKeychainManagerTests: XCTestCase {
         let metadata2 = [
             "id": testSessionId.uuidString,
             "pubkey": "pubkey2",
-            "displayName": "User 2",
             "signerType": "privatekey",
             "createdAt": Date().timeIntervalSince1970
         ] as [String: Any]

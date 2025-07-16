@@ -12,6 +12,7 @@ struct MintsView: View {
     @State private var showDiscoverMints = false
     @State private var isDiscovering = false
     @State private var isLoading = true
+    @State private var discoveredMints: [MintDiscovery] = []
     
     var body: some View {
         NavigationStack {
@@ -78,6 +79,9 @@ struct MintsView: View {
             .sheet(isPresented: $showAddMint) {
                 AddMintView()
             }
+            .sheet(isPresented: $showDiscoverMints) {
+                DiscoveredMintsView(discoveredMints: discoveredMints)
+            }
             .task {
                 await loadMints()
             }
@@ -97,24 +101,31 @@ struct MintsView: View {
     
     private func discoverMints() {
         isDiscovering = true
+        discoveredMints = [] // Clear previous results
         
         Task {
-            do {
-                let discovered = try await walletManager.discoverMints()
-                
+            var hasReceivedMints = false
+            
+            for await mints in walletManager.discoverMintsStream() {
                 await MainActor.run {
-                    isDiscovering = false
+                    discoveredMints = mints
                     
-                    if !discovered.isEmpty {
-                        // TODO: Show discovered mints sheet
-                        print("Discovered \(discovered.count) mints")
+                    // Show the sheet as soon as we get the first mint
+                    if !hasReceivedMints && !mints.isEmpty {
+                        hasReceivedMints = true
+                        showDiscoverMints = true
+                    }
+                    
+                    // Stop showing the loading indicator after first batch
+                    if isDiscovering && !mints.isEmpty {
+                        isDiscovering = false
                     }
                 }
-            } catch {
-                await MainActor.run {
-                    isDiscovering = false
-                    print("Failed to discover mints: \(error)")
-                }
+            }
+            
+            // Stream ended
+            await MainActor.run {
+                isDiscovering = false
             }
         }
     }

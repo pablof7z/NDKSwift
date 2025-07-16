@@ -12,6 +12,7 @@ class WalletManager {
     var error: Error?
     var transactions: [Transaction] = []
     var availableMints: [String] = []
+    var currentBalance: Int64 = 0
     
     private let nostrManager: NostrManager
     private let modelContext: ModelContext
@@ -64,6 +65,12 @@ class WalletManager {
         print("WalletManager - Loading wallet...")
         try await ndkWallet.load()
         print("WalletManager - Wallet loading finished")
+        
+        // Get initial balance
+        if let balance = try? await ndkWallet.getBalance() {
+            self.currentBalance = balance
+            print("WalletManager - Initial balance: \(balance)")
+        }
         
         // Check if wallet has mints configured
         let mintURLs = await ndkWallet.mints.getMintURLs()
@@ -133,6 +140,9 @@ class WalletManager {
                     
                 case .balanceChanged(let newBalance):
                     print("WalletManager - Balance changed: \(newBalance)")
+                    await MainActor.run {
+                        self.currentBalance = newBalance
+                    }
                     
                 case .nutzapReceived(let amount, let from):
                     print("WalletManager - Nutzap received: \(amount) sats from \(from ?? "unknown")")
@@ -215,14 +225,11 @@ class WalletManager {
             // Determine transaction type from tags
             let transactionType: Transaction.TransactionType
             
-            // Check for specific type in clear tags (e.g., nutzap, cross_mint_transfer)
+            // Check for specific type in clear tags (e.g., nutzap)
             if let typeTag = event.tags.first(where: { $0.count >= 2 && $0[0] == "type" }) {
                 switch typeTag[1] {
                 case "nutzap":
                     transactionType = .nutzap
-                case "cross_mint_transfer":
-                    // For transfers, determine if it's send or receive based on direction
-                    transactionType = direction == "out" ? .send : .receive
                 default:
                     // Fall back to direction-based type
                     guard let dir = direction else { return }
@@ -343,10 +350,7 @@ class WalletManager {
               let userPubkey = try? await signer.pubkey else {
             // Return default relays if we can't get user's relays
             return [
-                "wss://relay.damus.io",
-                "wss://relay.nostr.band",
-                "wss://relay.primal.net",
-                "wss://relay.snort.social"
+                "wss://relay.primal.net"
             ]
         }
         print("getRelaysForWallet guard ok")
@@ -370,10 +374,7 @@ class WalletManager {
         
         // Fallback to default relays
         return [
-            "wss://relay.damus.io",
-            "wss://relay.nostr.band",  
-            "wss://relay.primal.net",
-            "wss://relay.snort.social"
+            "wss://relay.primal.net"
         ]
     }
     
@@ -565,70 +566,60 @@ class WalletManager {
     
     /// Add a new mint
     func addMint(url: URL) async throws {
-        guard let wallet = activeWallet,
-              let ndk = nostrManager.ndk,
-              let signer = ndk.signer else {
+        guard let wallet = activeWallet else {
             throw WalletError.noActiveWallet
         }
         
-        print("WalletManager - Adding mint: \(url)")
+        print("🔧 WalletManager - Starting mint addition process for: \(url)")
         
-        // Get current mints and add the new one
-        let mintURLs = await wallet.mints.getMintURLs()
-        let currentMints = mintURLs.compactMap { URL(string: $0) }
-        var mintStrings = currentMints.map { $0.absoluteString }
+        // Use WalletManager's availableMints state which tracks the current configuration
+        var mintStrings = availableMints
+        print("🔧 WalletManager - Current mints from WalletManager state: \(mintStrings)")
+        
+        // Check if the mint already exists
+        if mintStrings.contains(url.absoluteString) {
+            print("🔧 WalletManager - Mint \(url) already exists, skipping")
+            return
+        }
+        
         mintStrings.append(url.absoluteString)
-        
-        // Get P2PK private key
-        let p2pkPrivateKey = try await wallet.getP2PKPrivateKey()
+        print("🔧 WalletManager - Updated mints list: \(mintStrings)")
         
         // Get relays
         let relays = await getRelaysForWallet()
+        print("🔧 WalletManager - Retrieved relays for wallet: \(relays)")
         
-        // Publish updated wallet configuration
-        try await NDKCashuWalletEvent.createAndPublish(
-            ndk: ndk,
+        // Use NIP60Wallet.setup() to handle both wallet config and mint list events
+        try await wallet.setup(
             mints: mintStrings,
             relays: relays,
-            p2pkPrivateKey: p2pkPrivateKey,
-            signer: signer
+            publishMintList: true
         )
         
-        print("WalletManager - Published updated wallet configuration with new mint: \(url)")
+        print("🔧 WalletManager - Completed mint addition process for: \(url)")
         
         // The wallet will update itself when it receives the event
     }
     
     /// Remove a mint
     func removeMint(url: URL) async throws {
-        guard let wallet = activeWallet,
-              let ndk = nostrManager.ndk,
-              let signer = ndk.signer else {
+        guard let wallet = activeWallet else {
             throw WalletError.noActiveWallet
         }
         
         print("WalletManager - Removing mint: \(url)")
         
-        // Get current mints and remove the specified one
-        let mintURLs = await wallet.mints.getMintURLs()
-        let currentMints = mintURLs.compactMap { URL(string: $0) }
-        let mintStrings = currentMints
-            .filter { $0 != url }
-            .map { $0.absoluteString }
-        
-        // Get P2PK private key
-        let p2pkPrivateKey = try await wallet.getP2PKPrivateKey()
+        // Use WalletManager's availableMints state which tracks the current configuration
+        let mintStrings = availableMints.filter { $0 != url.absoluteString }
         
         // Get relays
         let relays = await getRelaysForWallet()
         
-        // Publish updated wallet configuration
-        try await NDKCashuWalletEvent.createAndPublish(
-            ndk: ndk,
+        // Use NIP60Wallet.setup() to handle both wallet config and mint list events
+        try await wallet.setup(
             mints: mintStrings,
             relays: relays,
-            p2pkPrivateKey: p2pkPrivateKey,
-            signer: signer
+            publishMintList: true
         )
         
         print("WalletManager - Published updated wallet configuration without mint: \(url)")
@@ -636,14 +627,16 @@ class WalletManager {
         // The wallet will update itself when it receives the event
     }
     
-    /// Discover mints via NIP-60
-    func discoverMints() async throws -> [MintDiscovery] {
-        guard let wallet = activeWallet else {
-            throw WalletError.noActiveWallet
+    /// Discover mints via NIP-87 with streaming updates
+    func discoverMintsStream() -> AsyncStream<[DiscoveredMint]> {
+        guard let ndk = nostrManager.ndk else {
+            return AsyncStream { continuation in
+                continuation.finish()
+            }
         }
         
-        // TODO: Implement mint discovery
-        return []
+        let discoveryManager = MintDiscoveryManager(ndk: ndk)
+        return discoveryManager.discoverMintsStream()
     }
     
     // MARK: - Cross-mint Operations
@@ -696,6 +689,151 @@ class WalletManager {
         try await wallet.checkAndReconcileProofStates()
     }
     
+    // MARK: - Wallet Events Management
+    
+    /// Fetch all wallet events (kind 7375) and their deletion status
+    func fetchAllWalletEvents() async throws -> [WalletEventInfo] {
+        guard let ndk = nostrManager.ndk,
+              let signer = ndk.signer else {
+            throw WalletError.ndkNotInitialized
+        }
+        
+        let userPubkey = try await signer.pubkey
+        
+        // Fetch all token events (kind 7375) from this user
+        let tokenFilter = NDKFilter(
+            authors: [userPubkey],
+            kinds: [EventKind.cashuToken]
+        )
+        
+        // Fetch deletion events that target token events
+        let deletionFilter = NDKFilter(
+            authors: [userPubkey],
+            kinds: [EventKind.deletion],
+            tags: ["k": Set([String(EventKind.cashuToken)])]
+        )
+        
+        // Fetch events from cache or relays
+        let tokenEvents = try await ndk.fetchEvents([tokenFilter])
+        let deletionEvents = try await ndk.fetchEvents([deletionFilter])
+        
+        // Build a set of deleted event IDs from deletion events
+        var deletedEventIds = Set<String>()
+        var deletionEventMap: [String: NDKEvent] = [:]
+        
+        for deletionEvent in deletionEvents {
+            // Extract deleted event IDs from "e" tags
+            for tag in deletionEvent.tags {
+                if tag.count >= 2 && tag[0] == "e" {
+                    deletedEventIds.insert(tag[1])
+                    deletionEventMap[tag[1]] = deletionEvent
+                }
+            }
+        }
+        
+        // Also check for del tags in newer events
+        var eventsByDel: [String: Set<String>] = [:]
+        for event in tokenEvents {
+            // Try to decrypt and parse token data
+            if let tokenData = try? await decryptTokenEvent(event, signer: signer) {
+                if let delTags = tokenData.del {
+                    for deletedId in delTags {
+                        deletedEventIds.insert(deletedId)
+                        if eventsByDel[deletedId] == nil {
+                            eventsByDel[deletedId] = Set<String>()
+                        }
+                        eventsByDel[deletedId]?.insert(event.id)
+                    }
+                }
+            }
+        }
+        
+        // Process each token event
+        var walletEvents: [WalletEventInfo] = []
+        
+        for event in tokenEvents {
+            // Try to decrypt token data
+            let tokenData = try? await decryptTokenEvent(event, signer: signer)
+            
+            // Check if this event is deleted
+            let isDeleted = deletedEventIds.contains(event.id)
+            
+            // Determine deletion reason
+            var deletionReason: String? = nil
+            var deletionEvent: NDKEvent? = nil
+            
+            if isDeleted {
+                if let delEvent = deletionEventMap[event.id] {
+                    deletionReason = "Deleted via NIP-09"
+                    deletionEvent = delEvent
+                } else if let replacingEventIds = eventsByDel[event.id] {
+                    deletionReason = "Replaced by event(s): \(replacingEventIds.joined(separator: ", ").prefix(32))..."
+                }
+            }
+            
+            let eventInfo = WalletEventInfo(
+                event: event,
+                tokenData: tokenData,
+                isDeleted: isDeleted,
+                deletionReason: deletionReason,
+                deletionEvent: deletionEvent
+            )
+            
+            walletEvents.append(eventInfo)
+        }
+        
+        // Sort by creation date (newest first)
+        walletEvents.sort { $0.event.createdAt > $1.event.createdAt }
+        
+        return walletEvents
+    }
+    
+    /// Decrypt a token event to get its content
+    private func decryptTokenEvent(_ event: NDKEvent, signer: NDKSigner) async throws -> NIP60TokenEvent? {
+        let sender = NDKUser(pubkey: event.pubkey)
+        let decryptedContent = try await signer.decrypt(
+            sender: sender,
+            value: event.content,
+            scheme: .nip44
+        )
+        
+        guard let data = decryptedContent.data(using: .utf8) else {
+            return nil
+        }
+        
+        return try JSONDecoder().decode(NIP60TokenEvent.self, from: data)
+    }
+    
+    /// Check proof states for specific proofs
+    func checkProofStates(for proofs: [CashuSwift.Proof], mint mintURL: String) async throws -> [String: CashuSwift.Proof.ProofState] {
+        guard let wallet = activeWallet else {
+            throw WalletError.noActiveWallet
+        }
+        
+        guard let url = URL(string: mintURL) else {
+            throw WalletError.invalidMintURL
+        }
+        
+        // Get mint instance
+        let mints = await wallet.mints.getAllMints()
+        guard let mint = mints[mintURL] else {
+            throw WalletError.mintNotFound
+        }
+        
+        // Check proof states
+        let states = try await CashuSwift.check(proofs, mint: mint)
+        
+        // Build result dictionary mapping C value to state
+        var result: [String: CashuSwift.Proof.ProofState] = [:]
+        for (index, proof) in proofs.enumerated() {
+            if index < states.count {
+                result[proof.C] = states[index]
+            }
+        }
+        
+        return result
+    }
+    
     
     /// Get wallet's P2PK pubkey
     func getP2PKPubkey() async throws -> String {
@@ -717,6 +855,28 @@ class WalletManager {
         }
     }
     
+    // MARK: - Session Management
+    
+    /// Clear all wallet data and cancel active subscriptions (called during logout)
+    func clearWalletData() {
+        // Cancel active subscriptions
+        walletEventTask?.cancel()
+        walletEventTask = nil
+        
+        Task {
+            await historySubscription?.close()
+            historySubscription = nil
+        }
+        
+        // Clear wallet state
+        activeWallet = nil
+        transactions.removeAll()
+        availableMints.removeAll()
+        currentBalance = 0
+        
+        print("WalletManager - Cleared all wallet data and cancelled subscriptions")
+    }
+    
     // MARK: - Private Methods
 }
 
@@ -730,6 +890,8 @@ enum WalletError: LocalizedError {
     case invalidToken
     case encodingError
     case signerNotAvailable
+    case invalidMintURL
+    case mintNotFound
     
     var errorDescription: String? {
         switch self {
@@ -747,6 +909,10 @@ enum WalletError: LocalizedError {
             return "Failed to encode data"
         case .signerNotAvailable:
             return "Signer not available yet"
+        case .invalidMintURL:
+            return "Invalid mint URL"
+        case .mintNotFound:
+            return "Mint not found"
         }
     }
 }

@@ -1,6 +1,14 @@
 import Foundation
 import CashuSwift
 
+// MARK: - Extensions for CashuSwift.Proof to support Set operations
+extension CashuSwift.Proof: Hashable {
+    public func hash(into hasher: inout Hasher) {
+        // Use the proof's C value as the unique identifier for hashing
+        hasher.combine(C)
+    }
+}
+
 /// Manages the state of Cashu proofs within a wallet
 /// This includes tracking availability, reservations for concurrent operations, and selection algorithms
 public actor ProofStateManager {
@@ -58,17 +66,23 @@ public actor ProofStateManager {
     
     /// Update ownership of existing proofs to a new event
     func updateProofOwnership(_ proofs: [CashuSwift.Proof], eventId: String, timestamp: Timestamp) {
+        print("ProofStateManager.updateProofOwnership - Updating \(proofs.count) proofs to event \(eventId)")
         for proof in proofs {
             if var entry = proofState[proof.C] {
+                let previousOwner = entry.ownerEventId ?? "none"
                 // Only update if the new event is newer
                 if let existingTimestamp = entry.ownerTimestamp {
                     if timestamp <= existingTimestamp {
+                        print("  Proof \(proof.C): NOT updating owner from \(previousOwner) to \(eventId) - existing timestamp is newer")
                         continue // Don't update, existing owner is newer
                     }
                 }
                 entry.ownerEventId = eventId
                 entry.ownerTimestamp = timestamp
                 proofState[proof.C] = entry
+                print("  Proof \(proof.C): Updated owner from \(previousOwner) to \(eventId)")
+            } else {
+                print("  Proof \(proof.C): WARNING - proof not found in state!")
             }
         }
     }
@@ -227,6 +241,17 @@ public actor ProofStateManager {
         }
     }
     
+    /// Get the owner event ID for a single proof
+    /// Returns the event ID that owns this proof, or nil if no owner
+    func getOwnerEventId(for proof: CashuSwift.Proof) -> String? {
+        return proofState[proof.C]?.ownerEventId
+    }
+    
+    /// Get the mint for a proof
+    func getMintForProof(_ proof: CashuSwift.Proof) -> String? {
+        return proofState[proof.C]?.mint
+    }
+    
     /// Get the owner event IDs for a set of proofs
     /// Returns a set of event IDs that previously owned these proofs
     func getOwnerEventIds(for proofs: [CashuSwift.Proof]) -> Set<String> {
@@ -240,6 +265,32 @@ public actor ProofStateManager {
         }
         
         return ownerIds
+    }
+    
+    /// Get all proofs (available and reserved) that belong to a specific event
+    /// This is crucial for proper proof rollover when creating new token events
+    func getProofsForEvent(_ eventId: String) -> [CashuSwift.Proof] {
+        let proofs = proofState.values
+            .filter { entry in
+                entry.ownerEventId == eventId && entry.state != .deleted
+            }
+            .map { $0.proof }
+        print("ProofStateManager.getProofsForEvent(\(eventId)) - Found \(proofs.count) proofs")
+        return proofs
+    }
+    
+    /// Get all available proofs that belong to a specific event
+    func getAvailableProofsForEvent(_ eventId: String) -> [CashuSwift.Proof] {
+        let proofs = proofState.values
+            .filter { entry in
+                entry.ownerEventId == eventId && entry.state == .available
+            }
+            .map { $0.proof }
+        print("ProofStateManager.getAvailableProofsForEvent(\(eventId)) - Found \(proofs.count) available proofs")
+        for proof in proofs {
+            print("  - Proof C: \(proof.C), amount: \(proof.amount)")
+        }
+        return proofs
     }
 }
 

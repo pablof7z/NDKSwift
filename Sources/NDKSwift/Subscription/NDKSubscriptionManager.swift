@@ -51,6 +51,10 @@ public actor NDKSubscriptionManager {
     private var pendingGroups: [FilterFingerprint: PendingGroup] = [:]
     private var eventDeduplication: [EventID: Timestamp] = [:]
     private var eoseTracking: [String: EOSETracker] = [:]
+    
+    // Tombstone cache for deletion events that arrive before the original event
+    private var deletionTombstones: [EventID: Timestamp] = [:]
+    private let tombstoneTTL: TimeInterval = 600 // 10 minutes
 
     /// Configuration
     private let maxFiltersPerRequest = 10
@@ -195,6 +199,12 @@ public actor NDKSubscriptionManager {
     private func processEvent(_ event: NDKEvent, from source: EventSource) async {
         let eventId = event.id
 
+        // Check if this event was previously deleted (tombstone check)
+        if deletionTombstones[eventId] != nil {
+            // This event was deleted before it arrived, discard it
+            return
+        }
+
         // Check deduplication (skip for optimistic events to allow immediate UI updates)
         let now = Timestamp.now
         let isUnique: Bool
@@ -211,6 +221,11 @@ public actor NDKSubscriptionManager {
                 return
             }
             eventDeduplication[eventId] = now
+        }
+
+        // Process deletion events (NIP-09) before dispatching to subscriptions
+        if event.kind == EventKind.deletion {
+            await processDeletionEvent(event)
         }
 
         // Find matching subscriptions and dispatch
@@ -509,6 +524,50 @@ public actor NDKSubscriptionManager {
 
     // Removed obsolete cache strategy helpers
 
+    // MARK: - Deletion Event Processing (NIP-09)
+    
+    /// Process a kind:5 deletion event according to NIP-09
+    func processDeletionEvent(_ deletionEvent: NDKEvent) async {
+        guard let ndk = ndk else { return }
+        
+        // Extract event IDs to delete from "e" tags
+        let eventIdsToDelete = deletionEvent.tags
+            .filter { $0.count >= 2 && $0[0] == "e" }
+            .map { $0[1] }
+        
+        guard !eventIdsToDelete.isEmpty else { return }
+        
+        let now = Timestamp.now
+        
+        // For each event ID to delete
+        for eventId in eventIdsToDelete {
+            // First, try to get the event from cache to verify authorship
+            if let eventToDelete = await ndk.cache.getEvent(id: eventId) {
+                // NIP-09: Only the author of an event can delete it
+                if eventToDelete.pubkey == deletionEvent.pubkey {
+                    // Delete from cache
+                    do {
+                        try await ndk.cache.deleteEvent(id: eventId)
+                    } catch {
+                        // Log error but continue processing other deletions
+                        NDKLogger.shared.log(.error, category: .cache, "Failed to delete event \(eventId) from cache: \(error.localizedDescription)")
+                    }
+                }
+            } else {
+                // Event not in cache yet - add to tombstone cache
+                // This prevents the event from being added if it arrives later
+                deletionTombstones[eventId] = now
+                
+                // Also try to delete it in case some cache implementations handle this
+                do {
+                    try await ndk.cache.deleteEvent(id: eventId)
+                } catch {
+                    // Silent fail - event might not exist
+                }
+            }
+        }
+    }
+
     // MARK: - Cleanup
 
     private func startPeriodicCleanup() async {
@@ -521,10 +580,16 @@ public actor NDKSubscriptionManager {
     private func performCleanup() async {
         let now = Timestamp.now
         let cutoff = now - Int64(deduplicationWindow)
+        let tombstoneCutoff = now - Int64(tombstoneTTL)
 
         // Clean old event deduplication entries
         eventDeduplication = eventDeduplication.filter { _, timestamp in
             timestamp > cutoff
+        }
+        
+        // Clean old deletion tombstones
+        deletionTombstones = deletionTombstones.filter { _, timestamp in
+            timestamp > tombstoneCutoff
         }
 
         // Clean closed subscriptions

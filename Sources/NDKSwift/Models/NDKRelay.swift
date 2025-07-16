@@ -45,7 +45,7 @@ public enum NDKRelayConnectionState: Equatable, Codable, Sendable {
 }
 
 /// Relay statistics
-public struct NDKRelayStats: Sendable {
+public struct NDKRelayStats: Sendable, Equatable {
     public var connectedAt: Date?
     public var lastMessageAt: Date?
     public var messagesSent: Int = 0
@@ -72,6 +72,7 @@ actor RelayStateActor {
     
     // Observers
     var stateObservers: [@Sendable (NDKRelayConnectionState) -> Void] = []
+    var fullStateObservers: [@Sendable (NDKRelay.State) -> Void] = []
     
     // Connection management
     var connection: NDKRelayConnection?
@@ -85,11 +86,34 @@ actor RelayStateActor {
     func updateConnectionState(_ newState: NDKRelayConnectionState) {
         connectionState = newState
         
-        // Notify observers on main thread to avoid UI issues
+        // Notify connection state observers
         let observers = stateObservers
         Task { @MainActor in
             for observer in observers {
                 observer(newState)
+            }
+        }
+        
+        // Notify full state observers
+        notifyFullStateObservers()
+    }
+    
+    // MARK: - Full State Management
+    
+    func getFullState() -> NDKRelay.State {
+        return NDKRelay.State(
+            connectionState: connectionState,
+            stats: stats,
+            info: info
+        )
+    }
+    
+    private func notifyFullStateObservers() {
+        let snapshot = getFullState()
+        let observers = fullStateObservers
+        Task { @MainActor in
+            for observer in observers {
+                observer(snapshot)
             }
         }
     }
@@ -149,6 +173,7 @@ actor RelayStateActor {
     
     func updateStats(_ updater: (inout NDKRelayStats) -> Void) {
         updater(&stats)
+        notifyFullStateObservers()
     }
     
     func getStats() -> NDKRelayStats {
@@ -167,6 +192,7 @@ actor RelayStateActor {
     
     func setInfo(_ newInfo: NDKRelayInformation?) {
         info = newInfo
+        notifyFullStateObservers()
     }
     
     func getInfo() -> NDKRelayInformation? {
@@ -200,6 +226,16 @@ actor RelayStateActor {
     func getStateObservers() -> [@Sendable (NDKRelayConnectionState) -> Void] {
         return stateObservers
     }
+    
+    // MARK: - Full State Observers
+    
+    func addFullStateObserver(_ observer: @escaping @Sendable (NDKRelay.State) -> Void) {
+        fullStateObservers.append(observer)
+    }
+    
+    func removeAllFullStateObservers() {
+        fullStateObservers.removeAll()
+    }
 }
 
 /// Represents a Nostr relay that manages WebSocket connections and subscription routing
@@ -224,6 +260,15 @@ actor RelayStateActor {
 public final class NDKRelay: RelayProtocol, Hashable, Equatable, @unchecked Sendable {
     /// Relay URL
     public let url: RelayURL
+    
+    // MARK: - State Management
+    
+    /// Unified state snapshot for reactive updates
+    public struct State: Equatable {
+        public let connectionState: NDKRelayConnectionState
+        public let stats: NDKRelayStats
+        public let info: NDKRelayInformation?
+    }
 
     /// Reference to NDK instance
     private weak var _ndk: NDK?
@@ -295,6 +340,38 @@ public final class NDKRelay: RelayProtocol, Hashable, Equatable, @unchecked Send
     public var isConnected: Bool {
         get async {
             await stateActor.isConnected()
+        }
+    }
+    
+    /// Reactive stream of relay state changes
+    /// 
+    /// Subscribe to this stream to receive real-time updates whenever the relay's
+    /// connection state, statistics, or information changes.
+    /// 
+    /// Example usage:
+    /// ```swift
+    /// Task {
+    ///     for await state in relay.stateStream {
+    ///         print("Relay state updated: \(state.connectionState)")
+    ///     }
+    /// }
+    /// ```
+    public var stateStream: AsyncStream<State> {
+        AsyncStream { continuation in
+            let task = Task {
+                // Register for state updates
+                await self.stateActor.addFullStateObserver { state in
+                    continuation.yield(state)
+                }
+                
+                // Immediately emit current state
+                let currentState = await self.stateActor.getFullState()
+                continuation.yield(currentState)
+            }
+            
+            continuation.onTermination = { @Sendable _ in
+                task.cancel()
+            }
         }
     }
 
@@ -752,9 +829,11 @@ public extension NDKRelay {
 }
 
 /// Relay information from NIP-11
-public struct NDKRelayInformation: Codable, Sendable {
+public struct NDKRelayInformation: Codable, Sendable, Equatable {
     public let name: String?
     public let description: String?
+    public let banner: String?
+    public let icon: String?
     public let pubkey: PublicKey?
     public let contact: String?
     public let supportedNips: [Int]?
@@ -770,7 +849,7 @@ public struct NDKRelayInformation: Codable, Sendable {
     public let fees: RelayFees?
 
     private enum CodingKeys: String, CodingKey {
-        case name, description, pubkey, contact
+        case name, description, banner, icon, pubkey, contact
         case supportedNips = "supported_nips"
         case software, version, limitation, retention
         case relayCountries = "relay_countries"
@@ -783,7 +862,7 @@ public struct NDKRelayInformation: Codable, Sendable {
 }
 
 /// Relay limitations
-public struct RelayLimitation: Codable, Sendable {
+public struct RelayLimitation: Codable, Sendable, Equatable {
     public let maxMessageLength: Int?
     public let maxSubscriptions: Int?
     public let maxFilters: Int?
@@ -812,20 +891,20 @@ public struct RelayLimitation: Codable, Sendable {
 }
 
 /// Relay retention policy
-public struct RelayRetention: Codable, Sendable {
+public struct RelayRetention: Codable, Sendable, Equatable {
     public let kinds: [Int]?
     public let time: Int?
     public let count: Int?
 }
 
 /// Relay fee structure
-public struct RelayFees: Codable, Sendable {
+public struct RelayFees: Codable, Sendable, Equatable {
     public let admission: [RelayFee]?
     public let publication: [RelayFee]?
 }
 
 /// Individual relay fee
-public struct RelayFee: Codable, Sendable {
+public struct RelayFee: Codable, Sendable, Equatable {
     public let amount: Int
     public let unit: String
     public let period: Int?

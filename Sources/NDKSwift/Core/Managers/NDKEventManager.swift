@@ -61,11 +61,32 @@ public actor NDKEventManager {
             }
         }
         
-        // Get relay objects from URLs
+        // Get relay objects from URLs and start connecting them in parallel
         var targetRelays: [NDKRelay] = []
+        
+        // First, add all relays to pool and collect them
         for url in targetRelayUrls {
-            if let relay = await ndk.pool.getRelay(for: url) {
-                targetRelays.append(relay)
+            let relay = await ndk.pool.addRelay(url)
+            targetRelays.append(relay)
+        }
+        
+        // Start connecting to disconnected relays in parallel (non-blocking)
+        Task {
+            await withTaskGroup(of: Void.self) { group in
+                for relay in targetRelays {
+                    group.addTask {
+                        let connectionState = await relay.connectionState
+                        if connectionState != .connected && connectionState != .connecting {
+                            print("[NDKEventManager] Starting connection to relay for publishing: \(relay.url)")
+                            do {
+                                try await relay.connect()
+                                print("[NDKEventManager] Connected to relay: \(relay.url)")
+                            } catch {
+                                print("[NDKEventManager] Failed to connect to relay \(relay.url): \(error)")
+                            }
+                        }
+                    }
+                }
             }
         }
         
@@ -121,11 +142,32 @@ public actor NDKEventManager {
             print("[NDKEventManager] Warning: Failed to cache event: \(error)")
         }
         
-        // Get relay instances
+        // Get relay instances and start connecting them in parallel
         var targetRelays = Set<NDKRelay>()
+        
+        // First, add all relays to pool and collect them
         for url in relayUrls {
-            if let relay = await ndk.pool.getRelay(for: url) {
-                targetRelays.insert(relay)
+            let relay = await ndk.pool.addRelay(url)
+            targetRelays.insert(relay)
+        }
+        
+        // Start connecting to disconnected relays in parallel (non-blocking)
+        Task {
+            await withTaskGroup(of: Void.self) { group in
+                for relay in targetRelays {
+                    group.addTask {
+                        let connectionState = await relay.connectionState
+                        if connectionState != .connected && connectionState != .connecting {
+                            print("[NDKEventManager] Starting connection to relay for publishing: \(relay.url)")
+                            do {
+                                try await relay.connect()
+                                print("[NDKEventManager] Connected to relay: \(relay.url)")
+                            } catch {
+                                print("[NDKEventManager] Failed to connect to relay \(relay.url): \(error)")
+                            }
+                        }
+                    }
+                }
             }
         }
         

@@ -14,13 +14,7 @@ class NostrManager {
     var cache: NDKSQLiteCache?
     
     // Default relays for the app
-    let defaultRelays = [
-        "wss://relay.damus.io",
-        "wss://relay.nostr.band",
-        "wss://relay.primal.net",
-        "wss://relay.snort.social",
-        "wss://relay.primal.net"
-    ]
+    let defaultRelays = [ "wss://relay.primal.net" ]
     
     init(from: String) {
         print("🏚️ [NostrManager] Initializing...", from)
@@ -124,7 +118,6 @@ class NostrManager {
         // Create session with auth manager
         let session = try await ndkAuthManager.createSession(
             with: signer,
-            displayName: displayName,
             requiresBiometric: false,
             isHardwareBacked: false
         )
@@ -160,8 +153,26 @@ class NostrManager {
     }
     
     func logout() {
+        // Clear all cached data and sessions
+        Task {
+            if let cache = cache {
+                try? await cache.clear()
+                print("Cleared all cached data")
+            }
+            
+            // Clear all sessions from keychain to prevent "Welcome back" scenario
+            for session in ndkAuthManager.availableSessions {
+                try? await ndkAuthManager.deleteSession(session)
+            }
+        }
+        
+        // Clear active authentication state
         ndkAuthManager.logout()
-        print("Logged out")
+        
+        // Clear NDK signer
+        ndk?.signer = nil
+        
+        print("Logged out and cleared all authentication data")
     }
     
     // MARK: - Auth State Management
@@ -186,7 +197,6 @@ class NostrManager {
         // Create session with auth manager
         let session = try await ndkAuthManager.createSession(
             with: signer,
-            displayName: displayName,
             requiresBiometric: false,
             isHardwareBacked: false
         )
@@ -205,31 +215,6 @@ class NostrManager {
             guard ndkAuthManager.isAuthenticated else { return nil }
             return try? await ndkAuthManager.activeSigner?.user()
         }
-    }
-    
-    func fetchNIP60Wallets() async throws -> [NDKEvent] {
-        guard let ndk = ndk,
-              ndkAuthManager.isAuthenticated,
-              let user = await currentUser else {
-            throw NostrError.notLoggedIn
-        }
-        
-        let filter = NDKFilter(
-            authors: [user.npub],
-            kinds: [EventKind.walletInfo],
-            limit: 100
-        )
-        
-        // Fetch events - will use cache if available and fetch from relays if needed
-        let events = try await ndk.fetchEvents([filter])
-        return Array(events)
-    }
-    
-    func publishNIP60Wallet(_ walletEvent: NDKEvent) async throws {
-        guard ndk != nil else { throw NostrError.ndkNotInitialized }
-        
-        _ = try await ndk?.publish(walletEvent)
-        print("Published NIP-60 wallet event")
     }
 }
 

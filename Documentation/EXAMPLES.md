@@ -612,8 +612,10 @@ func fetchArticles(by author: String) async throws -> [Article] {
 ```swift
 // Delete a single event
 func deleteEvent(_ event: NDKEvent, reason: String = "Deleted by user") async throws {
-    let user = ndk.getUser(event.pubkey)
-    let deletionEvent = try await user.deleteEvent(event, reason: reason)
+    guard let signer = ndk.signer else {
+        throw NDKError.notConfigured("No signer configured")
+    }
+    let deletionEvent = try await event.delete(ndk: ndk, reason: reason, signer: signer)
     print("Deleted event \(event.id) with reason: \(reason)")
     
     // The event is automatically removed from cache when deletion is processed
@@ -621,8 +623,12 @@ func deleteEvent(_ event: NDKEvent, reason: String = "Deleted by user") async th
 
 // Delete multiple events at once
 func deleteEvents(_ events: [NDKEvent], reason: String = "Batch deletion") async throws {
-    let user = ndk.getUser(events.first?.pubkey ?? "")
-    let deletionEvent = try await user.deleteEvents(events, reason: reason)
+    guard let signer = ndk.signer else {
+        throw NDKError.notConfigured("No signer configured")
+    }
+    for event in events {
+        let deletionEvent = try await event.delete(ndk: ndk, reason: reason, signer: signer)
+    }
     print("Deleted \(events.count) events")
 }
 

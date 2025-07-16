@@ -8,13 +8,11 @@ final class NDKSessionTests: XCTestCase {
     func testSessionInitialization() {
         let session = NDKSession(
             pubkey: "d30effaa4e7090322e07b7b95b2c2f42c23bb16b12582d358fb088993a26e53f",
-            displayName: "Test User",
             signerType: "privatekey"
         )
         
         XCTAssertNotNil(session.id)
         XCTAssertEqual(session.pubkey, "d30effaa4e7090322e07b7b95b2c2f42c23bb16b12582d358fb088993a26e53f")
-        XCTAssertEqual(session.displayName, "Test User")
         XCTAssertEqual(session.signerType, "privatekey")
         XCTAssertFalse(session.isActive)
         XCTAssertNil(session.avatarURL)
@@ -27,7 +25,6 @@ final class NDKSessionTests: XCTestCase {
         let avatarURL = URL(string: "https://example.com/avatar.jpg")!
         var session = NDKSession(
             pubkey: "d30effaa4e7090322e07b7b95b2c2f42c23bb16b12582d358fb088993a26e53f",
-            displayName: "Complete User",
             signerType: "privatekey",
             requiresBiometric: true,
             isHardwareBacked: true,
@@ -40,7 +37,6 @@ final class NDKSessionTests: XCTestCase {
         session.about = "Test user profile"
         session.profileName = "Complete User"
         
-        XCTAssertEqual(session.displayName, "Complete User")
         XCTAssertTrue(session.isActive)
         XCTAssertEqual(session.avatarURL, avatarURL)
         XCTAssertEqual(session.profileName, "Complete User")
@@ -55,7 +51,6 @@ final class NDKSessionTests: XCTestCase {
     func testSessionWithSecuritySettings() {
         let session = NDKSession(
             pubkey: "d30effaa4e7090322e07b7b95b2c2f42c23bb16b12582d358fb088993a26e53f",
-            displayName: "Secure User",
             signerType: "privatekey",
             requiresBiometric: true,
             isHardwareBacked: false,
@@ -70,7 +65,6 @@ final class NDKSessionTests: XCTestCase {
     func testSessionSecurityDefaults() {
         let session = NDKSession(
             pubkey: "d30effaa4e7090322e07b7b95b2c2f42c23bb16b12582d358fb088993a26e53f",
-            displayName: "Default User",
             signerType: "privatekey"
         )
         
@@ -84,7 +78,6 @@ final class NDKSessionTests: XCTestCase {
     func testSessionActivation() {
         var session = NDKSession(
             pubkey: "d30effaa4e7090322e07b7b95b2c2f42c23bb16b12582d358fb088993a26e53f",
-            displayName: "Test User",
             signerType: "privatekey"
         )
         
@@ -97,7 +90,6 @@ final class NDKSessionTests: XCTestCase {
     func testLastUsedUpdate() {
         var session = NDKSession(
             pubkey: "d30effaa4e7090322e07b7b95b2c2f42c23bb16b12582d358fb088993a26e53f",
-            displayName: "Test User",
             signerType: "privatekey"
         )
         
@@ -115,7 +107,6 @@ final class NDKSessionTests: XCTestCase {
     func testProfileMetadataUpdate() {
         var session = NDKSession(
             pubkey: "d30effaa4e7090322e07b7b95b2c2f42c23bb16b12582d358fb088993a26e53f",
-            displayName: "Test User",
             signerType: "privatekey"
         )
         
@@ -134,7 +125,6 @@ final class NDKSessionTests: XCTestCase {
     func testAvatarURLUpdate() {
         var session = NDKSession(
             pubkey: "d30effaa4e7090322e07b7b95b2c2f42c23bb16b12582d358fb088993a26e53f",
-            displayName: "Test User",
             signerType: "privatekey"
         )
         
@@ -151,7 +141,6 @@ final class NDKSessionTests: XCTestCase {
     func testSessionEncodingDecoding() throws {
         var originalSession = NDKSession(
             pubkey: "d30effaa4e7090322e07b7b95b2c2f42c23bb16b12582d358fb088993a26e53f",
-            displayName: "Test User",
             signerType: "privatekey",
             requiresBiometric: true,
             isHardwareBacked: false,
@@ -170,7 +159,6 @@ final class NDKSessionTests: XCTestCase {
         
         XCTAssertEqual(originalSession.id, decodedSession.id)
         XCTAssertEqual(originalSession.pubkey, decodedSession.pubkey)
-        XCTAssertEqual(originalSession.displayName, decodedSession.displayName)
         XCTAssertEqual(originalSession.signerType, decodedSession.signerType)
         XCTAssertEqual(originalSession.isActive, decodedSession.isActive)
         XCTAssertEqual(originalSession.avatarURL, decodedSession.avatarURL)
@@ -183,39 +171,34 @@ final class NDKSessionTests: XCTestCase {
     
     func testSessionArrayActiveSession() {
         let session1 = NDKSession(
-            pubkey: "pubkey1",
-            displayName: "User 1",
+            pubkey: "d30effaa4e7090322e07b7b95b2c2f42c23bb16b12582d358fb088993a26e531",
             signerType: "privatekey"
         )
         
         var session2 = NDKSession(
-            pubkey: "pubkey2",
-            displayName: "User 2",
+            pubkey: "d30effaa4e7090322e07b7b95b2c2f42c23bb16b12582d358fb088993a26e532",
             signerType: "privatekey"
         )
         session2.isActive = true
         
         let session3 = NDKSession(
-            pubkey: "pubkey3",
-            displayName: "User 3",
+            pubkey: "d30effaa4e7090322e07b7b95b2c2f42c23bb16b12582d358fb088993a26e533",
             signerType: "privatekey"
         )
         
         let sessions = [session1, session2, session3]
         
-        XCTAssertEqual(sessions.activeSession?.pubkey, "pubkey2")
+        XCTAssertEqual(sessions.activeSession?.pubkey, "d30effaa4e7090322e07b7b95b2c2f42c23bb16b12582d358fb088993a26e532")
     }
     
     func testSessionArrayNoActiveSession() {
         let session1 = NDKSession(
-            pubkey: "pubkey1",
-            displayName: "User 1",
+            pubkey: "d30effaa4e7090322e07b7b95b2c2f42c23bb16b12582d358fb088993a26e531",
             signerType: "privatekey"
         )
         
         let session2 = NDKSession(
-            pubkey: "pubkey2",
-            displayName: "User 2",
+            pubkey: "d30effaa4e7090322e07b7b95b2c2f42c23bb16b12582d358fb088993a26e532",
             signerType: "privatekey"
         )
         
@@ -226,22 +209,19 @@ final class NDKSessionTests: XCTestCase {
     
     func testSessionArraySortedByLastUsed() {
         var session1 = NDKSession(
-            pubkey: "pubkey1",
-            displayName: "User 1",
+            pubkey: "d30effaa4e7090322e07b7b95b2c2f42c23bb16b12582d358fb088993a26e531",
             signerType: "privatekey"
         )
         session1.lastUsed = Date(timeIntervalSinceNow: -300) // 5 minutes ago
         
         var session2 = NDKSession(
-            pubkey: "pubkey2",
-            displayName: "User 2",
+            pubkey: "d30effaa4e7090322e07b7b95b2c2f42c23bb16b12582d358fb088993a26e532",
             signerType: "privatekey"
         )
         session2.lastUsed = Date(timeIntervalSinceNow: -60) // 1 minute ago
         
         var session3 = NDKSession(
-            pubkey: "pubkey3",
-            displayName: "User 3",
+            pubkey: "d30effaa4e7090322e07b7b95b2c2f42c23bb16b12582d358fb088993a26e533",
             signerType: "privatekey"
         )
         session3.lastUsed = Date() // now
@@ -249,8 +229,8 @@ final class NDKSessionTests: XCTestCase {
         let sessions = [session1, session2, session3]
         let sorted = sessions.sortedByLastUsed
         
-        XCTAssertEqual(sorted[0].pubkey, "pubkey3") // Most recent
-        XCTAssertEqual(sorted[1].pubkey, "pubkey2")
-        XCTAssertEqual(sorted[2].pubkey, "pubkey1") // Oldest
+        XCTAssertEqual(sorted[0].pubkey, "d30effaa4e7090322e07b7b95b2c2f42c23bb16b12582d358fb088993a26e533") // Most recent
+        XCTAssertEqual(sorted[1].pubkey, "d30effaa4e7090322e07b7b95b2c2f42c23bb16b12582d358fb088993a26e532")
+        XCTAssertEqual(sorted[2].pubkey, "d30effaa4e7090322e07b7b95b2c2f42c23bb16b12582d358fb088993a26e531") // Oldest
     }
 }

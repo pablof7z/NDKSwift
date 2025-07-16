@@ -78,7 +78,13 @@ public enum Nutzap {
             }
             
             // Update token events
-            _ = try await wallet.update(deletedProofs: selectedProofs, addedProofs: change ?? [])
+            let stateChange = WalletStateChange(
+                store: change ?? [],
+                destroy: selectedProofs,
+                mint: mintURL,
+                memo: "Send nutzap"
+            )
+            _ = try await wallet.update(stateChange: stateChange)
             
             // Create spending history
             try await eventManager.createSpendingHistoryEvent(
@@ -171,7 +177,26 @@ public enum Nutzap {
         guard totalReceived > 0 else { return }
         
         // Update wallet state
-        _ = try await wallet.update(deletedProofs: [], addedProofs: redeemedProofs)
+        // Group by mint since we may have redeemed from multiple mints
+        var proofsByMint: [String: [CashuSwift.Proof]] = [:]
+        for proof in redeemedProofs {
+            if let proofMint = mints.first(where: { _, mint in 
+                mint.keysets.contains { $0.keysetID == proof.keysetID }
+            }) {
+                proofsByMint[proofMint.key, default: []].append(proof)
+            }
+        }
+        
+        // Update state for each mint
+        for (mintURL, proofs) in proofsByMint {
+            let stateChange = WalletStateChange(
+                store: proofs,
+                destroy: [],
+                mint: mintURL,
+                memo: "Receive nutzap"
+            )
+            _ = try await wallet.update(stateChange: stateChange)
+        }
         
         // Create spending history for received nutzap
         try await eventManager.createSpendingHistoryEvent(

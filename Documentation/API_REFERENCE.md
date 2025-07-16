@@ -162,11 +162,7 @@ public func like(_ event: NDKEvent) async throws -> NDKEvent
 public func dislike(_ event: NDKEvent) async throws -> NDKEvent
 
 // NIP-09: Event Deletion
-// Delete one or more events
-public func deleteEvents(_ events: [NDKEvent], reason: String = "") async throws -> NDKEvent
-
-// Delete a single event
-public func deleteEvent(_ event: NDKEvent, reason: String = "") async throws -> NDKEvent
+// Note: Use event.delete(ndk:reason:signer:) method instead of NDK-level methods
 ```
 
 #### Statistics
@@ -792,42 +788,7 @@ public typealias RelayURL = String               // Relay websocket URL
 
 ### EventKind
 
-Common event kinds:
-
-```swift
-public struct EventKind {
-    public static let metadata = 0               // User metadata
-    public static let textNote = 1               // Text note
-    public static let recommendRelay = 2         // Relay recommendation
-    public static let contactList = 3            // Contact list
-    public static let encryptedDirectMessage = 4 // DM (NIP-04)
-    public static let deletion = 5               // Event deletion
-    public static let repost = 6                 // Repost
-    public static let reaction = 7               // Reaction
-    public static let badgeAward = 8             // Badge award
-    public static let giftWrap = 1059            // Gift wrap (NIP-59)
-    public static let fileMetadata = 1063        // File metadata
-    public static let liveChatMessage = 1311     // Live chat
-    public static let zap = 9735                 // Zap receipt
-    public static let cashuWallet = 7375         // Cashu wallet (NIP-60)
-    public static let cashuToken = 7376          // Cashu token (NIP-60)
-    public static let nutzap = 9321              // Nutzap (NIP-61)
-    public static let relayList = 10002          // Relay list (NIP-65)
-    public static let cashuMintList = 10019      // Mint preferences
-    public static let clientAuthentication = 22242 // Client auth
-    public static let walletInfo = 13194         // Wallet info
-    public static let walletRequest = 23194      // Wallet request
-    public static let walletResponse = 23195     // Wallet response
-    public static let nostrConnect = 24133       // Nostr connect
-    public static let blossomUpload = 24242      // Blossom auth
-    public static let httpAuth = 27235           // HTTP auth
-    public static let profileBadges = 30008      // Profile badges
-    public static let badgeDefinition = 30009    // Badge definition
-    public static let article = 30023            // Long-form content
-    public static let applicationData = 30078    // App-specific data
-    public static let mintAnnouncement = 38000   // Mint announcement (NIP-60)
-}
-```
+Common event kinds.
 
 ### NDKError
 

@@ -134,7 +134,13 @@ public enum Payment {
             }
             
             // Update wallet state
-            let newEventIds = try await wallet.update(deletedProofs: selectedProofs, addedProofs: change ?? [])
+            let stateChange = WalletStateChange(
+                store: change ?? [],
+                destroy: selectedProofs,
+                mint: mintURL,
+                memo: "Lightning payment"
+            )
+            let newEventIds = try await wallet.update(stateChange: stateChange)
             
             // Create spending history
             try await eventManager.createSpendingHistoryEvent(
@@ -218,7 +224,13 @@ public enum Payment {
             await proofStateManager.addProof(proof, mint: destinationMintURL.absoluteString)
         }
         
-        _ = try await wallet.update(deletedProofs: [], addedProofs: newProofs)
+        let stateChange = WalletStateChange(
+            store: newProofs,
+            destroy: [],
+            mint: destinationMintURL.absoluteString,
+            memo: "Cross-mint transfer"
+        )
+        _ = try await wallet.update(stateChange: stateChange)
         
         return PaymentTransferResult(
             proofs: newProofs,
@@ -286,7 +298,13 @@ public enum Payment {
             }
             
             // Update wallet state
-            _ = try await wallet.update(deletedProofs: selectedProofs, addedProofs: changeProofs)
+            let stateChange = WalletStateChange(
+                store: changeProofs,
+                destroy: selectedProofs,
+                mint: mintURL.absoluteString,
+                memo: "Send tokens"
+            )
+            _ = try await wallet.update(stateChange: stateChange)
             
             return (proofs: lockedProofs, change: changeProofs)
             
