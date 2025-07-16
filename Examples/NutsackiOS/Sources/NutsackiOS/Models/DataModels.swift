@@ -20,15 +20,6 @@ struct MintInfo: Identifiable, Equatable, Hashable {
     }
 }
 
-// MARK: - MintDiscovery
-// Local replacement for missing MintDiscovery type
-struct MintDiscovery {
-    let url: URL
-    let name: String?
-    let description: String?
-    let contact: String?
-    let pubkey: String?
-}
 
 // Note: MintInfo is now defined at the top level of this file
 // References to NIP60Wallet.MintInfo should be changed to just MintInfo

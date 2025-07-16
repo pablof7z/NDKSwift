@@ -11,12 +11,11 @@ struct WalletView: View {
     
     @Binding var urlState: URLState?
     
-    @State private var showConfigureMints = false
     @State private var navigationDestination: WalletDestination?
-    @State private var currentBalance: Int64 = 0
     @State private var showScanner = false
     @State private var scannedInvoice: String?
     @State private var showInvoicePreview = false
+    @State private var showWalletSettings = false
     
     enum WalletDestination: Identifiable, Hashable {
         case mint
@@ -45,12 +44,12 @@ struct WalletView: View {
         NavigationStack {
             VStack {
                 if walletManager.activeWallet == nil {
-                    EmptyWalletView(showConfigureMints: $showConfigureMints)
+                    EmptyWalletView()
                 } else {
                     ScrollView {
                         VStack(spacing: 20) {
                             // Balance card
-                            BalanceCard(balance: Int(currentBalance))
+                            BalanceCard(balance: Int(walletManager.currentBalance))
                                 .padding(.horizontal)
                             
                             // Relay status indicator
@@ -59,10 +58,6 @@ struct WalletView: View {
                                 .onTapGesture {
                                     navigationDestination = .relayHealth
                                 }
-                            
-                            // Mint allocation pie chart
-                            MintAllocationPieChart()
-                                .padding(.horizontal)
                             
                             // Recent transactions
                             RecentTransactionsView()
@@ -91,20 +86,11 @@ struct WalletView: View {
             .toolbar {
                 if walletManager.activeWallet != nil {
                     ToolbarItem(placement: .topBarTrailing) {
-                        Button(action: { showConfigureMints = true }) {
-                            Image(systemName: "building.columns")
-                        }
-                    }
-                    
-                    ToolbarItem(placement: .topBarTrailing) {
-                        Button(action: { navigationDestination = .relayHealth }) {
-                            Image(systemName: "antenna.radiowaves.left.and.right")
+                        Button(action: { showWalletSettings = true }) {
+                            Image(systemName: "gearshape")
                         }
                     }
                 }
-            }
-            .sheet(isPresented: $showConfigureMints) {
-                ConfigureMintsView()
             }
             .sheet(isPresented: $showScanner) {
                 QRScannerView { scannedValue in
@@ -115,6 +101,11 @@ struct WalletView: View {
                 if let invoice = scannedInvoice {
                     LightningInvoicePreviewView(invoice: invoice)
                 }
+            }
+            .sheet(isPresented: $showWalletSettings) {
+                WalletSettingsView()
+                    .environment(nostrManager)
+                    .environment(walletManager)
             }
             .navigationDestination(item: $navigationDestination) { destination in
                 switch destination {
@@ -138,13 +129,6 @@ struct WalletView: View {
                 print("WalletView - onAppear called")
                 print("WalletView - activeWallet: \(walletManager.activeWallet != nil)")
                 loadWalletIfNeeded()
-                updateBalance()
-            }
-            .onChange(of: navigationDestination) { oldValue, newValue in
-                // Update balance when returning from send/receive/melt/mint operations
-                if oldValue != nil && newValue == nil {
-                    updateBalance()
-                }
             }
             .onChange(of: urlState) { oldValue, newValue in
                 if let newValue {
@@ -194,20 +178,6 @@ struct WalletView: View {
         }
     }
     
-    private func updateBalance() {
-        Task {
-            guard let wallet = walletManager.activeWallet else { return }
-            do {
-                let balance = try await wallet.getBalance()
-                await MainActor.run {
-                    currentBalance = balance ?? 0
-                }
-            } catch {
-                print("Failed to update balance: \(error)")
-            }
-        }
-    }
-    
     private func handleScannedValue(_ scannedValue: String) {
         showScanner = false
         
@@ -232,8 +202,8 @@ struct WalletView: View {
 
 // MARK: - Empty Wallet View
 struct EmptyWalletView: View {
-    @Binding var showConfigureMints: Bool
     @Environment(NostrManager.self) private var nostrManager
+    @State private var showWalletSettings = false
     
     var body: some View {
         VStack(spacing: 24) {
@@ -252,12 +222,15 @@ struct EmptyWalletView: View {
                 .foregroundStyle(.secondary)
                 .padding(.horizontal, 40)
             
-            Button(action: { showConfigureMints = true }) {
-                Label("Configure Mints", systemImage: "building.columns.fill")
+            Button(action: { showWalletSettings = true }) {
+                Label("Configure Wallet", systemImage: "gearshape.fill")
                     .padding()
                     .background(Color.orange)
                     .foregroundColor(.white)
                     .cornerRadius(12)
+            }
+            .sheet(isPresented: $showWalletSettings) {
+                WalletSettingsView()
             }
             
             // Test button to verify NDK publishing works

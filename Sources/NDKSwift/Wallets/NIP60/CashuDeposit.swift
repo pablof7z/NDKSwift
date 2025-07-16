@@ -77,11 +77,9 @@ public enum CashuDeposit {
                             )
                             
                             if !proofs.isEmpty {
-                                // Delete the quote event
-                                try await eventManager.deleteQuoteEvent(
-                                    quoteId: quote.quoteId,
-                                    signer: signer
-                                )
+                                // Quote successfully used - we could delete the quote event here
+                                // but we'd need the actual Nostr event ID, not the quote ID
+                                // For now, we'll just let old quote events remain
                                 
                                 // Let the wallet handle proof state updates
                                 let createdEventIds = try await onProofsReceived(proofs)
@@ -107,7 +105,10 @@ public enum CashuDeposit {
                             }
                         } catch {
                             // If it's a specific error indicating deposit not ready, continue polling
-                            if case CashuError.quoteNotPaid = error {
+                            if case NDKError.walletError(let message) = error, message.contains("Deposit not ready") {
+                                // Expected - deposit not ready yet, continue polling
+                            } else if case CashuError.quoteNotPaid = error {
+                                // Also handle CashuError.quoteNotPaid for compatibility
                                 // Expected - deposit not ready yet, continue polling
                             } else {
                                 throw error

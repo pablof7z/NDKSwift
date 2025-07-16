@@ -17,7 +17,6 @@ import Foundation
 /// ```swift
 /// let session = NDKSession(
 ///     pubkey: userPubkey,
-///     displayName: "Alice",
 ///     signerType: "privatekey",
 ///     requiresBiometric: true
 /// )
@@ -29,8 +28,6 @@ public struct NDKSession: Codable, Identifiable, Sendable {
     /// User's public key (hex format)
     public let pubkey: String
     
-    /// Display name for the session
-    public let displayName: String
     
     /// Signer type identifier (used for deserialization)
     public let signerType: String
@@ -74,14 +71,12 @@ public struct NDKSession: Codable, Identifiable, Sendable {
     /// Initialize a new session
     /// - Parameters:
     ///   - pubkey: User's public key in hex format
-    ///   - displayName: Display name for the session
     ///   - signerType: Type identifier for the signer
     ///   - requiresBiometric: Whether biometric auth is required
     ///   - isHardwareBacked: Whether signer uses secure enclave
     ///   - autoLockTimeout: Auto-lock timeout in seconds
     public init(
         pubkey: String,
-        displayName: String,
         signerType: String,
         requiresBiometric: Bool = false,
         isHardwareBacked: Bool = false,
@@ -89,7 +84,6 @@ public struct NDKSession: Codable, Identifiable, Sendable {
     ) {
         self.id = UUID()
         self.pubkey = pubkey
-        self.displayName = displayName
         self.signerType = signerType
         self.createdAt = Date()
         self.lastUsed = Date()
@@ -106,12 +100,7 @@ public struct NDKSession: Codable, Identifiable, Sendable {
         try? Bech32.npub(from: pubkey)
     }
     
-    /// Best available display name (profile name > display name)
-    public var bestDisplayName: String {
-        profileName ?? displayName
-    }
-    
-    /// Short identifier for UI display
+/// Short identifier for UI display
     public var shortIdentifier: String {
         if let npub = npub {
             return String(npub.prefix(16)) + "..."
@@ -184,11 +173,6 @@ public struct NDKSession: Codable, Identifiable, Sendable {
             throw NDKSessionError.invalidSignerType(signerType)
         }
         
-        // Validate display name
-        guard !displayName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
-            throw NDKSessionError.invalidDisplayName
-        }
-        
         // Validate auto-lock timeout if set
         if let timeout = autoLockTimeout, timeout <= 0 {
             throw NDKSessionError.invalidAutoLockTimeout(timeout)
@@ -216,7 +200,6 @@ extension NDKSession: Hashable {
 public enum NDKSessionError: LocalizedError {
     case invalidPubkey(String)
     case invalidSignerType(String)
-    case invalidDisplayName
     case invalidAutoLockTimeout(TimeInterval)
     case sessionExpired
     case biometricRequired
@@ -228,8 +211,6 @@ public enum NDKSessionError: LocalizedError {
             return "Invalid public key format: \(pubkey)"
         case .invalidSignerType(let type):
             return "Invalid signer type: \(type)"
-        case .invalidDisplayName:
-            return "Display name cannot be empty"
         case .invalidAutoLockTimeout(let timeout):
             return "Auto-lock timeout must be positive: \(timeout)"
         case .sessionExpired:

@@ -185,3 +185,4 @@ struct ReceiveSuccessView: View {
         }
     }
 }
+

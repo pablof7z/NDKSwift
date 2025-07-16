@@ -30,6 +30,10 @@ public actor NIP60Wallet: NDKPaymentProvider {
 
     private let signer: NDKSigner
     
+    // MARK: - Quote Tracking
+    
+    private var activeQuoteMonitors: [String: Task<Void, Never>] = [:] // quoteId -> monitoring task
+    
     // MARK: - Event Stream
     
     public let events = NIP60WalletEventStream()
@@ -148,11 +152,23 @@ public actor NIP60Wallet: NDKPaymentProvider {
     
     /// Process wallet configuration from event
     internal func processWalletConfiguration(event: NDKEvent, decryptedTags: [[String]]) async {
+        print("⚙️ Processing wallet configuration with decrypted tags")
+        print("⚙️ Event ID: \(event.id)")
+        print("⚙️ Event Kind: \(event.kind)")
+        print("⚙️ Decrypted tags count: \(decryptedTags.count)")
+        
+        for (index, tag) in decryptedTags.enumerated() {
+            print("⚙️ Decrypted tag \(index): \(tag)")
+        }
+        
         let walletEvent = NDKCashuWalletEvent(event: event)
         
         // Process relay tags (unencrypted, no signer needed)
         walletRelays = walletEvent.relays.compactMap { NDKRelay(url: $0) }
         print("📡 Extracted \(walletRelays.count) wallet relays from wallet event")
+        
+        // Log unencrypted relay tags for comparison
+        print("📡 Unencrypted relay tags from event: \(walletEvent.relays)")
         
         do {
             // Get current mints before update
@@ -160,11 +176,15 @@ public actor NIP60Wallet: NDKPaymentProvider {
             
             // Process P2PK private key
             if let privkey = try await walletEvent.privateKey(signer: signer) {
+                print("🔑 Found P2PK private key in wallet config: \(privkey.prefix(8))...")
                 try? await p2pkManager.restoreFromPrivateKey(privkey)
+            } else {
+                print("🔑 No P2PK private key found in wallet config")
             }
             
             // Process mints
             let mintURLs = try await walletEvent.mints(signer: signer)
+            print("🏪 Extracted \(mintURLs.count) mint URLs from wallet config: \(mintURLs)")
             var newMints = Set<String>()
             
             for mintURL in mintURLs {
@@ -278,7 +298,7 @@ public actor NIP60Wallet: NDKPaymentProvider {
         }
         
         // Process the nutzap
-        let result = try await Nutzap.processIncoming(
+        _ = try await Nutzap.processIncoming(
             wallet: self,
             event: event,
             mints: mints,
@@ -456,10 +476,13 @@ public actor NIP60Wallet: NDKPaymentProvider {
                         timeout: timeout,
                         onProofsReceived: { proofs in
                             // Update wallet state with new proofs
-                            return try await self.update(
-                                deletedProofs: [],
-                                addedProofs: proofs
+                            let stateChange = WalletStateChange(
+                                store: proofs,
+                                destroy: [],
+                                mint: quote.mintURL,
+                                memo: "Deposit"
                             )
+                            return try await self.update(stateChange: stateChange)
                         }
                     )
                     
@@ -486,6 +509,9 @@ public actor NIP60Wallet: NDKPaymentProvider {
         configSubscriptionTask?.cancel()
         walletSubscriptionTask?.cancel()
         
+        // Stop any existing quote monitors
+        await stopQuoteMonitors()
+        
         let userPubkey = try await signer.pubkey
         
         // Use fetchEvent for a one-shot, reliable fetch of the latest config
@@ -511,12 +537,197 @@ public actor NIP60Wallet: NDKPaymentProvider {
         print("✅ Wallet loading complete. Monitoring for updates.")
     }
     
+    // MARK: - Quote Tracking Methods
     
+    /// Calculate polling interval based on quote age using exponential backoff
+    private func calculatePollingInterval(age: TimeInterval) -> TimeInterval {
+        // Base interval: 2 minutes (120 seconds)
+        // Max interval: 2 hours (7200 seconds)
+        // Growth factor: slowly increase interval as quote ages
+        
+        let baseInterval: TimeInterval = 120.0
+        let maxInterval: TimeInterval = 7200.0
+        let hoursOld = age / 3600.0
+        
+        // Exponential backoff: interval = min(base * (1.5 ^ hoursOld), max)
+        // This gives us approximately:
+        // 0 hours: 2 minutes
+        // 1 hour: 3 minutes
+        // 2 hours: 4.5 minutes
+        // 4 hours: 10 minutes
+        // 8 hours: 38 minutes
+        // 12 hours: 2 hours (capped)
+        
+        let interval = min(baseInterval * pow(1.5, hoursOld), maxInterval)
+        return interval
+    }
     
+    /// Start tracking a quote for automatic minting when paid
+    public func trackQuote(quote: CashuMintQuote, event: NDKEvent) async {
+        await startQuoteTracking(quote: quote, event: event)
+    }
     
+    /// Internal method to start quote tracking
+    private func startQuoteTracking(quote: CashuMintQuote, event: NDKEvent) async {
+        // Calculate age from event's created_at
+        let eventDate = Date(timeIntervalSince1970: TimeInterval(event.createdAt))
+        let age = Date().timeIntervalSince(eventDate)
+        
+        // Skip if older than 24 hours
+        guard age < 86400 else { 
+            print("📜 Skipping quote tracking for \(quote.quoteId) - older than 24 hours")
+            return 
+        }
+        
+        // Cancel existing monitor if any
+        activeQuoteMonitors[quote.quoteId]?.cancel()
+        
+        print("📜 Starting quote tracking for \(quote.quoteId) - age: \(Int(age/60)) minutes")
+        
+        // Start monitoring with dynamic interval
+        let task = Task { [weak self] in
+            guard let self = self else { return }
+            
+            do {
+                for try await status in await self.monitorDepositWithDynamicInterval(
+                    quote: quote,
+                    eventDate: eventDate,
+                    timeout: 86400 - age // Remaining time until 24h
+                ) {
+                    switch status {
+                    case .minted:
+                        // Success - delete the quote event
+                        print("✅ Quote \(quote.quoteId) successfully minted - deleting quote event")
+                        try? await self.eventManager.deleteQuoteEvent(eventId: event.id, signer: self.signer)
+                        await self.clearQuoteMonitor(quoteId: quote.quoteId)
+                        return
+                        
+                    case .expired, .cancelled:
+                        print("❌ Quote \(quote.quoteId) expired or cancelled")
+                        await self.clearQuoteMonitor(quoteId: quote.quoteId)
+                        return
+                        
+                    case .pending:
+                        // Continue monitoring
+                        continue
+                    }
+                }
+            } catch {
+                print("❌ Error monitoring quote \(quote.quoteId): \(error)")
+                await self.clearQuoteMonitor(quoteId: quote.quoteId)
+            }
+        }
+        
+        activeQuoteMonitors[quote.quoteId] = task
+    }
     
+    /// Monitor deposit with dynamically calculated intervals
+    private func monitorDepositWithDynamicInterval(
+        quote: CashuMintQuote,
+        eventDate: Date,
+        timeout: TimeInterval
+    ) -> AsyncThrowingStream<DepositStatus, Error> {
+        return AsyncThrowingStream { continuation in
+            let task = Task {
+                let startTime = Date()
+                
+                do {
+                    while Date().timeIntervalSince(startTime) < timeout {
+                        // Check if Lightning invoice has been paid to the mint
+                        do {
+                            let proofs = try await CashuDeposit.checkAndMintTokens(
+                                quoteId: quote.quoteId,
+                                mintURL: quote.mintURL,
+                                amount: quote.amount,
+                                mints: self.mints
+                            )
+                            
+                            if !proofs.isEmpty {
+                                // Let the wallet handle proof state updates
+                                let stateChange = WalletStateChange(
+                                    store: proofs, 
+                                    destroy: [], 
+                                    mint: quote.mintURL,
+                                    memo: "Lightning deposit"
+                                )
+                                let createdEventIds = try await self.update(stateChange: stateChange)
+                                
+                                // Create history event for the lightning deposit
+                                Task {
+                                    do {
+                                        try await self.eventManager.createSpendingHistoryEvent(
+                                            direction: .in,
+                                            amount: Int64(quote.amount),
+                                            createdEventIds: createdEventIds,
+                                            signer: self.signer
+                                        )
+                                        print("✅ Created NIP-60 history event for lightning deposit of \(quote.amount) sats")
+                                    } catch {
+                                        print("⚠️ Failed to create history event for deposit: \(error)")
+                                    }
+                                }
+                                
+                                continuation.yield(.minted(proofs: proofs))
+                                continuation.finish()
+                                return
+                            }
+                        } catch {
+                            // If it's a specific error indicating deposit not ready, continue polling
+                            if case NDKError.walletError(let message) = error, message.contains("Deposit not ready") {
+                                // Expected - deposit not ready yet, continue polling
+                            } else if case CashuError.quoteNotPaid = error {
+                                // Also handle CashuError.quoteNotPaid for compatibility
+                                // Expected - deposit not ready yet, continue polling
+                            } else {
+                                throw error
+                            }
+                        }
+                        
+                        // Still pending
+                        continuation.yield(.pending)
+                        
+                        // Calculate current age and interval
+                        let currentAge = Date().timeIntervalSince(eventDate)
+                        if currentAge >= 86400 {
+                            // Stop monitoring after 24 hours
+                            continuation.yield(.expired)
+                            continuation.finish()
+                            return
+                        }
+                        
+                        let interval = self.calculatePollingInterval(age: currentAge)
+                        print("📜 Quote \(quote.quoteId) still pending - next check in \(Int(interval)) seconds")
+                        
+                        // Wait before next check
+                        try await Task.sleep(nanoseconds: UInt64(interval * 1_000_000_000))
+                    }
+                    
+                    // Timeout reached
+                    continuation.yield(.expired)
+                    continuation.finish()
+                    
+                } catch {
+                    continuation.finish(throwing: error)
+                }
+            }
+            
+            continuation.onTermination = { @Sendable _ in
+                task.cancel()
+            }
+        }
+    }
     
+    /// Clear a specific quote monitor
+    private func clearQuoteMonitor(quoteId: String) async {
+        activeQuoteMonitors[quoteId] = nil
+    }
     
+    /// Stop all active quote monitors
+    public func stopQuoteMonitors() async {
+        print("🛑 Stopping all quote monitors")
+        activeQuoteMonitors.forEach { $0.value.cancel() }
+        activeQuoteMonitors.removeAll()
+    }
     
     /// Receive proofs from another user or source
     public func receive(proofs proofsToAdd: [CashuSwift.Proof]) async throws {
@@ -527,11 +738,24 @@ public actor NIP60Wallet: NDKPaymentProvider {
             }
         }
         
-        // Update state (this handles token event creation)
-        _ = try await update(
-            deletedProofs: [],
-            addedProofs: proofsToAdd
-        )
+        // Group proofs by mint for state update
+        var proofsByMint: [String: [CashuSwift.Proof]] = [:]
+        for proof in proofsToAdd {
+            if let mint = await mints.findMintForKeyset(proof.keysetID) {
+                proofsByMint[mint, default: []].append(proof)
+            }
+        }
+        
+        // Update state for each mint
+        for (mintURL, proofs) in proofsByMint {
+            let stateChange = WalletStateChange(
+                store: proofs,
+                destroy: [],
+                mint: mintURL,
+                memo: "Receive ecash"
+            )
+            _ = try await update(stateChange: stateChange)
+        }
     }
     
     /// Setup wallet with mints and relays, optionally publishing mint list (kind 10019)
@@ -558,12 +782,18 @@ public actor NIP60Wallet: NDKPaymentProvider {
         // Optionally publish mint list (kind 10019)
         if publishMintList {
             print("NIP60Wallet - Publishing mint list event")
+            
+            // Get P2PK public key for nutzaps
+            let p2pkPubkey = try await getP2PKPubkey()
+            print("NIP60Wallet - P2PK pubkey for mint list: \(p2pkPubkey)")
+            
             try await NDKCashuMintList.createAndPublish(
                 ndk: ndk,
                 mints: mints,
-                signer: signer
+                signer: signer,
+                p2pkPubkey: p2pkPubkey
             )
-            print("NIP60Wallet - Mint list published successfully")
+            print("NIP60Wallet - Mint list published successfully with p2pk tag")
         }
         
         // The wallet event processor will handle the incoming event and configure the mints
@@ -575,53 +805,69 @@ public actor NIP60Wallet: NDKPaymentProvider {
     
     // MARK: - Centralized State Management
     
-    /// The heart of the system - handles all proof state changes
-    internal func update(
-        deletedProofs: [CashuSwift.Proof],
-        addedProofs: [CashuSwift.Proof]
-    ) async throws -> [String] {
-        print("NIP60Wallet.update() - Adding \(addedProofs.count) proofs, deleting \(deletedProofs.count) proofs")
+    /// Handles all proof state changes using explicit state change instructions
+    public func update(stateChange: WalletStateChange) async throws -> [String] {
+        print("NIP60Wallet.update() - Storing \(stateChange.store.count) proofs, destroying \(stateChange.destroy.count) proofs")
         
-        // Get balance before update
-        let previousBalance = await proofStateManager.getTotalBalance()
+        // Update internal state immediately
+        await updateInternalState(stateChange)
         
-        // 1. Update proof states
-        await proofStateManager.markProofsAsDeleted(deletedProofs)
+        // Update external state (token events on relays)
+        let eventIds = try await updateExternalState(stateChange)
         
-        for proof in addedProofs {
-            // Find mint for this proof
-            guard let mint = await mints.findMintForKeyset(proof.keysetID) else {
-                throw NDKError.invalidProof("Proof with unknown keyset: \(proof.keysetID)")
-            }
-            await proofStateManager.addProof(proof, mint: mint)
+        // Notify balance change if needed
+        await notifyBalanceChangeIfNeeded()
+        
+        return eventIds
+    }
+    
+    /// Updates the internal proof state
+    private func updateInternalState(_ stateChange: WalletStateChange) async {
+        // Mark proofs as deleted
+        await proofStateManager.markProofsAsDeleted(stateChange.destroy)
+        
+        // Add new proofs
+        for proof in stateChange.store {
+            await proofStateManager.addProof(proof, mint: stateChange.mint)
             print("  Added proof: amount=\(proof.amount), C=\(proof.C)")
         }
         
-        // 2. Group available proofs by mint
+        // Update internal proofs array
         let availableByMint = await proofStateManager.getAvailableProofsByMint()
+        self.proofs = availableByMint.values.flatMap { $0 }
+    }
+    
+    /// Updates token events on relays based on state changes
+    private func updateExternalState(_ stateChange: WalletStateChange) async throws -> [String] {
+        // Calculate what tokens need to change
+        let tokenChange = await WalletStateCalculator.calculateNewState(
+            stateChange: stateChange,
+            proofStateManager: proofStateManager
+        )
         
-        // 3. Update token events through the event manager
-        let newEventIds = try await eventManager.updateTokenEvents(
-            availableProofsByMint: availableByMint,
+        // Update token events
+        let eventIds = try await eventManager.updateTokenEvents(
+            tokenChange: tokenChange,
             proofStateManager: proofStateManager,
             signer: signer
         )
         
-        // 4. Update tracking
-        await eventManager.setCurrentTokenEventIds(Set(newEventIds))
+        // Update tracking
+        await eventManager.setCurrentTokenEventIds(Set(eventIds))
         
-        // 5. Update internal proofs array for compatibility
-        self.proofs = availableByMint.values.flatMap { $0 }
-        
-        // 6. Check if balance changed and notify
-        let newBalance = await proofStateManager.getTotalBalance()
-        if newBalance != previousBalance {
-            events.yield(NIP60WalletEvent(type: .balanceChanged(newBalance)))
-        }
-        
-        // Return the newly created event IDs
-        return Array(newEventIds)
+        return eventIds
     }
+    
+    /// Check and notify if balance changed
+    private func notifyBalanceChangeIfNeeded() async {
+        let currentBalance = await proofStateManager.getTotalBalance()
+        if currentBalance != lastNotifiedBalance {
+            lastNotifiedBalance = currentBalance
+            events.yield(NIP60WalletEvent(type: .balanceChanged(currentBalance)))
+        }
+    }
+    
+    private var lastNotifiedBalance: Int64 = 0
     
     
     
@@ -665,5 +911,17 @@ public actor NIP60Wallet: NDKPaymentProvider {
     /// Process incoming nutzap event (for handler)
     internal func processIncomingNutzapEvent(_ event: NDKEvent) async throws {
         try await processIncomingNutzap(event)
+    }
+    
+    /// Stop the wallet and clean up resources
+    public func stop() async {
+        // Cancel subscriptions
+        configSubscriptionTask?.cancel()
+        walletSubscriptionTask?.cancel()
+        
+        // Stop quote monitors
+        await stopQuoteMonitors()
+        
+        print("🛑 NIP60Wallet stopped")
     }
 }

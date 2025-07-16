@@ -85,6 +85,7 @@ swift package generate-xcodeproj
 - Events → `NDKSubscriptionManager.processEvent()` → `NDKSubscription.handleEvent()` → Cache
 - Kind 5 deletion events are automatically processed by `NDKSubscriptionManager`
 - Referenced events are removed from cache with proper NIP-09 author validation
+- Only the original author can delete their own events
 - Database transactions ensure atomic deletion operations
 
 **Signer Architecture**:

@@ -312,7 +312,7 @@ public final class NDKSubscription: AsyncSequence, Sendable {
         options: NDKSubscriptionOptions = NDKSubscriptionOptions(),
         ndk: NDK? = nil
     ) {
-        self.id = id ?? "sub_\(Int.random(in: 100000...999999))"
+        self.id = id ?? Self.generateSubscriptionId(for: filters, userProvidedIds: nil)
         self.filters = filters
         
         // Initialize the state actor with the options and ndk
@@ -625,5 +625,78 @@ extension NDKSubscription: Equatable, Hashable {
 
     public func hash(into hasher: inout Hasher) {
         hasher.combine(id)
+    }
+}
+
+// MARK: - Subscription ID Generation
+
+extension NDKSubscription {
+    /// Generate a subscription ID following the ndk-core pattern
+    /// Format: [meaningful-part]-[random-suffix]
+    public static func generateSubscriptionId(
+        for filters: [NDKFilter],
+        userProvidedIds: [String]? = nil
+    ) -> String {
+        let maxBaseLength = 20
+        var basePart: String
+        
+        if let userIds = userProvidedIds, !userIds.isEmpty {
+            // Join user-provided IDs
+            basePart = userIds.joined(separator: "-")
+        } else if !filters.isEmpty {
+            // Build from filter information
+            var parts: [String] = []
+            
+            // Collect unique kinds across all filters
+            let allKinds = Set(filters.flatMap { $0.kinds ?? [] }).sorted()
+            if !allKinds.isEmpty {
+                parts.append("kinds:\(allKinds.map { String($0) }.joined(separator: ","))")
+            }
+            
+            // Check for common filter patterns
+            let hasAuthors = filters.contains { $0.authors != nil }
+            let hasEvents = filters.contains { $0.events != nil }
+            let hasPubkeys = filters.contains { $0.pubkeys != nil }
+            let hasSince = filters.contains { $0.since != nil }
+            let hasUntil = filters.contains { $0.until != nil }
+            
+            var filterTypes: [String] = []
+            if hasAuthors { filterTypes.append("auth") }
+            if hasEvents { filterTypes.append("#e") }
+            if hasPubkeys { filterTypes.append("#p") }
+            if hasSince || hasUntil { filterTypes.append("time") }
+            
+            if !filterTypes.isEmpty {
+                parts.append(filterTypes.joined(separator: ","))
+            }
+            
+            basePart = parts.joined(separator: "-")
+            
+            // If still empty or only one filter, use fingerprint
+            if basePart.isEmpty || (filters.count == 1 && basePart.count > maxBaseLength) {
+                basePart = filters[0].fingerprint
+            }
+        } else {
+            // Fallback for empty filters
+            basePart = "sub"
+        }
+        
+        // Truncate if needed
+        if basePart.count > maxBaseLength {
+            basePart = String(basePart.prefix(maxBaseLength))
+        }
+        
+        // Generate random suffix (5 alphanumeric characters)
+        let randomSuffix = generateRandomString(length: 5)
+        
+        return "\(basePart)-\(randomSuffix)"
+    }
+    
+    /// Generate a random alphanumeric string
+    private static func generateRandomString(length: Int) -> String {
+        let characters = "abcdefghijklmnopqrstuvwxyz0123456789"
+        return String((0..<length).map { _ in
+            characters.randomElement()!
+        })
     }
 }

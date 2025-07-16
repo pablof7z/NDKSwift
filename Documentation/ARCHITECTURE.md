@@ -195,6 +195,38 @@ func verifySignature(_ event: NDKEvent) -> Bool {
 }
 ```
 
+### Deletion Event Processing (NIP-09)
+
+NDKSwift automatically processes kind:5 deletion events according to NIP-09:
+
+```swift
+// In NDKSubscriptionManager
+private func processDeletionEvent(_ deletionEvent: NDKEvent) async {
+    // Extract event IDs from "e" tags
+    let eventIdsToDelete = deletionEvent.tags
+        .filter { $0[0] == "e" }
+        .map { $0[1] }
+    
+    // Verify authorship and delete
+    for eventId in eventIdsToDelete {
+        if let event = await cache.getEvent(id: eventId) {
+            // NIP-09: Only original author can delete
+            if event.pubkey == deletionEvent.pubkey {
+                try await cache.deleteEvent(id: eventId)
+            }
+        }
+    }
+}
+```
+
+Key features:
+- Automatic processing when kind:5 events are received
+- Author validation ensures only original authors can delete their events
+- Cache is automatically updated
+- Works with all cache implementations
+- Tombstone cache prevents deleted events from being added if deletion arrives first
+- 10-minute TTL on tombstones to handle network timing issues
+
 ### Optimistic Publishing
 
 NDKSwift implements optimistic publishing for instant UI feedback:

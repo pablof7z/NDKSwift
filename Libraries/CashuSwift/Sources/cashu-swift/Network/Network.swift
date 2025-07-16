@@ -26,15 +26,29 @@ struct Network {
         req.httpMethod = "GET"
         req.timeoutInterval = timeout
         
-        guard let (data, _) = try? await URLSession.shared.data(for: req) else {
-            throw CashuError.networkError
-        }
-        
         do {
-            let decoded = try JSONDecoder().decode(T.self, from: data)
-            return decoded
+            let (data, response) = try await URLSession.shared.data(for: req)
+            
+            // Log response details for debugging
+            if let httpResponse = response as? HTTPURLResponse {
+                logger.debug("GET \(url.absoluteString) - Status: \(httpResponse.statusCode)")
+                if httpResponse.statusCode >= 400 {
+                    logger.error("Server error - Status: \(httpResponse.statusCode), Data: \(String(data: data, encoding: .utf8) ?? "nil")")
+                    throw CashuError.networkError
+                }
+            }
+            
+            do {
+                let decoded = try JSONDecoder().decode(T.self, from: data)
+                return decoded
+            } catch {
+                logger.error("Decoding error for \(url.absoluteString): \(error)")
+                logger.error("Response data: \(String(data: data, encoding: .utf8) ?? "nil")")
+                throw parse(data)
+            }
         } catch {
-            throw parse(data)
+            logger.error("Network error for \(url.absoluteString): \(error)")
+            throw CashuError.networkError
         }
     }
     
@@ -45,11 +59,22 @@ struct Network {
         req.httpMethod = "GET"
         req.timeoutInterval = timeout
         
-        guard let (data, _) = try? await URLSession.shared.data(for: req) else {
+        do {
+            let (data, response) = try await URLSession.shared.data(for: req)
+            
+            if let httpResponse = response as? HTTPURLResponse {
+                logger.debug("GET \(url.absoluteString) - Status: \(httpResponse.statusCode)")
+                if httpResponse.statusCode >= 400 {
+                    logger.error("Server error - Status: \(httpResponse.statusCode)")
+                    throw CashuError.networkError
+                }
+            }
+            
+            return data
+        } catch {
+            logger.error("Network error for \(url.absoluteString): \(error)")
             throw CashuError.networkError
         }
-
-        return data
     }
     
     ///Makes a HTTP POST request to the specified URL, with the body as an object of type `I` that conforms to `Codable`

@@ -32,7 +32,7 @@ public struct NDKSignatureVerificationConfig: Sendable {
 }
 
 /// Statistics for signature verification on a relay
-public struct NDKRelaySignatureStats: Sendable {
+public struct NDKRelaySignatureStats: Sendable, Equatable {
     /// Number of events that had their signatures validated
     public private(set) var validatedCount: Int = 0
 

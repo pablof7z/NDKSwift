@@ -32,6 +32,11 @@ actor WalletEventProcessor {
     /// Process wallet configuration events
     private func processWalletConfigEvent(_ event: NDKEvent, context: WalletEventContext) async throws {
         print("🔧 Processing wallet configuration event")
+        print("🔧 Event ID: \(event.id)")
+        print("🔧 Event Kind: \(event.kind)")
+        print("🔧 Event Author: \(event.pubkey)")
+        print("🔧 Encrypted content length: \(event.content.count) characters")
+        print("🔧 Encrypted content (first 100 chars): \(event.content.prefix(100))")
         
         // Decrypt content
         let sender = NDKUser(pubkey: event.pubkey)
@@ -41,11 +46,50 @@ actor WalletEventProcessor {
             scheme: .nip44
         )
         
+        print("🔓 DECRYPTED WALLET CONFIG CONTENT:")
+        print("🔓 Decrypted length: \(decryptedContent.count) characters")
+        print("🔓 Decrypted content: \(decryptedContent)")
+        print("🔓 Decrypted content (raw): \(String(describing: decryptedContent.data(using: .utf8)))")
+        
         // Parse wallet tags
         guard let tagsData = decryptedContent.data(using: .utf8),
               let walletTags = try? JSONDecoder().decode([[String]].self, from: tagsData) else {
+            print("❌ Failed to parse wallet configuration from decrypted content")
             throw NDKError.invalidContent("Failed to parse wallet configuration")
         }
+        
+        print("⚙️ PARSED WALLET CONFIGURATION TAGS:")
+        print("⚙️ Total tags count: \(walletTags.count)")
+        
+        var mintCount = 0
+        var privkeyFound = false
+        var relayCount = 0
+        
+        for (index, tag) in walletTags.enumerated() {
+            if tag.count >= 2 {
+                switch tag[0] {
+                case "mint":
+                    mintCount += 1
+                    print("⚙️   Tag \(index): mint = \(tag[1])")
+                case "privkey":
+                    privkeyFound = true
+                    print("⚙️   Tag \(index): privkey = \(tag[1].prefix(8))... (P2PK private key)")
+                case "relay":
+                    relayCount += 1
+                    print("⚙️   Tag \(index): relay = \(tag[1])")
+                default:
+                    print("⚙️   Tag \(index): \(tag[0]) = \(tag[1])")
+                }
+            } else {
+                print("⚙️   Tag \(index): \(tag)")
+            }
+        }
+        
+        print("⚙️ WALLET CONFIGURATION SUMMARY:")
+        print("⚙️   - Mints configured: \(mintCount)")
+        print("⚙️   - P2PK private key present: \(privkeyFound)")
+        print("⚙️   - Relays configured: \(relayCount)")
+        print("⚙️   - Unencrypted relay tags from event: \(event.tags.filter { $0.count >= 2 && $0[0] == "relay" }.count)")
         
         // Process wallet configuration with both raw and encrypted tags
         await context.wallet.processWalletConfiguration(event: event, decryptedTags: walletTags)
@@ -60,6 +104,10 @@ actor WalletEventProcessor {
         }
         
         print("💰 Processing token event: \(event.id)")
+        print("💰 Event Kind: \(event.kind)")
+        print("💰 Event Author: \(event.pubkey)")
+        print("💰 Encrypted content length: \(event.content.count) characters")
+        print("💰 Encrypted content (first 100 chars): \(event.content.prefix(100))")
         
         // Decrypt and process token
         let sender = NDKUser(pubkey: event.pubkey)
@@ -69,10 +117,27 @@ actor WalletEventProcessor {
             scheme: .nip44
         )
         
+        print("🔓 DECRYPTED TOKEN CONTENT:")
+        print("🔓 Decrypted length: \(decryptedContent.count) characters")
+        print("🔓 Decrypted content: \(decryptedContent)")
+        print("🔓 Decrypted content (raw): \(String(describing: decryptedContent.data(using: .utf8)))")
+        
         // Parse token data
         guard let tokenData = decryptedContent.data(using: .utf8),
               let nip60Token = try? JSONDecoder().decode(NIP60TokenEvent.self, from: tokenData) else {
+            print("❌ Failed to parse NIP-60 token event data from decrypted content")
             throw NDKError.invalidContent("Failed to parse NIP-60 token event data")
+        }
+        
+        print("🪙 PARSED TOKEN EVENT:")
+        print("🪙 Mint URL: \(nip60Token.mint)")
+        print("🪙 Proofs count: \(nip60Token.proofs.count)")
+        print("🪙 Del tags count: \(nip60Token.del?.count ?? 0)")
+        if let delTags = nip60Token.del {
+            print("🪙 Del tags: \(delTags)")
+        }
+        for (index, proof) in nip60Token.proofs.enumerated() {
+            print("🪙 Proof \(index): amount=\(proof.amount), keysetID=\(proof.keysetID), C=\(proof.C.prefix(20))...")
         }
         
         // Handle del tags - these events are no longer valid
@@ -108,6 +173,11 @@ actor WalletEventProcessor {
     /// Process quote events
     private func processQuoteEvent(_ event: NDKEvent, context: WalletEventContext) async throws {
         print("📜 Processing quote event")
+        print("📜 Event ID: \(event.id)")
+        print("📜 Event Kind: \(event.kind)")
+        print("📜 Event Author: \(event.pubkey)")
+        print("📜 Encrypted content length: \(event.content.count) characters")
+        print("📜 Encrypted content (first 100 chars): \(event.content.prefix(100))")
         
         // Decrypt content
         let sender = NDKUser(pubkey: event.pubkey)
@@ -117,6 +187,10 @@ actor WalletEventProcessor {
             scheme: .nip44
         )
         
+        print("🔓 DECRYPTED QUOTE CONTENT:")
+        print("🔓 Decrypted length: \(decryptedContent.count) characters")
+        print("🔓 Decrypted content: \(decryptedContent)")
+        
         // Parse quote data
         guard let quoteData = decryptedContent.data(using: .utf8),
               let quote = try? JSONDecoder().decode(CashuMintQuote.self, from: quoteData) else {
@@ -125,8 +199,8 @@ actor WalletEventProcessor {
         
         print("📜 Loaded quote: \(quote.quoteId) for \(quote.amount) sats")
         
-        // Store quote for future reference if needed
-        // This could be used for resuming interrupted deposits
+        // Start tracking the quote for automatic minting
+        await context.wallet.trackQuote(quote: quote, event: event)
     }
     
     /// Process spending history events

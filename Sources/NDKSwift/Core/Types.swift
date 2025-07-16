@@ -52,11 +52,6 @@ public enum EventKind {
     public static let badgeAward = 8
     public static let genericRepost = 16
     public static let image = 20
-    public static let channelCreation = 40
-    public static let channelMetadata = 41
-    public static let channelMessage = 42
-    public static let channelHideMessage = 43
-    public static let channelMuteUser = 44
     public static let fileMetadata = 1063
     public static let zapRequest = 9734
     public static let zap = 9735
@@ -65,17 +60,15 @@ public enum EventKind {
     public static let cashuToken = 7375  // Token event (NIP-60)
     public static let cashuSpendingHistory = 7376  // Spending history (NIP-60)
     public static let nutzap = 9321
-    public static let nutzapRedemption = 7376
     public static let cashuWalletConfig = 17375  // Wallet configuration (NIP-60)
     public static let muteList = 10000
     public static let pinList = 10001
     public static let relayList = 10002
     public static let cashuMintList = 10019
     public static let nutzapPreferences = 10019  // Alias for NIP-61
-    public static let walletInfo = 13194
     public static let clientAuthentication = 22242
-    public static let walletRequest = 23194
-    public static let walletResponse = 23195
+    public static let nwcRequest = 23194
+    public static let nwcResponse = 23195
     public static let nostrConnect = 24133
     public static let httpAuth = 27235
     public static let categorizedPeople = 30000
@@ -84,7 +77,7 @@ public enum EventKind {
     public static let badgeDefinition = 30009
     public static let longFormContent = 30023
     public static let applicationSpecificData = 30078
-    public static let mintAnnouncement = 38000  // NIP-60 mint discovery
+    public static let mintAnnouncement = 38000  // NIP-87 mint discovery
 }
 
 /// Tag structure

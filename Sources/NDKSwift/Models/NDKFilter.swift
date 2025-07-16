@@ -1,4 +1,5 @@
 import Foundation
+import CryptoKit
 
 /// Filter for subscribing to events
 /// 
@@ -385,5 +386,79 @@ public struct NDKFilter: Codable, Equatable, Sendable {
         }
 
         return dict
+    }
+    
+    /// Generate a fingerprint for this filter (used for subscription ID generation)
+    /// This follows the same pattern as ndk-core
+    public var fingerprint: String {
+        // Build a consistent string representation of the filter
+        var parts: [String] = []
+        
+        // Add filter components in a consistent order
+        if let kinds = kinds?.sorted() {
+            parts.append("kinds:\(kinds.map { String($0) }.joined(separator: ","))")
+        }
+        
+        if let authors = authors?.sorted() {
+            // Take first 8 chars of each author pubkey for brevity
+            let authorPrefixes = authors.map { String($0.prefix(8)) }.joined(separator: ",")
+            parts.append("authors:\(authorPrefixes)")
+        }
+        
+        if let ids = ids?.sorted() {
+            // Take first 8 chars of each event ID for brevity
+            let idPrefixes = ids.map { String($0.prefix(8)) }.joined(separator: ",")
+            parts.append("ids:\(idPrefixes)")
+        }
+        
+        if let events = events?.sorted() {
+            let eventPrefixes = events.map { String($0.prefix(8)) }.joined(separator: ",")
+            parts.append("#e:\(eventPrefixes)")
+        }
+        
+        if let pubkeys = pubkeys?.sorted() {
+            let pubkeyPrefixes = pubkeys.map { String($0.prefix(8)) }.joined(separator: ",")
+            parts.append("#p:\(pubkeyPrefixes)")
+        }
+        
+        if let since = since {
+            parts.append("since:\(since)")
+        }
+        
+        if let until = until {
+            parts.append("until:\(until)")
+        }
+        
+        if let limit = limit {
+            parts.append("limit:\(limit)")
+        }
+        
+        // Add tag filters
+        let sortedTagFilters = tagFilters.keys.sorted()
+        for key in sortedTagFilters {
+            if let values = tagFilters[key]?.sorted() {
+                let valuePrefixes = values.map { String($0.prefix(8)) }.joined(separator: ",")
+                parts.append("\(key):\(valuePrefixes)")
+            }
+        }
+        
+        // Create a string representation
+        let filterString = parts.joined(separator: "-")
+        
+        // If the string is empty, return a default
+        if filterString.isEmpty {
+            return "empty-filter"
+        }
+        
+        // If it's short enough, use it directly
+        if filterString.count <= 20 {
+            return filterString
+        }
+        
+        // Otherwise, hash it and take first 15 chars
+        let data = filterString.data(using: .utf8)!
+        let hash = SHA256.hash(data: data)
+        let hashHex = hash.compactMap { String(format: "%02x", $0) }.joined()
+        return String(hashHex.prefix(15))
     }
 }

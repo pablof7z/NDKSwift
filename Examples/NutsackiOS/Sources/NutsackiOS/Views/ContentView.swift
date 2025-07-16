@@ -20,7 +20,6 @@ struct ContentView: View {
         case wallet
         case contacts
         case scanner
-        case mints
         case settings
     }
     
@@ -55,12 +54,6 @@ struct ContentView: View {
                             }
                         }
                         .tag(Tab.scanner)
-                    
-                    MintsView()
-                        .tabItem {
-                            Label("Mints", systemImage: "building.columns")
-                        }
-                        .tag(Tab.mints)
                     
                     SettingsView()
                         .tabItem {

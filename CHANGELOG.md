@@ -5,6 +5,125 @@ All notable changes to NDKSwift will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+- Automatic relay connection for explicitly requested relays in subscriptions and publishing
+  - When subscribing with specific relays, NDK now ensures they are connected before use
+  - When publishing to specific relays, NDK now ensures they are connected before use
+  - Publishing no longer blocks on slow relay connections - connections happen in parallel
+  - Added comprehensive tests in RelayConnectionTests.swift
+
+### Added
+- Automatic processing of kind:5 deletion events (NIP-09) in NDKSubscriptionManager
+- Author validation for deletion events - only original authors can delete their events
+- Tombstone cache for deletion events that arrive before the original event (10-minute TTL)
+- Comprehensive tests for deletion event processing including out-of-order scenarios (DeletionEventTests.swift)
+- NIP-87 Cashu Mint Discovery support
+  - Added `NDKCashuMintAnnouncement` for mint announcement events (kind: 38172)
+  - Added `NDKMintRecommendation` for mint recommendation events (kind: 38000)
+  - Added `MintDiscoveryManager` to discover mints from Nostr network in NutsackiOS
+  - Added UI for discovering and selecting mints in NutsackiOS example app
+  - Updated `WalletManager.discoverMints()` to use NIP-87 events
+- NIP-60 Quote Tracking with automatic minting
+  - Added automatic tracking of 7374 quote events on wallet startup
+  - Implemented dynamic polling intervals using exponential backoff (2 minutes to 2 hours)
+  - Quotes are monitored for up to 24 hours from creation
+  - Successfully minted quotes are automatically deleted from Nostr
+  - Fixed deposit polling bug where monitoring stopped after first check
+- NIP-11 icon and banner support in NDKRelayInformation
+  - Added `icon` and `banner` fields to match the updated NIP-11 specification
+  - Updated NutsackiOS example to use NIP-11 icon field instead of favicon.ico
+  - Relay icons now display in RelayManagementView and WalletSettingsView
+- Epic payment received animations in NutsackiOS
+  - Created sublime full-screen animation for received payments and nutzaps
+  - Features lightning bolts, confetti, fireworks, falling coins, and particle effects
+  - Includes haptic feedback for enhanced user experience
+  - Automatically triggers for both ecash token redemption and nutzap receipts
+
+### Fixed
+- NIP-60 wallet incorrectly deleting token events when making new deposits
+  - Completely refactored state management to follow ndk-wallet pattern
+  - Added explicit WalletStateChange to separate intent from implementation
+  - Replaced complex inference logic with simple calculateNewState function
+  - Fixed deposit operations to no longer trigger deletion events
+  - All wallet operations now explicitly declare what proofs to store/destroy
+
+### Changed
+- Event deletion API simplified - use `event.delete()` instead of `ndk.deleteEvent()`
+- Logging in deletion processing now uses NDKLogger instead of print() for consistency
+- **BREAKING**: Removed `displayName` parameter from `NDKSession` and `NDKAuthManager.createSession()`
+  - Sessions now only use profile metadata from kind:0 events
+  - Eliminates confusion between local display names and actual Nostr profile names
+
+### Removed
+- Deprecated `NDK.deleteEvent()` and `NDK.deleteEvents()` methods - use `NDKEvent.delete()` instead
+- `displayName` field from `NDKSession` struct
+- `bestDisplayName` computed property from `NDKSession` - use `profileName ?? shortIdentifier` directly
+- `invalidDisplayName` error case from `NDKSessionError`
+
+## [0.4.5] - 2025-07-16
+
+### Changed
+- Updated subscription ID generation to match ndk-core pattern instead of using UUIDs
+  - Subscription IDs now follow format: `[meaningful-part]-[random-suffix]`
+  - Meaningful part includes filter information (kinds, authors, tags, etc.) for better debugging
+  - Random suffix ensures uniqueness (5 alphanumeric characters)
+  - Example IDs: `kinds:1,3,7-a2x9k`, `kinds:0-auth,time-b3m5n`
+  
+### Added
+- Added `fingerprint` property to `NDKFilter` for generating consistent filter identifiers
+  - Used internally for subscription ID generation
+  - Returns human-readable representation when possible, otherwise SHA256 hash prefix
+
+## [0.4.4] - 2025-07-16
+
+### Added
+- Reactive relay state management with `NDKRelay.stateStream` AsyncStream
+  - Provides real-time updates for connection state, statistics, and relay information
+  - Unified `NDKRelay.State` struct combines all relay state into a single observable value
+  - Eliminates need for polling in UI components
+  
+### Changed
+- Made `NDKRelayStats`, `NDKRelayInformation`, and `NDKRelaySignatureStats` conform to Equatable
+- Updated RelayStateActor to broadcast state changes to observers
+- NutsackiOS: Refactored RelayManagementView to use reactive state observation instead of polling
+  - Individual RelayRowView components now observe their own relay state
+  - Real-time updates for connection status, statistics, and relay information
+  - Improved performance by eliminating periodic polling
+
+### Fixed
+- Fixed issue where 7375 events weren't being published to relays when created in NutsackiOS app
+  - Root cause was relay connections not being established before event publishing
+  - Reactive state management ensures UI accurately reflects relay connection status
+
+## [0.4.3] - 2025-07-16
+
+### Added
+- NutsackiOS: New wallet events view to display all NIP-60 token events (kind 7375)
+  - Shows all token events with their deletion status (active/deleted)
+  - Displays event details including mint, proofs, and proof states
+  - Supports checking real-time proof states (spent/unspent) with mints
+  - Tracks deletion via both NIP-09 deletion events and `del` tags in newer events
+  - Accessible via Settings → Wallet → Wallet Events
+
+## [0.4.2] - 2025-07-16
+
+### Fixed
+- Fixed invalid REQ message error in NIP-60 wallet deposits where Cashu quote IDs were being used as Nostr event IDs
+  - Modified `WalletEventManager.saveQuoteEvent` to return the Nostr event ID
+  - Updated `WalletEventManager.deleteQuoteEvent` to properly accept Nostr event IDs instead of Cashu quote IDs
+  - Removed incorrect deletion of quote events during deposit monitoring since the Nostr event ID is not available at that point
+
+## [0.4.1] - 2025-07-16
+
+### Fixed
+- NIP-60 wallet now properly includes `del` tags when creating new token events after spending proofs
+  - Added proof ownership tracking with timestamps to `ProofStateManager`
+  - New `getOwnerEventIds()` method returns previous owners of proofs
+  - `WalletEventManager.updateTokenEvents()` now includes superseded event IDs in `del` tags
+  - Prevents double-spending issues when syncing wallet state across clients
+
 ## [0.4.0] - 2025-07-16
 
 ### Changed

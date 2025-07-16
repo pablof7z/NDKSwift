@@ -250,7 +250,7 @@ public class NDKAuthManager {
             // Save updated session metadata
             try await saveSessionMetadata(updatedSession)
             
-            print("Session restored for user: \(updatedSession.bestDisplayName)")
+            print("Session restored for user: \(updatedSession.pubkey)")
         } catch {
             // If we fail to restore a session due to corrupted data, clean it up
             print("Failed to restore session \(session.id): \(error)")
@@ -275,13 +275,11 @@ public class NDKAuthManager {
     /// Create a new session with a signer
     /// - Parameters:
     ///   - signer: The signer for this session
-    ///   - displayName: Display name for the session
     ///   - requiresBiometric: Whether biometric auth is required
     ///   - isHardwareBacked: Whether the signer uses secure enclave
     /// - Returns: The created session
     public func createSession(
         with signer: any NDKSigner,
-        displayName: String,
         requiresBiometric: Bool = false,
         isHardwareBacked: Bool = false
     ) async throws -> NDKSession {
@@ -292,7 +290,6 @@ public class NDKAuthManager {
         // Create session
         let session = NDKSession(
             pubkey: pubkey,
-            displayName: displayName,
             signerType: type(of: signer).signerType,
             requiresBiometric: requiresBiometric,
             isHardwareBacked: isHardwareBacked
@@ -355,7 +352,7 @@ public class NDKAuthManager {
             logout()
         }
         
-        print("Deleted session for user: \(session.bestDisplayName)")
+        print("Deleted session for user: \(session.pubkey)")
     }
     
     /// Logout from the current session
@@ -424,7 +421,7 @@ public class NDKAuthManager {
         // Save updated metadata
         try await saveSessionMetadata(session)
         
-        print("Updated profile for session: \(session.bestDisplayName)")
+        print("Updated profile for session: \(session.pubkey)")
     }
     
     // MARK: - Private Helpers

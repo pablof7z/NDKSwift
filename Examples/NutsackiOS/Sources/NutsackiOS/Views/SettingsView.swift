@@ -85,6 +85,10 @@ struct SettingsView: View {
                     NavigationLink(destination: NutzapSettingsView()) {
                         Label("Nutzap Settings", systemImage: "bolt.heart")
                     }
+                    
+                    NavigationLink(destination: WalletEventsView()) {
+                        Label("Wallet Events", systemImage: "list.bullet.rectangle")
+                    }
                 } header: {
                     Text("Wallet")
                 } footer: {
@@ -143,7 +147,13 @@ struct SettingsView: View {
     }
     
     private func logout() {
+        // Clear wallet data and cancel subscriptions
+        walletManager.clearWalletData()
+        
+        // Clear authentication data
         nostrManager.logout()
+        
+        // Clear local state
         currentUser = nil
         userProfile = nil
     }
@@ -643,7 +653,7 @@ struct UnpublishedEventRow: View {
         case 5: return "Deletion"
         case 6: return "Repost"
         case 7: return "Reaction"
-        case 37375: return "NIP-60 Wallet"
+        case 17375: return "NIP-60 Wallet"
         default: return "Event \(event.kind)"
         }
     }

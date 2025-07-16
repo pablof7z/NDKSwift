@@ -7,9 +7,11 @@ struct BalanceCard: View {
     let balance: Int
     
     @State private var convertedBalance: String = ""
+    @State private var mintBalances: [(mint: String, balance: Int64, percentage: Double)] = []
+    @State private var isLoadingMints = false
     
     private let cardWidth: CGFloat = 330
-    private let cardHeight: CGFloat = 150
+    private let cardHeight: CGFloat = 180
     
     var body: some View {
         ZStack {
@@ -30,45 +32,55 @@ struct BalanceCard: View {
                 .frame(width: cardWidth, height: cardHeight)
             
             // Content
-            VStack(alignment: .leading) {
-                HStack {
-                    Text(balance == 0 ? "-" : formatBalance(balance))
-                        .font(.largeTitle)
-                        .fontWeight(.bold)
-                        .foregroundColor(.white)
-                        .lineLimit(1)
+            HStack(spacing: 16) {
+                // Left side - Balance info
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack(alignment: .top) {
+                        Text(balance == 0 ? "-" : formatBalance(balance))
+                            .font(.largeTitle)
+                            .fontWeight(.bold)
+                            .foregroundColor(.white)
+                            .lineLimit(1)
+                        
+                        Text("sats")
+                            .font(.headline)
+                            .foregroundColor(Color.gray)
+                            .padding(.top, 8)
+                    }
+                    
+                    // DLEQ verification status
+                    if walletManager.activeWallet != nil {
+                        DLEQStatusIndicator()
+                    }
                     
                     Spacer()
                     
-                    VStack(alignment: .trailing, spacing: 4) {
-                        Text("sats")
-                            .font(.title)
-                            .foregroundColor(Color.gray)
-                        
-                        // DLEQ verification status
-                        if walletManager.activeWallet != nil {
-                            DLEQStatusIndicator()
-                        }
+                    // Fiat conversion
+                    if appState.preferredConversionUnit != .sat {
+                        Text(convertedBalance)
+                            .font(.subheadline)
+                            .opacity(0.7)
+                            .animation(.default, value: convertedBalance)
                     }
                 }
                 
                 Spacer()
                 
-                // Fiat conversion
-                if appState.preferredConversionUnit != .sat {
-                    HStack {
-                        Text(convertedBalance)
-                        Spacer()
-                    }
-                    .opacity(0.7)
-                    .animation(.default, value: convertedBalance)
+                // Right side - Mini pie chart
+                if !mintBalances.isEmpty {
+                    MiniPieChart(mintBalances: mintBalances)
+                        .frame(width: 80, height: 80)
                 }
             }
-            .padding(24)
+            .padding(20)
             .frame(width: cardWidth, height: cardHeight)
         }
         .task(id: balance) {
             await convert()
+            await loadMintBalances()
+        }
+        .task {
+            await loadMintBalances()
         }
         .onChange(of: appState.preferredConversionUnit) { _, _ in
             Task {
@@ -119,6 +131,94 @@ struct BalanceCard: View {
         formatter.currencyCode = appState.preferredConversionUnit.rawValue.uppercased()
         
         convertedBalance = formatter.string(from: NSNumber(value: fiatValue)) ?? ""
+    }
+    
+    private func loadMintBalances() async {
+        isLoadingMints = true
+        defer { isLoadingMints = false }
+        
+        guard let wallet = walletManager.activeWallet else { return }
+        
+        let mintStrings = await wallet.mints.getMintURLs()
+        let mints = mintStrings.compactMap { URL(string: $0) }
+        var balances: [(mint: String, balance: Int64, percentage: Double)] = []
+        var totalBalance: Int64 = 0
+        
+        // Get balance for each mint
+        for url in mints {
+            let balance = await wallet.getBalance(mint: url)
+            if balance > 0 {
+                balances.append((mint: url.absoluteString, balance: balance, percentage: 0))
+                totalBalance += balance
+            }
+        }
+        
+        // Calculate percentages
+        if totalBalance > 0 {
+            balances = balances.map { item in
+                let percentage = (Double(item.balance) / Double(totalBalance)) * 100
+                return (mint: item.mint, balance: item.balance, percentage: percentage)
+            }
+        }
+        
+        // Sort by balance (largest first) and take top 4
+        balances.sort { $0.balance > $1.balance }
+        if balances.count > 4 {
+            balances = Array(balances.prefix(4))
+        }
+        
+        await MainActor.run {
+            self.mintBalances = balances
+        }
+    }
+}
+
+struct MiniPieChart: View {
+    let mintBalances: [(mint: String, balance: Int64, percentage: Double)]
+    
+    private let mintColors: [Color] = [
+        Color(red: 0.98, green: 0.54, blue: 0.13), // Orange
+        Color(red: 0.13, green: 0.59, blue: 0.95), // Blue
+        Color(red: 0.96, green: 0.26, blue: 0.21), // Red
+        Color(red: 0.30, green: 0.69, blue: 0.31), // Green
+    ]
+    
+    var body: some View {
+        ZStack {
+            ForEach(Array(mintBalances.enumerated()), id: \.element.mint) { index, item in
+                Circle()
+                    .trim(from: startAngle(for: index), to: endAngle(for: index))
+                    .stroke(
+                        mintColors[index % mintColors.count],
+                        style: StrokeStyle(lineWidth: 20, lineCap: .butt)
+                    )
+                    .rotationEffect(.degrees(-90))
+            }
+            
+            // Center text showing number of mints
+            Text("\(mintBalances.count)")
+                .font(.title2)
+                .fontWeight(.bold)
+                .foregroundColor(.white)
+        }
+    }
+    
+    private func startAngle(for index: Int) -> CGFloat {
+        guard index > 0 else { return 0 }
+        
+        let previousAngles = mintBalances[0..<index].reduce(0) { sum, item in
+            sum + (item.percentage / 100.0)
+        }
+        
+        return previousAngles
+    }
+    
+    private func endAngle(for index: Int) -> CGFloat {
+        let cumulativeAngle = mintBalances[0...index].reduce(0) { sum, item in
+            sum + (item.percentage / 100.0)
+        }
+        
+        return cumulativeAngle
     }
 }
 

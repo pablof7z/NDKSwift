@@ -79,42 +79,5 @@ public extension NDK {
     }
     
     // MARK: - NIP-09: Event Deletion
-    
-    /// Delete one or more events
-    /// 
-    /// - Parameters:
-    ///   - events: The events to delete
-    ///   - reason: The reason for deletion (optional)
-    /// 
-    /// - Returns: The published deletion event
-    func deleteEvents(_ events: [NDKEvent], reason: String = "") async throws -> NDKEvent {
-        guard let signer = signer else {
-            throw NDKError.notConfigured("No signer configured")
-        }
-        
-        var builder = NDKEventBuilder()
-            .content(reason)
-            .kind(EventKind.deletion)
-        
-        for event in events {
-            builder = builder
-                .tagEvent(event.id)
-                .tag(["k", String(event.kind)])
-        }
-        
-        let deletionEvent = try await builder.build(signer: signer)
-        _ = try await publish(deletionEvent)
-        return deletionEvent
-    }
-    
-    /// Delete a single event
-    /// 
-    /// - Parameters:
-    ///   - event: The event to delete
-    ///   - reason: The reason for deletion (optional)
-    /// 
-    /// - Returns: The published deletion event
-    func deleteEvent(_ event: NDKEvent, reason: String = "") async throws -> NDKEvent {
-        return try await deleteEvents([event], reason: reason)
-    }
+    // Note: Use event.delete() method instead
 }

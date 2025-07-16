@@ -27,71 +27,86 @@ public actor WalletEventManager {
     
     // MARK: - Token Event Management
     
-    /// Create or update token events based on proof state changes
+    /// Create or update token events based on calculated token changes
     public func updateTokenEvents(
-        availableProofsByMint: [String: [CashuSwift.Proof]],
+        tokenChange: WalletTokenChange,
         proofStateManager: ProofStateManager,
         signer: NDKSigner
     ) async throws -> [String] {
-        // Create new token events for each mint
-        var newEventIds: Set<String> = []
+        print("\n=== WalletEventManager.updateTokenEvents START ===")
+        print("Tokens to delete: \(tokenChange.deletedTokenIds)")
+        print("Proofs to save: \(tokenChange.saveProofs.count)")
         
-        for (mint, proofs) in availableProofsByMint {
-            // Get the previous owner event IDs for these proofs
-            // These are the token events that will be superseded by the new token
-            let previousOwnerEventIds = await proofStateManager.getOwnerEventIds(for: proofs)
-            
-            let token = CashuSwift.Token(
-                proofs: [mint: proofs],
-                unit: "sat"
-            )
-            
-            // Convert Set to Array and filter out any that might be in currentTokenEventIds
-            // to avoid including events that are still valid
-            let deletedEventIds = Array(previousOwnerEventIds.intersection(currentTokenEventIds))
-            
-            let eventId = try await saveTokenEvent(
-                token: token,
-                signer: signer,
-                deletedEventIds: deletedEventIds.isEmpty ? nil : deletedEventIds
-            )
-            newEventIds.insert(eventId)
-            print("WalletEventManager - Saved token event: \(eventId) for mint: \(mint)")
-            if !deletedEventIds.isEmpty {
-                print("  With del tags for events: \(deletedEventIds)")
+        var newEventIds = Set<String>()
+        
+        // Keep existing token events that aren't being deleted
+        for existingId in currentTokenEventIds {
+            if !tokenChange.deletedTokenIds.contains(existingId) {
+                newEventIds.insert(existingId)
             }
-            
-            // Update proof ownership to this event
-            // We don't have the timestamp here, but these are new events we're creating
-            // so they will have the current timestamp which should be newer than any existing
-            await proofStateManager.updateProofOwnership(proofs, eventId: eventId, timestamp: Timestamp(Date().timeIntervalSince1970))
         }
         
-        // Delete old token events that are no longer needed
-        // Note: We now use explicit del tags in new tokens, so we might not need
-        // to create separate deletion events for all cases. However, we keep this
-        // for tokens that have no proofs left (completely spent)
-        let eventsToDelete = currentTokenEventIds.subtracting(newEventIds)
-        for eventId in eventsToDelete {
-            // Check if this event was already included in del tags
-            var alreadyDeleted = false
-            for (_, proofs) in availableProofsByMint {
-                let previousOwners = await proofStateManager.getOwnerEventIds(for: proofs)
-                if previousOwners.contains(eventId) {
-                    alreadyDeleted = true
-                    break
+        // Create deletion events for tokens being deleted
+        if !tokenChange.deletedTokenIds.isEmpty {
+            let deleteEvent = try await NDKEventBuilder()
+                .kind(5) // Event deletion
+                .content("")
+                .tags([
+                    ["k", String(7375)] // Cashu token kind
+                ] + tokenChange.deletedTokenIds.map { ["e", $0] })
+                .build(signer: signer)
+            
+            try await ndk.publish(deleteEvent)
+            
+            // Create individual Kind 5 events for each deleted token
+            for tokenId in tokenChange.deletedTokenIds {
+                Task {
+                    do {
+                        try await self.createDeleteEvent(eventId: tokenId, signer: signer)
+                    } catch {
+                        print("⚠️ Failed to create Kind 5 deletion event for \(tokenId)")
+                    }
                 }
             }
+        }
+        
+        // Create new token event if we have proofs to save
+        if !tokenChange.saveProofs.isEmpty {
+            // Group proofs by mint
+            var proofsByMint: [String: [CashuSwift.Proof]] = [:]
+            for proof in tokenChange.saveProofs {
+                let mint = await proofStateManager.getMintForProof(proof) ?? "unknown"
+                proofsByMint[mint, default: []].append(proof)
+            }
             
-            // Only create explicit delete event if not already handled via del tags
-            if !alreadyDeleted {
-                try await createDeleteEvent(eventId: eventId, signer: signer)
+            // Create a token event for each mint
+            for (mint, proofs) in proofsByMint {
+                let token = CashuSwift.Token(
+                    proofs: [mint: proofs],
+                    unit: "sat"
+                )
+                
+                let eventId = try await saveTokenEvent(
+                    token: token,
+                    signer: signer,
+                    deletedEventIds: Array(tokenChange.deletedTokenIds)
+                )
+                
+                newEventIds.insert(eventId)
+                
+                // Update proof ownership
+                await proofStateManager.updateProofOwnership(
+                    proofs,
+                    eventId: eventId,
+                    timestamp: Timestamp(Date().timeIntervalSince1970)
+                )
             }
         }
         
         // Update tracking
         currentTokenEventIds = newEventIds
         
+        print("=== WalletEventManager.updateTokenEvents END ===\n")
         return Array(newEventIds)
     }
     
@@ -125,25 +140,27 @@ public actor WalletEventManager {
     
     // MARK: - Quote Event Management
     
-    /// Save a quote event
-    public func saveQuoteEvent(quote: CashuMintQuote, signer: NDKSigner) async throws {
-        try await NDKCashuQuoteEvent.createAndPublish(
+    /// Save a quote event and return its event ID
+    @discardableResult
+    public func saveQuoteEvent(quote: CashuMintQuote, signer: NDKSigner) async throws -> String {
+        let quoteEvent = try await NDKCashuQuoteEvent.createAndPublish(
             ndk: ndk,
             quote: quote,
             signer: signer
         )
+        return quoteEvent.event.id
     }
     
-    /// Delete a quote event
-    public func deleteQuoteEvent(quoteId: String, signer: NDKSigner) async throws {
+    /// Delete a quote event by its Nostr event ID
+    public func deleteQuoteEvent(eventId: String, signer: NDKSigner) async throws {
         // First get the event to delete
-        let filter = NDKFilter(ids: [quoteId])
+        let filter = NDKFilter(ids: [eventId])
         
         if let quoteEvent = try await ndk.fetchEvent(filter) {
             try await quoteEvent.delete(ndk: ndk, reason: "Quote expired or used", signer: signer)
         }
         
-        print("WalletEventManager - Deleted quote event: \(quoteId)")
+        print("WalletEventManager - Deleted quote event: \(eventId)")
     }
     
     // MARK: - Spending History

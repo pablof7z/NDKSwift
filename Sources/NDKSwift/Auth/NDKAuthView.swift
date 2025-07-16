@@ -473,7 +473,7 @@ private struct SessionRowView: View {
                     Circle()
                         .fill(.gray.opacity(0.3))
                         .overlay(
-                            Text(session.bestDisplayName.prefix(1).uppercased())
+                            Text((session.profileName ?? "?").prefix(1).uppercased())
                                 .font(.title3)
                                 .fontWeight(.medium)
                         )
@@ -482,7 +482,7 @@ private struct SessionRowView: View {
                 .clipShape(Circle())
                 
                 VStack(alignment: .leading, spacing: 4) {
-                    Text(session.bestDisplayName)
+                    Text(session.profileName ?? session.shortIdentifier)
                         .font(.headline)
                         .foregroundStyle(.primary)
                     

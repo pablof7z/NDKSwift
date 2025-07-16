@@ -34,14 +34,14 @@ public actor NDKSubscriptionCoordinator {
             var options = NDKSubscriptionOptions()
             options.closeOnEose = closeOnEose
             return NDKSubscription(
-                id: id ?? UUID().uuidString,
+                id: id ?? NDKSubscription.generateSubscriptionId(for: filters, userProvidedIds: nil),
                 filters: filters,
                 options: options,
                 ndk: NDK()
             )
         }
         
-        let subscriptionId = id ?? UUID().uuidString
+        let subscriptionId = id ?? NDKSubscription.generateSubscriptionId(for: filters, userProvidedIds: nil)
         print("[NDKSubscriptionCoordinator.subscribe] Created subscription ID: \(subscriptionId)")
         
         // Collect all authors from all filters for outbox model
@@ -65,6 +65,31 @@ public actor NDKSubscriptionCoordinator {
             }
         }
         print("[NDKSubscriptionCoordinator.subscribe] Selected \(selectedRelays.count) relays")
+        
+        // Ensure explicitly requested relays exist in the pool and are connected
+        if let specificRelays = relays {
+            print("[NDKSubscriptionCoordinator.subscribe] Ensuring specific relays are added to pool and connected")
+            await withTaskGroup(of: Void.self) { group in
+                for relayUrl in specificRelays {
+                    group.addTask {
+                        // Add relay to pool if it doesn't exist
+                        let relay = await ndk.pool.addRelay(relayUrl)
+                        
+                        // Connect if not already connected
+                        let connectionState = await relay.connectionState
+                        if connectionState != .connected && connectionState != .connecting {
+                            print("[NDKSubscriptionCoordinator.subscribe] Connecting to explicitly requested relay: \(relayUrl)")
+                            do {
+                                try await relay.connect()
+                                print("[NDKSubscriptionCoordinator.subscribe] Connected to relay: \(relayUrl)")
+                            } catch {
+                                print("[NDKSubscriptionCoordinator.subscribe] Failed to connect to relay \(relayUrl): \(error)")
+                            }
+                        }
+                    }
+                }
+            }
+        }
         
         var options = NDKSubscriptionOptions()
         options.closeOnEose = closeOnEose

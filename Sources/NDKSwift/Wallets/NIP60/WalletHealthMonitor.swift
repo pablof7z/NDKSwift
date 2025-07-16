@@ -217,13 +217,26 @@ public actor WalletHealthMonitor {
             
             // Update wallet state if we found spent proofs
             if !spentProofsByMint.isEmpty {
-                // Remove spent proofs from each mint's available set
-                let availableByMint = await proofStateManager.getAvailableProofsByMint()
-                _ = try await eventManager.updateTokenEvents(
-                    availableProofsByMint: availableByMint,
-                    proofStateManager: proofStateManager,
-                    signer: signer
-                )
+                // Create state changes for each mint
+                for (mint, proofs) in spentProofsByMint {
+                    let stateChange = WalletStateChange(
+                        store: [],
+                        destroy: proofs,
+                        mint: mint,
+                        memo: "Reconciliation - remove spent proofs"
+                    )
+                    
+                    let tokenChange = await WalletStateCalculator.calculateNewState(
+                        stateChange: stateChange,
+                        proofStateManager: proofStateManager
+                    )
+                    
+                    _ = try await eventManager.updateTokenEvents(
+                        tokenChange: tokenChange,
+                        proofStateManager: proofStateManager,
+                        signer: signer
+                    )
+                }
             }
         }
         

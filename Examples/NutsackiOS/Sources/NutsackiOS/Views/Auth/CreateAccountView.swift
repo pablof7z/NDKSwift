@@ -121,7 +121,7 @@ struct BackupKeyView: View {
     @State private var nsec: String?
     
     var displayName: String {
-        session.bestDisplayName
+        session.profileName ?? session.shortIdentifier
     }
     
     var body: some View {
