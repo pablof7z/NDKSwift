@@ -40,19 +40,16 @@ struct RelayManagementView: View {
 // Separate view for relay list content that observes NDK relays
 struct RelayListContent: View {
     let ndk: NDK
-    @State private var relays: [NDKRelay] = []
-    @State private var isLoading = true
+    @StateObject private var relayCollection: NDKRelayCollection
+    
+    init(ndk: NDK) {
+        self.ndk = ndk
+        self._relayCollection = StateObject(wrappedValue: ndk.createRelayCollection())
+    }
     
     var body: some View {
         Group {
-            if isLoading {
-                HStack {
-                    Spacer()
-                    ProgressView("Loading relays...")
-                    Spacer()
-                }
-                .listRowBackground(Color.clear)
-            } else if relays.isEmpty {
+            if relayCollection.relays.isEmpty {
                 VStack(spacing: 16) {
                     Image(systemName: "network.slash")
                         .font(.system(size: 60))
@@ -69,105 +66,31 @@ struct RelayListContent: View {
                 .listRowBackground(Color.clear)
             } else {
                 Section {
-                    ForEach(relays, id: \.url) { relay in
-                        RelayRowView(relay: relay)
+                    ForEach(relayCollection.relays) { relayInfo in
+                        RelayRowView(relayInfo: relayInfo, ndk: ndk)
                     }
                 } header: {
                     HStack {
                         Text("Connected Relays")
                         Spacer()
-                        RelayConnectionCounter(relays: relays)
+                        Text("\(relayCollection.connectedCount)/\(relayCollection.totalCount)")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
                     }
                 }
             }
         }
-        .task {
-            await loadRelays()
-        }
-    }
-    
-    private func loadRelays() async {
-        let allRelays = await ndk.relays
-        await MainActor.run {
-            self.relays = allRelays.sorted { $0.url < $1.url }
-            self.isLoading = false
-        }
     }
 }
 
-// View that counts connected relays reactively
-struct RelayConnectionCounter: View {
-    let relays: [NDKRelay]
-    @State private var connectedCount = 0
-    @State private var tasks: [Task<Void, Never>] = []
-    
-    var body: some View {
-        Text("\(connectedCount)/\(relays.count)")
-            .font(.caption)
-            .foregroundStyle(.secondary)
-            .onAppear {
-                startObserving()
-            }
-            .onDisappear {
-                stopObserving()
-            }
-    }
-    
-    private func startObserving() {
-        // Cancel any existing tasks
-        stopObserving()
-        
-        // Create a task for each relay to observe its state
-        for relay in relays {
-            let task = Task {
-                for await state in relay.stateStream {
-                    await MainActor.run {
-                        updateConnectedCount()
-                    }
-                }
-            }
-            tasks.append(task)
-        }
-        
-        // Initial count
-        Task {
-            await updateConnectedCountAsync()
-        }
-    }
-    
-    private func stopObserving() {
-        for task in tasks {
-            task.cancel()
-        }
-        tasks.removeAll()
-    }
-    
-    private func updateConnectedCount() {
-        Task {
-            await updateConnectedCountAsync()
-        }
-    }
-    
-    private func updateConnectedCountAsync() async {
-        var count = 0
-        for relay in relays {
-            let state = await relay.connectionState
-            if case .connected = state {
-                count += 1
-            }
-        }
-        await MainActor.run {
-            self.connectedCount = count
-        }
-    }
-}
 
-// Individual relay row that observes its own state
+// Individual relay row using relay info from collection
 struct RelayRowView: View {
-    let relay: NDKRelay
-    @State private var relayState: NDKRelay.State?
+    let relayInfo: NDKRelayCollection.RelayInfo
+    let ndk: NDK
     @State private var showDetails = false
-    @State private var observationTask: Task<Void, Never>?
+    @State private var relay: NDKRelay?
+    @State private var relayState: NDKRelay.State?
     @State private var relayIcon: Image?
     
     var body: some View {
@@ -177,19 +100,18 @@ struct RelayRowView: View {
                 RelayIconView(icon: relayIcon)
                 
                 VStack(alignment: .leading, spacing: 4) {
-                    Text(relay.url)
+                    Text(relayInfo.url)
                         .font(.headline)
                         .lineLimit(1)
                     
                     HStack(spacing: 12) {
-                        if let state = relayState {
-                            ConnectionStatusBadge(state: state.connectionState, style: .full)
-                            
-                            if let name = state.info?.name {
-                                Text(name)
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
-                            }
+                        ConnectionStatusBadge(state: relayInfo.state, style: .full)
+                        
+                        if let state = relayState,
+                           let name = state.info?.name {
+                            Text(name)
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
                         }
                     }
                 }
@@ -211,21 +133,23 @@ struct RelayRowView: View {
             showDetails = true
         }
         .sheet(isPresented: $showDetails) {
-            if let state = relayState {
+            if let relay = relay, let state = relayState {
                 RelayDetailView(relay: relay, initialState: state)
             }
         }
-        .onAppear {
-            startObserving()
-        }
-        .onDisappear {
-            stopObserving()
+        .task {
+            // Get the actual relay and its current state
+            await loadRelay()
         }
     }
     
-    private func startObserving() {
-        observationTask = Task {
-            for await state in relay.stateStream {
+    private func loadRelay() async {
+        let allRelays = await ndk.relays
+        if let foundRelay = allRelays.first(where: { $0.url == relayInfo.url }) {
+            self.relay = foundRelay
+            
+            // Get initial state
+            for await state in foundRelay.stateStream {
                 await MainActor.run {
                     self.relayState = state
                     
@@ -243,13 +167,10 @@ struct RelayRowView: View {
                         }
                     }
                 }
+                // Only need the first state for display
+                break
             }
         }
-    }
-    
-    private func stopObserving() {
-        observationTask?.cancel()
-        observationTask = nil
     }
 }
 
@@ -528,16 +449,13 @@ struct AddRelayView: View {
         
         Task {
             do {
-                // Add relay to NDK
-                await nostrManager.ndk?.addRelay(relayURL)
+                // Add relay to NDK and connect to it
+                guard let ndk = nostrManager.ndk else {
+                    throw NSError(domain: "NutsackiOS", code: 0, userInfo: [NSLocalizedDescriptionKey: "NDK not initialized"])
+                }
                 
-                // Connect to the relay
-                // Connect to the newly added relay
-                if let ndk = nostrManager.ndk {
-                    let relays = await ndk.relays
-                    if let relay = relays.first(where: { $0.url == relayURL }) {
-                        try await relay.connect()
-                    }
+                guard let _ = await ndk.addRelayAndConnect(relayURL) else {
+                    throw NSError(domain: "NutsackiOS", code: 0, userInfo: [NSLocalizedDescriptionKey: "Failed to add relay"])
                 }
                 
                 await MainActor.run {

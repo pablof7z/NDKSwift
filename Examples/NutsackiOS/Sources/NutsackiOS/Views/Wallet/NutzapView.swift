@@ -317,7 +317,7 @@ struct NutzapView: View {
     private func loadBalance() {
         Task {
             do {
-                let balance = try await walletManager.getBalance()
+                let balance = try await walletManager.activeWallet?.getBalance() ?? 0
                 await MainActor.run {
                     availableBalance = Int(balance)
                 }

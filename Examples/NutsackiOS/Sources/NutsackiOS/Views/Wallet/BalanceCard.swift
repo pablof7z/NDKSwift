@@ -4,8 +4,6 @@ struct BalanceCard: View {
     @EnvironmentObject private var appState: AppState
     @Environment(WalletManager.self) private var walletManager
     
-    let balance: Int
-    
     @State private var convertedBalance: String = ""
     @State private var mintBalances: [(mint: String, balance: Int64, percentage: Double)] = []
     @State private var isLoadingMints = false
@@ -22,7 +20,7 @@ struct BalanceCard: View {
             // Balance display - centered
             VStack(spacing: 8) {
                 HStack(alignment: .firstTextBaseline, spacing: 8) {
-                    Text(formatBalance(balance))
+                    Text(formatBalance(Int(walletManager.currentBalance)))
                         .font(.system(size: 56, weight: .semibold, design: .rounded))
                         .foregroundStyle(.primary)
                     
@@ -49,7 +47,7 @@ struct BalanceCard: View {
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 24)
-        .task(id: balance) {
+        .task(id: walletManager.currentBalance) {
             await convert()
             await loadMintBalances()
         }
@@ -89,7 +87,7 @@ struct BalanceCard: View {
         case .usd: bitcoinPrice = prices.usd
         case .eur: bitcoinPrice = prices.eur
         case .btc:
-            let btcAmount = Double(balance) / 100_000_000.0
+            let btcAmount = Double(walletManager.currentBalance) / 100_000_000.0
             convertedBalance = String(format: "%.8f BTC", btcAmount)
             return
         case .sat:
@@ -97,7 +95,7 @@ struct BalanceCard: View {
             return
         }
         
-        let bitcoinAmount = Double(balance) / 100_000_000.0
+        let bitcoinAmount = Double(walletManager.currentBalance) / 100_000_000.0
         let fiatValue = bitcoinAmount * Double(bitcoinPrice)
         
         let formatter = NumberFormatter()

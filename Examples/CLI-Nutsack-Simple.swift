@@ -25,9 +25,13 @@ struct CLINutsackSimple {
         print("💰 Creating wallet...")
         let wallet = NIP60Wallet(ndk: ndk)
         
-        // Add test mints
-        try await wallet.addMint(url: URL(string: "https://testnut.cashu.space")!)
-        print("✅ Added test mint\n")
+        // Setup wallet with test mint
+        try await wallet.setup(
+            mints: ["https://testnut.cashu.space"],
+            relays: ["wss://relay.primal.net"],
+            publishMintList: true
+        )
+        print("✅ Wallet configured with test mint\n")
         
         // Load wallet
         try await wallet.load()

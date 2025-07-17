@@ -8,11 +8,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Fixed
+- **CRITICAL**: Fixed completely broken Nutzap implementation (NIP-61)
+  - Nutzaps were putting the entire serialized token in the content field instead of using proof tags
+  - Added proper `proof` tags containing JSON-encoded proofs as per NIP-61 specification
+  - Added required `u` tags for mint URLs
+  - Fixed content field to contain comment (not the token)
+  - Fixed recipient P2PK key lookup to use `p2pk` tag instead of `pubkey` tag in kind:10019 events
+  - Updated `NutzapPaymentRequest` to properly separate Nostr pubkey and P2PK key
+  - Fixed `processIncoming` to parse proofs from tags instead of content field
+  - Ensured P2PK keys have '02' prefix for Nostr compatibility
+
+### Added
+- Reactive profile observation API via `observeProfile(for:)` method
+  - Returns an AsyncStream that yields profile updates in real-time
+  - Immediately yields cached profiles if available
+  - Automatically subscribes to profile updates from relays
+  - Follows the same AsyncSequence pattern as NDKSubscription
+  - Perfect for reactive UIs that need to display up-to-date profile information
+
+### Fixed
 - NIP60Wallet now properly exposes wallet configuration relays from kind 17375 events
   - Added `walletConfigRelays` property to expose relay URLs from the wallet configuration
   - NutsackiOS wallet settings now correctly shows relays from the wallet configuration event
   - Empty relay lists in the configuration are properly handled (wallet settings shows empty)
   - Removed redundant decryption in WalletEventProcessor - now uses NDKCashuWalletEvent's built-in methods
+- Fixed NIP60Wallet mint synchronization issues in `processWalletConfiguration`
+  - Mints that fail to load (network errors) are now properly handled and not added to wallet
+  - Wallet now removes mints that are no longer in the configuration event
+  - Event emissions now reflect actual MintManager state, not just requested configuration
+  - Added detailed logging for mint addition/removal operations
 
 ### Changed
 - Empty relay sets in `ndk.subscribe()` now behave the same as nil (use default relay selection)

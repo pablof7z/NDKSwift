@@ -1,26 +1,18 @@
 import SwiftUI
+import NDKSwift
 
 struct ContentView: View {
-    @EnvironmentObject var authManager: AuthManager
-    @State private var isShowingSplash = true
+    @Environment(NDKAuthManager.self) var authManager
+    @EnvironmentObject var ndkManager: NDKManager
     
     var body: some View {
-        ZStack {
-            Group {
-                if authManager.isAuthenticated {
-                    MainTabView()
-                } else {
-                    AuthView()
-                }
-            }
-            .opacity(isShowingSplash ? 0 : 1)
-            .animation(.easeInOut(duration: 0.5), value: isShowingSplash)
-            
-            if isShowingSplash {
-                SplashView(isShowingSplash: $isShowingSplash)
-                    .transition(.opacity)
-            }
-        }
+        NDKAuthView(authManager: authManager, ndk: ndkManager.ndk, authenticatedContent: {
+            // Authenticated content
+            MainTabView()
+        }, authenticationContent: {
+            // Authentication content
+            PostaAuthView()
+        })
     }
 }
 
@@ -33,7 +25,7 @@ struct MainTabView: View {
                     Text("Home")
                 }
             
-            Text("Profile")
+            ProfileView(pubkey: nil)
                 .tabItem {
                     Image(systemName: "person")
                     Text("Profile")
@@ -50,5 +42,7 @@ struct MainTabView: View {
 
 #Preview {
     ContentView()
-        .environmentObject(AuthManager())
+        .environment(NDKAuthManager.shared)
+        .environmentObject(NDKManager.shared)
+        .environmentObject(RelayManager())
 }

@@ -52,7 +52,7 @@ struct WalletView: View {
                     ScrollView {
                         VStack(spacing: 20) {
                             // Balance card
-                            BalanceCard(balance: Int(walletManager.currentBalance))
+                            BalanceCard()
                                 .padding(.horizontal)
                             
                             // Recent transactions
@@ -363,18 +363,18 @@ struct ActionButtonsView: View {
                             endPoint: .bottomTrailing
                         )
                     )
-                    .frame(width: 77, height: 77) // 10% taller than 70
+                    .frame(width: 90, height: 90)
                     .shadow(color: Color.orange.opacity(0.4), radius: 12, x: 0, y: 6)
                     .overlay(
                         Image(systemName: "qrcode.viewfinder")
-                            .font(.system(size: 30, weight: .medium))
+                            .font(.system(size: 40, weight: .medium))
                             .foregroundColor(.white)
                     )
                     .scaleEffect(scanButtonPressed ? 0.92 : 1.0)
             }
             .buttonStyle(PlainButtonStyle())
         }
-        .frame(height: 77) // Match the taller scan button
+        .frame(height: 84) // Match the taller scan button
     }
 }
 

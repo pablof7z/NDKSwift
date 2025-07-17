@@ -104,40 +104,13 @@ struct ContactsView: View {
                 let pTags = contactListEvent.tags.filter { $0.first == "p" }
                 let pubkeys = pTags.compactMap { $0.count > 1 ? $0[1] : nil }
                 
-                // Fetch profiles for contacts
-                var users: [NDKUser] = []
-                for pubkey in pubkeys {
-                    let user = NDKUser(pubkey: pubkey)
-                    // Try to fetch profile
-                    do {
-                        let metadataFilter = NDKFilter(
-                            authors: [pubkey],
-                            kinds: [0],
-                            limit: 1
-                        )
-                        if let event = try await ndk.fetchEvent(metadataFilter),
-                           let contentData = event.content.data(using: .utf8),
-                           let _ = try? JSONDecoder().decode(NDKUserProfile.self, from: contentData) {
-                            // Profile metadata will be available via async property
-                        }
-                    } catch {
-                        print("Failed to fetch profile for \(pubkey): \(error)")
-                    }
-                    users.append(user)
-                }
+                // Create NDKUser objects for contacts
+                let users = pubkeys.map { NDKUser(pubkey: $0) }
                 
-                // Sort users by name
-                var sortedUsers: [(user: NDKUser, name: String)] = []
-                for user in users {
-                    let profile = await user.profile
-                    let name = profile?.displayName ?? profile?.name ?? ""
-                    sortedUsers.append((user: user, name: name))
-                }
-                
-                sortedUsers.sort { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
-                
+                // For now, just show contacts in the order they appear
+                // Individual ContactRow views will handle loading profiles reactively
                 await MainActor.run {
-                    self.contacts = sortedUsers.map { $0.user }
+                    self.contacts = users
                     isLoading = false
                 }
             } else {
@@ -158,6 +131,8 @@ struct ContactRow: View {
     let user: NDKUser
     @State private var showNutzapView = false
     @State private var profile: NDKUserProfile?
+    @State private var profileTask: Task<Void, Never>?
+    @Environment(NostrManager.self) private var nostrManager
     
     var displayName: String {
         profile?.displayName ?? profile?.name ?? "Nostr User"
@@ -224,7 +199,23 @@ struct ContactRow: View {
                 .presentationDetents([.medium])
         }
         .task {
-            profile = await user.profile
+            guard let ndk = nostrManager.ndk else { return }
+            
+            profileTask = Task {
+                let profileStream = await ndk.observeProfile(for: user.pubkey, closeOnEose: true)
+                
+                for await profileUpdate in profileStream {
+                    if let profile = profileUpdate {
+                        await MainActor.run {
+                            self.profile = profile
+                        }
+                        break // We only need the first profile for display
+                    }
+                }
+            }
+        }
+        .onDisappear {
+            profileTask?.cancel()
         }
     }
 }

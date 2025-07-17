@@ -69,7 +69,8 @@ actor WalletPaymentRouter {
         let nutzapEvent = try await Nutzap.send(
             wallet: wallet,
             amount: nutzapRequest.amountSats,
-            to: nutzapRequest.recipientPubkey,
+            to: nutzapRequest.recipientPubkey,  // This is the Nostr pubkey
+            recipientP2PKKey: nutzapRequest.recipientP2PK,  // This is the P2PK key from payment request
             comment: nutzapRequest.comment,
             eventId: nil,
             mints: mintsDict,

@@ -837,7 +837,7 @@ class RelayManager {
         // Connect to user's relays
         for relayInfo in relayList {
             if relayInfo.read || relayInfo.write {
-                ndk.addRelay(relayInfo.url)
+                await ndk.addRelay(relayInfo.url)
             }
         }
         
@@ -1012,18 +1012,20 @@ class CashuWalletManager {
     
     func setupWallet(signer: NDKSigner) async throws {
         // Initialize Cashu wallet
-        wallet = NDKCashuWallet(signer: signer, ndk: ndk)
-        await wallet?.connect()
+        wallet = NIP60Wallet(ndk: ndk)
         
-        // Configure mints
+        // Setup wallet with mints and relays
         let mints = [
             "https://mint.minibits.cash/Bitcoin",
             "https://mint.coinos.io"
         ]
         
-        for mintUrl in mints {
-            try await wallet?.addMint(url: mintUrl)
-        }
+        let relays = [
+            "wss://relay.damus.io",
+            "wss://relay.nostr.band"
+        ]
+        
+        try await wallet?.setup(mints: mints, relays: relays, publishMintList: true)
     }
     
     func checkBalance() async -> Int {

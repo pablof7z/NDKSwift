@@ -398,7 +398,8 @@ struct LightningInvoicePreviewView: View {
     private func loadBalance() {
         Task {
             do {
-                let balance = try await walletManager.getBalance()
+                guard let wallet = walletManager.activeWallet else { return }
+                let balance = try await wallet.getBalance() ?? 0
                 await MainActor.run {
                     availableBalance = Int(balance)
                 }

@@ -109,26 +109,14 @@ struct DiscoveredMintsView: View {
     }
     
     private func addSelectedMints() {
-        isAdding = true
+        // Just dismiss - user should manage mints in wallet settings
+        dismiss()
         
+        // Show a message that they need to use wallet settings
         Task {
-            do {
-                // Add each selected mint
-                for mintURLString in selectedMints {
-                    if let url = URL(string: mintURLString) {
-                        try await walletManager.addMint(url: url)
-                    }
-                }
-                
-                await MainActor.run {
-                    dismiss()
-                }
-            } catch {
-                await MainActor.run {
-                    errorMessage = "Failed to add mints: \(error.localizedDescription)"
-                    showError = true
-                    isAdding = false
-                }
+            await MainActor.run {
+                errorMessage = "To add discovered mints, please use Wallet Settings."
+                showError = true
             }
         }
     }

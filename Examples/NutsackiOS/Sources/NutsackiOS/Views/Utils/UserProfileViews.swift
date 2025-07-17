@@ -6,13 +6,29 @@ import NDKSwift
 struct UserDisplayName: View {
     let user: NDKUser
     @State private var displayName = "Nostr User"
+    @State private var profileTask: Task<Void, Never>?
+    @Environment(NostrManager.self) private var nostrManager
     
     var body: some View {
         Text(displayName)
             .task {
-                if let profile = await user.profile {
-                    displayName = profile.displayName ?? profile.name ?? "Nostr User"
+                guard let ndk = nostrManager.ndk else { return }
+                
+                profileTask = Task {
+                    let profileStream = await ndk.observeProfile(for: user.pubkey, closeOnEose: true)
+                    
+                    for await profile in profileStream {
+                        if let profile = profile {
+                            await MainActor.run {
+                                displayName = profile.displayName ?? profile.name ?? "Nostr User"
+                            }
+                            break // We only need the first profile for display
+                        }
+                    }
                 }
+            }
+            .onDisappear {
+                profileTask?.cancel()
             }
     }
 }
@@ -21,6 +37,8 @@ struct UserProfilePicture: View {
     let user: NDKUser
     let size: CGFloat
     @State private var pictureURL: String?
+    @State private var profileTask: Task<Void, Never>?
+    @Environment(NostrManager.self) private var nostrManager
     
     init(user: NDKUser, size: CGFloat = 40) {
         self.user = user
@@ -48,9 +66,23 @@ struct UserProfilePicture: View {
             }
         }
         .task {
-            if let profile = await user.profile {
-                pictureURL = profile.picture
+            guard let ndk = nostrManager.ndk else { return }
+            
+            profileTask = Task {
+                let profileStream = await ndk.observeProfile(for: user.pubkey, closeOnEose: true)
+                
+                for await profile in profileStream {
+                    if let profile = profile {
+                        await MainActor.run {
+                            pictureURL = profile.picture
+                        }
+                        break // We only need the first profile for display
+                    }
+                }
             }
+        }
+        .onDisappear {
+            profileTask?.cancel()
         }
     }
 }
@@ -59,6 +91,8 @@ struct UserNIP05: View {
     let user: NDKUser
     @State private var nip05: String?
     @State private var npub: String?
+    @State private var profileTask: Task<Void, Never>?
+    @Environment(NostrManager.self) private var nostrManager
     
     var body: some View {
         Group {
@@ -71,10 +105,25 @@ struct UserNIP05: View {
             }
         }
         .task {
-            if let profile = await user.profile {
-                nip05 = profile.nip05
-            }
             npub = user.npub
+            
+            guard let ndk = nostrManager.ndk else { return }
+            
+            profileTask = Task {
+                let profileStream = await ndk.observeProfile(for: user.pubkey, closeOnEose: true)
+                
+                for await profile in profileStream {
+                    if let profile = profile {
+                        await MainActor.run {
+                            nip05 = profile.nip05
+                        }
+                        break // We only need the first profile for display
+                    }
+                }
+            }
+        }
+        .onDisappear {
+            profileTask?.cancel()
         }
     }
 }

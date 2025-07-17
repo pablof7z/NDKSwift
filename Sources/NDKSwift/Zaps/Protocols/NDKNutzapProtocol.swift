@@ -42,7 +42,8 @@ public class NDKNutzapProtocol: NDKZapProtocol {
         // Payment provider will choose the optimal one
         let paymentRequest = NutzapPaymentRequest(
             amountSats: amountSats,
-            recipientPubkey: await preferences.p2pkPubkey,
+            recipientPubkey: user.pubkey,  // Nostr pubkey for p tag
+            recipientP2PK: await preferences.p2pkPubkey,  // P2PK key for locking proofs
             acceptedMints: acceptedMints,
             comment: comment
         )

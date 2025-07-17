@@ -11,7 +11,6 @@ class WalletManager {
     var isLoading = false
     var error: Error?
     var transactions: [Transaction] = []
-    var availableMints: [String] = []
     var currentBalance: Int64 = 0
     
     private let nostrManager: NostrManager
@@ -66,11 +65,8 @@ class WalletManager {
         try await ndkWallet.load()
         print("WalletManager - Wallet loading finished")
         
-        // Get initial balance
-        if let balance = try? await ndkWallet.getBalance() {
-            self.currentBalance = balance
-            print("WalletManager - Initial balance: \(balance)")
-        }
+        // The wallet's load() method will emit a balanceChanged event
+        // which our event monitoring task will catch and update currentBalance
         
         // Check if wallet has mints configured
         let mintURLs = await ndkWallet.mints.getMintURLs()
@@ -90,8 +86,6 @@ class WalletManager {
             print("WalletManager - Default wallet setup completed")
         } else {
             print("WalletManager - Wallet loaded with \(mintURLs.count) mints")
-            // Update our local state
-            self.availableMints = mintURLs
         }
     }
     
@@ -128,9 +122,6 @@ class WalletManager {
                 switch event.type {
                 case .configurationUpdated(let mints):
                     print("WalletManager - Configuration updated with \(mints.count) mints")
-                    await MainActor.run {
-                        self.availableMints = mints
-                    }
                     
                 case .mintsAdded(let addedMints):
                     print("WalletManager - Mints added: \(addedMints)")
@@ -317,51 +308,8 @@ class WalletManager {
         return nil
     }
     
-    /// Get current balance
-    func getBalance() async throws -> Int64 {
-        guard let wallet = activeWallet else {
-            throw WalletError.noActiveWallet
-        }
-        
-        return try await wallet.getBalance() ?? 0
-    }
-    
-    /// Get balance for specific mint
-    func getBalance(for mintURL: URL) async -> Int64 {
-        guard let wallet = activeWallet else {
-            return 0
-        }
-        
-        return await wallet.getBalance(mint: mintURL)
-    }
     
     /// Create and configure a new wallet with selected mints
-    func createAndConfigureWallet(with mintURLs: [URL]) async throws {
-        guard let wallet = activeWallet else {
-            throw WalletError.noActiveWallet
-        }
-        
-        print("WalletManager - Configuring wallet with \(mintURLs.count) mints")
-        
-        // Convert URLs to strings
-        let mintStrings = mintURLs.map { $0.absoluteString }
-        
-        // Get relays from the user's relay list or use defaults
-        let relays = await getRelaysForWallet()
-        
-        // Setup wallet with mints, relays, and publish mint list
-        print("WalletManager - Publishing wallet configuration")
-        try await wallet.setup(
-            mints: mintStrings,
-            relays: relays,
-            publishMintList: true
-        )
-        print("WalletManager - Wallet configuration published")
-        
-        // The wallet event monitoring will update availableMints when the event is processed
-        // For now, optimistically update the UI
-        self.availableMints = mintStrings
-    }
     
     /// Get relays for wallet configuration
     private func getRelaysForWallet() async -> [String] {
@@ -401,29 +349,6 @@ class WalletManager {
     
     // MARK: - Mint Operations
     
-    /// Request a Lightning invoice to mint ecash
-    func requestMint(amount: Int64, mintURL: String) async throws -> CashuMintQuote {
-        guard let wallet = activeWallet else {
-            throw WalletError.noActiveWallet
-        }
-        
-        return try await wallet.requestMint(
-            amount: amount,
-            mintURL: mintURL,
-            persistQuote: true
-        )
-    }
-    
-    /// Monitor deposit status
-    func monitorDeposit(quote: CashuMintQuote) async -> AsyncThrowingStream<DepositStatus, Error> {
-        guard let wallet = activeWallet else {
-            return AsyncThrowingStream { continuation in
-                continuation.finish(throwing: WalletError.noActiveWallet)
-            }
-        }
-        
-        return await wallet.monitorDeposit(quote: quote, timeout: 600.0)
-    }
     
     // MARK: - Send Operations
     
@@ -609,6 +534,7 @@ class WalletManager {
         let request = NutzapPaymentRequest(
             amountSats: amount,
             recipientPubkey: recipient,
+            recipientP2PK: "", // Empty P2PK for now, will be set by wallet
             acceptedMints: acceptedMints,
             comment: comment
         )
@@ -621,80 +547,7 @@ class WalletManager {
     
     // MARK: - Mint Management
     
-    /// Add a new mint
-    func addMint(url: URL) async throws {
-        guard let wallet = activeWallet else {
-            throw WalletError.noActiveWallet
-        }
-        
-        print("🔧 WalletManager - Starting mint addition process for: \(url)")
-        
-        // Use WalletManager's availableMints state which tracks the current configuration
-        var mintStrings = availableMints
-        print("🔧 WalletManager - Current mints from WalletManager state: \(mintStrings)")
-        
-        // Check if the mint already exists
-        if mintStrings.contains(url.absoluteString) {
-            print("🔧 WalletManager - Mint \(url) already exists, skipping")
-            return
-        }
-        
-        mintStrings.append(url.absoluteString)
-        print("🔧 WalletManager - Updated mints list: \(mintStrings)")
-        
-        // Get relays
-        let relays = await getRelaysForWallet()
-        print("🔧 WalletManager - Retrieved relays for wallet: \(relays)")
-        
-        // Use NIP60Wallet.setup() to handle both wallet config and mint list events
-        try await wallet.setup(
-            mints: mintStrings,
-            relays: relays,
-            publishMintList: true
-        )
-        
-        print("🔧 WalletManager - Completed mint addition process for: \(url)")
-        
-        // The wallet will update itself when it receives the event
-    }
     
-    /// Remove a mint
-    func removeMint(url: URL) async throws {
-        guard let wallet = activeWallet else {
-            throw WalletError.noActiveWallet
-        }
-        
-        print("WalletManager - Removing mint: \(url)")
-        
-        // Use WalletManager's availableMints state which tracks the current configuration
-        let mintStrings = availableMints.filter { $0 != url.absoluteString }
-        
-        // Get relays
-        let relays = await getRelaysForWallet()
-        
-        // Use NIP60Wallet.setup() to handle both wallet config and mint list events
-        try await wallet.setup(
-            mints: mintStrings,
-            relays: relays,
-            publishMintList: true
-        )
-        
-        print("WalletManager - Published updated wallet configuration without mint: \(url)")
-        
-        // The wallet will update itself when it receives the event
-    }
-    
-    /// Discover mints via NIP-87 with streaming updates
-    func discoverMintsStream() -> AsyncStream<[DiscoveredMint]> {
-        guard let ndk = nostrManager.ndk else {
-            return AsyncStream { continuation in
-                continuation.finish()
-            }
-        }
-        
-        let discoveryManager = MintDiscoveryManager(ndk: ndk)
-        return discoveryManager.discoverMintsStream()
-    }
     
     // MARK: - Cross-mint Operations
     
@@ -904,13 +757,6 @@ class WalletManager {
     // MARK: - Mint Management
     
     /// Get mints info as MintInfo array
-    func getMintsInfo() async -> [MintInfo] {
-        // Use the availableMints property which is updated via event monitoring
-        let mintURLs = availableMints.compactMap { URL(string: $0) }
-        return mintURLs.map { url in
-            MintInfo(url: url)
-        }
-    }
     
     // MARK: - Session Management
     
@@ -928,7 +774,6 @@ class WalletManager {
         // Clear wallet state
         activeWallet = nil
         transactions.removeAll()
-        availableMints.removeAll()
         currentBalance = 0
         
         print("WalletManager - Cleared all wallet data and cancelled subscriptions")

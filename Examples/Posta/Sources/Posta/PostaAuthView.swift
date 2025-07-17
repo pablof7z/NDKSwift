@@ -1,9 +1,11 @@
 import SwiftUI
+import NDKSwift
 
-struct AuthView: View {
-    @EnvironmentObject var authManager: AuthManager
-    @State private var privateKey: String = ""
-    @State private var bunkerUrl: String = ""
+struct PostaAuthView: View {
+    @Environment(NDKAuthManager.self) var authManager
+    @EnvironmentObject var ndkManager: NDKManager
+    @EnvironmentObject var relayManager: RelayManager
+    @State private var loginInput: String = ""
     @State private var isLoading = false
     @State private var errorMessage: String?
     @State private var showingLogin = true
@@ -70,18 +72,10 @@ struct AuthView: View {
             .padding(.horizontal)
             
             // Input field based on login method
-            switch loginMethod {
-            case .privateKey:
-                TextField(loginMethod.placeholder, text: $privateKey)
-                    .textFieldStyle(RoundedBorderTextFieldStyle())
-                    .autocapitalization(.none)
-                    .disableAutocorrection(true)
-            case .nip46:
-                TextField(loginMethod.placeholder, text: $bunkerUrl)
-                    .textFieldStyle(RoundedBorderTextFieldStyle())
-                    .autocapitalization(.none)
-                    .disableAutocorrection(true)
-            }
+            TextField(loginMethod.placeholder, text: $loginInput)
+                .textFieldStyle(RoundedBorderTextFieldStyle())
+                .autocapitalization(.none)
+                .disableAutocorrection(true)
             
             if let errorMessage = errorMessage {
                 Text(errorMessage)
@@ -108,7 +102,7 @@ struct AuthView: View {
             .background(Color.blue)
             .foregroundColor(.white)
             .cornerRadius(10)
-            .disabled(isLoading || (loginMethod == .privateKey ? privateKey.isEmpty : bunkerUrl.isEmpty))
+            .disabled(isLoading || loginInput.isEmpty)
         }
     }
     
@@ -156,18 +150,41 @@ struct AuthView: View {
         errorMessage = nil
         
         do {
+            let signer: any NDKSigner
+            
             switch loginMethod {
             case .privateKey:
-                try await authManager.login(privateKey: privateKey)
+                // NDKPrivateKeySigner handles both hex and nsec formats
+                signer = try NDKPrivateKeySigner(privateKey: loginInput)
+                
             case .nip46:
-                try await authManager.loginWithBunker(bunkerUrl: bunkerUrl)
+                guard let ndk = ndkManager.ndk else {
+                    throw AuthError.ndkNotInitialized
+                }
+                
+                // Initialize bunker signer
+                if loginInput.starts(with: "bunker://") {
+                    // Extract connection token from bunker URL
+                    guard let connectionToken = extractConnectionToken(from: loginInput) else {
+                        throw AuthError.invalidBunkerUrl
+                    }
+                    signer = NDKBunkerSigner.bunker(ndk: ndk, connectionToken: connectionToken)
+                } else if loginInput.contains("@") {
+                    signer = NDKBunkerSigner.nip05(ndk: ndk, nip05: loginInput)
+                } else {
+                    throw AuthError.invalidBunkerUrl
+                }
             }
+            
+            // Create session with the signer
+            _ = try await authManager.createSession(with: signer)
+            
         } catch {
             switch loginMethod {
             case .privateKey:
                 errorMessage = "Invalid private key or nsec"
             case .nip46:
-                errorMessage = "Failed to connect to bunker: \(error.localizedDescription)"
+                errorMessage = "Failed to connect: \(error.localizedDescription)"
             }
         }
         
@@ -179,7 +196,13 @@ struct AuthView: View {
         errorMessage = nil
         
         do {
-            try await authManager.register()
+            // Generate new private key
+            let privateKey = Crypto.generatePrivateKey()
+            let signer = try NDKPrivateKeySigner(privateKey: privateKey)
+            
+            // Create session with the new signer
+            _ = try await authManager.createSession(with: signer)
+            
         } catch {
             errorMessage = "Failed to create account"
         }
@@ -188,7 +211,36 @@ struct AuthView: View {
     }
 }
 
+enum AuthError: Error {
+    case invalidBunkerUrl
+    case ndkNotInitialized
+}
+
+// Helper function to extract connection token from bunker URL
+private func extractConnectionToken(from bunkerUrl: String) -> String? {
+    // bunker://pubkey?relay=wss://relay.url&secret=token
+    // We need to extract the token/secret from the URL
+    guard let url = URL(string: bunkerUrl),
+          let components = URLComponents(url: url, resolvingAgainstBaseURL: false) else {
+        return nil
+    }
+    
+    // Try to find secret or token parameter
+    if let secret = components.queryItems?.first(where: { $0.name == "secret" })?.value {
+        return secret
+    }
+    
+    // If no secret parameter, the entire path after bunker:// might be the token
+    if let host = url.host, !host.isEmpty {
+        return host
+    }
+    
+    return nil
+}
+
 #Preview {
-    AuthView()
-        .environmentObject(AuthManager())
+    PostaAuthView()
+        .environment(NDKAuthManager.shared)
+        .environmentObject(NDKManager.shared)
+        .environmentObject(RelayManager())
 }
