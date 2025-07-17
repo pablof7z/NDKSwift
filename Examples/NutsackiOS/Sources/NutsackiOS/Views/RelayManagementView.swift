@@ -174,22 +174,7 @@ struct RelayRowView: View {
         VStack(alignment: .leading, spacing: 8) {
             HStack {
                 // Relay icon
-                Group {
-                    if let relayIcon = relayIcon {
-                        relayIcon
-                            .resizable()
-                            .aspectRatio(contentMode: .fit)
-                            .frame(width: 40, height: 40)
-                            .clipShape(RoundedRectangle(cornerRadius: 8))
-                    } else {
-                        Image(systemName: "antenna.radiowaves.left.and.right")
-                            .font(.title2)
-                            .foregroundColor(.blue)
-                            .frame(width: 40, height: 40)
-                            .background(Color.blue.opacity(0.1))
-                            .clipShape(RoundedRectangle(cornerRadius: 8))
-                    }
-                }
+                RelayIconView(icon: relayIcon)
                 
                 VStack(alignment: .leading, spacing: 4) {
                     Text(relay.url)
@@ -198,7 +183,7 @@ struct RelayRowView: View {
                     
                     HStack(spacing: 12) {
                         if let state = relayState {
-                            ConnectionStatusBadge(state: state.connectionState)
+                            ConnectionStatusBadge(state: state.connectionState, style: .full)
                             
                             if let name = state.info?.name {
                                 Text(name)
@@ -217,38 +202,7 @@ struct RelayRowView: View {
             
             // Stats row
             if let state = relayState {
-                HStack(spacing: 16) {
-                    StatItem(
-                        icon: "arrow.up",
-                        value: "\(state.stats.messagesSent)",
-                        label: "sent"
-                    )
-                    
-                    StatItem(
-                        icon: "arrow.down",
-                        value: "\(state.stats.messagesReceived)",
-                        label: "received"
-                    )
-                    
-                    if let latency = state.stats.latency {
-                        StatItem(
-                            icon: "timer",
-                            value: String(format: "%.0fms", latency * 1000),
-                            label: "latency"
-                        )
-                    }
-                    
-                    if state.stats.connectionAttempts > 0 {
-                        let successRate = Double(state.stats.successfulConnections) / Double(state.stats.connectionAttempts) * 100
-                        StatItem(
-                            icon: "checkmark.circle",
-                            value: String(format: "%.0f%%", successRate),
-                            label: "success"
-                        )
-                    }
-                }
-                .font(.caption)
-                .foregroundStyle(.secondary)
+                RelayStatsView(stats: state.stats)
             }
         }
         .padding(.vertical, 4)
@@ -299,74 +253,7 @@ struct RelayRowView: View {
     }
 }
 
-struct ConnectionStatusBadge: View {
-    let state: NDKRelayConnectionState
-    
-    var body: some View {
-        HStack(spacing: 4) {
-            Circle()
-                .fill(statusColor)
-                .frame(width: 8, height: 8)
-            
-            Text(statusText)
-                .font(.caption)
-                .fontWeight(.medium)
-        }
-        .padding(.horizontal, 8)
-        .padding(.vertical, 2)
-        .background(statusColor.opacity(0.2))
-        .cornerRadius(12)
-    }
-    
-    private var statusColor: Color {
-        switch state {
-        case .connected:
-            return .green
-        case .connecting:
-            return .orange
-        case .disconnected:
-            return .gray
-        case .disconnecting:
-            return .orange
-        case .failed:
-            return .red
-        }
-    }
-    
-    private var statusText: String {
-        switch state {
-        case .connected:
-            return "Connected"
-        case .connecting:
-            return "Connecting"
-        case .disconnected:
-            return "Disconnected"
-        case .disconnecting:
-            return "Disconnecting"
-        case .failed:
-            return "Failed"
-        }
-    }
-}
 
-struct StatItem: View {
-    let icon: String
-    let value: String
-    let label: String
-    
-    var body: some View {
-        VStack(spacing: 2) {
-            HStack(spacing: 2) {
-                Image(systemName: icon)
-                    .font(.system(size: 10))
-                Text(value)
-                    .fontWeight(.medium)
-            }
-            Text(label)
-                .font(.system(size: 9))
-        }
-    }
-}
 
 // MARK: - Relay Detail View
 

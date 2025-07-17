@@ -10,71 +10,45 @@ struct BalanceCard: View {
     @State private var mintBalances: [(mint: String, balance: Int64, percentage: Double)] = []
     @State private var isLoadingMints = false
     
-    private let cardWidth: CGFloat = 330
-    private let cardHeight: CGFloat = 180
+    private let mintColors: [Color] = [
+        Color(red: 0.98, green: 0.54, blue: 0.13), // Orange
+        Color(red: 0.13, green: 0.59, blue: 0.95), // Blue
+        Color(red: 0.96, green: 0.26, blue: 0.21), // Red
+        Color(red: 0.30, green: 0.69, blue: 0.31), // Green
+    ]
     
     var body: some View {
-        ZStack {
-            // Card background with gradient and border
-            RoundedRectangle(cornerRadius: 16)
-                .fill(
-                    RadialGradient(
-                        gradient: Gradient(colors: [Color(white: 0.12), Color.black]),
-                        center: .topTrailing,
-                        startRadius: 0,
-                        endRadius: cardWidth * 3
-                    )
-                )
-                .overlay(
-                    RoundedRectangle(cornerRadius: 16)
-                        .stroke(Color.gray.opacity(0.6), lineWidth: 1)
-                )
-                .frame(width: cardWidth, height: cardHeight)
-            
-            // Content
-            HStack(spacing: 16) {
-                // Left side - Balance info
-                VStack(alignment: .leading, spacing: 8) {
-                    HStack(alignment: .top) {
-                        Text(balance == 0 ? "-" : formatBalance(balance))
-                            .font(.largeTitle)
-                            .fontWeight(.bold)
-                            .foregroundColor(.white)
-                            .lineLimit(1)
-                        
-                        Text("sats")
-                            .font(.headline)
-                            .foregroundColor(Color.gray)
-                            .padding(.top, 8)
-                    }
+        VStack(spacing: 20) {
+            // Balance display - centered
+            VStack(spacing: 8) {
+                HStack(alignment: .firstTextBaseline, spacing: 8) {
+                    Text(formatBalance(balance))
+                        .font(.system(size: 56, weight: .semibold, design: .rounded))
+                        .foregroundStyle(.primary)
                     
-                    // DLEQ verification status
-                    if walletManager.activeWallet != nil {
-                        DLEQStatusIndicator()
-                    }
-                    
-                    Spacer()
-                    
-                    // Fiat conversion
-                    if appState.preferredConversionUnit != .sat {
-                        Text(convertedBalance)
-                            .font(.subheadline)
-                            .opacity(0.7)
-                            .animation(.default, value: convertedBalance)
-                    }
+                    Text("sats")
+                        .font(.system(size: 24, weight: .medium, design: .rounded))
+                        .foregroundStyle(.secondary)
                 }
                 
-                Spacer()
-                
-                // Right side - Mini pie chart
-                if !mintBalances.isEmpty {
-                    MiniPieChart(mintBalances: mintBalances)
-                        .frame(width: 80, height: 80)
+                // Fiat conversion
+                if appState.preferredConversionUnit != .sat && !convertedBalance.isEmpty && convertedBalance != "..." {
+                    Text(convertedBalance)
+                        .font(.system(size: 18, weight: .regular, design: .rounded))
+                        .foregroundStyle(.secondary)
+                        .opacity(0.8)
+                        .animation(.default, value: convertedBalance)
                 }
             }
-            .padding(20)
-            .frame(width: cardWidth, height: cardHeight)
+            
+            // Mini pie chart
+            if !mintBalances.isEmpty && mintBalances.count > 1 {
+                MiniPieChart(mintBalances: mintBalances)
+                    .frame(width: 80, height: 80)
+            }
         }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 24)
         .task(id: balance) {
             await convert()
             await loadMintBalances()

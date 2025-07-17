@@ -59,8 +59,8 @@ public enum CashuDeposit {
         mints: MintManager,
         eventManager: WalletEventManager,
         signer: NDKSigner,
-        pollingInterval: TimeInterval = 5.0,
         timeout: TimeInterval = 600.0,
+        quoteAge: TimeInterval = 0,
         onProofsReceived: @escaping ([CashuSwift.Proof]) async throws -> [String]
     ) -> AsyncThrowingStream<DepositStatus, Error> {
         return AsyncThrowingStream { continuation in
@@ -90,6 +90,7 @@ public enum CashuDeposit {
                                         try await eventManager.createSpendingHistoryEvent(
                                             direction: .in,
                                             amount: Int64(quote.amount),
+                                            memo: "Lightning deposit",
                                             createdEventIds: createdEventIds,
                                             signer: signer
                                         )
@@ -118,8 +119,17 @@ public enum CashuDeposit {
                         // Still pending
                         continuation.yield(.pending)
                         
+                        // Calculate dynamic polling interval based on quote age using exponential backoff
+                        let currentAge = quoteAge + Date().timeIntervalSince(startTime)
+                        let hoursOld = currentAge / 3600.0
+                        let baseInterval: TimeInterval = 120.0 // 2 minutes
+                        let maxInterval: TimeInterval = 7200.0 // 2 hours
+                        let interval = min(baseInterval * pow(1.5, hoursOld), maxInterval)
+                        
+                        print("📜 Quote \(quote.quoteId) still pending - next check in \(Int(interval)) seconds")
+                        
                         // Wait before next check
-                        try await Task.sleep(nanoseconds: UInt64(pollingInterval * 1_000_000_000))
+                        try await Task.sleep(nanoseconds: UInt64(interval * 1_000_000_000))
                     }
                     
                     // Timeout reached - persist quote and mark as expired

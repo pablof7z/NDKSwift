@@ -87,15 +87,20 @@ struct TransactionRow: View {
                 .frame(width: 30)
             
             VStack(alignment: .leading, spacing: 2) {
-                Text(transaction.type.displayName)
-                    .font(.subheadline)
-                    .fontWeight(.medium)
-                
+                // Show memo as primary text if available, otherwise show type
                 if let memo = transaction.memo {
                     Text(memo)
+                        .font(.subheadline)
+                        .fontWeight(.medium)
+                        .lineLimit(1)
+                    
+                    Text(transaction.type.displayName)
                         .font(.caption)
                         .foregroundStyle(.secondary)
-                        .lineLimit(1)
+                } else {
+                    Text(transaction.type.displayName)
+                        .font(.subheadline)
+                        .fontWeight(.medium)
                 }
             }
             

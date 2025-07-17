@@ -202,21 +202,27 @@ class WalletManager {
                 print("Failed to parse history event tags")
                 return
             }
+
+            print("tags")
+            print(tags)
             
             // Extract transaction info from tags
             var direction: String?
             var amount: Int64?
             var memo: String?
+            var mint: String?
             
             for tag in tags {
                 guard tag.count >= 2 else { continue }
                 switch tag[0] {
+                case "mint":
+                    mint = tag[1]
+                case "description":
+                    memo = tag[1]
                 case "direction":
                     direction = tag[1]
                 case "amount":
                     amount = Int64(tag[1])
-                case "memo":
-                    memo = tag[1]
                 default:
                     break
                 }
@@ -259,11 +265,26 @@ class WalletManager {
             guard let amt = amount ?? extractAmountFromTags(event.tags) else {
                 return
             }
+
+            // Create transaction with proper memo
+            let transactionMemo: String?
+            if let memo = memo, !memo.isEmpty {
+                transactionMemo = memo
+            } else {
+                // Fallback to type-based description if no memo
+                switch transactionType {
+                case .mint: transactionMemo = "Lightning deposit"
+                case .melt: transactionMemo = "Lightning payment" 
+                case .send: transactionMemo = "Sent ecash"
+                case .receive: transactionMemo = "Received ecash"
+                case .nutzap: transactionMemo = "Nutzap"
+                }
+            }
             
             let transaction = Transaction(
                 type: transactionType,
                 amount: Int(amt),
-                memo: memo
+                memo: transactionMemo
             )
             transaction.createdAt = Date(timeIntervalSince1970: TimeInterval(event.createdAt))
             transaction.status = .completed
@@ -401,7 +422,7 @@ class WalletManager {
             }
         }
         
-        return await wallet.monitorDeposit(quote: quote, pollingInterval: 5.0, timeout: 600.0)
+        return await wallet.monitorDeposit(quote: quote, timeout: 600.0)
     }
     
     // MARK: - Send Operations
@@ -467,6 +488,23 @@ class WalletManager {
             .replacingOccurrences(of: "/", with: "_")
             .replacingOccurrences(of: "=", with: "")
         
+        // Create history event for sending ecash
+        Task {
+            do {
+                guard let ndk = nostrManager.ndk,
+                      let signer = ndk.signer else { return }
+                
+                try await wallet.eventManager.createSpendingHistoryEvent(
+                    direction: .out,
+                    amount: amount,
+                    memo: memo ?? "Sent ecash",
+                    signer: signer
+                )
+            } catch {
+                print("Failed to create history event for send: \(error)")
+            }
+        }
+        
         return "cashuA\(base64Token)"
     }
     
@@ -509,6 +547,25 @@ class WalletManager {
             
             // Calculate total
             totalReceived += proofs.reduce(0) { $0 + Int64($1.amount) }
+        }
+        
+        // Create history event for receiving ecash
+        if totalReceived > 0 {
+            Task {
+                do {
+                    guard let ndk = nostrManager.ndk,
+                          let signer = ndk.signer else { return }
+                    
+                    try await wallet.eventManager.createSpendingHistoryEvent(
+                        direction: .in,
+                        amount: totalReceived,
+                        memo: token.memo ?? "Received ecash",
+                        signer: signer
+                    )
+                } catch {
+                    print("Failed to create history event for receive: \(error)")
+                }
+            }
         }
         
         return totalReceived

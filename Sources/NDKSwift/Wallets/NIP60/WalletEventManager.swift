@@ -169,6 +169,7 @@ public actor WalletEventManager {
     public func createSpendingHistoryEvent(
         direction: SpendingDirection,
         amount: Int64,
+        memo: String? = nil,
         destroyedEventIds: [String]? = nil,
         createdEventIds: [String]? = nil,
         redeemedEventId: String? = nil,
@@ -178,6 +179,7 @@ public actor WalletEventManager {
             ndk: ndk,
             direction: direction,
             amount: amount,
+            memo: memo,
             destroyedEventIds: destroyedEventIds,
             createdEventIds: createdEventIds,
             redeemedEventId: redeemedEventId,

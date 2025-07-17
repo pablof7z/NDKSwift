@@ -336,6 +336,7 @@ public struct NDKCashuSpendingHistory {
         ndk: NDK,
         direction: SpendingDirection,
         amount: Int64,
+        memo: String? = nil,
         destroyedEventIds: [String]? = nil,
         createdEventIds: [String]? = nil,
         redeemedEventId: String? = nil,
@@ -345,6 +346,7 @@ public struct NDKCashuSpendingHistory {
             ndk: ndk,
             direction: direction,
             amount: amount,
+            memo: memo,
             destroyedEventIds: destroyedEventIds,
             createdEventIds: createdEventIds,
             redeemedEventId: redeemedEventId,
@@ -362,6 +364,7 @@ public struct NDKCashuSpendingHistory {
         ndk: NDK,
         direction: SpendingDirection,
         amount: Int64,
+        memo: String? = nil,
         destroyedEventIds: [String]? = nil,
         createdEventIds: [String]? = nil,
         redeemedEventId: String? = nil,
@@ -370,6 +373,10 @@ public struct NDKCashuSpendingHistory {
         var encryptedTags: [[String]] = []
         encryptedTags.append(["direction", direction.rawValue])
         encryptedTags.append(["amount", String(amount)])
+        
+        if let memo = memo {
+            encryptedTags.append(["memo", memo])
+        }
         
         if let createdIds = createdEventIds {
             for eventId in createdIds {

@@ -48,7 +48,7 @@ public actor NDKSubscriptionCoordinator {
         let allAuthors = filters.compactMap { $0.authors }.flatMap { $0 }
         
         let selectedRelays: Set<RelayURL>
-        if let specificRelays = relays {
+        if let specificRelays = relays, !specificRelays.isEmpty {
             print("[NDKSubscriptionCoordinator.subscribe] Using specific relays: \(specificRelays.joined(separator: ", "))")
             selectedRelays = specificRelays
         } else {
@@ -67,7 +67,7 @@ public actor NDKSubscriptionCoordinator {
         print("[NDKSubscriptionCoordinator.subscribe] Selected \(selectedRelays.count) relays")
         
         // Ensure explicitly requested relays exist in the pool and are connected
-        if let specificRelays = relays {
+        if let specificRelays = relays, !specificRelays.isEmpty {
             print("[NDKSubscriptionCoordinator.subscribe] Ensuring specific relays are added to pool and connected")
             await withTaskGroup(of: Void.self) { group in
                 for relayUrl in specificRelays {

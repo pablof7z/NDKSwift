@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- NIP60Wallet now properly exposes wallet configuration relays from kind 17375 events
+  - Added `walletConfigRelays` property to expose relay URLs from the wallet configuration
+  - NutsackiOS wallet settings now correctly shows relays from the wallet configuration event
+  - Empty relay lists in the configuration are properly handled (wallet settings shows empty)
+  - Removed redundant decryption in WalletEventProcessor - now uses NDKCashuWalletEvent's built-in methods
+
+### Changed
+- Empty relay sets in `ndk.subscribe()` now behave the same as nil (use default relay selection)
+  - Previously, passing an empty relay set would result in an inactive subscription
+  - Now, both nil and empty sets will use the outbox model or all available relays
+
 ### Added
 - Automatic relay connection for explicitly requested relays in subscriptions and publishing
   - When subscribing with specific relays, NDK now ensures they are connected before use
@@ -48,6 +60,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Replaced complex inference logic with simple calculateNewState function
   - Fixed deposit operations to no longer trigger deletion events
   - All wallet operations now explicitly declare what proofs to store/destroy
+- Fixed wallet balance showing "-" instead of "0" in NutsackiOS
+  - Removed unnecessary "-" display for zero balance in BalanceCard
+  - The wallet already correctly loads balance via subscription
 
 ### Changed
 - Event deletion API simplified - use `event.delete()` instead of `ndk.deleteEvent()`

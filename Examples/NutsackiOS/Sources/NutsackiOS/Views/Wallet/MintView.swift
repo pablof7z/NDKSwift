@@ -22,15 +22,68 @@ struct MintView: View {
     @State private var showInvoice = false
     @State private var depositTask: Task<Void, Never>?
     @State private var loadMintTask: Task<Void, Never>?
+    @State private var showPaymentAnimation = false
+    @State private var mintedAmount: Int64 = 0
+    @FocusState private var amountFieldFocused: Bool
     
     var body: some View {
-        Form {
-            Section {
-                TextField("Amount in sats", text: $amount)
-                    #if os(iOS)
-                    .keyboardType(.numberPad)
-                    #endif
+        ScrollView {
+            VStack(spacing: 24) {
+                // Amount Section
+                VStack(spacing: 16) {
+                    // Hidden text field that drives the amount
+                    TextField("0", text: $amount)
+                        .keyboardType(.numberPad)
+                        .opacity(0)
+                        .frame(height: 0)
+                        .focused($amountFieldFocused)
+                    
+                    // Visual amount display
+                    VStack(spacing: 8) {
+                        HStack(alignment: .firstTextBaseline, spacing: 8) {
+                            Text(formattedAmount)
+                                .font(.system(size: 48, weight: .semibold, design: .rounded))
+                                .foregroundStyle(.primary)
+                            
+                            Text("sats")
+                                .font(.system(size: 20, weight: .medium, design: .rounded))
+                                .foregroundStyle(.secondary)
+                        }
+                        .contentShape(Rectangle())
+                        .onTapGesture {
+                            amountFieldFocused = true
+                        }
+                        
+                        // USD equivalent (placeholder)
+                        Text("≈ $0.00 USD")
+                            .font(.system(size: 16, weight: .regular, design: .rounded))
+                            .foregroundStyle(.secondary)
+                            .opacity(0.6)
+                    }
+                    
+                    // Quick amount buttons
+                    HStack(spacing: 12) {
+                        ForEach([1000, 5000, 10000, 50000], id: \.self) { preset in
+                            Button(action: { setAmount(preset) }) {
+                                Text("\(preset / 1000)k")
+                                    .font(.system(size: 14, weight: .medium, design: .rounded))
+                                    .foregroundColor(.orange)
+                                    .padding(.horizontal, 14)
+                                    .padding(.vertical, 6)
+                                    .background(Color.orange.opacity(0.15))
+                                    .cornerRadius(16)
+                            }
+                        }
+                    }
+                }
+                .padding(.horizontal)
                 
+                // Mint Selection
+                VStack(alignment: .leading, spacing: 12) {
+                    Text("Select Mint")
+                        .font(.headline)
+                        .padding(.horizontal)
+                    
                 if availableMints.isEmpty {
                     HStack {
                         ProgressView()
@@ -38,37 +91,82 @@ struct MintView: View {
                         Text("Loading mints...")
                             .foregroundStyle(.secondary)
                     }
+                    .padding(.vertical, 8)
                 } else {
-                    Picker("Mint", selection: $selectedMintURL) {
+                    VStack(spacing: 8) {
                         ForEach(availableMints, id: \.url.absoluteString) { mint in
-                            Text(mint.url.host ?? mint.url.absoluteString).tag(mint.url.absoluteString)
+                        HStack {
+                            // Mint icon
+                            Circle()
+                                .fill(Color.orange.opacity(0.15))
+                                .frame(width: 40, height: 40)
+                                .overlay(
+                                    Image(systemName: "building.columns")
+                                        .font(.system(size: 16))
+                                        .foregroundColor(.orange)
+                                )
+                            
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(mint.name ?? mint.url.host ?? "Unknown Mint")
+                                    .font(.system(size: 16, weight: .medium))
+                                
+                                Text(mint.url.host ?? mint.url.absoluteString)
+                                    .font(.system(size: 12))
+                                    .foregroundStyle(.secondary)
+                            }
+                            
+                            Spacer()
+                            
+                            if selectedMintURL == mint.url.absoluteString {
+                                Image(systemName: "checkmark.circle.fill")
+                                    .foregroundColor(.orange)
+                            }
                         }
+                        .contentShape(Rectangle())
+                        .onTapGesture {
+                            selectedMintURL = mint.url.absoluteString
+                        }
+                        .padding(.horizontal)
+                    }
                     }
                 }
-            } header: {
-                Text("Mint Details")
-            } footer: {
-                Text("Create a Lightning invoice to mint ecash")
-            }
+                }
             
-            Section {
+                // Create Invoice Button
                 Button(action: createMintQuote) {
                     if isMinting {
-                        ProgressView()
-                            .frame(maxWidth: .infinity)
+                        HStack {
+                            ProgressView()
+                                .scaleEffect(0.8)
+                            Text("Creating...")
+                        }
+                        .frame(maxWidth: .infinity)
+                        .padding()
+                        .background(Color.orange.opacity(0.3))
+                        .foregroundColor(.orange)
+                        .cornerRadius(12)
                     } else {
                         Text("Create Invoice")
                             .frame(maxWidth: .infinity)
+                            .fontWeight(.semibold)
+                            .padding()
+                            .background(Color.orange)
+                            .foregroundColor(.white)
+                            .cornerRadius(12)
                     }
                 }
-                .disabled(amount.isEmpty || selectedMintURL.isEmpty || isMinting)
+                .disabled(!isValidAmount || isMinting)
+                .padding(.horizontal)
+                .padding(.top, 16)
             }
+            .padding(.vertical)
         }
         .navigationTitle("Mint Ecash")
         .platformNavigationBarTitleDisplayMode(inline: true)
         .toolbar {
-            ToolbarItem(placement: .cancellationAction) {
+            ToolbarItem(placement: .navigationBarTrailing) {
                 Button("Cancel") { dismiss() }
+                    .foregroundColor(.orange)
             }
         }
         .alert("Error", isPresented: $showError) {
@@ -91,6 +189,12 @@ struct MintView: View {
         .onDisappear {
             depositTask?.cancel()
             loadMintTask?.cancel()
+        }
+        .background(Color.black)
+        .fullScreenCover(isPresented: $showPaymentAnimation) {
+            PaymentReceivedAnimation(amount: mintedAmount) {
+                dismiss()
+            }
         }
     }
     
@@ -124,6 +228,33 @@ struct MintView: View {
             }
         }
     }
+    
+    // MARK: - Computed Properties
+    private var formattedAmount: String {
+        if amount.isEmpty {
+            return "0"
+        }
+        
+        // Format with thousand separators
+        if let number = Int(amount) {
+            let formatter = NumberFormatter()
+            formatter.numberStyle = .decimal
+            formatter.groupingSeparator = ","
+            return formatter.string(from: NSNumber(value: number)) ?? amount
+        }
+        return amount
+    }
+    
+    private var isValidAmount: Bool {
+        guard let amountInt = Int(amount), amountInt > 0 else { return false }
+        return !selectedMintURL.isEmpty
+    }
+    
+    // MARK: - Helper Functions
+    private func setAmount(_ preset: Int) {
+        amount = "\(preset)"
+    }
+    
     
     private func createMintQuote() {
         guard let amountInt = Int(amount),
@@ -174,10 +305,15 @@ struct MintView: View {
                         // Success! Tokens have been minted
                         print("Successfully minted \(proofs.count) proofs")
                         
+                        // Calculate total amount from proofs
+                        let totalAmount = proofs.reduce(0) { $0 + $1.amount }
+                        
                         await MainActor.run {
                             // Update wallet balance in UI
                             // The wallet manager already saved the proofs
-                            dismiss()
+                            mintedAmount = Int64(totalAmount)
+                            showInvoice = false
+                            showPaymentAnimation = true
                         }
                         return
                         
@@ -288,3 +424,4 @@ struct InvoiceView: View {
     }
     
 }
+

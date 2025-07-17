@@ -16,6 +16,9 @@ public actor NIP60Wallet: NDKPaymentProvider {
     // Relay health monitoring
     public internal(set) var walletRelays: [NDKRelay] = []
     
+    // Wallet configuration relays (from kind 17375 event)
+    public internal(set) var walletConfigRelays: [String] = []
+    
     // Wallet subscriptions
     private var configSubscriptionTask: Task<Void, Never>?
     private var walletSubscriptionTask: Task<Void, Never>?
@@ -65,6 +68,7 @@ public actor NIP60Wallet: NDKPaymentProvider {
         walletSubscriptionTask = Task {
             do {
                 let userPubkey = try await signer.pubkey
+                let twentyFourHoursAgo = Int64(Date(timeIntervalSinceNow: -60 * 60 * 24).timeIntervalSince1970)
                 
                 // Create filters for all wallet-related events
                 let filters = [
@@ -73,8 +77,15 @@ public actor NIP60Wallet: NDKPaymentProvider {
                         authors: [userPubkey],
                         kinds: [
                             EventKind.cashuToken,
-                            EventKind.cashuQuote
                         ]
+                    ),
+                    NDKFilter(
+                        authors: [userPubkey],
+                        kinds: [
+                            EventKind.cashuQuote
+                        ],
+                        since: twentyFourHoursAgo,
+                        limit: 20
                     ),
                     // Wallet config with limit: 0 to only get future updates
                     NDKFilter(
@@ -151,24 +162,17 @@ public actor NIP60Wallet: NDKPaymentProvider {
     
     
     /// Process wallet configuration from event
-    internal func processWalletConfiguration(event: NDKEvent, decryptedTags: [[String]]) async {
-        print("⚙️ Processing wallet configuration with decrypted tags")
+    internal func processWalletConfiguration(event: NDKEvent) async {
+        print("⚙️ Processing wallet configuration")
         print("⚙️ Event ID: \(event.id)")
         print("⚙️ Event Kind: \(event.kind)")
-        print("⚙️ Decrypted tags count: \(decryptedTags.count)")
-        
-        for (index, tag) in decryptedTags.enumerated() {
-            print("⚙️ Decrypted tag \(index): \(tag)")
-        }
         
         let walletEvent = NDKCashuWalletEvent(event: event)
         
         // Process relay tags (unencrypted, no signer needed)
+        walletConfigRelays = walletEvent.relays
         walletRelays = walletEvent.relays.compactMap { NDKRelay(url: $0) }
         print("📡 Extracted \(walletRelays.count) wallet relays from wallet event")
-        
-        // Log unencrypted relay tags for comparison
-        print("📡 Unencrypted relay tags from event: \(walletEvent.relays)")
         
         do {
             // Get current mints before update
@@ -461,7 +465,6 @@ public actor NIP60Wallet: NDKPaymentProvider {
     /// Monitor deposit status for a mint quote (checking if Lightning invoice was paid)
     public func monitorDeposit(
         quote: CashuMintQuote,
-        pollingInterval: TimeInterval = 5.0,
         timeout: TimeInterval = 600.0
     ) -> AsyncThrowingStream<DepositStatus, Error> {
         return AsyncThrowingStream { continuation in
@@ -472,8 +475,8 @@ public actor NIP60Wallet: NDKPaymentProvider {
                         mints: self.mints,
                         eventManager: self.eventManager,
                         signer: signer,
-                        pollingInterval: pollingInterval,
                         timeout: timeout,
+                        quoteAge: 0, // New quote, no age
                         onProofsReceived: { proofs in
                             // Update wallet state with new proofs
                             let stateChange = WalletStateChange(
@@ -504,6 +507,7 @@ public actor NIP60Wallet: NDKPaymentProvider {
         // Clear state before starting
         await proofStateManager.clear()
         await eventManager.clearTrackedEvents()
+        walletConfigRelays = []
         
         // Cancel any existing subscriptions
         configSubscriptionTask?.cancel()
@@ -539,29 +543,6 @@ public actor NIP60Wallet: NDKPaymentProvider {
     
     // MARK: - Quote Tracking Methods
     
-    /// Calculate polling interval based on quote age using exponential backoff
-    private func calculatePollingInterval(age: TimeInterval) -> TimeInterval {
-        // Base interval: 2 minutes (120 seconds)
-        // Max interval: 2 hours (7200 seconds)
-        // Growth factor: slowly increase interval as quote ages
-        
-        let baseInterval: TimeInterval = 120.0
-        let maxInterval: TimeInterval = 7200.0
-        let hoursOld = age / 3600.0
-        
-        // Exponential backoff: interval = min(base * (1.5 ^ hoursOld), max)
-        // This gives us approximately:
-        // 0 hours: 2 minutes
-        // 1 hour: 3 minutes
-        // 2 hours: 4.5 minutes
-        // 4 hours: 10 minutes
-        // 8 hours: 38 minutes
-        // 12 hours: 2 hours (capped)
-        
-        let interval = min(baseInterval * pow(1.5, hoursOld), maxInterval)
-        return interval
-    }
-    
     /// Start tracking a quote for automatic minting when paid
     public func trackQuote(quote: CashuMintQuote, event: NDKEvent) async {
         await startQuoteTracking(quote: quote, event: event)
@@ -589,10 +570,23 @@ public actor NIP60Wallet: NDKPaymentProvider {
             guard let self = self else { return }
             
             do {
-                for try await status in await self.monitorDepositWithDynamicInterval(
+                for try await status in await CashuDeposit.monitorDeposit(
                     quote: quote,
-                    eventDate: eventDate,
-                    timeout: 86400 - age // Remaining time until 24h
+                    mints: self.mints,
+                    eventManager: self.eventManager,
+                    signer: self.signer,
+                    timeout: 86400 - age, // Remaining time until 24h
+                    quoteAge: age,
+                    onProofsReceived: { proofs in
+                        // Let the wallet handle proof state updates
+                        let stateChange = WalletStateChange(
+                            store: proofs, 
+                            destroy: [], 
+                            mint: quote.mintURL,
+                            memo: "Lightning deposit"
+                        )
+                        return try await self.update(stateChange: stateChange)
+                    }
                 ) {
                     switch status {
                     case .minted:
@@ -619,102 +613,6 @@ public actor NIP60Wallet: NDKPaymentProvider {
         }
         
         activeQuoteMonitors[quote.quoteId] = task
-    }
-    
-    /// Monitor deposit with dynamically calculated intervals
-    private func monitorDepositWithDynamicInterval(
-        quote: CashuMintQuote,
-        eventDate: Date,
-        timeout: TimeInterval
-    ) -> AsyncThrowingStream<DepositStatus, Error> {
-        return AsyncThrowingStream { continuation in
-            let task = Task {
-                let startTime = Date()
-                
-                do {
-                    while Date().timeIntervalSince(startTime) < timeout {
-                        // Check if Lightning invoice has been paid to the mint
-                        do {
-                            let proofs = try await CashuDeposit.checkAndMintTokens(
-                                quoteId: quote.quoteId,
-                                mintURL: quote.mintURL,
-                                amount: quote.amount,
-                                mints: self.mints
-                            )
-                            
-                            if !proofs.isEmpty {
-                                // Let the wallet handle proof state updates
-                                let stateChange = WalletStateChange(
-                                    store: proofs, 
-                                    destroy: [], 
-                                    mint: quote.mintURL,
-                                    memo: "Lightning deposit"
-                                )
-                                let createdEventIds = try await self.update(stateChange: stateChange)
-                                
-                                // Create history event for the lightning deposit
-                                Task {
-                                    do {
-                                        try await self.eventManager.createSpendingHistoryEvent(
-                                            direction: .in,
-                                            amount: Int64(quote.amount),
-                                            createdEventIds: createdEventIds,
-                                            signer: self.signer
-                                        )
-                                        print("✅ Created NIP-60 history event for lightning deposit of \(quote.amount) sats")
-                                    } catch {
-                                        print("⚠️ Failed to create history event for deposit: \(error)")
-                                    }
-                                }
-                                
-                                continuation.yield(.minted(proofs: proofs))
-                                continuation.finish()
-                                return
-                            }
-                        } catch {
-                            // If it's a specific error indicating deposit not ready, continue polling
-                            if case NDKError.walletError(let message) = error, message.contains("Deposit not ready") {
-                                // Expected - deposit not ready yet, continue polling
-                            } else if case CashuError.quoteNotPaid = error {
-                                // Also handle CashuError.quoteNotPaid for compatibility
-                                // Expected - deposit not ready yet, continue polling
-                            } else {
-                                throw error
-                            }
-                        }
-                        
-                        // Still pending
-                        continuation.yield(.pending)
-                        
-                        // Calculate current age and interval
-                        let currentAge = Date().timeIntervalSince(eventDate)
-                        if currentAge >= 86400 {
-                            // Stop monitoring after 24 hours
-                            continuation.yield(.expired)
-                            continuation.finish()
-                            return
-                        }
-                        
-                        let interval = self.calculatePollingInterval(age: currentAge)
-                        print("📜 Quote \(quote.quoteId) still pending - next check in \(Int(interval)) seconds")
-                        
-                        // Wait before next check
-                        try await Task.sleep(nanoseconds: UInt64(interval * 1_000_000_000))
-                    }
-                    
-                    // Timeout reached
-                    continuation.yield(.expired)
-                    continuation.finish()
-                    
-                } catch {
-                    continuation.finish(throwing: error)
-                }
-            }
-            
-            continuation.onTermination = { @Sendable _ in
-                task.cancel()
-            }
-        }
     }
     
     /// Clear a specific quote monitor
@@ -759,12 +657,16 @@ public actor NIP60Wallet: NDKPaymentProvider {
     }
     
     /// Setup wallet with mints and relays, optionally publishing mint list (kind 10019)
+    /// THIS IS THE MAIN AND CORRECT WAY TO CREATE A CASHU WALLET AND SETUP NUTZAPS
     /// - Parameters:
     ///   - mints: Array of mint URLs to configure
     ///   - relays: Array of relay URLs to publish wallet events to
     ///   - publishMintList: Whether to publish a public mint list event (kind 10019)
     public func setup(mints: [String], relays: [String], publishMintList: Bool = true) async throws {
         print("NIP60Wallet - setup() called with \(mints.count) mints, \(relays.count) relays")
+        
+        // Update wallet configuration relays immediately
+        self.walletConfigRelays = relays
         
         // Get or create P2PK keypair
         let (p2pkPrivateKey, _) = try await p2pkManager.getOrCreateKeypair()
@@ -921,6 +823,9 @@ public actor NIP60Wallet: NDKPaymentProvider {
         
         // Stop quote monitors
         await stopQuoteMonitors()
+        
+        // Clear wallet configuration
+        walletConfigRelays = []
         
         print("🛑 NIP60Wallet stopped")
     }
