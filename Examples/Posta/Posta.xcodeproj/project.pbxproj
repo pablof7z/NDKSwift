@@ -3,32 +3,61 @@
 	archiveVersion = 1;
 	classes = {
 	};
-	objectVersion = 60;
+	objectVersion = 54;
 	objects = {
 
 /* Begin PBXBuildFile section */
-		277E0E112E28E880006804C8 /* NDKSwift in Frameworks */ = {isa = PBXBuildFile; productRef = 277E0E102E28E880006804C8 /* NDKSwift */; };
+		03437C51B6AF1451AB5493C1 /* NotificationSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 986A841F13D6BA43B035F2A6 /* NotificationSettingsView.swift */; };
+		1089942926B933752761F2EF /* SplashView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1582DA2D0964FB86FFD22737 /* SplashView.swift */; };
+		11ACF5202A0A6CD1804D99E2 /* PrivacySettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CABF96A49CF7DCDEA2A81490 /* PrivacySettingsView.swift */; };
+		15DF43D8E7C3FFF42A66F674 /* AccountSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA715CB14D15CD0742DCB3F8 /* AccountSettingsView.swift */; };
 		53C95595312C58D3DB96CFBB /* AuthView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 61052722591CD54996B24778 /* AuthView.swift */; };
 		6A1C3CE24E1DE3A27D51523A /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7FC51DF064CDBF43562A49B7 /* ContentView.swift */; };
+		6C97E674C32B0E1C93C8487A /* RelayManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0D7BB846C97E0CE4754F485A /* RelayManager.swift */; };
 		700AF2C5B000F9231B82316A /* AuthManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8CA0F04B325560719E26F9AD /* AuthManager.swift */; };
+		724D3774AD60E792300AD9A5 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 57E4286C68B29F1067E1E5E9 /* SettingsView.swift */; };
 		793BF367E112F49D7A3168CD /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 473DF610696C7C8D6BE3D7C9 /* Assets.xcassets */; };
+		81A513C4F226861819FD14C8 /* ThemeManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 409933079609CEDCF33B802B /* ThemeManager.swift */; };
+		9726C57DB02F0828075FB854 /* SubscriptionManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1F4E20A070905E5188933E9 /* SubscriptionManager.swift */; };
 		9B0BB37D975DC528DAF44ECF /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 0E1C662710FBEF7F41C5E825 /* LaunchScreen.storyboard */; };
+		A677E223B0C3B07B2A454BD2 /* AppearanceSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0DBD81CB29A5387DD9C8217C /* AppearanceSettingsView.swift */; };
+		A97DD097A817F1970846D503 /* ProfileView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7AA98904E3EA794C29708D45 /* ProfileView.swift */; };
 		B41FF27648976DB0C3201120 /* HomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 723539740E0D28EEC30522D9 /* HomeView.swift */; };
+		C5A2F752DC478F4787ECE462 /* AccountManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7451F57AC248D0842B14D025 /* AccountManager.swift */; };
+		C772C3F6D82904629A951F59 /* VisualEffectBlur.swift in Sources */ = {isa = PBXBuildFile; fileRef = B88397F1C4B9DC130C6BF474 /* VisualEffectBlur.swift */; };
 		CC71AFB2EBB3A74CB1B743A0 /* NDKSwift in Frameworks */ = {isa = PBXBuildFile; productRef = BCF0556AD7A95C6D64794BE7 /* NDKSwift */; };
+		D0504F3789EF3D2E1D316695 /* AboutView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F262F1D409139EEE06AB75A2 /* AboutView.swift */; };
+		DFBE09ED69CC11EA9CC1A798 /* AdvancedSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 22FA6D73D50DF5AF2CCCF558 /* AdvancedSettingsView.swift */; };
 		ED4C661205BEE20D13793DD7 /* PostaApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 91767EC64A1E67DD57D491CA /* PostaApp.swift */; };
+		F5DAE67FEF06F4F2DAE5E957 /* RelaySettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 49A90AAD5FC23A2B0F94BDC7 /* RelaySettingsView.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
-		01A98A4F92B708F7B99225EB /* NDKSwift-z94ws0 */ = {isa = PBXFileReference; lastKnownFileType = folder; name = "NDKSwift-z94ws0"; path = ../..; sourceTree = SOURCE_ROOT; };
+		0D7BB846C97E0CE4754F485A /* RelayManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RelayManager.swift; sourceTree = "<group>"; };
+		0DBD81CB29A5387DD9C8217C /* AppearanceSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppearanceSettingsView.swift; sourceTree = "<group>"; };
 		0E1C662710FBEF7F41C5E825 /* LaunchScreen.storyboard */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; path = LaunchScreen.storyboard; sourceTree = "<group>"; };
-		337E36311AB841CE15B215F3 /* Posta.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Posta.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		1582DA2D0964FB86FFD22737 /* SplashView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SplashView.swift; sourceTree = "<group>"; };
+		22FA6D73D50DF5AF2CCCF558 /* AdvancedSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AdvancedSettingsView.swift; sourceTree = "<group>"; };
+		337E36311AB841CE15B215F3 /* Posta.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = Posta.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		409933079609CEDCF33B802B /* ThemeManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ThemeManager.swift; sourceTree = "<group>"; };
 		473DF610696C7C8D6BE3D7C9 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		49A90AAD5FC23A2B0F94BDC7 /* RelaySettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RelaySettingsView.swift; sourceTree = "<group>"; };
 		4FFAA2438B334E8D89CA9115 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
+		57E4286C68B29F1067E1E5E9 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
 		61052722591CD54996B24778 /* AuthView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuthView.swift; sourceTree = "<group>"; };
 		723539740E0D28EEC30522D9 /* HomeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeView.swift; sourceTree = "<group>"; };
+		7451F57AC248D0842B14D025 /* AccountManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AccountManager.swift; sourceTree = "<group>"; };
+		7AA98904E3EA794C29708D45 /* ProfileView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProfileView.swift; sourceTree = "<group>"; };
 		7FC51DF064CDBF43562A49B7 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
 		8CA0F04B325560719E26F9AD /* AuthManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuthManager.swift; sourceTree = "<group>"; };
 		91767EC64A1E67DD57D491CA /* PostaApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PostaApp.swift; sourceTree = "<group>"; };
+		986A841F13D6BA43B035F2A6 /* NotificationSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotificationSettingsView.swift; sourceTree = "<group>"; };
+		AA715CB14D15CD0742DCB3F8 /* AccountSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AccountSettingsView.swift; sourceTree = "<group>"; };
+		B34D563ED0B52F02C166DE78 /* NDKSwift-sfodj5 */ = {isa = PBXFileReference; lastKnownFileType = folder; name = "NDKSwift-sfodj5"; path = ../..; sourceTree = SOURCE_ROOT; };
+		B88397F1C4B9DC130C6BF474 /* VisualEffectBlur.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VisualEffectBlur.swift; sourceTree = "<group>"; };
+		CABF96A49CF7DCDEA2A81490 /* PrivacySettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PrivacySettingsView.swift; sourceTree = "<group>"; };
+		F1F4E20A070905E5188933E9 /* SubscriptionManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SubscriptionManager.swift; sourceTree = "<group>"; };
+		F262F1D409139EEE06AB75A2 /* AboutView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AboutView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -36,7 +65,6 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				277E0E112E28E880006804C8 /* NDKSwift in Frameworks */,
 				CC71AFB2EBB3A74CB1B743A0 /* NDKSwift in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -47,7 +75,7 @@
 		65488ADDDECC7D7E75BA08EA /* Packages */ = {
 			isa = PBXGroup;
 			children = (
-				01A98A4F92B708F7B99225EB /* NDKSwift-z94ws0 */,
+				B34D563ED0B52F02C166DE78 /* NDKSwift-sfodj5 */,
 			);
 			name = Packages;
 			sourceTree = "<group>";
@@ -64,6 +92,11 @@
 		D782595365097A714F5C2330 /* Posta */ = {
 			isa = PBXGroup;
 			children = (
+				F262F1D409139EEE06AB75A2 /* AboutView.swift */,
+				7451F57AC248D0842B14D025 /* AccountManager.swift */,
+				AA715CB14D15CD0742DCB3F8 /* AccountSettingsView.swift */,
+				22FA6D73D50DF5AF2CCCF558 /* AdvancedSettingsView.swift */,
+				0DBD81CB29A5387DD9C8217C /* AppearanceSettingsView.swift */,
 				473DF610696C7C8D6BE3D7C9 /* Assets.xcassets */,
 				8CA0F04B325560719E26F9AD /* AuthManager.swift */,
 				61052722591CD54996B24778 /* AuthView.swift */,
@@ -71,7 +104,17 @@
 				723539740E0D28EEC30522D9 /* HomeView.swift */,
 				4FFAA2438B334E8D89CA9115 /* Info.plist */,
 				0E1C662710FBEF7F41C5E825 /* LaunchScreen.storyboard */,
+				986A841F13D6BA43B035F2A6 /* NotificationSettingsView.swift */,
 				91767EC64A1E67DD57D491CA /* PostaApp.swift */,
+				CABF96A49CF7DCDEA2A81490 /* PrivacySettingsView.swift */,
+				7AA98904E3EA794C29708D45 /* ProfileView.swift */,
+				0D7BB846C97E0CE4754F485A /* RelayManager.swift */,
+				49A90AAD5FC23A2B0F94BDC7 /* RelaySettingsView.swift */,
+				57E4286C68B29F1067E1E5E9 /* SettingsView.swift */,
+				1582DA2D0964FB86FFD22737 /* SplashView.swift */,
+				F1F4E20A070905E5188933E9 /* SubscriptionManager.swift */,
+				409933079609CEDCF33B802B /* ThemeManager.swift */,
+				B88397F1C4B9DC130C6BF474 /* VisualEffectBlur.swift */,
 			);
 			name = Posta;
 			path = Sources/Posta;
@@ -103,7 +146,6 @@
 			name = Posta;
 			packageProductDependencies = (
 				BCF0556AD7A95C6D64794BE7 /* NDKSwift */,
-				277E0E102E28E880006804C8 /* NDKSwift */,
 			);
 			productName = Posta;
 			productReference = 337E36311AB841CE15B215F3 /* Posta.app */;
@@ -117,6 +159,11 @@
 			attributes = {
 				BuildIndependentTargetsInParallel = YES;
 				LastUpgradeCheck = 1430;
+				TargetAttributes = {
+					2AAE453AA4C67B9374ADE9D4 = {
+						DevelopmentTeam = "";
+					};
+				};
 			};
 			buildConfigurationList = 1DB44697353CD6786C536FFF /* Build configuration list for PBXProject "Posta" */;
 			compatibilityVersion = "Xcode 14.0";
@@ -127,9 +174,11 @@
 				en,
 			);
 			mainGroup = 793456AB7C2E3E1702AB7702;
+			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
 				722C516399829E67DE90D713 /* XCLocalSwiftPackageReference "../.." */,
 			);
+			preferredProjectObjectVersion = 54;
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
@@ -155,11 +204,26 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				D0504F3789EF3D2E1D316695 /* AboutView.swift in Sources */,
+				C5A2F752DC478F4787ECE462 /* AccountManager.swift in Sources */,
+				15DF43D8E7C3FFF42A66F674 /* AccountSettingsView.swift in Sources */,
+				DFBE09ED69CC11EA9CC1A798 /* AdvancedSettingsView.swift in Sources */,
+				A677E223B0C3B07B2A454BD2 /* AppearanceSettingsView.swift in Sources */,
 				700AF2C5B000F9231B82316A /* AuthManager.swift in Sources */,
 				53C95595312C58D3DB96CFBB /* AuthView.swift in Sources */,
 				6A1C3CE24E1DE3A27D51523A /* ContentView.swift in Sources */,
 				B41FF27648976DB0C3201120 /* HomeView.swift in Sources */,
+				03437C51B6AF1451AB5493C1 /* NotificationSettingsView.swift in Sources */,
 				ED4C661205BEE20D13793DD7 /* PostaApp.swift in Sources */,
+				11ACF5202A0A6CD1804D99E2 /* PrivacySettingsView.swift in Sources */,
+				A97DD097A817F1970846D503 /* ProfileView.swift in Sources */,
+				6C97E674C32B0E1C93C8487A /* RelayManager.swift in Sources */,
+				F5DAE67FEF06F4F2DAE5E957 /* RelaySettingsView.swift in Sources */,
+				724D3774AD60E792300AD9A5 /* SettingsView.swift in Sources */,
+				1089942926B933752761F2EF /* SplashView.swift in Sources */,
+				9726C57DB02F0828075FB854 /* SubscriptionManager.swift in Sources */,
+				81A513C4F226861819FD14C8 /* ThemeManager.swift in Sources */,
+				C772C3F6D82904629A951F59 /* VisualEffectBlur.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -231,7 +295,6 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
-				DEVELOPMENT_TEAM = 456SHKPP26;
 				INFOPLIST_FILE = Sources/Posta/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -250,7 +313,6 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
-				DEVELOPMENT_TEAM = 456SHKPP26;
 				INFOPLIST_FILE = Sources/Posta/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -362,10 +424,6 @@
 /* End XCLocalSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
-		277E0E102E28E880006804C8 /* NDKSwift */ = {
-			isa = XCSwiftPackageProductDependency;
-			productName = NDKSwift;
-		};
 		BCF0556AD7A95C6D64794BE7 /* NDKSwift */ = {
 			isa = XCSwiftPackageProductDependency;
 			productName = NDKSwift;
