@@ -542,7 +542,8 @@ public actor NDKSubscriptionManager {
             var cachedEvents: [NDKEvent] = []
             for filter in subscription.filters {
                 if let events = try? await cache.queryEvents(filter) {
-                    cachedEvents.append(contentsOf: events)
+                    let eventsWithNDK = events.map { $0.withNDK(ndk) }
+                    cachedEvents.append(contentsOf: eventsWithNDK)
                 }
             }
 

@@ -20,13 +20,16 @@ public final class NDKEventBuilder {
     private var kind: Kind = EventKind.textNote
     private var tags: [Tag] = []
     private var content: String = ""
+    private weak var ndk: NDK?
     
     // MARK: - Initialization
     
-    public init() {}
+    public init(ndk: NDK? = nil) {
+        self.ndk = ndk
+    }
     
-    public convenience init(content: String) {
-        self.init()
+    public convenience init(content: String, ndk: NDK? = nil) {
+        self.init(ndk: ndk)
         self.content = content
     }
     
@@ -109,24 +112,154 @@ public final class NDKEventBuilder {
         return self.tag(tag)
     }
     
-    /// Add an 'e' tag for referencing an event
+    /// Add an 'e' tag for referencing an event (NIP-10 compliant)
+    /// 
+    /// This method automatically extracts all necessary information from the event object,
+    /// including pubkey hints for proper outbox model support.
     /// 
     /// - Parameters:
-    ///   - eventId: The event ID to reference
+    ///   - event: The event to reference
     ///   - marker: Optional marker like "reply", "root", or "mention" (NIP-10)
-    ///   - relay: Optional relay hint where this event can be found
+    ///   - preferredRelay: Optional relay hint override
     @discardableResult
-    public func tagEvent(_ eventId: EventID, marker: String? = nil, relay: String? = nil) -> NDKEventBuilder {
-        var tag = ["e", eventId]
-        if let relay = relay {
+    public func tagEvent(_ event: NDKEvent, marker: String? = nil, preferredRelay: String? = nil) -> NDKEventBuilder {
+        let relay = preferredRelay ?? ""
+        
+        var tag = ["e", event.id]
+        
+        // Add relay hint (or empty string if we need to add marker/pubkey)
+        if !relay.isEmpty {
             tag.append(relay)
+        } else if marker != nil {
+            tag.append("") // Empty relay URL
         }
+        
+        // Add marker
         if let marker = marker {
-            if relay == nil {
-                tag.append("") // Empty relay URL
-            }
             tag.append(marker)
         }
+        
+        // Always add pubkey hint for NIP-10 compliance
+        if marker != nil || !relay.isEmpty {
+            // Ensure we have the right number of elements before adding pubkey
+            while tag.count < 4 {
+                tag.append("")
+            }
+            tag.append(event.pubkey)
+        }
+        
+        return self.tag(tag)
+    }
+    
+    /// Add an 'e' tag for referencing an event with NDK relay tracking (NIP-10 compliant)
+    /// 
+    /// This async version can use the NDK eventTracker to automatically determine
+    /// relay hints from where the event was originally seen.
+    /// 
+    /// - Parameters:
+    ///   - event: The event to reference
+    ///   - marker: Optional marker like "reply", "root", or "mention" (NIP-10)
+    ///   - preferredRelay: Optional relay hint override (takes precedence over tracked relay)
+    ///   - ndk: NDK instance to get relay hints from eventTracker (optional, uses event's bound NDK if not provided)
+    @discardableResult
+    public func tagEvent(_ event: NDKEvent, marker: String? = nil, preferredRelay: String? = nil, ndk: NDK? = nil) async -> NDKEventBuilder {
+        let relay: String
+        
+        if let preferredRelay = preferredRelay {
+            // Use explicitly provided relay
+            relay = preferredRelay
+        } else if let ndkInstance = ndk ?? event.ndk {
+            // Try to get relay hint from eventTracker
+            let sourceRelay = await ndkInstance.eventTracker.getSourceRelay(eventId: event.id)
+            relay = sourceRelay ?? ""
+        } else {
+            // No NDK available, use empty relay
+            relay = ""
+        }
+        
+        var tag = ["e", event.id]
+        
+        // Add relay hint (or empty string if we need to add marker/pubkey)
+        if !relay.isEmpty {
+            tag.append(relay)
+        } else if marker != nil {
+            tag.append("") // Empty relay URL
+        }
+        
+        // Add marker
+        if let marker = marker {
+            tag.append(marker)
+        }
+        
+        // Always add pubkey hint for NIP-10 compliance
+        if marker != nil || !relay.isEmpty {
+            // Ensure we have the right number of elements before adding pubkey
+            while tag.count < 4 {
+                tag.append("")
+            }
+            tag.append(event.pubkey)
+        }
+        
+        return self.tag(tag)
+    }
+    
+    /// Add a 'q' tag for quoting an event (NIP-10 compliant)
+    /// 
+    /// This method is used when citing/quoting events in the content.
+    /// According to NIP-10, q tags should be used when referencing events
+    /// within the content using NIP-21 format (nostr:note1..., nostr:nevent1...).
+    /// 
+    /// - Parameters:
+    ///   - event: The event to quote
+    ///   - preferredRelay: Optional relay hint where the quoted event can be found
+    @discardableResult
+    public func quoteEvent(_ event: NDKEvent, preferredRelay: String? = nil) -> NDKEventBuilder {
+        // q tag format: ["q", <event-id>, <relay-url>, <pubkey>]
+        var tag = ["q", event.id]
+        
+        // Add relay hint (or empty string)
+        let relay = preferredRelay ?? ""
+        tag.append(relay)
+        
+        // Add pubkey hint for outbox model support
+        tag.append(event.pubkey)
+        
+        return self.tag(tag)
+    }
+    
+    /// Add a 'q' tag for quoting an event with NDK relay tracking (NIP-10 compliant)
+    /// 
+    /// This async version can use the NDK eventTracker to automatically determine
+    /// relay hints from where the event was originally seen.
+    /// 
+    /// - Parameters:
+    ///   - event: The event to quote
+    ///   - preferredRelay: Optional relay hint override (takes precedence over tracked relay)
+    ///   - ndk: NDK instance to get relay hints from eventTracker (optional, uses event's bound NDK if not provided)
+    @discardableResult
+    public func quoteEvent(_ event: NDKEvent, preferredRelay: String? = nil, ndk: NDK? = nil) async -> NDKEventBuilder {
+        // q tag format: ["q", <event-id>, <relay-url>, <pubkey>]
+        var tag = ["q", event.id]
+        
+        let relay: String
+        if let preferredRelay = preferredRelay {
+            // Use explicitly provided relay
+            relay = preferredRelay
+        } else if let ndkInstance = ndk ?? event.ndk {
+            // Try to get relay hint from eventTracker
+            let sourceRelay = await ndkInstance.eventTracker.getSourceRelay(eventId: event.id)
+            relay = sourceRelay ?? ""
+        } else {
+            // No NDK available, use empty relay
+            relay = ""
+        }
+        
+        // Add relay hint (or empty string)
+        tag.append(relay)
+        
+        // Add pubkey hint for outbox model support
+        tag.append(event.pubkey)
+        
         return self.tag(tag)
     }
     
@@ -257,7 +390,8 @@ public final class NDKEventBuilder {
             kind: kind,
             tags: tags,
             content: content,
-            sig: signature
+            sig: signature,
+            ndk: ndk
         )
         
         // Validate the event
@@ -290,7 +424,8 @@ public final class NDKEventBuilder {
             kind: kind,
             tags: tags,
             content: content,
-            sig: signature
+            sig: signature,
+            ndk: ndk
         )
         
         // Validate the event
@@ -362,18 +497,37 @@ public final class NDKEventBuilder {
         return NDKEventBuilder()
             .content(content)
             .kind(EventKind.reaction)
-            .tagEvent(event.id)
+            .tagEvent(event)
             .tagUser(event.pubkey)
             .tag(["k", String(event.kind)])
     }
     
     /// Create a reply event
-    public static func reply(_ content: String, to eventId: EventID, author: PublicKey) -> NDKEventBuilder {
+    public static func reply(_ content: String, to event: NDKEvent) -> NDKEventBuilder {
         return NDKEventBuilder()
             .content(content)
             .kind(EventKind.textNote)
-            .tagEvent(eventId, marker: "reply")
-            .tagUser(author)
+            .tagEvent(event, marker: "reply")
+            .tagUser(event.pubkey)
+    }
+    
+    /// Create a quote event (text note with q tag)
+    /// 
+    /// This creates a kind 1 text note that quotes another event.
+    /// The event reference is added to the content and a q-tag is included.
+    /// 
+    /// - Parameters:
+    ///   - comment: The comment text to add before the quote
+    ///   - event: The event to quote
+    public static func quote(_ comment: String, event: NDKEvent) throws -> NDKEventBuilder {
+        // Create nevent/note reference
+        let reference = try event.encode()
+        let fullContent = "\(comment)\n\nnostr:\(reference)"
+        
+        return NDKEventBuilder()
+            .content(fullContent)
+            .kind(EventKind.textNote)
+            .quoteEvent(event)
     }
     
     /// Create a repost event (automatically chooses kind 6 for text notes, kind 16 for others)
@@ -392,7 +546,7 @@ public final class NDKEventBuilder {
         var builder = NDKEventBuilder()
             .content(content)
             .kind(repostKind)
-            .tagEvent(event.id)
+            .tagEvent(event)
             .tagUser(event.pubkey)
         
         // For non-text events, add k tag with original kind
@@ -411,7 +565,7 @@ public final class NDKEventBuilder {
         
         for event in events {
             builder = builder
-                .tagEvent(event.id)
+                .tag(["e", event.id])
                 .tag(["k", String(event.kind)])
         }
         
@@ -420,7 +574,11 @@ public final class NDKEventBuilder {
     
     /// Create a deletion event for a single event
     public static func deletion(event: NDKEvent, reason: String = "") -> NDKEventBuilder {
-        return deletion(events: [(event.id, event.kind)], reason: reason)
+        return NDKEventBuilder()
+            .content(reason)
+            .kind(EventKind.deletion)
+            .tagEvent(event)
+            .tag(["k", String(event.kind)])
     }
     
     /// Create a parameterized replaceable event

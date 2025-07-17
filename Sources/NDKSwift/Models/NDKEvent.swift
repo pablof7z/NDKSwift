@@ -31,6 +31,9 @@ public struct NDKEvent: Codable, Equatable, Hashable, Sendable {
 
     /// Event signature
     public let sig: Signature
+    
+    /// Weak reference to the NDK instance that manages this event
+    public weak var ndk: NDK?
 
     // MARK: - Initialization
 
@@ -41,7 +44,8 @@ public struct NDKEvent: Codable, Equatable, Hashable, Sendable {
         kind: Kind,
         tags: [Tag],
         content: String,
-        sig: Signature
+        sig: Signature,
+        ndk: NDK? = nil
     ) {
         self.id = id
         self.pubkey = pubkey
@@ -50,6 +54,7 @@ public struct NDKEvent: Codable, Equatable, Hashable, Sendable {
         self.tags = tags
         self.content = content
         self.sig = sig
+        self.ndk = ndk
     }
 
     // MARK: - Codable
@@ -82,7 +87,8 @@ public struct NDKEvent: Codable, Equatable, Hashable, Sendable {
             kind: kind,
             tags: tags,
             content: content,
-            sig: sig
+            sig: sig,
+            ndk: nil
         )
     }
     
@@ -344,6 +350,15 @@ public struct NDKEvent: Codable, Equatable, Hashable, Sendable {
     private func hasMetadataWorthyOfNevent() -> Bool {
         // Use nevent if the event has non-standard kind or has important tags
         return kind != EventKind.textNote || !referencedEventIds.isEmpty || !referencedPubkeys.isEmpty
+    }
+    
+    /// Set the NDK reference for this event
+    /// - Parameter ndk: The NDK instance to associate with this event
+    /// - Returns: A copy of this event with the NDK reference set
+    public func withNDK(_ ndk: NDK?) -> NDKEvent {
+        var event = self
+        event.ndk = ndk
+        return event
     }
 }
 
