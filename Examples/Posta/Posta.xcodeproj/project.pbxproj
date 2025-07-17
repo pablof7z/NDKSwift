@@ -1,0 +1,376 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 60;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		277E0E112E28E880006804C8 /* NDKSwift in Frameworks */ = {isa = PBXBuildFile; productRef = 277E0E102E28E880006804C8 /* NDKSwift */; };
+		53C95595312C58D3DB96CFBB /* AuthView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 61052722591CD54996B24778 /* AuthView.swift */; };
+		6A1C3CE24E1DE3A27D51523A /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7FC51DF064CDBF43562A49B7 /* ContentView.swift */; };
+		700AF2C5B000F9231B82316A /* AuthManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8CA0F04B325560719E26F9AD /* AuthManager.swift */; };
+		793BF367E112F49D7A3168CD /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 473DF610696C7C8D6BE3D7C9 /* Assets.xcassets */; };
+		9B0BB37D975DC528DAF44ECF /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 0E1C662710FBEF7F41C5E825 /* LaunchScreen.storyboard */; };
+		B41FF27648976DB0C3201120 /* HomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 723539740E0D28EEC30522D9 /* HomeView.swift */; };
+		CC71AFB2EBB3A74CB1B743A0 /* NDKSwift in Frameworks */ = {isa = PBXBuildFile; productRef = BCF0556AD7A95C6D64794BE7 /* NDKSwift */; };
+		ED4C661205BEE20D13793DD7 /* PostaApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 91767EC64A1E67DD57D491CA /* PostaApp.swift */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXFileReference section */
+		01A98A4F92B708F7B99225EB /* NDKSwift-z94ws0 */ = {isa = PBXFileReference; lastKnownFileType = folder; name = "NDKSwift-z94ws0"; path = ../..; sourceTree = SOURCE_ROOT; };
+		0E1C662710FBEF7F41C5E825 /* LaunchScreen.storyboard */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; path = LaunchScreen.storyboard; sourceTree = "<group>"; };
+		337E36311AB841CE15B215F3 /* Posta.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Posta.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		473DF610696C7C8D6BE3D7C9 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		4FFAA2438B334E8D89CA9115 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
+		61052722591CD54996B24778 /* AuthView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuthView.swift; sourceTree = "<group>"; };
+		723539740E0D28EEC30522D9 /* HomeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeView.swift; sourceTree = "<group>"; };
+		7FC51DF064CDBF43562A49B7 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
+		8CA0F04B325560719E26F9AD /* AuthManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuthManager.swift; sourceTree = "<group>"; };
+		91767EC64A1E67DD57D491CA /* PostaApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PostaApp.swift; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		B915994450C31B396D7C6FDF /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				277E0E112E28E880006804C8 /* NDKSwift in Frameworks */,
+				CC71AFB2EBB3A74CB1B743A0 /* NDKSwift in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		65488ADDDECC7D7E75BA08EA /* Packages */ = {
+			isa = PBXGroup;
+			children = (
+				01A98A4F92B708F7B99225EB /* NDKSwift-z94ws0 */,
+			);
+			name = Packages;
+			sourceTree = "<group>";
+		};
+		793456AB7C2E3E1702AB7702 = {
+			isa = PBXGroup;
+			children = (
+				65488ADDDECC7D7E75BA08EA /* Packages */,
+				D782595365097A714F5C2330 /* Posta */,
+				EF914A941A5433E1C4227819 /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		D782595365097A714F5C2330 /* Posta */ = {
+			isa = PBXGroup;
+			children = (
+				473DF610696C7C8D6BE3D7C9 /* Assets.xcassets */,
+				8CA0F04B325560719E26F9AD /* AuthManager.swift */,
+				61052722591CD54996B24778 /* AuthView.swift */,
+				7FC51DF064CDBF43562A49B7 /* ContentView.swift */,
+				723539740E0D28EEC30522D9 /* HomeView.swift */,
+				4FFAA2438B334E8D89CA9115 /* Info.plist */,
+				0E1C662710FBEF7F41C5E825 /* LaunchScreen.storyboard */,
+				91767EC64A1E67DD57D491CA /* PostaApp.swift */,
+			);
+			name = Posta;
+			path = Sources/Posta;
+			sourceTree = "<group>";
+		};
+		EF914A941A5433E1C4227819 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				337E36311AB841CE15B215F3 /* Posta.app */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		2AAE453AA4C67B9374ADE9D4 /* Posta */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 09A459965BAC64286026A541 /* Build configuration list for PBXNativeTarget "Posta" */;
+			buildPhases = (
+				C7411099ED23BBD5256498F6 /* Sources */,
+				F1E0F95C695741FFF64058F1 /* Resources */,
+				B915994450C31B396D7C6FDF /* Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = Posta;
+			packageProductDependencies = (
+				BCF0556AD7A95C6D64794BE7 /* NDKSwift */,
+				277E0E102E28E880006804C8 /* NDKSwift */,
+			);
+			productName = Posta;
+			productReference = 337E36311AB841CE15B215F3 /* Posta.app */;
+			productType = "com.apple.product-type.application";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		CAF71BAE96F352768C0FEE7C /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = YES;
+				LastUpgradeCheck = 1430;
+			};
+			buildConfigurationList = 1DB44697353CD6786C536FFF /* Build configuration list for PBXProject "Posta" */;
+			compatibilityVersion = "Xcode 14.0";
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				Base,
+				en,
+			);
+			mainGroup = 793456AB7C2E3E1702AB7702;
+			packageReferences = (
+				722C516399829E67DE90D713 /* XCLocalSwiftPackageReference "../.." */,
+			);
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				2AAE453AA4C67B9374ADE9D4 /* Posta */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		F1E0F95C695741FFF64058F1 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				793BF367E112F49D7A3168CD /* Assets.xcassets in Resources */,
+				9B0BB37D975DC528DAF44ECF /* LaunchScreen.storyboard in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		C7411099ED23BBD5256498F6 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				700AF2C5B000F9231B82316A /* AuthManager.swift in Sources */,
+				53C95595312C58D3DB96CFBB /* AuthView.swift in Sources */,
+				6A1C3CE24E1DE3A27D51523A /* ContentView.swift in Sources */,
+				B41FF27648976DB0C3201120 /* HomeView.swift in Sources */,
+				ED4C661205BEE20D13793DD7 /* PostaApp.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin XCBuildConfiguration section */
+		17B45732DCDC87970C210032 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				CURRENT_PROJECT_VERSION = 1;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				DEVELOPMENT_TEAM = "";
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				MARKETING_VERSION = 1.0.0;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				PRODUCT_BUNDLE_IDENTIFIER = com.posta.app;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				SWIFT_VERSION = 5.0;
+			};
+			name = Release;
+		};
+		5B2C39867F0511AFAFBDDDDC /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_IDENTITY = "iPhone Developer";
+				DEVELOPMENT_TEAM = 456SHKPP26;
+				INFOPLIST_FILE = Sources/Posta/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				PRODUCT_NAME = Posta;
+				SDKROOT = iphoneos;
+				SUPPORTS_MACCATALYST = NO;
+				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = NO;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+		84B5DC290C26A46102E4CC43 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_IDENTITY = "iPhone Developer";
+				DEVELOPMENT_TEAM = 456SHKPP26;
+				INFOPLIST_FILE = Sources/Posta/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				PRODUCT_NAME = Posta;
+				SDKROOT = iphoneos;
+				SUPPORTS_MACCATALYST = NO;
+				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = NO;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		E6C59853B8125D12F9BD77B9 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				CURRENT_PROJECT_VERSION = 1;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				DEVELOPMENT_TEAM = "";
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"$(inherited)",
+					"DEBUG=1",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				MARKETING_VERSION = 1.0.0;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				PRODUCT_BUNDLE_IDENTIFIER = com.posta.app;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_VERSION = 5.0;
+			};
+			name = Debug;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		09A459965BAC64286026A541 /* Build configuration list for PBXNativeTarget "Posta" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				84B5DC290C26A46102E4CC43 /* Debug */,
+				5B2C39867F0511AFAFBDDDDC /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		1DB44697353CD6786C536FFF /* Build configuration list for PBXProject "Posta" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				E6C59853B8125D12F9BD77B9 /* Debug */,
+				17B45732DCDC87970C210032 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+/* End XCConfigurationList section */
+
+/* Begin XCLocalSwiftPackageReference section */
+		722C516399829E67DE90D713 /* XCLocalSwiftPackageReference "../.." */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = ../..;
+		};
+/* End XCLocalSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		277E0E102E28E880006804C8 /* NDKSwift */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = NDKSwift;
+		};
+		BCF0556AD7A95C6D64794BE7 /* NDKSwift */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = NDKSwift;
+		};
+/* End XCSwiftPackageProductDependency section */
+	};
+	rootObject = CAF71BAE96F352768C0FEE7C /* Project object */;
+}
