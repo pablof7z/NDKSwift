@@ -163,10 +163,12 @@ public actor NDKSubscriptionManager {
         }
 
         // Determine execution strategy
-        if shouldGroupSubscription(subscription) {
-            addToGrouping(subscription)
-        } else {
-            executeImmediately(subscription)
+        Task {
+            if await shouldGroupSubscription(subscription) {
+                await addToGrouping(subscription)
+            } else {
+                await executeImmediately(subscription)
+            }
         }
     }
 
@@ -259,6 +261,15 @@ public actor NDKSubscriptionManager {
                             relayUrl: relay.url,
                             isUnique: isUnique
                         )
+                        
+                        // Track relay information in eventTracker
+                        if isUnique {
+                            // This is the first time we've seen this event, so set as source relay
+                            await ndk.eventTracker.setSourceRelay(eventId: eventId, relay: relay.url)
+                        } else {
+                            // We've seen this event before, just mark it as seen on this relay
+                            await ndk.eventTracker.markSeen(eventId: eventId, relay: relay.url)
+                        }
                     }
                 }
 
@@ -317,10 +328,29 @@ public actor NDKSubscriptionManager {
 
     // MARK: - Grouping Logic
 
-    private func shouldGroupSubscription(_ subscription: NDKSubscription) -> Bool {
-        // For now, disable grouping since we need async access to options
-        // This can be refactored later to support async checking
-        return false
+    private func shouldGroupSubscription(_ subscription: NDKSubscription) async -> Bool {
+        // Get subscription options
+        let options = await subscription.options
+        
+        // Don't group if:
+        // - Subscription has specific relays
+        // - Has a very small limit that shouldn't be shared
+        // - closeOnEose is true (these are typically one-shot queries)
+        guard options.relays == nil,
+              options.limit == nil || options.limit! > 10,
+              !options.closeOnEose
+        else {
+            return false
+        }
+        
+        // Check for time constraints that make grouping risky
+        for filter in subscription.filters {
+            if filter.since != nil || filter.until != nil {
+                return false
+            }
+        }
+        
+        return true
     }
 
     private func addToGrouping(_ subscription: NDKSubscription) {
@@ -341,7 +371,7 @@ public actor NDKSubscriptionManager {
             // Set timer to execute group
             group.timer = Task {
                 try? await Task.sleep(nanoseconds: UInt64(groupingDelay * 1_000_000_000))
-                executeGroup(fingerprint: fingerprint)
+                await executeGroup(fingerprint: fingerprint)
             }
 
             pendingGroups[fingerprint] = group
@@ -358,7 +388,7 @@ public actor NDKSubscriptionManager {
         return FilterFingerprint(filter: firstFilter, closeOnEose: false)
     }
 
-    private func executeGroup(fingerprint: FilterFingerprint) {
+    private func executeGroup(fingerprint: FilterFingerprint) async {
         guard var group = pendingGroups[fingerprint] else { return }
 
         pendingGroups.removeValue(forKey: fingerprint)
@@ -367,27 +397,43 @@ public actor NDKSubscriptionManager {
         guard !group.subscriptions.isEmpty else { return }
 
         // Create execution plan
-        let plan = createExecutionPlan(for: group.subscriptions)
+        let plan = await createExecutionPlan(for: group.subscriptions)
 
         // Execute the plan
-        executeSubscriptionGroup(plan)
+        await executeSubscriptionGroup(plan)
 
         // Update statistics
         stats.recordGrouping(originalCount: group.subscriptions.count, finalCount: plan.mergedFilters.count)
     }
 
-    private func createExecutionPlan(for subscriptions: [NDKSubscription]) -> ExecutionPlan {
+    private func createExecutionPlan(for subscriptions: [NDKSubscription]) async -> ExecutionPlan {
         // Merge compatible filters
         let mergedFilters = mergeFilters(from: subscriptions)
 
-        // Use default relay set since we can't access options synchronously
-        // Note: This is a workaround since we can't use async in this synchronous context
-        // The relay set will be properly populated when the subscription is executed
-        let relaySet: Set<NDKRelay> = []
-
-        // Default to safe values for now since we can't access options synchronously
-        let useCache = true
-        let closeOnEose = false
+        // Collect all unique relays from subscriptions
+        var relaySet: Set<NDKRelay> = []
+        var useCache = true
+        var closeOnEose = false
+        
+        for subscription in subscriptions {
+            let options = await subscription.options
+            if let specificRelays = options.relays {
+                relaySet.formUnion(specificRelays)
+            }
+            // If any subscription doesn't use cache, disable for group
+            if !options.useCache {
+                useCache = false
+            }
+            // If any subscription has closeOnEose, enable for group
+            if options.closeOnEose {
+                closeOnEose = true
+            }
+        }
+        
+        // If no specific relays, use NDK's default relays
+        if relaySet.isEmpty, let ndk = ndk {
+            relaySet = Set(ndk.relays)
+        }
 
         return ExecutionPlan(
             subscriptions: subscriptions,
