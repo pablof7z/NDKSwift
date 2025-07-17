@@ -3,290 +3,265 @@ import NDKSwift
 
 struct HomeView: View {
     @EnvironmentObject var authManager: AuthManager
-    @State private var posts: [PostItem] = []
-    @State private var isLoading = true
-    @State private var isRefreshing = false
-    @State private var subscription: NDKSubscription?
+    @State private var subscriptionManager: SubscriptionManager?
+    @State private var profileCache: [String: NDKUserProfile] = [:]
+    @State private var selectedProfile: String?
     
     var body: some View {
         NavigationView {
             ZStack {
-                // Background gradient
+                // Sophisticated gradient background
                 LinearGradient(
-                    gradient: Gradient(colors: [Color(.systemBackground), Color(.systemGray6)]),
+                    gradient: Gradient(stops: [
+                        .init(color: Color(.systemBackground), location: 0),
+                        .init(color: Color(.systemBackground).opacity(0.97), location: 0.1),
+                        .init(color: Color(.secondarySystemBackground).opacity(0.4), location: 1)
+                    ]),
                     startPoint: .top,
                     endPoint: .bottom
                 )
                 .ignoresSafeArea()
                 
                 VStack(spacing: 0) {
-                    // Custom navigation header
-                    customHeader
+                    // Elegant header
+                    headerView
                     
                     // Main content
-                    if isLoading && posts.isEmpty {
-                        loadingView
-                    } else if posts.isEmpty {
-                        emptyStateView
+                    if let manager = subscriptionManager {
+                        if manager.isLoadingFollows {
+                            loadingFollowsView
+                        } else if manager.notes.isEmpty && !manager.isLoadingNotes {
+                            emptyStateView
+                        } else {
+                            chatListView(manager: manager)
+                        }
                     } else {
-                        postsList
+                        loadingView
                     }
                 }
             }
             .navigationBarHidden(true)
         }
-        .onAppear {
-            Task {
-                await startSubscription()
-            }
+        .sheet(item: $selectedProfile) { pubkey in
+            ProfileView(pubkey: pubkey)
         }
-        .onDisappear {
-            Task {
-                await subscription?.close()
-            }
+        .onAppear {
+            subscriptionManager = authManager.getSubscriptionManager()
         }
     }
     
-    private var customHeader: some View {
-        HStack {
-            Text("Posta")
-                .font(.largeTitle)
-                .fontWeight(.bold)
-                .foregroundColor(.primary)
+    private var headerView: some View {
+        ZStack {
+            // Subtle background blur effect
+            VisualEffectBlur(blurStyle: .systemUltraThinMaterial)
+                .opacity(0.9)
             
-            Spacer()
+            HStack(spacing: 16) {
+                Text("Messages")
+                    .font(.system(size: 34, weight: .bold, design: .default))
+                    .foregroundColor(.primary)
+                
+                Spacer()
+                
+                // Profile button
+                Button(action: {
+                    if let currentUser = authManager.currentUser {
+                        selectedProfile = currentUser.pubkey
+                    }
+                }) {
+                    ZStack {
+                        Circle()
+                            .fill(Color(.tertiarySystemFill))
+                            .frame(width: 38, height: 38)
+                        
+                        Image(systemName: "person.circle")
+                            .font(.system(size: 20, weight: .medium))
+                            .foregroundColor(.secondary)
+                    }
+                }
+            }
+            .padding(.horizontal, 20)
+            .padding(.vertical, 16)
+        }
+        .frame(height: 98)
+        .overlay(
+            Rectangle()
+                .fill(Color(.separator).opacity(0.2))
+                .frame(height: 0.5),
+            alignment: .bottom
+        )
+    }
+    
+    private var loadingFollowsView: some View {
+        VStack(spacing: 24) {
+            ProgressView()
+                .scaleEffect(1.1)
+                .tint(.accentColor)
             
-            Button(action: {
-                authManager.logout()
-            }) {
-                Image(systemName: "rectangle.portrait.and.arrow.right")
-                    .font(.title3)
+            VStack(spacing: 8) {
+                Text("Loading your network")
+                    .font(.system(size: 17, weight: .semibold))
+                    .foregroundColor(.primary)
+                
+                Text("Fetching your follow list...")
+                    .font(.system(size: 15))
                     .foregroundColor(.secondary)
-                    .padding(8)
-                    .background(Circle().fill(Color(.systemGray5)))
             }
         }
-        .padding(.horizontal)
-        .padding(.top, 60)
-        .padding(.bottom, 16)
-        .background(
-            Color(.systemBackground)
-                .shadow(color: .black.opacity(0.05), radius: 5, x: 0, y: 2)
-        )
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
     
     private var loadingView: some View {
         VStack(spacing: 20) {
             ProgressView()
-                .scaleEffect(1.2)
+                .scaleEffect(1.1)
                 .tint(.accentColor)
             
-            Text("Loading messages...")
-                .font(.subheadline)
+            Text("Initializing...")
+                .font(.system(size: 15))
                 .foregroundColor(.secondary)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
     
     private var emptyStateView: some View {
-        VStack(spacing: 20) {
-            Image(systemName: "bubble.left.and.bubble.right")
-                .font(.system(size: 60))
-                .foregroundColor(.secondary.opacity(0.5))
+        VStack(spacing: 24) {
+            ZStack {
+                Circle()
+                    .fill(Color(.quaternarySystemFill))
+                    .frame(width: 120, height: 120)
+                
+                Image(systemName: "bubble.left.and.bubble.right.fill")
+                    .font(.system(size: 56))
+                    .foregroundColor(.secondary.opacity(0.6))
+                    .symbolRenderingMode(.hierarchical)
+            }
             
-            Text("No messages yet")
-                .font(.title3)
-                .fontWeight(.medium)
-                .foregroundColor(.secondary)
-            
-            Text("New messages will appear here")
-                .font(.subheadline)
-                .foregroundColor(.secondary.opacity(0.8))
+            VStack(spacing: 8) {
+                Text("No messages yet")
+                    .font(.system(size: 22, weight: .semibold))
+                    .foregroundColor(.primary)
+                
+                Text("Messages from people you follow will appear here")
+                    .font(.system(size: 16))
+                    .foregroundColor(.secondary)
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal, 40)
+            }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
     
-    private var postsList: some View {
+    private func chatListView(manager: SubscriptionManager) -> some View {
         ScrollView {
             LazyVStack(spacing: 0) {
-                ForEach(posts) { post in
-                    PostRowView(post: post)
-                        .transition(.opacity.combined(with: .move(edge: .bottom)))
+                ForEach(manager.notes, id: \.id) { event in
+                    ChatRowView(
+                        event: event,
+                        profile: profileCache[event.pubkey],
+                        onProfileLoad: { profile in
+                            profileCache[event.pubkey] = profile
+                        },
+                        onTap: {
+                            selectedProfile = event.pubkey
+                        }
+                    )
+                    .transition(.opacity.combined(with: .move(edge: .bottom)))
                     
-                    Divider()
-                        .padding(.leading, 72)
+                    if event.id != manager.notes.last?.id {
+                        Divider()
+                            .padding(.leading, 76)
+                    }
                 }
             }
-            .padding(.top, 8)
+            .animation(.spring(response: 0.4, dampingFraction: 0.8), value: manager.notes.count)
         }
-        .refreshable {
-            await refreshPosts()
-        }
-    }
-    
-    private func startSubscription() async {
-        guard let ndk = authManager.getNDK() else { return }
-        
-        // Create filter for kind:1 notes
-        let filter = NDKFilter(
-            kinds: [EventKind.textNote],
-            limit: 50
-        )
-        
-        // Subscribe to events
-        subscription = await ndk.subscribe(filters: [filter])
-        
-        Task {
-            do {
-                for try await event in subscription! {
-                    await processEvent(event)
-                }
-            } catch {
-                print("Subscription error: \(error)")
-            }
-        }
-        
-        // Also fetch existing events
-        await fetchInitialPosts()
-    }
-    
-    private func fetchInitialPosts() async {
-        guard let ndk = authManager.getNDK() else { return }
-        
-        let filter = NDKFilter(
-            kinds: [EventKind.textNote],
-            limit: 100
-        )
-        
-        do {
-            let events = try await ndk.fetchEvents([filter])
-            
-            // Process all events
-            for event in events {
-                await processEvent(event)
-            }
-            
-            isLoading = false
-        } catch {
-            print("Error fetching posts: \(error)")
-            isLoading = false
-        }
-    }
-    
-    private func processEvent(_ event: NDKEvent) async {
-        // Filter out replies (posts with 'e' tags)
-        let hasReplyTag = event.tags.contains { tag in
-            tag.first == "e"
-        }
-        
-        if hasReplyTag {
-           // return // Skip replies
-        }
-        
-        // Create PostItem
-        await createPostItem(from: event)
-    }
-    
-    private func createPostItem(from event: NDKEvent) async {
-        guard let ndk = authManager.getNDK() else { return }
-        
-        // Create user
-        let user = NDKUser(pubkey: event.pubkey)
-        user.ndk = ndk
-        
-        // Fetch profile
-        let profile = try? await ndk.fetchProfile(event.pubkey)
-        
-        let post = PostItem(
-            id: event.id,
-            eventId: event.id,
-            authorPubkey: event.pubkey,
-            authorName: profile?.displayName ?? profile?.name,
-            content: event.content,
-            timestamp: Date(timeIntervalSince1970: TimeInterval(event.createdAt)),
-            avatarURL: profile?.picture
-        )
-        
-        // Add to posts array (avoid duplicates)
-        await MainActor.run {
-            if !posts.contains(where: { $0.eventId == event.id }) {
-                posts.append(post)
-                // Sort by timestamp (newest first)
-                posts.sort { $0.timestamp > $1.timestamp }
-            }
-        }
-    }
-    
-    private func refreshPosts() async {
-        isRefreshing = true
-        posts.removeAll()
-        await fetchInitialPosts()
-        isRefreshing = false
+        .scrollIndicators(.hidden)
     }
 }
 
-struct PostItem: Identifiable {
-    let id: String
-    let eventId: String
-    let authorPubkey: String
-    let authorName: String?
-    let content: String
-    let timestamp: Date
-    let avatarURL: String?
-}
-
-struct PostRowView: View {
-    let post: PostItem
+struct ChatRowView: View {
+    let event: NDKEvent
+    let profile: NDKUserProfile?
+    let onProfileLoad: (NDKUserProfile) -> Void
+    let onTap: () -> Void
+    
     @State private var isPressed = false
+    @State private var hasLoadedProfile = false
+    @EnvironmentObject var authManager: AuthManager
     
     var body: some View {
-        HStack(alignment: .top, spacing: 12) {
-            // Avatar
-            AsyncImage(url: URL(string: post.avatarURL ?? "")) { image in
-                image
-                    .resizable()
-                    .aspectRatio(contentMode: .fill)
-            } placeholder: {
-                Image(systemName: "person.circle.fill")
-                    .font(.system(size: 40))
-                    .foregroundColor(Color(.systemGray4))
+        HStack(alignment: .top, spacing: 0) {
+            // Avatar section
+            ZStack {
+                if let avatarURL = profile?.picture, let url = URL(string: avatarURL) {
+                    AsyncImage(url: url) { image in
+                        image
+                            .resizable()
+                            .aspectRatio(contentMode: .fill)
+                    } placeholder: {
+                        Circle()
+                            .fill(Color(.tertiarySystemFill))
+                            .overlay(
+                                Text(avatarInitial)
+                                    .font(.system(size: 22, weight: .medium))
+                                    .foregroundColor(.secondary)
+                            )
+                    }
+                    .frame(width: 56, height: 56)
+                    .clipShape(Circle())
+                } else {
+                    Circle()
+                        .fill(Color(.tertiarySystemFill))
+                        .frame(width: 56, height: 56)
+                        .overlay(
+                            Text(avatarInitial)
+                                .font(.system(size: 22, weight: .medium))
+                                .foregroundColor(.secondary)
+                        )
+                }
             }
-            .frame(width: 48, height: 48)
-            .clipShape(Circle())
-            .overlay(
-                Circle()
-                    .stroke(Color(.systemGray5), lineWidth: 0.5)
-            )
+            .padding(.leading, 16)
+            .padding(.trailing, 12)
             
-            VStack(alignment: .leading, spacing: 4) {
-                // Header
+            // Content section
+            VStack(alignment: .leading, spacing: 3) {
+                // Header row
                 HStack(alignment: .firstTextBaseline) {
-                    Text(post.authorName ?? shortenPubkey(post.authorPubkey))
-                        .font(.system(size: 16, weight: .semibold))
+                    Text(displayName)
+                        .font(.system(size: 17, weight: .semibold))
                         .foregroundColor(.primary)
                         .lineLimit(1)
                     
                     Spacer()
                     
-                    Text(post.timestamp, style: .relative)
-                        .font(.system(size: 14))
-                        .foregroundColor(.secondary)
+                    HStack(spacing: 4) {
+                        Text(formatTimestamp(event.createdAt))
+                            .font(.system(size: 15))
+                            .foregroundColor(Color.secondary.opacity(0.6))
+                        
+                        Image(systemName: "chevron.right")
+                            .font(.system(size: 12, weight: .semibold))
+                            .foregroundColor(Color.secondary.opacity(0.3))
+                    }
                 }
                 
-                // Content preview
-                Text(post.content)
+                // Message preview
+                Text(cleanContent(event.content))
                     .font(.system(size: 15))
+                    .lineSpacing(2)
+                    .foregroundColor(.secondary)
                     .lineLimit(2)
-                    .foregroundColor(.primary.opacity(0.9))
-                    .fixedSize(horizontal: false, vertical: true)
+                    .multilineTextAlignment(.leading)
             }
+            .padding(.trailing, 16)
             .frame(maxWidth: .infinity, alignment: .leading)
         }
-        .padding(.horizontal, 16)
         .padding(.vertical, 12)
+        .contentShape(Rectangle())
         .background(
             Color(.systemBackground)
-                .opacity(isPressed ? 0.8 : 1.0)
+                .brightness(isPressed ? -0.02 : 0)
         )
         .onTapGesture {
             withAnimation(.easeInOut(duration: 0.1)) {
@@ -294,16 +269,72 @@ struct PostRowView: View {
             }
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
                 isPressed = false
+                onTap()
+            }
+        }
+        .task {
+            if !hasLoadedProfile, let ndk = authManager.getNDK() {
+                if let fetchedProfile = try? await ndk.fetchProfile(event.pubkey) {
+                    onProfileLoad(fetchedProfile)
+                    hasLoadedProfile = true
+                }
             }
         }
     }
     
+    private var displayName: String {
+        if let name = profile?.displayName ?? profile?.name {
+            return name
+        }
+        return shortenPubkey(event.pubkey)
+    }
+    
+    private var avatarInitial: String {
+        let name = displayName
+        return String(name.prefix(1)).uppercased()
+    }
+    
     private func shortenPubkey(_ pubkey: String) -> String {
         if pubkey.count > 16 {
-            return String(pubkey.prefix(6)) + "..." + String(pubkey.suffix(6))
+            return String(pubkey.prefix(8)) + "..." + String(pubkey.suffix(8))
         }
         return pubkey
     }
+    
+    private func cleanContent(_ content: String) -> String {
+        // Remove extra whitespace and newlines for preview
+        return content
+            .components(separatedBy: .newlines)
+            .joined(separator: " ")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+    
+    private func formatTimestamp(_ timestamp: Timestamp) -> String {
+        let date = Date(timeIntervalSince1970: TimeInterval(timestamp))
+        let now = Date()
+        let calendar = Calendar.current
+        
+        if calendar.isDateInToday(date) {
+            let formatter = DateFormatter()
+            formatter.timeStyle = .short
+            return formatter.string(from: date)
+        } else if calendar.isDateInYesterday(date) {
+            return "Yesterday"
+        } else if let days = calendar.dateComponents([.day], from: date, to: now).day, days < 7 {
+            let formatter = DateFormatter()
+            formatter.dateFormat = "EEEE"
+            return formatter.string(from: date)
+        } else {
+            let formatter = DateFormatter()
+            formatter.dateStyle = .short
+            return formatter.string(from: date)
+        }
+    }
+}
+
+
+extension String: @retroactive Identifiable {
+    public var id: String { self }
 }
 
 #Preview {
