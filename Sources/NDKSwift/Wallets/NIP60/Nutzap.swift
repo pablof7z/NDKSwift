@@ -90,6 +90,7 @@ public enum Nutzap {
             try await eventManager.createSpendingHistoryEvent(
                 direction: .out,
                 amount: amount,
+                memo: comment ?? "Nutzap sent",
                 destroyedEventIds: nil,
                 createdEventIds: nil,
                 redeemedEventId: nil,
@@ -199,9 +200,16 @@ public enum Nutzap {
         }
         
         // Create spending history for received nutzap
+        // Extract comment from nutzap event if available
+        var nutzapComment: String?
+        if let commentTag = event.tags.first(where: { $0.count >= 2 && $0[0] == "comment" }) {
+            nutzapComment = commentTag[1]
+        }
+        
         try await eventManager.createSpendingHistoryEvent(
             direction: .in,
             amount: totalReceived,
+            memo: nutzapComment ?? "Nutzap received",
             destroyedEventIds: nil,
             createdEventIds: nil,
             redeemedEventId: event.id,

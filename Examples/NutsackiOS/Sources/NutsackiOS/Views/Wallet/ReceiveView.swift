@@ -85,9 +85,9 @@ struct ReceiveView: View {
                 showScanner = false
             }
         }
-        .sheet(isPresented: $showSuccess) {
+        .fullScreenCover(isPresented: $showSuccess) {
             if let amount = receivedAmount {
-                ReceiveSuccessView(amount: amount) {
+                PaymentReceivedAnimation(amount: Int64(amount)) {
                     dismiss()
                 }
             }

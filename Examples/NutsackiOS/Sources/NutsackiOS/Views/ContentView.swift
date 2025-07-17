@@ -10,18 +10,10 @@ struct ContentView: View {
     @Environment(WalletManager.self) private var walletManager
     
     
-    @State private var selectedTab: Tab = .wallet
     @State private var urlState: URLState?
     @State private var showScanner = false
     @State private var scannedInvoice: String?
     @State private var showInvoicePreview = false
-    
-    enum Tab {
-        case wallet
-        case contacts
-        case scanner
-        case settings
-    }
     
     var body: some View {
         ZStack {
@@ -29,47 +21,7 @@ struct ContentView: View {
             
             NDKAuthView(authManager: nostrManager.authManager, ndk: nostrManager.ndk) {
                 // Main app interface - shown when authenticated
-                TabView(selection: $selectedTab) {
-                    WalletView(urlState: $urlState)
-                        .tabItem {
-                            Label("Wallet", systemImage: "bitcoinsign.circle")
-                        }
-                        .tag(Tab.wallet)
-                    
-                    ContactsView()
-                        .tabItem {
-                            Label("Contacts", systemImage: "person.2")
-                        }
-                        .tag(Tab.contacts)
-                    
-                    // Scanner "tab" - doesn't show content, just triggers action
-                    Color.clear
-                        .tabItem {
-                            Label {
-                                Text("Scan")
-                                    .fontWeight(.bold)
-                            } icon: {
-                                Image(systemName: selectedTab == .scanner ? "qrcode.viewfinder" : "viewfinder.circle.fill")
-                                    .symbolRenderingMode(.hierarchical)
-                            }
-                        }
-                        .tag(Tab.scanner)
-                    
-                    SettingsView()
-                        .tabItem {
-                            Label("Settings", systemImage: "gear")
-                        }
-                        .tag(Tab.settings)
-                }
-                .tint(.orange)
-                .background(Color.black)
-                .onChange(of: selectedTab) { _, newValue in
-                    if newValue == .scanner {
-                        showScanner = true
-                        // Reset to previous tab (wallet by default)
-                        selectedTab = .wallet
-                    }
-                }
+                WalletView(urlState: $urlState, showScanner: $showScanner)
             } authenticationContent: {
                 // Custom authentication UI
                 AuthenticationView()
@@ -97,7 +49,6 @@ struct ContentView: View {
         print("URL passed to application: \(url.absoluteString)")
         
         if url.scheme == "cashu" || url.scheme == "nostr" {
-            selectedTab = .wallet
             urlState = URLState(url: url.absoluteString, timestamp: Date())
         }
     }
@@ -109,9 +60,11 @@ struct ContentView: View {
         if isLightningInvoice(scannedValue) {
             scannedInvoice = scannedValue
             showInvoicePreview = true
+        } else if scannedValue.lowercased().starts(with: "cashu") {
+            // Handle cashu token by updating wallet view URL state
+            urlState = URLState(url: scannedValue, timestamp: Date())
         } else {
-            // Handle other QR codes (cashu tokens, nostr, etc.)
-            selectedTab = .wallet
+            // Handle other QR codes (nostr URLs, etc)
             urlState = URLState(url: scannedValue, timestamp: Date())
         }
     }

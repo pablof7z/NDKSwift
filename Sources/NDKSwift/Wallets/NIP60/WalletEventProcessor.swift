@@ -7,10 +7,11 @@ actor WalletEventProcessor {
     
     /// Process a wallet event based on its kind
     func processEvent(_ event: NDKEvent, context: WalletEventContext) async {
+        print("wallet event received", event.kind)
         do {
             switch event.kind {
             case EventKind.cashuWalletConfig:
-                try await processWalletConfigEvent(event, context: context)
+                try await context.wallet.processWalletConfiguration(event: event)
             case EventKind.cashuToken:
                 try await processTokenEvent(event, context: context)
             case EventKind.cashuQuote:
@@ -28,72 +29,6 @@ actor WalletEventProcessor {
     }
     
     // MARK: - Private Event Processing Methods
-    
-    /// Process wallet configuration events
-    private func processWalletConfigEvent(_ event: NDKEvent, context: WalletEventContext) async throws {
-        print("🔧 Processing wallet configuration event")
-        print("🔧 Event ID: \(event.id)")
-        print("🔧 Event Kind: \(event.kind)")
-        print("🔧 Event Author: \(event.pubkey)")
-        print("🔧 Encrypted content length: \(event.content.count) characters")
-        print("🔧 Encrypted content (first 100 chars): \(event.content.prefix(100))")
-        
-        // Decrypt content
-        let sender = NDKUser(pubkey: event.pubkey)
-        let decryptedContent = try await context.signer.decrypt(
-            sender: sender,
-            value: event.content,
-            scheme: .nip44
-        )
-        
-        print("🔓 DECRYPTED WALLET CONFIG CONTENT:")
-        print("🔓 Decrypted length: \(decryptedContent.count) characters")
-        print("🔓 Decrypted content: \(decryptedContent)")
-        print("🔓 Decrypted content (raw): \(String(describing: decryptedContent.data(using: .utf8)))")
-        
-        // Parse wallet tags
-        guard let tagsData = decryptedContent.data(using: .utf8),
-              let walletTags = try? JSONDecoder().decode([[String]].self, from: tagsData) else {
-            print("❌ Failed to parse wallet configuration from decrypted content")
-            throw NDKError.invalidContent("Failed to parse wallet configuration")
-        }
-        
-        print("⚙️ PARSED WALLET CONFIGURATION TAGS:")
-        print("⚙️ Total tags count: \(walletTags.count)")
-        
-        var mintCount = 0
-        var privkeyFound = false
-        var relayCount = 0
-        
-        for (index, tag) in walletTags.enumerated() {
-            if tag.count >= 2 {
-                switch tag[0] {
-                case "mint":
-                    mintCount += 1
-                    print("⚙️   Tag \(index): mint = \(tag[1])")
-                case "privkey":
-                    privkeyFound = true
-                    print("⚙️   Tag \(index): privkey = \(tag[1].prefix(8))... (P2PK private key)")
-                case "relay":
-                    relayCount += 1
-                    print("⚙️   Tag \(index): relay = \(tag[1])")
-                default:
-                    print("⚙️   Tag \(index): \(tag[0]) = \(tag[1])")
-                }
-            } else {
-                print("⚙️   Tag \(index): \(tag)")
-            }
-        }
-        
-        print("⚙️ WALLET CONFIGURATION SUMMARY:")
-        print("⚙️   - Mints configured: \(mintCount)")
-        print("⚙️   - P2PK private key present: \(privkeyFound)")
-        print("⚙️   - Relays configured: \(relayCount)")
-        print("⚙️   - Unencrypted relay tags from event: \(event.tags.filter { $0.count >= 2 && $0[0] == "relay" }.count)")
-        
-        // Process wallet configuration with both raw and encrypted tags
-        await context.wallet.processWalletConfiguration(event: event, decryptedTags: walletTags)
-    }
     
     /// Process token events
     private func processTokenEvent(_ event: NDKEvent, context: WalletEventContext) async throws {

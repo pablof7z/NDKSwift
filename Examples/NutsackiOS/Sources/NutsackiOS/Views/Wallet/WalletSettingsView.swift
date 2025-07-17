@@ -62,16 +62,17 @@ struct WalletSettingsView: View {
                     }
                     
                     // Add mint buttons
-                    HStack {
+                    HStack(spacing: 16) {
                         Button(action: { showAddMintSheet = true }) {
                             Label("Add Mint", systemImage: "plus.circle")
                         }
+                        .buttonStyle(.bordered)
                         
                         Spacer()
                         
                         Button(action: discoverMints) {
                             if isDiscovering {
-                                HStack {
+                                HStack(spacing: 4) {
                                     ProgressView()
                                         .scaleEffect(0.8)
                                     Text("Discovering...")
@@ -80,6 +81,7 @@ struct WalletSettingsView: View {
                                 Label("Discover", systemImage: "magnifyingglass")
                             }
                         }
+                        .buttonStyle(.bordered)
                         .disabled(isDiscovering)
                     }
                 } header: {
@@ -172,8 +174,8 @@ struct WalletSettingsView: View {
             let mintURLObjects = mintURLs.compactMap { URL(string: $0) }
             mints = mintURLObjects.map { MintInfo(url: $0, name: $0.host ?? "Unknown Mint") }
             
-            // Load wallet relays
-            relays = await wallet.walletRelays.map { $0.url }
+            // Load wallet relays from configuration
+            relays = await wallet.walletConfigRelays
             
             // Check if wallet info exists
             hasWalletInfo = await checkWalletInfo()
@@ -356,40 +358,40 @@ struct MintSettingsRow: View {
 struct RelaySettingsRow: View {
     let relayURL: String
     let onDelete: () -> Void
-    @State private var relayName: String?
-    @State private var favicon: Image?
+    @State private var relayState: NDKRelay.State?
+    @State private var relayIcon: Image?
+    @State private var observationTask: Task<Void, Never>?
     @Environment(NostrManager.self) private var nostrManager
     
     var body: some View {
         HStack(spacing: 12) {
-            // Favicon
-            Group {
-                if let favicon = favicon {
-                    favicon
-                        .resizable()
-                        .aspectRatio(contentMode: .fit)
-                        .frame(width: 40, height: 40)
-                        .clipShape(RoundedRectangle(cornerRadius: 8))
-                } else {
-                    Image(systemName: "antenna.radiowaves.left.and.right")
-                        .font(.title2)
-                        .foregroundColor(.blue)
-                        .frame(width: 40, height: 40)
-                        .background(Color.blue.opacity(0.1))
-                        .clipShape(RoundedRectangle(cornerRadius: 8))
+            // Relay Icon
+            RelayIconView(icon: relayIcon)
+            
+            VStack(alignment: .leading, spacing: 4) {
+                // Use NIP-11 name if available, otherwise use hostname
+                Text(relayState?.info?.name ?? getRelayHost(relayURL) ?? "Unknown Relay")
+                    .font(.headline)
+                    
+                HStack(spacing: 8) {
+                    Text(relayURL)
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                        .lineLimit(1)
+                    
+                    // Connection status indicator
+                    if let state = relayState {
+                        ConnectionStatusBadge(state: state.connectionState, style: .compact)
+                    }
                 }
             }
             
-            VStack(alignment: .leading, spacing: 4) {
-                Text(relayName ?? getRelayHost(relayURL) ?? "Unknown Relay")
-                    .font(.headline)
-                Text(relayURL)
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-                    .lineLimit(1)
-            }
-            
             Spacer()
+            
+            // Show NIP-11 info if available
+            if let info = relayState?.info {
+                RelayInfoView(info: info, style: .compact)
+            }
             
             Button(action: onDelete) {
                 Image(systemName: "xmark.circle.fill")
@@ -401,6 +403,9 @@ struct RelaySettingsRow: View {
         .task {
             await loadRelayInfo()
         }
+        .onDisappear {
+            stopObserving()
+        }
     }
     
     private func getRelayHost(_ url: String) -> String? {
@@ -408,18 +413,54 @@ struct RelaySettingsRow: View {
     }
     
     private func loadRelayInfo() async {
-        // For now, just use host name formatting
-        // TODO: In the future, we can fetch NIP-11 data directly
-        if let host = getRelayHost(relayURL) {
-            await MainActor.run {
-                relayName = host
-                    .replacingOccurrences(of: "relay.", with: "")
-                    .replacingOccurrences(of: ".com", with: "")
-                    .capitalized
+        guard let ndk = nostrManager.ndk else { return }
+        
+        // Get the relay from NDK
+        let relays = await ndk.relays
+        guard let relay = relays.first(where: { $0.url == relayURL }) else {
+            // If relay not found in NDK, just use basic formatting
+            if let host = getRelayHost(relayURL) {
+                await MainActor.run {
+                    relayState = NDKRelay.State(
+                        connectionState: .disconnected,
+                        stats: NDKRelayStats(),
+                        info: nil
+                    )
+                }
+            }
+            return
+        }
+        
+        // Start observing relay state
+        observationTask = Task {
+            for await state in relay.stateStream {
+                await MainActor.run {
+                    self.relayState = state
+                    
+                    // Load relay icon from NIP-11 data if available
+                    if let iconURL = state.info?.icon,
+                       let url = URL(string: iconURL),
+                       relayIcon == nil {
+                        Task {
+                            if let data = try? await URLSession.shared.data(from: url).0,
+                               let uiImage = UIImage(data: data) {
+                                await MainActor.run {
+                                    self.relayIcon = Image(uiImage: uiImage)
+                                }
+                            }
+                        }
+                    }
+                }
             }
         }
     }
+    
+    private func stopObserving() {
+        observationTask?.cancel()
+        observationTask = nil
+    }
 }
+
 
 // MARK: - Add Mint Sheet
 struct AddMintSheet: View {

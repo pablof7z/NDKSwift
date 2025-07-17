@@ -3,9 +3,11 @@ import NDKSwift
 
 struct ContactsView: View {
     @Environment(NostrManager.self) private var nostrManager
+    @Environment(WalletManager.self) private var walletManager
     @State private var contacts: [NDKUser] = []
     @State private var searchText = ""
     @State private var isLoading = true
+    @State private var showSettings = false
     
     var filteredContacts: [NDKUser] {
         if searchText.isEmpty {
@@ -56,6 +58,19 @@ struct ContactsView: View {
             .searchable(text: $searchText, prompt: "Search contacts")
             .navigationTitle("Contacts")
             .platformNavigationBarTitleDisplayMode(inline: true)
+            .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    Button(action: { showSettings = true }) {
+                        Image(systemName: "person.circle.fill")
+                            .font(.title3)
+                    }
+                }
+            }
+            .sheet(isPresented: $showSettings) {
+                SettingsView()
+                    .environment(nostrManager)
+                    .environment(walletManager)
+            }
             .refreshable {
                 await loadContacts()
             }

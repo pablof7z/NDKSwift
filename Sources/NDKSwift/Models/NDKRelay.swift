@@ -58,6 +58,30 @@ public struct NDKRelayStats: Sendable, Equatable {
 
     /// Signature verification statistics
     public var signatureStats: NDKRelaySignatureStats = .init()
+    
+    public init(
+        connectedAt: Date? = nil,
+        lastMessageAt: Date? = nil,
+        messagesSent: Int = 0,
+        messagesReceived: Int = 0,
+        bytesReceived: Int = 0,
+        bytesSent: Int = 0,
+        latency: TimeInterval? = nil,
+        connectionAttempts: Int = 0,
+        successfulConnections: Int = 0,
+        signatureStats: NDKRelaySignatureStats = .init()
+    ) {
+        self.connectedAt = connectedAt
+        self.lastMessageAt = lastMessageAt
+        self.messagesSent = messagesSent
+        self.messagesReceived = messagesReceived
+        self.bytesReceived = bytesReceived
+        self.bytesSent = bytesSent
+        self.latency = latency
+        self.connectionAttempts = connectionAttempts
+        self.successfulConnections = successfulConnections
+        self.signatureStats = signatureStats
+    }
 }
 
 /// Internal actor that manages all mutable state for NDKRelay
@@ -268,6 +292,12 @@ public final class NDKRelay: RelayProtocol, Hashable, Equatable, @unchecked Send
         public let connectionState: NDKRelayConnectionState
         public let stats: NDKRelayStats
         public let info: NDKRelayInformation?
+        
+        public init(connectionState: NDKRelayConnectionState, stats: NDKRelayStats, info: NDKRelayInformation?) {
+            self.connectionState = connectionState
+            self.stats = stats
+            self.info = info
+        }
     }
 
     /// Reference to NDK instance

@@ -10,12 +10,13 @@ struct WalletView: View {
     @Environment(WalletManager.self) private var walletManager
     
     @Binding var urlState: URLState?
+    @Binding var showScanner: Bool
     
     @State private var navigationDestination: WalletDestination?
-    @State private var showScanner = false
     @State private var scannedInvoice: String?
     @State private var showInvoicePreview = false
     @State private var showWalletSettings = false
+    @State private var showSettings = false
     
     enum WalletDestination: Identifiable, Hashable {
         case mint
@@ -25,6 +26,7 @@ struct WalletView: View {
         case nutzap
         case swap
         case relayHealth
+        case contacts
         
         var id: String {
             switch self {
@@ -35,6 +37,7 @@ struct WalletView: View {
             case .nutzap: return "nutzap"
             case .swap: return "swap"
             case .relayHealth: return "relayHealth"
+            case .contacts: return "contacts"
             }
         }
     }
@@ -52,13 +55,6 @@ struct WalletView: View {
                             BalanceCard(balance: Int(walletManager.currentBalance))
                                 .padding(.horizontal)
                             
-                            // Relay status indicator
-                            RelayStatusIndicator()
-                                .padding(.horizontal)
-                                .onTapGesture {
-                                    navigationDestination = .relayHealth
-                                }
-                            
                             // Recent transactions
                             RecentTransactionsView()
                                 .padding(.horizontal)
@@ -69,7 +65,7 @@ struct WalletView: View {
                     Spacer()
                     
                     // Action buttons
-                    ActionButtonsView(navigationDestination: $navigationDestination)
+                    ActionButtonsView(navigationDestination: $navigationDestination, showScanner: $showScanner)
                         .padding()
                 }
             }
@@ -81,20 +77,22 @@ struct WalletView: View {
                     endRadius: 400
                 )
             )
-            .navigationTitle("Wallet")
-            .platformNavigationBarTitleDisplayMode(inline: true)
+            .navigationTitle("")
+            .navigationBarTitleDisplayMode(.inline)
             .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    Button(action: { showSettings = true }) {
+                        Image(systemName: "person.circle.fill")
+                            .font(.title3)
+                    }
+                }
+                
                 if walletManager.activeWallet != nil {
                     ToolbarItem(placement: .topBarTrailing) {
                         Button(action: { showWalletSettings = true }) {
                             Image(systemName: "gearshape")
                         }
                     }
-                }
-            }
-            .sheet(isPresented: $showScanner) {
-                QRScannerView { scannedValue in
-                    handleScannedValue(scannedValue)
                 }
             }
             .sheet(isPresented: $showInvoicePreview) {
@@ -104,6 +102,11 @@ struct WalletView: View {
             }
             .sheet(isPresented: $showWalletSettings) {
                 WalletSettingsView()
+                    .environment(nostrManager)
+                    .environment(walletManager)
+            }
+            .sheet(isPresented: $showSettings) {
+                SettingsView()
                     .environment(nostrManager)
                     .environment(walletManager)
             }
@@ -123,6 +126,8 @@ struct WalletView: View {
                     SwapView()
                 case .relayHealth:
                     RelayHealthView()
+                case .contacts:
+                    ContactsView()
                 }
             }
             .onAppear {
@@ -152,6 +157,7 @@ struct WalletView: View {
                 }
             }
         }
+        .tint(.orange)
     }
     
     private func loadWalletIfNeeded() {
@@ -176,27 +182,6 @@ struct WalletView: View {
                 print("Failed to load wallet: \(error)")
             }
         }
-    }
-    
-    private func handleScannedValue(_ scannedValue: String) {
-        showScanner = false
-        
-        // Check if it's a lightning invoice
-        if isLightningInvoice(scannedValue) {
-            scannedInvoice = scannedValue
-            showInvoicePreview = true
-        } else if scannedValue.lowercased().starts(with: "cashu") {
-            // Handle cashu token directly
-            navigationDestination = .receive(urlString: scannedValue)
-        } else {
-            // Handle other QR codes
-            urlState = URLState(url: scannedValue, timestamp: Date())
-        }
-    }
-    
-    private func isLightningInvoice(_ text: String) -> Bool {
-        let cleanText = text.lowercased().replacingOccurrences(of: "lightning:", with: "")
-        return cleanText.starts(with: "lnbc") || cleanText.starts(with: "lntb") || cleanText.starts(with: "lnbcrt")
     }
 }
 
@@ -270,75 +255,128 @@ struct EmptyWalletView: View {
     }
 }
 
-// MARK: - Action Buttons
-struct ActionButtonsView: View {
-    @Binding var navigationDestination: WalletView.WalletDestination?
-    @State private var showReceiveMenu = false
-    @State private var showSendMenu = false
-    
-    var body: some View {
-        HStack(spacing: 16) {
-            // Receive button with menu
-            Menu {
-                Button(action: { navigationDestination = .receive(urlString: nil) }) {
-                    Label("Redeem", systemImage: "qrcode")
-                }
-                
-                Button(action: { navigationDestination = .mint }) {
-                    Label("Mint", systemImage: "bolt.fill")
-                }
-            } label: {
-                ActionButtonLabel(
-                    imageName: "arrow.down",
-                    text: "Receive",
-                    fade: false
-                )
-            }
-            
-            // Send button with menu
-            Menu {
-                Button(action: { navigationDestination = .send }) {
-                    Label("Send", systemImage: "banknote")
-                }
-                
-                Button(action: { navigationDestination = .melt }) {
-                    Label("Melt", systemImage: "bolt.fill")
-                }
-                
-                Button(action: { navigationDestination = .nutzap }) {
-                    Label("Nutzap", systemImage: "bolt.heart.fill")
-                }
-                
-                Divider()
-                
-                Button(action: { navigationDestination = .swap }) {
-                    Label("Transfer Between Mints", systemImage: "arrow.triangle.swap")
-                }
-            } label: {
-                ActionButtonLabel(
-                    imageName: "arrow.up",
-                    text: "Send",
-                    fade: false
-                )
-            }
-        }
+// Premium button style with subtle press effect
+struct PremiumButtonStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .scaleEffect(configuration.isPressed ? 0.95 : 1.0)
+            .opacity(configuration.isPressed ? 0.8 : 1.0)
+            .animation(.easeInOut(duration: 0.1), value: configuration.isPressed)
     }
 }
 
-// MARK: - Helper Views
-struct ActionButtonLabel: View {
-    let imageName: String
-    let text: String
-    let fade: Bool
+// MARK: - Action Buttons
+struct ActionButtonsView: View {
+    @Binding var navigationDestination: WalletView.WalletDestination?
+    @Binding var showScanner: Bool
+    @State private var showReceiveMenu = false
+    @State private var showSendMenu = false
+    @State private var scanButtonPressed = false
     
     var body: some View {
-        Text("\(Image(systemName: imageName))  \(text)")
-            .opacity(fade ? 0.5 : 1)
-            .font(.title3)
-            .fontWeight(.semibold)
-            .padding(.vertical, 20)
-            .frame(maxWidth: .infinity)
-            .background(Color.secondary.opacity(0.3))
-            .cornerRadius(10)
+        ZStack {
+            // Base layer - receive and send buttons touching
+            HStack(spacing: 0) {
+                // Receive button
+                Button(action: { navigationDestination = .mint }) {
+                    VStack(spacing: 6) {
+                        Image(systemName: "arrow.down")
+                            .font(.system(size: 22, weight: .medium))
+                        Text("Receive")
+                            .font(.system(size: 13, weight: .medium))
+                    }
+                    .foregroundColor(.white)
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 70)
+                }
+                .buttonStyle(PremiumButtonStyle())
+                
+                // Send button with menu
+                Menu {
+                    Button(action: { navigationDestination = .send }) {
+                        Label("Send", systemImage: "banknote")
+                    }
+                    
+                    Button(action: { navigationDestination = .melt }) {
+                        Label("Melt", systemImage: "bolt.fill")
+                    }
+                    
+                    Button(action: { navigationDestination = .nutzap }) {
+                        Label("Nutzap", systemImage: "bolt.heart.fill")
+                    }
+                    
+                    Divider()
+                    
+                    Button(action: { navigationDestination = .contacts }) {
+                        Label("Contacts", systemImage: "person.2")
+                    }
+                    
+                    Button(action: { navigationDestination = .swap }) {
+                        Label("Transfer Between Mints", systemImage: "arrow.triangle.swap")
+                    }
+                } label: {
+                    VStack(spacing: 6) {
+                        Image(systemName: "arrow.up")
+                            .font(.system(size: 22, weight: .medium))
+                        Text("Send")
+                            .font(.system(size: 13, weight: .medium))
+                    }
+                    .foregroundColor(.white)
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 70)
+                }
+                .buttonStyle(PremiumButtonStyle())
+            }
+            .background(
+                RoundedRectangle(cornerRadius: 16)
+                    .fill(
+                        LinearGradient(
+                            gradient: Gradient(colors: [
+                                Color(white: 0.18),
+                                Color(white: 0.12)
+                            ]),
+                            startPoint: .top,
+                            endPoint: .bottom
+                        )
+                    )
+            )
+            .shadow(color: Color.black.opacity(0.3), radius: 20, x: 0, y: 10)
+            
+            // Floating scan button on top
+            Button(action: { 
+                withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) {
+                    scanButtonPressed = true
+                }
+                showScanner = true
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                    scanButtonPressed = false
+                }
+            }) {
+                Circle()
+                    .fill(
+                        LinearGradient(
+                            gradient: Gradient(colors: [
+                                Color.orange,
+                                Color.orange.opacity(0.85)
+                            ]),
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+                    .frame(width: 77, height: 77) // 10% taller than 70
+                    .shadow(color: Color.orange.opacity(0.4), radius: 12, x: 0, y: 6)
+                    .overlay(
+                        Image(systemName: "qrcode.viewfinder")
+                            .font(.system(size: 30, weight: .medium))
+                            .foregroundColor(.white)
+                    )
+                    .scaleEffect(scanButtonPressed ? 0.92 : 1.0)
+            }
+            .buttonStyle(PlainButtonStyle())
+        }
+        .frame(height: 77) // Match the taller scan button
     }
 }
+
+
+// MARK: - Helper Views

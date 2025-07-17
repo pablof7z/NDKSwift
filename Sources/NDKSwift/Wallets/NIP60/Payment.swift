@@ -146,6 +146,7 @@ public enum Payment {
             try await eventManager.createSpendingHistoryEvent(
                 direction: .out,
                 amount: amount,
+                memo: "Lightning payment",
                 destroyedEventIds: nil,
                 createdEventIds: newEventIds,
                 redeemedEventId: nil,

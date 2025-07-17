@@ -10,6 +10,8 @@ struct SettingsView: View {
     
     @State private var userProfile: NDKUserProfile?
     @State private var currentUser: NDKUser?
+    @State private var showPaymentAnimation = false
+    @State private var debugAnimationAmount: Int64 = 21000
     
     var body: some View {
         NavigationStack {
@@ -111,6 +113,24 @@ struct SettingsView: View {
                     Text("App")
                 }
                 
+                // Debug section
+                #if DEBUG
+                Section {
+                    Button(action: { showPaymentAnimation = true }) {
+                        Label("Trigger Deposit Animation", systemImage: "sparkles")
+                    }
+                    
+                    Stepper("Animation Amount: \(debugAnimationAmount) sats", 
+                           value: $debugAnimationAmount, 
+                           in: 100...1000000, 
+                           step: 1000)
+                } header: {
+                    Text("Debug")
+                } footer: {
+                    Text("Test the payment animation without making a real deposit")
+                }
+                #endif
+                
                 // Danger zone
                 Section {
                     Button(role: .destructive, action: logout) {
@@ -124,6 +144,11 @@ struct SettingsView: View {
             #endif
             .onAppear {
                 loadUserProfile()
+            }
+            .fullScreenCover(isPresented: $showPaymentAnimation) {
+                PaymentReceivedAnimation(amount: debugAnimationAmount) {
+                    showPaymentAnimation = false
+                }
             }
         }
     }

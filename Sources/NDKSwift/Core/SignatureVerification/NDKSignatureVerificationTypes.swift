@@ -41,6 +41,9 @@ public struct NDKRelaySignatureStats: Sendable, Equatable {
 
     /// Current validation ratio for this relay
     public private(set) var currentValidationRatio: Double = 1.0
+    
+    /// Public initializer
+    public init() {}
 
     /// Total events processed
     public var totalEvents: Int {
