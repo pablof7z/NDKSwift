@@ -2,8 +2,8 @@ import SwiftUI
 import NDKSwift
 
 struct HomeView: View {
-    @EnvironmentObject var authManager: AuthManager
-    @State private var subscriptionManager: SubscriptionManager?
+    @Environment(NDKAuthManager.self) var authManager
+    @EnvironmentObject var subscriptionManager: SubscriptionManager
     @State private var profileCache: [String: NDKUserProfile] = [:]
     @State private var selectedProfile: String?
     
@@ -27,16 +27,12 @@ struct HomeView: View {
                     headerView
                     
                     // Main content
-                    if let manager = subscriptionManager {
-                        if manager.isLoadingFollows {
-                            loadingFollowsView
-                        } else if manager.notes.isEmpty && !manager.isLoadingNotes {
-                            emptyStateView
-                        } else {
-                            chatListView(manager: manager)
-                        }
+                    if subscriptionManager.isLoadingFollows {
+                        loadingFollowsView
+                    } else if subscriptionManager.notes.isEmpty && !subscriptionManager.isLoadingNotes {
+                        emptyStateView
                     } else {
-                        loadingView
+                        chatListView(manager: subscriptionManager)
                     }
                 }
             }
@@ -46,7 +42,7 @@ struct HomeView: View {
             ProfileView(pubkey: pubkey)
         }
         .onAppear {
-            subscriptionManager = authManager.getSubscriptionManager()
+            // SubscriptionManager is now passed via environment
         }
     }
     
@@ -65,8 +61,8 @@ struct HomeView: View {
                 
                 // Profile button
                 Button(action: {
-                    if let currentUser = authManager.currentUser {
-                        selectedProfile = currentUser.pubkey
+                    if let activeSession = authManager.activeSession {
+                        selectedProfile = activeSession.pubkey
                     }
                 }) {
                     ZStack {
@@ -187,8 +183,8 @@ struct ChatRowView: View {
     let onTap: () -> Void
     
     @State private var isPressed = false
-    @State private var hasLoadedProfile = false
-    @EnvironmentObject var authManager: AuthManager
+    @State private var profileTask: Task<Void, Never>?
+    @EnvironmentObject var ndkManager: NDKManager
     
     var body: some View {
         HStack(alignment: .top, spacing: 0) {
@@ -273,12 +269,24 @@ struct ChatRowView: View {
             }
         }
         .task {
-            if !hasLoadedProfile, let ndk = authManager.getNDK() {
-                if let fetchedProfile = try? await ndk.fetchProfile(event.pubkey) {
-                    onProfileLoad(fetchedProfile)
-                    hasLoadedProfile = true
+            if profile == nil, let ndk = ndkManager.ndk {
+                profileTask = Task {
+                    let profileStream = await ndk.observeProfile(for: event.pubkey)
+                    
+                    for await profileUpdate in profileStream {
+                        if let profile = profileUpdate {
+                            await MainActor.run {
+                                onProfileLoad(profile)
+                            }
+                            // We only need the first valid profile for the list view
+                            break
+                        }
+                    }
                 }
             }
+        }
+        .onDisappear {
+            profileTask?.cancel()
         }
     }
     
@@ -339,5 +347,6 @@ extension String: @retroactive Identifiable {
 
 #Preview {
     HomeView()
-        .environmentObject(AuthManager())
+        .environment(NDKAuthManager.shared)
+        .environmentObject(SubscriptionManager())
 }

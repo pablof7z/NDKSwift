@@ -13,6 +13,8 @@ struct MintsView: View {
     @State private var isDiscovering = false
     @State private var isLoading = true
     @State private var discoveredMints: [MintDiscovery] = []
+    @State private var showError = false
+    @State private var errorMessage = ""
     
     var body: some View {
         NavigationStack {
@@ -82,6 +84,11 @@ struct MintsView: View {
             .sheet(isPresented: $showDiscoverMints) {
                 DiscoveredMintsView(discoveredMints: discoveredMints)
             }
+            .alert("Notice", isPresented: $showError) {
+                Button("OK") { }
+            } message: {
+                Text(errorMessage)
+            }
             .task {
                 await loadMints()
             }
@@ -92,40 +99,31 @@ struct MintsView: View {
     }
     
     private func loadMints() async {
-        let mints = await walletManager.getMintsInfo()
+        guard let wallet = walletManager.activeWallet else { 
+            await MainActor.run {
+                isLoading = false
+            }
+            return 
+        }
+        
+        let mintURLs = await wallet.mints.getMintURLs()
+        let mintInfos = mintURLs.compactMap { urlString -> MintInfo? in
+            guard let url = URL(string: urlString) else { return nil }
+            return MintInfo(url: url, name: url.host ?? "Unknown Mint")
+        }
+        
         await MainActor.run {
-            availableMints = mints
+            availableMints = mintInfos
             isLoading = false
         }
     }
     
     private func discoverMints() {
-        isDiscovering = true
-        discoveredMints = [] // Clear previous results
-        
+        // Just show a message to use wallet settings
         Task {
-            var hasReceivedMints = false
-            
-            for await mints in walletManager.discoverMintsStream() {
-                await MainActor.run {
-                    discoveredMints = mints
-                    
-                    // Show the sheet as soon as we get the first mint
-                    if !hasReceivedMints && !mints.isEmpty {
-                        hasReceivedMints = true
-                        showDiscoverMints = true
-                    }
-                    
-                    // Stop showing the loading indicator after first batch
-                    if isDiscovering && !mints.isEmpty {
-                        isDiscovering = false
-                    }
-                }
-            }
-            
-            // Stream ended
             await MainActor.run {
-                isDiscovering = false
+                errorMessage = "To discover and add mints, please use Wallet Settings."
+                showError = true
             }
         }
     }
@@ -289,17 +287,14 @@ struct MintDetailView: View {
     }
     
     private func performRemoveMint() {
+        // Just dismiss - user should manage mints in wallet settings
+        dismiss()
+        
+        // Show a message that they need to use wallet settings
         Task {
-            do {
-                try await walletManager.removeMint(url: mintInfo.url)
-                await MainActor.run {
-                    dismiss()
-                }
-            } catch {
-                await MainActor.run {
-                    errorMessage = "Failed to remove mint: \(error.localizedDescription)"
-                    showError = true
-                }
+            await MainActor.run {
+                errorMessage = "To remove mints, please use Wallet Settings."
+                showError = true
             }
         }
     }
@@ -387,28 +382,14 @@ struct AddMintView: View {
     }
     
     private func addMint() {
-        guard let url = URL(string: mintURL) else {
-            errorMessage = "Invalid URL"
-            showError = true
-            return
-        }
+        // Just dismiss - user should manage mints in wallet settings
+        dismiss()
         
-        isAdding = true
-        
+        // Show a message that they need to use wallet settings
         Task {
-            do {
-                // Add mint through wallet manager
-                try await walletManager.addMint(url: url)
-                
-                await MainActor.run {
-                    dismiss()
-                }
-            } catch {
-                await MainActor.run {
-                    errorMessage = "Failed to add mint: \(error.localizedDescription)"
-                    showError = true
-                    isAdding = false
-                }
+            await MainActor.run {
+                errorMessage = "To add mints, please use Wallet Settings."
+                showError = true
             }
         }
     }

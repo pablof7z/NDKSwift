@@ -30,16 +30,6 @@ public actor MintManager {
         }
     }
     
-    /// Add a mint to the manager
-    public func addMint(url: URL) async throws {
-        let mint = try await loadMint(url: url)
-        mints[url.absoluteString] = mint
-        
-        // Store keysets
-        for keyset in mint.keysets {
-            keysets[keyset.keysetID] = keyset
-        }
-    }
     
     /// Add mint URL without connecting (for configuration)
     public func addMintURL(url: URL) async {
@@ -146,7 +136,14 @@ public actor MintManager {
     public func requestMintQuote(amount: Int64, mintURL: String) async throws -> CashuSwift.Bolt11.MintQuote {
         // Ensure mint is loaded
         if !hasMint(url: mintURL), let url = URL(string: mintURL) {
-            try await addMint(url: url)
+            // Load the mint data when needed
+            let mint = try await loadMint(url: url)
+            mints[url.absoluteString] = mint
+            
+            // Store keysets
+            for keyset in mint.keysets {
+                keysets[keyset.keysetID] = keyset
+            }
         }
         
         guard let mint = getMint(url: mintURL) else {

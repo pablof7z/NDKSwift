@@ -59,6 +59,16 @@ public actor NDKProfileManager {
     /// Timer task for batching
     private var batchTask: Task<Void, Never>?
     
+    /// Active profile observations
+    private class ContinuationWrapper {
+        let continuation: AsyncStream<NDKUserProfile?>.Continuation
+        init(_ continuation: AsyncStream<NDKUserProfile?>.Continuation) {
+            self.continuation = continuation
+        }
+    }
+    
+    private var activeObservations: [PublicKey: [ContinuationWrapper]] = [:]
+    
     public init(ndk: NDK, config: NDKProfileConfig = .default) {
         self.ndk = ndk
         self.config = config
@@ -115,6 +125,76 @@ public actor NDKProfileManager {
         }
         
         return results
+    }
+    
+    /// Observe profile updates for a given pubkey
+    /// Returns an AsyncSequence that yields the profile immediately if cached,
+    /// then yields updates as they arrive from relays
+    /// - Parameters:
+    ///   - pubkey: The public key to observe
+    ///   - closeOnEose: If true, closes the subscription after receiving initial data (EOSE)
+    public func observeProfile(for pubkey: PublicKey, closeOnEose: Bool = false) -> AsyncStream<NDKUserProfile?> {
+        AsyncStream { continuation in
+            Task {
+                // Add continuation to active observations
+                let wrapper = ContinuationWrapper(continuation)
+                if activeObservations[pubkey] == nil {
+                    activeObservations[pubkey] = []
+                }
+                activeObservations[pubkey]?.append(wrapper)
+                
+                // Yield cached profile immediately if available
+                if let cached = checkCache(for: pubkey) {
+                    continuation.yield(cached)
+                }
+                
+                // Set up subscription for profile updates
+                guard let ndk = ndk else {
+                    continuation.finish()
+                    return
+                }
+                
+                let filter = NDKFilter(
+                    authors: [pubkey],
+                    kinds: [EventKind.metadata],
+                    limit: 1
+                )
+                
+                let subscription = await ndk.subscriptionCoordinator.subscribe(
+                    filters: [filter],
+                    relays: nil,
+                    closeOnEose: closeOnEose
+                )
+                
+                // Process events from subscription
+                do {
+                    for try await event in subscription {
+                        if let profileData = event.content.data(using: .utf8),
+                           let profile = try? JSONDecoder().decode(NDKUserProfile.self, from: profileData) {
+                            // Update cache
+                            updateCache(pubkey: pubkey, profile: profile)
+                            
+                            // Notify all observers for this pubkey
+                            activeObservations[pubkey]?.forEach { wrapper in
+                                wrapper.continuation.yield(profile)
+                            }
+                            
+                            // Save to persistent cache
+                            try? await ndk.cache.saveProfile(profile, pubkey: pubkey)
+                        }
+                    }
+                } catch {
+                    // Subscription ended or errored
+                }
+                
+                // Clean up when done
+                activeObservations[pubkey]?.removeAll { $0 === wrapper }
+                if activeObservations[pubkey]?.isEmpty == true {
+                    activeObservations.removeValue(forKey: pubkey)
+                }
+                continuation.finish()
+            }
+        }
     }
     
     /// Clear the profile cache

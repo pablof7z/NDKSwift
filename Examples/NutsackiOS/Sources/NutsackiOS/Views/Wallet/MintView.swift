@@ -199,7 +199,12 @@ struct MintView: View {
     }
     
     private func loadMints() async {
-        let mints = await walletManager.getMintsInfo()
+        guard let wallet = walletManager.activeWallet else { return }
+        let mintURLs = await wallet.mints.getMintURLs()
+        let mints = mintURLs.compactMap { urlString -> MintInfo? in
+            guard let url = URL(string: urlString) else { return nil }
+            return MintInfo(url: url, name: url.host ?? "Unknown Mint")
+        }
         await MainActor.run {
             availableMints = mints
             if selectedMintURL.isEmpty && !mints.isEmpty {
@@ -266,7 +271,10 @@ struct MintView: View {
         Task {
             do {
                 // Request mint quote from the wallet
-                let quote = try await walletManager.requestMint(
+                guard let wallet = walletManager.activeWallet else {
+                    throw WalletError.noActiveWallet
+                }
+                let quote = try await wallet.requestMint(
                     amount: Int64(amountInt),
                     mintURL: selectedMintURL
                 )
@@ -295,7 +303,8 @@ struct MintView: View {
         
         depositTask = Task {
             do {
-                for try await status in await walletManager.monitorDeposit(quote: quote) {
+                guard let wallet = walletManager.activeWallet else { return }
+                for try await status in wallet.monitorDeposit(quote: quote) {
                     switch status {
                     case .pending:
                         // Still waiting for payment

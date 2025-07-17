@@ -144,14 +144,14 @@ struct SendView: View {
     private func updateAvailableBalance() {
         Task {
             if let mintURL = selectedMintURL {
-                let balance = await walletManager.getBalance(for: mintURL)
+                let balance = await walletManager.activeWallet?.getBalance(mint: mintURL) ?? 0
                 await MainActor.run {
                     availableBalance = Int(balance)
                 }
             } else {
                 // Get total balance
                 do {
-                    let totalBalance = try await walletManager.getBalance()
+                    let totalBalance = try await walletManager.activeWallet?.getBalance() ?? 0
                     await MainActor.run {
                         availableBalance = Int(totalBalance)
                     }
@@ -164,7 +164,12 @@ struct SendView: View {
     
     private func loadMints() {
         Task {
-            let loadedMints = await walletManager.getMintsInfo()
+            guard let wallet = walletManager.activeWallet else { return }
+            let mintURLs = await wallet.mints.getMintURLs()
+            let loadedMints = mintURLs.compactMap { urlString -> MintInfo? in
+                guard let url = URL(string: urlString) else { return nil }
+                return MintInfo(url: url, name: url.host ?? "Unknown Mint")
+            }
             await MainActor.run {
                 mints = loadedMints
                 selectedMintURL = mints.first?.url

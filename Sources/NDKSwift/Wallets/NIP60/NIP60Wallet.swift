@@ -162,6 +162,8 @@ public actor NIP60Wallet: NDKPaymentProvider {
     
     
     /// Process wallet configuration from event
+    /// This method extracts mints, relays, and P2PK keys from a wallet configuration event.
+    /// Note: Mints that fail to load (e.g., due to network errors) will be skipped and not added to the wallet.
     internal func processWalletConfiguration(event: NDKEvent) async {
         print("⚙️ Processing wallet configuration")
         print("⚙️ Event ID: \(event.id)")
@@ -189,21 +191,47 @@ public actor NIP60Wallet: NDKPaymentProvider {
             // Process mints
             let mintURLs = try await walletEvent.mints(signer: signer)
             print("🏪 Extracted \(mintURLs.count) mint URLs from wallet config: \(mintURLs)")
-            var newMints = Set<String>()
             
-            for mintURL in mintURLs {
+            let configuredMints = Set(mintURLs)
+            
+            // Remove mints that are no longer in the configuration
+            let mintsToRemove = previousMints.subtracting(configuredMints)
+            for mintURL in mintsToRemove {
                 guard let url = URL(string: mintURL) else { continue }
-                try? await mints.addMint(url: url)
-                newMints.insert(mintURL)
+                _ = await mints.removeMint(url: url)
+                print("🗑 Removed mint no longer in config: \(mintURL)")
             }
             
-            // Determine what changed
-            let addedMints = newMints.subtracting(previousMints)
-            let removedMints = previousMints.subtracting(newMints)
+            // Add new mints from configuration
+            var successfullyAddedMints = Set<String>()
+            
+            for mintURL in mintURLs {
+                guard let url = URL(string: mintURL) else { 
+                    print("⚠️ Invalid mint URL: \(mintURL)")
+                    continue 
+                }
+                
+                // Skip if already exists
+                if previousMints.contains(mintURL) {
+                    successfullyAddedMints.insert(mintURL)
+                    continue
+                }
+                
+                await mints.addMintURL(url: url)
+                successfullyAddedMints.insert(mintURL)
+                print("✅ Added mint URL: \(mintURL)")
+            }
+            
+            // Get the actual current mints from MintManager after updates
+            let actualCurrentMints = Set(await mints.getMintURLs())
+            
+            // Determine what changed based on actual MintManager state
+            let addedMints = actualCurrentMints.subtracting(previousMints)
+            let removedMints = previousMints.subtracting(actualCurrentMints)
             
             // Emit events
             if !addedMints.isEmpty || !removedMints.isEmpty {
-                let currentMintList = Array(newMints)
+                let currentMintList = Array(actualCurrentMints)
                 
                 events.yield(NIP60WalletEvent(type: .configurationUpdated(mints: currentMintList)))
                 
@@ -216,7 +244,11 @@ public actor NIP60Wallet: NDKPaymentProvider {
                 }
             }
             
-            print("✅ Wallet configuration updated with \(newMints.count) mints")
+            print("✅ Wallet configuration updated:")
+            print("  - Requested mints: \(mintURLs.count)")
+            print("  - Successfully added: \(successfullyAddedMints.count)")
+            print("  - Total active mints: \(actualCurrentMints.count)")
+            print("  - Active mint URLs: \(actualCurrentMints)")
         } catch {
             print("❌ Failed to parse wallet configuration: \(error)")
         }
@@ -536,6 +568,29 @@ public actor NIP60Wallet: NDKPaymentProvider {
             print("ℹ️ No existing wallet configuration found for user \(userPubkey)")
         }
         
+        // Fetch historical token events before starting subscription
+        print("📡 Fetching historical token events...")
+        let tokenFilter = NDKFilter(
+            authors: [userPubkey],
+            kinds: [EventKind.cashuToken]
+        )
+        
+        // Fetch all token events that represent wallet state
+        let tokenEvents = try await ndk.fetchEvents([tokenFilter], timeoutSeconds: 10)
+        print("📦 Found \(tokenEvents.count) token events")
+        
+        // Process each token event to load proofs
+        for event in tokenEvents {
+            await self.processWalletEvent(event)
+        }
+        
+        // Log the initial balance after loading historical events
+        let initialBalance = await proofStateManager.getTotalBalance()
+        print("💰 Initial wallet balance after loading: \(initialBalance) sats")
+        
+        // Emit balance change event if we have a non-zero balance after loading
+        await notifyBalanceChangeIfNeeded()
+        
         // Now start the long-lived subscription for any future updates
         await self.startWalletSubscription()
         print("✅ Wallet loading complete. Monitoring for updates.")
@@ -828,5 +883,31 @@ public actor NIP60Wallet: NDKPaymentProvider {
         walletConfigRelays = []
         
         print("🛑 NIP60Wallet stopped")
+    }
+    
+    /// Debug method to diagnose mint synchronization state
+    public func debugMintState() async -> (configured: [String], loaded: [String], failed: [String]) {
+        // Get the latest wallet configuration event
+        let userPubkey = try? await signer.pubkey
+        guard let userPubkey = userPubkey else {
+            return ([], await mints.getMintURLs(), [])
+        }
+        
+        let configFilter = NDKFilter(
+            authors: [userPubkey],
+            kinds: [EventKind.cashuWalletConfig],
+            limit: 1
+        )
+        
+        guard let configEvent = try? await ndk.fetchEvent(configFilter, timeoutSeconds: 5) else {
+            return ([], await mints.getMintURLs(), [])
+        }
+        
+        let walletEvent = NDKCashuWalletEvent(event: configEvent)
+        let configuredMints = (try? await walletEvent.mints(signer: signer)) ?? []
+        let loadedMints = await mints.getMintURLs()
+        let failedMints = configuredMints.filter { !loadedMints.contains($0) }
+        
+        return (configuredMints, loadedMints, failedMints)
     }
 }

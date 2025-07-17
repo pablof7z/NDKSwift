@@ -67,6 +67,23 @@ public actor NDKPool {
         return relayMap[normalizedUrl]
     }
     
+    /// Get a snapshot of all relay states for quick status checks
+    /// Returns a dictionary mapping relay URLs to their current connection states
+    public func getRelayStateSnapshot() async -> [RelayURL: NDKRelayConnectionState] {
+        var snapshot: [RelayURL: NDKRelayConnectionState] = [:]
+        for relay in relays {
+            snapshot[relay.url] = await relay.connectionState
+        }
+        return snapshot
+    }
+    
+    /// Get connection summary (connected count, total count)
+    public func getConnectionSummary() async -> (connected: Int, total: Int) {
+        let states = await getRelayStateSnapshot()
+        let connected = states.values.filter { $0 == .connected }.count
+        return (connected: connected, total: states.count)
+    }
+    
     /// Connect to all relays
     public func connectAll() async {
         print("[NDKPool] Connecting to all relays...")

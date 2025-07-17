@@ -1,8 +1,8 @@
 import SwiftUI
+import NDKSwift
 
 struct RelaySettingsView: View {
     @ObservedObject var relayManager: RelayManager
-    @ObservedObject var authManager: AuthManager
     @State private var showingAddRelay = false
     @State private var newRelayUrl = ""
     @State private var showingResetConfirmation = false
@@ -84,9 +84,7 @@ struct RelaySettingsView: View {
             Text("This will remove all custom relays and restore the default relay list.")
         }
         .onAppear {
-            if let ndk = authManager.getNDK() {
-                relayManager.setNDK(ndk)
-            }
+            // NDK is now managed centrally
         }
     }
 }

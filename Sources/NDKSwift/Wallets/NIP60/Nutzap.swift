@@ -7,10 +7,23 @@ public enum Nutzap {
     // MARK: - Sending Nutzaps
     
     /// Send a nutzap to a recipient
+    /// - Parameters:
+    ///   - wallet: The NIP60 wallet to send from
+    ///   - amount: Amount to send in satoshis
+    ///   - recipient: Recipient's Nostr public key
+    ///   - recipientP2PKKey: Recipient's P2PK key (from their kind:10019 event or payment request)
+    ///   - comment: Optional comment for the nutzap
+    ///   - eventId: Optional event ID if nutzapping an event
+    ///   - mints: Available mints
+    ///   - proofStateManager: Proof state manager
+    ///   - eventManager: Event manager for history
+    ///   - ndk: NDK instance
+    ///   - signer: Signer for the nutzap event
     public static func send(
         wallet: NIP60Wallet,
         amount: Int64,
         to recipient: PublicKey,
+        recipientP2PKKey: String,
         comment: String? = nil,
         eventId: String? = nil,
         mints: [String: CashuSwift.Mint],
@@ -33,8 +46,8 @@ public enum Nutzap {
             throw NDKError.insufficientBalance(amount: amount)
         }
         
-        // Get recipient's P2PK pubkey (for nutzaps, it's their Nostr pubkey)
-        let recipientP2PK = recipient
+        // Use the provided P2PK key (should come from payment request)
+        let recipientP2PK = recipientP2PKKey
         
         // Select and lock proofs
         let selectedProofs = await proofStateManager.selectProofs(amount: amount, mint: mintURL)
@@ -124,39 +137,68 @@ public enum Nutzap {
         let privateKey = try await p2pkManager.getOrCreatePrivateKey()
         let ourPubkeyHex = try await p2pkManager.getCashuPublicKey()
         
-        // Verify p tag points to our pubkey
+        // Verify p tag points to our Nostr pubkey
         let pTags = event.tags.filter { $0.first == "p" }
         guard let recipientTag = pTags.first,
-              recipientTag.count > 1,
-              recipientTag[1] == ourPubkeyHex else {
-            // Not for us
+              recipientTag.count > 1 else {
+            // No recipient tag
             return
         }
         
-        // Decode the token from content
-        guard let tokenData = event.content.data(using: .utf8),
-              let token = try? JSONDecoder().decode(CashuSwift.Token.self, from: tokenData) else {
-            print("Failed to decode token from nutzap")
+        // Get mint URLs from u tags
+        let mintURLs = event.tags
+            .filter { $0.count >= 2 && $0[0] == "u" }
+            .map { $0[1] }
+        
+        guard !mintURLs.isEmpty else {
+            print("No mint URLs in nutzap")
             return
+        }
+        
+        // Extract proofs from proof tags
+        let proofTags = event.tags.filter { $0.count >= 2 && $0[0] == "proof" }
+        guard !proofTags.isEmpty else {
+            print("No proofs in nutzap")
+            return
+        }
+        
+        var allProofs: [CashuSwift.Proof] = []
+        for proofTag in proofTags {
+            guard let proofData = proofTag[1].data(using: .utf8),
+                  let proof = try? JSONDecoder().decode(CashuSwift.Proof.self, from: proofData) else {
+                print("Failed to decode proof from tag")
+                continue
+            }
+            allProofs.append(proof)
         }
         
         var totalReceived: Int64 = 0
         var redeemedProofs: [CashuSwift.Proof] = []
         
-        // Process each mint's proofs
-        for (mintURL, proofs) in token.proofsByMint {
+        // Filter proofs locked to us
+        let ourProofs = CashuHelpers.filterProofsLockedTo(proofs: allProofs, pubkey: ourPubkeyHex)
+        guard !ourProofs.isEmpty else {
+            print("No proofs locked to us in nutzap")
+            return
+        }
+        
+        // Process proofs by mint
+        for mintURL in mintURLs {
             guard let mint = mints[mintURL] else {
                 print("Unknown mint in nutzap: \(mintURL)")
                 continue
             }
             
-            // Filter proofs locked to us
-            let ourProofs = CashuHelpers.filterProofsLockedTo(proofs: proofs, pubkey: ourPubkeyHex)
-            guard !ourProofs.isEmpty else { continue }
+            // Find proofs for this mint
+            let mintProofs = ourProofs.filter { proof in
+                mint.keysets.contains { $0.keysetID == proof.keysetID }
+            }
+            
+            guard !mintProofs.isEmpty else { continue }
             
             // Redeem the P2PK-locked proofs
             let lockedToken = CashuSwift.Token(
-                proofs: [mintURL: ourProofs],
+                proofs: [mintURL: mintProofs],
                 unit: "sat"
             )
             let (unlockedProofs, _, _) = try await CashuSwift.receive(
@@ -200,11 +242,8 @@ public enum Nutzap {
         }
         
         // Create spending history for received nutzap
-        // Extract comment from nutzap event if available
-        var nutzapComment: String?
-        if let commentTag = event.tags.first(where: { $0.count >= 2 && $0[0] == "comment" }) {
-            nutzapComment = commentTag[1]
-        }
+        // The comment is in the content field per NIP-61
+        let nutzapComment = event.content.isEmpty ? nil : event.content
         
         try await eventManager.createSpendingHistoryEvent(
             direction: .in,
@@ -259,41 +298,43 @@ public enum Nutzap {
         // Get mints reference
         let mints = await wallet.mints.getAllMints()
         
-        // Group proofs by mint URL
-        var proofsByMint: [String: [CashuSwift.Proof]] = [:]
+        // Build nutzap event (kind 9321)
+        let eventBuilder = NDKEventBuilder()
+            .content(comment ?? "") // Content is the comment, not the token
+            .kind(9321) // Nutzap kind
+        
+        // Add p tag for recipient
+        _ = eventBuilder.tag(["p", recipient])
+        
+        // Add e tag if nutzapping an event
+        if let eventId = eventId {
+            _ = eventBuilder.tag(["e", eventId])
+        }
+        
+        // Group proofs by mint and add proof/u tags for each mint
+        var mintURLs = Set<String>()
+        
         for proof in proofs {
             // Find mint URL for this proof
             for (mintURL, mint) in mints {
                 if mint.keysets.contains(where: { $0.keysetID == proof.keysetID }) {
-                    proofsByMint[mintURL, default: []].append(proof)
+                    mintURLs.insert(mintURL)
+                    
+                    // Encode the proof as JSON
+                    let proofData = try JSONEncoder().encode(proof)
+                    let proofJSON = String(data: proofData, encoding: .utf8) ?? ""
+                    
+                    // Add proof tag
+                    _ = eventBuilder.tag(["proof", proofJSON])
+                    
                     break
                 }
             }
         }
         
-        // Create token for the proofs
-        let token = CashuSwift.Token(
-            proofs: proofsByMint,
-            unit: "sat"
-        )
-        
-        // Encode token
-        let tokenString = try token.serialize()
-        
-        // Build nutzap event (kind 9321)
-        let eventBuilder = NDKEventBuilder()
-            .content(tokenString)
-            .kind(9321) // Nutzap kind
-            .tag(["p", recipient, "", String(amount)])
-        
-        if let eventId = eventId {
-            _ = eventBuilder.tag(["e", eventId])
-        }
-        
-        _ = eventBuilder.tag(["amount", String(amount)])
-        
-        if let comment = comment {
-            _ = eventBuilder.tag(["comment", comment])
+        // Add u tag for each mint URL
+        for mintURL in mintURLs {
+            _ = eventBuilder.tag(["u", mintURL])
         }
         
         let nutzapEvent = try await eventBuilder.build(signer: signer)

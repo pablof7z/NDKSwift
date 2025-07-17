@@ -1,5 +1,6 @@
 import Foundation
 import NDKSwift
+import Combine
 
 @MainActor
 class RelayManager: ObservableObject {
@@ -17,7 +18,8 @@ class RelayManager: ObservableObject {
     
     @Published var relays: [RelayInfo] = []
     private var ndk: NDK?
-    private var stateObserverTasks: [String: Task<Void, Never>] = [:]
+    private var relayCollection: NDKRelayCollection?
+    private var cancellables = Set<AnyCancellable>()
     
     private let defaultRelays = [
         "wss://relay.damus.io",
@@ -33,53 +35,43 @@ class RelayManager: ObservableObject {
     }
     
     deinit {
-        // Cancel all observer tasks
-        for task in stateObserverTasks.values {
-            task.cancel()
-        }
+        // Cleanup handled by NDKRelayCollection
     }
     
     func setNDK(_ ndk: NDK) {
         self.ndk = ndk
         
-        // Cancel existing observers
-        for task in stateObserverTasks.values {
-            task.cancel()
-        }
-        stateObserverTasks.removeAll()
+        // Create relay collection for observing state
+        self.relayCollection = ndk.createRelayCollection()
         
-        // Set up observers for all relays
+        // Observe relay collection changes
         Task {
-            let allRelays = await ndk.relays
-            for relay in allRelays {
-                setupRelayObserver(relay)
-            }
+            await observeRelayCollection()
+            await updateConnectionStatus()
         }
-        
-        updateConnectionStatus()
     }
     
-    private func setupRelayObserver(_ relay: NDKRelay) {
-        let url = relay.url
+    private func observeRelayCollection() async {
+        guard let collection = relayCollection else { return }
         
-        // Cancel any existing observer for this relay
-        stateObserverTasks[url]?.cancel()
-        
-        // Create new observer task
-        let task = Task {
-            for await state in relay.stateStream {
-                await MainActor.run {
-                    if let index = relays.firstIndex(where: { $0.url == url }) {
-                        relays[index].isConnected = state.connectionState == .connected
-                        if relays[index].isConnected {
-                            relays[index].lastSeen = Date()
+        // Observe changes from NDKRelayCollection
+        collection.$relays
+            .sink { [weak self] ndkRelays in
+                Task { @MainActor [weak self] in
+                    guard let self = self else { return }
+                    
+                    // Update our relay info based on NDK relay states
+                    for ndkRelay in ndkRelays {
+                        if let index = self.relays.firstIndex(where: { $0.url == ndkRelay.url }) {
+                            self.relays[index].isConnected = ndkRelay.isConnected
+                            if ndkRelay.isConnected {
+                                self.relays[index].lastSeen = ndkRelay.lastConnectedAt
+                            }
                         }
                     }
                 }
             }
-        }
-        
-        stateObserverTasks[url] = task
+            .store(in: &cancellables)
     }
     
     func addRelay(_ url: String) {
@@ -90,13 +82,9 @@ class RelayManager: ObservableObject {
         relays.append(relay)
         saveRelays()
         
-        if let ndk = ndk {
+        if let collection = relayCollection {
             Task {
-                let ndkRelay = await ndk.addRelay(normalizedUrl)
-                setupRelayObserver(ndkRelay)
-                // Connect to the newly added relay
-                try? await ndkRelay.connect()
-                updateConnectionStatus()
+                await collection.addRelay(normalizedUrl)
             }
         }
     }
@@ -105,13 +93,9 @@ class RelayManager: ObservableObject {
         relays.removeAll { $0.id == relay.id }
         saveRelays()
         
-        // Cancel observer for this relay
-        stateObserverTasks[relay.url]?.cancel()
-        stateObserverTasks.removeValue(forKey: relay.url)
-        
-        if let ndk = ndk {
+        if let collection = relayCollection {
             Task {
-                await ndk.removeRelay(relay.url)
+                await collection.removeRelay(relay.url)
             }
         }
     }
@@ -121,20 +105,13 @@ class RelayManager: ObservableObject {
         relays[index].isActive.toggle()
         saveRelays()
         
-        if let ndk = ndk {
+        if let collection = relayCollection {
             Task {
                 if relays[index].isActive {
-                    let ndkRelay = await ndk.addRelay(relay.url)
-                    setupRelayObserver(ndkRelay)
-                    // Connect to the newly activated relay
-                    try? await ndkRelay.connect()
+                    await collection.addRelay(relay.url)
                 } else {
-                    // Cancel observer when deactivating
-                    stateObserverTasks[relay.url]?.cancel()
-                    stateObserverTasks.removeValue(forKey: relay.url)
-                    await ndk.removeRelay(relay.url)
+                    await collection.removeRelay(relay.url)
                 }
-                updateConnectionStatus()
             }
         }
     }
@@ -143,52 +120,25 @@ class RelayManager: ObservableObject {
         relays = defaultRelays.map { RelayInfo(url: $0) }
         saveRelays()
         
-        // Cancel all observers
-        for task in stateObserverTasks.values {
-            task.cancel()
-        }
-        stateObserverTasks.removeAll()
-        
-        if let ndk = ndk {
+        if let ndk = ndk, let collection = relayCollection {
             Task {
                 // Remove all existing relays
                 for relay in await ndk.relays {
-                    await ndk.removeRelay(relay.url)
+                    await collection.removeRelay(relay.url)
                 }
                 
-                // Add default relays and set up observers
+                // Add default relays
                 for relay in relays where relay.isActive {
-                    let ndkRelay = await ndk.addRelay(relay.url)
-                    setupRelayObserver(ndkRelay)
+                    await collection.addRelay(relay.url)
                 }
-                // Connect to all relays
-                await ndk.pool.connectAll()
-                await updateConnectionStatus()
             }
         }
     }
     
-    private func updateConnectionStatus() {
-        guard let ndk = ndk else { return }
-        
-        Task {
-            let allRelays = await ndk.relays
-            var connectedRelays: [NDKRelay] = []
-            for relay in allRelays {
-                if await relay.isConnected {
-                    connectedRelays.append(relay)
-                }
-            }
-            
-            await MainActor.run {
-                for i in relays.indices {
-                    relays[i].isConnected = connectedRelays.contains { $0.url == relays[i].url }
-                    if relays[i].isConnected {
-                        relays[i].lastSeen = Date()
-                    }
-                }
-            }
-        }
+    private func updateConnectionStatus() async {
+        // Update connection status from relay collection
+        guard let collection = relayCollection else { return }
+        await collection.refresh()
     }
     
     private func normalizeRelayUrl(_ url: String) -> String {

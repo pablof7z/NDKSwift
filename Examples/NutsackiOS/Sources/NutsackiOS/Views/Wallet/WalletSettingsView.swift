@@ -168,13 +168,14 @@ struct WalletSettingsView: View {
     private func loadCurrentSettings() async {
         isLoading = true
         
-        // Load current mints
+        // Load current configuration directly from the wallet
         if let wallet = walletManager.activeWallet {
+            // Get mints from the wallet's mint manager
             let mintURLs = await wallet.mints.getMintURLs()
             let mintURLObjects = mintURLs.compactMap { URL(string: $0) }
             mints = mintURLObjects.map { MintInfo(url: $0, name: $0.host ?? "Unknown Mint") }
             
-            // Load wallet relays from configuration
+            // Get relays from the wallet's configuration
             relays = await wallet.walletConfigRelays
             
             // Check if wallet info exists
@@ -226,9 +227,6 @@ struct WalletSettingsView: View {
                 publishMintList: true
             )
             
-            // Update wallet manager state
-            await walletManager.updateMints(mints)
-            
             // Update wallet info flag
             hasWalletInfo = true
             
@@ -246,9 +244,17 @@ struct WalletSettingsView: View {
         discoveredMints = []
         
         Task {
+            guard let ndk = nostrManager.ndk else { 
+                await MainActor.run {
+                    isDiscovering = false
+                }
+                return 
+            }
+            
+            let discoveryManager = MintDiscoveryManager(ndk: ndk)
             var hasReceivedMints = false
             
-            for await mints in walletManager.discoverMintsStream() {
+            for await mints in discoveryManager.discoverMintsStream() {
                 await MainActor.run {
                     discoveredMints = mints
                     
@@ -610,8 +616,3 @@ struct DiscoveredMintsSheet: View {
 }
 
 // MARK: - Supporting Types
-extension WalletManager {
-    func updateMints(_ mints: [MintInfo]) async {
-        self.availableMints = mints.map { $0.url.absoluteString }
-    }
-}

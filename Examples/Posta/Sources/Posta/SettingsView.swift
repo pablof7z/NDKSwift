@@ -1,19 +1,13 @@
 import SwiftUI
+import NDKSwift
 
 struct SettingsView: View {
-    @EnvironmentObject var authManager: AuthManager
+    @Environment(NDKAuthManager.self) var authManager
     @EnvironmentObject var themeManager: ThemeManager
+    @EnvironmentObject var relayManager: RelayManager
     
     @State private var showingAbout = false
     @State private var showingProfile = false
-    
-    private var relayManager: RelayManager {
-        authManager.getRelayManager()
-    }
-    
-    private var accountManager: AccountManager {
-        authManager.getAccountManager()
-    }
     
     var body: some View {
         NavigationStack {
@@ -30,8 +24,8 @@ struct SettingsView: View {
                                 Text("My Profile")
                                     .font(.headline)
                                     .foregroundColor(.primary)
-                                if let user = authManager.currentUser {
-                                    Text(String(user.pubkey.prefix(8)) + "...")
+                                if let session = authManager.activeSession {
+                                    Text(String(session.pubkey.prefix(8)) + "...")
                                         .font(.caption)
                                         .foregroundColor(.secondary)
                                 }
@@ -44,7 +38,7 @@ struct SettingsView: View {
                         .padding(.vertical, 4)
                     }
                     
-                    NavigationLink(destination: AccountSettingsView(accountManager: accountManager, authManager: authManager)) {
+                    NavigationLink(destination: AccountSettingsView()) {
                         HStack {
                             Image(systemName: "person.crop.circle.fill")
                                 .font(.title2)
@@ -52,8 +46,8 @@ struct SettingsView: View {
                             VStack(alignment: .leading) {
                                 Text("Accounts")
                                     .font(.headline)
-                                if let activeAccount = accountManager.activeAccount {
-                                    Text(activeAccount.name ?? String(activeAccount.pubkey.prefix(8)) + "...")
+                                if authManager.availableSessions.count > 1 {
+                                    Text("\(authManager.availableSessions.count) accounts")
                                         .font(.caption)
                                         .foregroundColor(.secondary)
                                 }
@@ -65,7 +59,7 @@ struct SettingsView: View {
                 
                 // Relay Section
                 Section {
-                    NavigationLink(destination: RelaySettingsView(relayManager: relayManager, authManager: authManager)) {
+                    NavigationLink(destination: RelaySettingsView(relayManager: relayManager)) {
                         HStack {
                             Image(systemName: "network")
                                 .font(.title2)
@@ -165,17 +159,14 @@ struct SettingsView: View {
                 AboutView()
             }
             .sheet(isPresented: $showingProfile) {
-                if let user = authManager.currentUser {
-                    ProfileView(pubkey: user.pubkey)
-                        .environmentObject(authManager)
-                }
+                ProfileView(pubkey: nil)
+                    .environment(authManager)
+                    .environmentObject(NDKManager.shared)
             }
         }
         .preferredColorScheme(themeManager.currentTheme.colorScheme)
         .onAppear {
-            if let ndk = authManager.getNDK() {
-                relayManager.setNDK(ndk)
-            }
+            // NDK is now managed centrally
         }
     }
 }

@@ -21,6 +21,9 @@ public actor NDKRelayConnection {
             let config = URLSessionConfiguration.default
             config.timeoutIntervalForRequest = 30
             config.timeoutIntervalForResource = 300
+            config.httpAdditionalHeaders = [
+                "User-Agent": "NDKSwift 1.0"
+            ]
             return URLSession(configuration: config)
         }()
     #endif

@@ -2,9 +2,14 @@ import SwiftUI
 import NDKSwift
 
 struct ProfileView: View {
-    let pubkey: String
-    @EnvironmentObject var authManager: AuthManager
+    let pubkey: String?
+    @Environment(NDKAuthManager.self) var authManager
+    @EnvironmentObject var ndkManager: NDKManager
     @Environment(\.dismiss) private var dismiss
+    
+    private var displayPubkey: String {
+        pubkey ?? authManager.activeSession?.pubkey ?? ""
+    }
     
     @State private var profile: NDKUserProfile?
     @State private var isLoading = true
@@ -14,7 +19,7 @@ struct ProfileView: View {
     @State private var isFollowing = false
     @State private var showingQRCode = false
     @State private var notesSubscription: NDKSubscription?
-    @State private var profileSubscription: NDKSubscription?
+    @State private var profileTask: Task<Void, Never>?
     
     var body: some View {
         NavigationView {
@@ -64,11 +69,13 @@ struct ProfileView: View {
         .onDisappear {
             Task {
                 await notesSubscription?.close()
-                await profileSubscription?.close()
             }
+            profileTask?.cancel()
         }
         .sheet(isPresented: $showingQRCode) {
-            QRCodeView(pubkey: pubkey, profile: profile)
+            if let pubkey = pubkey {
+                QRCodeView(pubkey: pubkey, profile: profile)
+            }
         }
     }
     
@@ -182,7 +189,7 @@ struct ProfileView: View {
                 Text(nip05)
                     .font(.system(size: 16))
                     .foregroundColor(.secondary)
-            } else {
+            } else if let pubkey = pubkey {
                 Text(shortenPubkey(pubkey))
                     .font(.system(size: 16, weight: .medium))
                     .foregroundColor(.secondary)
@@ -351,7 +358,15 @@ struct ProfileView: View {
     // MARK: - Helper Methods
     
     private var displayName: String {
-        profile?.displayName ?? profile?.name ?? shortenPubkey(pubkey)
+        if let displayName = profile?.displayName {
+            return displayName
+        } else if let name = profile?.name {
+            return name
+        } else if let pubkey = pubkey {
+            return shortenPubkey(pubkey)
+        } else {
+            return "Unknown"
+        }
     }
     
     private var avatarInitial: String {
@@ -391,53 +406,27 @@ struct ProfileView: View {
     }
     
     private func loadProfile() async {
-        guard let ndk = authManager.getNDK() else { return }
+        guard let ndk = ndkManager.ndk else { return }
         
-        // First, try to fetch the profile directly
-        do {
-            if let fetchedProfile = try await ndk.fetchProfile(for: pubkey) {
+        // Use the new observeProfile API for reactive profile updates
+        profileTask = Task {
+            let profileStream = await ndk.observeProfile(for: displayPubkey)
+            
+            for await profileUpdate in profileStream {
                 await MainActor.run {
-                    self.profile = fetchedProfile
-                    print("[ProfileView] Loaded profile for \(pubkey): \(fetchedProfile.displayName ?? "unknown")")
-                }
-            } else {
-                print("[ProfileView] No profile found for \(pubkey)")
-            }
-        } catch {
-            print("[ProfileView] Error fetching profile: \(error)")
-        }
-        
-        // Also subscribe to profile updates for real-time changes
-        let profileFilter = NDKFilter(
-            authors: [pubkey],
-            kinds: [0],
-            limit: 1
-        )
-        
-        profileSubscription = await ndk.subscribe(filters: [profileFilter])
-        
-        if let subscription = profileSubscription {
-            Task {
-                do {
-                    for try await event in subscription {
-                        // Parse profile from event
-                        if let profileData = event.content.data(using: .utf8),
-                           let fetchedProfile = try? JSONDecoder().decode(NDKUserProfile.self, from: profileData) {
-                            await MainActor.run {
-                                self.profile = fetchedProfile
-                                print("[ProfileView] Updated profile from subscription: \(fetchedProfile.displayName ?? "unknown")")
-                            }
-                        }
+                    self.profile = profileUpdate
+                    if let profile = profileUpdate {
+                        print("[ProfileView] Profile updated for \(displayPubkey): \(profile.displayName ?? "unknown")")
+                    } else {
+                        print("[ProfileView] No profile available for \(displayPubkey)")
                     }
-                } catch {
-                    print("[ProfileView] Profile subscription error: \(error)")
                 }
             }
         }
         
         // Subscribe to notes
         let filter = NDKFilter(
-            authors: [pubkey],
+            authors: [displayPubkey],
             kinds: [1],
             limit: 50
         )
@@ -561,5 +550,6 @@ struct QRCodeView: View {
 
 #Preview {
     ProfileView(pubkey: "test_pubkey")
-        .environmentObject(AuthManager())
+        .environment(NDKAuthManager.shared)
+        .environmentObject(NDKManager.shared)
 }

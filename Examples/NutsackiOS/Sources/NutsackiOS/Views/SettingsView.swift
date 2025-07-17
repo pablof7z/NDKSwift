@@ -12,6 +12,7 @@ struct SettingsView: View {
     @State private var currentUser: NDKUser?
     @State private var showPaymentAnimation = false
     @State private var debugAnimationAmount: Int64 = 21000
+    @State private var profileTask: Task<Void, Never>?
     
     var body: some View {
         NavigationStack {
@@ -150,12 +151,16 @@ struct SettingsView: View {
                     showPaymentAnimation = false
                 }
             }
+            .onDisappear {
+                profileTask?.cancel()
+            }
         }
     }
     
     private func loadUserProfile() {
         Task {
-            guard let user = await nostrManager.currentUser else {
+            guard let user = await nostrManager.currentUser,
+                  let ndk = nostrManager.ndk else {
                 await MainActor.run {
                     currentUser = nil
                     userProfile = nil
@@ -163,10 +168,26 @@ struct SettingsView: View {
                 return
             }
             
-            let profile = await user.profile
             await MainActor.run {
                 currentUser = user
-                userProfile = profile
+            }
+            
+            // Cancel previous profile observation
+            profileTask?.cancel()
+            
+            // Observe profile updates
+            profileTask = Task {
+                let profileStream = await ndk.observeProfile(for: user.pubkey, closeOnEose: true)
+                
+                for await profile in profileStream {
+                    await MainActor.run {
+                        self.userProfile = profile
+                    }
+                    // For settings, we can close after first profile
+                    if profile != nil {
+                        break
+                    }
+                }
             }
         }
     }

@@ -173,36 +173,34 @@ public final class NDK {
         await pool.addRelay(url)
     }
     
-    /// Add a relay to the pool (backward compatibility - returns immediately)
+    /// Add a relay to the pool and connect to it
     @discardableResult
-    public func addRelay(_ url: RelayURL) -> NDKRelay {
-        let relay = NDKRelay(url: URLNormalizer.tryNormalizeRelayUrl(url) ?? url)
-        relay.setNDK(self)
-        
-        Task {
-            // Actually add to pool in background
-            _ = await pool.addRelay(url)
-        }
-        
-        return relay
+    public func addRelayAndConnect(_ url: RelayURL) async -> NDKRelay? {
+        await pool.addRelayAndConnect(url: url)
     }
     
-    /// Remove a relay from the pool (async version)
+    /// Remove a relay from the pool
     public func removeRelay(_ url: RelayURL) async {
         await pool.removeRelay(url)
-    }
-    
-    /// Remove a relay from the pool (backward compatibility)
-    public func removeRelay(_ url: RelayURL) {
-        Task {
-            await pool.removeRelay(url)
-        }
     }
     
     public var relays: [NDKRelay] {
         get async {
             await pool.relays
         }
+    }
+    
+    /// Get an observable relay collection for SwiftUI integration
+    /// This provides a reactive view of relay states without modifying core architecture
+    @MainActor
+    public func createRelayCollection() -> NDKRelayCollection {
+        return NDKRelayCollection(ndk: self)
+    }
+    
+    /// Get a quick snapshot of relay connection states
+    /// Useful for one-time status checks without setting up observers
+    public func getRelayConnectionSummary() async -> (connected: Int, total: Int) {
+        await pool.getConnectionSummary()
     }
     
     public func connect() async {
@@ -288,6 +286,16 @@ public final class NDK {
         forceRefresh: Bool = false
     ) async throws -> NDKUserProfile? {
         try await profileManager.fetchProfile(for: pubkey, forceRefresh: forceRefresh)
+    }
+    
+    /// Observe profile updates for a given pubkey
+    /// Returns an AsyncSequence that yields the profile immediately if cached,
+    /// then yields updates as they arrive from relays
+    /// - Parameters:
+    ///   - pubkey: The public key to observe
+    ///   - closeOnEose: If true, closes the subscription after receiving initial data (EOSE)
+    public func observeProfile(for pubkey: PublicKey, closeOnEose: Bool = false) async -> AsyncStream<NDKUserProfile?> {
+        await profileManager.observeProfile(for: pubkey, closeOnEose: closeOnEose)
     }
     
     public func getSubscriptionStats() async -> NDKSubscriptionManager.SubscriptionStats {

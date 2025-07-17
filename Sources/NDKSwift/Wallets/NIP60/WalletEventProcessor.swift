@@ -41,8 +41,6 @@ actor WalletEventProcessor {
         print("💰 Processing token event: \(event.id)")
         print("💰 Event Kind: \(event.kind)")
         print("💰 Event Author: \(event.pubkey)")
-        print("💰 Encrypted content length: \(event.content.count) characters")
-        print("💰 Encrypted content (first 100 chars): \(event.content.prefix(100))")
         
         // Decrypt and process token
         let sender = NDKUser(pubkey: event.pubkey)
@@ -85,18 +83,12 @@ actor WalletEventProcessor {
         
         // Add proofs to state
         for proof in nip60Token.proofs {
-            // Store proof if we have the corresponding keyset
-            if await context.wallet.mints.hasKeyset(id: proof.keysetID) {
-                // Find mint for this proof
-                if let mint = await context.wallet.mints.findMintForKeyset(proof.keysetID) {
-                    await context.proofStateManager.addProof(
-                        proof, 
-                        mint: mint, 
-                        eventId: event.id,
-                        timestamp: event.createdAt
-                    )
-                }
-            }
+            await context.proofStateManager.addProof(
+                proof, 
+                mint: nip60Token.mint, 
+                eventId: event.id,
+                timestamp: event.createdAt
+            )
         }
         
         await context.eventManager.addCurrentTokenEventId(event.id)

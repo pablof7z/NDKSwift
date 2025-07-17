@@ -34,15 +34,15 @@ public struct LightningInvoiceRequest: PaymentRequest {
 /// Nutzap payment request - includes accepted mints
 public struct NutzapPaymentRequest: PaymentRequest {
     public let amountSats: Int64
-    public let recipientPubkey: String
-    public let recipientP2PK: String  // Alias for compatibility
-    public let acceptedMints: [URL]  // All mints the recipient accepts
+    public let recipientPubkey: String  // Nostr pubkey for the p tag
+    public let recipientP2PK: String    // P2PK key for locking proofs
+    public let acceptedMints: [URL]     // All mints the recipient accepts
     public let comment: String?
     
-    public init(amountSats: Int64, recipientPubkey: String, acceptedMints: [URL], comment: String? = nil) {
+    public init(amountSats: Int64, recipientPubkey: String, recipientP2PK: String, acceptedMints: [URL], comment: String? = nil) {
         self.amountSats = amountSats
-        self.recipientPubkey = recipientPubkey
-        self.recipientP2PK = recipientPubkey  // Same value
+        self.recipientPubkey = recipientPubkey  // Nostr pubkey
+        self.recipientP2PK = recipientP2PK      // P2PK key
         self.acceptedMints = acceptedMints
         self.comment = comment
     }

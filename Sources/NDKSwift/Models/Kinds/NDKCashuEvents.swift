@@ -288,8 +288,6 @@ public struct NDKCashuWalletEvent {
         print("🔐 Event ID: \(event.id)")
         print("🔐 Event Kind: \(event.kind)")
         print("🔐 Event Author: \(event.pubkey)")
-        print("🔐 Encrypted content length: \(event.content.count) characters")
-        print("🔐 Encrypted content (first 100 chars): \(event.content.prefix(100))")
         
         let sender = NDKUser(pubkey: event.pubkey)
         let decryptedContent = try await signer.decrypt(
