@@ -454,7 +454,8 @@ public final class NDKSubscription: AsyncSequence, Sendable {
             print("[NDKSubscription.checkCache] Querying cache with filter")
             if let events = try? await cache.queryEvents(filter) {
                 print("[NDKSubscription.checkCache] Found \(events.count) events in cache")
-                cachedEvents.append(contentsOf: events)
+                let eventsWithNDK = events.map { $0.withNDK(ndk) }
+                cachedEvents.append(contentsOf: eventsWithNDK)
             }
         }
         
@@ -527,8 +528,11 @@ public final class NDKSubscription: AsyncSequence, Sendable {
         _eventCount.value = currentEventCount
         
         // Store in cache if available (only for confirmed events)
-        if case .relay = source, let ndk = await stateActor.getNDK() {
+        if case .relay(let relay) = source, let ndk = await stateActor.getNDK() {
             try? await ndk.cache.saveEvent(event)
+            
+            // Track relay information in eventTracker when caching
+            await ndk.eventTracker.markSeen(eventId: event.id, relay: relay.url)
         }
         
         // Send event to stream

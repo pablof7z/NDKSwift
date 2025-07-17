@@ -58,7 +58,7 @@ public final class NDK {
     internal var profileManager: NDKProfileManager!
     
     /// Event tracker for managing event metadata
-    internal let eventTracker: NDKEventTracker = NDKEventTracker()
+    public let eventTracker: NDKEventTracker = NDKEventTracker()
     
     /// Subscription manager
     internal var subscriptionManager: NDKSubscriptionManager!
@@ -385,7 +385,7 @@ public final class NDK {
         }
         
         do {
-            let authEvent = try await NDKEventBuilder()
+            let authEvent = try await NDKEventBuilder(ndk: self)
                 .kind(EventKind.clientAuthentication)
                 .tag(["challenge", challenge])
                 .tag(["relay", relay.url])
