@@ -189,6 +189,19 @@ public struct NDKEvent: Codable, Equatable, Hashable, Sendable {
         let foundTag = tag(withName: name)
         return foundTag?.count ?? 0 > 1 ? foundTag?[1] : nil
     }
+    
+    /// Get the client tag information if present (NIP-89)
+    /// 
+    /// - Returns: A tuple containing (name, address, relay) or nil if no client tag exists
+    public var clientTag: (name: String, address: String?, relay: String?)? {
+        guard let tag = tag(withName: "client"), tag.count >= 2 else { return nil }
+        
+        let name = tag[1]
+        let address = tag.count >= 3 && !tag[2].isEmpty ? tag[2] : nil
+        let relay = tag.count >= 4 && !tag[3].isEmpty ? tag[3] : nil
+        
+        return (name: name, address: address, relay: relay)
+    }
 
     // MARK: - Signing
     
@@ -254,8 +267,8 @@ public struct NDKEvent: Codable, Equatable, Hashable, Sendable {
             let dTag = tags.first(where: { $0.count >= 2 && $0[0] == "d" })?[1] ?? ""
             return "\(kind):\(pubkey):\(dTag)"
         } else if isReplaceable {
-            // Regular replaceable events
-            return "\(kind):\(pubkey)"
+            // Regular replaceable events - NIP-01 requires trailing colon
+            return "\(kind):\(pubkey):"
         } else {
             return id
         }

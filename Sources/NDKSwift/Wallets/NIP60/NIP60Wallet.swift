@@ -850,6 +850,51 @@ public actor NIP60Wallet: NDKPaymentProvider {
     
     
     
+    // MARK: - Proof Access
+    
+    /// Get all unspent proofs grouped by mint
+    /// Returns a dictionary mapping mint URLs to their unspent proofs
+    public func getUnspentProofs() async -> [String: [CashuSwift.Proof]] {
+        return await proofStateManager.getAvailableProofsByMint()
+    }
+    
+    /// Create a token from specific proofs without P2PK locking
+    /// This is used for offline token generation where exact proofs are specified
+    public func createTokenFromProofs(
+        proofs: [CashuSwift.Proof],
+        mint: URL,
+        memo: String? = nil
+    ) async throws -> String {
+        // Create the token
+        let token = CashuSwift.Token(
+            proofs: [mint.absoluteString: proofs],
+            unit: "sat",
+            memo: memo
+        )
+        
+        // Serialize token using CashuSwift's built-in method
+        let tokenString = try token.serialize(to: .V3)
+        
+        // Update wallet state (mark proofs as spent)
+        let stateChange = WalletStateChange(
+            store: [],  // No new proofs to store
+            destroy: proofs,  // Mark these proofs as spent
+            mint: mint.absoluteString
+        )
+        
+        _ = try await update(stateChange: stateChange)
+        
+        // Create spending history event
+        try await eventManager.createSpendingHistoryEvent(
+            direction: .out,
+            amount: proofs.reduce(0) { $0 + Int64($1.amount) },
+            memo: memo ?? "Offline token",
+            signer: signer
+        )
+        
+        return tokenString
+    }
+    
     // MARK: - Relay Health
     
     /// Get relay health status for wallet synchronization
@@ -929,5 +974,23 @@ public actor NIP60Wallet: NDKPaymentProvider {
         let failedMints = configuredMints.filter { !loadedMints.contains($0) }
         
         return (configuredMints, loadedMints, failedMints)
+    }
+    
+    // MARK: - Health Monitoring
+    
+    /// Check wallet health status
+    public func checkWalletHealth() async throws -> WalletHealthMonitor.WalletHealthStatus {
+        let walletRelays = await ndk.pool.relays
+        return await healthMonitor.getWalletHealthStatus(walletRelays: walletRelays)
+    }
+    
+    /// Validate proofs with their respective mints
+    public func validateProofs() async throws -> ProofReconciliationResult {
+        let allMints = await mints.getAllMints()
+        return try await healthMonitor.checkAndReconcileProofStates(
+            proofStateManager: proofStateManager,
+            mints: allMints,
+            signer: signer
+        )
     }
 }

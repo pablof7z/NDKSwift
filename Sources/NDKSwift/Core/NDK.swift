@@ -36,6 +36,9 @@ public final class NDK {
     /// Configuration for optimistic publishing
     public var optimisticPublishingConfig: NDKOptimisticPublishingConfig = NDKOptimisticPublishingConfig()
     
+    /// Configuration for automatic client tagging (NIP-89)
+    public var clientTagConfig: NDKClientTagConfig?
+    
     // MARK: - Outbox API
     
     /// Outbox manager - provides simplified API for outbox operations

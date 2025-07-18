@@ -183,7 +183,7 @@ public extension NDKEvent {
 
         tags.append(imetaTag)
 
-        let event = try await NDKEventBuilder()
+        let event = try await ndk.event()
             .content(caption ?? firstBlob.url)
             .kind(EventKind.image)
             .tags(tags)

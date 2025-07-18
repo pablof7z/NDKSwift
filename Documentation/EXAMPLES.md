@@ -11,6 +11,7 @@ Practical code examples for common Nostr use cases with NDKSwift.
 - [Content Management](#content-management)
 - [Wallet Integration](#wallet-integration)
 - [File Storage](#file-storage)
+- [Client Identification (NIP-89)](#client-identification-nip-89)
 - [Advanced Patterns](#advanced-patterns)
 
 ## Basic Operations
@@ -691,6 +692,69 @@ func getReactions(for eventId: String) async throws -> [String: Int] {
 }
 ```
 
+### Tagging Addressable Events
+
+When referencing events in Nostr, NDKSwift automatically uses the appropriate tag type:
+- Regular events (kind 1, etc.) → 'e' tags
+- Replaceable events (kinds 10000-19999) → 'a' tags  
+- Parameterized replaceable events (kinds 30000-39999) → 'a' tags
+
+#### Automatic Tag Selection
+
+The `tagEvent()` method intelligently chooses the correct tag type:
+
+```swift
+// Tag a regular event - uses 'e' tag
+let textNote = try await NDKEventBuilder()
+    .content("Hello world")
+    .kind(1)
+    .build(signer: signer)
+
+let reply = try await NDKEventBuilder()
+    .content("Reply to text note")
+    .kind(1)
+    .tagEvent(textNote, marker: "reply")  // Creates 'e' tag
+    .build(signer: signer)
+
+// Tag a parameterized replaceable event - uses 'a' tag
+let article = try await NDKEventBuilder()
+    .content("Long-form article content")
+    .kind(30023)
+    .tagIdentifier("my-article-id")
+    .build(signer: signer)
+
+let comment = try await NDKEventBuilder()
+    .content("Comment on article")
+    .kind(1)
+    .tagEvent(article)  // Creates 'a' tag automatically
+    .build(signer: signer)
+```
+
+#### Explicit Addressable Event Tagging
+
+For explicit control, use `tagAddressableEvent()`:
+
+```swift
+let replyBuilder = await NDKEventBuilder()
+    .content("Reference to article")
+    .tagAddressableEvent(article, preferredRelay: "wss://article.relay.com")
+```
+
+#### Tag Formats
+
+NDKSwift generates the correct tag format for each event type:
+
+```swift
+// Regular event → 'e' tag
+["e", "<event-id>", "<relay-url>", "<marker>", "<pubkey>"]
+
+// Replaceable event → 'a' tag  
+["a", "<kind>:<pubkey>:", "<relay-url>"]
+
+// Parameterized replaceable event → 'a' tag
+["a", "<kind>:<pubkey>:<d-tag>", "<relay-url>"]
+```
+
 ### Quoting Events (NIP-10)
 
 NDKSwift provides full NIP-10 compliant support for quoting events with proper relay hints and pubkey hints for optimal event discovery through the outbox model.
@@ -1238,6 +1302,235 @@ class CashuWalletManager {
         }
     }
 }
+```
+
+## Client Identification (NIP-89)
+
+NIP-89 provides a way for clients to identify themselves and for other clients to discover applications that handle specific event kinds. NDKSwift provides full support for NIP-89 client tags and handler events.
+
+### Automatic Client Tags
+
+Configure NDK to automatically add client tags to all published events:
+
+```swift
+import NDKSwift
+
+class MyClient {
+    let ndk: NDK
+    
+    init() {
+        ndk = NDK(relayUrls: ["wss://relay.damus.io"])
+        
+        // Configure automatic client tagging
+        ndk.clientTagConfig = NDKClientTagConfig(
+            name: "MyClient",
+            address: "31990:mypubkey:myclient-ios", // Optional handler event address
+            relay: "wss://relay.damus.io",
+            autoTag: true,
+            excludedKinds: [
+                4, // Exclude DMs for privacy
+                EventKind.cashuToken, // Exclude sensitive wallet events
+                EventKind.encryptedDirectMessage
+            ]
+        )
+    }
+    
+    func publishNote() async throws {
+        // Client tag is automatically added
+        let event = try await ndk.event()
+            .content("Hello from MyClient!")
+            .kind(1)
+            .build()
+        
+        // This event will include: ["client", "MyClient", "31990:mypubkey:myclient-ios", "wss://relay.damus.io"]
+        try await ndk.publish(event)
+    }
+}
+```
+
+### Manual Client Tags
+
+Add client tags manually for specific events:
+
+```swift
+// With full handler information
+let event = try await ndk.event()
+    .content("Hello, Nostr!")
+    .kind(1)
+    .clientTag(name: "MyClient", address: "31990:mypubkey:myclient", relay: "wss://relay.damus.io")
+    .build()
+
+// Or with just client name for simple identification
+let simpleEvent = try await ndk.event()
+    .content("Hello, Nostr!")
+    .kind(1)
+    .clientTag(name: "MyClient")
+    .build()
+```
+
+### Simple Client Identification
+
+For basic client identification without handler discovery:
+
+```swift
+// Configure with just client name
+ndk.clientTagConfig = NDKClientTagConfig(
+    name: "MyClient",
+    autoTag: true,
+    excludedKinds: [4] // Still exclude sensitive events
+)
+
+// This creates minimal client tags: ["client", "MyClient"]
+// Perfect for attribution without the complexity of handler discovery
+```
+
+### Publishing Handler Information
+
+Create a NIP-89 handler information event to advertise your client's capabilities:
+
+```swift
+func publishHandlerInfo() async throws {
+    let metadata = NIP89HandlerMetadata(
+        name: "MyClient",
+        about: "A powerful Nostr client with advanced features",
+        picture: "https://myclient.com/icon.png",
+        website: "https://myclient.com",
+        lud16: "support@myclient.com"
+    )
+    
+    let handlerEvent = try await ndk.event()
+        .nip89HandlerInfo(
+            identifier: "myclient-ios",
+            supportedKinds: [1, 3, 6, 7, 9735], // Text notes, contacts, reposts, reactions, zaps
+            handlerURLs: [
+                "web": "https://myclient.com/e/<bech32>",
+                "ios": "myclient://event/<bech32>",
+                "android": "intent://event/<bech32>#Intent;scheme=myclient;end"
+            ],
+            metadata: metadata
+        )
+        .build()
+    
+    try await ndk.publish(handlerEvent)
+}
+```
+
+### Publishing Recommendations
+
+Recommend your client for specific event kinds:
+
+```swift
+func publishRecommendation() async throws {
+    let handlers = [
+        NIP89HandlerReference(
+            address: "31990:mypubkey:myclient-ios",
+            relay: "wss://relay.damus.io",
+            platform: "ios"
+        )
+    ]
+    
+    let recommendation = try await ndk.event()
+        .nip89Recommendation(
+            eventKind: 1, // Recommending for text notes
+            handlers: handlers
+        )
+        .build()
+    
+    try await ndk.publish(recommendation)
+}
+```
+
+### Discovering Handlers
+
+Find applications that can handle specific event kinds:
+
+```swift
+func discoverHandlers(for eventKind: Kind) async throws -> [NIP89HandlerInfo] {
+    // Search for recommendations
+    let recommendationFilter = NDKFilter(
+        kinds: [31989], // Recommendation events
+        tagFilters: ["#d": [String(eventKind)]]
+    )
+    
+    let recommendations = try await ndk.fetchEvents(recommendationFilter)
+    
+    // Extract handler addresses
+    var handlerAddresses: [String] = []
+    for event in recommendations {
+        if let recommendation = event.asNIP89Recommendation() {
+            handlerAddresses.append(contentsOf: recommendation.handlers.map { $0.address })
+        }
+    }
+    
+    // Fetch handler information
+    let handlerFilter = NDKFilter(
+        kinds: [31990], // Handler info events
+        tagFilters: ["#a": handlerAddresses]
+    )
+    
+    let handlerEvents = try await ndk.fetchEvents(handlerFilter)
+    
+    return handlerEvents.compactMap { $0.asNIP89HandlerInfo() }
+}
+```
+
+### Extracting Client Information
+
+Extract client information from events:
+
+```swift
+func analyzeEvent(_ event: NDKEvent) {
+    if let clientTag = event.clientTag {
+        print("Published by: \(clientTag.name)")
+        
+        if let address = clientTag.address {
+            print("Handler: \(address)")
+            // This client supports handler discovery
+        } else {
+            print("Simple client identification (no handler)")
+        }
+        
+        if let relay = clientTag.relay {
+            print("Relay: \(relay)")
+        }
+        
+        // You can use this information to:
+        // - Show client attribution in your UI
+        // - Filter events by client
+        // - Discover new clients (if handler address is provided)
+        // - Provide client-specific features
+    }
+}
+```
+
+### Privacy Considerations
+
+NIP-89 client tags have privacy implications. Configure exclusions carefully:
+
+```swift
+// Example privacy-conscious configuration
+ndk.clientTagConfig = NDKClientTagConfig(
+    name: "MyClient",
+    address: "31990:mypubkey:myclient",
+    relay: "wss://relay.damus.io",
+    autoTag: true,
+    excludedKinds: [
+        // Exclude all encrypted/private events
+        4,    // Encrypted direct messages
+        EventKind.encryptedDirectMessage,
+        
+        // Exclude wallet-related events
+        EventKind.cashuToken,
+        EventKind.cashuSpendingHistory,
+        EventKind.cashuProof,
+        
+        // Exclude other sensitive events
+        EventKind.auth,
+        EventKind.deletion,
+        
+        // Add any other kinds you want to keep private
+    ]
+)
 ```
 
 ## Running the Examples

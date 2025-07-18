@@ -255,7 +255,7 @@ struct MintAllocationPieChart: View {
     private func startAngle(for index: Int) -> Angle {
         guard index > 0 else { return .degrees(-90) }
         
-        let previousAngles = mintBalances[0..<index].reduce(0) { sum, item in
+        let previousAngles = mintBalances[0..<index].reduce(0.0) { sum, item in
             sum + (item.percentage / 100.0 * 360.0)
         }
         
@@ -263,7 +263,12 @@ struct MintAllocationPieChart: View {
     }
     
     private func endAngle(for index: Int) -> Angle {
-        let cumulativeAngle = mintBalances[0...index].reduce(0) { sum, item in
+        // For the last slice, ensure it closes perfectly at 270 degrees (top of circle)
+        if index == mintBalances.count - 1 {
+            return .degrees(270) // Ensure perfect closure at top
+        }
+        
+        let cumulativeAngle = mintBalances[0...index].reduce(0.0) { sum, item in
             sum + (item.percentage / 100.0 * 360.0)
         }
         
@@ -362,33 +367,76 @@ struct PieSliceShape: Shape {
         var path = Path()
         let center = CGPoint(x: rect.midX, y: rect.midY)
         
-        // Outer arc
-        path.addArc(
-            center: center,
-            radius: outerRadius,
-            startAngle: startAngle,
-            endAngle: endAngle,
-            clockwise: false
-        )
-        
-        // Line to inner arc
-        let innerEndPoint = CGPoint(
-            x: center.x + innerRadius * Foundation.cos(endAngle.radians),
-            y: center.y + innerRadius * Foundation.sin(endAngle.radians)
-        )
-        path.addLine(to: innerEndPoint)
-        
-        // Inner arc (reversed)
-        path.addArc(
-            center: center,
-            radius: innerRadius,
-            startAngle: endAngle,
-            endAngle: startAngle,
-            clockwise: true
-        )
-        
-        // Close the path
-        path.closeSubpath()
+        // If it's a full circle (360 degrees), draw it specially to avoid gaps
+        let angleDifference = endAngle.degrees - startAngle.degrees
+        if abs(angleDifference - 360.0) < 0.01 || abs(angleDifference - (-360.0)) < 0.01 {
+            // Full circle case
+            if innerRadius > 0 {
+                // Donut shape
+                path.addEllipse(in: CGRect(
+                    x: center.x - outerRadius,
+                    y: center.y - outerRadius,
+                    width: outerRadius * 2,
+                    height: outerRadius * 2
+                ))
+                path.addEllipse(in: CGRect(
+                    x: center.x - innerRadius,
+                    y: center.y - innerRadius,
+                    width: innerRadius * 2,
+                    height: innerRadius * 2
+                ))
+            } else {
+                // Full circle
+                path.addEllipse(in: CGRect(
+                    x: center.x - outerRadius,
+                    y: center.y - outerRadius,
+                    width: outerRadius * 2,
+                    height: outerRadius * 2
+                ))
+            }
+        } else {
+            // Regular pie slice
+            
+            // Start point on outer radius
+            let outerStartPoint = CGPoint(
+                x: center.x + outerRadius * Foundation.cos(startAngle.radians),
+                y: center.y + outerRadius * Foundation.sin(startAngle.radians)
+            )
+            path.move(to: outerStartPoint)
+            
+            // Outer arc
+            path.addArc(
+                center: center,
+                radius: outerRadius,
+                startAngle: startAngle,
+                endAngle: endAngle,
+                clockwise: false
+            )
+            
+            // Line to inner arc (or center if innerRadius is 0)
+            if innerRadius > 0 {
+                let innerEndPoint = CGPoint(
+                    x: center.x + innerRadius * Foundation.cos(endAngle.radians),
+                    y: center.y + innerRadius * Foundation.sin(endAngle.radians)
+                )
+                path.addLine(to: innerEndPoint)
+                
+                // Inner arc (reversed)
+                path.addArc(
+                    center: center,
+                    radius: innerRadius,
+                    startAngle: endAngle,
+                    endAngle: startAngle,
+                    clockwise: true
+                )
+            } else {
+                // Line to center for solid pie slice
+                path.addLine(to: center)
+            }
+            
+            // Close the path
+            path.closeSubpath()
+        }
         
         return path
     }

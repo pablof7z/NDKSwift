@@ -60,7 +60,6 @@ final class NIP60SimpleWalletE2ETest: XCTestCase {
         // Monitor deposit (testnut auto-settles)
         let depositStream = await wallet.monitorDeposit(
             quote: quote,
-            pollingInterval: 2.0,
             timeout: 30.0
         )
         

@@ -348,8 +348,37 @@ struct LightningInvoicePreviewView: View {
         }
         .sheet(isPresented: $showSuccess) {
             if let amount = decodedAmount {
-                MeltSuccessView(amount: Int(amount)) {
-                    dismiss()
+                NavigationStack {
+                    VStack(spacing: 30) {
+                        Image(systemName: "checkmark.circle.fill")
+                            .font(.system(size: 60))
+                            .foregroundStyle(.green)
+                            .padding(.top, 40)
+                        
+                        VStack(spacing: 8) {
+                            Text("Payment Successful!")
+                                .font(.title)
+                                .fontWeight(.bold)
+                            
+                            Text("\(Int(amount)) sats")
+                                .font(.largeTitle)
+                                .fontWeight(.semibold)
+                        }
+                        
+                        Spacer()
+                        
+                        Button("Done") {
+                            showSuccess = false
+                            dismiss()
+                        }
+                        .buttonStyle(.borderedProminent)
+                        .tint(.orange)
+                        .controlSize(.large)
+                        .padding(.bottom)
+                    }
+                    .padding()
+                    .navigationTitle("Success")
+                    .navigationBarTitleDisplayMode(.inline)
                 }
             }
         }

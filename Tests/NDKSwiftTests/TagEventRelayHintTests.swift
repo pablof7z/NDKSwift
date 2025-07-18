@@ -24,13 +24,13 @@ final class TagEventRelayHintTests: XCTestCase {
     
     func testTagEventWithoutNDK() async throws {
         // Create a test event
-        let testEvent = try await NDKEventBuilder()
+        let testEvent = try await ndk.event()
             .content("Test event")
             .kind(EventKind.textNote)
             .build(signer: signer)
         
         // Tag the event without NDK (should use empty relay)
-        let replyBuilder = NDKEventBuilder()
+        let replyBuilder = await ndk.event()
             .content("Reply to test event")
             .kind(EventKind.textNote)
             .tagEvent(testEvent, marker: "reply")
@@ -51,7 +51,7 @@ final class TagEventRelayHintTests: XCTestCase {
     
     func testTagEventWithPreferredRelay() async throws {
         // Create a test event
-        let testEvent = try await NDKEventBuilder()
+        let testEvent = try await ndk.event()
             .content("Test event")
             .kind(EventKind.textNote)
             .build(signer: signer)
@@ -59,7 +59,7 @@ final class TagEventRelayHintTests: XCTestCase {
         let preferredRelay = "wss://relay.example.com"
         
         // Tag the event with explicit relay
-        let replyBuilder = NDKEventBuilder()
+        let replyBuilder = await ndk.event()
             .content("Reply to test event")
             .kind(EventKind.textNote)
             .tagEvent(testEvent, marker: "reply", preferredRelay: preferredRelay)
@@ -80,7 +80,7 @@ final class TagEventRelayHintTests: XCTestCase {
     
     func testTagEventWithNDKRelayTracking() async throws {
         // Create a test event
-        let testEvent = try await NDKEventBuilder()
+        let testEvent = try await ndk.event()
             .content("Test event")
             .kind(EventKind.textNote)
             .build(signer: signer)
@@ -91,11 +91,11 @@ final class TagEventRelayHintTests: XCTestCase {
         await ndk.eventTracker.setSourceRelay(eventId: testEvent.id, relay: relayUrl)
         
         // Tag the event with NDK (should pick up relay from tracker)
-        let replyBuilder = NDKEventBuilder()
+        let replyBuilder = ndk.event()
             .content("Reply to test event")
             .kind(EventKind.textNote)
         
-        let replyBuilderWithTag = await replyBuilder.tagEvent(testEvent, marker: "reply", ndk: ndk)
+        let replyBuilderWithTag = await replyBuilder.tagEvent(testEvent, marker: "reply")
         let replyEvent = try await replyBuilderWithTag.build(signer: signer)
         
         // Verify the e tag was created correctly with tracked relay
@@ -112,7 +112,7 @@ final class TagEventRelayHintTests: XCTestCase {
     
     func testTagEventWithNDKButNoTrackedRelay() async throws {
         // Create a test event
-        let testEvent = try await NDKEventBuilder()
+        let testEvent = try await ndk.event()
             .content("Test event")
             .kind(EventKind.textNote)
             .build(signer: signer)
@@ -120,11 +120,11 @@ final class TagEventRelayHintTests: XCTestCase {
         // Don't track the event in any relay
         
         // Tag the event with NDK (should use empty relay since no tracking)
-        let replyBuilder = NDKEventBuilder()
+        let replyBuilder = ndk.event()
             .content("Reply to test event")
             .kind(EventKind.textNote)
         
-        let replyBuilderWithTag = await replyBuilder.tagEvent(testEvent, marker: "reply", ndk: ndk)
+        let replyBuilderWithTag = await replyBuilder.tagEvent(testEvent, marker: "reply")
         let replyEvent = try await replyBuilderWithTag.build(signer: signer)
         
         // Verify the e tag was created correctly with empty relay
@@ -141,7 +141,7 @@ final class TagEventRelayHintTests: XCTestCase {
     
     func testTagEventPreferredRelayOverridesNDK() async throws {
         // Create a test event
-        let testEvent = try await NDKEventBuilder()
+        let testEvent = try await ndk.event()
             .content("Test event")
             .kind(EventKind.textNote)
             .build(signer: signer)
@@ -153,11 +153,11 @@ final class TagEventRelayHintTests: XCTestCase {
         await ndk.eventTracker.setSourceRelay(eventId: testEvent.id, relay: trackedRelay)
         
         // Tag the event with both NDK and explicit relay (preferred should win)
-        let replyBuilder = NDKEventBuilder()
+        let replyBuilder = ndk.event()
             .content("Reply to test event")
             .kind(EventKind.textNote)
         
-        let replyBuilderWithTag = await replyBuilder.tagEvent(testEvent, marker: "reply", preferredRelay: preferredRelay, ndk: ndk)
+        let replyBuilderWithTag = await replyBuilder.tagEvent(testEvent, marker: "reply", preferredRelay: preferredRelay)
         let replyEvent = try await replyBuilderWithTag.build(signer: signer)
         
         // Verify the e tag was created correctly with preferred relay
@@ -174,7 +174,7 @@ final class TagEventRelayHintTests: XCTestCase {
     
     func testTagEventWithMultipleRelaysSeen() async throws {
         // Create a test event
-        let testEvent = try await NDKEventBuilder()
+        let testEvent = try await ndk.event()
             .content("Test event")
             .kind(EventKind.textNote)
             .build(signer: signer)
@@ -189,11 +189,11 @@ final class TagEventRelayHintTests: XCTestCase {
         await ndk.eventTracker.markSeen(eventId: testEvent.id, relay: relay3)
         
         // Tag the event with NDK (should use source relay)
-        let replyBuilder = NDKEventBuilder()
+        let replyBuilder = ndk.event()
             .content("Reply to test event")
             .kind(EventKind.textNote)
         
-        let replyBuilderWithTag = await replyBuilder.tagEvent(testEvent, marker: "reply", ndk: ndk)
+        let replyBuilderWithTag = await replyBuilder.tagEvent(testEvent, marker: "reply")
         let replyEvent = try await replyBuilderWithTag.build(signer: signer)
         
         // Verify the e tag uses the source relay (not just any seen relay)

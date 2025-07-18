@@ -1,5 +1,39 @@
 import Foundation
 
+// MARK: - Client Tag Configuration
+
+/// Configuration for automatic client tagging (NIP-89)
+public struct NDKClientTagConfig {
+    /// The name of the client (e.g., "Nutsack", "Damus", "Primal")
+    public let name: String
+    
+    /// The NIP-89 handler address in format "31990:pubkey:identifier"
+    public let address: String?
+    
+    /// Optional relay hint for finding the handler event
+    public let relay: String?
+    
+    /// Whether to automatically add client tags to all events (default: true)
+    public let autoTag: Bool
+    
+    /// Event kinds that should not receive client tags (defaults to empty)
+    public let excludedKinds: Set<Kind>
+    
+    public init(
+        name: String,
+        address: String? = nil,
+        relay: String? = nil,
+        autoTag: Bool = true,
+        excludedKinds: Set<Kind> = []
+    ) {
+        self.name = name
+        self.address = address
+        self.relay = relay
+        self.autoTag = autoTag
+        self.excludedKinds = excludedKinds
+    }
+}
+
 /// Builder pattern for creating and signing NDK events
 /// 
 /// This class provides a mutable interface for constructing events before they
@@ -8,25 +42,37 @@ import Foundation
 /// 
 /// ## Usage
 /// ```swift
-/// let event = try await NDKEventBuilder()
+/// let event = try await ndk.event()
 ///     .content("Hello, Nostr!")
 ///     .kind(EventKind.textNote)
 ///     .tag(["t", "nostr"])
-///     .build(signer: signer)
+///     .build()
 /// ```
 public final class NDKEventBuilder {
     private var pubkey: PublicKey = ""
     private var createdAt: Timestamp = Timestamp.now
-    private var kind: Kind = EventKind.textNote
-    private var tags: [Tag] = []
-    private var content: String = ""
+    public private(set) var kind: Kind = EventKind.textNote
+    public private(set) var tags: [Tag] = []
+    public private(set) var content: String = ""
+    private weak var ndk: NDK?
+    
+    // MARK: - Static reference to shared NDK instance
+    private static weak var sharedNDK: NDK?
+    
+    /// Set the shared NDK instance for all builders
+    internal static func setSharedNDK(_ ndk: NDK) {
+        sharedNDK = ndk
+    }
     
     // MARK: - Initialization
     
-    public init() {}
+    /// Internal initializer - use ndk.eventBuilder() instead
+    internal init(ndk: NDK? = nil) {
+        self.ndk = ndk ?? Self.sharedNDK
+    }
     
-    public convenience init(content: String) {
-        self.init()
+    internal convenience init(content: String, ndk: NDK? = nil) {
+        self.init(ndk: ndk)
         self.content = content
     }
     
@@ -95,24 +141,66 @@ public final class NDKEventBuilder {
     ///   - marker: Optional marker like "reply" or "mention" (NIP-10)
     ///   - relay: Optional relay hint
     @discardableResult
-    public func tagUser(_ pubkey: PublicKey, marker: String? = nil, relay: String? = nil) -> NDKEventBuilder {
+    public func tagUser(_ pubkey: PublicKey, marker: String? = nil, relay: String? = nil) async -> NDKEventBuilder {
         var tag = ["p", pubkey]
+        
+        // Determine relay hint
+        let relayHint: String
         if let relay = relay {
-            tag.append(relay)
+            // Use explicitly provided relay
+            relayHint = relay
+        } else if self.ndk != nil {
+            // Try to get relay hint from user's relay list or outbox
+            // TODO: Implement relay hint lookup from cache/outbox
+            // For now, just use empty relay
+            relayHint = ""
+        } else {
+            relayHint = ""
         }
+        
+        if !relayHint.isEmpty {
+            tag.append(relayHint)
+        } else if marker != nil {
+            tag.append("") // Empty relay URL if we need to add marker
+        }
+        
         if let marker = marker {
-            if relay == nil {
-                tag.append("") // Empty relay URL
-            }
             tag.append(marker)
         }
+        
         return self.tag(tag)
     }
     
-    /// Add an 'e' tag for referencing an event (NIP-10 compliant)
+    /// Add an appropriate tag for referencing an event (NIP-10 compliant)
+    /// 
+    /// This method intelligently determines the correct tag type:
+    /// - For replaceable/parameterized replaceable events: Uses 'a' tag
+    /// - For regular events: Uses 'e' tag
     /// 
     /// This async version can use the NDK eventTracker to automatically determine
     /// relay hints from where the event was originally seen.
+    /// 
+    /// - Parameters:
+    ///   - event: The event to reference
+    ///   - marker: Optional marker like "reply", "root", or "mention" (NIP-10) - only used for 'e' tags
+    ///   - preferredRelay: Optional relay hint override (takes precedence over tracked relay)
+    ///   - ndk: NDK instance to get relay hints from eventTracker (optional)
+    @discardableResult
+    public func tagEvent(_ event: NDKEvent, marker: String? = nil, preferredRelay: String? = nil) async -> NDKEventBuilder {
+        // Check if this is a replaceable or parameterized replaceable event
+        if event.isReplaceable || event.isParameterizedReplaceable {
+            // Use 'a' tag for replaceable events
+            return await self.tagAddressableEvent(event, preferredRelay: preferredRelay)
+        }
+        
+        // Otherwise, use 'e' tag for regular events
+        return await self.tagRegularEvent(event, marker: marker, preferredRelay: preferredRelay)
+    }
+    
+    /// Add an 'e' tag for referencing a regular (non-replaceable) event (NIP-10 compliant)
+    /// 
+    /// This is the internal implementation for regular events. Most users should use
+    /// `tagEvent()` which automatically chooses the correct tag type.
     /// 
     /// - Parameters:
     ///   - event: The event to reference
@@ -120,15 +208,15 @@ public final class NDKEventBuilder {
     ///   - preferredRelay: Optional relay hint override (takes precedence over tracked relay)
     ///   - ndk: NDK instance to get relay hints from eventTracker (optional)
     @discardableResult
-    public func tagEvent(_ event: NDKEvent, marker: String? = nil, preferredRelay: String? = nil, ndk: NDK? = nil) async -> NDKEventBuilder {
+    public func tagRegularEvent(_ event: NDKEvent, marker: String? = nil, preferredRelay: String? = nil) async -> NDKEventBuilder {
         let relay: String
         
         if let preferredRelay = preferredRelay {
             // Use explicitly provided relay
             relay = preferredRelay
-        } else if let ndkInstance = ndk {
+        } else if let ndk = self.ndk {
             // Try to get relay hint from eventTracker
-            let sourceRelay = await ndkInstance.eventTracker.getSourceRelay(eventId: event.id)
+            let sourceRelay = await ndk.eventTracker.getSourceRelay(eventId: event.id)
             relay = sourceRelay ?? ""
         } else {
             // No NDK available, use empty relay
@@ -171,7 +259,7 @@ public final class NDKEventBuilder {
     ///   - preferredRelay: Optional relay hint override (takes precedence over tracked relay)
     ///   - ndk: NDK instance to get relay hints from eventTracker (optional)
     @discardableResult
-    public func quoteEvent(_ event: NDKEvent, preferredRelay: String? = nil, ndk: NDK? = nil) async -> NDKEventBuilder {
+    public func quoteEvent(_ event: NDKEvent, preferredRelay: String? = nil) async -> NDKEventBuilder {
         // q tag format: ["q", <event-id>, <relay-url>, <pubkey>]
         var tag = ["q", event.id]
         
@@ -179,9 +267,9 @@ public final class NDKEventBuilder {
         if let preferredRelay = preferredRelay {
             // Use explicitly provided relay
             relay = preferredRelay
-        } else if let ndkInstance = ndk {
+        } else if let ndk = self.ndk {
             // Try to get relay hint from eventTracker
-            let sourceRelay = await ndkInstance.eventTracker.getSourceRelay(eventId: event.id)
+            let sourceRelay = await ndk.eventTracker.getSourceRelay(eventId: event.id)
             relay = sourceRelay ?? ""
         } else {
             // No NDK available, use empty relay
@@ -205,8 +293,296 @@ public final class NDKEventBuilder {
     
     /// Add a 'd' tag for replaceable events
     @discardableResult
-    public func tagIdentifier(_ identifier: String) -> NDKEventBuilder {
+    public func dTag(_ identifier: String) -> NDKEventBuilder {
         return self.tag(["d", identifier])
+    }
+    
+    /// Add a 'client' tag for NIP-89 client identification
+    /// 
+    /// This tag identifies the client that published the event, providing a way for
+    /// other clients to discover and recommend applications that handle specific event kinds.
+    /// 
+    /// - Parameters:
+    ///   - name: The name of the client (e.g., "Nutsack", "Damus", "Primal")
+    ///   - address: The NIP-89 handler address in format "31990:pubkey:identifier"
+    ///   - relay: Optional relay hint for finding the handler event
+    /// 
+    /// - Returns: Self for chaining
+    /// 
+    /// ## Usage
+    /// ```swift
+    /// let event = try await ndk.event()
+    ///     .content("Hello from my client!")
+    ///     .clientTag(name: "Nutsack", address: "31990:abc123:nutsack-ios", relay: "wss://relay.example.com")
+    ///     .build()
+    /// ```
+    @discardableResult
+    public func clientTag(name: String, address: String? = nil, relay: String? = nil) -> NDKEventBuilder {
+        var tag = ["client", name]
+        
+        // Add address if provided
+        if let address = address, !address.isEmpty {
+            tag.append(address)
+        } else {
+            // Add empty address to maintain tag structure if relay is provided
+            if relay != nil {
+                tag.append("")
+            }
+        }
+        
+        // Add relay if provided
+        if let relay = relay {
+            tag.append(relay)
+        }
+        
+        return self.tag(tag)
+    }
+    
+    /// Add a tag for any bech32-encoded Nostr entity
+    /// 
+    /// Automatically decodes the bech32 string and creates the appropriate tag:
+    /// - npub → 'p' tag
+    /// - note → 'e' tag  
+    /// - naddr → 'a' tag (with coordinate format)
+    /// - nevent → 'e' tag with relay and author hints
+    /// - nprofile → 'p' tag with relay hints
+    /// 
+    /// This is useful when you have a bech32 string but not the full event object.
+    /// The content parser uses this internally when processing nostr: URIs.
+    /// 
+    /// - Parameter bech32: The bech32-encoded entity (npub, note, naddr, etc.)
+    /// - Returns: Self for chaining
+    @discardableResult
+    public func tagBech32(_ bech32String: String) async -> NDKEventBuilder {
+        do {
+            // Determine the type by prefix
+            if bech32String.hasPrefix("npub1") {
+                // Decode npub to get public key
+                if let pubkey = try? PublicKey.fromNpub(bech32String) {
+                    return await self.tagUser(pubkey)
+                }
+                
+            } else if bech32String.hasPrefix("note1") {
+                // Decode note to get event ID
+                let eventId = try Bech32.eventId(from: bech32String)
+                return self.tag(["e", eventId])
+                
+            } else if bech32String.hasPrefix("naddr1") {
+                // For naddr, we need to parse the TLV data manually
+                let (hrp, data) = try Bech32.decode(bech32String)
+                guard hrp == "naddr" else { return self }
+                
+                var identifier: String?
+                var relays: [String] = []
+                var author: String?
+                var kind: Int?
+                
+                // Parse TLV data
+                var index = 0
+                while index < data.count {
+                    guard index + 1 < data.count else { break }
+                    
+                    let type = data[index]
+                    let length = Int(data[index + 1])
+                    index += 2
+                    
+                    guard index + length <= data.count else { break }
+                    
+                    let value = Array(data[index..<index + length])
+                    
+                    switch type {
+                    case 0: // Identifier
+                        identifier = String(bytes: value, encoding: .utf8)
+                    case 1: // Relay
+                        if let relay = String(bytes: value, encoding: .utf8) {
+                            relays.append(relay)
+                        }
+                    case 2: // Author (32 bytes)
+                        if value.count == 32 {
+                            author = Data(value).hexString
+                        }
+                    case 3: // Kind (4 bytes big-endian)
+                        if value.count == 4 {
+                            kind = Int(value.withUnsafeBytes { $0.load(as: UInt32.self).bigEndian })
+                        }
+                    default:
+                        break
+                    }
+                    
+                    index += length
+                }
+                
+                // Build the coordinate
+                if let author = author, let kind = kind {
+                    let coordinate = "\(kind):\(author):\(identifier ?? "")"
+                    var tag = ["a", coordinate]
+                    if let firstRelay = relays.first {
+                        tag.append(firstRelay)
+                    } else {
+                        tag.append("")
+                    }
+                    return self.tag(tag)
+                }
+                
+            } else if bech32String.hasPrefix("nevent1") {
+                // For nevent, parse TLV data
+                let (hrp, data) = try Bech32.decode(bech32String)
+                guard hrp == "nevent" else { return self }
+                
+                var eventId: String?
+                var relays: [String] = []
+                var author: String?
+                
+                // Parse TLV data
+                var index = 0
+                while index < data.count {
+                    guard index + 1 < data.count else { break }
+                    
+                    let type = data[index]
+                    let length = Int(data[index + 1])
+                    index += 2
+                    
+                    guard index + length <= data.count else { break }
+                    
+                    let value = Array(data[index..<index + length])
+                    
+                    switch type {
+                    case 0: // Event ID (32 bytes)
+                        if value.count == 32 {
+                            eventId = Data(value).hexString
+                        }
+                    case 1: // Relay
+                        if let relay = String(bytes: value, encoding: .utf8) {
+                            relays.append(relay)
+                        }
+                    case 2: // Author (32 bytes)
+                        if value.count == 32 {
+                            author = Data(value).hexString
+                        }
+                    default:
+                        break
+                    }
+                    
+                    index += length
+                }
+                
+                // Build the e tag
+                if let eventId = eventId {
+                    var tag = ["e", eventId]
+                    
+                    // Add relay hint
+                    if let firstRelay = relays.first {
+                        tag.append(firstRelay)
+                    } else {
+                        tag.append("")
+                    }
+                    
+                    // Add author hint if present
+                    if let author = author {
+                        // Ensure we have marker position
+                        if tag.count == 3 {
+                            tag.append("") // Empty marker
+                        }
+                        tag.append(author)
+                    }
+                    
+                    return self.tag(tag)
+                }
+                
+            } else if bech32String.hasPrefix("nprofile1") {
+                // For nprofile, parse TLV data  
+                let (hrp, data) = try Bech32.decode(bech32String)
+                guard hrp == "nprofile" else { return self }
+                
+                var pubkey: String?
+                var relays: [String] = []
+                
+                // Parse TLV data
+                var index = 0
+                while index < data.count {
+                    guard index + 1 < data.count else { break }
+                    
+                    let type = data[index]
+                    let length = Int(data[index + 1])
+                    index += 2
+                    
+                    guard index + length <= data.count else { break }
+                    
+                    let value = Array(data[index..<index + length])
+                    
+                    switch type {
+                    case 0: // Pubkey (32 bytes)
+                        if value.count == 32 {
+                            pubkey = Data(value).hexString
+                        }
+                    case 1: // Relay
+                        if let relay = String(bytes: value, encoding: .utf8) {
+                            relays.append(relay)
+                        }
+                    default:
+                        break
+                    }
+                    
+                    index += length
+                }
+                
+                // Build the p tag
+                if let pubkey = pubkey {
+                    var tag = ["p", pubkey]
+                    if let firstRelay = relays.first {
+                        tag.append(firstRelay)
+                    }
+                    return self.tag(tag)
+                }
+            }
+        } catch {
+            // Failed to decode, ignore silently
+        }
+        
+        return self
+    }
+    
+    /// Add an 'a' tag for referencing a replaceable or parameterized replaceable event
+    /// 
+    /// This method intelligently determines the correct tag structure based on the event type:
+    /// - For parameterized replaceable events (30000-39999): ["a", "<kind>:<pubkey>:<d-tag>", <relay-url>]
+    /// - For regular replaceable events (10000-19999): ["a", "<kind>:<pubkey>:", <relay-url>]
+    /// - For regular events: Falls back to using 'e' tag via tagEvent()
+    /// 
+    /// - Parameters:
+    ///   - event: The event to reference
+    ///   - preferredRelay: Optional relay hint override (takes precedence over tracked relay)
+    ///   - ndk: NDK instance to get relay hints from eventTracker (optional)
+    @discardableResult
+    public func tagAddressableEvent(_ event: NDKEvent, preferredRelay: String? = nil) async -> NDKEventBuilder {
+        // Check if this is a replaceable or parameterized replaceable event
+        if event.isReplaceable || event.isParameterizedReplaceable {
+            // Build the coordinate (address)
+            let coordinate = event.tagAddress
+            var tag = ["a", coordinate]
+            
+            // Determine relay hint
+            let relay: String
+            if let preferredRelay = preferredRelay {
+                // Use explicitly provided relay
+                relay = preferredRelay
+            } else if let ndk = self.ndk {
+                // Try to get relay hint from eventTracker
+                let sourceRelay = await ndk.eventTracker.getSourceRelay(eventId: event.id)
+                relay = sourceRelay ?? ""
+            } else {
+                // No NDK available, use empty relay
+                relay = ""
+            }
+            
+            // Add relay hint (or empty string)
+            tag.append(relay)
+            
+            return self.tag(tag)
+        } else {
+            // For regular events, fall back to 'e' tag
+            return await self.tagEvent(event, marker: nil, preferredRelay: preferredRelay)
+        }
     }
     
     // MARK: - Content Tag Generation
@@ -215,19 +591,38 @@ public final class NDKEventBuilder {
     /// 
     /// Automatically scans the content for:
     /// - Hashtags (#tag) → adds 't' tags
-    /// - Nostr entities (npub1..., note1..., etc.) → adds 'p' or 'e' tags
+    /// - Nostr entities (npub1..., note1..., etc.) → adds appropriate tags ('p', 'e', 'a', 'q')
     /// - URLs → preserves as-is
     /// 
     /// This method is called automatically during build unless disabled.
+    /// Uses the NDK context (if available) to add intelligent relay hints.
     @discardableResult
-    public func generateContentTags() -> NDKEventBuilder {
-        let result = ContentTagger.generateContentTags(from: content, existingTags: tags)
+    public func generateContentTags() async -> NDKEventBuilder {
+        let (entities, normalizedContent) = ContentParser.parseContent(content)
         
         // Update content with normalized nostr: format
-        self.content = result.content
+        self.content = normalizedContent
         
-        // Update tags with merged tags
-        self.tags = result.tags
+        // Process entities and generate tags
+        for entity in entities {
+            switch entity {
+            case .npub(let bech32):
+                await self.tagBech32(bech32)
+            case .nprofile(let bech32):
+                await self.tagBech32(bech32)
+            case .note(let bech32):
+                await self.tagBech32(bech32)
+            case .nevent(let bech32):
+                await self.tagBech32(bech32)
+            case .naddr(let bech32):
+                await self.tagBech32(bech32)
+            case .hashtag(let tag):
+                self.tagHashtag(tag.lowercased()) // NIP-24: hashtags must be lowercase
+            case .text(_), .url(_):
+                // These don't generate tags
+                break
+            }
+        }
         
         return self
     }
@@ -252,13 +647,13 @@ public final class NDKEventBuilder {
     /// ## Usage
     /// ```swift
     /// // Encrypt to a specific recipient
-    /// let event = try await NDKEventBuilder()
+    /// let event = try await ndk.event()
     ///     .content("Secret message")
     ///     .kind(EventKind.encryptedDirectMessage)
     ///     .encrypt(recipient: recipientUser, signer: signer)
     /// 
     /// // Encrypt to self (signer's pubkey)
-    /// let event = try await NDKEventBuilder()
+    /// let event = try await ndk.event()
     ///     .content("Private note")
     ///     .kind(EventKind.cashuSpendingHistory)
     ///     .encrypt(signer: signer)
@@ -299,22 +694,36 @@ public final class NDKEventBuilder {
     /// - Returns: A signed, immutable NDKEvent
     /// 
     /// - Throws: Signing errors or validation errors
-    public func build(signer: NDKSigner, generateContentTags: Bool = true) async throws -> NDKEvent {
+    public func build(signer: NDKSigner? = nil, generateContentTags: Bool = true) async throws -> NDKEvent {
+        // Use provided signer or fall back to NDK's signer
+        guard let actualSigner = signer ?? ndk?.signer else {
+            throw NDKError.signingFailed("No signer available")
+        }
         // Set pubkey from signer if not already set
         if pubkey.isEmpty {
-            pubkey = try await signer.pubkey
+            pubkey = try await actualSigner.pubkey
+        }
+        
+        // Apply automatic client tagging if configured
+        if let clientConfig = ndk?.clientTagConfig,
+           clientConfig.autoTag,
+           !clientConfig.excludedKinds.contains(kind),
+           !tags.contains(where: { $0.first == "client" }) {
+            
+            // Add client tag - address is optional
+            _ = self.clientTag(name: clientConfig.name, address: clientConfig.address, relay: clientConfig.relay)
         }
         
         // Generate content tags if requested
         if generateContentTags {
-            _ = self.generateContentTags()
+            _ = await self.generateContentTags()
         }
         
         // Calculate event ID
         let eventId = try calculateEventID()
         
         // Sign the event
-        let signature = try await signEvent(eventId: eventId, signer: signer)
+        let signature = try await signEvent(eventId: eventId, signer: actualSigner)
         
         // Create the immutable event
         let event = NDKEvent(
@@ -343,10 +752,10 @@ public final class NDKEventBuilder {
     /// - Returns: An immutable NDKEvent
     /// 
     /// - Throws: Validation errors
-    public func buildUnsigned(eventId: EventID, signature: Signature, generateContentTags: Bool = true) throws -> NDKEvent {
+    public func buildUnsigned(eventId: EventID, signature: Signature, generateContentTags: Bool = true) async throws -> NDKEvent {
         // Generate content tags if requested
         if generateContentTags {
-            _ = self.generateContentTags()
+            _ = await self.generateContentTags()
         }
         
         // Create the immutable event
@@ -408,150 +817,4 @@ public final class NDKEventBuilder {
         return try await signer.sign(tempEvent)
     }
     
-    // MARK: - Convenience Factory Methods
-    
-    /// Create a text note event
-    public static func textNote(_ content: String) -> NDKEventBuilder {
-        return NDKEventBuilder()
-            .content(content)
-            .kind(EventKind.textNote)
-    }
-    
-    /// Create a metadata event
-    public static func metadata(_ content: String) -> NDKEventBuilder {
-        return NDKEventBuilder()
-            .content(content)
-            .kind(EventKind.metadata)
-    }
-    
-    /// Create a reaction event
-    /// 
-    /// - Parameters:
-    ///   - content: The reaction content (e.g., "+", "-", "❤️")
-    ///   - event: The event to react to
-    ///   - ndk: Optional NDK instance for relay hints
-    public static func reaction(_ content: String, to event: NDKEvent, ndk: NDK? = nil) async -> NDKEventBuilder {
-        let builder = NDKEventBuilder()
-            .content(content)
-            .kind(EventKind.reaction)
-            .tagUser(event.pubkey)
-            .tag(["k", String(event.kind)])
-        
-        await builder.tagEvent(event, ndk: ndk)
-        return builder
-    }
-    
-    /// Create a reply event
-    /// 
-    /// - Parameters:
-    ///   - content: The reply content
-    ///   - event: The event to reply to
-    ///   - ndk: Optional NDK instance for relay hints
-    public static func reply(_ content: String, to event: NDKEvent, ndk: NDK? = nil) async -> NDKEventBuilder {
-        let builder = NDKEventBuilder()
-            .content(content)
-            .kind(EventKind.textNote)
-            .tagUser(event.pubkey)
-        
-        await builder.tagEvent(event, marker: "reply", ndk: ndk)
-        return builder
-    }
-    
-    /// Create a quote event (text note with q tag)
-    /// 
-    /// This creates a kind 1 text note that quotes another event.
-    /// The event reference is added to the content and a q-tag is included.
-    /// 
-    /// - Parameters:
-    ///   - comment: The comment text to add before the quote
-    ///   - event: The event to quote
-    ///   - ndk: Optional NDK instance for relay hints
-    public static func quote(_ comment: String, event: NDKEvent, ndk: NDK? = nil) async throws -> NDKEventBuilder {
-        // Create nevent/note reference
-        let reference = try event.encode()
-        let fullContent = "\(comment)\n\nnostr:\(reference)"
-        
-        let builder = NDKEventBuilder()
-            .content(fullContent)
-            .kind(EventKind.textNote)
-        
-        await builder.quoteEvent(event, ndk: ndk)
-        return builder
-    }
-    
-    /// Create a repost event (automatically chooses kind 6 for text notes, kind 16 for others)
-    /// 
-    /// - Parameters:
-    ///   - event: The event to repost
-    ///   - includeContent: Whether to include the full event JSON in content
-    ///   - ndk: Optional NDK instance for relay hints
-    public static func repost(_ event: NDKEvent, includeContent: Bool = true, ndk: NDK? = nil) async -> NDKEventBuilder {
-        // Determine repost kind based on original event kind
-        let repostKind = event.kind == EventKind.textNote ? EventKind.repost : EventKind.genericRepost
-        
-        // Set content to JSON stringified event (unless it's protected)
-        let content: String
-        if includeContent && !event.isProtected {
-            content = (try? event.serialize()) ?? ""
-        } else {
-            content = ""
-        }
-        
-        var builder = NDKEventBuilder()
-            .content(content)
-            .kind(repostKind)
-            .tagUser(event.pubkey)
-        
-        await builder.tagEvent(event, ndk: ndk)
-        
-        // For non-text events, add k tag with original kind
-        if event.kind != EventKind.textNote {
-            builder = builder.tag(["k", String(event.kind)])
-        }
-        
-        return builder
-    }
-    
-    /// Create a deletion event for multiple events with their kinds
-    public static func deletion(events: [(id: EventID, kind: Kind)], reason: String = "") -> NDKEventBuilder {
-        var builder = NDKEventBuilder()
-            .content(reason)
-            .kind(EventKind.deletion)
-        
-        for event in events {
-            builder = builder
-                .tag(["e", event.id])
-                .tag(["k", String(event.kind)])
-        }
-        
-        return builder
-    }
-    
-    /// Create a deletion event for a single event
-    /// 
-    /// - Parameters:
-    ///   - event: The event to delete
-    ///   - reason: The reason for deletion
-    ///   - ndk: Optional NDK instance for relay hints
-    public static func deletion(event: NDKEvent, reason: String = "", ndk: NDK? = nil) async -> NDKEventBuilder {
-        let builder = NDKEventBuilder()
-            .content(reason)
-            .kind(EventKind.deletion)
-            .tag(["k", String(event.kind)])
-        
-        await builder.tagEvent(event, ndk: ndk)
-        return builder
-    }
-    
-    /// Create a parameterized replaceable event
-    public static func parameterizedReplaceable(kind: Kind, identifier: String, content: String) -> NDKEventBuilder {
-        guard kind >= 30000 && kind < 40000 else {
-            fatalError("Kind \(kind) is not a parameterized replaceable event kind")
-        }
-        
-        return NDKEventBuilder()
-            .content(content)
-            .kind(kind)
-            .tagIdentifier(identifier)
-    }
 }

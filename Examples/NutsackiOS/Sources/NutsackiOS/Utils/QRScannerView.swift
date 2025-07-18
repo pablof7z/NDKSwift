@@ -23,11 +23,12 @@ class QRScannerViewController: UIViewController, AVCaptureMetadataOutputObjectsD
     var previewLayer: AVCaptureVideoPreviewLayer!
     var onScan: ((String) -> Void)?
     var onDismiss: (() -> Void)?
+    private var scanAreaView: UIView!
     
     override func viewDidLoad() {
         super.viewDidLoad()
         
-        view.backgroundColor = UIColor.black
+        view.backgroundColor = UIColor.systemBackground
         captureSession = AVCaptureSession()
         
         guard let videoCaptureDevice = AVCaptureDevice.default(for: .video) else { return }
@@ -58,18 +59,39 @@ class QRScannerViewController: UIViewController, AVCaptureMetadataOutputObjectsD
             return
         }
         
-        previewLayer = AVCaptureVideoPreviewLayer(session: captureSession)
-        previewLayer.frame = view.layer.bounds
-        previewLayer.videoGravity = .resizeAspectFill
-        view.layer.addSublayer(previewLayer)
-        
-        // Add overlay
+        // Add overlay first
         addOverlay()
+        
+        // Create camera preview container with square shape
+        let cameraContainer = UIView()
+        cameraContainer.backgroundColor = .black
+        cameraContainer.layer.cornerRadius = 12
+        cameraContainer.layer.borderWidth = 3
+        cameraContainer.layer.borderColor = UIColor.white.cgColor
+        cameraContainer.clipsToBounds = true
+        cameraContainer.translatesAutoresizingMaskIntoConstraints = false
+        view.addSubview(cameraContainer)
+        
+        NSLayoutConstraint.activate([
+            cameraContainer.centerXAnchor.constraint(equalTo: view.centerXAnchor),
+            cameraContainer.centerYAnchor.constraint(equalTo: view.centerYAnchor, constant: -50),
+            cameraContainer.widthAnchor.constraint(equalToConstant: 280),
+            cameraContainer.heightAnchor.constraint(equalToConstant: 280)
+        ])
+        
+        // Add preview layer to container
+        previewLayer = AVCaptureVideoPreviewLayer(session: captureSession)
+        previewLayer.frame = CGRect(x: 0, y: 0, width: 280, height: 280)
+        previewLayer.videoGravity = .resizeAspectFill
+        cameraContainer.layer.addSublayer(previewLayer)
+        
+        // Store reference to scan area for metadata output
+        scanAreaView = cameraContainer
         
         // Add close button
         let closeButton = UIButton(type: .system)
         closeButton.setImage(UIImage(systemName: "xmark.circle.fill"), for: .normal)
-        closeButton.tintColor = .white
+        closeButton.tintColor = .label
         closeButton.addTarget(self, action: #selector(closeTapped), for: .touchUpInside)
         closeButton.translatesAutoresizingMaskIntoConstraints = false
         view.addSubview(closeButton)
@@ -81,50 +103,42 @@ class QRScannerViewController: UIViewController, AVCaptureMetadataOutputObjectsD
             closeButton.heightAnchor.constraint(equalToConstant: 44)
         ])
         
+        // Add paste button
+        let pasteButton = UIButton(type: .system)
+        pasteButton.setTitle("Paste", for: .normal)
+        pasteButton.titleLabel?.font = .systemFont(ofSize: 18, weight: .medium)
+        pasteButton.backgroundColor = .systemBlue
+        pasteButton.setTitleColor(.white, for: .normal)
+        pasteButton.layer.cornerRadius = 12
+        pasteButton.addTarget(self, action: #selector(pasteTapped), for: .touchUpInside)
+        pasteButton.translatesAutoresizingMaskIntoConstraints = false
+        view.addSubview(pasteButton)
+        
+        NSLayoutConstraint.activate([
+            pasteButton.centerXAnchor.constraint(equalTo: view.centerXAnchor),
+            pasteButton.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor, constant: -40),
+            pasteButton.widthAnchor.constraint(equalToConstant: 120),
+            pasteButton.heightAnchor.constraint(equalToConstant: 50)
+        ])
+        
         DispatchQueue.global(qos: .userInitiated).async { [weak self] in
             self?.captureSession.startRunning()
         }
     }
     
     func addOverlay() {
-        let overlayView = UIView()
-        overlayView.translatesAutoresizingMaskIntoConstraints = false
-        view.addSubview(overlayView)
-        
-        NSLayoutConstraint.activate([
-            overlayView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
-            overlayView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
-            overlayView.topAnchor.constraint(equalTo: view.topAnchor),
-            overlayView.bottomAnchor.constraint(equalTo: view.bottomAnchor)
-        ])
-        
-        // Create scanning area
-        let scanArea = UIView()
-        scanArea.layer.borderColor = UIColor.white.cgColor
-        scanArea.layer.borderWidth = 2
-        scanArea.layer.cornerRadius = 10
-        scanArea.translatesAutoresizingMaskIntoConstraints = false
-        overlayView.addSubview(scanArea)
-        
-        NSLayoutConstraint.activate([
-            scanArea.centerXAnchor.constraint(equalTo: overlayView.centerXAnchor),
-            scanArea.centerYAnchor.constraint(equalTo: overlayView.centerYAnchor),
-            scanArea.widthAnchor.constraint(equalToConstant: 250),
-            scanArea.heightAnchor.constraint(equalToConstant: 250)
-        ])
-        
         // Add instruction label
         let label = UILabel()
         label.text = "Scan QR Code"
-        label.textColor = .white
+        label.textColor = .label
         label.textAlignment = .center
-        label.font = .systemFont(ofSize: 18, weight: .medium)
+        label.font = .systemFont(ofSize: 20, weight: .semibold)
         label.translatesAutoresizingMaskIntoConstraints = false
-        overlayView.addSubview(label)
+        view.addSubview(label)
         
         NSLayoutConstraint.activate([
-            label.centerXAnchor.constraint(equalTo: overlayView.centerXAnchor),
-            label.topAnchor.constraint(equalTo: scanArea.bottomAnchor, constant: 30)
+            label.centerXAnchor.constraint(equalTo: view.centerXAnchor),
+            label.bottomAnchor.constraint(equalTo: view.centerYAnchor, constant: -200)
         ])
     }
     
@@ -171,6 +185,23 @@ class QRScannerViewController: UIViewController, AVCaptureMetadataOutputObjectsD
     
     @objc func closeTapped() {
         onDismiss?()
+    }
+    
+    @objc func pasteTapped() {
+        if let pasteboardString = UIPasteboard.general.string {
+            found(code: pasteboardString)
+        } else {
+            let alert = UIAlertController(title: "No Text", message: "There is no text in the clipboard to paste.", preferredStyle: .alert)
+            alert.addAction(UIAlertAction(title: "OK", style: .default))
+            present(alert, animated: true)
+        }
+    }
+    
+    override func viewDidLayoutSubviews() {
+        super.viewDidLayoutSubviews()
+        if let scanArea = scanAreaView {
+            previewLayer?.frame = scanArea.bounds
+        }
     }
     
     override var prefersStatusBarHidden: Bool {

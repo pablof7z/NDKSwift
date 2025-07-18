@@ -152,7 +152,6 @@ final class NIP60WalletE2ETests: XCTestCase {
         
         let depositStream = await wallet.monitorDeposit(
             quote: quote,
-            pollingInterval: 3.0,
             timeout: 60.0 // 1 minute timeout
         )
         

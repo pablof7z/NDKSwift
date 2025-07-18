@@ -234,6 +234,7 @@ struct TransactionHistoryView: View {
 
 struct TransactionDetailRow: View {
     let transaction: Transaction
+    @State private var showOfflineToken = false
     
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -250,9 +251,34 @@ struct TransactionDetailRow: View {
                 .padding(.horizontal, 12)
                 .padding(.bottom, 4)
             }
+            
+            // Show offline token button if available
+            if transaction.offlineToken != nil && transaction.type == .send {
+                Button(action: { showOfflineToken = true }) {
+                    HStack {
+                        Image(systemName: "qrcode")
+                            .font(.caption)
+                        Text("View Token")
+                            .font(.caption)
+                    }
+                    .foregroundStyle(.orange)
+                }
+                .padding(.horizontal, 12)
+                .padding(.bottom, 4)
+            }
         }
         .listRowBackground(Color.secondary.opacity(0.1))
         .listRowInsets(EdgeInsets(top: 4, leading: 8, bottom: 4, trailing: 8))
+        .sheet(isPresented: $showOfflineToken) {
+            if let token = transaction.offlineToken {
+                OfflineTokenView(
+                    token: token,
+                    amount: transaction.amount,
+                    memo: transaction.memo ?? "",
+                    mintURL: nil  // TODO: Store mint URL with transaction
+                )
+            }
+        }
     }
 }
 
@@ -267,3 +293,4 @@ extension Transaction.TransactionType {
         }
     }
 }
+

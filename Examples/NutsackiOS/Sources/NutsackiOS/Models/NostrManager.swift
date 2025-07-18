@@ -9,6 +9,7 @@ class NostrManager {
     var ndk: NDK?
     var isConnected = false
     var relayStatus: [String: Bool] = [:]
+    var zapManager: NDKZapManager?
     
     private var ndkAuthManager: NDKAuthManager
     var cache: NDKSQLiteCache?
@@ -41,6 +42,24 @@ class NostrManager {
         if let ndk = ndk {
             print("🏚️ [NostrManager] Setting NDK on auth manager")
             ndkAuthManager.setNDK(ndk)
+            
+            // Configure NIP-89 client tags for Nutsack
+            ndk.clientTagConfig = NDKClientTagConfig(
+                name: "Nutsack",
+                relay: "wss://relay.primal.net",
+                autoTag: true,
+                excludedKinds: [
+                    // Exclude sensitive event kinds from client tagging
+                    EventKind.encryptedDirectMessage,
+                    EventKind.cashuSpendingHistory,
+                    EventKind.cashuToken,
+                ]
+            )
+            print("🏚️ [NostrManager] Configured NIP-89 client tags")
+            
+            // Initialize zap manager
+            zapManager = NDKZapManager(ndk: ndk)
+            print("🏚️ [NostrManager] Zap manager initialized")
         }
         
         Task {
@@ -75,6 +94,8 @@ class NostrManager {
         
         let signer = try NDKPrivateKeySigner(privateKey: privateKey)
         ndk?.signer = signer
+        
+        // Zap manager gets signer from NDK automatically
         
         let publicKey = try await signer.pubkey
         print("Logged in with public key: \(publicKey)")
@@ -126,6 +147,8 @@ class NostrManager {
         print("🏚️ [NostrManager] Switching to new session...")
         try await ndkAuthManager.switchToSession(session)
         
+        // Zap manager gets signer from NDK automatically
+        
         // Create and publish profile
         let metadata = NDKUserProfile(
             name: displayName,
@@ -137,7 +160,7 @@ class NostrManager {
             print("🏚️ [NostrManager] User is authenticated, publishing metadata...")
             // Create metadata event
             let metadataContent = try JSONEncoder().encode(metadata)
-            let metadataEvent = try await NDKEventBuilder()
+            let metadataEvent = try await ndk.event()
                 .content(String(data: metadataContent, encoding: .utf8) ?? "{}")
                 .kind(0)
                 .build(signer: signer)
@@ -172,6 +195,9 @@ class NostrManager {
         // Clear NDK signer
         ndk?.signer = nil
         
+        // Clear zap manager signer
+        // Zap manager gets signer from NDK automatically
+        
         print("Logged out and cleared all authentication data")
     }
     
@@ -204,6 +230,8 @@ class NostrManager {
         // Switch to this session
         print("🏚️ [NostrManager] Switching to imported session...")
         try await ndkAuthManager.switchToSession(session)
+        
+        // Zap manager gets signer from NDK automatically
         
         print("🏚️ [NostrManager] createAccountFromNsec() completed successfully with pubkey: \(session.pubkey)")
         return session

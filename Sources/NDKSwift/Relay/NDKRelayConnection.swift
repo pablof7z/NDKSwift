@@ -42,7 +42,7 @@ public actor NDKRelayConnection {
     private let retryPolicy = RetryPolicy(configuration: .relayConnection)
     
     /// Connection completion handlers
-    private var connectionContinuation: CheckedContinuation<Void, Error>?
+    private var connectionContinuations: [CheckedContinuation<Void, Error>] = []
     
     /// Track if this is an initial connection attempt
     private var isInitialConnection = true
@@ -77,17 +77,17 @@ public actor NDKRelayConnection {
         }
         
         // If there's already a connection attempt in progress, wait for it
-        if connectionContinuation != nil {
+        if !connectionContinuations.isEmpty {
             NDKLogger.shared.log(.debug, category: .relay, "Connection already in progress for \(url)")
             try await withCheckedThrowingContinuation { continuation in
-                self.connectionContinuation = continuation
+                self.connectionContinuations.append(continuation)
             }
             return
         }
         
         do {
             try await withCheckedThrowingContinuation { continuation in
-                self.connectionContinuation = continuation
+                self.connectionContinuations.append(continuation)
                 
                 Task {
                     await self._connect()
@@ -109,15 +109,21 @@ public actor NDKRelayConnection {
     
     private func _connect() async {
         guard !isConnected else {
-            connectionContinuation?.resume()
-            connectionContinuation = nil
+            // Resume all waiting continuations
+            for continuation in connectionContinuations {
+                continuation.resume()
+            }
+            connectionContinuations.removeAll()
             return
         }
         
         #if os(iOS) || os(macOS) || os(watchOS) || os(tvOS)
             guard webSocketTask == nil else {
-                connectionContinuation?.resume()
-                connectionContinuation = nil
+                // Resume all waiting continuations
+                for continuation in connectionContinuations {
+                    continuation.resume()
+                }
+                connectionContinuations.removeAll()
                 return
             }
             
@@ -145,8 +151,11 @@ public actor NDKRelayConnection {
             NDKLogger.shared.log(.info, category: .relay, "Mock WebSocket connection to \(url) (Linux doesn't support WebSockets)")
             isConnected = true
             connectedAt = Date()
-            connectionContinuation?.resume()
-            connectionContinuation = nil
+            // Resume all waiting continuations
+            for continuation in connectionContinuations {
+                continuation.resume()
+            }
+            connectionContinuations.removeAll()
             
             await notifyDelegate { delegate in
                 delegate.relayConnectionDidConnect(self)
@@ -183,59 +192,55 @@ public actor NDKRelayConnection {
     
     /// Publish an event and wait for OK response
     public func publishEvent(_ event: NDKEvent, timeout: TimeInterval = 10.0) async throws -> Bool {
-        guard isConnected else {
-            throw NDKError.connectionFailed(relay: url.absoluteString, message: "Not connected")
+        // Ensure we're connected first
+        if !isConnected {
+            try await connect()
         }
         
         let eventId = event.id
         NDKLogger.shared.log(.debug, category: .relay, "publishEvent called for event \(eventId)")
         
-        // Create a continuation holder that we can access from the actor context
-        return try await withThrowingTaskGroup(of: Bool.self) { group in
-            // Add task to handle the OK response
-            group.addTask {
-                try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Bool, Error>) in
-                    // Store the continuation - this is now within the actor context
-                    Task { [weak self] in
-                        await self?.storePendingContinuation(eventId: eventId, continuation: continuation)
-                    }
-                }
+        // Store continuation and handle the async work within actor context
+        return try await withCheckedThrowingContinuation { continuation in
+            Task { [weak self] in
+                await self?.performPublishEvent(eventId: eventId, event: event, continuation: continuation, timeout: timeout)
             }
-            
-            // Add task to send the event and handle timeout
-            group.addTask {
-                // Give a tiny delay to ensure continuation is stored first
-                try await Task.sleep(nanoseconds: 10_000_000) // 10ms
-                
-                // Send the event
-                let eventMessage = NostrMessage.event(subscriptionId: nil, event: event)
-                try await self.send(eventMessage)
-                NDKLogger.shared.log(.debug, category: .relay, "Event sent, waiting for OK response...")
-                
-                // Wait for timeout
-                try await Task.sleep(nanoseconds: UInt64(timeout * 1_000_000_000))
-                
-                // If we get here, we timed out
-                await self.handleTimeout(eventId: eventId)
-                throw NDKError.timeout(operation: "publishEvent", seconds: Int(timeout))
-            }
-            
-            // Wait for first result (either OK response or timeout)
-            for try await result in group {
-                group.cancelAll()
-                return result
-            }
-            
-            // Should never reach here
-            throw NDKError.internalError("Unexpected error in publishEvent")
         }
     }
     
-    /// Store a pending continuation (actor-isolated)
-    private func storePendingContinuation(eventId: EventID, continuation: CheckedContinuation<Bool, Error>) {
+    /// Perform the actual publish event work (actor-isolated)
+    private func performPublishEvent(eventId: EventID, event: NDKEvent, continuation: CheckedContinuation<Bool, Error>, timeout: TimeInterval) async {
+        // Store the continuation - now within actor context
         pendingEvents[eventId] = continuation
-        NDKLogger.shared.log(.trace, category: .relay, "Stored continuation for event \(eventId)")
+        
+        await withThrowingTaskGroup(of: Void.self) { group in
+            // Send event task
+            group.addTask {
+                let eventMessage = NostrMessage.event(subscriptionId: nil, event: event)
+                try await self.send(eventMessage)
+                NDKLogger.shared.log(.debug, category: .relay, "Event sent, waiting for OK response...")
+            }
+            
+            // Timeout task
+            group.addTask {
+                try await Task.sleep(nanoseconds: UInt64(timeout * 1_000_000_000))
+                await self.handleTimeout(eventId: eventId)
+            }
+            
+            // Wait for any task to complete
+            do {
+                try await group.next()
+                group.cancelAll()
+            } catch {
+                group.cancelAll()
+                // Remove continuation and resume with error
+                if let storedContinuation = pendingEvents.removeValue(forKey: eventId) {
+                    storedContinuation.resume(throwing: error)
+                }
+            }
+        }
     }
+    
     
     /// Handle timeout for a pending event (actor-isolated)
     private func handleTimeout(eventId: EventID) {
@@ -332,8 +337,11 @@ public actor NDKRelayConnection {
     #if os(iOS) || os(macOS) || os(watchOS) || os(tvOS)
     private func sendPing() async {
         guard let task = webSocketTask else {
-            connectionContinuation?.resume(throwing: NDKError.connectionFailed(relay: url.absoluteString, message: "No WebSocket task"))
-            connectionContinuation = nil
+            // Resume all waiting continuations with error
+            for continuation in connectionContinuations {
+                continuation.resume(throwing: NDKError.connectionFailed(relay: url.absoluteString, message: "No WebSocket task"))
+            }
+            connectionContinuations.removeAll()
             return
         }
         
@@ -361,8 +369,11 @@ public actor NDKRelayConnection {
     
     private func markAsConnected() async {
         guard !isConnected else {
-            connectionContinuation?.resume()
-            connectionContinuation = nil
+            // Resume all waiting continuations
+            for continuation in connectionContinuations {
+                continuation.resume()
+            }
+            connectionContinuations.removeAll()
             return
         }
         
@@ -373,9 +384,11 @@ public actor NDKRelayConnection {
         
         NDKLogger.shared.log(.info, category: .relay, "Marked as connected: \(url)")
         
-        // Resume the connection continuation if waiting
-        connectionContinuation?.resume()
-        connectionContinuation = nil
+        // Resume all waiting continuations
+        for continuation in connectionContinuations {
+            continuation.resume()
+        }
+        connectionContinuations.removeAll()
         
         // Notify delegate
         await notifyDelegate { delegate in
@@ -384,8 +397,11 @@ public actor NDKRelayConnection {
     }
     
     private func resumeContinuationWithError(_ error: Error) async {
-        connectionContinuation?.resume(throwing: error)
-        connectionContinuation = nil
+        // Resume all waiting continuations with error
+        for continuation in connectionContinuations {
+            continuation.resume(throwing: error)
+        }
+        connectionContinuations.removeAll()
     }
     #endif
     

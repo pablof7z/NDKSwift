@@ -9,6 +9,7 @@ public extension NDKEvent {
     /// 
     /// - Parameters:
     ///   - signer: The signer to use for creating the repost
+    ///   - ndk: The NDK instance for context
     /// 
     /// - Returns: The created repost event
     /// 
@@ -17,9 +18,29 @@ public extension NDKEvent {
     /// - Uses kind 16 for all other event kinds
     /// - Includes the full event JSON in content (unless protected by NIP-70)
     /// - Adds appropriate tags (e, p, and k for non-text events)
-    func repost(signer: NDKSigner) async throws -> NDKEvent {
-        // Create repost event using builder
-        let builder = await NDKEventBuilder.repost(self, includeContent: true, ndk: nil)
+    func repost(signer: NDKSigner, ndk: NDK) async throws -> NDKEvent {
+        // Determine repost kind based on original event kind
+        let repostKind = self.kind == EventKind.textNote ? EventKind.repost : EventKind.genericRepost
+        
+        // Set content to JSON stringified event (unless it's protected)
+        let content: String
+        if !self.isProtected {
+            content = (try? self.serialize()) ?? ""
+        } else {
+            content = ""
+        }
+        
+        var builder = await ndk.event()
+            .content(content)
+            .kind(repostKind)
+            .tagUser(self.pubkey)
+            .tagEvent(self)
+        
+        // For non-text events, add k tag with original kind
+        if self.kind != EventKind.textNote {
+            builder = builder.tag(["k", String(self.kind)])
+        }
+        
         return try await builder.build(signer: signer)
     }
     
@@ -28,19 +49,19 @@ public extension NDKEvent {
     /// - Parameters:
     ///   - comment: The comment to add to the quote
     ///   - signer: The signer to use
+    ///   - ndk: The NDK instance for context
     /// 
     /// - Returns: The created quote repost event
-    func quoteRepost(comment: String, signer: NDKSigner) async throws -> NDKEvent {
+    func quoteRepost(comment: String, signer: NDKSigner, ndk: NDK) async throws -> NDKEvent {
         // Create nevent/note reference
         let reference = try self.encode()
         let fullContent = "\(comment)\n\nnostr:\(reference)"
         
         // Create quote repost as a text note with q tag
-        let builder = NDKEventBuilder()
+        let builder = await ndk.event()
             .content(fullContent)
             .kind(EventKind.textNote)
-        
-        await builder.quoteEvent(self, ndk: nil)
+            .quoteEvent(self)
         
         return try await builder.build(signer: signer)
     }
@@ -52,22 +73,29 @@ public extension NDKEvent {
     /// - Parameters:
     ///   - content: The reaction content (e.g., "+", "-", "❤️", "🚀")
     ///   - signer: The signer to use
+    ///   - ndk: The NDK instance for context
     /// 
     /// - Returns: The created reaction event
-    func react(with content: String, signer: NDKSigner) async throws -> NDKEvent {
+    func react(with content: String, signer: NDKSigner, ndk: NDK) async throws -> NDKEvent {
         // Create reaction event
-        let builder = await NDKEventBuilder.reaction(content, to: self, ndk: nil)
+        let builder = await ndk.event()
+            .content(content)
+            .kind(EventKind.reaction)
+            .tagUser(self.pubkey)
+            .tag(["k", String(self.kind)])
+            .tagEvent(self)
+        
         return try await builder.build(signer: signer)
     }
     
     /// Create a like reaction (+)
-    func like(signer: NDKSigner) async throws -> NDKEvent {
-        return try await react(with: "+", signer: signer)
+    func like(signer: NDKSigner, ndk: NDK) async throws -> NDKEvent {
+        return try await react(with: "+", signer: signer, ndk: ndk)
     }
     
     /// Create a dislike reaction (-)
-    func dislike(signer: NDKSigner) async throws -> NDKEvent {
-        return try await react(with: "-", signer: signer)
+    func dislike(signer: NDKSigner, ndk: NDK) async throws -> NDKEvent {
+        return try await react(with: "-", signer: signer, ndk: ndk)
     }
     
     // MARK: - NIP-09: Event Deletion
@@ -84,7 +112,12 @@ public extension NDKEvent {
     func delete(reason: String = "", signer: NDKSigner, ndk: NDK) async throws -> NDKEvent {
         
         // Create deletion event
-        let builder = await NDKEventBuilder.deletion(event: self, reason: reason, ndk: ndk)
+        let builder = await ndk.event()
+            .content(reason)
+            .kind(EventKind.deletion)
+            .tag(["k", String(self.kind)])
+            .tagEvent(self)
+        
         let deletionEvent = try await builder.build(signer: signer)
         
         // Publish the deletion event
@@ -98,11 +131,17 @@ public extension NDKEvent {
     /// - Parameters:
     ///   - reason: The reason for deletion (optional)
     ///   - signer: The signer to use
+    ///   - ndk: The NDK instance for context
     /// 
     /// - Returns: The created deletion event
-    func createDeletionRequest(reason: String = "", signer: NDKSigner) async throws -> NDKEvent {
-        // Create deletion event - note: no NDK instance means no relay hints
-        let builder = await NDKEventBuilder.deletion(event: self, reason: reason, ndk: nil)
+    func createDeletionRequest(reason: String = "", signer: NDKSigner, ndk: NDK) async throws -> NDKEvent {
+        // Create deletion event
+        let builder = await ndk.event()
+            .content(reason)
+            .kind(EventKind.deletion)
+            .tag(["k", String(self.kind)])
+            .tagEvent(self)
+        
         return try await builder.build(signer: signer)
     }
 }

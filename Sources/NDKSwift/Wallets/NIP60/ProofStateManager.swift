@@ -2,7 +2,7 @@ import Foundation
 import CashuSwift
 
 // MARK: - Extensions for CashuSwift.Proof to support Set operations
-extension CashuSwift.Proof: Hashable {
+extension CashuSwift.Proof: @retroactive Hashable {
     public func hash(into hasher: inout Hasher) {
         // Use the proof's C value as the unique identifier for hashing
         hasher.combine(C)

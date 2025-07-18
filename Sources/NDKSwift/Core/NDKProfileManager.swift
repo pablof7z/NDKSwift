@@ -8,27 +8,12 @@ public struct NDKProfileConfig {
     /// Time interval before cached profiles are considered stale (in seconds)
     public var staleAfter: TimeInterval
     
-    /// Whether to automatically batch profile requests
-    public var batchRequests: Bool
-    
-    /// Delay before executing batched requests (in seconds)
-    public var batchDelay: TimeInterval
-    
-    /// Maximum number of profiles to request in a single subscription
-    public var maxBatchSize: Int
-    
     public init(
         cacheSize: Int = 1000,
-        staleAfter: TimeInterval = 3600, // 1 hour
-        batchRequests: Bool = true,
-        batchDelay: TimeInterval = 0.1,
-        maxBatchSize: Int = 100
+        staleAfter: TimeInterval = 3600 // 1 hour
     ) {
         self.cacheSize = cacheSize
         self.staleAfter = staleAfter
-        self.batchRequests = batchRequests
-        self.batchDelay = batchDelay
-        self.maxBatchSize = maxBatchSize
     }
     
     public static let `default` = NDKProfileConfig()
@@ -44,7 +29,7 @@ private struct ProfileCacheEntry {
     }
 }
 
-/// Manager for efficient profile fetching with caching and batching
+/// Manager for efficient profile fetching with caching
 public actor NDKProfileManager {
     private weak var ndk: NDK?
     private let config: NDKProfileConfig
@@ -52,12 +37,6 @@ public actor NDKProfileManager {
     /// In-memory LRU cache for profiles
     private var profileCache: [PublicKey: ProfileCacheEntry] = [:]
     private var cacheOrder: [PublicKey] = [] // For LRU tracking
-    
-    /// Pending profile requests waiting to be batched
-    private var pendingRequests: [PublicKey: [CheckedContinuation<NDKUserProfile?, Error>]] = [:]
-    
-    /// Timer task for batching
-    private var batchTask: Task<Void, Never>?
     
     /// Active profile observations
     private class ContinuationWrapper {
@@ -75,6 +54,7 @@ public actor NDKProfileManager {
     }
     
     /// Fetch a single profile with caching and optional force refresh
+    /// The subscription manager automatically batches multiple profile requests
     public func fetchProfile(for pubkey: PublicKey, forceRefresh: Bool = false) async throws -> NDKUserProfile? {
         // Check cache first
         if !forceRefresh {
@@ -83,24 +63,12 @@ public actor NDKProfileManager {
             }
         }
         
-        // If batching is disabled or force refresh, fetch immediately
-        if !config.batchRequests || forceRefresh {
-            return try await fetchProfileImmediately(for: pubkey)
-        }
-        
-        // Add to pending requests for batching
-        return try await withCheckedThrowingContinuation { continuation in
-            if pendingRequests[pubkey] == nil {
-                pendingRequests[pubkey] = []
-            }
-            pendingRequests[pubkey]?.append(continuation)
-            
-            // Schedule batch processing
-            scheduleBatchProcessing()
-        }
+        // Fetch profile - subscription manager handles batching automatically
+        return try await fetchSingleProfile(pubkey)
     }
     
     /// Fetch multiple profiles efficiently
+    /// The subscription manager will automatically batch these into a single request
     public func fetchProfiles(for pubkeys: [PublicKey], forceRefresh: Bool = false) async throws -> [PublicKey: NDKUserProfile] {
         var results: [PublicKey: NDKUserProfile] = [:]
         var toFetch: [PublicKey] = []
@@ -118,10 +86,42 @@ public actor NDKProfileManager {
             toFetch = pubkeys
         }
         
-        // Fetch remaining profiles
+        // Fetch remaining profiles - subscription manager will batch them automatically
         if !toFetch.isEmpty {
-            let fetched = try await fetchProfilesBatch(toFetch)
-            results.merge(fetched) { _, new in new }
+            guard let ndk = ndk else {
+                throw NDKError.notConfigured("NDK instance not available")
+            }
+            
+            let filter = NDKFilter(
+                authors: toFetch,
+                kinds: [EventKind.metadata]
+            )
+            
+            let events = try await ndk.fetchEvents([filter])
+            
+            // Process events
+            for event in events {
+                guard let profileData = event.content.data(using: String.Encoding.utf8),
+                      let profile = try? JSONDecoder().decode(NDKUserProfile.self, from: profileData) else {
+                    continue
+                }
+                
+                let eventPubkey = event.pubkey
+                results[eventPubkey] = profile
+                updateCache(pubkey: eventPubkey, profile: profile)
+                
+                // Notify any active observations
+                if let wrappers = activeObservations[eventPubkey] {
+                    for wrapper in wrappers {
+                        wrapper.continuation.yield(profile)
+                    }
+                }
+                
+                // Save to cache
+                Task {
+                    try? await ndk.cache.saveProfile(profile, pubkey: eventPubkey)
+                }
+            }
         }
         
         return results
@@ -160,9 +160,8 @@ public actor NDKProfileManager {
                     limit: 1
                 )
                 
-                let subscription = await ndk.subscriptionCoordinator.subscribe(
+                let subscription = await ndk.subscribe(
                     filters: [filter],
-                    relays: nil,
                     closeOnEose: closeOnEose
                 )
                 
@@ -253,7 +252,7 @@ public actor NDKProfileManager {
         cacheOrder.append(pubkey)
     }
     
-    private func fetchProfileImmediately(for pubkey: PublicKey) async throws -> NDKUserProfile? {
+    private func fetchSingleProfile(_ pubkey: PublicKey) async throws -> NDKUserProfile? {
         guard let ndk = ndk else {
             throw NDKError.notConfigured("NDK instance not available")
         }
@@ -261,12 +260,12 @@ public actor NDKProfileManager {
         // Create filter for kind 0 events (user metadata)
         let filter = NDKFilter(
             authors: [pubkey],
-            kinds: [0],
+            kinds: [EventKind.metadata],
             limit: 1
         )
         
         // Fetch the event
-        guard let event = try await ndk.subscriptionCoordinator.fetchEvent(filter) else {
+        guard let event = try await ndk.fetchEvent(filter) else {
             return nil
         }
         
@@ -283,96 +282,5 @@ public actor NDKProfileManager {
         try? await ndk.cache.saveProfile(profile, pubkey: pubkey)
         
         return profile
-    }
-    
-    private func fetchProfilesBatch(_ pubkeys: [PublicKey]) async throws -> [PublicKey: NDKUserProfile] {
-        guard let ndk = ndk else {
-            throw NDKError.notConfigured("NDK instance not available")
-        }
-        
-        var results: [PublicKey: NDKUserProfile] = [:]
-        
-        // Split into batches if needed
-        let batches = pubkeys.chunked(into: config.maxBatchSize)
-        
-        for batch in batches {
-            // Create filter for metadata events
-            let filter = NDKFilter(
-                authors: batch,
-                kinds: [EventKind.metadata],
-                limit: batch.count
-            )
-            
-            // Fetch events
-            let events = try await ndk.subscriptionCoordinator.fetchEvents([filter])
-            
-            // Process events
-            for event in events {
-                guard let profileData = event.content.data(using: String.Encoding.utf8),
-                      let profile = try? JSONDecoder().decode(NDKUserProfile.self, from: profileData) else {
-                    continue
-                }
-                
-                let eventPubkey = event.pubkey
-                results[eventPubkey] = profile
-                updateCache(pubkey: eventPubkey, profile: profile)
-                
-                // Save to persistent cache
-                try? await ndk.cache.saveProfile(profile, pubkey: eventPubkey)
-            }
-        }
-        
-        return results
-    }
-    
-    private func scheduleBatchProcessing() {
-        // Cancel existing task if any
-        batchTask?.cancel()
-        
-        // Schedule new batch processing
-        batchTask = Task { [weak self] in
-            guard let self = self else { return }
-            try? await Task.sleep(nanoseconds: UInt64(self.config.batchDelay * 1_000_000_000))
-            await self.processPendingBatch()
-        }
-    }
-    
-    private func processPendingBatch() async {
-        guard !pendingRequests.isEmpty else { return }
-        
-        // Get all pending pubkeys
-        let pubkeys = Array(pendingRequests.keys)
-        let continuations = pendingRequests
-        pendingRequests.removeAll()
-        
-        do {
-            // Fetch all profiles in batch
-            let profiles = try await fetchProfilesBatch(pubkeys)
-            
-            // Resume all continuations
-            for (pubkey, conts) in continuations {
-                let profile = profiles[pubkey]
-                for cont in conts {
-                    cont.resume(returning: profile)
-                }
-            }
-        } catch {
-            // Resume all continuations with error
-            for (_, conts) in continuations {
-                for cont in conts {
-                    cont.resume(throwing: error)
-                }
-            }
-        }
-    }
-}
-
-// MARK: - Array Extension for Chunking
-
-private extension Array {
-    func chunked(into size: Int) -> [[Element]] {
-        return stride(from: 0, to: count, by: size).map {
-            Array(self[$0..<Swift.min($0 + size, count)])
-        }
     }
 }

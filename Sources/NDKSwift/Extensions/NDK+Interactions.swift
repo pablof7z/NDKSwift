@@ -21,7 +21,7 @@ public extension NDK {
             throw NDKError.notConfigured("No signer configured")
         }
         
-        let repostEvent = try await event.repost(signer: signer)
+        let repostEvent = try await event.repost(signer: signer, ndk: self)
         _ = try await publish(repostEvent)
         return repostEvent
     }
@@ -38,7 +38,7 @@ public extension NDK {
             throw NDKError.notConfigured("No signer configured")
         }
         
-        let quoteEvent = try await event.quoteRepost(comment: comment, signer: signer)
+        let quoteEvent = try await event.quoteRepost(comment: comment, signer: signer, ndk: self)
         _ = try await publish(quoteEvent)
         return quoteEvent
     }
@@ -57,7 +57,7 @@ public extension NDK {
             throw NDKError.notConfigured("No signer configured")
         }
         
-        let reaction = try await event.react(with: content, signer: signer)
+        let reaction = try await event.react(with: content, signer: signer, ndk: self)
         _ = try await publish(reaction)
         return reaction
     }
