@@ -639,6 +639,17 @@ public final class NDKRelay: RelayProtocol, Hashable, Equatable, @unchecked Send
         case .req, .close:
             // These are client->relay messages, shouldn't receive them
             break
+            
+        case .negOpen, .negMsg, .negClose, .negErr:
+            // NIP-77 messages - route to sync handler via NDK
+            print("[NDKRelay] Routing NIP-77 message to handler: \(message)")
+            if let ndk = ndk {
+                Task {
+                    await ndk.processNIP77Message(message, from: self)
+                }
+            } else {
+                print("[NDKRelay] No NDK instance to route NIP-77 message!")
+            }
         }
     }
 
@@ -800,6 +811,10 @@ extension NDKRelay: NDKRelayConnectionDelegate {
         case let .auth(challenge):
             // Handle authentication challenge
             await handleAuthChallenge(challenge)
+            
+        case .negOpen, .negMsg, .negClose, .negErr:
+            // Route NIP-77 messages
+            await routeMessage(message)
 
         default:
             // Handle other message types as needed

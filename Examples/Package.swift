@@ -9,7 +9,9 @@ let package = Package(
     ],
     products: [
         .executable(name: "RelayCollectionDemo", targets: ["RelayCollectionDemo"]),
-        .executable(name: "DebugKind0Fetcher", targets: ["DebugKind0Fetcher"])
+        .executable(name: "DebugKind0Fetcher", targets: ["DebugKind0Fetcher"]),
+        .executable(name: "NIP77Demo", targets: ["NIP77Demo"]),
+        .executable(name: "TestNegentropyProtocol", targets: ["TestNegentropyProtocol"])
     ],
     dependencies: [
         .package(path: "..")
@@ -28,6 +30,20 @@ let package = Package(
                 .product(name: "NDKSwift", package: "NDKSwift-sfodj5")
             ],
             path: "Sources/DebugKind0Fetcher"
+        ),
+        .executableTarget(
+            name: "NIP77Demo",
+            dependencies: [
+                .product(name: "NDKSwift", package: "NDKSwift-sfodj5")
+            ],
+            path: "Sources/NIP77Demo"
+        ),
+        .executableTarget(
+            name: "TestNegentropyProtocol",
+            dependencies: [
+                .product(name: "NDKSwift", package: "NDKSwift-sfodj5")
+            ],
+            path: "Sources/TestNegentropyProtocol"
         )
     ]
 )

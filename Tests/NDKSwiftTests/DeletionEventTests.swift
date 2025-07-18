@@ -23,7 +23,7 @@ final class MockRelay: RelayProtocol, @unchecked Sendable {
 final class DeletionEventTests: XCTestCase {
     var ndk: NDK!
     var signer: NDKPrivateKeySigner!
-    var cache: SimpleMemoryCache!
+    var cache: MemoryCache!
     
     override func setUp() async throws {
         try await super.setUp()
@@ -33,7 +33,7 @@ final class DeletionEventTests: XCTestCase {
         signer = try NDKPrivateKeySigner(privateKey: privateKey)
         
         // Create cache
-        cache = SimpleMemoryCache()
+        cache = MemoryCache()
         
         // Create NDK with test configuration
         ndk = NDK(

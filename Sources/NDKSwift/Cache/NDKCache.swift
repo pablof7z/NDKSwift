@@ -109,6 +109,29 @@ public protocol NDKCache: Actor {
     /// Check if keysets need refresh
     func areKeysetsStale(mintUrl: String, maxAge: TimeInterval) async -> Bool
     
+    // MARK: - Negentropy Support
+    
+    /// Get events in a timestamp range for Negentropy reconciliation
+    /// - Parameters:
+    ///   - from: Start timestamp (inclusive)
+    ///   - to: End timestamp (exclusive)
+    ///   - filter: Optional filter to apply (e.g., by author or kind)
+    /// - Returns: Array of events in the range
+    func getEventsByTimeRange(from: Timestamp, to: Timestamp, filter: NDKFilter?) async throws -> [NDKEvent]
+    
+    /// Get event IDs and timestamps for efficient fingerprinting
+    /// - Parameters:
+    ///   - from: Start timestamp (inclusive)
+    ///   - to: End timestamp (exclusive)
+    ///   - filter: Optional filter to apply
+    /// - Returns: Array of tuples containing event ID and timestamp
+    func getEventIdsWithTimestamps(from: Timestamp, to: Timestamp, filter: NDKFilter?) async throws -> [(id: String, timestamp: Timestamp)]
+    
+    /// Batch check which events exist in cache
+    /// - Parameter ids: Array of event IDs to check
+    /// - Returns: Dictionary mapping event ID to existence boolean
+    func hasEvents(ids: [String]) async -> [String: Bool]
+    
     // MARK: - Cache Management
     
     /// Clear all cached data
@@ -238,5 +261,30 @@ public extension NDKCache {
     /// Default implementation that returns true (always stale)
     func areKeysetsStale(mintUrl: String, maxAge: TimeInterval) async -> Bool {
         return true
+    }
+    
+    // MARK: - Default Negentropy Implementation
+    
+    /// Default implementation using queryEvents
+    func getEventsByTimeRange(from: Timestamp, to: Timestamp, filter: NDKFilter?) async throws -> [NDKEvent] {
+        var rangeFilter = filter ?? NDKFilter()
+        rangeFilter.since = from
+        rangeFilter.until = to
+        return try await queryEvents(rangeFilter)
+    }
+    
+    /// Default implementation that fetches full events
+    func getEventIdsWithTimestamps(from: Timestamp, to: Timestamp, filter: NDKFilter?) async throws -> [(id: String, timestamp: Timestamp)] {
+        let events = try await getEventsByTimeRange(from: from, to: to, filter: filter)
+        return events.map { (id: $0.id, timestamp: $0.createdAt) }
+    }
+    
+    /// Default implementation that checks each event individually
+    func hasEvents(ids: [String]) async -> [String: Bool] {
+        var result: [String: Bool] = [:]
+        for id in ids {
+            result[id] = await hasEvent(id: id)
+        }
+        return result
     }
 }

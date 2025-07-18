@@ -10,6 +10,11 @@ public enum NostrMessageType: String {
     case ok = "OK"
     case auth = "AUTH"
     case count = "COUNT"
+    // NIP-77 Negentropy messages
+    case negOpen = "NEG-OPEN"
+    case negMsg = "NEG-MSG"
+    case negClose = "NEG-CLOSE"
+    case negErr = "NEG-ERR"
 }
 
 /// Nostr message protocol
@@ -22,6 +27,11 @@ public enum NostrMessage {
     case ok(eventId: EventID, accepted: Bool, message: String?)
     case auth(challenge: String)
     case count(subscriptionId: String, count: Int)
+    // NIP-77 Negentropy messages
+    case negOpen(subscriptionId: String, filter: NDKFilter, message: String)
+    case negMsg(subscriptionId: String, message: String)
+    case negClose(subscriptionId: String)
+    case negErr(subscriptionId: String, error: String)
 
     /// Parse a message from relay
     public static func parse(from json: String) throws -> NostrMessage {
@@ -124,6 +134,43 @@ public enum NostrMessage {
                 throw NDKError.invalidMessage( "Invalid COUNT message")
             }
             return .count(subscriptionId: subscriptionId, count: count)
+            
+        case .negOpen:
+            guard array.count >= 4,
+                  let subscriptionId = array[1] as? String,
+                  let filterDict = array[2] as? [String: Any],
+                  let hexMessage = array[3] as? String
+            else {
+                throw NDKError.invalidMessage("Invalid NEG-OPEN message")
+            }
+            let filter = try NDKFilter.fromDictionary(filterDict)
+            return .negOpen(subscriptionId: subscriptionId, filter: filter, message: hexMessage)
+            
+        case .negMsg:
+            guard array.count >= 3,
+                  let subscriptionId = array[1] as? String,
+                  let hexMessage = array[2] as? String
+            else {
+                throw NDKError.invalidMessage("Invalid NEG-MSG message")
+            }
+            return .negMsg(subscriptionId: subscriptionId, message: hexMessage)
+            
+        case .negClose:
+            guard array.count >= 2,
+                  let subscriptionId = array[1] as? String
+            else {
+                throw NDKError.invalidMessage("Invalid NEG-CLOSE message")
+            }
+            return .negClose(subscriptionId: subscriptionId)
+            
+        case .negErr:
+            guard array.count >= 3,
+                  let subscriptionId = array[1] as? String,
+                  let error = array[2] as? String
+            else {
+                throw NDKError.invalidMessage("Invalid NEG-ERR message")
+            }
+            return .negErr(subscriptionId: subscriptionId, error: error)
         }
     }
 
@@ -174,6 +221,26 @@ public enum NostrMessage {
             array.append("COUNT")
             array.append(subscriptionId)
             array.append(["count": count])
+            
+        case let .negOpen(subscriptionId, filter, message):
+            array.append("NEG-OPEN")
+            array.append(subscriptionId)
+            array.append(filter.toDictionary())
+            array.append(message)
+            
+        case let .negMsg(subscriptionId, message):
+            array.append("NEG-MSG")
+            array.append(subscriptionId)
+            array.append(message)
+            
+        case let .negClose(subscriptionId):
+            array.append("NEG-CLOSE")
+            array.append(subscriptionId)
+            
+        case let .negErr(subscriptionId, error):
+            array.append("NEG-ERR")
+            array.append(subscriptionId)
+            array.append(error)
         }
 
         let data = try JSONSerialization.data(withJSONObject: array, options: [.withoutEscapingSlashes])
@@ -194,6 +261,8 @@ public enum NostrMessage {
         case let .count(id, _):
             return id
         case let .req(id, _), let .close(id):
+            return id
+        case let .negOpen(id, _, _), let .negMsg(id, _), let .negClose(id), let .negErr(id, _):
             return id
         case .notice, .ok, .auth:
             return nil

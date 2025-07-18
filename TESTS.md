@@ -86,7 +86,7 @@ Integration tests verify that different modules of the library work together as 
     *   `Sources/NDKSwift/Core/Managers/NDKPool.swift`
     *   `Sources/NDKSwift/Core/Managers/NDKSubscriptionCoordinator.swift`
 *   **Test Scenario:**
-    1.  Initialize `NDK` with `SimpleMemoryCache` and a `NDKPrivateKeySigner`.
+    1.  Initialize `NDK` with `MemoryCache` and a `NDKPrivateKeySigner`.
     2.  Use a mock relay implementation to avoid actual network calls.
     3.  **Publish:** Call `ndk.publish(event)`. Verify the event is sent to the mock relay.
     4.  **Subscribe:** Create a subscription using `ndk.subscribe(...)`.
