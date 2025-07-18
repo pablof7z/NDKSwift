@@ -240,7 +240,14 @@ while !Task.isCancelled {
 - NDKRelayCollection should observe this stream instead of polling
 - Only react when actual changes occur
 
-**Status**: TO FIX - Replace polling with event-driven updates
+**Status**: FIXED ✅ - Replaced polling with event-driven updates
+
+**Fix implemented**:
+- Added NDKPoolChangeEvent enum and AsyncStream to NDKPool 
+- Events emitted when relays are added/removed from pool
+- NDKRelayCollection now observes relay changes stream instead of polling
+- Removed 2-second polling loop completely
+- CPU-efficient event-driven updates only when actual changes occur
 
 ---
 
@@ -282,53 +289,6 @@ hasSeenEose = true
 - Avoid shared mutable state
 
 **Status**: TO FIX - Add proper task cancellation
-
----
-
-## 10. CashuDeposit Polling (CashuDeposit.swift:132)
-
-**Problem**: Polling Cashu mint for deposit status with exponential backoff.
-
-**Current Code**:
-```swift
-while checks < maxChecks {
-    do {
-        // Check mint-quote for Lightning invoice payment
-        let mintQuote = try await mintManager.mintQuote(quote: quote.quoteId, mint: mint)
-        
-        if mintQuote.paid == true {
-            // Success! Mint the tokens
-            let proofs = try await mintManager.mint(quote: quote, mint: mint)
-            // ...
-            break
-        }
-    } catch {
-        // Handle specific errors
-    }
-    
-    // Still pending - calculate dynamic polling interval
-    let interval = min(baseInterval * pow(1.5, hoursOld), maxInterval)
-    
-    // Wait before next check
-    try await Task.sleep(nanoseconds: UInt64(interval * 1_000_000_000))
-}
-```
-
-**Analysis**: This is a **LEGITIMATE USE** of Task.sleep!
-
-**Why it's correct**:
-- Polling is necessary - Cashu mints don't push status updates
-- Uses exponential backoff (starts at 2 min, increases to max 2 hours)
-- Properly handles cancellation via AsyncStream
-- Task is stored and cancelled on termination
-- This is exactly what polling APIs require
-
-**Good patterns**:
-- Dynamic interval based on quote age
-- Proper error handling for expected "not paid" status
-- Clean termination handling
-
-**Status**: NO CHANGE NEEDED ✓ (Required for external API polling)
 
 ---
 

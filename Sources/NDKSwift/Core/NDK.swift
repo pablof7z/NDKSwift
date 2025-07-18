@@ -140,6 +140,9 @@ public final class NDK {
             ndk: self
         )
         
+        // Set shared NDK instance for NDKEventBuilder
+        NDKEventBuilder.setSharedNDK(self)
+        
         // Add initial relays
         Task {
             for url in relayUrls {
@@ -187,6 +190,13 @@ public final class NDK {
     public var relays: [NDKRelay] {
         get async {
             await pool.relays
+        }
+    }
+    
+    /// Stream of relay pool changes for event-driven observation
+    public var relayChanges: AsyncStream<NDKPoolChangeEvent> {
+        get async {
+            await pool.relayChanges
         }
     }
     
@@ -320,6 +330,26 @@ public final class NDK {
         await subscriptionCoordinator.clearRelayListCache(for: author)
     }
     
+    // MARK: - Event Building
+    
+    /// Create a new event builder with full NDK context
+    /// 
+    /// The returned builder has access to:
+    /// - Automatic relay hint detection from event tracker
+    /// - Cache access for user metadata
+    /// - Default signer (if available)
+    /// 
+    /// ## Usage
+    /// ```swift
+    /// let event = try await ndk.event()
+    ///     .content("Hello, Nostr!")
+    ///     .kind(1)
+    ///     .build() // Uses ndk.signer automatically
+    /// ```
+    public func event() -> NDKEventBuilder {
+        return NDKEventBuilder(ndk: self)
+    }
+    
     // MARK: - User Management
     
     public func getUser(_ pubkey: PublicKey) -> NDKUser {
@@ -393,7 +423,7 @@ public final class NDK {
         }
         
         do {
-            let authEvent = try await NDKEventBuilder()
+            let authEvent = try await self.event()
                 .kind(EventKind.clientAuthentication)
                 .tag(["challenge", challenge])
                 .tag(["relay", relay.url])
