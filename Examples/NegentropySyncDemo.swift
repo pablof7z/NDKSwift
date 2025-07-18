@@ -19,7 +19,7 @@ struct NegentropySyncDemo {
             await ndk.setCacheAdapter(cache)
             
             // Create test signer
-            let privateKey = generateRandomPrivateKey()
+            let privateKey = try NDKPrivateKeySigner.generatePrivateKey()
             let signer = NDKPrivateKeySigner(privateKey: privateKey)
             ndk.signer = signer
             
@@ -111,11 +111,6 @@ struct NegentropySyncDemo {
         return events
     }
     
-    static func generateRandomPrivateKey() -> String {
-        var bytes = [UInt8](repeating: 0, count: 32)
-        _ = SecRandomCopyBytes(kSecRandomDefault, 32, &bytes)
-        return Data(bytes).hexEncodedString()
-    }
     
     static func formatBytes(_ bytes: Int) -> String {
         let formatter = ByteCountFormatter()
@@ -124,32 +119,7 @@ struct NegentropySyncDemo {
     }
 }
 
-// Extension for hex encoding
-extension Data {
-    func hexEncodedString() -> String {
-        return self.map { String(format: "%02x", $0) }.joined()
-    }
-}
 
-// Sync result structure
-struct NegentropySyncResult {
-    let localEventCount: Int
-    let downloadedEvents: [NDKEvent]
-    let uploadedEvents: [NDKEvent]
-    let messageRounds: Int
-    let bytesTransferred: Int
-    let efficiencyRatio: Int // Percentage of bandwidth saved vs naive sync
-}
 
-// Extensions to be implemented
-extension NDK {
-    func syncEvents(filter: NDKFilter, relay: String) async throws -> NegentropySyncResult {
-        // TODO: Implement NIP-77 sync
-        fatalError("NIP-77 sync not yet implemented")
-    }
-    
-    func syncWithAllRelays(filter: NDKFilter) async throws -> [String: NegentropySyncResult] {
-        // TODO: Implement multi-relay sync
-        fatalError("NIP-77 multi-relay sync not yet implemented")
-    }
-}
+// Import the NIP-77 implementation
+// The sync methods are now implemented in NDKSyncExtension.swift

@@ -7,7 +7,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.1] - 2025-01-18
+
+### Fixed
+- Fixed crash in Negentropy compareData function when processing bounds with partial IDs
+  - Added safe bounds checking to handle Data objects of different lengths (1-byte partial IDs vs 32-byte full IDs)
+  - The protocol uses partial ID matching for efficient range-based set reconciliation
+- Fixed misleading 99% bandwidth efficiency calculation in NIP-77 sync
+  - Now properly tracks all protocol overhead including Negentropy messages, event fetching (REQ/EVENT/EOSE), and event publishing
+  - Bandwidth efficiency calculation now shows realistic percentages (0-76%) based on actual vs naive sync comparison
+  - Added separate tracking for negentropyBytes, eventFetchBytes, and eventPublishBytes in SyncSession
+
+## [0.3.0] - 2025-01-18
+
 ### Added
+- **NIP-77 Negentropy Sync Protocol** - Efficient set reconciliation for syncing events between clients and relays
+  - Core Negentropy implementation with incremental hash accumulator
+  - Range-based set reconciliation algorithm
+  - Binary message encoding/decoding with varint support
+  - Cache integration for efficient event queries
+  - `syncEvents(filter:relay:)` - Sync with specific relay
+  - `syncWithAllRelays(filter:)` - Sync with all connected relays
+  - Bandwidth-efficient sync that only transfers missing events
+  - Support for both SQLite and in-memory cache backends
+- Extended NDKCache protocol with Negentropy support methods:
+  - `getEventsByTimeRange(from:to:filter:)` - Query events in timestamp range
+  - `getEventIdsWithTimestamps(from:to:filter:)` - Efficient ID/timestamp queries
+  - `hasEvents(ids:)` - Batch check event existence
+- NostrMessage extended with NIP-77 message types (NEG-OPEN, NEG-MSG, NEG-CLOSE, NEG-ERR)
 - Configurable subscription grouping delay via `groupingDelay` parameter
   - Set custom delay when calling `ndk.subscribe(filters:groupingDelay:)` 
   - Default remains 100ms for backward compatibility

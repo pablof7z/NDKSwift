@@ -292,4 +292,68 @@ public actor MemoryCache: NDKCache {
         print("[MemoryCache] Keysets for mint \(mintUrl) are \(isStale ? "stale" : "fresh")")
         return isStale
     }
+    
+    // MARK: - Negentropy Support
+    
+    public func getEventsByTimeRange(from: Timestamp, to: Timestamp, filter: NDKFilter?) async throws -> [NDKEvent] {
+        var results: [NDKEvent] = []
+        
+        for event in events.values {
+            // Check time range
+            if event.createdAt < from || event.createdAt >= to {
+                continue
+            }
+            
+            // Apply filter if provided
+            if let filter = filter {
+                if !filter.matches(event: event) {
+                    continue
+                }
+            }
+            
+            results.append(event)
+        }
+        
+        // Sort by timestamp for consistent ordering
+        let sorted = results.sorted { $0.createdAt < $1.createdAt }
+        print("[MemoryCache] Found \(sorted.count) events in range [\(from), \(to))")
+        return sorted
+    }
+    
+    public func getEventIdsWithTimestamps(from: Timestamp, to: Timestamp, filter: NDKFilter?) async throws -> [(id: String, timestamp: Timestamp)] {
+        var results: [(id: String, timestamp: Timestamp)] = []
+        
+        for event in events.values {
+            // Check time range
+            if event.createdAt < from || event.createdAt >= to {
+                continue
+            }
+            
+            // Apply filter if provided
+            if let filter = filter {
+                if !filter.matches(event: event) {
+                    continue
+                }
+            }
+            
+            results.append((id: event.id, timestamp: event.createdAt))
+        }
+        
+        // Sort by timestamp for consistent ordering
+        let sorted = results.sorted { $0.timestamp < $1.timestamp }
+        print("[MemoryCache] Found \(sorted.count) event IDs in range [\(from), \(to))")
+        return sorted
+    }
+    
+    public func hasEvents(ids: [String]) async -> [String: Bool] {
+        var result: [String: Bool] = [:]
+        
+        for id in ids {
+            result[id] = events[id] != nil
+        }
+        
+        let foundCount = result.values.filter { $0 }.count
+        print("[MemoryCache] Checked \(ids.count) event IDs, found \(foundCount)")
+        return result
+    }
 }
