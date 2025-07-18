@@ -167,7 +167,7 @@ public actor NDKSubscriptionManager {
             if await shouldGroupSubscription(subscription) {
                 await addToGrouping(subscription)
             } else {
-                await executeImmediately(subscription)
+                executeImmediately(subscription)
             }
         }
     }
@@ -332,6 +332,11 @@ public actor NDKSubscriptionManager {
         // Get subscription options
         let options = await subscription.options
         
+        // Don't group if groupingDelay is explicitly set to 0
+        if let delay = options.groupingDelay, delay == 0 {
+            return false
+        }
+        
         // Don't group if:
         // - Subscription has specific relays
         // - Has a very small limit that shouldn't be shared
@@ -353,7 +358,7 @@ public actor NDKSubscriptionManager {
         return true
     }
 
-    private func addToGrouping(_ subscription: NDKSubscription) {
+    private func addToGrouping(_ subscription: NDKSubscription) async {
         subscriptionStates[subscription.id] = .grouping
 
         // Create fingerprint for grouping
@@ -368,9 +373,13 @@ public actor NDKSubscriptionManager {
             var group = PendingGroup()
             group.addSubscription(subscription)
 
+            // Get the subscription's grouping delay or use default
+            let options = await subscription.options
+            let delay = options.groupingDelay ?? groupingDelay
+
             // Set timer to execute group
             group.timer = Task {
-                try? await Task.sleep(nanoseconds: UInt64(groupingDelay * 1_000_000_000))
+                try? await Task.sleep(nanoseconds: UInt64(delay * 1_000_000_000))
                 await executeGroup(fingerprint: fingerprint)
             }
 
@@ -400,7 +409,7 @@ public actor NDKSubscriptionManager {
         let plan = await createExecutionPlan(for: group.subscriptions)
 
         // Execute the plan
-        await executeSubscriptionGroup(plan)
+        executeSubscriptionGroup(plan)
 
         // Update statistics
         stats.recordGrouping(originalCount: group.subscriptions.count, finalCount: plan.mergedFilters.count)
@@ -432,7 +441,7 @@ public actor NDKSubscriptionManager {
         
         // If no specific relays, use NDK's default relays
         if relaySet.isEmpty, let ndk = ndk {
-            relaySet = Set(ndk.relays)
+            relaySet = Set(await ndk.relays)
         }
 
         return ExecutionPlan(
@@ -542,8 +551,7 @@ public actor NDKSubscriptionManager {
             var cachedEvents: [NDKEvent] = []
             for filter in subscription.filters {
                 if let events = try? await cache.queryEvents(filter) {
-                    let eventsWithNDK = events.map { $0.withNDK(ndk) }
-                    cachedEvents.append(contentsOf: eventsWithNDK)
+                    cachedEvents.append(contentsOf: events)
                 }
             }
 

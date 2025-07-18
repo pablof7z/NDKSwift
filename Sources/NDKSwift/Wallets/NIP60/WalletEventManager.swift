@@ -56,7 +56,7 @@ public actor WalletEventManager {
                 ] + tokenChange.deletedTokenIds.map { ["e", $0] })
                 .build(signer: signer)
             
-            try await ndk.publish(deleteEvent)
+            _ = try await ndk.publish(deleteEvent)
             
             // Create individual Kind 5 events for each deleted token
             for tokenId in tokenChange.deletedTokenIds {
@@ -131,7 +131,7 @@ public actor WalletEventManager {
         let filter = NDKFilter(ids: [eventId])
         
         if let eventToDelete = try await ndk.fetchEvent(filter) {
-            try await eventToDelete.delete(ndk: ndk, reason: "Deleted token event", signer: signer)
+            try await eventToDelete.delete(reason: "Deleted token event", signer: signer, ndk: ndk)
         }
         
         deletedTokenEventIds.insert(eventId)
@@ -157,7 +157,7 @@ public actor WalletEventManager {
         let filter = NDKFilter(ids: [eventId])
         
         if let quoteEvent = try await ndk.fetchEvent(filter) {
-            try await quoteEvent.delete(ndk: ndk, reason: "Quote expired or used", signer: signer)
+            try await quoteEvent.delete(reason: "Quote expired or used", signer: signer, ndk: ndk)
         }
         
         print("WalletEventManager - Deleted quote event: \(eventId)")

@@ -37,6 +37,7 @@ final class Transaction {
     var nostrEventID: String?  // For nutzaps
     var lightningInvoice: String?
     var status: TransactionStatus
+    var senderPubkey: String?  // For nutzaps and received transactions
     
     
     init(type: TransactionType, amount: Int, memo: String? = nil) {

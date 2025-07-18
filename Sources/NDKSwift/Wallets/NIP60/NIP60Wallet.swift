@@ -295,6 +295,7 @@ public actor NIP60Wallet: NDKPaymentProvider {
     public func getBalance() async throws -> Int64? {
         let balance = await proofStateManager.getTotalBalance()
         print("NIP60Wallet.getBalance() - balance: \(balance)")
+        print("NIP60Wallet.getBalance() - proofStateManager: \(ObjectIdentifier(proofStateManager))")
         return balance
     }
     
@@ -302,6 +303,25 @@ public actor NIP60Wallet: NDKPaymentProvider {
     public func getBalance(mint: URL) async -> Int64 {
         let proofs = await proofStateManager.getAvailableProofs(mint: mint.absoluteString)
         return proofs.reduce(0) { $0 + Int64($1.amount) }
+    }
+    
+    /// Get balances grouped by mint
+    /// Returns a dictionary mapping mint URLs to their balances
+    public func getBalancesByMint() async -> [String: Int64] {
+        var balancesByMint: [String: Int64] = [:]
+        
+        // Get proofs already grouped by mint from the proof state manager
+        let proofsByMint = await proofStateManager.getAvailableProofsByMint()
+        
+        // Calculate balance for each mint
+        for (mint, proofs) in proofsByMint {
+            let balance = proofs.reduce(0) { $0 + Int64($1.amount) }
+            if balance > 0 {
+                balancesByMint[mint] = balance
+            }
+        }
+        
+        return balancesByMint
     }
     
     public func createInvoice(amount: Int64, description: String?) async throws -> String {

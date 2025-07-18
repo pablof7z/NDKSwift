@@ -384,6 +384,7 @@ public class NDKKeychainManager {
     
     /// Get available biometric type
     /// - Returns: The available biometric type
+    #if !os(watchOS)
     public func getBiometricType() async -> LABiometryType {
         let context = LAContext()
         var error: NSError?
@@ -394,6 +395,7 @@ public class NDKKeychainManager {
         
         return context.biometryType
     }
+    #endif
     
     /// Create authentication context for biometric authentication
     /// - Parameters:

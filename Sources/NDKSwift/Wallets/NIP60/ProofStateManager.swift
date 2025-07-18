@@ -46,6 +46,8 @@ public actor ProofStateManager {
                 }
             }
         }
+
+        print("Adding proof from mint \(mint)")
         
         proofState[proof.C] = ProofEntry(
             proof: proof,
@@ -106,6 +108,7 @@ public actor ProofStateManager {
         var result: [String: [CashuSwift.Proof]] = [:]
         
         for entry in proofState.values where entry.state == .available {
+            print("Proof from mint \(entry.mint)")
             result[entry.mint, default: []].append(entry.proof)
         }
         
@@ -121,9 +124,11 @@ public actor ProofStateManager {
     
     /// Get balance for a specific mint
     func getBalance(mint: String) -> Int64 {
-        return proofState.values
+        let availableProofs = proofState.values
             .filter { $0.state == .available && $0.mint == mint }
-            .reduce(0) { $0 + Int64($1.proof.amount) }
+        let balance = availableProofs.reduce(0) { $0 + Int64($1.proof.amount) }
+        print("ProofStateManager.getBalance(mint: \(mint)) - found \(availableProofs.count) available proofs, balance: \(balance)")
+        return balance
     }
     
     /// Select proofs for a given amount from a specific mint

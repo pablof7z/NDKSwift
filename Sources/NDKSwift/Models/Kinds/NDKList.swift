@@ -482,7 +482,7 @@ public class NDKList {
 
         try await sign()
         let event = toNDKEvent()
-        try await ndk.publish(event)
+        _ = try await ndk.publish(event)
     }
 }
 

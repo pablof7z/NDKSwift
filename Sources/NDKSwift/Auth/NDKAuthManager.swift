@@ -72,7 +72,9 @@ public class NDKAuthManager {
     public private(set) var biometricAuthAvailable = false
     
     /// Type of biometric authentication available
+    #if !os(watchOS)
     public private(set) var biometricType: LABiometryType = .none
+    #endif
     
     // MARK: - Private Properties
     
@@ -378,7 +380,9 @@ public class NDKAuthManager {
     private func updateBiometricAvailability() {
         Task { @MainActor in
             biometricAuthAvailable = await keychainManager.isBiometricAuthenticationAvailable()
+            #if !os(watchOS)
             biometricType = await keychainManager.getBiometricType()
+            #endif
         }
     }
     

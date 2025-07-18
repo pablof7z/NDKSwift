@@ -273,7 +273,7 @@ public extension NDK {
         let events = try await fetchEvents([filter])
 
         guard let event = events.first else { return nil }
-        return await NDKRelayList.fromEvent(event)
+        return NDKRelayList.fromEvent(event)
     }
 
     /// Fetch the relay list for the current user
@@ -292,7 +292,7 @@ public extension NDK {
 
         try await relayList.sign()
         let event = relayList.toNDKEvent()
-        try await publish(event)
+        _ = try await publish(event)
     }
 }
 

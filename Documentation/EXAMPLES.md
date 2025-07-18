@@ -659,13 +659,16 @@ func deletePostsContaining(_ word: String) async throws {
 ```swift
 // Add reaction
 func reactToPost(_ event: NDKEvent, with emoji: String = "👍") async throws {
-    let reaction = try await event.react(content: emoji, publish: true)
+    let builder = await NDKEventBuilder.reaction(emoji, to: event, ndk: ndk)
+    let reaction = try await builder.build(signer: ndk.signer!)
+    try await ndk.publish(reaction)
     print("Reacted with \(emoji)")
 }
 
 // Post comment/reply
 func replyToPost(_ event: NDKEvent, comment: String) async throws {
-    let reply = event.createReply(content: comment, mentionAuthor: true)
+    let builder = await NDKEventBuilder.reply(comment, to: event, ndk: ndk)
+    let reply = try await builder.build(signer: ndk.signer!)
     try await ndk.publish(reply)
 }
 
@@ -685,6 +688,95 @@ func getReactions(for eventId: String) async throws -> [String: Int] {
         counts[emoji, default: 0] += 1
     }
     return counts
+}
+```
+
+### Quoting Events (NIP-10)
+
+NDKSwift provides full NIP-10 compliant support for quoting events with proper relay hints and pubkey hints for optimal event discovery through the outbox model.
+
+```swift
+// Quote an event with a comment
+func quoteEvent(_ event: NDKEvent, comment: String) async throws {
+    // Method 1: Using the convenience factory method
+    let builder = try await NDKEventBuilder.quote(comment, event: event, ndk: ndk)
+    let quoteEvent = try await builder.build(signer: ndk.signer!)
+    try await ndk.publish(quoteEvent)
+}
+
+// Method 2: Using the event extension for quote reposts
+func quoteRepost(_ event: NDKEvent, comment: String) async throws {
+    let quoteEvent = try await event.quoteRepost(comment: comment, signer: ndk.signer!)
+    try await ndk.publish(quoteEvent)
+}
+
+// Method 3: Manual quote event construction
+func manualQuoteEvent(_ event: NDKEvent, comment: String) async throws {
+    // Encode the event reference
+    let reference = try event.encode()
+    let content = "\(comment)\n\nnostr:\(reference)"
+    
+    // Build the event with proper q-tag
+    let builder = NDKEventBuilder()
+        .content(content)
+        .kind(EventKind.textNote)
+    
+    // Add NIP-10 compliant q-tag with relay hints
+    await builder.quoteEvent(event, ndk: ndk)
+    
+    let quoteEvent = try await builder.build(signer: ndk.signer!)
+    try await ndk.publish(quoteEvent)
+}
+
+// Finding quoted events
+func findQuotedEvents(in event: NDKEvent) async throws -> [NDKEvent] {
+    var quotedEvents: [NDKEvent] = []
+    
+    // Check q-tags for quoted events
+    let qTags = event.tags.filter { $0.first == "q" && $0.count >= 2 }
+    
+    for qTag in qTags {
+        let quotedEventId = qTag[1]
+        let relayHint = qTag.count > 2 ? qTag[2] : nil
+        let pubkeyHint = qTag.count > 3 ? qTag[3] : nil
+        
+        // Try to fetch using relay hint and pubkey hint for optimal discovery
+        var filter = NDKFilter(ids: [quotedEventId])
+        
+        // If we have a pubkey hint, we can use the outbox model
+        if let pubkey = pubkeyHint {
+            filter.authors = [pubkey]
+        }
+        
+        // Fetch with specific relay if provided
+        let events: [NDKEvent]
+        if let relay = relayHint, !relay.isEmpty {
+            events = try await ndk.fetchEvents(filter, from: [relay])
+        } else {
+            events = try await ndk.fetchEvents(filter)
+        }
+        
+        quotedEvents.append(contentsOf: events)
+    }
+    
+    return quotedEvents
+}
+```
+
+### Reposts
+
+```swift
+// Create a repost
+func repostEvent(_ event: NDKEvent) async throws {
+    let builder = await NDKEventBuilder.repost(event, includeContent: true, ndk: ndk)
+    let repost = try await builder.build(signer: ndk.signer!)
+    try await ndk.publish(repost)
+}
+
+// Using the extension method
+func repostWithExtension(_ event: NDKEvent) async throws {
+    let repost = try await event.repost(signer: ndk.signer!)
+    try await ndk.publish(repost)
 }
 ```
 

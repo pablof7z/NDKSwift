@@ -19,8 +19,13 @@ actor WalletPaymentRouter {
             throw NDKError.invalidRequest("NIP60Wallet only supports nutzap payments")
         }
         
+        print("WalletPaymentRouter.executePayment - amount: \(nutzapRequest.amountSats)")
+        print("WalletPaymentRouter.executePayment - proofStateManager: \(ObjectIdentifier(proofStateManager))")
+        
         // Find the best payment route
         let acceptedMintURLs = Set(nutzapRequest.acceptedMints.map { $0.absoluteString })
+        print("WalletPaymentRouter.executePayment - acceptedMints: \(acceptedMintURLs)")
+        
         let paymentRoute = await CrossMintTransfer.findBestPaymentRoute(
             amount: nutzapRequest.amountSats,
             acceptedMints: acceptedMintURLs,

@@ -93,7 +93,7 @@ final class DeletionEventTests: XCTestCase {
         let deletionEvent = try await NDKEventBuilder()
             .content("Deleting my post")
             .kind(EventKind.deletion)
-            .tagEvent(originalEvent.id)
+            .tagEvent(originalEvent)
             .tag(["k", String(originalEvent.kind)])
             .build(signer: signer)
         
@@ -137,7 +137,7 @@ final class DeletionEventTests: XCTestCase {
         let deletionEvent = try await NDKEventBuilder()
             .content("Trying to delete someone else's post")
             .kind(EventKind.deletion)
-            .tagEvent(originalEvent.id)
+            .tagEvent(originalEvent)
             .tag(["k", String(originalEvent.kind)])
             .build(signer: otherSigner)
         
@@ -187,9 +187,9 @@ final class DeletionEventTests: XCTestCase {
         let deletionEvent = try await NDKEventBuilder()
             .content("Batch deletion")
             .kind(EventKind.deletion)
-            .tagEvent(event1.id)
-            .tagEvent(event2.id)
-            .tagEvent(event3.id)
+            .tagEvent(event1)
+            .tagEvent(event2)
+            .tagEvent(event3)
             .tag(["k", String(EventKind.textNote)])
             .tag(["k", String(EventKind.reaction)])
             .build(signer: signer)
@@ -225,7 +225,7 @@ final class DeletionEventTests: XCTestCase {
         let deletionEvent = try await NDKEventBuilder()
             .content("Deleting non-existent event")
             .kind(EventKind.deletion)
-            .tagEvent(fakeEventId)
+            .tag(["e", fakeEventId])
             .tag(["k", String(EventKind.textNote)])
             .build(signer: signer)
         
@@ -286,7 +286,7 @@ final class DeletionEventTests: XCTestCase {
         let deletionEvent = try await NDKEventBuilder()
             .content("Deleting an event that hasn't arrived yet")
             .kind(EventKind.deletion)
-            .tagEvent(originalEvent.id)
+            .tagEvent(originalEvent)
             .tag(["k", String(originalEvent.kind)])
             .build(signer: signer)
         

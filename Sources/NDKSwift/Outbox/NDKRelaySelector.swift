@@ -35,9 +35,9 @@ actor NDKRelaySelector {
         missingRelayPubkeys.formUnion(contextualRelays.missingPubkeys)
 
         // 3. Special handling for NIP-65 relay lists
-        if await event.kind == NDKRelayList.kind {
+        if event.kind == NDKRelayList.kind {
             // For relay lists, also publish to read relays
-            if let userItem = await tracker.getRelaysSyncFor(pubkey: await event.pubkey, type: .read) {
+            if let userItem = await tracker.getRelaysSyncFor(pubkey: event.pubkey, type: .read) {
                 targetRelays.formUnion(userItem.readRelays.map { $0.url })
             }
         }
@@ -215,14 +215,14 @@ actor NDKRelaySelector {
         var missingPubkeys = Set<String>()
 
         // Extract from e tags (reply/quote context)
-        for eTag in await event.eTags {
+        for eTag in event.eTags {
             if let recommendedRelay = eTag.recommendedRelay {
                 relays.insert(recommendedRelay)
             }
         }
 
         // Extract from p tags (mentioned users)
-        for pubkey in await event.pTags {
+        for pubkey in event.pTags {
             if let item = await tracker.getRelaysSyncFor(pubkey: pubkey) {
                 switch purpose {
                 case .publishing:

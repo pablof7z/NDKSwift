@@ -215,7 +215,7 @@ struct AccountDetailView: View {
     @State private var nsecKey: String?
     
     var npub: String {
-        user.npub ?? user.pubkey
+        user.npub
     }
     
     var body: some View {

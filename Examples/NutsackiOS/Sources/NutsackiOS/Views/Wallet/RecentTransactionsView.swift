@@ -1,5 +1,6 @@
 import SwiftUI
 import SwiftData
+import NDKSwift
 
 struct RecentTransactionsView: View {
     @Environment(WalletManager.self) private var walletManager
@@ -53,6 +54,8 @@ struct RecentTransactionsView: View {
 
 struct TransactionRow: View {
     let transaction: Transaction
+    @Environment(NostrManager.self) private var nostrManager
+    @State private var senderProfile: NDKUserProfile?
     
     var icon: String {
         switch transaction.type {
@@ -64,43 +67,89 @@ struct TransactionRow: View {
         }
     }
     
-    
     var color: Color {
         switch transaction.type {
-        case .mint, .receive: return .green
-        case .melt, .send, .nutzap: return .orange
+        case .mint, .receive, .nutzap: return .green  // Nutzaps are received, so green
+        case .melt, .send: return .orange
         }
     }
     
     var sign: String {
         switch transaction.type {
-        case .mint, .receive: return "+"
-        case .melt, .send, .nutzap: return "-"
+        case .mint, .receive, .nutzap: return "+"  // Nutzaps are received, so positive
+        case .melt, .send: return "-"
+        }
+    }
+    
+    var displayText: String {
+        if transaction.type == .nutzap {
+            if let senderProfile = senderProfile {
+                let senderName = senderProfile.name ?? senderProfile.displayName ?? "Anonymous"
+                return "Nutzap from \(senderName)"
+            } else if let senderPubkey = transaction.senderPubkey {
+                return "Nutzap from \(senderPubkey.prefix(8))..."
+            } else {
+                return "Nutzap"
+            }
+        } else if let memo = transaction.memo {
+            return memo
+        } else {
+            return transaction.type.displayName
         }
     }
     
     var body: some View {
         HStack {
-            Image(systemName: icon)
-                .font(.body)
-                .foregroundStyle(color)
-                .frame(width: 30)
+            // Avatar for nutzaps, icon for other transactions
+            if transaction.type == .nutzap && transaction.senderPubkey != nil {
+                ZStack {
+                    // Sender avatar
+                    AsyncImage(url: URL(string: senderProfile?.picture ?? "")) { image in
+                        image
+                            .resizable()
+                            .aspectRatio(contentMode: .fill)
+                    } placeholder: {
+                        Circle()
+                            .fill(Color.secondary.opacity(0.3))
+                            .overlay(
+                                Image(systemName: "person.fill")
+                                    .foregroundColor(.secondary)
+                            )
+                    }
+                    .frame(width: 30, height: 30)
+                    .clipShape(Circle())
+                    
+                    // Overlay zap icon
+                    Image(systemName: "bolt.heart.fill")
+                        .font(.caption2)
+                        .foregroundColor(.yellow)
+                        .background(Circle().fill(.white).frame(width: 12, height: 12))
+                        .offset(x: 10, y: -10)
+                }
+                .frame(width: 30, height: 30)
+            } else {
+                Image(systemName: icon)
+                    .font(.body)
+                    .foregroundStyle(color)
+                    .frame(width: 30)
+            }
             
             VStack(alignment: .leading, spacing: 2) {
-                // Show memo as primary text if available, otherwise show type
-                if let memo = transaction.memo {
-                    Text(memo)
-                        .font(.subheadline)
-                        .fontWeight(.medium)
-                        .lineLimit(1)
-                    
+                Text(displayText)
+                    .font(.subheadline)
+                    .fontWeight(.medium)
+                    .lineLimit(1)
+                
+                // Show nutzap comment or transaction type
+                if transaction.type == .nutzap && transaction.memo != nil && !transaction.memo!.isEmpty {
+                    Text(transaction.memo!)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(2)
+                } else if transaction.memo != nil && transaction.type != .nutzap {
                     Text(transaction.type.displayName)
                         .font(.caption)
                         .foregroundStyle(.secondary)
-                } else {
-                    Text(transaction.type.displayName)
-                        .font(.subheadline)
-                        .fontWeight(.medium)
                 }
             }
             
@@ -119,6 +168,18 @@ struct TransactionRow: View {
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 8)
+        .task {
+            // Fetch sender profile for nutzaps
+            if transaction.type == .nutzap, 
+               let senderPubkey = transaction.senderPubkey,
+               let ndk = nostrManager.ndk {
+                
+                for await profile in await ndk.observeProfile(for: senderPubkey) {
+                    senderProfile = profile
+                    break
+                }
+            }
+        }
     }
 }
 
@@ -136,8 +197,8 @@ struct TransactionHistoryView: View {
         func matches(_ transaction: Transaction) -> Bool {
             switch self {
             case .all: return true
-            case .sent: return [.send, .melt, .nutzap].contains(transaction.type)
-            case .received: return [.receive, .mint].contains(transaction.type)
+            case .sent: return [.send, .melt].contains(transaction.type)
+            case .received: return [.receive, .mint, .nutzap].contains(transaction.type)
             }
         }
     }

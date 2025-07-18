@@ -367,7 +367,7 @@ actor OutboxItem {
         lastUpdated = Date()
 
         // Also update the event's relay status
-        await event.updatePublishStatus(relay: relay, status: status)
+        event.updatePublishStatus(relay: relay, status: status)
     }
     
     func setOverallStatus(_ status: PublishStatus) {

@@ -252,7 +252,7 @@ public actor NDKRelaySubscriptionManager {
             for subscription in relaySub.subscriptions {
                 var matches = false
                 for filter in subscription.filters {
-                    if await filter.matches(event: event) {
+                    if filter.matches(event: event) {
                         matches = true
                         break
                     }
@@ -293,7 +293,7 @@ public actor NDKRelaySubscriptionManager {
                     for subscription in relaySub.subscriptions {
                         var matches = false
                         for filter in subscription.filters {
-                            if await filter.matches(event: event) {
+                            if filter.matches(event: event) {
                                 matches = true
                                 break
                             }
@@ -429,7 +429,7 @@ public actor NDKRelaySubscriptionManager {
 
             for subscription in relaySub.subscriptions {
                 Task {
-                    await subscription.handleError(error)
+                    subscription.handleError(error)
                 }
             }
         }
@@ -463,7 +463,7 @@ public actor NDKRelaySubscriptionManager {
         } catch {
             for subscription in relaySub.subscriptions {
                 Task {
-                    await subscription.handleError(error)
+                    subscription.handleError(error)
                 }
             }
         }

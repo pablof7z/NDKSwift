@@ -44,3 +44,4 @@ targets:
             echo "Debug build"
           fi
         name: "Debug Check"
+

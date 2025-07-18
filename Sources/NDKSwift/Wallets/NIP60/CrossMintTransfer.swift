@@ -30,6 +30,48 @@ public enum CrossMintTransfer {
         return nil
     }
     
+    /// Find all mints that have sufficient balance and are in the intersection of accepted mints
+    public static func findAllMintsWithSufficientBalance(
+        acceptedMints: Set<String>,
+        requiredAmount: Int64,
+        mints: MintManager,
+        proofStateManager: ProofStateManager
+    ) async -> [String] {
+        // Get our mints
+        let ourMints = await mints.getMintURLs()
+        
+        // Find intersection
+        let commonMints = Set(ourMints).intersection(acceptedMints)
+        
+        var viableMints: [String] = []
+        
+        // Check each common mint for sufficient balance
+        for mintURL in commonMints {
+            let balance = await proofStateManager.getBalance(mint: mintURL)
+            if balance >= requiredAmount {
+                viableMints.append(mintURL)
+            }
+        }
+        
+        // Sort by balance (highest first) to try the mint with most balance first
+        let sortedMints = await withTaskGroup(of: (String, Int64).self) { group in
+            for mintURL in viableMints {
+                group.addTask {
+                    let balance = await proofStateManager.getBalance(mint: mintURL)
+                    return (mintURL, balance)
+                }
+            }
+            
+            var results: [(String, Int64)] = []
+            for await result in group {
+                results.append(result)
+            }
+            return results.sorted { $0.1 > $1.1 }.map { $0.0 }
+        }
+        
+        return sortedMints
+    }
+    
     /// Find the best source mint for a cross-mint transfer
     public static func findSourceMintForTransfer(
         amount: Int64,
@@ -68,6 +110,7 @@ public enum CrossMintTransfer {
         mints: MintManager,
         proofStateManager: ProofStateManager
     ) async -> PaymentRoute {
+        print("CrossMintTransfer.findBestPaymentRoute - amount: \(amount), acceptedMints: \(acceptedMints)")
         // First, try to find a direct payment option
         if let directMint = await findMintWithSufficientBalance(
             acceptedMints: acceptedMints,
@@ -78,57 +121,55 @@ public enum CrossMintTransfer {
             return .direct(mint: directMint)
         }
         
-        // No direct payment possible, find cross-mint transfer route
-        guard let targetMint = acceptedMints.first else {
-            return .impossible(reason: "No accepted mints provided")
-        }
-        
-        // Find source mint with sufficient balance for transfer + fees
-        guard let sourceMint = await findSourceMintForTransfer(
-            amount: amount,
-            targetMint: targetMint,
-            mints: mints,
-            proofStateManager: proofStateManager,
-            feeBuffer: 1000
-        ) else {
-            let totalBalance = await getTotalBalance(
+        // No direct payment possible, try cross-mint transfer routes for all accepted mints
+        for targetMint in acceptedMints {
+            // Find source mint with sufficient balance for transfer + fees
+            if let sourceMint = await findSourceMintForTransfer(
+                amount: amount,
+                targetMint: targetMint,
                 mints: mints,
-                proofStateManager: proofStateManager
-            )
-            if totalBalance < amount {
-                return .impossible(reason: "Insufficient total balance: \(totalBalance) < \(amount)")
-            } else {
-                return .impossible(reason: "Insufficient balance in any single mint for transfer with fees")
+                proofStateManager: proofStateManager,
+                feeBuffer: 1000
+            ) {
+                // Estimate fees for the transfer
+                if let sourceURL = URL(string: sourceMint),
+                   let targetURL = URL(string: targetMint) {
+                    do {
+                        let fees = try await estimateTransferFees(
+                            amount: amount,
+                            from: sourceURL,
+                            to: targetURL,
+                            mints: mints,
+                            proofStateManager: proofStateManager
+                        )
+                        return .crossMint(
+                            sourceMint: sourceMint,
+                            targetMint: targetMint,
+                            estimatedFee: fees.totalFee
+                        )
+                    } catch {
+                        // If fee estimation fails, still suggest the route with unknown fees
+                        return .crossMint(
+                            sourceMint: sourceMint,
+                            targetMint: targetMint,
+                            estimatedFee: nil
+                        )
+                    }
+                }
             }
         }
         
-        // Estimate fees for the transfer
-        if let sourceURL = URL(string: sourceMint),
-           let targetURL = URL(string: targetMint) {
-            do {
-                let fees = try await estimateTransferFees(
-                    amount: amount,
-                    from: sourceURL,
-                    to: targetURL,
-                    mints: mints,
-                    proofStateManager: proofStateManager
-                )
-                return .crossMint(
-                    sourceMint: sourceMint,
-                    targetMint: targetMint,
-                    estimatedFee: fees.totalFee
-                )
-            } catch {
-                // If fee estimation fails, still suggest the route with unknown fees
-                return .crossMint(
-                    sourceMint: sourceMint,
-                    targetMint: targetMint,
-                    estimatedFee: nil
-                )
-            }
+        // If no routes work, check why
+        let totalBalance = await getTotalBalance(
+            mints: mints,
+            proofStateManager: proofStateManager
+        )
+        print("CrossMintTransfer.evaluateTransferRoute - totalBalance: \(totalBalance), required amount: \(amount)")
+        if totalBalance < amount {
+            return .impossible(reason: "Insufficient total balance: \(totalBalance) < \(amount)")
+        } else {
+            return .impossible(reason: "Insufficient balance in any single mint for transfer with fees")
         }
-        
-        return .impossible(reason: "Invalid mint URLs")
     }
     
     // MARK: - Transfer Operations
@@ -234,13 +275,17 @@ public enum CrossMintTransfer {
         mints: MintManager,
         proofStateManager: ProofStateManager
     ) async -> Int64 {
-        let mints = await mints.getMintURLs()
+        let mintURLs = await mints.getMintURLs()
+        print("CrossMintTransfer.getTotalBalance - checking balance for \(mintURLs.count) mints: \(mintURLs)")
         var total: Int64 = 0
         
-        for mint in mints {
-            total += await proofStateManager.getBalance(mint: mint)
+        for mint in mintURLs {
+            let balance = await proofStateManager.getBalance(mint: mint)
+            print("CrossMintTransfer.getTotalBalance - mint: \(mint), balance: \(balance)")
+            total += balance
         }
         
+        print("CrossMintTransfer.getTotalBalance - total balance: \(total)")
         return total
     }
 }

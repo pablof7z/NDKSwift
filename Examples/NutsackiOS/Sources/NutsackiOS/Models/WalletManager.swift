@@ -91,7 +91,7 @@ class WalletManager {
     
     /// Load wallet from NIP-60 events
     func loadWallet() async throws {
-        guard let ndk = nostrManager.ndk else {
+        guard nostrManager.ndk != nil else {
             throw WalletError.ndkNotInitialized
         }
         
@@ -101,7 +101,7 @@ class WalletManager {
         // Ensure wallet exists (creates if needed)
         try await ensureWalletExists()
         
-        guard let wallet = activeWallet else {
+        guard activeWallet != nil else {
             throw WalletError.noActiveWallet
         }
         
@@ -201,13 +201,10 @@ class WalletManager {
             var direction: String?
             var amount: Int64?
             var memo: String?
-            var mint: String?
             
             for tag in tags {
                 guard tag.count >= 2 else { continue }
                 switch tag[0] {
-                case "mint":
-                    mint = tag[1]
                 case "description":
                     memo = tag[1]
                 case "direction":
@@ -219,11 +216,23 @@ class WalletManager {
                 }
             }
             
+            // Check for redeemed marker in clear tags to detect nutzaps
+            var redeemedEventId: String?
+            var nutzapSender: String?
+            if let redeemedTag = event.tags.first(where: { $0.count >= 4 && $0[0] == "e" && $0[3] == "redeemed" }) {
+                redeemedEventId = redeemedTag[1]
+                if redeemedTag.count >= 5 {
+                    nutzapSender = redeemedTag[4] // Sender pubkey is in position 4
+                }
+            }
+            
             // Determine transaction type from tags
             let transactionType: Transaction.TransactionType
             
-            // Check for specific type in clear tags (e.g., nutzap)
-            if let typeTag = event.tags.first(where: { $0.count >= 2 && $0[0] == "type" }) {
+            // Check for redeemed tag first (indicates nutzap)
+            if redeemedEventId != nil {
+                transactionType = .nutzap
+            } else if let typeTag = event.tags.first(where: { $0.count >= 2 && $0[0] == "type" }) {
                 switch typeTag[1] {
                 case "nutzap":
                     transactionType = .nutzap
@@ -268,7 +277,12 @@ class WalletManager {
                 case .melt: transactionMemo = "Lightning payment" 
                 case .send: transactionMemo = "Sent ecash"
                 case .receive: transactionMemo = "Received ecash"
-                case .nutzap: transactionMemo = "Nutzap"
+                case .nutzap: 
+                    if let sender = nutzapSender {
+                        transactionMemo = "Nutzap from \(sender.prefix(8))..."
+                    } else {
+                        transactionMemo = "Nutzap"
+                    }
                 }
             }
             
@@ -279,6 +293,12 @@ class WalletManager {
             )
             transaction.createdAt = Date(timeIntervalSince1970: TimeInterval(event.createdAt))
             transaction.status = .completed
+            
+            // Store the nutzap event ID and sender if this is a nutzap transaction
+            if let redeemedId = redeemedEventId {
+                transaction.nostrEventID = redeemedId
+                transaction.senderPubkey = nutzapSender
+            }
             
             // Add to published transactions array
             await MainActor.run {
@@ -291,6 +311,26 @@ class WalletManager {
                     
                     // Sort by date (newest first)
                     self.transactions.sort { $0.createdAt > $1.createdAt }
+                }
+            }
+            
+            // Fetch nutzap comment asynchronously if this is a nutzap
+            if let eventId = redeemedEventId, let ndk = nostrManager.ndk {
+                Task {
+                    if let nutzapEvent = try? await ndk.fetchEvent(id: eventId) {
+                        let nutzap = NDKNutzap(event: nutzapEvent)
+                        await MainActor.run {
+                            // Update the transaction with the comment
+                            if let existingTransaction = self.transactions.first(where: { 
+                                $0.createdAt == transaction.createdAt && 
+                                $0.amount == transaction.amount 
+                            }) {
+                                if let comment = nutzap.comment, !comment.isEmpty {
+                                    existingTransaction.memo = comment
+                                }
+                            }
+                        }
+                    }
                 }
             }
         } catch {
@@ -359,19 +399,19 @@ class WalletManager {
         }
         
         // Select mint if not specified
-        let mintURL: URL
+        let selectedMintURL: URL
         if let fromMint = fromMint {
-            mintURL = fromMint
+            selectedMintURL = fromMint
         } else {
             // Auto-select mint with sufficient balance
             let mintURLs = await wallet.mints.getMintURLs()
             let mints = mintURLs.compactMap { URL(string: $0) }
             var selectedMint: URL?
             
-            for mintURL in mints {
-                let balance = await wallet.getBalance(mint: mintURL)
+            for mint in mints {
+                let balance = await wallet.getBalance(mint: mint)
                 if balance >= amount {
-                    selectedMint = mintURL
+                    selectedMint = mint
                     break
                 }
             }
@@ -379,7 +419,7 @@ class WalletManager {
             guard let selected = selectedMint else {
                 throw WalletError.insufficientBalance
             }
-            mintURL = selected
+            selectedMintURL = selected
         }
         
         // Generate P2PK pubkey for locking
@@ -389,12 +429,12 @@ class WalletManager {
         let (proofs, _) = try await wallet.send(
             amount: amount,
             to: p2pkPubkey,
-            mint: mintURL
+            mint: selectedMintURL
         )
         
         // Create token from proofs
         let token = CashuSwift.Token(
-            proofs: [mintURL.absoluteString: proofs],
+            proofs: [selectedMintURL.absoluteString: proofs],
             unit: "sat",
             memo: memo
         )
@@ -527,9 +567,6 @@ class WalletManager {
             throw WalletError.noActiveWallet
         }
         
-        // Create recipient user
-        let recipientUser = NDKUser(pubkey: recipient)
-        
         // Create nutzap request
         let request = NutzapPaymentRequest(
             amountSats: amount,
@@ -574,7 +611,7 @@ class WalletManager {
         fromMint: URL,
         toMint: URL
     ) async throws -> (lightningFee: Int64, inputFee: Int64, totalFee: Int64) {
-        guard let wallet = activeWallet else {
+        guard activeWallet != nil else {
             throw WalletError.noActiveWallet
         }
         
@@ -720,7 +757,7 @@ class WalletManager {
             throw WalletError.noActiveWallet
         }
         
-        guard let url = URL(string: mintURL) else {
+        guard URL(string: mintURL) != nil else {
             throw WalletError.invalidMintURL
         }
         

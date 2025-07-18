@@ -8,8 +8,20 @@ struct MintAllocationPieChart: View {
     @State private var animationProgress: Double = 0
     @State private var isLoading = true
     
-    private let chartSize: CGFloat = 240
-    private let innerRadius: CGFloat = 60
+    // Customizable properties
+    var chartSize: CGFloat = 240
+    var showTitle: Bool = true
+    var showLegend: Bool = true
+    var expansionProgress: CGFloat = 1.0
+    var onBalancesLoaded: ([(mint: String, balance: Int64, percentage: Double)]) -> Void = { _ in }
+    
+    private var innerRadius: CGFloat {
+        if expansionProgress < 0.5 {
+            return 0 // Solid circle when small
+        } else {
+            return chartSize * 0.3 * ((expansionProgress - 0.5) * 2) // Gradually hollow out
+        }
+    }
     
     // Beautiful color palette for the pie chart
     private let mintColors: [Color] = [
@@ -25,16 +37,25 @@ struct MintAllocationPieChart: View {
     
     var body: some View {
         VStack(spacing: 20) {
-            titleView
+            if showTitle {
+                titleView
+            }
             
             if mintBalances.isEmpty && !isLoading {
-                emptyStateView
+                // Don't show empty state for embedded usage
+                if showTitle {
+                    emptyStateView
+                }
             } else {
-                chartAndLegendView
+                if showLegend {
+                    chartAndLegendView
+                } else {
+                    chartView
+                }
             }
         }
-        .padding(20)
-        .background(backgroundView)
+        .padding(showTitle ? 20 : 0)
+        .background(showTitle ? backgroundView : nil)
         .onAppear {
             Task {
                 await loadMintBalances()
@@ -97,12 +118,14 @@ struct MintAllocationPieChart: View {
                     innerRadius: innerRadius,
                     outerRadius: chartSize / 2,
                     color: mintColors[index % mintColors.count],
-                    isSelected: selectedSlice == item.mint,
+                    isSelected: selectedSlice == item.mint && showLegend,
                     animationProgress: animationProgress
                 )
                 .onTapGesture {
-                    withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
-                        selectedSlice = selectedSlice == item.mint ? nil : item.mint
+                    if showLegend {
+                        withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                            selectedSlice = selectedSlice == item.mint ? nil : item.mint
+                        }
                     }
                 }
             }
@@ -114,19 +137,35 @@ struct MintAllocationPieChart: View {
     }
     
     private var centerTotalView: some View {
-        VStack(spacing: 4) {
-            Text("Total")
-                .font(.caption)
-                .foregroundColor(.secondary)
-            
-            Text(formatSats(mintBalances.reduce(0) { $0 + $1.balance }))
-                .font(.headline)
-                .fontWeight(.bold)
-                .foregroundColor(.white)
-            
-            Text("sats")
-                .font(.caption2)
-                .foregroundColor(.secondary)
+        Group {
+            if expansionProgress > 0.5 && showLegend {
+                VStack(spacing: 4) {
+                    Text("Total")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                    
+                    Text(formatSats(mintBalances.reduce(0) { $0 + $1.balance }))
+                        .font(.headline)
+                        .fontWeight(.bold)
+                        .foregroundColor(.white)
+                    
+                    Text("sats")
+                        .font(.caption2)
+                        .foregroundColor(.secondary)
+                }
+                .opacity(Double((expansionProgress - 0.5) * 2))
+            } else if expansionProgress > 0.5 {
+                // Simplified center for BalanceCard usage
+                VStack(spacing: 2) {
+                    Text("\(mintBalances.count)")
+                        .font(.system(size: 18 + (10 * expansionProgress), weight: .bold))
+                        .foregroundColor(.white)
+                    Text("mints")
+                        .font(.system(size: 10 + (4 * expansionProgress)))
+                        .foregroundColor(.secondary)
+                }
+                .opacity(Double((expansionProgress - 0.5) * 2))
+            }
         }
     }
     
@@ -190,25 +229,17 @@ struct MintAllocationPieChart: View {
         
         guard let wallet = walletManager.activeWallet else { return }
         
-        let mintStrings = await wallet.mints.getMintURLs()
-        let mints = mintStrings.compactMap { URL(string: $0) }
-        var balances: [(mint: String, balance: Int64, percentage: Double)] = []
-        var totalBalance: Int64 = 0
+        // Get balances grouped by mint directly
+        let balancesByMint = await wallet.getBalancesByMint()
         
-        // Get balance for each mint
-        for url in mints {
-            let balance = await wallet.getBalance(mint: url)
-            if balance > 0 {
-                balances.append((mint: url.absoluteString, balance: balance, percentage: 0))
-                totalBalance += balance
-            }
-        }
+        var balances: [(mint: String, balance: Int64, percentage: Double)] = []
+        let totalBalance = balancesByMint.values.reduce(0, +)
         
         // Calculate percentages
         if totalBalance > 0 {
-            balances = balances.map { item in
-                let percentage = (Double(item.balance) / Double(totalBalance)) * 100
-                return (mint: item.mint, balance: item.balance, percentage: percentage)
+            for (mint, balance) in balancesByMint {
+                let percentage = (Double(balance) / Double(totalBalance)) * 100
+                balances.append((mint: mint, balance: balance, percentage: percentage))
             }
         }
         
@@ -217,6 +248,7 @@ struct MintAllocationPieChart: View {
         
         await MainActor.run {
             self.mintBalances = balances
+            self.onBalancesLoaded(balances)
         }
     }
     

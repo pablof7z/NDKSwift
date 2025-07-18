@@ -51,9 +51,10 @@ struct WalletView: View {
                 } else {
                     ScrollView {
                         VStack(spacing: 20) {
-                            // Balance card
+                            // Balance card with expandable pie chart
                             BalanceCard()
                                 .padding(.horizontal)
+                                .zIndex(1) // Ensure it stays on top during expansion
                             
                             // Recent transactions
                             RecentTransactionsView()
@@ -61,6 +62,7 @@ struct WalletView: View {
                         }
                         .padding(.top)
                     }
+                    .scrollIndicators(.hidden)
                     
                     Spacer()
                     
