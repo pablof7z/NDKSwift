@@ -33,18 +33,18 @@ public enum Nutzap {
         signer: NDKSigner
     ) async throws -> NDKEvent {
         // Find mints with sufficient balance, ordered by balance (highest first)
-        var viableMints: [(url: String, mint: CashuSwift.Mint)] = []
+        var mintsWithBalance: [(url: String, mint: CashuSwift.Mint, balance: Int64)] = []
         for (mintURL, mint) in mints {
             let balance = await proofStateManager.getBalance(mint: mintURL)
             if balance >= amount {
-                viableMints.append((url: mintURL, mint: mint))
+                mintsWithBalance.append((url: mintURL, mint: mint, balance: balance))
             }
         }
         
         // Sort by balance (highest first) to try the mint with most balance first
-        viableMints.sort { lhs, rhs in
-            await proofStateManager.getBalance(mint: lhs.url) > await proofStateManager.getBalance(mint: rhs.url)
-        }
+        let viableMints = mintsWithBalance
+            .sorted { $0.balance > $1.balance }
+            .map { (url: $0.url, mint: $0.mint) }
         
         guard !viableMints.isEmpty else {
             throw NDKError.insufficientBalance(amount: amount)
@@ -318,7 +318,7 @@ public enum Nutzap {
         let mints = await wallet.mints.getAllMints()
         
         // Build nutzap event (kind 9321)
-        let eventBuilder = NDKEventBuilder()
+        let eventBuilder = wallet.ndk.event()
             .content(comment ?? "") // Content is the comment, not the token
             .kind(9321) // Nutzap kind
         

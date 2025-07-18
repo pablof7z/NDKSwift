@@ -65,7 +65,7 @@ swift package generate-xcodeproj
 
 1. **Protocol-Oriented Design**: The codebase heavily uses protocols (NDKSigner, NDKCacheAdapter, NDKWallet) to allow multiple implementations and testing flexibility.
 
-2. **Actor-Based Concurrency**: Key components like NDKRelayPool, NDKFileCache, and BlossomClient use Swift actors for thread-safe state management. This requires understanding Swift's async/await patterns.
+2. **Actor-Based Concurrency**: Key components like NDKRelayPool, and BlossomClient use Swift actors for thread-safe state management. This requires understanding Swift's async/await patterns.
 
 3. **Event-Driven Architecture**: The system revolves around NDKEvent objects that flow through relays, subscriptions, and caches. Events are immutable once signed.
 
@@ -97,7 +97,6 @@ swift package generate-xcodeproj
 **Cache System**:
 - `NDKCacheAdapter` protocol allows pluggable storage
 - `NDKInMemoryCache` for temporary storage
-- `NDKFileCache` for persistent JSON-based storage
 - Caches handle both events and user profiles
 
 **Blossom Integration**:

@@ -20,7 +20,8 @@ public extension NDK {
             id: nil,
             closeOnEose: options.closeOnEose
         )
-        await subscription.start()
+        // Note: subscription.start() removed to prevent duplicate REQ messages
+        // The subscription is already started by NDKSubscriptionManager via subscribe()
         
         defer {
             Task {
@@ -45,7 +46,8 @@ public extension NDK {
                 id: nil,
                 closeOnEose: options.closeOnEose
             )
-            await sub.start()
+            // Note: sub.start() removed to prevent duplicate REQ messages
+            // The subscription is already started by NDKSubscriptionManager via subscribe()
             subscriptions.append(sub)
         }
         
@@ -87,7 +89,8 @@ public class AutoClosingSubscription: AsyncSequence {
         self.subscription = subscription
         if autoStart {
             Task {
-                await subscription.start()
+                // Note: subscription.start() removed to prevent duplicate REQ messages
+        // The subscription is already started by NDKSubscriptionManager via subscribe()
             }
         }
     }
@@ -101,7 +104,8 @@ public class AutoClosingSubscription: AsyncSequence {
     /// Start the subscription if it was created with autoStart = false
     public func start() {
         Task {
-            await subscription.start()
+            // Note: subscription.start() removed to prevent duplicate REQ messages
+        // The subscription is already started by NDKSubscriptionManager via subscribe()
         }
     }
     

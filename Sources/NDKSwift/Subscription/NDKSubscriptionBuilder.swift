@@ -130,11 +130,8 @@ public class NDKSubscriptionBuilder {
             closeOnEose: options.closeOnEose
         )
         
-        if autoStart {
-            Task {
-                await subscription.start()
-            }
-        }
+        // Note: autoStart is handled by NDKSubscriptionManager - no need to call start() directly
+        // This prevents duplicate REQ messages from being sent to relays
         
         return subscription
     }
@@ -183,7 +180,8 @@ extension NDK {
             }
         }
         
-        await subscription.start()
+        // Note: subscription.start() removed to prevent duplicate REQ messages
+        // The subscription is already started by NDKSubscriptionManager via subscribe()
         
         // Wait for EOSE or timeout
         try await withThrowingTaskGroup(of: Void.self) { group in
@@ -233,7 +231,8 @@ extension NDK {
             }
         }
         
-        await subscription.start()
+        // Note: subscription.start() removed to prevent duplicate REQ messages
+        // The subscription is already started by NDKSubscriptionManager via subscribe()
         
         // Wait for EOSE or timeout
         try await withThrowingTaskGroup(of: Void.self) { group in
@@ -273,7 +272,8 @@ extension NDK {
                 }
                 
                 // Start the subscription
-                await subscription.start()
+                // Note: subscription.start() removed to prevent duplicate REQ messages
+        // The subscription is already started by NDKSubscriptionManager via subscribe()
                 
                 do {
                     for try await event in subscription {
@@ -346,7 +346,8 @@ public class NDKSubscriptionGroup {
     public func subscribe(_ filter: NDKFilter) async -> NDKSubscription {
         let subscription = await ndk.subscribe(filters: [filter])
         subscriptions.append(subscription)
-        await subscription.start()
+        // Note: subscription.start() removed to prevent duplicate REQ messages
+        // The subscription is already started by NDKSubscriptionManager via subscribe()
         return subscription
     }
     
@@ -355,7 +356,8 @@ public class NDKSubscriptionGroup {
     public func subscribe(filters: [NDKFilter]) async -> NDKSubscription {
         let subscription = await ndk.subscribe(filters: filters)
         subscriptions.append(subscription)
-        await subscription.start()
+        // Note: subscription.start() removed to prevent duplicate REQ messages
+        // The subscription is already started by NDKSubscriptionManager via subscribe()
         return subscription
     }
     

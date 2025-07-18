@@ -111,6 +111,21 @@ struct BalanceCard: View {
                         }
                     }
                     .padding(.horizontal)
+                    
+                    // Reconcile button
+                    NavigationLink(destination: SwapView()) {
+                        HStack {
+                            Image(systemName: "arrow.triangle.swap")
+                            Text("Reconcile")
+                        }
+                        .font(.system(size: 16, weight: .medium))
+                        .foregroundColor(.white)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 12)
+                        .background(Color.orange)
+                        .cornerRadius(12)
+                    }
+                    .padding(.horizontal)
                 }
                 .transition(.asymmetric(
                     insertion: .scale.combined(with: .opacity),

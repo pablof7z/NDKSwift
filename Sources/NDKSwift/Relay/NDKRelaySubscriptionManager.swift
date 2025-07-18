@@ -17,9 +17,7 @@ public actor NDKRelaySubscriptionManager {
         mutating func addSubscription(_ subscription: NDKSubscription, filters _: [NDKFilter]) {
             subscriptions.append(subscription)
             // Re-merge filters when adding new subscription
-            mergedFilters = NDKRelaySubscriptionManager.mergeAllFilters(
-                from: subscriptions.map { ($0, $0.filters) }
-            )
+            mergedFilters = NDKRelaySubscriptionManager.mergeFilters(subscriptions)
         }
 
         /// Remove a subscription from this relay subscription
@@ -27,9 +25,7 @@ public actor NDKRelaySubscriptionManager {
             subscriptions.removeAll { $0.id == subscriptionId }
             if !subscriptions.isEmpty {
                 // Re-merge filters after removal
-                mergedFilters = NDKRelaySubscriptionManager.mergeAllFilters(
-                    from: subscriptions.map { ($0, $0.filters) }
-                )
+                mergedFilters = NDKRelaySubscriptionManager.mergeFilters(subscriptions)
             }
         }
 
@@ -50,31 +46,46 @@ public actor NDKRelaySubscriptionManager {
     }
 
     /// Filter fingerprint for grouping
+    /// Uses the same approach as NDKSubscriptionManager for consistency
     public struct FilterFingerprint: Hashable {
-        let kinds: String
-        let authorsPresent: Bool
-        let tagKeys: String
-        let hasLimit: Bool
-        let hasTimeConstraints: Bool
-        let closeOnEose: Bool
-
+        let value: String
+        
         init(filters: [NDKFilter], closeOnEose: Bool) {
-            // Sort kinds for consistent fingerprinting
-            let allKinds = filters.compactMap { $0.kinds }.flatMap { $0 }.sorted()
-            self.kinds = allKinds.isEmpty ? "all" : allKinds.map { String($0) }.joined(separator: ",")
-
-            self.authorsPresent = filters.contains { $0.authors != nil && !$0.authors!.isEmpty }
-
-            // Extract tag keys from filters
-            let tagKeys = filters.compactMap { filter -> [String]? in
-                guard let tags = filter.tags else { return nil }
-                return Array(tags.keys).sorted()
-            }.flatMap { $0 }
-            self.tagKeys = tagKeys.isEmpty ? "" : tagKeys.joined(separator: ",")
-
-            self.hasLimit = filters.contains { $0.limit != nil }
-            self.hasTimeConstraints = filters.contains { $0.since != nil || $0.until != nil }
-            self.closeOnEose = closeOnEose
+            // Use the same fingerprint generation as NDKSubscriptionManager
+            var parts: [String] = []
+            
+            for filter in filters {
+                var keys: [String] = []
+                
+                // Add keys for non-nil properties (not values, except for time)
+                if filter.ids != nil { keys.append("ids") }
+                if filter.authors != nil { keys.append("authors") }
+                if filter.kinds != nil { keys.append("kinds") }
+                if filter.events != nil { keys.append("#e") }
+                if filter.pubkeys != nil { keys.append("#p") }
+                
+                // Time constraints include values to prevent mixing different windows
+                if let since = filter.since { keys.append("since:\(since)") }
+                if let until = filter.until { keys.append("until:\(until)") }
+                
+                // Limit affects groupability
+                if filter.limit != nil { keys.append("limit") }
+                
+                // Add generic tag filters
+                if let tags = filter.tags {
+                    for tagName in tags.keys.sorted() {
+                        keys.append("#\(tagName)")
+                    }
+                }
+                
+                // Sort keys and join
+                let filterPart = keys.sorted().joined(separator: "-")
+                parts.append(filterPart)
+            }
+            
+            // Build final fingerprint
+            let prefix = closeOnEose ? "+" : ""
+            self.value = prefix + parts.joined(separator: "|")
         }
     }
 
@@ -537,86 +548,93 @@ public actor NDKRelaySubscriptionManager {
 
     // MARK: - Filter Merging
 
-    /// Merge filters from multiple subscriptions
-    static func mergeAllFilters(from subscriptions: [(NDKSubscription, [NDKFilter])]) -> [NDKFilter] {
-        var mergedFilters: [NDKFilter] = []
-        var filtersWithLimits: [NDKFilter] = []
-        var filtersWithoutLimits: [NDKFilter] = []
-
-        // Separate filters with and without limits
-        for (_, filters) in subscriptions {
-            for filter in filters {
+    /// Merge filters from multiple subscriptions using the same logic as NDKSubscriptionManager
+    static func mergeFilters(_ subscriptions: [NDKSubscription]) -> [NDKFilter] {
+        // Following ndk-core approach:
+        // 1. Filters with limit are not merged - kept separate
+        // 2. Filters without limit are merged using union semantics
+        // 3. Limited filters come first in the result
+        
+        var limitedFilters: [NDKFilter] = []
+        var unlimitedFilters: [NDKFilter] = []
+        
+        // Separate filters by whether they have limits
+        for subscription in subscriptions {
+            for filter in subscription.filters {
                 if filter.limit != nil {
-                    filtersWithLimits.append(filter)
+                    limitedFilters.append(filter)
                 } else {
-                    filtersWithoutLimits.append(filter)
+                    unlimitedFilters.append(filter)
                 }
             }
         }
-
-        // Filters with limits are not merged
-        mergedFilters.append(contentsOf: filtersWithLimits)
-
-        // Merge filters without limits
-        if !filtersWithoutLimits.isEmpty {
-            let merged = mergeFiltersWithoutLimits(filtersWithoutLimits)
-            mergedFilters.append(merged)
+        
+        // Merge unlimited filters using union semantics
+        let mergedUnlimited = mergeUnlimitedFilters(unlimitedFilters)
+        
+        // Combine results: limited filters first, then merged unlimited
+        var result = limitedFilters
+        if let merged = mergedUnlimited {
+            result.append(merged)
         }
-
-        return mergedFilters
+        
+        return result
     }
-
-    /// Merge filters that don't have limits
-    private static func mergeFiltersWithoutLimits(_ filters: [NDKFilter]) -> NDKFilter {
-        var merged = NDKFilter()
-
-        // Merge kinds
-        let allKinds = filters.compactMap { $0.kinds }.flatMap { $0 }
-        if !allKinds.isEmpty {
-            merged.kinds = Array(Set(allKinds)).sorted()
-        }
-
-        // Merge authors
-        let allAuthors = filters.compactMap { $0.authors }.flatMap { $0 }
-        if !allAuthors.isEmpty {
-            merged.authors = Array(Set(allAuthors))
-        }
-
-        // Merge IDs
-        let allIds = filters.compactMap { $0.ids }.flatMap { $0 }
-        if !allIds.isEmpty {
-            merged.ids = Array(Set(allIds))
-        }
-
-        // Merge tags
-        var mergedTags: [String: [String]] = [:]
+    
+    /// Merge filters without limits using union semantics
+    private static func mergeUnlimitedFilters(_ filters: [NDKFilter]) -> NDKFilter? {
+        guard !filters.isEmpty else { return nil }
+        
+        // Start with empty sets
+        var mergedIds = Set<EventID>()
+        var mergedAuthors = Set<PublicKey>()
+        var mergedKinds = Set<Kind>()
+        var mergedEvents = Set<EventID>()
+        var mergedPubkeys = Set<PublicKey>()
+        var mergedTags: [String: Set<String>] = [:]
+        
+        // Use most inclusive time range
+        var mergedSince: Timestamp?
+        var mergedUntil: Timestamp?
+        
+        // Union all filter values
         for filter in filters {
+            if let ids = filter.ids { mergedIds.formUnion(ids) }
+            if let authors = filter.authors { mergedAuthors.formUnion(authors) }
+            if let kinds = filter.kinds { mergedKinds.formUnion(kinds) }
+            if let events = filter.events { mergedEvents.formUnion(events) }
+            if let pubkeys = filter.pubkeys { mergedPubkeys.formUnion(pubkeys) }
+            
+            // For time constraints, use most inclusive range
+            if let since = filter.since {
+                mergedSince = mergedSince != nil ? min(mergedSince!, since) : since
+            }
+            if let until = filter.until {
+                mergedUntil = mergedUntil != nil ? max(mergedUntil!, until) : until
+            }
+            
+            // Merge tag filters
             if let tags = filter.tags {
-                for (key, values) in tags {
-                    if mergedTags[key] == nil {
-                        mergedTags[key] = []
+                for (tagName, values) in tags {
+                    if mergedTags[tagName] == nil {
+                        mergedTags[tagName] = Set<String>()
                     }
-                    mergedTags[key]?.append(contentsOf: values)
+                    mergedTags[tagName]?.formUnion(values)
                 }
             }
         }
-
-        // Convert merged tags to proper format and add to filter
-        for (tagName, values) in mergedTags {
-            merged.addTagFilter(tagName, values: Array(Set(values)))
-        }
-
-        // Handle time constraints (use most restrictive)
-        let sinceValues = filters.compactMap { $0.since }
-        if !sinceValues.isEmpty {
-            merged.since = sinceValues.max() // Most recent since
-        }
-
-        let untilValues = filters.compactMap { $0.until }
-        if !untilValues.isEmpty {
-            merged.until = untilValues.min() // Earliest until
-        }
-
-        return merged
+        
+        // Create merged filter
+        return NDKFilter(
+            ids: mergedIds.isEmpty ? nil : Array(mergedIds),
+            authors: mergedAuthors.isEmpty ? nil : Array(mergedAuthors),
+            kinds: mergedKinds.isEmpty ? nil : Array(mergedKinds),
+            events: mergedEvents.isEmpty ? nil : Array(mergedEvents),
+            pubkeys: mergedPubkeys.isEmpty ? nil : Array(mergedPubkeys),
+            since: mergedSince,
+            until: mergedUntil,
+            limit: nil, // Unlimited filters only
+            tags: mergedTags.isEmpty ? nil : mergedTags
+        )
     }
 }

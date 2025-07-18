@@ -206,7 +206,7 @@ public actor NDKEventManager {
             throw NDKError.notConfigured("No signer available")
         }
         
-        let eventBuilder = NDKEventBuilder()
+        let eventBuilder = ndk.event()
         let configuredBuilder = builder(eventBuilder)
         
         // Build the event

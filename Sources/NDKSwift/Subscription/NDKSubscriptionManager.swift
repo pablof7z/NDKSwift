@@ -24,22 +24,51 @@ public actor NDKSubscriptionManager {
     }
 
     /// Filter fingerprint for grouping compatibility
+    /// Follows ndk-core's approach: uses filter keys (not values) to determine groupability
     struct FilterFingerprint: Hashable {
-        let kinds: Set<Int>?
-        let authorsCount: Int
-        let tagTypes: Set<String>
-        let hasTimeConstraints: Bool
-        let hasLimit: Bool
-        let closeOnEose: Bool
-
-        init(filter: NDKFilter, closeOnEose: Bool) {
-            self.kinds = filter.kinds != nil ? Set(filter.kinds!) : nil
-            self.authorsCount = filter.authors?.count ?? 0
-            // Note: tagNames property doesn't exist in current NDKFilter, use empty set
-            self.tagTypes = Set<String>()
-            self.hasTimeConstraints = filter.since != nil || filter.until != nil
-            self.hasLimit = filter.limit != nil
-            self.closeOnEose = closeOnEose
+        let value: String
+        
+        /// Create fingerprint from filters following ndk-core pattern:
+        /// Format: [+][filter-keys-sorted|filter-keys-sorted|...]
+        /// - Prefix '+' indicates closeOnEose
+        /// - Filter keys are sorted alphabetically
+        /// - Multiple filters separated by '|'
+        /// - Time constraints (since/until) include actual values
+        init(filters: [NDKFilter], closeOnEose: Bool) {
+            var parts: [String] = []
+            
+            for filter in filters {
+                var keys: [String] = []
+                
+                // Add keys for non-nil properties (not values, except for time)
+                if filter.ids != nil { keys.append("ids") }
+                if filter.authors != nil { keys.append("authors") }
+                if filter.kinds != nil { keys.append("kinds") }
+                if filter.events != nil { keys.append("#e") }
+                if filter.pubkeys != nil { keys.append("#p") }
+                
+                // Time constraints include values to prevent mixing different windows
+                if let since = filter.since { keys.append("since:\(since)") }
+                if let until = filter.until { keys.append("until:\(until)") }
+                
+                // Limit affects groupability
+                if filter.limit != nil { keys.append("limit") }
+                
+                // Add generic tag filters
+                if let tags = filter.tags {
+                    for tagName in tags.keys.sorted() {
+                        keys.append("#\(tagName)")
+                    }
+                }
+                
+                // Sort keys and join
+                let filterPart = keys.sorted().joined(separator: "-")
+                parts.append(filterPart)
+            }
+            
+            // Build final fingerprint
+            let prefix = closeOnEose ? "+" : ""
+            self.value = prefix + parts.joined(separator: "|")
         }
     }
 
@@ -362,7 +391,7 @@ public actor NDKSubscriptionManager {
         subscriptionStates[subscription.id] = .grouping
 
         // Create fingerprint for grouping
-        let fingerprint = createFingerprint(for: subscription)
+        let fingerprint = await createFingerprint(for: subscription)
 
         if var group = pendingGroups[fingerprint] {
             // Add to existing group
@@ -387,14 +416,9 @@ public actor NDKSubscriptionManager {
         }
     }
 
-    private func createFingerprint(for subscription: NDKSubscription) -> FilterFingerprint {
-        // For now, create fingerprint from first filter
-        // In a more sophisticated implementation, we'd analyze all filters
-        guard let firstFilter = subscription.filters.first else {
-            return FilterFingerprint(filter: NDKFilter(), closeOnEose: false)
-        }
-
-        return FilterFingerprint(filter: firstFilter, closeOnEose: false)
+    private func createFingerprint(for subscription: NDKSubscription) async -> FilterFingerprint {
+        let options = await subscription.options
+        return FilterFingerprint(filters: subscription.filters, closeOnEose: options.closeOnEose)
     }
 
     private func executeGroup(fingerprint: FilterFingerprint) async {
@@ -455,39 +479,97 @@ public actor NDKSubscriptionManager {
     }
 
     private func mergeFilters(from subscriptions: [NDKSubscription]) -> [NDKFilter] {
-        var result: [NDKFilter] = []
-        var processed: Set<String> = []
-
+        // Following ndk-core approach:
+        // 1. Filters with limit are not merged - kept separate
+        // 2. Filters without limit are merged using union semantics
+        // 3. Limited filters come first in the result
+        
+        var limitedFilters: [NDKFilter] = []
+        var unlimitedFilters: [NDKFilter] = []
+        
+        // Separate filters by whether they have limits
         for subscription in subscriptions {
             for filter in subscription.filters {
-                let filterId = "\(filter.kinds ?? [])_\(filter.authors?.count ?? 0)" // Simple approach
-
-                if !processed.contains(filterId) {
-                    // Try to merge with existing filters
-                    var merged = false
-                    for i in 0 ..< result.count {
-                        if let mergedFilter = result[i].merged(with: filter) {
-                            result[i] = mergedFilter
-                            merged = true
-                            break
-                        }
-                    }
-
-                    if !merged {
-                        result.append(filter)
-                    }
-
-                    processed.insert(filterId)
+                if filter.limit != nil {
+                    limitedFilters.append(filter)
+                } else {
+                    unlimitedFilters.append(filter)
                 }
             }
         }
-
+        
+        // Merge unlimited filters using union semantics
+        let mergedUnlimited = mergeUnlimitedFilters(unlimitedFilters)
+        
+        // Combine results: limited filters first, then merged unlimited
+        var result = limitedFilters
+        if let merged = mergedUnlimited {
+            result.append(merged)
+        }
+        
         // Respect maximum filters per request
         if result.count > maxFiltersPerRequest {
             result = Array(result.prefix(maxFiltersPerRequest))
         }
-
+        
         return result
+    }
+    
+    /// Merge filters without limits using union semantics
+    private func mergeUnlimitedFilters(_ filters: [NDKFilter]) -> NDKFilter? {
+        guard !filters.isEmpty else { return nil }
+        
+        // Start with empty sets
+        var mergedIds = Set<EventID>()
+        var mergedAuthors = Set<PublicKey>()
+        var mergedKinds = Set<Kind>()
+        var mergedEvents = Set<EventID>()
+        var mergedPubkeys = Set<PublicKey>()
+        var mergedTags: [String: Set<String>] = [:]
+        
+        // Use most inclusive time range
+        var mergedSince: Timestamp?
+        var mergedUntil: Timestamp?
+        
+        // Union all filter values
+        for filter in filters {
+            if let ids = filter.ids { mergedIds.formUnion(ids) }
+            if let authors = filter.authors { mergedAuthors.formUnion(authors) }
+            if let kinds = filter.kinds { mergedKinds.formUnion(kinds) }
+            if let events = filter.events { mergedEvents.formUnion(events) }
+            if let pubkeys = filter.pubkeys { mergedPubkeys.formUnion(pubkeys) }
+            
+            // For time constraints, use most inclusive range
+            if let since = filter.since {
+                mergedSince = mergedSince != nil ? min(mergedSince!, since) : since
+            }
+            if let until = filter.until {
+                mergedUntil = mergedUntil != nil ? max(mergedUntil!, until) : until
+            }
+            
+            // Merge tag filters
+            if let tags = filter.tags {
+                for (tagName, values) in tags {
+                    if mergedTags[tagName] == nil {
+                        mergedTags[tagName] = Set<String>()
+                    }
+                    mergedTags[tagName]?.formUnion(values)
+                }
+            }
+        }
+        
+        // Create merged filter
+        return NDKFilter(
+            ids: mergedIds.isEmpty ? nil : Array(mergedIds),
+            authors: mergedAuthors.isEmpty ? nil : Array(mergedAuthors),
+            kinds: mergedKinds.isEmpty ? nil : Array(mergedKinds),
+            events: mergedEvents.isEmpty ? nil : Array(mergedEvents),
+            pubkeys: mergedPubkeys.isEmpty ? nil : Array(mergedPubkeys),
+            since: mergedSince,
+            until: mergedUntil,
+            limit: nil, // Unlimited filters only
+            tags: mergedTags.isEmpty ? nil : mergedTags
+        )
     }
 
     private func executeImmediately(_ subscription: NDKSubscription) {

@@ -36,7 +36,7 @@ public struct NWCRequestBuilder {
         )
         
         // Create the event using the builder
-        let event = try await NDKEventBuilder()
+        let event = try await ndk.event()
             .pubkey(signerPubkey)
             .createdAt(Timestamp.now)
             .kind(.nostrWalletConnectReq)

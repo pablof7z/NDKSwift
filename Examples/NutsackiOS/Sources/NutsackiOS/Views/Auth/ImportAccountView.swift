@@ -11,6 +11,7 @@ struct ImportAccountView: View {
     @State private var showError = false
     @State private var errorMessage = ""
     @State private var showScanner = false
+    @State private var profileTask: Task<Void, Never>?
     
     var body: some View {
         NavigationStack {
@@ -72,6 +73,9 @@ struct ImportAccountView: View {
                     showScanner = false
                 }
             }
+            .onDisappear {
+                profileTask?.cancel()
+            }
         }
     }
     
@@ -86,13 +90,21 @@ struct ImportAccountView: View {
                 let signer = try NDKPrivateKeySigner(nsec: nsecInput)
                 let pubkey = try await signer.pubkey
                 
-                // Fetch the user's profile (kind 0) to get their display name
-                print("🔑 [ImportAccountView] Fetching profile for pubkey: \(pubkey)")
-                let profile = try await nostrManager.ndk?.fetchProfile(for: pubkey)
+                // Observe the user's profile (kind 0) to get their display name
+                print("🔑 [ImportAccountView] Observing profile for pubkey: \(pubkey)")
+                var displayName = "Nostr User"
                 
-                // Use the profile name if available, otherwise use a default
-                let displayName = profile?.name ?? profile?.displayName ?? "Nostr User"
-                print("🔑 [ImportAccountView] Using display name: \(displayName)")
+                if let ndk = nostrManager.ndk {
+                    let profileStream = await ndk.observeProfile(for: pubkey, closeOnEose: true)
+                    
+                    for await profile in profileStream {
+                        if let profile = profile {
+                            displayName = profile.displayName ?? profile.name ?? "Nostr User"
+                            print("🔑 [ImportAccountView] Using display name: \(displayName)")
+                            break // We only need the first profile for login
+                        }
+                    }
+                }
                 
                 // Create session using NDKAuth system
                 print("🔑 [ImportAccountView] Creating session...")

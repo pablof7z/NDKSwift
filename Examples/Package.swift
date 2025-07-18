@@ -8,7 +8,8 @@ let package = Package(
         .macOS(.v14)
     ],
     products: [
-        .executable(name: "RelayCollectionDemo", targets: ["RelayCollectionDemo"])
+        .executable(name: "RelayCollectionDemo", targets: ["RelayCollectionDemo"]),
+        .executable(name: "DebugKind0Fetcher", targets: ["DebugKind0Fetcher"])
     ],
     dependencies: [
         .package(path: "..")
@@ -20,6 +21,13 @@ let package = Package(
                 .product(name: "NDKSwift", package: "NDKSwift-sfodj5")
             ],
             path: "Sources/RelayCollectionDemo"
+        ),
+        .executableTarget(
+            name: "DebugKind0Fetcher",
+            dependencies: [
+                .product(name: "NDKSwift", package: "NDKSwift-sfodj5")
+            ],
+            path: "Sources/DebugKind0Fetcher"
         )
     ]
 )

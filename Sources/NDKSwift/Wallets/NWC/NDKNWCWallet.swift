@@ -26,6 +26,7 @@ public actor NDKNWCWallet: NDKPaymentProvider {
     private var _cachedBalance: Int64?
     private var _lastBalanceCheck: Date?
     private let balanceCacheDuration: TimeInterval = 30 // 30 seconds
+    private var connectionTask: Task<Void, Error>?
     
     // MARK: - Computed Properties
     
@@ -76,24 +77,43 @@ public actor NDKNWCWallet: NDKPaymentProvider {
     // MARK: - Connection Management
     
     public func connect() async throws {
+        // If already connecting, wait for that connection
+        if let existingTask = connectionTask {
+            return try await existingTask.value
+        }
+        
+        // If already connected, nothing to do
+        guard _status != .connected else { return }
+        
         _status = .connecting
         print("[NWC] Starting connection...")
         
-        do {
-            // Fetch wallet info to verify connection
-            print("[NWC] Fetching wallet info...")
-            let info = try await getInfo()
-            print("[NWC] Got wallet info: \(info.methods.count) methods")
-            _walletInfo = info
-            _status = .connected
-        } catch {
-            print("[NWC] Connection error: \(error)")
-            _status = .error(error.localizedDescription)
-            throw error
+        // Store the connection task
+        connectionTask = Task {
+            do {
+                // Fetch wallet info to verify connection
+                print("[NWC] Fetching wallet info...")
+                let info = try await getInfo()
+                print("[NWC] Got wallet info: \(info.methods.count) methods")
+                _walletInfo = info
+                _status = .connected
+                connectionTask = nil
+            } catch {
+                print("[NWC] Connection error: \(error)")
+                _status = .error(error.localizedDescription)
+                connectionTask = nil
+                throw error
+            }
         }
+        
+        try await connectionTask!.value
     }
     
     public func disconnect() async {
+        // Cancel any pending connection
+        connectionTask?.cancel()
+        connectionTask = nil
+        
         _status = .disconnected
         _walletInfo = nil
         _cachedBalance = nil
@@ -365,12 +385,13 @@ public actor NDKNWCWallet: NDKPaymentProvider {
         case .disconnected:
             try await connect()
         case .connecting:
-            // Wait a bit for connection to complete
-            try await Task.sleep(nanoseconds: 1_000_000_000) // 1 second
-            if case .connected = _status {
-                return
+            // Wait for the existing connection task
+            if let task = connectionTask {
+                try await task.value
+            } else {
+                // Shouldn't happen, but handle gracefully by attempting connection
+                try await connect()
             }
-            throw NDKError.connectionFailed(relay: connectionURI.relayURLs.joined(separator: ", "), message: "Wallet not connected")
         case .error(let message):
             throw NDKError.walletError(message: "Wallet connection error: \(message)")
         }

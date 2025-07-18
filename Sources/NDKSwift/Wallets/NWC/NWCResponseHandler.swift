@@ -86,8 +86,10 @@ public struct NWCResponseHandler {
             throw NDKError.timeout(operation: "NWC response", seconds: Int(timeout))
         }
         
-        // 3. Wait a moment for subscription to be established
-        try await Task.sleep(nanoseconds: 500_000_000) // 0.5 seconds
+        // 3. Wait for subscription to be ready by waiting for EOSE
+        print("[NWC Response] Waiting for subscription to receive EOSE before publishing request")
+        await subscription.waitForEOSE()
+        print("[NWC Response] Subscription ready (EOSE received)")
         
         // 4. Now publish the request
         print("[NWC Response] Publishing request event \(requestId)")

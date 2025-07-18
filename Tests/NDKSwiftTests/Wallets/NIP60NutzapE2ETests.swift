@@ -260,7 +260,6 @@ final class NIP60NutzapE2ETests: XCTestCase {
         
         let depositStream = await wallet1.monitorDeposit(
             quote: quote,
-            pollingInterval: 3.0,
             timeout: 30.0 // 30 seconds timeout for testing
         )
         
@@ -351,6 +350,7 @@ final class NIP60NutzapE2ETests: XCTestCase {
         let nutzapRequest = NutzapPaymentRequest(
             amountSats: nutzapAmount,
             recipientPubkey: pubkey2,
+            recipientP2PK: pubkey2, // Use the same for testing
             acceptedMints: acceptedMints,
             comment: "Test nutzap from E2E test"
         )

@@ -38,6 +38,7 @@ final class Transaction {
     var lightningInvoice: String?
     var status: TransactionStatus
     var senderPubkey: String?  // For nutzaps and received transactions
+    var offlineToken: String?  // Store generated offline token
     
     
     init(type: TransactionType, amount: Int, memo: String? = nil) {

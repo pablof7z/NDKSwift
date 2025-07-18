@@ -1,20 +1,33 @@
 # NDKSwift
 
-A modern Swift implementation of the Nostr Development Kit for Apple platforms (iOS, macOS, tvOS, watchOS).
+**Build unstoppable, local-first Nostr applications that work everywhere - even offline.**
 
-NDKSwift provides a comprehensive toolkit for building Nostr applications with Swift, featuring modern async/await patterns, type safety, and seamless integration with Apple's ecosystem.
+NDKSwift is a modern Swift implementation of the Nostr Development Kit for Apple platforms. It embraces the local-first philosophy, ensuring your applications remain fast, resilient, and respectful of user autonomy - whether online, offline, or anything in between.
 
-## Features
+## Why NDKSwift?
 
-- **Modern Swift Design**: Built with async/await, AsyncSequence, and actors for thread-safe concurrency
-- **Optimistic Publishing**: Instant UI updates with events appearing immediately in subscriptions
-- **Comprehensive NIP Support**: Extensive protocol coverage (see supported NIPs below)
-- **Flexible Architecture**: Protocol-oriented design allowing custom implementations
-- **Outbox Model**: Intelligent relay selection and event routing (enabled by default)
-- **Built-in Caching**: Optional caching with SQLite implementation and optimistic event tracking
-- **Wallet Integration**: Nostr Wallet Connect (NWC) support for payments
-- **File Storage**: Blossom protocol support for decentralized file storage
-- **Type Safety**: Strongly typed events, filters, and relay management
+### 🚀 Local-First by Design
+Your data lives on your device first. Write a note on a plane, in a subway, or during an outage - NDKSwift ensures it reaches the world when it can. No spinners. No "connection failed" errors. Just instant, responsive software that respects your autonomy.
+
+### 🔐 True Data Ownership  
+With Nostr + NDKSwift, your social identity lives in your pocket, not on someone's server. Export it, back it up, move it between apps. Your followers, your content, your rules. No platform can delete your account or censor your voice.
+
+### ⚡ Lightning Fast
+Zero network latency for your own actions. Post instantly. Like instantly. Reply instantly. The network syncs in the background while your users experience native app performance.
+
+## Core Features
+
+- **Local-First Architecture**: Everything works offline - posts, likes, profiles, search
+- **Optimistic Publishing**: Events appear immediately in local UI, sync when online
+- **Automatic Retry**: Smart exponential backoff ensures your content always reaches relays
+- **Progressive Sync**: Honest UI shows delivery status (sending → partial → confirmed)
+- **Modern Swift**: Async/await, AsyncSequence, and actors for elegant concurrent code
+- **Comprehensive NIPs**: Extensive protocol support including outbox model (NIP-65) and client identification (NIP-89)
+- **Built-in Caching**: SQLite-powered local storage with full-text search
+- **Wallet Integration**: Lightning (NWC) and Cashu support for seamless payments
+- **Decentralized Storage**: Blossom protocol for censorship-resistant file hosting
+- **Client Identification**: Automatic client tagging and application discovery (NIP-89)
+- **Type Safety**: Strongly typed APIs prevent common errors at compile time
 
 ## Installation
 
@@ -38,33 +51,68 @@ Or add it through Xcode:
 ```swift
 import NDKSwift
 
-// Create NDK instance
-let ndk = NDK(relayUrls: [
-    "wss://relay.damus.io",
-    "wss://relay.primal.net",
-    "wss://relay.nostr.band"
-])
+// Create a local-first Nostr app in seconds
+let cache = NDKSQLiteCache() // Your personal Nostr database
+let ndk = NDK(
+    relayUrls: [
+        "wss://relay.damus.io",
+        "wss://relay.primal.net", 
+        "wss://relay.nostr.band"
+    ],
+    cache: cache  // Enables local-first superpowers
+)
 
-// Connect to relays
-await ndk.connect()
-
-// Subscribe to text notes
-let subscription = ndk.subscribe(filters: [
-    NDKFilter(kinds: [1], limit: 10)
-])
-
-// Process events using AsyncSequence
-for await event in subscription {
-    print("\(event.pubkey): \(event.content)")
-}
-
-// Publish an event (appears instantly in subscriptions!)
+// Generate your identity (or use existing keys)
 let signer = try NDKPrivateKeySigner.generate()
 ndk.signer = signer
 
-let event = NDKEvent(content: "Hello, Nostr!", tags: [])
-try await ndk.publish(event) // Event appears immediately in active subscriptions
+// Configure client identification (NIP-89)
+ndk.clientTagConfig = NDKClientTagConfig(
+    name: "MyApp",
+    address: "31990:mypubkey:myapp-ios", // Optional
+    autoTag: true
+)
+
+// Subscribe to notes - works even offline!
+let subscription = ndk.subscribe(filters: [
+    NDKFilter(kinds: [1], limit: 50)
+])
+
+// Process events from cache AND network seamlessly
+for await event in subscription {
+    // Events flow from:
+    // 1. Local cache (instant)
+    // 2. Optimistic updates (instant) 
+    // 3. Network relays (when connected)
+    print("\(event.pubkey): \(event.content)")
+}
+
+// Publish instantly - even on airplane mode!
+let event = NDKEvent(content: "Hello, decentralized world! 🌍")
+try await ndk.publish(event)
+// ✓ Appears immediately in local UI
+// ✓ Syncs to relays when online
+// ✓ Retries automatically if needed
+
+// Connect when you want (or don't - it still works!)
+await ndk.connect()
 ```
+
+## The Local-First Advantage
+
+Building with NDKSwift means your users get:
+
+### 🚄 Subway-Proof Social
+No more "No Internet Connection" errors. Your users can browse, post, and interact whether they're underground, in-flight, or in a remote cabin. The conversation continues uninterrupted.
+
+### 🛡️ Censorship Immunity  
+When your data lives locally first, no platform, government, or corporation can delete it. Users own their social graph, their content, and their identity. Truly unstoppable applications.
+
+### ⚡ Native App Performance
+Forget loading spinners. Every action feels instant because it IS instant. The network becomes an enhancement, not a dependency. Your app feels as fast as native because it runs like native.
+
+### 🔄 Seamless Sync
+NDKSwift handles the complexity of distributed systems. Events sync across devices and relays automatically. Conflicts resolve naturally. Your code stays simple while your app stays resilient.
 
 ## Core Concepts
 
@@ -78,13 +126,19 @@ let event = NDKEvent(
     tags: [["t", "nostr"], ["t", "swift"]]
 )
 
-// Sign and publish (with optimistic publishing for instant UI feedback)
+// Sign and publish - works even when offline!
 try await ndk.publish(event)
+// ✓ Event appears instantly in local subscriptions
+// ✓ Automatically retries when connectivity is restored
+// ✓ Tracks confirmation state across all relays
 
 // Configure optimistic publishing behavior
 ndk.optimisticPublishingConfig.enabled = true // default
 ndk.optimisticPublishingConfig.cacheUnpublishedEvents = true
 ndk.optimisticPublishingConfig.dispatchToSubscriptions = true
+
+// Manually retry unpublished events if needed
+try await ndk.retryUnpublishedEvents()
 ```
 
 ### Subscriptions
@@ -135,14 +189,14 @@ let bunkerSigner = NDKBunkerSigner(remotePubkey: "bunker-pubkey", relayUrls: ["w
 
 ### Caching
 
-Enable caching for better performance and optimistic publishing:
+Enable caching for better performance and offline support:
 
 ```swift
 let cache = NDKSQLiteCache()
 let ndk = NDK(relayUrls: relayUrls, cache: cache)
 
 // Events are automatically cached
-// Optimistic events are tracked with confirmation states
+// Unpublished events are stored and retried when online
 // Deletion events (NIP-09) are automatically processed
 // Queries check cache first
 let cachedEvents = try await ndk.fetchEvents(filter, useCache: true)
@@ -151,11 +205,19 @@ let cachedEvents = try await ndk.fetchEvents(filter, useCache: true)
 let confirmationState = await cache.getEventConfirmationState(eventId: event.id)
 switch confirmationState {
 case .optimistic:
-    // Show "sending..." indicator
-case .confirmed(let relay):
-    // Show "sent via \(relay)" indicator
+    // Show "sending..." indicator - event will retry automatically
+case .partial(let confirmed, let pending):
+    // Show "sent to \(confirmed.count) of \(confirmed.count + pending.count) relays"
+case .confirmed:
+    // Show "sent ✓" indicator
 case nil:
     // Event not found or no tracking
+}
+
+// Monitor offline events
+let unpublishedCount = try await cache.getUnpublishedEvents(limit: 100).count
+if unpublishedCount > 0 {
+    print("\(unpublishedCount) events waiting to be sent")
 }
 ```
 
@@ -241,6 +303,45 @@ let eventZap = try await event.zap(
 let zaps = try await event.fetchZaps(includeNutzaps: true)
 ```
 
+#### Client Identification (NIP-89)
+```swift
+// Configure automatic client tagging
+ndk.clientTagConfig = NDKClientTagConfig(
+    name: "MyApp",
+    address: "31990:mypubkey:myapp-ios", // Optional
+    autoTag: true,
+    excludedKinds: [4] // Exclude DMs for privacy
+)
+
+// All published events now include client tags automatically
+let event = try await ndk.event()
+    .content("Hello from MyApp!")
+    .build() // Includes: ["client", "MyApp", "31990:mypubkey:myapp-ios"]
+
+// Or configure with just client name for simple identification
+ndk.clientTagConfig = NDKClientTagConfig(
+    name: "MyApp",
+    autoTag: true
+) // Creates: ["client", "MyApp"]
+
+// Extract client info from events
+if let clientTag = event.clientTag {
+    print("Published by: \(clientTag.name)")
+    if let address = clientTag.address {
+        print("Handler: \(address)")
+    }
+}
+
+// Create handler info to advertise your app
+let handler = try await ndk.event()
+    .nip89HandlerInfo(
+        identifier: "myapp-ios",
+        supportedKinds: [1, 6, 7], // Text, reposts, reactions
+        handlerURLs: ["ios": "myapp://event/<bech32>"]
+    )
+    .build()
+```
+
 ## Supported NIPs
 
 NDKSwift implements the following Nostr Implementation Possibilities:
@@ -249,11 +350,12 @@ NDKSwift implements the following Nostr Implementation Possibilities:
 - **NIP-01**: Basic protocol flow description
 - **NIP-02**: Contact List and Petnames
 - **NIP-09**: Event Deletion
-- **NIP-10**: Conventions for clients' use of e and p tags in text events (with pubkey hints)
+- **NIP-10**: Conventions for clients' use of e and p tags in text events (with pubkey hints, supports "a" tags for addressable events)
 - **NIP-18**: Reposts
 - **NIP-19**: bech32-encoded entities
 - **NIP-25**: Reactions
 - **NIP-65**: Relay List Metadata (Outbox Model)
+- **NIP-89**: Recommended Application Handlers (Client Identification)
 
 ### Encryption & Security
 - **NIP-04**: Encrypted Direct Messages (deprecated, use NIP-44)
@@ -280,9 +382,11 @@ NDKSwift implements the following Nostr Implementation Possibilities:
 Comprehensive documentation is available in the [Documentation](Documentation/) directory:
 
 - [Getting Started Guide](Documentation/GETTING_STARTED.md) - Step-by-step introduction
+- [Local-First Philosophy](Documentation/LOCAL_FIRST.md) - Why local-first matters for Nostr
 - [API Reference](Documentation/API_REFERENCE.md) - Complete API documentation
 - [Examples](Documentation/EXAMPLES.md) - Practical code examples
 - [Architecture Overview](Documentation/ARCHITECTURE.md) - System design and patterns
+- [Optimistic Publishing](Documentation/OPTIMISTIC_PUBLISHING.md) - Deep dive into offline features
 
 ## Examples
 
@@ -290,7 +394,7 @@ The [Examples](Examples/) directory contains runnable demos:
 
 - `SimpleDemo.swift` - Basic usage example
 - `StandaloneDemo.swift` - Self-contained demo (no compilation needed)
-- `OptimisticPublishingDemo.swift` - Optimistic publishing demonstration
+- `OptimisticPublishingDemo.swift` - Offline publishing and retry demonstration
 - `NWCDemo.swift` - Wallet integration example
 - `BlossomDemo.swift` - File storage example
 - `OutboxDemo.swift` - Outbox model demonstration

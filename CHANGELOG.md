@@ -8,9 +8,61 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **NIP-89 Client Identification**: Complete support for application handler discovery
+  - `NDKEventBuilder.clientTag()` - Add client tags to events manually
+  - `NDKClientTagConfig` - Configure automatic client tagging for all events
+  - `NDKEvent.clientTag` - Extract client information from events
+  - `NDKNIP89Events.swift` - Full NIP-89 event types and parsing
+  - `NDKEventBuilder.nip89HandlerInfo()` - Create handler information events (kind 31990)
+  - `NDKEventBuilder.nip89Recommendation()` - Create recommendation events (kind 31989)
+  - `NDKEvent.asNIP89HandlerInfo()` - Parse handler information from events
+  - `NDKEvent.asNIP89Recommendation()` - Parse recommendations from events
+  - Privacy-conscious configuration with excluded event kinds
+  - Comprehensive documentation and examples in `EXAMPLES.md`
+  - Full test suite covering all NIP-89 functionality
+
+### Changed
+- **Subscription Grouping**: Completely reimplemented to match ndk-core patterns
+  - Fingerprints now use filter structure (keys) not values, enabling proper grouping
+  - Multiple profile requests (e.g., kind:0 with different authors) are now merged into single subscriptions
+  - Filters with limits are kept separate and not merged
+  - Union semantics for merging array values (authors, kinds, etc.)
+  - Time constraints (since/until) included in fingerprints to prevent inappropriate grouping
+  - Both NDKSubscriptionManager and NDKRelaySubscriptionManager use consistent fingerprinting
+- **ProfileManager**: Completely removed batching code
+  - Removed `NDKProfileConfig` properties: `batchRequests`, `batchDelay`, `maxBatchSize`
+  - Removed all batching methods and instance variables
+  - ProfileManager now relies on subscription layer for automatic batching
+  - Simplified from 382 lines to 286 lines (25% reduction)
+- **Performance**: Added caching for decrypted wallet event data
+  - `NDKCashuWalletEvent` now caches decrypted tags to avoid repeated decryption
+  - Significant performance improvement when accessing mints and private keys multiple times
+  
+### Fixed
+- Profile requests no longer create separate subscriptions for each pubkey
+- Subscription grouping now properly merges filters using union semantics instead of intersection
+
+## [0.4.6] - 2025-07-18
+
+### Added
+- Comprehensive local-first philosophy documentation explaining the ethos and benefits
+- Detailed optimistic publishing and offline support documentation
+- New example demonstrating offline publishing and automatic retry behavior
+- Completely revamped README.md to prominently feature local-first benefits and user sovereignty
+- "Why NDKSwift?" section highlighting censorship resistance and data ownership
+- "The Local-First Advantage" section with compelling user benefits
+- Documentation links for both local-first philosophy and technical implementation
 - Configurable subscription grouping delay via `groupingDelay` parameter
   - Set custom delay when calling `ndk.subscribe(filters:groupingDelay:)` 
   - Default remains 100ms for backward compatibility
+- **Offline Cashu Token Generation**: Complete support for creating Cashu tokens offline
+  - `NIP60Wallet.getUnspentProofs()` - Get all unspent proofs grouped by mint
+  - `NIP60Wallet.createTokenFromProofs()` - Create tokens from specific proofs without P2PK locking
+  - Proper NIP-60 state management with automatic rollover of spent proofs
+  - Integration with 7376 history events for transaction tracking
+  - NutsackiOS: Added offline send UI with proof combination calculator
+  - NutsackiOS: QR code display for generated offline tokens
+  - NutsackiOS: Transaction history shows "View Token" for offline transactions
   - Set to 0 to disable grouping for specific subscriptions
   - Multiple subscriptions within the delay window are merged into single relay requests
 - Re-enabled subscription grouping that was previously disabled
@@ -18,11 +70,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Reduces relay connections and improves efficiency
   - Grouping considers: kinds, filter structure, relay requirements, limits, closeOnEose, time constraints
 - Full NIP-10 compliant e-tag and q-tag implementation with pubkey hints
+- Support for "a" tags when referencing addressable events (replaceable and parameterized replaceable)
+- `tagAddressableEvent()` method for explicit "a" tag creation with relay hints
+- Automatic tag type selection in `tagEvent()` - uses "e" tags for regular events, "a" tags for addressable events
   - `tagEvent` now requires an NDKEvent object (not just event ID) to automatically include pubkey hints
   - New `quoteEvent` method for adding NIP-10 compliant q-tags when citing events in content
   - The pubkey hint (5th position in e-tags, 4th in q-tags) helps with the outbox model to find events from author's write relays
   - Updated all event interaction methods (reactions, reposts, deletions, replies, quotes) to use the new NIP-10 compliant tagging
   - Removed backward compatibility - all event tagging must now use the event object for proper NIP-10 compliance
+
+### Changed
+- `tagEvent()` now intelligently chooses between "e" and "a" tags based on event type
+- Fixed `tagAddress` property to include trailing colon for regular replaceable events per NIP-01 specification
 
 ### Fixed
 - **CRITICAL**: Fixed completely broken Nutzap implementation (NIP-61)

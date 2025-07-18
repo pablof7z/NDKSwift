@@ -78,7 +78,7 @@ public struct NDKCashuTokenEvent {
             throw NDKError.encodingError("Failed to encode token data")
         }
         
-        let tokenEvent = try await NDKEventBuilder()
+        let tokenEvent = try await ndk.event()
             .content(plaintext)
             .kind(EventKind.cashuToken)
             .encrypt(signer: signer, scheme: .nip44)
@@ -128,7 +128,7 @@ public struct NDKCashuQuoteEvent {
             throw NDKError.encodingError("Failed to encode quote data")
         }
         
-        let quoteEvent = try await NDKEventBuilder()
+        let quoteEvent = try await ndk.event()
             .content(plaintext)
             .kind(EventKind.cashuQuote)
             .encrypt(signer: signer, scheme: .nip44)
@@ -136,6 +136,24 @@ public struct NDKCashuQuoteEvent {
         return NDKCashuQuoteEvent(event: quoteEvent)
     }
 }
+
+// MARK: - Decrypted Data Cache
+
+/// Cache for decrypted wallet data to avoid repeated decryption
+private actor DecryptedWalletCache {
+    private var cache: [EventID: [[String]]] = [:]
+    
+    func get(for eventId: EventID) -> [[String]]? {
+        return cache[eventId]
+    }
+    
+    func set(_ tags: [[String]], for eventId: EventID) {
+        cache[eventId] = tags
+    }
+}
+
+// Global cache instance
+private let decryptedWalletCache = DecryptedWalletCache()
 
 // MARK: - NDKCashuWalletEvent
 
@@ -220,7 +238,7 @@ public struct NDKCashuWalletEvent {
         print("🔐 NDKCashuWalletEvent - Pre-encryption plaintext JSON: \(plaintext)")
         print("🔐 NDKCashuWalletEvent - Pre-encryption plaintext size: \(plaintext.count) characters")
         
-        let builder = NDKEventBuilder()
+        let builder = ndk.event()
             .content(plaintext)
             .kind(EventKind.cashuWalletConfig)
         
@@ -284,6 +302,12 @@ public struct NDKCashuWalletEvent {
     // MARK: - Private Helpers
     
     private func decryptedTags(signer: NDKSigner) async throws -> [[String]] {
+        // Check cache first
+        if let cachedTags = await decryptedWalletCache.get(for: event.id) {
+            print("🔐 NDKCashuWalletEvent.decryptedTags() - Using cached decrypted tags for event \(event.id)")
+            return cachedTags
+        }
+        
         print("🔐 NDKCashuWalletEvent.decryptedTags() - Starting decryption")
         print("🔐 Event ID: \(event.id)")
         print("🔐 Event Kind: \(event.kind)")
@@ -312,6 +336,10 @@ public struct NDKCashuWalletEvent {
         for (index, tag) in walletTags.enumerated() {
             print("🔓 Tag \(index): \(tag)")
         }
+        
+        // Cache the decrypted tags
+        await decryptedWalletCache.set(walletTags, for: event.id)
+        print("🔐 NDKCashuWalletEvent.decryptedTags() - Cached decrypted tags for future use")
         
         return walletTags
     }
@@ -399,7 +427,7 @@ public struct NDKCashuSpendingHistory {
             throw NDKError.encodingError("Failed to encode spending history")
         }
         
-        let historyEvent = try await NDKEventBuilder()
+        let historyEvent = try await ndk.event()
             .content(plaintext)
             .kind(EventKind.cashuSpendingHistory)
             .tags(clearTags)
@@ -471,7 +499,7 @@ public struct NDKCashuMintList {
         print("🏪 NDKCashuMintList - Input mints: \(mints)")
         print("🏪 NDKCashuMintList - Input p2pkPubkey: \(p2pkPubkey ?? "nil")")
         
-        let builder = NDKEventBuilder()
+        let builder = ndk.event()
             .kind(10019)  // NIP-60 mint list kind
         
         // Add mint tags

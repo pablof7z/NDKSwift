@@ -57,6 +57,12 @@ class WalletManager {
         // Set as active wallet
         self.activeWallet = ndkWallet
         
+        // Register the wallet with the zap manager
+        if let zapManager = nostrManager.zapManager {
+            await zapManager.register(provider: ndkWallet)
+            print("WalletManager - Registered NIP60Wallet with zap manager")
+        }
+        
         // Start monitoring wallet events
         startWalletEventMonitoring()
         
@@ -390,6 +396,64 @@ class WalletManager {
     // MARK: - Mint Operations
     
     
+    // MARK: - Offline Operations
+    
+    /// Get all unspent proofs grouped by mint for offline sending
+    func getUnspentProofsByMint() async throws -> [URL: [CashuSwift.Proof]] {
+        guard let wallet = activeWallet else {
+            throw WalletError.noActiveWallet
+        }
+        
+        let proofsByMint = await wallet.getUnspentProofs()
+        
+        // Convert string mint URLs to URL objects
+        var result: [URL: [CashuSwift.Proof]] = [:]
+        for (mintString, proofs) in proofsByMint {
+            if let mintURL = URL(string: mintString) {
+                result[mintURL] = proofs
+            }
+        }
+        
+        return result
+    }
+    
+    /// Send offline using specific proofs
+    func sendOffline(
+        proofs: [CashuSwift.Proof],
+        mint: URL,
+        memo: String?
+    ) async throws -> (token: String, transactionId: UUID) {
+        guard let wallet = activeWallet else {
+            throw WalletError.noActiveWallet
+        }
+        
+        // Create the token without P2PK locking
+        let token = try await wallet.createTokenFromProofs(
+            proofs: proofs,
+            mint: mint,
+            memo: memo
+        )
+        
+        // Create transaction record with offline token
+        let transaction = Transaction(
+            type: .send,
+            amount: Int(proofs.reduce(0) { $0 + Int64($1.amount) }),
+            memo: memo
+        )
+        transaction.status = .completed
+        transaction.offlineToken = token
+        
+        modelContext.insert(transaction)
+        try modelContext.save()
+        
+        // Add to transactions array
+        await MainActor.run {
+            self.transactions.insert(transaction, at: 0)
+        }
+        
+        return (token: token, transactionId: transaction.transactionID)
+    }
+    
     // MARK: - Send Operations
     
     /// Send ecash tokens
@@ -506,7 +570,7 @@ class WalletManager {
         var totalReceived: Int64 = 0
         
         // Process proofs from each mint
-        for (mintURL, proofs) in token.proofsByMint {
+        for (_, proofs) in token.proofsByMint {
             // Receive the proofs - wallet can handle proofs from any mint
             try await wallet.receive(proofs: proofs)
             
@@ -814,6 +878,13 @@ class WalletManager {
         currentBalance = 0
         
         print("WalletManager - Cleared all wallet data and cancelled subscriptions")
+    }
+    
+    // MARK: - Health Monitoring
+    
+    /// Get wallet reference for health monitoring
+    var wallet: NIP60Wallet? {
+        return activeWallet
     }
     
     // MARK: - Private Methods

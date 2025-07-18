@@ -32,7 +32,6 @@
 		70E4645881C5BA0281EDBA16 /* AsyncContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B43D3EE06E7A1612A33CC851 /* AsyncContentView.swift */; };
 		7EA1E6F16B65DDEA250DC8C5 /* MintAllocationPieChart.swift in Sources */ = {isa = PBXBuildFile; fileRef = EA976807E9192087ECCFF66D /* MintAllocationPieChart.swift */; };
 		88FE9EC64A51F5AC21E76510 /* BalanceCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = C53A61281693438AA3C00939 /* BalanceCard.swift */; };
-		912BCD5A26CC14CCCC2C277E /* MeltView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8EC79820D97886A50E12AEF1 /* MeltView.swift */; };
 		95A1023397C7AECD55F78C73 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D2DF5538965B7EB3C64426FB /* SettingsView.swift */; };
 		993E5AEE067897EC76F4F75C /* WalletEventInfo.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9D5B9AA3E71133AA8A3EA248 /* WalletEventInfo.swift */; };
 		A123B5F5AB3ABD9DA82BF157 /* NDKSwift in Frameworks */ = {isa = PBXBuildFile; productRef = 8D61774580F270BFA6E25A26 /* NDKSwift */; };
@@ -53,6 +52,8 @@
 		F33D4EFB5F5A07FED0953D0E /* RelayManagementView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 672C722284F61C8F87DBC9BD /* RelayManagementView.swift */; };
 		F4D2CEAE92BF3D746AE2E29A /* SwapView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0118B4914C3C24FF6C27D362 /* SwapView.swift */; };
 		FE9B372405B563AA3EC15B71 /* QRCodeGenerator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 67721329672986338EBD9E47 /* QRCodeGenerator.swift */; };
+		17C15A7E420E4095A160AC7F /* OfflineTokenView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A38442B088A5462D862A38B2 /* OfflineTokenView.swift */; };
+		A4B5C6D7E8F9G0H1I2J3K4L5 /* SplashView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B3EE89F1A2B3C4D5E6F78901 /* SplashView.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -82,7 +83,6 @@
 		85C54882260F3096F3402AEE /* DiscoveredMintsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiscoveredMintsView.swift; sourceTree = "<group>"; };
 		89F70690BBEA51B2AC1E862F /* MintDiscoveryManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MintDiscoveryManager.swift; sourceTree = "<group>"; };
 		8B052F81B7B409EB3A7F20DE /* AppState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppState.swift; sourceTree = "<group>"; };
-		8EC79820D97886A50E12AEF1 /* MeltView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MeltView.swift; sourceTree = "<group>"; };
 		9484A8DCD0E6CDFA798237DF /* NutzapSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NutzapSettingsView.swift; sourceTree = "<group>"; };
 		962F8D0E61C0A3CED699E5E5 /* QRScannerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QRScannerView.swift; sourceTree = "<group>"; };
 		98B33CB2CD71269193050EE8 /* CreateAccountView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CreateAccountView.swift; sourceTree = "<group>"; };
@@ -104,6 +104,8 @@
 		F7ACD26D8FA1630E42EFEC94 /* SendView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SendView.swift; sourceTree = "<group>"; };
 		FA415E993BB5A7710A803BD9 /* PaymentReceivedAnimation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PaymentReceivedAnimation.swift; sourceTree = "<group>"; };
 		FD1FAFE4A7259CADFAF7276C /* ImportAccountView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImportAccountView.swift; sourceTree = "<group>"; };
+		A38442B088A5462D862A38B2 /* OfflineTokenView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OfflineTokenView.swift; sourceTree = "<group>"; };
+		B3EE89F1A2B3C4D5E6F78901 /* SplashView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SplashView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -157,11 +159,11 @@
 			children = (
 				C53A61281693438AA3C00939 /* BalanceCard.swift */,
 				CC302DE92627A808C4316A97 /* DLEQStatusIndicator.swift */,
-				8EC79820D97886A50E12AEF1 /* MeltView.swift */,
 				EA976807E9192087ECCFF66D /* MintAllocationPieChart.swift */,
 				6BEE0E04E0712D430ADCD91E /* MintBalanceLegend.swift */,
 				BFD3618F6ACCDFC05E146B73 /* MintView.swift */,
 				055295357886CE289C42C9DD /* NutzapView.swift */,
+				A38442B088A5462D862A38B2 /* OfflineTokenView.swift */,
 				FA415E993BB5A7710A803BD9 /* PaymentReceivedAnimation.swift */,
 				29823E16BE363E01B66A8DE5 /* ReceiveView.swift */,
 				E0B1C99B01866B00245F62DE /* RecentTransactionsView.swift */,
@@ -246,6 +248,7 @@
 				9484A8DCD0E6CDFA798237DF /* NutzapSettingsView.swift */,
 				672C722284F61C8F87DBC9BD /* RelayManagementView.swift */,
 				D2DF5538965B7EB3C64426FB /* SettingsView.swift */,
+				B3EE89F1A2B3C4D5E6F78901 /* SplashView.swift */,
 				89D520A27A28FB620595C7DA /* Auth */,
 				8F7DE8539C0B8DED8494CA2D /* Helpers */,
 				7FC8A45741B3716CB01697F2 /* Utils */,
@@ -358,7 +361,6 @@
 				6BA1850F5A5A565895F45E8D /* DataModels.swift in Sources */,
 				578BFBDCED5863A68DA9A05D /* DiscoveredMintsView.swift in Sources */,
 				DC55894F1FA07AC597FE8FB2 /* ImportAccountView.swift in Sources */,
-				912BCD5A26CC14CCCC2C277E /* MeltView.swift in Sources */,
 				7EA1E6F16B65DDEA250DC8C5 /* MintAllocationPieChart.swift in Sources */,
 				2203216B7A95C7061968E7D3 /* MintBalanceLegend.swift in Sources */,
 				3AE0DBFC1CA063A6AC21FD56 /* MintDiscoveryManager.swift in Sources */,
@@ -380,7 +382,9 @@
 				F33D4EFB5F5A07FED0953D0E /* RelayManagementView.swift in Sources */,
 				BFEA02908127F7398C6C37FE /* RelayStatusIndicator.swift in Sources */,
 				517942D2DD49A8AA4473D66A /* SendView.swift in Sources */,
+				17C15A7E420E4095A160AC7F /* OfflineTokenView.swift in Sources */,
 				95A1023397C7AECD55F78C73 /* SettingsView.swift in Sources */,
+				A4B5C6D7E8F9G0H1I2J3K4L5 /* SplashView.swift in Sources */,
 				F4D2CEAE92BF3D746AE2E29A /* SwapView.swift in Sources */,
 				A30E03D3719F1A46F36595C3 /* UserProfileViews.swift in Sources */,
 				3E17EB5A5226CACB8D750A19 /* WalletEventDetailView.swift in Sources */,

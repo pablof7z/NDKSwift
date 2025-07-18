@@ -28,9 +28,7 @@ public actor NDKSubscriptionCoordinator {
         closeOnEose: Bool = false,
         groupingDelay: TimeInterval? = nil
     ) async -> NDKSubscription {
-        print("[NDKSubscriptionCoordinator.subscribe] Starting subscription with \(filters.count) filters, closeOnEose: \(closeOnEose)")
         guard let ndk = ndk else {
-            print("[NDKSubscriptionCoordinator.subscribe] NDK is nil, returning dummy subscription")
             // Return a dummy subscription if NDK is deallocated
             var options = NDKSubscriptionOptions()
             options.closeOnEose = closeOnEose
@@ -44,33 +42,26 @@ public actor NDKSubscriptionCoordinator {
         }
         
         let subscriptionId = id ?? NDKSubscription.generateSubscriptionId(for: filters, userProvidedIds: nil)
-        print("[NDKSubscriptionCoordinator.subscribe] Created subscription ID: \(subscriptionId)")
         
         // Collect all authors from all filters for outbox model
         let allAuthors = filters.compactMap { $0.authors }.flatMap { $0 }
         
         let selectedRelays: Set<RelayURL>
         if let specificRelays = relays, !specificRelays.isEmpty {
-            print("[NDKSubscriptionCoordinator.subscribe] Using specific relays: \(specificRelays.joined(separator: ", "))")
             selectedRelays = specificRelays
         } else {
-            print("[NDKSubscriptionCoordinator.subscribe] No specific relays, determining relay selection")
             // Use outbox model or all relays
             if ndk.outboxEnabled, !allAuthors.isEmpty {
-                print("[NDKSubscriptionCoordinator.subscribe] Using outbox model for \(allAuthors.count) authors")
                 let outboxRelays = await getOutboxRelays(for: allAuthors)
                 selectedRelays = outboxRelays
             } else {
-                print("[NDKSubscriptionCoordinator.subscribe] Using all available relays")
                 let allRelays = await ndk.pool.relays
                 selectedRelays = Set(allRelays.map { $0.url })
             }
         }
-        print("[NDKSubscriptionCoordinator.subscribe] Selected \(selectedRelays.count) relays")
         
         // Ensure explicitly requested relays exist in the pool and are connected
         if let specificRelays = relays, !specificRelays.isEmpty {
-            print("[NDKSubscriptionCoordinator.subscribe] Ensuring specific relays are added to pool and connected")
             await withTaskGroup(of: Void.self) { group in
                 for relayUrl in specificRelays {
                     group.addTask {
@@ -80,12 +71,10 @@ public actor NDKSubscriptionCoordinator {
                         // Connect if not already connected
                         let connectionState = await relay.connectionState
                         if connectionState != .connected && connectionState != .connecting {
-                            print("[NDKSubscriptionCoordinator.subscribe] Connecting to explicitly requested relay: \(relayUrl)")
                             do {
                                 try await relay.connect()
-                                print("[NDKSubscriptionCoordinator.subscribe] Connected to relay: \(relayUrl)")
                             } catch {
-                                print("[NDKSubscriptionCoordinator.subscribe] Failed to connect to relay \(relayUrl): \(error)")
+                                // Connection failed, continue with other relays
                             }
                         }
                     }
@@ -106,19 +95,13 @@ public actor NDKSubscriptionCoordinator {
         )
         
         // Add to subscription manager
-        print("[NDKSubscriptionCoordinator.subscribe] Adding subscription to manager")
         await subscriptionManager.addSubscription(subscription)
-        print("[NDKSubscriptionCoordinator.subscribe] Subscription added to manager")
         
-        // Track the subscription
         // Track the subscription for each filter
-        print("[NDKSubscriptionCoordinator.subscribe] Tracking subscription for \(filters.count) filters")
         for filter in filters {
             await subscriptionTracker.trackSubscription(subscription, filter: filter, relayUrls: Array(selectedRelays))
         }
-        print("[NDKSubscriptionCoordinator.subscribe] Subscription tracking complete")
         
-        print("[NDKSubscriptionCoordinator.subscribe] Returning subscription")
         return subscription
     }
     
@@ -128,63 +111,48 @@ public actor NDKSubscriptionCoordinator {
         relays: Set<RelayURL>? = nil,
         timeoutSeconds: Int = 5
     ) async throws -> [NDKEvent] {
-        print("[NDKSubscriptionCoordinator.fetchEvents] Starting with \(filters.count) filters")
         guard ndk != nil else {
-            print("[NDKSubscriptionCoordinator.fetchEvents] NDK reference lost")
             throw NDKError.notConfigured("NDK reference lost")
         }
         
         // Check cache first if no specific relays are specified
         if relays == nil && filters.count == 1 {
-            print("[NDKSubscriptionCoordinator.fetchEvents] Checking cache for single filter")
             do {
-                print("[NDKSubscriptionCoordinator.fetchEvents] Calling cache.queryEvents...")
                 let cachedEvents = try await cache.queryEvents(filters[0])
-                print("[NDKSubscriptionCoordinator.fetchEvents] cache.queryEvents returned \(cachedEvents.count) events")
                 if !cachedEvents.isEmpty {
-                    print("[NDKSubscriptionCoordinator] Returning \(cachedEvents.count) events from cache")
                     return cachedEvents
                 }
             } catch {
-                print("[NDKSubscriptionCoordinator] Cache query failed: \(error)")
+                // Cache query failed, continue with relay fetch
             }
         }
         
         // Create subscription with closeOnEose
-        print("[NDKSubscriptionCoordinator.fetchEvents] Creating subscription with closeOnEose")
         let subscription = await subscribe(filters: filters, relays: relays, closeOnEose: true)
-        print("[NDKSubscriptionCoordinator.fetchEvents] Subscription created: \(subscription.id)")
         
         var events: [NDKEvent] = []
         var hasSeenEose = false
         
         // Set up timeout
-        print("[NDKSubscriptionCoordinator.fetchEvents] Setting up timeout for \(timeoutSeconds) seconds")
         let timeoutTask = Task {
             try await Task.sleep(nanoseconds: UInt64(timeoutSeconds) * 1_000_000_000)
             if !hasSeenEose {
-                print("[NDKSubscriptionCoordinator.fetchEvents] Timeout reached, closing subscription")
                 await subscription.close()
             }
         }
         
         // Collect events
-        print("[NDKSubscriptionCoordinator.fetchEvents] Starting to collect events")
         do {
             for try await event in subscription {
-                print("[NDKSubscriptionCoordinator.fetchEvents] Received event: \(event.id)")
                 events.append(event)
             }
             hasSeenEose = true
-            print("[NDKSubscriptionCoordinator.fetchEvents] Finished collecting events (EOSE)")
         } catch {
-            print("[NDKSubscriptionCoordinator.fetchEvents] Error collecting events: \(error)")
             timeoutTask.cancel()
             throw error
         }
         
         timeoutTask.cancel()
-        print("[NDKSubscriptionCoordinator.fetchEvents] Timeout task cancelled")
         
         // Deduplicate by event ID if multiple filters were used
         if filters.count > 1 {
@@ -201,11 +169,8 @@ public actor NDKSubscriptionCoordinator {
         relays: Set<RelayURL>? = nil,
         timeoutSeconds: Int = 5
     ) async throws -> NDKEvent? {
-        print("[NDKSubscriptionCoordinator.fetchEvent] Starting for ID: \(id)")
         let filter = NDKFilter(ids: [id])
-        print("[NDKSubscriptionCoordinator.fetchEvent] Calling fetchEvents with filter")
         let events = try await fetchEvents([filter], relays: relays, timeoutSeconds: timeoutSeconds)
-        print("[NDKSubscriptionCoordinator.fetchEvent] fetchEvents returned \(events.count) events")
         return events.first
     }
     
@@ -215,12 +180,9 @@ public actor NDKSubscriptionCoordinator {
         relays: Set<RelayURL>? = nil,
         timeoutSeconds: Int = 5
     ) async throws -> NDKEvent? {
-        print("[NDKSubscriptionCoordinator.fetchEvent] Starting with filter")
         var limitedFilter = filter
         limitedFilter.limit = 1
-        print("[NDKSubscriptionCoordinator.fetchEvent] Calling fetchEvents with limited filter")
         let events = try await fetchEvents([limitedFilter], relays: relays, timeoutSeconds: timeoutSeconds)
-        print("[NDKSubscriptionCoordinator.fetchEvent] fetchEvents returned \(events.count) events")
         return events.first
     }
     
@@ -293,10 +255,8 @@ public actor NDKSubscriptionCoordinator {
             if let cached = relayListCache[author] {
                 let age = Date().timeIntervalSince(cached.timestamp)
                 if age < relayListCacheTTL {
-                    print("[NDKSubscriptionCoordinator] Using cached relay list for \(author) (age: \(Int(age))s)")
                     outboxRelays.formUnion(cached.relays)
                 } else {
-                    print("[NDKSubscriptionCoordinator] Cached relay list for \(author) expired (age: \(Int(age))s)")
                     authorsNeedingFetch.append(author)
                 }
             } else {
@@ -306,8 +266,6 @@ public actor NDKSubscriptionCoordinator {
         
         // Only fetch for authors not in cache
         if !authorsNeedingFetch.isEmpty {
-            print("[NDKSubscriptionCoordinator] Fetching relay lists for \(authorsNeedingFetch.count) authors")
-            
             // Fetch relay lists for authors
             let relayListFilter = NDKFilter(
                 authors: authorsNeedingFetch,
@@ -315,7 +273,7 @@ public actor NDKSubscriptionCoordinator {
             )
             
             do {
-                // IMPORTANT: Pass empty relay set to prevent recursive outbox model calls
+                // IMPORTANT: Pass all relays to prevent recursive outbox model calls
                 // This forces fetchEvents to use all available relays instead of triggering outbox model again
                 let allRelays = await ndk.pool.relays
                 let allRelayUrls = Set(allRelays.map { $0.url })
@@ -344,18 +302,16 @@ public actor NDKSubscriptionCoordinator {
                 let now = Date()
                 for (author, relays) in relaysByAuthor {
                     relayListCache[author] = (relays: relays, timestamp: now)
-                    print("[NDKSubscriptionCoordinator] Cached relay list for \(author) with \(relays.count) relays")
                 }
                 
                 // For authors with no relay list, cache empty set to prevent repeated queries
                 for author in authorsNeedingFetch {
                     if relaysByAuthor[author] == nil {
                         relayListCache[author] = (relays: [], timestamp: now)
-                        print("[NDKSubscriptionCoordinator] Cached empty relay list for \(author)")
                     }
                 }
             } catch {
-                print("[NDKSubscriptionCoordinator] Failed to fetch outbox relays: \(error)")
+                // Failed to fetch outbox relays, continue with all relays
             }
         }
         
@@ -373,12 +329,10 @@ public actor NDKSubscriptionCoordinator {
     /// Clear the relay list cache
     public func clearRelayListCache() {
         relayListCache.removeAll()
-        print("[NDKSubscriptionCoordinator] Cleared relay list cache")
     }
     
     /// Clear relay list cache for specific author
     public func clearRelayListCache(for author: String) {
         relayListCache.removeValue(forKey: author)
-        print("[NDKSubscriptionCoordinator] Cleared relay list cache for \(author)")
     }
 }

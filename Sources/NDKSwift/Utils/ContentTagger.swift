@@ -162,11 +162,21 @@ public enum ContentTagger {
                                 segments.append(.mention(npub: entity))
                                 tags.append(["p", pubkey])
                             }
-                        case "note", "nevent", "naddr":
+                        case "note", "nevent":
                             segments.append(.event(nevent: entity))
                             if let eventId = decoded.eventId {
                                 let relay = decoded.relays?.first ?? ""
                                 tags.append(["q", eventId, relay])
+                            }
+                            if let pubkey = decoded.pubkey {
+                                tags.append(["p", pubkey])
+                            }
+                        case "naddr":
+                            segments.append(.event(nevent: entity))
+                            if let eventId = decoded.eventId {
+                                // naddr uses 'a' tags
+                                let relay = decoded.relays?.first ?? ""
+                                tags.append(["a", eventId, relay])
                             }
                             if let pubkey = decoded.pubkey {
                                 tags.append(["p", pubkey])
@@ -365,8 +375,9 @@ public enum ContentTagger {
 
                     case "naddr":
                         if let eventId = decoded.eventId {
+                            // naddr uses 'a' tags, not 'q' tags
                             let relay = decoded.relays?.first ?? ""
-                            newTag = ["q", eventId, relay]
+                            newTag = ["a", eventId, relay]
 
                             // Also add p tag for author
                             if let pubkey = decoded.pubkey {

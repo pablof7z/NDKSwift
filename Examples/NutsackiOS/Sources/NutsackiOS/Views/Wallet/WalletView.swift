@@ -22,8 +22,7 @@ struct WalletView: View {
         case mint
         case send
         case receive(urlString: String?)
-        case melt
-        case nutzap
+        case nutzap(pubkey: String? = nil)
         case swap
         case relayHealth
         case contacts
@@ -33,8 +32,7 @@ struct WalletView: View {
             case .mint: return "mint"
             case .send: return "send"
             case .receive(let url): return "receive_\(url ?? "nil")"
-            case .melt: return "melt"
-            case .nutzap: return "nutzap"
+            case .nutzap(let pubkey): return "nutzap_\(pubkey ?? "nil")"
             case .swap: return "swap"
             case .relayHealth: return "relayHealth"
             case .contacts: return "contacts"
@@ -55,6 +53,10 @@ struct WalletView: View {
                             BalanceCard()
                                 .padding(.horizontal)
                                 .zIndex(1) // Ensure it stays on top during expansion
+                            
+                            // Contacts horizontal scroll
+                            ContactsScrollView(navigationDestination: $navigationDestination)
+                                .padding(.top, -10)
                             
                             // Recent transactions
                             RecentTransactionsView()
@@ -120,16 +122,14 @@ struct WalletView: View {
                     SendView()
                 case .receive(let urlString):
                     ReceiveView(tokenString: urlString)
-                case .melt:
-                    MeltView()
-                case .nutzap:
-                    NutzapView()
+                case .nutzap(let pubkey):
+                    NutzapView(recipientPubkey: pubkey)
                 case .swap:
                     SwapView()
                 case .relayHealth:
                     RelayHealthView()
                 case .contacts:
-                    ContactsView()
+                    ContactsView(navigationDestination: $navigationDestination)
                 }
             }
             .onAppear {
@@ -242,7 +242,7 @@ struct EmptyWalletView: View {
             
             do {
                 print("Test: Creating test event")
-                let testEvent = try await NDKEventBuilder()
+                let testEvent = try await ndk.event()
                     .content("Test event from Nutsack wallet - " + UUID().uuidString)
                     .kind(1) // Regular text note
                     .build(signer: signer)
@@ -281,51 +281,31 @@ struct ActionButtonsView: View {
             HStack(spacing: 0) {
                 // Receive button
                 Button(action: { navigationDestination = .mint }) {
-                    VStack(spacing: 6) {
+                    HStack(spacing: 8) {
                         Image(systemName: "arrow.down")
-                            .font(.system(size: 22, weight: .medium))
+                            .font(.system(size: 20, weight: .medium))
                         Text("Receive")
-                            .font(.system(size: 13, weight: .medium))
+                            .font(.system(size: 16, weight: .medium))
                     }
                     .foregroundColor(.white)
-                    .frame(maxWidth: .infinity)
-                    .frame(height: 70)
+                    .frame(maxWidth: .infinity, alignment: .center)
+                    .frame(height: 60)
+                    .padding(.trailing, 40) // Offset for floating circle (80px width / 2)
                 }
                 .buttonStyle(PremiumButtonStyle())
                 
-                // Send button with menu
-                Menu {
-                    Button(action: { navigationDestination = .send }) {
-                        Label("Send", systemImage: "banknote")
-                    }
-                    
-                    Button(action: { navigationDestination = .melt }) {
-                        Label("Melt", systemImage: "bolt.fill")
-                    }
-                    
-                    Button(action: { navigationDestination = .nutzap }) {
-                        Label("Nutzap", systemImage: "bolt.heart.fill")
-                    }
-                    
-                    Divider()
-                    
-                    Button(action: { navigationDestination = .contacts }) {
-                        Label("Contacts", systemImage: "person.2")
-                    }
-                    
-                    Button(action: { navigationDestination = .swap }) {
-                        Label("Transfer Between Mints", systemImage: "arrow.triangle.swap")
-                    }
-                } label: {
-                    VStack(spacing: 6) {
+                // Send button - direct to send view
+                Button(action: { navigationDestination = .send }) {
+                    HStack(spacing: 8) {
                         Image(systemName: "arrow.up")
-                            .font(.system(size: 22, weight: .medium))
+                            .font(.system(size: 20, weight: .medium))
                         Text("Send")
-                            .font(.system(size: 13, weight: .medium))
+                            .font(.system(size: 16, weight: .medium))
                     }
                     .foregroundColor(.white)
-                    .frame(maxWidth: .infinity)
-                    .frame(height: 70)
+                    .frame(maxWidth: .infinity, alignment: .center)
+                    .frame(height: 60)
+                    .padding(.leading, 40) // Offset for floating circle (80px width / 2)
                 }
                 .buttonStyle(PremiumButtonStyle())
             }
@@ -365,20 +345,200 @@ struct ActionButtonsView: View {
                             endPoint: .bottomTrailing
                         )
                     )
-                    .frame(width: 90, height: 90)
+                    .frame(width: 80, height: 80)
                     .shadow(color: Color.orange.opacity(0.4), radius: 12, x: 0, y: 6)
                     .overlay(
                         Image(systemName: "qrcode.viewfinder")
-                            .font(.system(size: 40, weight: .medium))
+                            .font(.system(size: 36, weight: .medium))
                             .foregroundColor(.white)
                     )
                     .scaleEffect(scanButtonPressed ? 0.92 : 1.0)
             }
             .buttonStyle(PlainButtonStyle())
         }
-        .frame(height: 84) // Match the taller scan button
+        .frame(height: 76) // Match the reduced scan button
     }
 }
 
+
+// MARK: - Contacts Scroll View
+struct ContactsScrollView: View {
+    @Binding var navigationDestination: WalletView.WalletDestination?
+    @Environment(NostrManager.self) private var nostrManager
+    @State private var contacts: [NDKUser] = []
+    @State private var scrollOffset: CGFloat = 0
+    
+    var body: some View {
+        ScrollViewReader { proxy in
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 16) {
+                    ForEach(contacts, id: \.pubkey) { contact in
+                        ContactAvatarView(user: contact) {
+                            navigationDestination = .nutzap(pubkey: contact.pubkey)
+                        }
+                    }
+                    
+                    // View All button at the end
+                    Button(action: {
+                        navigationDestination = .contacts
+                    }) {
+                        VStack(spacing: 4) {
+                            ZStack {
+                                Circle()
+                                    .fill(Color(white: 0.15))
+                                    .frame(width: 64, height: 64)
+                                
+                                Image(systemName: "ellipsis")
+                                    .font(.system(size: 24, weight: .medium))
+                                    .foregroundColor(.white.opacity(0.6))
+                            }
+                            
+                            Text("All")
+                                .font(.caption2)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                    .id("viewAll")
+                }
+                .padding(.horizontal)
+                .background(GeometryReader { geometry in
+                    Color.clear
+                        .preference(key: ScrollOffsetPreferenceKey.self, 
+                                  value: geometry.frame(in: .named("scroll")).minX)
+                })
+            }
+            .coordinateSpace(name: "scroll")
+            .onPreferenceChange(ScrollOffsetPreferenceKey.self) { value in
+                scrollOffset = value
+                // If scrolled far enough to the right (view all button visible)
+                if value < -UIScreen.main.bounds.width {
+                    navigationDestination = .contacts
+                }
+            }
+        }
+        .task {
+            await loadContacts()
+        }
+    }
+    
+    private func loadContacts() async {
+        guard let ndk = nostrManager.ndk else { return }
+        
+        do {
+            // Get user's contact list
+            guard let signer = ndk.signer else { return }
+            let pubkey = try await signer.pubkey
+            
+            let filter = NDKFilter(
+                authors: [pubkey],
+                kinds: [3],
+                limit: 1
+            )
+            
+            if let contactListEvent = try await ndk.fetchEvent(filter) {
+                // Parse the contact list
+                var contactPubkeys: [String] = []
+                for tag in contactListEvent.tags {
+                    if tag.count >= 2 && tag[0] == "p" {
+                        contactPubkeys.append(tag[1])
+                    }
+                }
+                
+                // Limit to first 20 contacts for performance
+                let limitedPubkeys = Array(contactPubkeys.prefix(20))
+                
+                // Create NDKUser objects and show them immediately
+                contacts = limitedPubkeys.map { NDKUser(pubkey: $0) }
+            }
+        } catch {
+            print("Failed to load contacts: \(error)")
+        }
+    }
+}
+
+struct ContactAvatarView: View {
+    let user: NDKUser
+    let onTap: () -> Void
+    @State private var profile: NDKUserProfile?
+    @State private var profileTask: Task<Void, Never>?
+    @Environment(NostrManager.self) private var nostrManager
+    
+    var displayName: String {
+        profile?.displayName ?? profile?.name ?? String(user.pubkey.prefix(8))
+    }
+    
+    var body: some View {
+        Button(action: onTap) {
+            VStack(spacing: 4) {
+                Group {
+                    if let imageUrl = profile?.picture, let url = URL(string: imageUrl) {
+                        AsyncImage(url: url) { image in
+                            image
+                                .resizable()
+                                .aspectRatio(contentMode: .fill)
+                                .frame(width: 64, height: 64)
+                                .clipShape(Circle())
+                        } placeholder: {
+                            Circle()
+                                .fill(Color(white: 0.15))
+                                .frame(width: 64, height: 64)
+                                .overlay(
+                                    Text(String(displayName.prefix(1)).uppercased())
+                                        .font(.title2)
+                                        .foregroundColor(.white.opacity(0.6))
+                                )
+                        }
+                    } else {
+                        Circle()
+                            .fill(Color(white: 0.15))
+                            .frame(width: 64, height: 64)
+                            .overlay(
+                                Text(String(displayName.prefix(1)).uppercased())
+                                    .font(.title2)
+                                    .foregroundColor(.white.opacity(0.6))
+                            )
+                    }
+                }
+                .overlay(
+                    Circle()
+                        .stroke(Color.white.opacity(0.1), lineWidth: 1)
+                )
+                
+                Text(displayName)
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+                    .frame(maxWidth: 64)
+            }
+        }
+        .buttonStyle(PlainButtonStyle())
+        .task {
+            guard let ndk = nostrManager.ndk else { return }
+            
+            profileTask = Task {
+                let profileStream = await ndk.observeProfile(for: user.pubkey, closeOnEose: true)
+                
+                for await profileUpdate in profileStream {
+                    if let profile = profileUpdate {
+                        await MainActor.run {
+                            self.profile = profile
+                        }
+                        break
+                    }
+                }
+            }
+        }
+        .onDisappear {
+            profileTask?.cancel()
+        }
+    }
+}
+
+struct ScrollOffsetPreferenceKey: PreferenceKey {
+    static var defaultValue: CGFloat = 0
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
+        value = nextValue()
+    }
+}
 
 // MARK: - Helper Views
