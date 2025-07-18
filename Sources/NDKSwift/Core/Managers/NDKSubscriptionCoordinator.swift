@@ -25,7 +25,8 @@ public actor NDKSubscriptionCoordinator {
         filters: [NDKFilter],
         relays: Set<RelayURL>? = nil,
         id: String? = nil,
-        closeOnEose: Bool = false
+        closeOnEose: Bool = false,
+        groupingDelay: TimeInterval? = nil
     ) async -> NDKSubscription {
         print("[NDKSubscriptionCoordinator.subscribe] Starting subscription with \(filters.count) filters, closeOnEose: \(closeOnEose)")
         guard let ndk = ndk else {
@@ -33,6 +34,7 @@ public actor NDKSubscriptionCoordinator {
             // Return a dummy subscription if NDK is deallocated
             var options = NDKSubscriptionOptions()
             options.closeOnEose = closeOnEose
+            options.groupingDelay = groupingDelay
             return NDKSubscription(
                 id: id ?? NDKSubscription.generateSubscriptionId(for: filters, userProvidedIds: nil),
                 filters: filters,
@@ -94,6 +96,7 @@ public actor NDKSubscriptionCoordinator {
         var options = NDKSubscriptionOptions()
         options.closeOnEose = closeOnEose
         options.relays = nil // We'll handle relay selection differently
+        options.groupingDelay = groupingDelay
         
         let subscription = NDKSubscription(
             id: subscriptionId,

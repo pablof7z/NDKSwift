@@ -111,7 +111,7 @@ public struct NDKCashuQuoteEvent {
             signer: signer
         )
         
-        try await ndk.publish(quoteEvent.event)
+        _ = try await ndk.publish(quoteEvent.event)
         print("NDKCashuQuoteEvent - Published quote event: \(quoteEvent.event.id)")
         
         return quoteEvent
@@ -351,7 +351,7 @@ public struct NDKCashuSpendingHistory {
             signer: signer
         )
         
-        try await ndk.publish(historyEvent.event)
+        _ = try await ndk.publish(historyEvent.event)
         print("NDKCashuSpendingHistory - Created spending history event")
         
         return historyEvent
@@ -540,7 +540,7 @@ public struct NDKCashuMintAnnouncement {
             signer: signer
         )
         
-        try await ndk.publish(announcement.event)
+        _ = try await ndk.publish(announcement.event)
         return announcement
     }
     
@@ -664,7 +664,7 @@ public struct NDKMintRecommendation {
             signer: signer
         )
         
-        try await ndk.publish(recommendation.event)
+        _ = try await ndk.publish(recommendation.event)
         return recommendation
     }
     

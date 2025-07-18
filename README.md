@@ -107,6 +107,11 @@ var options = NDKSubscriptionOptions()
 options.skipOptimisticEvents = true
 let strictSubscription = ndk.subscribe(filters: [filter], options: options)
 
+// Control subscription grouping delay (default: 100ms)
+// Multiple subscriptions within this window may be merged into a single relay request
+let sub1 = await ndk.subscribe(filters: [filter], groupingDelay: 0.2)  // 200ms delay
+let sub2 = await ndk.subscribe(filters: [filter], groupingDelay: 0)    // No grouping
+
 // One-shot fetch
 let events = try await ndk.fetchEvents(
     NDKFilter(kinds: [0], authors: [alicePubkey])
@@ -244,7 +249,7 @@ NDKSwift implements the following Nostr Implementation Possibilities:
 - **NIP-01**: Basic protocol flow description
 - **NIP-02**: Contact List and Petnames
 - **NIP-09**: Event Deletion
-- **NIP-10**: Reply conventions
+- **NIP-10**: Conventions for clients' use of e and p tags in text events (with pubkey hints)
 - **NIP-18**: Reposts
 - **NIP-19**: bech32-encoded entities
 - **NIP-25**: Reactions

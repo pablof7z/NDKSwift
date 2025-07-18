@@ -1,12 +1,24 @@
 import SwiftUI
 
+struct MintBalance: Identifiable, Equatable {
+    let id = UUID()
+    let mint: String
+    let balance: Int64
+    let percentage: Double
+    
+    static func == (lhs: MintBalance, rhs: MintBalance) -> Bool {
+        lhs.mint == rhs.mint && lhs.balance == rhs.balance && lhs.percentage == rhs.percentage
+    }
+}
+
 struct BalanceCard: View {
     @EnvironmentObject private var appState: AppState
     @Environment(WalletManager.self) private var walletManager
     
     @State private var convertedBalance: String = ""
-    @State private var mintBalances: [(mint: String, balance: Int64, percentage: Double)] = []
+    @State private var mintBalances: [MintBalance] = []
     @State private var isLoadingMints = false
+    @State private var isExpanded = false
     
     private let mintColors: [Color] = [
         Color(red: 0.98, green: 0.54, blue: 0.13), // Orange
@@ -15,34 +27,95 @@ struct BalanceCard: View {
         Color(red: 0.30, green: 0.69, blue: 0.31), // Green
     ]
     
+    private let compactChartSize: CGFloat = 20
+    private let expandedChartSize: CGFloat = 180
+    
     var body: some View {
         VStack(spacing: 20) {
             // Balance display - centered
             VStack(spacing: 8) {
                 HStack(alignment: .firstTextBaseline, spacing: 8) {
                     Text(formatBalance(Int(walletManager.currentBalance)))
-                        .font(.system(size: 56, weight: .semibold, design: .rounded))
+                        .font(.system(size: isExpanded ? 48 : 56, weight: .semibold, design: .rounded))
                         .foregroundStyle(.primary)
                     
                     Text("sats")
-                        .font(.system(size: 24, weight: .medium, design: .rounded))
+                        .font(.system(size: isExpanded ? 20 : 24, weight: .medium, design: .rounded))
                         .foregroundStyle(.secondary)
                 }
+                .animation(.spring(response: 0.4, dampingFraction: 0.8), value: isExpanded)
                 
-                // Fiat conversion
+                // Fiat conversion with mini pie chart
                 if appState.preferredConversionUnit != .sat && !convertedBalance.isEmpty && convertedBalance != "..." {
-                    Text(convertedBalance)
-                        .font(.system(size: 18, weight: .regular, design: .rounded))
-                        .foregroundStyle(.secondary)
-                        .opacity(0.8)
-                        .animation(.default, value: convertedBalance)
+                    HStack(spacing: 12) {
+                        // Compact pie chart on the left
+                        if !mintBalances.isEmpty && mintBalances.count > 1 && !isExpanded {
+                            ExpandablePieChart(
+                                mintBalances: mintBalances,
+                                mintColors: mintColors,
+                                size: compactChartSize,
+                                useGrayscale: true
+                            )
+                            .onTapGesture {
+                                withAnimation(.spring(response: 0.5, dampingFraction: 0.8)) {
+                                    isExpanded.toggle()
+                                }
+                            }
+                        }
+                        
+                        Text(convertedBalance)
+                            .font(.system(size: 18, weight: .regular, design: .rounded))
+                            .foregroundStyle(.secondary)
+                            .opacity(isExpanded ? 0.5 : 0.8)
+                    }
+                    .animation(.default, value: convertedBalance)
                 }
             }
             
-            // Mini pie chart
-            if !mintBalances.isEmpty && mintBalances.count > 1 {
-                MiniPieChart(mintBalances: mintBalances)
-                    .frame(width: 80, height: 80)
+            // Expanded pie chart with legend
+            if !mintBalances.isEmpty && mintBalances.count > 1 && isExpanded {
+                VStack(spacing: 20) {
+                    // Large pie chart
+                    ExpandablePieChart(
+                        mintBalances: mintBalances,
+                        mintColors: mintColors,
+                        size: expandedChartSize,
+                        useGrayscale: false
+                    )
+                    .onTapGesture {
+                        withAnimation(.spring(response: 0.5, dampingFraction: 0.8)) {
+                            isExpanded.toggle()
+                        }
+                    }
+                    
+                    // Legend
+                    VStack(alignment: .leading, spacing: 12) {
+                        ForEach(Array(mintBalances.enumerated()), id: \.element.id) { index, item in
+                            HStack(spacing: 12) {
+                                Circle()
+                                    .fill(mintColors[index % mintColors.count])
+                                    .frame(width: 14, height: 14)
+                                
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(formatMintURL(item.mint))
+                                        .font(.system(size: 15, weight: .medium))
+                                        .foregroundStyle(.primary)
+                                    
+                                    Text("\(formatBalance(Int(item.balance))) sats (\(String(format: "%.1f", item.percentage))%)")
+                                        .font(.system(size: 13))
+                                        .foregroundStyle(.secondary)
+                                }
+                                
+                                Spacer()
+                            }
+                        }
+                    }
+                    .padding(.horizontal)
+                }
+                .transition(.asymmetric(
+                    insertion: .scale.combined(with: .opacity),
+                    removal: .scale.combined(with: .opacity)
+                ))
             }
         }
         .frame(maxWidth: .infinity)
@@ -71,6 +144,24 @@ struct BalanceCard: View {
         formatter.numberStyle = .decimal
         formatter.groupingSeparator = ","
         return formatter.string(from: NSNumber(value: sats)) ?? String(sats)
+    }
+    
+    private func formatMintURL(_ urlString: String) -> String {
+        guard let url = URL(string: urlString),
+              let host = url.host else {
+            return urlString
+        }
+        
+        var cleanHost = host
+        if cleanHost.hasPrefix("www.") {
+            cleanHost = String(cleanHost.dropFirst(4))
+        }
+        
+        if cleanHost.count > 20 {
+            return String(cleanHost.prefix(17)) + "..."
+        }
+        
+        return cleanHost
     }
     
     @MainActor
@@ -111,26 +202,16 @@ struct BalanceCard: View {
         
         guard let wallet = walletManager.activeWallet else { return }
         
-        let mintStrings = await wallet.mints.getMintURLs()
-        let mints = mintStrings.compactMap { URL(string: $0) }
-        var balances: [(mint: String, balance: Int64, percentage: Double)] = []
-        var totalBalance: Int64 = 0
+        // Use the efficient getBalancesByMint method instead of looping
+        let balancesByMint = await wallet.getBalancesByMint()
         
-        // Get balance for each mint
-        for url in mints {
-            let balance = await wallet.getBalance(mint: url)
-            if balance > 0 {
-                balances.append((mint: url.absoluteString, balance: balance, percentage: 0))
-                totalBalance += balance
-            }
-        }
+        var balances: [MintBalance] = []
+        let totalBalance = balancesByMint.values.reduce(0, +)
         
-        // Calculate percentages
-        if totalBalance > 0 {
-            balances = balances.map { item in
-                let percentage = (Double(item.balance) / Double(totalBalance)) * 100
-                return (mint: item.mint, balance: item.balance, percentage: percentage)
-            }
+        // Convert to MintBalance array with percentages
+        for (mint, balance) in balancesByMint where balance > 0 {
+            let percentage = totalBalance > 0 ? (Double(balance) / Double(totalBalance)) * 100 : 0
+            balances.append(MintBalance(mint: mint, balance: balance, percentage: percentage))
         }
         
         // Sort by balance (largest first) and take top 4
@@ -145,33 +226,72 @@ struct BalanceCard: View {
     }
 }
 
-struct MiniPieChart: View {
-    let mintBalances: [(mint: String, balance: Int64, percentage: Double)]
+struct ExpandablePieChart: View {
+    let mintBalances: [MintBalance]
+    let mintColors: [Color]
+    let size: CGFloat
+    var useGrayscale: Bool = false
     
-    private let mintColors: [Color] = [
-        Color(red: 0.98, green: 0.54, blue: 0.13), // Orange
-        Color(red: 0.13, green: 0.59, blue: 0.95), // Blue
-        Color(red: 0.96, green: 0.26, blue: 0.21), // Red
-        Color(red: 0.30, green: 0.69, blue: 0.31), // Green
+    @State private var showChart = false
+    
+    private let grayscaleColors: [Color] = [
+        Color(white: 0.7),
+        Color(white: 0.5),
+        Color(white: 0.3),
+        Color(white: 0.4)
     ]
     
     var body: some View {
         ZStack {
-            ForEach(Array(mintBalances.enumerated()), id: \.element.mint) { index, item in
+            ForEach(Array(mintBalances.enumerated()), id: \.element.id) { index, item in
                 Circle()
                     .trim(from: startAngle(for: index), to: endAngle(for: index))
                     .stroke(
-                        mintColors[index % mintColors.count],
-                        style: StrokeStyle(lineWidth: 20, lineCap: .butt)
+                        useGrayscale ? grayscaleColors[index % grayscaleColors.count] : mintColors[index % mintColors.count],
+                        style: StrokeStyle(
+                            lineWidth: size > 50 ? size * 0.25 : size * 0.25,
+                            lineCap: .butt
+                        )
                     )
                     .rotationEffect(.degrees(-90))
+                    .scaleEffect(showChart ? 1 : 0)
+                    .opacity(showChart ? 1 : 0)
+                    .animation(
+                        .spring(response: 0.5, dampingFraction: 0.7)
+                        .delay(Double(index) * 0.05),
+                        value: showChart
+                    )
             }
             
-            // Center text showing number of mints
-            Text("\(mintBalances.count)")
-                .font(.title2)
-                .fontWeight(.bold)
-                .foregroundColor(.white)
+            // Subtle inner shadow for depth (only for larger sizes)
+            if size > 50 {
+                Circle()
+                    .stroke(
+                        LinearGradient(
+                            gradient: Gradient(colors: [
+                                Color.black.opacity(0.2),
+                                Color.clear
+                            ]),
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        ),
+                        lineWidth: 1
+                    )
+                    .frame(width: size * 0.5, height: size * 0.5)
+                    .blur(radius: 2)
+            }
+        }
+        .frame(width: size, height: size)
+        .onAppear {
+            withAnimation(.easeOut(duration: 0.3)) {
+                showChart = true
+            }
+        }
+        .onChange(of: mintBalances) { _, _ in
+            showChart = false
+            withAnimation(.easeOut(duration: 0.3).delay(0.1)) {
+                showChart = true
+            }
         }
     }
     
@@ -193,4 +313,3 @@ struct MiniPieChart: View {
         return cumulativeAngle
     }
 }
-

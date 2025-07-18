@@ -187,6 +187,10 @@ public struct NDKSubscriptionOptions: Sendable {
     /// Whether to skip optimistic events from local publishing
     public var skipOptimisticEvents: Bool = false
     
+    /// Grouping delay in seconds (how long to wait to batch subscriptions)
+    /// Set to 0 to disable grouping for this subscription
+    public var groupingDelay: TimeInterval?
+    
     public init() {}
 }
 
@@ -374,7 +378,7 @@ public final class NDKSubscription: AsyncSequence, Sendable {
     
     /// Wait for EOSE to be received from all relays
     public func waitForEOSE() async {
-        while await !self.eoseReceived {
+        while !self.eoseReceived {
             try? await Task.sleep(nanoseconds: 100_000_000) // Sleep 100ms
         }
     }
@@ -454,8 +458,7 @@ public final class NDKSubscription: AsyncSequence, Sendable {
             print("[NDKSubscription.checkCache] Querying cache with filter")
             if let events = try? await cache.queryEvents(filter) {
                 print("[NDKSubscription.checkCache] Found \(events.count) events in cache")
-                let eventsWithNDK = events.map { $0.withNDK(ndk) }
-                cachedEvents.append(contentsOf: eventsWithNDK)
+                cachedEvents.append(contentsOf: events)
             }
         }
         
@@ -511,7 +514,7 @@ public final class NDKSubscription: AsyncSequence, Sendable {
         // Check if event matches our filters
         var matchesAny = false
         for filter in filters {
-            if await filter.matches(event: event) {
+            if filter.matches(event: event) {
                 matchesAny = true
                 break
             }

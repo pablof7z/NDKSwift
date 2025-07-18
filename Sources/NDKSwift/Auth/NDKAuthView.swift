@@ -394,6 +394,7 @@ public struct NDKAuthView<AuthenticatedContent: View, AuthenticationContent: Vie
     }
     
     private var biometricSystemImage: String {
+        #if !os(watchOS)
         switch authManager.biometricType {
         case .faceID:
             return "faceid"
@@ -402,9 +403,13 @@ public struct NDKAuthView<AuthenticatedContent: View, AuthenticationContent: Vie
         default:
             return "lock.shield"
         }
+        #else
+        return "lock.shield"
+        #endif
     }
     
     private var biometricTypeText: String {
+        #if !os(watchOS)
         switch authManager.biometricType {
         case .faceID:
             return "Face ID"
@@ -413,6 +418,9 @@ public struct NDKAuthView<AuthenticatedContent: View, AuthenticationContent: Vie
         default:
             return "biometric authentication"
         }
+        #else
+        return "authentication"
+        #endif
     }
     
     // MARK: - Private Methods

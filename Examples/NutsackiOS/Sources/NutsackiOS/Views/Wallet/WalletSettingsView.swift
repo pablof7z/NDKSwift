@@ -425,7 +425,7 @@ struct RelaySettingsRow: View {
         let relays = await ndk.relays
         guard let relay = relays.first(where: { $0.url == relayURL }) else {
             // If relay not found in NDK, just use basic formatting
-            if let host = getRelayHost(relayURL) {
+            if getRelayHost(relayURL) != nil {
                 await MainActor.run {
                     relayState = NDKRelay.State(
                         connectionState: .disconnected,

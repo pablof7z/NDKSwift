@@ -143,7 +143,7 @@ struct WalletEventRow: View {
                         
                         Spacer()
                         
-                        if let tokenData = eventInfo.tokenData {
+                        if eventInfo.tokenData != nil {
                             Text("\(totalAmount) sats")
                                 .font(.subheadline)
                                 .fontWeight(.medium)

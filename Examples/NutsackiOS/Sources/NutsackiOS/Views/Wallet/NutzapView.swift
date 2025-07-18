@@ -10,6 +10,7 @@ struct NutzapView: View {
     
     @State private var recipientInput = ""
     @State private var resolvedUser: NDKUser?
+    @State private var recipientProfile: NDKUserProfile?
     @State private var amount = ""
     @State private var comment = ""
     @State private var isResolving = false
@@ -20,123 +21,232 @@ struct NutzapView: View {
     @State private var acceptedMints: [String] = []
     @State private var showQRScanner = false
     @State private var availableBalance: Int = 0
+    @State private var profileTask: Task<Void, Never>?
+    @FocusState private var amountFieldFocused: Bool
     
     var amountInt: Int {
         Int(amount) ?? 0
     }
     
+    private var formattedAmount: String {
+        if amount.isEmpty {
+            return "0"
+        }
+        
+        // Format with thousand separators
+        if let number = Int(amount) {
+            let formatter = NumberFormatter()
+            formatter.numberStyle = .decimal
+            formatter.groupingSeparator = ","
+            return formatter.string(from: NSNumber(value: number)) ?? amount
+        }
+        return amount
+    }
+    
+    private func setAmount(_ preset: Int) {
+        amount = "\(preset)"
+    }
+    
     var body: some View {
-        Form {
-            Section {
-                VStack(alignment: .leading, spacing: 12) {
-                    HStack {
-                        TextField("npub, NIP-05, or hex pubkey", text: $recipientInput)
-                            #if os(iOS)
-                            .textInputAutocapitalization(.never)
-                            #endif
-                            .autocorrectionDisabled()
-                        
-                        #if os(iOS)
-                        Button(action: { showQRScanner = true }) {
-                            Image(systemName: "qrcode.viewfinder")
-                                .font(.title2)
-                                .foregroundColor(.white)
-                                .frame(width: 44, height: 44)
-                                .background(Color.orange)
-                                .cornerRadius(10)
-                        }
-                        .buttonStyle(.plain)
-                        #endif
-                    }
-                    
-                    if isResolving {
-                        HStack {
-                            ProgressView()
-                                .scaleEffect(0.8)
-                            Text("Resolving...")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                        }
-                    } else if let user = resolvedUser {
-                        HStack {
-                            // Profile picture
-                            UserProfilePicture(user: user)
+        GeometryReader { geometry in
+            VStack(spacing: 0) {
+                ScrollView {
+                    VStack(spacing: 24) {
+                        // Recipient Section
+                        VStack(alignment: .leading, spacing: 12) {
+                            Text("Recipient")
+                                .font(.headline)
+                                .padding(.horizontal)
                             
-                            VStack(alignment: .leading) {
-                                UserDisplayName(user: user)
-                                    .font(.subheadline)
-                                    .fontWeight(.medium)
+                            VStack(alignment: .leading, spacing: 12) {
+                                HStack {
+                                    TextField("npub, NIP-05, or hex pubkey", text: $recipientInput)
+                                        #if os(iOS)
+                                        .textInputAutocapitalization(.never)
+                                        #endif
+                                        .autocorrectionDisabled()
+                                    
+                                    #if os(iOS)
+                                    Button(action: { showQRScanner = true }) {
+                                        Image(systemName: "qrcode.viewfinder")
+                                            .font(.title2)
+                                            .foregroundColor(.white)
+                                            .frame(width: 44, height: 44)
+                                            .background(Color.orange)
+                                            .cornerRadius(10)
+                                    }
+                                    .buttonStyle(.plain)
+                                    #endif
+                                }
+                                .padding(.horizontal)
                                 
-                                UserNIP05(user: user)
-                                    .font(.caption)
+                                if isResolving {
+                                    HStack {
+                                        ProgressView()
+                                            .scaleEffect(0.8)
+                                        Text("Resolving...")
+                                            .font(.caption)
+                                            .foregroundStyle(.secondary)
+                                    }
+                                    .padding(.horizontal)
+                                } else if let user = resolvedUser {
+                                    HStack {
+                                        // Profile picture
+                                        UserProfilePicture(user: user)
+                                        
+                                        VStack(alignment: .leading) {
+                                            UserDisplayName(user: user)
+                                                .font(.subheadline)
+                                                .fontWeight(.medium)
+                                            
+                                            UserNIP05(user: user)
+                                                .font(.caption)
+                                                .foregroundStyle(.secondary)
+                                        }
+                                        
+                                        Spacer()
+                                        
+                                        Image(systemName: "checkmark.circle.fill")
+                                            .foregroundStyle(.green)
+                                    }
+                                    .padding(.vertical, 4)
+                                    .padding(.horizontal)
+                                }
+                            }
+                        }
+                        
+                        // Amount Section
+                        VStack(spacing: 16) {
+                            // Hidden text field that drives the amount
+                            TextField("0", text: $amount)
+                                .keyboardType(.numberPad)
+                                .opacity(0)
+                                .frame(height: 0)
+                                .focused($amountFieldFocused)
+                            
+                            // Visual amount display
+                            VStack(spacing: 8) {
+                                HStack(alignment: .firstTextBaseline, spacing: 8) {
+                                    Text(formattedAmount)
+                                        .font(.system(size: 48, weight: .semibold, design: .rounded))
+                                        .foregroundStyle(.primary)
+                                    
+                                    Text("sats")
+                                        .font(.system(size: 20, weight: .medium, design: .rounded))
+                                        .foregroundStyle(.secondary)
+                                }
+                                .contentShape(Rectangle())
+                                .onTapGesture {
+                                    amountFieldFocused = true
+                                }
+                                
+                                // USD equivalent (placeholder)
+                                Text("≈ $0.00 USD")
+                                    .font(.system(size: 16, weight: .regular, design: .rounded))
                                     .foregroundStyle(.secondary)
+                                    .opacity(0.6)
                             }
                             
-                            Spacer()
-                            
-                            Image(systemName: "checkmark.circle.fill")
-                                .foregroundStyle(.green)
+                            // Quick amount buttons
+                            HStack(spacing: 12) {
+                                ForEach([1000, 5000, 10000, 50000], id: \.self) { preset in
+                                    Button(action: { setAmount(preset) }) {
+                                        Text("\(preset / 1000)k")
+                                            .font(.system(size: 14, weight: .medium, design: .rounded))
+                                            .foregroundColor(.orange)
+                                            .padding(.horizontal, 14)
+                                            .padding(.vertical, 6)
+                                            .background(Color.orange.opacity(0.15))
+                                            .cornerRadius(16)
+                                    }
+                                }
+                            }
                         }
-                        .padding(.vertical, 4)
+                        .padding(.horizontal)
+                        
+                        // Comment Section
+                        if resolvedUser != nil {
+                            VStack(alignment: .leading, spacing: 12) {
+                                Text("Comment (optional)")
+                                    .font(.headline)
+                                    .padding(.horizontal)
+                                
+                                TextField("Comment (optional)", text: $comment, axis: .vertical)
+                                    .lineLimit(2...4)
+                                    .padding(.horizontal)
+                                
+                                Text("Your comment will be public on Nostr")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                                    .padding(.horizontal)
+                            }
+                        }
+                        
+                        // Accepted mints display
+                        if !acceptedMints.isEmpty {
+                            VStack(alignment: .leading, spacing: 12) {
+                                Text("Accepted Mints")
+                                    .font(.headline)
+                                    .padding(.horizontal)
+                                
+                                VStack(alignment: .leading, spacing: 4) {
+                                    ForEach(acceptedMints, id: \.self) { mint in
+                                        Text(URL(string: mint)?.host ?? mint)
+                                            .font(.caption)
+                                            .foregroundStyle(.secondary)
+                                    }
+                                }
+                                .padding(.horizontal)
+                            }
+                        }
                     }
-                }
-            } header: {
-                Text("Recipient")
-            }
-            
-            Section {
-                HStack {
-                    TextField("Amount", text: $amount)
-                        #if os(iOS)
-                        .keyboardType(.numberPad)
-                        #endif
-                    Text("sats")
-                        .foregroundStyle(.secondary)
+                    .padding(.vertical)
+                    .padding(.bottom, 100) // Add space for the fixed button
                 }
                 
-                if !acceptedMints.isEmpty {
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text("Accepted mints:")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                        ForEach(acceptedMints, id: \.self) { mint in
-                            Text(URL(string: mint)?.host ?? mint)
-                                .font(.caption2)
-                                .foregroundStyle(.secondary)
+                // Send Nutzap Button - Fixed at bottom
+                VStack {
+                    Divider()
+                    
+                    Button(action: sendNutzap) {
+                        if isSending {
+                            HStack {
+                                ProgressView()
+                                    .scaleEffect(0.8)
+                                Text("Sending...")
+                            }
+                            .frame(maxWidth: .infinity)
+                            .padding()
+                            .background(Color.orange.opacity(0.3))
+                            .foregroundColor(.orange)
+                            .cornerRadius(12)
+                        } else {
+                            Text("Send Nutzap")
+                                .frame(maxWidth: .infinity)
+                                .fontWeight(.semibold)
+                                .padding()
+                                .background(Color.orange)
+                                .foregroundColor(.white)
+                                .cornerRadius(12)
                         }
                     }
+                    .disabled(resolvedUser == nil || amount.isEmpty || amountInt <= 0 || amountInt > availableBalance || isSending)
+                    .padding()
                 }
-            } header: {
-                Text("Amount")
+                .background(Color(.systemBackground))
+                .frame(maxWidth: .infinity)
             }
-            
-            Section {
-                TextField("Comment (optional)", text: $comment, axis: .vertical)
-                    .lineLimit(2...4)
-            } header: {
-                Text("Comment")
-            } footer: {
-                Text("Your comment will be public on Nostr")
-            }
-            
-            Section {
-                Button(action: sendNutzap) {
-                    if isSending {
-                        ProgressView()
-                            .frame(maxWidth: .infinity)
-                    } else {
-                        Text("Send Nutzap")
-                            .frame(maxWidth: .infinity)
-                    }
-                }
-                .disabled(resolvedUser == nil || amount.isEmpty || amountInt <= 0 || amountInt > availableBalance || isSending)
-            }
+            .frame(maxHeight: .infinity)
         }
         .navigationTitle("Nutzap")
         .platformNavigationBarTitleDisplayMode(inline: true)
+        #if os(iOS)
+        .ignoresSafeArea(.keyboard, edges: .bottom)
+        #endif
         .toolbar {
-            ToolbarItem(placement: .cancellationAction) {
+            ToolbarItem(placement: .confirmationAction) {
                 Button("Cancel") { dismiss() }
+                    .foregroundColor(.orange)
             }
         }
         .alert("Error", isPresented: $showError) {
@@ -158,6 +268,9 @@ struct NutzapView: View {
         .onAppear {
             loadBalance()
         }
+        .onDisappear {
+            profileTask?.cancel()
+        }
         #if os(iOS)
         .sheet(isPresented: $showQRScanner) {
             QRScannerView { scannedCode in
@@ -171,10 +284,13 @@ struct NutzapView: View {
     private func resolveRecipient() {
         guard !recipientInput.isEmpty else {
             resolvedUser = nil
+            recipientProfile = nil
+            profileTask?.cancel()
             return
         }
         
         isResolving = true
+        profileTask?.cancel()
         
         Task {
             do {
@@ -200,21 +316,25 @@ struct NutzapView: View {
                 
                 if let pubkey = pubkey {
                     let user = NDKUser(pubkey: pubkey)
-                    // Try to fetch profile
-                    let metadataFilter = NDKFilter(
-                        authors: [pubkey],
-                        kinds: [0],
-                        limit: 1
-                    )
-                    if let event = try? await ndk.fetchEvent(metadataFilter),
-                       let contentData = event.content.data(using: .utf8),
-                       let metadata = try? JSONDecoder().decode(NDKUserProfile.self, from: contentData) {
-                        // Profile will be loaded via async property
-                    }
                     
                     await MainActor.run {
                         resolvedUser = user
                         isResolving = false
+                    }
+                    
+                    // Observe profile updates
+                    profileTask = Task {
+                        let profileStream = await ndk.observeProfile(for: pubkey, closeOnEose: true)
+                        
+                        for await profile in profileStream {
+                            await MainActor.run {
+                                self.recipientProfile = profile
+                            }
+                            // For nutzap, we can close after first profile
+                            if profile != nil {
+                                break
+                            }
+                        }
                     }
                     
                     // Load accepted mints
@@ -222,12 +342,14 @@ struct NutzapView: View {
                 } else {
                     await MainActor.run {
                         resolvedUser = nil
+                        recipientProfile = nil
                         isResolving = false
                     }
                 }
             } catch {
                 await MainActor.run {
                     resolvedUser = nil
+                    recipientProfile = nil
                     isResolving = false
                 }
             }

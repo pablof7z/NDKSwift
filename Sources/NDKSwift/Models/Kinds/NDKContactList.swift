@@ -318,7 +318,7 @@ public extension NDK {
 
         try await contactList.sign()
         let event = contactList.toNDKEvent()
-        try await publish(event)
+        _ = try await publish(event)
     }
 
     /// Follow a user (add to contact list)

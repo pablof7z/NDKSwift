@@ -154,8 +154,13 @@ struct PostaAuthView: View {
             
             switch loginMethod {
             case .privateKey:
-                // NDKPrivateKeySigner handles both hex and nsec formats
-                signer = try NDKPrivateKeySigner(privateKey: loginInput)
+                // Check if input is nsec or hex format
+                if loginInput.starts(with: "nsec1") {
+                    signer = try NDKPrivateKeySigner(nsec: loginInput)
+                } else {
+                    // Assume hex format
+                    signer = try NDKPrivateKeySigner(privateKey: loginInput)
+                }
                 
             case .nip46:
                 guard let ndk = ndkManager.ndk else {

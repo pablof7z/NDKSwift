@@ -92,7 +92,7 @@ public actor EventDeduplicator {
         
         // Check per-relay cache if enabled
         if config.perRelayTracking, let relayUrl = relayUrl {
-            let relayCache = await getOrCreateRelayCache(for: relayUrl)
+            let relayCache = getOrCreateRelayCache(for: relayUrl)
             if await relayCache.get(eventId) != nil {
                 statistics.duplicates += 1
                 statistics.cacheHits += 1
@@ -117,7 +117,7 @@ public actor EventDeduplicator {
         
         // Add to per-relay cache if enabled
         if config.perRelayTracking, let relayUrl = relayUrl {
-            let relayCache = await getOrCreateRelayCache(for: relayUrl)
+            let relayCache = getOrCreateRelayCache(for: relayUrl)
             await relayCache.set(eventId, value: now)
         }
     }

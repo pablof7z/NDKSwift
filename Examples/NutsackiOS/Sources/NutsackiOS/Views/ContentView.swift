@@ -362,7 +362,6 @@ struct LightningInvoicePreviewView: View {
         }
         
         if cleanInvoice.lowercased().starts(with: "lnbc") || cleanInvoice.lowercased().starts(with: "lntb") || cleanInvoice.lowercased().starts(with: "lnbcrt") {
-            let prefix = cleanInvoice.prefix(4)
             let trimmed = cleanInvoice.dropFirst(4)
             var amountStr = ""
             var multiplier: Int64 = 1

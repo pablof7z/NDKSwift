@@ -12,7 +12,7 @@ struct MintsView: View {
     @State private var showDiscoverMints = false
     @State private var isDiscovering = false
     @State private var isLoading = true
-    @State private var discoveredMints: [MintDiscovery] = []
+    @State private var discoveredMints: [DiscoveredMint] = []
     @State private var showError = false
     @State private var errorMessage = ""
     

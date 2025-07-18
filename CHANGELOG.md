@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- Configurable subscription grouping delay via `groupingDelay` parameter
+  - Set custom delay when calling `ndk.subscribe(filters:groupingDelay:)` 
+  - Default remains 100ms for backward compatibility
+  - Set to 0 to disable grouping for specific subscriptions
+  - Multiple subscriptions within the delay window are merged into single relay requests
+- Re-enabled subscription grouping that was previously disabled
+  - Subscriptions with compatible filters are automatically merged
+  - Reduces relay connections and improves efficiency
+  - Grouping considers: kinds, filter structure, relay requirements, limits, closeOnEose, time constraints
+- Full NIP-10 compliant e-tag and q-tag implementation with pubkey hints
+  - `tagEvent` now requires an NDKEvent object (not just event ID) to automatically include pubkey hints
+  - New `quoteEvent` method for adding NIP-10 compliant q-tags when citing events in content
+  - The pubkey hint (5th position in e-tags, 4th in q-tags) helps with the outbox model to find events from author's write relays
+  - Updated all event interaction methods (reactions, reposts, deletions, replies, quotes) to use the new NIP-10 compliant tagging
+  - Removed backward compatibility - all event tagging must now use the event object for proper NIP-10 compliance
+
 ### Fixed
 - **CRITICAL**: Fixed completely broken Nutzap implementation (NIP-61)
   - Nutzaps were putting the entire serialized token in the content field instead of using proof tags

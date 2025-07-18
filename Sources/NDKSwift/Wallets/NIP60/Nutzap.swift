@@ -32,91 +32,110 @@ public enum Nutzap {
         ndk: NDK,
         signer: NDKSigner
     ) async throws -> NDKEvent {
-        // Find a mint with sufficient balance
-        var selectedMint: (url: String, mint: CashuSwift.Mint)?
+        // Find mints with sufficient balance, ordered by balance (highest first)
+        var viableMints: [(url: String, mint: CashuSwift.Mint)] = []
         for (mintURL, mint) in mints {
             let balance = await proofStateManager.getBalance(mint: mintURL)
             if balance >= amount {
-                selectedMint = (url: mintURL, mint: mint)
-                break
+                viableMints.append((url: mintURL, mint: mint))
             }
         }
         
-        guard let (mintURL, mint) = selectedMint else {
+        // Sort by balance (highest first) to try the mint with most balance first
+        viableMints.sort { lhs, rhs in
+            await proofStateManager.getBalance(mint: lhs.url) > await proofStateManager.getBalance(mint: rhs.url)
+        }
+        
+        guard !viableMints.isEmpty else {
             throw NDKError.insufficientBalance(amount: amount)
         }
         
         // Use the provided P2PK key (should come from payment request)
         let recipientP2PK = recipientP2PKKey
         
-        // Select and lock proofs
-        let selectedProofs = await proofStateManager.selectProofs(amount: amount, mint: mintURL)
-        guard !selectedProofs.isEmpty else {
-            throw NDKError.insufficientBalance(amount: amount)
-        }
-        
-        // Reserve proofs
-        try await proofStateManager.reserveProofs(selectedProofs)
-        
-        do {
-            // Create P2PK-locked proofs
-            let (lockedProofs, change) = try await lockProofsForRecipient(
-                proofs: selectedProofs,
-                amount: amount,
-                recipientPubkey: recipientP2PK,
-                mint: mint,
-                mintURL: mintURL
-            )
-            
-            // Create nutzap event
-            let nutzapEvent = try await createNutzapEvent(
-                wallet: wallet,
-                proofs: lockedProofs,
-                recipient: recipient,
-                amount: amount,
-                comment: comment,
-                eventId: eventId,
-                signer: signer
-            )
-            
-            // Publish the nutzap
-            try await ndk.publish(nutzapEvent)
-            
-            // Update wallet state
-            await proofStateManager.markProofsAsDeleted(selectedProofs)
-            if let changeProofs = change {
-                for proof in changeProofs {
-                    await proofStateManager.addProof(proof, mint: mintURL)
-                }
+        // Try each viable mint until one succeeds
+        var lastError: Error?
+        for (mintURL, mint) in viableMints {
+            // Select and lock proofs
+            let selectedProofs = await proofStateManager.selectProofs(amount: amount, mint: mintURL)
+            guard !selectedProofs.isEmpty else {
+                lastError = NDKError.insufficientBalance(amount: amount)
+                continue
             }
             
-            // Update token events
-            let stateChange = WalletStateChange(
-                store: change ?? [],
-                destroy: selectedProofs,
-                mint: mintURL,
-                memo: "Send nutzap"
-            )
-            _ = try await wallet.update(stateChange: stateChange)
+            // Reserve proofs
+            do {
+                try await proofStateManager.reserveProofs(selectedProofs)
+            } catch {
+                lastError = error
+                continue
+            }
             
-            // Create spending history
-            try await eventManager.createSpendingHistoryEvent(
-                direction: .out,
-                amount: amount,
-                memo: comment ?? "Nutzap sent",
-                destroyedEventIds: nil,
-                createdEventIds: nil,
-                redeemedEventId: nil,
-                signer: signer
-            )
-            
-            return nutzapEvent
-            
-        } catch {
-            // Release proofs on failure
-            await proofStateManager.releaseProofs(selectedProofs)
-            throw error
+            do {
+                // Create P2PK-locked proofs
+                let (lockedProofs, change) = try await lockProofsForRecipient(
+                    proofs: selectedProofs,
+                    amount: amount,
+                    recipientPubkey: recipientP2PK,
+                    mint: mint,
+                    mintURL: mintURL
+                )
+                
+                // Create nutzap event
+                let nutzapEvent = try await createNutzapEvent(
+                    wallet: wallet,
+                    proofs: lockedProofs,
+                    recipient: recipient,
+                    amount: amount,
+                    comment: comment,
+                    eventId: eventId,
+                    signer: signer
+                )
+                
+                // Publish the nutzap
+                _ = try await ndk.publish(nutzapEvent)
+                
+                // Update wallet state
+                await proofStateManager.markProofsAsDeleted(selectedProofs)
+                if let changeProofs = change {
+                    for proof in changeProofs {
+                        await proofStateManager.addProof(proof, mint: mintURL)
+                    }
+                }
+                
+                // Update token events
+                let stateChange = WalletStateChange(
+                    store: change ?? [],
+                    destroy: selectedProofs,
+                    mint: mintURL,
+                    memo: "Send nutzap"
+                )
+                _ = try await wallet.update(stateChange: stateChange)
+                
+                // Create spending history
+                try await eventManager.createSpendingHistoryEvent(
+                    direction: .out,
+                    amount: amount,
+                    memo: comment ?? "Nutzap sent",
+                    destroyedEventIds: nil,
+                    createdEventIds: nil,
+                    redeemedEventId: nil,
+                    signer: signer
+                )
+                
+                return nutzapEvent
+                
+            } catch {
+                // Release proofs on failure and try next mint
+                await proofStateManager.releaseProofs(selectedProofs)
+                lastError = error
+                print("Nutzap failed with mint \(mintURL): \(error). Trying next mint...")
+                continue
+            }
         }
+        
+        // If we reach here, all mints failed
+        throw lastError ?? NDKError.insufficientBalance(amount: amount)
     }
     
     // MARK: - Receiving Nutzaps

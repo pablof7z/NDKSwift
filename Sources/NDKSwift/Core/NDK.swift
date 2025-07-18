@@ -232,13 +232,21 @@ public final class NDK {
     // MARK: - Subscriptions (Delegated to SubscriptionCoordinator)
     
     /// Subscribe to events matching the provided filters
+    /// - Parameters:
+    ///   - filters: Array of filters to match events against
+    ///   - relays: Specific relays to use (nil uses default relay selection)
+    ///   - id: Custom subscription ID (auto-generated if nil)
+    ///   - closeOnEose: Whether to close subscription after receiving EOSE
+    ///   - groupingDelay: Time to wait for batching subscriptions (default: 0.1s, set to 0 to disable)
+    /// - Returns: An NDKSubscription that can be iterated over as an AsyncSequence
     public func subscribe(
         filters: [NDKFilter],
         relays: Set<RelayURL>? = nil,
         id: String? = nil,
-        closeOnEose: Bool = false
+        closeOnEose: Bool = false,
+        groupingDelay: TimeInterval? = nil
     ) async -> NDKSubscription {
-        await subscriptionCoordinator.subscribe(filters: filters, relays: relays, id: id, closeOnEose: closeOnEose)
+        await subscriptionCoordinator.subscribe(filters: filters, relays: relays, id: id, closeOnEose: closeOnEose, groupingDelay: groupingDelay)
     }
     
     public func fetchEvents(
@@ -385,7 +393,7 @@ public final class NDK {
         }
         
         do {
-            let authEvent = try await NDKEventBuilder(ndk: self)
+            let authEvent = try await NDKEventBuilder()
                 .kind(EventKind.clientAuthentication)
                 .tag(["challenge", challenge])
                 .tag(["relay", relay.url])
