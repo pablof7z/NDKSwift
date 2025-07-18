@@ -110,7 +110,7 @@ public final class NDK {
         subscriptionTrackingConfig: SubscriptionTrackingConfig = .default
     ) {
         self.signer = signer
-        self.cache = cache ?? SimpleMemoryCache()
+        self.cache = cache ?? MemoryCache()
         self.signatureVerificationConfig = signatureVerificationConfig
         self.signatureVerificationSampler = NDKSignatureVerificationSampler(config: signatureVerificationConfig)
         self.subscriptionTracker = NDKSubscriptionTracker(
@@ -483,5 +483,27 @@ public final class NDK {
     /// Get a specific relay - primarily for internal use
     internal func getRelay(for url: RelayURL) async -> NDKRelay? {
         await pool.getRelay(for: url)
+    }
+    
+    // MARK: - NIP-77 Support
+    
+    /// Process NIP-77 Negentropy message from relay
+    internal func processNIP77Message(_ message: NostrMessage, from relay: NDKRelay) async {
+        print("[NDK] Processing NIP-77 message from \(relay.url)")
+        
+        // Get the sync handler for this relay
+        guard let handler = await pool.getSyncHandler(for: relay.url) else {
+            print("⚠️ Received NIP-77 message but no sync handler found for \(relay.url)")
+            return
+        }
+        
+        print("[NDK] Found sync handler, processing message...")
+        
+        // Process the message
+        do {
+            try await handler.handleMessage(message)
+        } catch {
+            print("❌ Failed to handle NIP-77 message: \(error)")
+        }
     }
 }

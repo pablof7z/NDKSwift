@@ -155,7 +155,7 @@ case nil:
 
 ### Cache System
 - `Sources/NDKSwift/Cache/NDKCache.swift` - Added optimistic publishing methods to protocol
-- `Sources/NDKSwift/Cache/SimpleMemoryCache.swift` - Implemented optimistic publishing support
+- `Sources/NDKSwift/Cache/MemoryCache.swift` - Implemented optimistic publishing support
 
 ### Subscription System
 - `Sources/NDKSwift/Subscription/NDKSubscriptionManager.swift` - Added processOptimisticEvent() method

@@ -867,4 +867,197 @@ public actor NDKSQLiteCache: NDKCache {
             return []
         }
     }
+    
+    // MARK: - Negentropy Support
+    
+    public func getEventsByTimeRange(from: Timestamp, to: Timestamp, filter: NDKFilter?) async throws -> [NDKEvent] {
+        return try await dbQueue.read { db in
+            var sql = "SELECT DISTINCT e.json FROM events e"
+            var arguments = StatementArguments()
+            var whereClauses: [String] = []
+            var joins: [String] = []
+            var tagIndex = 0
+            
+            // Time range
+            whereClauses.append("e.created_at >= ? AND e.created_at < ?")
+            arguments += [from, to]
+            
+            // Apply additional filter conditions if provided
+            if let filter = filter {
+                // Authors filter
+                if let authors = filter.authors, !authors.isEmpty {
+                    let placeholders = authors.map { _ in "?" }.joined(separator: ", ")
+                    whereClauses.append("e.pubkey IN (\(placeholders))")
+                    for author in authors {
+                        arguments += [author]
+                    }
+                }
+                
+                // Kinds filter
+                if let kinds = filter.kinds, !kinds.isEmpty {
+                    let placeholders = kinds.map { _ in "?" }.joined(separator: ", ")
+                    whereClauses.append("e.kind IN (\(placeholders))")
+                    for kind in kinds {
+                        arguments += [kind]
+                    }
+                }
+                
+                // Tag filters
+                if let tags = filter.tags {
+                    for (tagName, tagValues) in tags {
+                        if !tagValues.isEmpty {
+                            let alias = "t\(tagIndex)"
+                            joins.append("JOIN tags \(alias) ON e.id = \(alias).event_id")
+                            
+                            let placeholders = tagValues.map { _ in "?" }.joined(separator: ", ")
+                            whereClauses.append("\(alias).tag_name = ? AND \(alias).tag_value IN (\(placeholders))")
+                            
+                            arguments += [tagName]
+                            for value in tagValues {
+                                arguments += [value]
+                            }
+                            
+                            tagIndex += 1
+                        }
+                    }
+                }
+            }
+            
+            // Build final query
+            if !joins.isEmpty {
+                sql += " " + joins.joined(separator: " ")
+            }
+            
+            if !whereClauses.isEmpty {
+                sql += " WHERE " + whereClauses.joined(separator: " AND ")
+            }
+            
+            sql += " ORDER BY e.created_at ASC"
+            
+            let rows = try Row.fetchAll(db, sql: sql, arguments: arguments)
+            
+            return rows.compactMap { row in
+                guard let jsonString = row["json"] as? String,
+                      let jsonData = jsonString.data(using: .utf8) else { return nil }
+                return JSONCoding.safeDecode(NDKEvent.self, from: jsonData)
+            }
+        }
+    }
+    
+    public func getEventIdsWithTimestamps(from: Timestamp, to: Timestamp, filter: NDKFilter?) async throws -> [(id: String, timestamp: Timestamp)] {
+        return try await dbQueue.read { db in
+            var sql = "SELECT DISTINCT e.id, e.created_at FROM events e"
+            var arguments = StatementArguments()
+            var whereClauses: [String] = []
+            var joins: [String] = []
+            var tagIndex = 0
+            
+            // Time range
+            whereClauses.append("e.created_at >= ? AND e.created_at < ?")
+            arguments += [from, to]
+            
+            // Apply additional filter conditions if provided
+            if let filter = filter {
+                // Authors filter
+                if let authors = filter.authors, !authors.isEmpty {
+                    let placeholders = authors.map { _ in "?" }.joined(separator: ", ")
+                    whereClauses.append("e.pubkey IN (\(placeholders))")
+                    for author in authors {
+                        arguments += [author]
+                    }
+                }
+                
+                // Kinds filter
+                if let kinds = filter.kinds, !kinds.isEmpty {
+                    let placeholders = kinds.map { _ in "?" }.joined(separator: ", ")
+                    whereClauses.append("e.kind IN (\(placeholders))")
+                    for kind in kinds {
+                        arguments += [kind]
+                    }
+                }
+                
+                // Tag filters
+                if let tags = filter.tags {
+                    for (tagName, tagValues) in tags {
+                        if !tagValues.isEmpty {
+                            let alias = "t\(tagIndex)"
+                            joins.append("JOIN tags \(alias) ON e.id = \(alias).event_id")
+                            
+                            let placeholders = tagValues.map { _ in "?" }.joined(separator: ", ")
+                            whereClauses.append("\(alias).tag_name = ? AND \(alias).tag_value IN (\(placeholders))")
+                            
+                            arguments += [tagName]
+                            for value in tagValues {
+                                arguments += [value]
+                            }
+                            
+                            tagIndex += 1
+                        }
+                    }
+                }
+            }
+            
+            // Build final query
+            if !joins.isEmpty {
+                sql += " " + joins.joined(separator: " ")
+            }
+            
+            if !whereClauses.isEmpty {
+                sql += " WHERE " + whereClauses.joined(separator: " AND ")
+            }
+            
+            sql += " ORDER BY e.created_at ASC"
+            
+            let rows = try Row.fetchAll(db, sql: sql, arguments: arguments)
+            
+            return rows.compactMap { row in
+                guard let id = row["id"] as? String,
+                      let createdAt = row["created_at"] as? Int64 else { return nil }
+                return (id: id, timestamp: Timestamp(createdAt))
+            }
+        }
+    }
+    
+    public func hasEvents(ids: [String]) async -> [String: Bool] {
+        guard !ids.isEmpty else { return [:] }
+        
+        do {
+            return try await dbQueue.read { db in
+                var result: [String: Bool] = [:]
+                
+                // Initialize all IDs as false
+                for id in ids {
+                    result[id] = false
+                }
+                
+                // Query in batches of 100 to avoid SQLite limits
+                let batchSize = 100
+                for i in stride(from: 0, to: ids.count, by: batchSize) {
+                    let endIndex = min(i + batchSize, ids.count)
+                    let batch = Array(ids[i..<endIndex])
+                    
+                    let placeholders = batch.map { _ in "?" }.joined(separator: ", ")
+                    let sql = "SELECT id FROM events WHERE id IN (\(placeholders))"
+                    
+                    var arguments = StatementArguments()
+                    for id in batch {
+                        arguments += [id]
+                    }
+                    
+                    let existingIds = try String.fetchAll(db, sql: sql, arguments: arguments)
+                    for id in existingIds {
+                        result[id] = true
+                    }
+                }
+                
+                return result
+            }
+        } catch {
+            if debugMode {
+                print("NDKSQLiteCache: Failed to check event existence. Error: \(error)")
+            }
+            // Return empty dictionary on error
+            return [:]
+        }
+    }
 }

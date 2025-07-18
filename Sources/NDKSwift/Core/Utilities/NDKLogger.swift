@@ -154,6 +154,26 @@ public struct NDKLogger {
             print("   TYPE: COUNT")
             print("   SUBSCRIPTION: \(subscriptionId)")
             print("   COUNT: \(count)")
+            
+        case let .negOpen(subscriptionId, filter, message):
+            print("   TYPE: NEG-OPEN")
+            print("   SUBSCRIPTION: \(subscriptionId)")
+            print("   FILTER: \(filter)")
+            print("   MESSAGE: \(message)")
+            
+        case let .negMsg(subscriptionId, message):
+            print("   TYPE: NEG-MSG")
+            print("   SUBSCRIPTION: \(subscriptionId)")
+            print("   MESSAGE: \(message)")
+            
+        case let .negClose(subscriptionId):
+            print("   TYPE: NEG-CLOSE")
+            print("   SUBSCRIPTION: \(subscriptionId)")
+            
+        case let .negErr(subscriptionId, error):
+            print("   TYPE: NEG-ERR")
+            print("   SUBSCRIPTION: \(subscriptionId)")
+            print("   ERROR: \(error)")
         }
     }
 }
