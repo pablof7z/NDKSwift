@@ -1,12 +1,30 @@
 import Foundation
 
+/// Relay pool change event
+public enum NDKPoolChangeEvent: Sendable {
+    case relayAdded(NDKRelay)
+    case relayRemoved(RelayURL)
+}
+
 /// Thread-safe actor that manages a pool of relay connections
 public actor NDKPool {
     private weak var ndk: NDK?
     private var relayMap: [String: NDKRelay] = [:]
     
+    /// Stream of relay pool changes for event-driven observation
+    private let poolChangeStream: AsyncStream<NDKPoolChangeEvent>
+    private let poolChangeContinuation: AsyncStream<NDKPoolChangeEvent>.Continuation
+    
     init(ndk: NDK) {
         self.ndk = ndk
+        
+        // Initialize the relay change stream
+        (self.poolChangeStream, self.poolChangeContinuation) = AsyncStream<NDKPoolChangeEvent>.makeStream()
+    }
+    
+    /// Public accessor for relay pool changes stream
+    public var relayChanges: AsyncStream<NDKPoolChangeEvent> {
+        poolChangeStream
     }
     
     // MARK: - Relay Management
@@ -38,6 +56,9 @@ public actor NDKPool {
             }
         }
         
+        // Emit relay added event
+        poolChangeContinuation.yield(.relayAdded(relay))
+        
         return relay
     }
     
@@ -46,6 +67,9 @@ public actor NDKPool {
         let normalizedUrl = URLNormalizer.tryNormalizeRelayUrl(url) ?? url
         if let relay = relayMap.removeValue(forKey: normalizedUrl) {
             await relay.disconnect()
+            
+            // Emit relay removed event
+            poolChangeContinuation.yield(.relayRemoved(normalizedUrl))
         }
     }
     

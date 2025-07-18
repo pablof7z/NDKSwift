@@ -199,51 +199,50 @@ public final class NDKRelayCollection: ObservableObject {
         await ndk.removeRelay(url)
     }
     
-    /// Monitor the relay pool for changes
+    /// Monitor the relay pool for changes using event-driven approach
     private func startPoolObserver(_ ndk: NDK) async {
         poolObserverTask?.cancel()
         
         poolObserverTask = Task { @MainActor in
-            // Keep track of known relay URLs
-            var knownRelayUrls = Set(relays.map { $0.url })
+            // Get the relay changes stream from NDK
+            let relayChangesStream = await ndk.relayChanges
             
-            // Check for changes periodically
-            while !Task.isCancelled {
-                do {
-                    try await Task.sleep(nanoseconds: 2_000_000_000) // 2 seconds
+            // Listen for relay pool changes
+            for await change in relayChangesStream {
+                switch change {
+                case .relayAdded(let relay):
+                    await handleRelayAdded(relay)
                     
-                    let currentRelays = await ndk.relays
-                    let currentUrls = Set(currentRelays.map { $0.url })
-                    
-                    // Check for added relays
-                    let addedUrls = currentUrls.subtracting(knownRelayUrls)
-                    for url in addedUrls {
-                        if let relay = currentRelays.first(where: { $0.url == url }) {
-                            let state = await relay.connectionState
-                            let info = RelayInfo(relay: relay, state: state)
-                            relays.append(info)
-                            observeRelayState(relay)
-                        }
-                    }
-                    
-                    // Check for removed relays
-                    let removedUrls = knownRelayUrls.subtracting(currentUrls)
-                    for url in removedUrls {
-                        stateObservers[url]?.cancel()
-                        stateObservers.removeValue(forKey: url)
-                        relays.removeAll { $0.url == url }
-                    }
-                    
-                    // Update counts if there were changes
-                    if !addedUrls.isEmpty || !removedUrls.isEmpty {
-                        updateCounts()
-                        knownRelayUrls = currentUrls
-                    }
-                } catch {
-                    // Task was cancelled
-                    break
+                case .relayRemoved(let url):
+                    await handleRelayRemoved(url)
                 }
             }
+        }
+    }
+    
+    /// Handle a relay being added to the pool
+    private func handleRelayAdded(_ relay: NDKRelay) async {
+        let state = await relay.connectionState
+        let info = RelayInfo(relay: relay, state: state)
+        
+        await MainActor.run {
+            relays.append(info)
+            updateCounts()
+        }
+        
+        // Start observing the new relay's state
+        observeRelayState(relay)
+    }
+    
+    /// Handle a relay being removed from the pool
+    private func handleRelayRemoved(_ url: String) async {
+        // Cancel observer for removed relay
+        stateObservers[url]?.cancel()
+        stateObservers.removeValue(forKey: url)
+        
+        await MainActor.run {
+            relays.removeAll { $0.url == url }
+            updateCounts()
         }
     }
 }
