@@ -25,6 +25,7 @@ public actor NDKNostrRPC {
     private let relayUrls: [String]
     private var encryptionScheme: NDKEncryptionScheme = .nip04
     private var pendingRequests: [String: CheckedContinuation<NDKRPCResponse, Error>] = [:]
+    private var timeoutTasks: [String: Task<Void, Never>] = [:]
 
     init(ndk: NDK, localSigner: NDKPrivateKeySigner, relayUrls: [String]) {
         self.ndk = ndk
@@ -75,6 +76,9 @@ public actor NDKNostrRPC {
 
             // Resume any waiting continuation
             if let continuation = pendingRequests.removeValue(forKey: id) {
+                // Cancel associated timeout task
+                timeoutTasks[id]?.cancel()
+                timeoutTasks.removeValue(forKey: id)
                 continuation.resume(returning: response)
             }
 
@@ -100,7 +104,7 @@ public actor NDKNostrRPC {
         let encryptedContent = try await localSigner.encrypt(recipient: remoteUser, value: requestString, scheme: encryptionScheme)
         print("[RPC] Encrypted content using scheme: \(encryptionScheme)")
 
-        let event = try await NDKEventBuilder()
+        let event = try await ndk.event()
             .content(encryptedContent)
             .kind(24133)
             .tags([["p", pubkey]])
@@ -152,6 +156,8 @@ public actor NDKNostrRPC {
                     setupTimeout(for: id, continuation: continuation)
                 } catch {
                     self.pendingRequests.removeValue(forKey: id)
+                    self.timeoutTasks[id]?.cancel()
+                    self.timeoutTasks.removeValue(forKey: id)
                     continuation.resume(throwing: error)
                 }
             }
@@ -168,13 +174,15 @@ public actor NDKNostrRPC {
     }
 
     private func setupTimeout(for id: String, continuation: CheckedContinuation<NDKRPCResponse, Error>, timeoutSeconds: UInt64 = 30) {
-        Task {
+        let timeoutTask = Task {
             try? await Task.sleep(nanoseconds: timeoutSeconds * 1_000_000_000)
             await self.handleTimeout(id: id, continuation: continuation)
         }
+        timeoutTasks[id] = timeoutTask
     }
 
     private func handleTimeout(id: String, continuation: CheckedContinuation<NDKRPCResponse, Error>) async {
+        timeoutTasks.removeValue(forKey: id)
         if pendingRequests.removeValue(forKey: id) != nil {
             continuation.resume(throwing: NDKError.timeout(operation: "RPC request", seconds: 30))
         }

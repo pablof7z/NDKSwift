@@ -255,9 +255,8 @@ public actor NDKBunkerSigner: NDKSigner, Sendable {
                     }
                 }
             }
-
-            // Wait a bit for connections to stabilize
-            try await Task.sleep(nanoseconds: 500_000_000) // 0.5 seconds
+            
+            // No need to wait - relay.connect() already waits for full connection including initial ping
         } else {
             print("[BunkerSigner] WARNING: No relays specified for bunker connection!")
         }
