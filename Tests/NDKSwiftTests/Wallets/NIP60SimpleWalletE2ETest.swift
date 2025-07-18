@@ -6,7 +6,7 @@ final class NIP60SimpleWalletE2ETest: XCTestCase {
     
     func testSimpleWalletDepositAnd7375Event() async throws {
         // Create NDK instance
-        let ndk = NDK(cache: FullInMemoryCache())
+        let ndk = NDK(cache: MemoryCache())
         
         // Add a single relay
         let relay = await ndk.pool.addRelay("wss://relay.damus.io")

@@ -1,13 +1,17 @@
 import Foundation
+import CashuSwift
 
-/// Simple in-memory cache implementation for testing
-public actor SimpleMemoryCache: NDKCache {
+/// Comprehensive in-memory cache implementation for testing and temporary use
+public actor MemoryCache: NDKCache {
     private var events: [String: NDKEvent] = [:]
     private var profiles: [String: NDKUserProfile] = [:]
     private var eventConfirmations: [String: EventConfirmationState] = [:]
     private var unpublishedEventRelays: [String: Set<String>] = [:]
     private var eventCreationTimes: [String: Date] = [:]
     private var decryptedContent: LRUCache<String, String>
+    private var mintInfos: [String: (info: NDKMintInfo, timestamp: Date)] = [:]
+    private var keysets: [String: CashuSwift.Keyset] = [:]
+    private var mintKeysets: [String: [(keyset: CashuSwift.Keyset, timestamp: Date)]] = [:]
     
     public init() {
         // Initialize LRU cache with 1000 item limit for decrypted content
@@ -19,12 +23,12 @@ public actor SimpleMemoryCache: NDKCache {
     public func saveEvent(_ event: NDKEvent) async throws {
         let eventId = event.id
         events[eventId] = event
-        print("[SimpleMemoryCache] Saved event \(eventId)")
+        print("[MemoryCache] Saved event \(eventId)")
     }
     
     public func getEvent(id: String) async -> NDKEvent? {
         let event = events[id]
-        print("[SimpleMemoryCache] Retrieved event \(id): \(event != nil ? "found" : "not found")")
+        print("[MemoryCache] Retrieved event \(id): \(event != nil ? "found" : "not found")")
         return event
     }
     
@@ -65,25 +69,25 @@ public actor SimpleMemoryCache: NDKCache {
         
         results = sortedResults
         
-        print("[SimpleMemoryCache] Query returned \(results.count) events")
+        print("[MemoryCache] Query returned \(results.count) events")
         return results
     }
     
     public func deleteEvent(id: String) async throws {
         events.removeValue(forKey: id)
-        print("[SimpleMemoryCache] Deleted event \(id)")
+        print("[MemoryCache] Deleted event \(id)")
     }
     
     // MARK: - Profile Operations
     
     public func saveProfile(_ profile: NDKUserProfile, pubkey: String) async throws {
         profiles[pubkey] = profile
-        print("[SimpleMemoryCache] Saved profile for \(pubkey)")
+        print("[MemoryCache] Saved profile for \(pubkey)")
     }
     
     public func getProfile(pubkey: String) async -> NDKUserProfile? {
         let profile = profiles[pubkey]
-        print("[SimpleMemoryCache] Retrieved profile for \(pubkey): \(profile != nil ? "found" : "not found")")
+        print("[MemoryCache] Retrieved profile for \(pubkey): \(profile != nil ? "found" : "not found")")
         return profile
     }
     
@@ -93,8 +97,11 @@ public actor SimpleMemoryCache: NDKCache {
         events.removeAll()
         profiles.removeAll()
         eventConfirmations.removeAll()
+        mintInfos.removeAll()
+        keysets.removeAll()
+        mintKeysets.removeAll()
         await decryptedContent.clear()
-        print("[SimpleMemoryCache] Cleared all cache data")
+        print("[MemoryCache] Cleared all cache data")
     }
     
     // MARK: - Optimistic Publishing Support
@@ -105,7 +112,7 @@ public actor SimpleMemoryCache: NDKCache {
         eventConfirmations[eventId] = .optimistic
         unpublishedEventRelays[eventId] = relays
         eventCreationTimes[eventId] = Date()
-        print("[SimpleMemoryCache] Added unpublished event \(eventId) for relays: \(relays.joined(separator: ", "))")
+        print("[MemoryCache] Added unpublished event \(eventId) for relays: \(relays.joined(separator: ", "))")
     }
     
     public func confirmEvent(eventId: String, onRelay relay: String) async throws {
@@ -113,14 +120,14 @@ public actor SimpleMemoryCache: NDKCache {
             switch existingState {
             case .optimistic:
                 eventConfirmations[eventId] = .confirmed(fromRelay: relay)
-                print("[SimpleMemoryCache] Confirmed event \(eventId) on relay \(relay)")
+                print("[MemoryCache] Confirmed event \(eventId) on relay \(relay)")
             case .confirmed:
-                print("[SimpleMemoryCache] Event \(eventId) already confirmed")
+                print("[MemoryCache] Event \(eventId) already confirmed")
             }
         } else {
             // Event not found, might have been confirmed directly
             eventConfirmations[eventId] = .confirmed(fromRelay: relay)
-            print("[SimpleMemoryCache] Marked event \(eventId) as confirmed on relay \(relay)")
+            print("[MemoryCache] Marked event \(eventId) as confirmed on relay \(relay)")
         }
     }
     
@@ -160,7 +167,7 @@ public actor SimpleMemoryCache: NDKCache {
             results = Array(results.prefix(limit))
         }
         
-        print("[SimpleMemoryCache] Found \(results.count) unpublished events (maxAge: \(maxAge)s)")
+        print("[MemoryCache] Found \(results.count) unpublished events (maxAge: \(maxAge)s)")
         return results
     }
     
@@ -174,12 +181,12 @@ public actor SimpleMemoryCache: NDKCache {
     public func storeDecryptedContent(_ content: String, for eventId: String, viewerPubkey: String) async {
         let key = "\(eventId):\(viewerPubkey)"
         await decryptedContent.set(key, value: content)
-        print("[SimpleMemoryCache] Cached decrypted content for event \(eventId) viewer \(viewerPubkey)")
+        print("[MemoryCache] Cached decrypted content for event \(eventId) viewer \(viewerPubkey)")
     }
     
     public func clearDecryptedContent() async {
         await decryptedContent.clear()
-        print("[SimpleMemoryCache] Cleared all decrypted content")
+        print("[MemoryCache] Cleared all decrypted content")
     }
     
     public func clearDecryptedContent(for viewerPubkey: String) async {
@@ -188,7 +195,7 @@ public actor SimpleMemoryCache: NDKCache {
         for (key, _) in allItems where key.hasSuffix(":\(viewerPubkey)") {
             await decryptedContent.remove(key)
         }
-        print("[SimpleMemoryCache] Cleared decrypted content for viewer \(viewerPubkey)")
+        print("[MemoryCache] Cleared decrypted content for viewer \(viewerPubkey)")
     }
     
     // MARK: - Debug Helpers
@@ -203,5 +210,86 @@ public actor SimpleMemoryCache: NDKCache {
     
     public func unconfirmedEventCount() async -> Int {
         return eventConfirmations.values.filter { !$0.isConfirmed }.count
+    }
+    
+    // MARK: - Mint Cache Operations
+    
+    public func saveMintInfo(_ info: NDKMintInfo, url: String) async throws {
+        mintInfos[url] = (info, Date())
+        print("[MemoryCache] Saved mint info for \(url)")
+    }
+    
+    public func getMintInfo(url: String) async -> NDKMintInfo? {
+        let info = mintInfos[url]?.info
+        print("[MemoryCache] Retrieved mint info for \(url): \(info != nil ? "found" : "not found")")
+        return info
+    }
+    
+    public func isMintInfoStale(url: String, maxAge: TimeInterval) async -> Bool {
+        guard let entry = mintInfos[url] else { return true }
+        let isStale = Date().timeIntervalSince(entry.timestamp) > maxAge
+        print("[MemoryCache] Mint info for \(url) is \(isStale ? "stale" : "fresh")")
+        return isStale
+    }
+    
+    public func invalidateMintCache(url: String) async throws {
+        mintInfos.removeValue(forKey: url)
+        mintKeysets.removeValue(forKey: url)
+        print("[MemoryCache] Invalidated mint cache for \(url)")
+    }
+    
+    public func saveKeyset(_ keyset: CashuSwift.Keyset, mintUrl: String) async throws {
+        keysets[keyset.keysetID] = keyset
+        
+        var mintList = mintKeysets[mintUrl] ?? []
+        mintList.append((keyset, Date()))
+        mintKeysets[mintUrl] = mintList
+        
+        print("[MemoryCache] Saved keyset \(keyset.keysetID) for mint \(mintUrl)")
+    }
+    
+    public func saveKeysets(_ keysets: [CashuSwift.Keyset], mintUrl: String) async throws {
+        let timestamp = Date()
+        var mintList = mintKeysets[mintUrl] ?? []
+        
+        for keyset in keysets {
+            self.keysets[keyset.keysetID] = keyset
+            mintList.append((keyset, timestamp))
+        }
+        
+        mintKeysets[mintUrl] = mintList
+        print("[MemoryCache] Saved \(keysets.count) keysets for mint \(mintUrl)")
+    }
+    
+    public func getKeyset(id: String) async -> CashuSwift.Keyset? {
+        let keyset = keysets[id]
+        print("[MemoryCache] Retrieved keyset \(id): \(keyset != nil ? "found" : "not found")")
+        return keyset
+    }
+    
+    public func getKeysets(mintUrl: String) async -> [CashuSwift.Keyset] {
+        let keysets = mintKeysets[mintUrl]?.map { $0.keyset } ?? []
+        print("[MemoryCache] Retrieved \(keysets.count) keysets for mint \(mintUrl)")
+        return keysets
+    }
+    
+    public func getActiveKeysets(mintUrl: String, unit: String) async -> [CashuSwift.Keyset] {
+        let activeKeysets = mintKeysets[mintUrl]?
+            .map { $0.keyset }
+            .filter { $0.unit == unit && $0.active } ?? []
+        print("[MemoryCache] Retrieved \(activeKeysets.count) active keysets for mint \(mintUrl) unit \(unit)")
+        return activeKeysets
+    }
+    
+    public func areKeysetsStale(mintUrl: String, maxAge: TimeInterval) async -> Bool {
+        guard let entries = mintKeysets[mintUrl], !entries.isEmpty else { 
+            print("[MemoryCache] No keysets found for mint \(mintUrl), considering stale")
+            return true 
+        }
+        
+        let oldestTimestamp = entries.map { $0.timestamp }.min() ?? Date()
+        let isStale = Date().timeIntervalSince(oldestTimestamp) > maxAge
+        print("[MemoryCache] Keysets for mint \(mintUrl) are \(isStale ? "stale" : "fresh")")
+        return isStale
     }
 }

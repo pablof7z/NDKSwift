@@ -10,7 +10,7 @@ final class NDKAuthManagerTests: XCTestCase {
         try await super.setUp()
         
         // Create NDK instance with in-memory cache for testing
-        let cache = FullInMemoryCache()
+        let cache = MemoryCache()
         ndk = NDK(cache: cache)
         
         // Create fresh auth manager

@@ -107,7 +107,7 @@ public final class NDK {
         subscriptionTrackingConfig: SubscriptionTrackingConfig = .default
     ) {
         self.signer = signer
-        self.cache = cache ?? SimpleMemoryCache()
+        self.cache = cache ?? MemoryCache()
         self.signatureVerificationConfig = signatureVerificationConfig
         self.signatureVerificationSampler = NDKSignatureVerificationSampler(config: signatureVerificationConfig)
         self.subscriptionTracker = NDKSubscriptionTracker(
