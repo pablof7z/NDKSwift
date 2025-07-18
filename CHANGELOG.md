@@ -217,7 +217,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added `NDKCashuMintList` to wrap kind 10019 events for advertising accepted mints
 
 ### Changed
-- Fixed `NDK` initializer to use `SimpleMemoryCache()` instead of non-existent `NDKInMemoryCache()`
+- Fixed `NDK` initializer to use `MemoryCache()` instead of non-existent `NDKInMemoryCache()`
 - Consolidated tag utility functions from `TagHelpers.swift` into `ContentTagger.swift`
 - Updated `NDKUser.pay()` to return `PaymentConfirmation` instead of deprecated `NDKPaymentConfirmation`
 - Updated example apps to use new payment types (`NutzapPaymentRequest` instead of deprecated `NDKNutzapRequest`)

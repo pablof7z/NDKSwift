@@ -10,7 +10,7 @@ final class NIP60WalletE2ETests: XCTestCase {
         try await super.setUp()
         
         // Create NDK instance with in-memory cache for testing
-        let cache = FullInMemoryCache()
+        let cache = MemoryCache()
         ndk = NDK(cache: cache)
         
         // Add test relays

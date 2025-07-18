@@ -645,9 +645,9 @@ public protocol NDKCache: Actor {
 
 #### Implementations
 
-**SimpleMemoryCache** - In-memory cache:
+**MemoryCache** - In-memory cache:
 ```swift
-public actor SimpleMemoryCache: NDKCache
+public actor MemoryCache: NDKCache
 ```
 
 **NDKSQLiteCache** - SQLite persistent cache:

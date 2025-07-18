@@ -365,7 +365,7 @@ let subscription = ndk.subscribe(filters: [filter], options: options)
 
 **Cache Support:**
 
-Both `SimpleMemoryCache` and `NDKSQLiteCache` fully support optimistic publishing:
+Both `MemoryCache` and `NDKSQLiteCache` fully support optimistic publishing:
 
 *   **`addUnpublishedEvent(_:relays:)`**: Cache events with optimistic state
 *   **`confirmEvent(eventId:onRelay:)`**: Mark events as confirmed
