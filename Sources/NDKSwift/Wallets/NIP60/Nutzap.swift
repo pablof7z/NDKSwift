@@ -41,10 +41,16 @@ public enum Nutzap {
             }
         }
         
-        // Sort by balance (highest first) to try the mint with most balance first
-        viableMints.sort { lhs, rhs in
-            await proofStateManager.getBalance(mint: lhs.url) > await proofStateManager.getBalance(mint: rhs.url)
+        // Get balances for sorting
+        var mintsWithBalances: [(mint: (url: String, mint: CashuSwift.Mint), balance: Int64)] = []
+        for viableMint in viableMints {
+            let balance = await proofStateManager.getBalance(mint: viableMint.url)
+            mintsWithBalances.append((mint: viableMint, balance: balance))
         }
+        
+        // Sort by balance (highest first) to try the mint with most balance first
+        mintsWithBalances.sort { $0.balance > $1.balance }
+        viableMints = mintsWithBalances.map { $0.mint }
         
         guard !viableMints.isEmpty else {
             throw NDKError.insufficientBalance(amount: amount)

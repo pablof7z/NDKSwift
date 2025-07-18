@@ -3,18 +3,15 @@ import Foundation
 /// Encoder for Negentropy protocol messages
 public struct NegentropyEncoder {
     
-    /// Encode initial message with full set fingerprint
+    /// Encode initial message - just the protocol version
     public static func encodeInitialMessage(fingerprint: Data, count: Int) throws -> Data {
         var data = Data()
         
-        // Message type: 0 for initial
-        data.append(0)
+        // Protocol version byte (0x61 for Negentropy v1)
+        data.append(0x61)
         
-        // Encode count as varint
-        data.append(encodeVarint(UInt64(count)))
-        
-        // Encode fingerprint (32 bytes)
-        data.append(fingerprint)
+        // Initial message is just the protocol version
+        // The fingerprint and count will be sent in the first reconciliation round
         
         return data
     }
@@ -143,28 +140,59 @@ public struct NegentropyDecoder {
     
     /// Decode a message from data
     public static func decode(_ data: Data) throws -> NegentropyMessage {
-        var index = data.startIndex
-        
-        // Read message type
-        guard index < data.endIndex else {
+        guard !data.isEmpty else {
             throw NegentropyError.decodingError
         }
-        let messageType = data[index]
-        index = data.index(after: index)
         
-        switch messageType {
-        case 0:
-            return try decodeInitialMessage(data: data, index: &index)
-        case 1:
+        // Check for protocol version (0x61 at the start)
+        if !data.isEmpty && data[0] == 0x61 {
+            // If it's just the protocol version byte, it's an acknowledgment
+            if data.count == 1 {
+                return .protocolVersion
+            }
+            // Otherwise, skip the protocol version and decode the rest
+            var index = data.index(after: data.startIndex)
+            return try decodeMessageAfterProtocol(data: data, index: &index)
+        }
+        
+        // The actual Negentropy protocol doesn't use explicit message type bytes
+        // Messages are distinguished by their structure
+        // For now, we'll use a simplified heuristic approach
+        
+        var index = data.startIndex
+        
+        // The Negentropy protocol uses a more complex format
+        // For now, we'll implement a basic version that handles the common cases
+        
+        // If first byte is < 0x80, it's likely a reconciliation message
+        let firstByte = data[data.startIndex]
+        if firstByte < 0x80 {
             return try decodeReconciliationMessage(data: data, index: &index)
-        case 2:
+        } else {
+            // Could be termination or other message type
             return try decodeTerminationMessage(data: data, index: &index)
-        default:
-            throw NegentropyError.decodingError
         }
     }
     
     // MARK: - Message Decoders
+    
+    private static func decodeMessageAfterProtocol(data: Data, index: inout Data.Index) throws -> NegentropyMessage {
+        // After protocol version, check what type of message follows
+        guard index < data.endIndex else {
+            throw NegentropyError.decodingError
+        }
+        
+        let firstByte = data[index]
+        
+        // Check for termination (0x00)
+        if firstByte == 0x00 {
+            index = data.index(after: index)
+            return try decodeTerminationMessage(data: data, index: &index)
+        }
+        
+        // Otherwise it's a reconciliation message with ranges
+        return try decodeReconciliationMessage(data: data, index: &index)
+    }
     
     private static func decodeInitialMessage(data: Data, index: inout Data.Index) throws -> NegentropyMessage {
         // Decode count

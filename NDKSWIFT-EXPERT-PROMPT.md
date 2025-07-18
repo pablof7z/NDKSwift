@@ -491,7 +491,202 @@ ForEach(Array(seenRelays), id: \.self) { relay in
 
 ---
 
-### 8. Performance & Advanced Topics
+### 8. Negentropy Set Reconciliation: Efficient Synchronization
+
+NDKSwift includes a comprehensive implementation of Negentropy, a set reconciliation protocol that dramatically improves sync efficiency for large datasets. This is particularly valuable for bandwidth-constrained environments and large-scale synchronization operations.
+
+**When to Use Negentropy:**
+
+*   **Large Event Sets (1000+ events)**: Traditional REQ/EOSE becomes inefficient for bulk operations
+*   **Mobile/Cellular Networks**: Bandwidth conservation is critical
+*   **Resumable Syncs**: Handle network interruptions gracefully
+*   **Partial Sync Scenarios**: When you have some events and need to identify differences
+*   **Background Sync**: Efficient catch-up during app launches
+
+**When NOT to Use Negentropy:**
+
+*   **Small Event Sets (< 100 events)**: Traditional sync is simpler and faster
+*   **Real-time Subscriptions**: Use regular `NDKSubscription` for live feeds
+*   **One-off Queries**: Use `ndk.fetchEvents()` for simple, specific queries
+*   **Unsupported Relays**: Always check relay NIP-77 support first
+
+**Core Implementation Pattern:**
+
+```swift
+// Basic Negentropy sync
+func syncUserData(pubkey: String) async throws {
+    // Check if relay supports NIP-77 first
+    guard await relay.supportsNegentropy() else {
+        // Fall back to traditional sync
+        return try await traditionalSync(pubkey: pubkey)
+    }
+    
+    // Define what to sync
+    let filter = NDKFilter(
+        authors: [pubkey],
+        kinds: [1, 6, 7], // notes, reposts, reactions
+        since: Timestamp(Date().timeIntervalSince1970 - 86400 * 7) // last week
+    )
+    
+    // Perform efficient sync
+    let result = try await ndk.syncEvents(filter: filter)
+    print("Synced \(result.receivedEvents.count) events efficiently")
+}
+```
+
+**Network-Adaptive Sync Strategy:**
+
+Think about Negentropy as having different "gears" based on network conditions:
+
+```swift
+class AdaptiveNegentropyManager {
+    func syncWithNetworkAwareness(filter: NDKFilter) async throws {
+        let frameSize: Int
+        let strategy: SyncStrategy
+        
+        switch networkMonitor.currentStatus {
+        case .cellular:
+            frameSize = 30_000 // Conservative 30KB chunks
+            strategy = .essential // Only critical data
+        case .wifi:
+            frameSize = 100_000 // Aggressive 100KB chunks  
+            strategy = .comprehensive // All data
+        case .unknown:
+            frameSize = 20_000 // Very conservative
+            strategy = .minimal // Bare minimum
+        }
+        
+        let storage = NDKCacheNegentropyStorage(cache: ndk.cache!)
+        let reconciler = NegentropyReconciler(storage: storage, frameSizeLimit: frameSize)
+        
+        try await performSyncWithStrategy(strategy, reconciler: reconciler, filter: filter)
+    }
+}
+```
+
+**Error Handling and Fallbacks:**
+
+Always implement graceful degradation:
+
+```swift
+func robustSync(filter: NDKFilter) async throws -> [NDKEvent] {
+    do {
+        // Attempt Negentropy first
+        let result = try await ndk.syncEvents(filter: filter)
+        return result.receivedEvents
+    } catch NIP77Error.unsupportedByRelay {
+        // Relay doesn't support NIP-77, fall back immediately
+        return try await ndk.fetchEvents(filter)
+    } catch NIP77Error.timeout {
+        // Network issues, try traditional sync with smaller limits
+        var fallbackFilter = filter
+        fallbackFilter.limit = 100 // Reduce load
+        return try await ndk.fetchEvents(fallbackFilter)
+    } catch {
+        // Other errors, attempt traditional sync as last resort
+        return try await ndk.fetchEvents(filter)
+    }
+}
+```
+
+**Mobile-Specific Considerations:**
+
+For iOS apps, think about Negentropy in terms of user experience:
+
+*   **Foreground Sync**: Aggressive settings for immediate user needs
+*   **Background Sync**: Conservative settings with strict time limits
+*   **Launch Sync**: Balanced approach for app startup synchronization
+
+```swift
+// In your app's background task
+func performBackgroundSync() async {
+    let storage = NDKCacheNegentropyStorage(cache: cache)
+    let reconciler = NegentropyReconciler(
+        storage: storage,
+        frameSizeLimit: 10_000 // Very small for background
+    )
+    
+    // Sync only essential data in background
+    let essentialFilter = NDKFilter(
+        authors: [currentUser.pubkey],
+        kinds: [1, 7], // Just notes and reactions
+        since: Timestamp(Date().timeIntervalSince1970 - 3600) // Last hour only
+    )
+    
+    // Use short timeout for background operations
+    try await withTimeout(15.0) {
+        _ = try await ndk.syncEvents(filter: essentialFilter)
+    }
+}
+```
+
+**Cache Optimization for Negentropy:**
+
+Ensure your cache is optimized for timestamp-based range queries:
+
+```swift
+// In your cache setup
+let cache = NDKSQLiteCache(path: "negentropy_cache.db")
+
+// Create indexes for efficient Negentropy queries
+try await cache.execute("""
+    CREATE INDEX IF NOT EXISTS idx_events_timestamp_id 
+    ON events(created_at, id)
+""")
+
+// Pre-populate cache for better efficiency
+for event in existingEvents {
+    try await cache.saveEvent(event)
+}
+```
+
+**Performance Monitoring:**
+
+Track Negentropy efficiency to optimize your implementation:
+
+```swift
+struct SyncMetrics {
+    let eventsReceived: Int
+    let bytesTransferred: Int
+    let roundTrips: Int
+    let duration: TimeInterval
+    
+    var efficiency: Double { 
+        Double(eventsReceived) / Double(bytesTransferred) 
+    }
+}
+
+// Monitor and log sync performance
+let metrics = try await measureSync {
+    try await ndk.syncEvents(filter: filter)
+}
+
+print("Sync efficiency: \(metrics.efficiency) events/byte")
+```
+
+**Integration with Existing Patterns:**
+
+Negentropy works seamlessly with NDKSwift's existing patterns:
+
+*   **Authentication**: Uses the same `NDKSigner` for any required signatures
+*   **Caching**: Integrates with `NDKSQLiteCache` and `MemoryCache`
+*   **Relay Management**: Works with `NDKRelayPool` and automatic relay selection
+*   **Error Handling**: Follows the same error handling patterns as other NDK operations
+
+**Architectural Thinking:**
+
+When designing with Negentropy, think in terms of:
+
+1. **Sync Layers**: Background, foreground, and real-time layers with different strategies
+2. **Data Prioritization**: Essential vs. nice-to-have data with different sync frequencies  
+3. **Network Adaptation**: Dynamic adjustment based on connection quality
+4. **User Experience**: Immediate feedback with progressive enhancement
+
+By integrating Negentropy thoughtfully, you can provide users with dramatically improved sync performance while maintaining the robust error handling and user experience patterns that NDKSwift promotes.
+
+---
+
+### 9. Performance & Advanced Topics
 
 *   **Signature Verification Sampling:** NDKSwift does not verify every single signature by default to save CPU. It uses a sampling strategy defined by `NDKSignatureVerificationConfig`. For most apps, the default is fine. You can configure it to be more or less strict. It also automatically detects and can blacklist "evil relays" that serve events with invalid signatures.
 *   **Caching:** Use `NDKSQLiteCache` to persist events, profiles, and other Nostr data. This dramatically improves launch times and provides a basic offline experience. The `NDKProfileManager` also uses this cache to avoid re-fetching profile metadata.
