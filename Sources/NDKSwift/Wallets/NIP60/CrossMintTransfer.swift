@@ -19,15 +19,15 @@ public enum CrossMintTransfer {
         
         // Find intersection
         let commonMints = ourMints.intersection(acceptedMints)
-        print("CrossMintTransfer.findMintWithSufficientBalance - ourMints: \(ourMints)")
-        print("CrossMintTransfer.findMintWithSufficientBalance - acceptedMints: \(acceptedMints)")
-        print("CrossMintTransfer.findMintWithSufficientBalance - commonMints: \(commonMints)")
+        NDKLogger.shared.log(.debug, category: .general, "CrossMintTransfer.findMintWithSufficientBalance - ourMints: \(ourMints)")
+        NDKLogger.shared.log(.debug, category: .general, "CrossMintTransfer.findMintWithSufficientBalance - acceptedMints: \(acceptedMints)")
+        NDKLogger.shared.log(.debug, category: .general, "CrossMintTransfer.findMintWithSufficientBalance - commonMints: \(commonMints)")
         
         // Get mints with sufficient balance, then find first one in accepted mints
         let mintsWithBalance = await proofStateManager.getMintsWithSufficientBalance(amount: requiredAmount)
-        print("CrossMintTransfer.findMintWithSufficientBalance - mintsWithBalance: \(mintsWithBalance)")
+        NDKLogger.shared.log(.debug, category: .general, "CrossMintTransfer.findMintWithSufficientBalance - mintsWithBalance: \(mintsWithBalance)")
         let result = mintsWithBalance.first { commonMints.contains($0) }
-        print("CrossMintTransfer.findMintWithSufficientBalance - result: \(String(describing: result))")
+        NDKLogger.shared.log(.debug, category: .general, "CrossMintTransfer.findMintWithSufficientBalance - result: \(String(describing: result))")
         return result
     }
     
