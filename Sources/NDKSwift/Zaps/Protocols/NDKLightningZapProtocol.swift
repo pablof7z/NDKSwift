@@ -260,7 +260,7 @@ public class NDKLightningZapProtocol: NDKZapProtocol {
         
         // Fetch LNURL metadata
         var request = URLRequest(url: url)
-        request.httpMethod = "GET"
+        request.httpMethod = HTTPConstants.methodGet
         
         let (data, response) = try await urlSession.data(for: request)
         
@@ -323,7 +323,7 @@ public class NDKLightningZapProtocol: NDKZapProtocol {
         
         // Fetch invoice
         var request = URLRequest(url: url)
-        request.httpMethod = "GET"
+        request.httpMethod = HTTPConstants.methodGet
         
         let (data, response) = try await urlSession.data(for: request)
         
