@@ -20,7 +20,7 @@ import secp256k1
 public enum NIP44 {
     
     /// NIP-44 specific errors
-    public enum NIP44Error: Error, LocalizedError {
+    public enum NIP44Error: LocalizedError {
         case unsupportedVersion
         case invalidPayloadSize
         case invalidDataSize

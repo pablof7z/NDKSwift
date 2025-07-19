@@ -26,7 +26,7 @@ public protocol NDKEncryption {
 }
 
 /// Encryption errors
-public enum NDKEncryptionError: Error, LocalizedError {
+public enum NDKEncryptionError: LocalizedError {
     case encryptionFailed(String)
     case decryptionFailed(String)
     case unsupportedVersion
