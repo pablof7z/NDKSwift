@@ -75,21 +75,21 @@ public enum NIP44 {
             throw Crypto.CryptoError.invalidPoint
         }
         
-        let unpadded_len = unpadded.count
-        guard unpadded_len >= Constants.minPlaintextSize && 
-              unpadded_len <= Constants.maxPlaintextSize else {
+        let unpaddedLen = unpadded.count
+        guard unpaddedLen >= Constants.minPlaintextSize && 
+              unpaddedLen <= Constants.maxPlaintextSize else {
             throw NIP44Error.invalidPayloadSize
         }
         
         // Write length as big-endian uint16
         var padded = Data()
-        padded.append(UInt8((unpadded_len >> 8) & 0xFF))
-        padded.append(UInt8(unpadded_len & 0xFF))
+        padded.append(UInt8((unpaddedLen >> 8) & 0xFF))
+        padded.append(UInt8(unpaddedLen & 0xFF))
         padded.append(unpadded)
         
         // Add zero padding
-        let targetLen = calcPaddedLen(unpadded_len)
-        let paddingLen = targetLen - unpadded_len
+        let targetLen = calcPaddedLen(unpaddedLen)
+        let paddingLen = targetLen - unpaddedLen
         if paddingLen > 0 {
             padded.append(Data(repeating: 0, count: paddingLen))
         }
@@ -104,15 +104,15 @@ public enum NIP44 {
         }
         
         // Read big-endian uint16 length
-        let unpadded_len = Int(padded[0]) << 8 | Int(padded[1])
+        let unpaddedLen = Int(padded[0]) << 8 | Int(padded[1])
         
-        guard unpadded_len > 0,
-              padded.count >= 2 + unpadded_len,
-              padded.count == calcPaddedLen(unpadded_len) + 2 else {
+        guard unpaddedLen > 0,
+              padded.count >= 2 + unpaddedLen,
+              padded.count == calcPaddedLen(unpaddedLen) + 2 else {
             throw NIP44Error.invalidPadding
         }
         
-        let unpadded = padded[2..<(2 + unpadded_len)]
+        let unpadded = padded[2..<(2 + unpaddedLen)]
         guard let plaintext = String(data: unpadded, encoding: .utf8) else {
             throw NIP44Error.invalidPadding
         }
