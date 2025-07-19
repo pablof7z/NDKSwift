@@ -30,29 +30,7 @@ func compareData(_ a: Data, _ b: Data) -> Int {
     return 0
 }
 
-// Extension for hex encoding
-extension Data {
-    init(hex: String) {
-        var hex = hex
-        if hex.hasPrefix("0x") {
-            hex = String(hex.dropFirst(2))
-        }
-        
-        self.init()
-        var index = hex.startIndex
-        while index < hex.endIndex {
-            let nextIndex = hex.index(index, offsetBy: 2, limitedBy: hex.endIndex) ?? hex.endIndex
-            if let byte = UInt8(hex[index..<nextIndex], radix: 16) {
-                self.append(byte)
-            }
-            index = nextIndex
-        }
-    }
-    
-    func hexString() -> String {
-        return self.map { String(format: "%02x", $0) }.joined()
-    }
-}
+// Using hex conversion from NDKSwift's DataExtensions
 
 // Simple in-memory storage for testing
 class NegentropyStorageVector: NegentropyStorage {
@@ -129,8 +107,7 @@ while let line = readLine() {
         }
         let timestamp = UInt64(parts[1]) ?? 0
         let id = String(parts[2]).trimmingCharacters(in: .whitespacesAndNewlines)
-        let idData = Data(hex: id)
-        guard idData.count == 32 else {
+        guard let idData = Data(hexString: id), idData.count == 32 else {
             print("Error: bad id format", to: &stderr)
             exit(1)
         }
@@ -160,7 +137,7 @@ while let line = readLine() {
             }
             do {
                 let msg = try await negentropy.initiate()
-                print("msg,\(msg.hexString())")
+                print("msg,\(msg.hexString)")
             } catch {
                 print("Error initiating: \(error)", to: &stderr)
                 exit(1)
@@ -173,8 +150,7 @@ while let line = readLine() {
             exit(1)
         }
         let msgHex = String(parts[1])
-        let msgData = Data(hex: msgHex)
-        guard msgData.count > 0 else {
+        guard let msgData = Data(hexString: msgHex), msgData.count > 0 else {
             print("Error: bad message format", to: &stderr)
             exit(1)
         }
@@ -195,7 +171,7 @@ while let line = readLine() {
                 }
                 
                 if let data = responseData {
-                    print("msg,\(data.hexString())")
+                    print("msg,\(data.hexString)")
                 } else {
                     print("done")
                 }

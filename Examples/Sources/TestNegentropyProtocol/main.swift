@@ -39,7 +39,7 @@ struct TestNegentropyProtocol {
             
             // Initialize
             let initialMessage = try await reconciler.initiate()
-            print("Initial message: \(initialMessage.hexEncodedString())")
+            print("Initial message: \(initialMessage.hexString)")
             print("Expected: 61 (protocol version)")
             
             // Simulate protocol ack
@@ -48,7 +48,7 @@ struct TestNegentropyProtocol {
             
             switch response {
             case .continuing(let data, _, _):
-                print("\nResponse after ack: \(data.hexEncodedString())")
+                print("\nResponse after ack: \(data.hexString)")
                 print("Decoded:")
                 decodeMessage(data)
             case .terminated:
@@ -84,7 +84,7 @@ struct TestNegentropyProtocol {
             
             // Initialize
             let initialMessage = try await reconciler.initiate()
-            print("Initial message: \(initialMessage.hexEncodedString())")
+            print("Initial message: \(initialMessage.hexString)")
             
             // Simulate protocol ack
             let ackData = Data([0x61])
@@ -92,7 +92,7 @@ struct TestNegentropyProtocol {
             
             switch response {
             case .continuing(let data, _, _):
-                print("\nResponse after ack: \(data.hexEncodedString())")
+                print("\nResponse after ack: \(data.hexString)")
                 print("Decoded:")
                 decodeMessage(data)
             case .terminated:
@@ -112,18 +112,18 @@ struct TestNegentropyProtocol {
             
             print("1. Client initiates with protocol version")
             let initialMessage = try await reconciler.initiate()
-            print("   Sent: \(initialMessage.hexEncodedString())")
+            print("   Sent: \(initialMessage.hexString)")
             
             print("\n2. Server acknowledges with protocol version")
             let ackData = Data([0x61])
-            print("   Received: \(ackData.hexEncodedString())")
+            print("   Received: \(ackData.hexString)")
             
             print("\n3. Client sends actual data")
             let response = try await reconciler.processMessage(ackData)
             
             switch response {
             case .continuing(let data, _, _):
-                print("   Sent: \(data.hexEncodedString())")
+                print("   Sent: \(data.hexString)")
                 
                 // Try to decode what we're sending
                 print("\n   Analysis of sent data:")
@@ -151,7 +151,7 @@ struct TestNegentropyProtocol {
                             print("   - Mode: Fingerprint (0x01)")
                             if index + 16 <= data.count {
                                 let fingerprint = data[index..<index+16]
-                                print("   - Fingerprint: \(fingerprint.hexEncodedString())")
+                                print("   - Fingerprint: \(fingerprint.hexString)")
                                 index += 16
                             }
                         case 0x02:
@@ -170,7 +170,7 @@ struct TestNegentropyProtocol {
                                 // Read ID (32 bytes)
                                 if index + 32 <= data.count {
                                     let id = data[index..<index+32]
-                                    print("   - Item \(i) ID: \(id.hexEncodedString())")
+                                    print("   - Item \(i) ID: \(id.hexString)")
                                     index += 32
                                 }
                             }
@@ -219,7 +219,7 @@ struct TestNegentropyProtocol {
                 print("    Type: Fingerprint")
                 if index + 16 <= data.count {
                     let fingerprint = data[index..<index+16]
-                    print("    Fingerprint: \(fingerprint.hexEncodedString())")
+                    print("    Fingerprint: \(fingerprint.hexString)")
                     index += 16
                 }
             case 0x02:
@@ -262,36 +262,5 @@ struct TestNegentropyProtocol {
 }
 
 // Extension for hex encoding
-extension Data {
-    func hexEncodedString() -> String {
-        return self.map { String(format: "%02x", $0) }.joined()
-    }
-    
-    init?(hex: String) {
-        var data = Data()
-        var hex = hex
-        
-        // Remove 0x prefix if present
-        if hex.hasPrefix("0x") {
-            hex = String(hex.dropFirst(2))
-        }
-        
-        // Ensure even number of characters
-        if hex.count % 2 != 0 {
-            hex = "0" + hex
-        }
-        
-        var index = hex.startIndex
-        while index < hex.endIndex {
-            let nextIndex = hex.index(index, offsetBy: 2)
-            guard let byte = UInt8(hex[index..<nextIndex], radix: 16) else {
-                return nil
-            }
-            data.append(byte)
-            index = nextIndex
-        }
-        
-        self = data
-    }
-}
+// Using hex conversion from NDKSwift's DataExtensions
 
