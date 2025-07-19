@@ -55,6 +55,31 @@ public actor NDKSQLiteCache: NDKCache {
         try migrator.migrate(dbQueue)
     }
     
+    // MARK: - Helper Methods
+    
+    /// Helper method to decode NDKEvent from database row JSON
+    /// - Parameter row: Database row containing JSON data
+    /// - Returns: Decoded NDKEvent or nil if decoding fails
+    private func decodeEventFromRow(_ row: Row) -> NDKEvent? {
+        guard let jsonString = row["json"] as? String,
+              let jsonData = jsonString.data(using: .utf8) else {
+            return nil
+        }
+        return JSONCoding.safeDecode(NDKEvent.self, from: jsonData)
+    }
+    
+    /// Helper method to decode NDKEvent from database row JSON (throwing version)
+    /// - Parameter row: Database row containing JSON data
+    /// - Returns: Decoded NDKEvent
+    /// - Throws: Decoding error if JSON is invalid
+    private func decodeEventFromRowThrowing(_ row: Row) throws -> NDKEvent? {
+        guard let jsonString = row["json"] as? String,
+              let jsonData = jsonString.data(using: .utf8) else {
+            return nil
+        }
+        return try JSONCoding.decode(NDKEvent.self, from: jsonData)
+    }
+    
     // MARK: - Event Operations (NDKCache protocol)
     
     public func saveEvent(_ event: NDKEvent) async throws {
@@ -102,10 +127,8 @@ public actor NDKSQLiteCache: NDKCache {
     public func getEvent(id: String) async -> NDKEvent? {
         do {
             return try await dbQueue.read { db in
-                if let row = try Row.fetchOne(db, sql: "SELECT json FROM events WHERE id = ?", arguments: [id]),
-                   let jsonString = row["json"] as? String,
-                   let jsonData = jsonString.data(using: .utf8) {
-                    return try JSONCoding.decode(NDKEvent.self, from: jsonData)
+                if let row = try Row.fetchOne(db, sql: "SELECT json FROM events WHERE id = ?", arguments: [id]) {
+                    return try decodeEventFromRowThrowing(row)
                 }
                 return nil
             }
@@ -212,9 +235,7 @@ public actor NDKSQLiteCache: NDKCache {
             print("[NDKSQLiteCache.queryEvents] Query returned \(rows.count) rows")
             
             let events: [NDKEvent] = rows.compactMap { row in
-                guard let jsonString = row["json"] as? String,
-                      let jsonData = jsonString.data(using: .utf8) else { return nil }
-                return JSONCoding.safeDecode(NDKEvent.self, from: jsonData)
+                return decodeEventFromRow(row)
             }
             
             print("[NDKSQLiteCache.queryEvents] Decoded \(events.count) events")
