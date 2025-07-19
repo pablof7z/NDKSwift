@@ -259,25 +259,17 @@ public struct NDKCashuWalletEvent {
     
     /// The mints configured in this wallet event
     public func mints(signer: NDKSigner) async throws -> [String] {
-        print("🏪 NDKCashuWalletEvent.mints() - Extracting mints from wallet event")
         let tags = try await decryptedTags(signer: signer)
         let mintURLs = tags
             .filter { $0.first == "mint" && $0.count > 1 }
             .map { $0[1] }
-        print("🏪 NDKCashuWalletEvent.mints() - Extracted \(mintURLs.count) mint URLs: \(mintURLs)")
         return mintURLs
     }
     
     /// The P2PK private key configured in this wallet event
     public func privateKey(signer: NDKSigner) async throws -> String? {
-        print("🔑 NDKCashuWalletEvent.privateKey() - Extracting P2PK private key from wallet event")
         let tags = try await decryptedTags(signer: signer)
         let privateKey = tags.first(where: { $0.first == "privkey" && $0.count > 1 })?[1]
-        if let key = privateKey {
-            print("🔑 NDKCashuWalletEvent.privateKey() - Found P2PK private key: \(key.prefix(8))...")
-        } else {
-            print("🔑 NDKCashuWalletEvent.privateKey() - No P2PK private key found in wallet event")
-        }
         return privateKey
     }
     
@@ -286,7 +278,6 @@ public struct NDKCashuWalletEvent {
         let relayURLs = event.tags
             .filter { $0.first == "relay" && $0.count > 1 }
             .map { $0[1] }
-        print("📡 NDKCashuWalletEvent.relays - Extracted \(relayURLs.count) relay URLs: \(relayURLs)")
         return relayURLs
     }
     
@@ -295,14 +286,8 @@ public struct NDKCashuWalletEvent {
     private func decryptedTags(signer: NDKSigner) async throws -> [[String]] {
         // Check cache first
         if let cachedTags = await decryptedWalletCache.get(for: event.id) {
-            print("🔐 NDKCashuWalletEvent.decryptedTags() - Using cached decrypted tags for event \(event.id)")
             return cachedTags
         }
-        
-        print("🔐 NDKCashuWalletEvent.decryptedTags() - Starting decryption")
-        print("🔐 Event ID: \(event.id)")
-        print("🔐 Event Kind: \(event.kind)")
-        print("🔐 Event Author: \(event.pubkey)")
         
         let sender = NDKUser(pubkey: event.pubkey)
         let decryptedContent = try await signer.decrypt(
@@ -311,26 +296,13 @@ public struct NDKCashuWalletEvent {
             scheme: .nip44
         )
         
-        print("🔓 DECRYPTED TAGS CONTENT:")
-        print("🔓 Decrypted content length: \(decryptedContent.count) characters")
-        print("🔓 Decrypted content: \(decryptedContent)")
-        print("🔓 Decrypted content (raw): \(String(describing: decryptedContent.data(using: .utf8)))")
-        
         guard let tagsData = decryptedContent.data(using: .utf8),
               let walletTags = JSONCoding.safeDecode([[String]].self, from: tagsData) else {
-            print("❌ Failed to parse wallet configuration from decrypted content")
             throw NDKError.invalidContent("Failed to parse wallet configuration")
-        }
-        
-        print("🔓 PARSED WALLET TAGS:")
-        print("🔓 Wallet tags count: \(walletTags.count)")
-        for (index, tag) in walletTags.enumerated() {
-            print("🔓 Tag \(index): \(tag)")
         }
         
         // Cache the decrypted tags
         await decryptedWalletCache.set(walletTags, for: event.id)
-        print("🔐 NDKCashuWalletEvent.decryptedTags() - Cached decrypted tags for future use")
         
         return walletTags
     }
@@ -371,7 +343,6 @@ public struct NDKCashuSpendingHistory {
         )
         
         _ = try await ndk.publish(historyEvent.event)
-        print("NDKCashuSpendingHistory - Created spending history event")
         
         return historyEvent
     }
@@ -450,10 +421,6 @@ public struct NDKCashuMintList {
         signer: NDKSigner,
         p2pkPubkey: String? = nil
     ) async throws -> NDKCashuMintList {
-        print("🏪 NDKCashuMintList - Creating and publishing Kind 10019 mint list event")
-        print("🏪 NDKCashuMintList - Input mints: \(mints)")
-        print("🏪 NDKCashuMintList - Input p2pkPubkey: \(p2pkPubkey ?? "nil")")
-        
         let mintList = try await create(
             ndk: ndk,
             mints: mints,
@@ -461,17 +428,7 @@ public struct NDKCashuMintList {
             p2pkPubkey: p2pkPubkey
         )
         
-        print("🏪 NDKCashuMintList - Publishing mint list event with \(mints.count) mints")
-        print("🏪 NDKCashuMintList - Event ID: \(mintList.event.id)")
-        print("🏪 NDKCashuMintList - Event tags: \(mintList.event.tags)")
-        
-        do {
-            let publishedRelays = try await ndk.publish(mintList.event)
-            print("🏪 NDKCashuMintList - Successfully published to \(publishedRelays.count) relays: \(publishedRelays)")
-        } catch {
-            print("🏪 NDKCashuMintList - ERROR: Failed to publish mint list event: \(error)")
-            throw error
-        }
+        _ = try await ndk.publish(mintList.event)
         
         return mintList
     }
@@ -483,10 +440,6 @@ public struct NDKCashuMintList {
         signer: NDKSigner,
         p2pkPubkey: String? = nil
     ) async throws -> NDKCashuMintList {
-        print("🏪 NDKCashuMintList - Creating Kind 10019 mint list event")
-        print("🏪 NDKCashuMintList - Input mints: \(mints)")
-        print("🏪 NDKCashuMintList - Input p2pkPubkey: \(p2pkPubkey ?? "nil")")
-        
         let builder = ndk.event()
             .kind(10019)  // NIP-60 mint list kind
         
@@ -494,24 +447,13 @@ public struct NDKCashuMintList {
         for mint in mints {
             _ = builder.tag(["mint", mint])
         }
-        print("🏪 NDKCashuMintList - Added mint tags for \(mints.count) mints")
         
         // Add P2PK pubkey tag if provided (required for nutzaps per NIP-61)
         if let p2pkPubkey = p2pkPubkey {
             _ = builder.tag(["p2pk", p2pkPubkey])
-            print("🏪 NDKCashuMintList - Added p2pk tag: \(p2pkPubkey)")
-        } else {
-            print("🏪 NDKCashuMintList - WARNING: No p2pk tag added! Nutzaps won't work without it.")
         }
         
         let mintListEvent = try await builder.build(signer: signer)
-        
-        print("🏪 NDKCashuMintList - Created mint list event:")
-        print("🏪   - Event ID: \(mintListEvent.id)")
-        print("🏪   - Event Kind: \(mintListEvent.kind)")
-        print("🏪   - Event Author: \(mintListEvent.pubkey)")
-        print("🏪   - Event tags: \(mintListEvent.tags)")
-        print("🏪   - Created at: \(mintListEvent.createdAt)")
         
         return NDKCashuMintList(event: mintListEvent)
     }
@@ -696,7 +638,6 @@ public struct NDKNutzapEvent {
         )
         
         _ = try await ndk.publish(nutzapEvent.event)
-        print("NDKNutzapEvent - Published nutzap event: \(nutzapEvent.event.id)")
         
         return nutzapEvent
     }
@@ -736,6 +677,9 @@ public struct NDKNutzapEvent {
         
         // Add amount tag
         _ = builder.tag(["amount", String(totalAmount)])
+        
+        // Add unit tag (hardcoded to "sat")
+        _ = builder.tag(["unit", "sat"])
         
         for proof in proofs {
             let proofJSON = try JSONCoding.encodeToString(proof)
@@ -784,10 +728,9 @@ public struct NDKNutzapEvent {
         return Int64(amountString)
     }
     
-    /// Extract the unit from the nutzap event (deprecated, use mintURL for mint URL)
+    /// Extract the unit from the nutzap event 
     public var unit: String? {
-        // For backward compatibility, keep this but it's not used in NIP-61
-        return "sat"
+        return event.tags.first(where: { $0.count >= 2 && $0[0] == "unit" })?[1] ?? "sat"
     }
     
     /// Extract the recipient from the p tag

@@ -106,6 +106,11 @@ final class NDKNutzapEventTests: XCTestCase {
         XCTAssertEqual(amountTags.count, 1)
         XCTAssertEqual(amountTags.first?[1], "60") // 50 + 10
         
+        // Check unit tag
+        let unitTags = tags.filter { $0.first == "unit" }
+        XCTAssertEqual(unitTags.count, 1)
+        XCTAssertEqual(unitTags.first?[1], "sat")
+        
         // Should not have e tag since no eventId provided
         let eTags = tags.filter { $0.first == "e" }
         XCTAssertEqual(eTags.count, 0)
@@ -175,6 +180,7 @@ final class NDKNutzapEventTests: XCTestCase {
                 ["u", "\(testMintURL!)"],
                 ["p", "\(testRecipientPubkey!)"],
                 ["amount", "1"],
+                ["unit", "sat"],
                 ["proof", "{\\"amount\\":1,\\"C\\":\\"02277c66191736eb72fce9d975d08e3191f8f96afb73ab1eec37e4465683066d3f\\",\\"id\\":\\"000a93d6f8a1d2c4\\",\\"secret\\":\\"[\\\\\\"P2PK\\\\\\",{\\\\\\"nonce\\\\\\":\\\\\\"b00bdd0467b0090a25bdf2d2f0d45ac4e355c482c1418350f273a04fedaaee83\\\\\\",\\\\\\"data\\\\\\":\\\\\\"02eaee8939e3565e48cc62967e2fde9d8e2a4b3ec0081f29eceff5c64ef10ac1ed\\\\\\"}]\\"}"],
                 ["e", "abc123def456"]
             ],
@@ -196,6 +202,7 @@ final class NDKNutzapEventTests: XCTestCase {
         XCTAssertEqual(nutzapEvent.comment, "Thanks for this great idea.")
         XCTAssertEqual(nutzapEvent.mintURL, testMintURL)
         XCTAssertEqual(nutzapEvent.amount, 1)
+        XCTAssertEqual(nutzapEvent.unit, "sat")
         XCTAssertEqual(nutzapEvent.recipient, testRecipientPubkey)
         XCTAssertEqual(nutzapEvent.nutzappedEventId, "abc123def456")
         
@@ -223,6 +230,7 @@ final class NDKNutzapEventTests: XCTestCase {
                 ["u", "\(testMintURL!)"],
                 ["p", "\(testRecipientPubkey!)"],
                 ["amount", "100"],
+                ["unit", "sat"],
                 ["proof", "{\\"amount\\":50,\\"C\\":\\"02277c66191736eb72fce9d975d08e3191f8f96afb73ab1eec37e4465683066d3f\\",\\"id\\":\\"keyset1\\",\\"secret\\":\\"[P2PK_secret_1]\\"}"],
                 ["proof", "{\\"amount\\":25,\\"C\\":\\"03388c77191736eb72fce9d975d08e3191f8f96afb73ab1eec37e4465683066d4f\\",\\"id\\":\\"keyset1\\",\\"secret\\":\\"[P2PK_secret_2]\\"}"],
                 ["proof", "{\\"amount\\":25,\\"C\\":\\"04499d88201846fc72fce9d975d08e3191f8f96afb73ab1eec37e4465683066e5f\\",\\"id\\":\\"keyset1\\",\\"secret\\":\\"[P2PK_secret_3]\\"}"]
@@ -268,6 +276,7 @@ final class NDKNutzapEventTests: XCTestCase {
                 ["u", "\(testMintURL!)"],
                 ["p", "\(testRecipientPubkey!)"],
                 ["amount", "1"],
+                ["unit", "sat"],
                 ["proof", "{\\"amount\\":1,\\"C\\":\\"02277c66191736eb72fce9d975d08e3191f8f96afb73ab1eec37e4465683066d3f\\",\\"id\\":\\"000a93d6f8a1d2c4\\",\\"secret\\":\\"[P2PK_secret]\\"}"]
             ],
             "sig": "signature_here"
@@ -300,7 +309,8 @@ final class NDKNutzapEventTests: XCTestCase {
             "tags": [
                 ["u", "\(testMintURL!)"],
                 ["p", "\(testRecipientPubkey!)"],
-                ["amount", "0"]
+                ["amount", "0"],
+                ["unit", "sat"]
             ],
             "sig": "signature_here"
         }
@@ -331,6 +341,7 @@ final class NDKNutzapEventTests: XCTestCase {
             "tags": [
                 ["p", "\(testRecipientPubkey!)"],
                 ["amount", "1"],
+                ["unit", "sat"],
                 ["proof", "{\\"amount\\":1,\\"C\\":\\"02277c66191736eb72fce9d975d08e3191f8f96afb73ab1eec37e4465683066d3f\\",\\"id\\":\\"000a93d6f8a1d2c4\\",\\"secret\\":\\"[P2PK_secret]\\"}"]
             ],
             "sig": "signature_here"
@@ -363,6 +374,7 @@ final class NDKNutzapEventTests: XCTestCase {
                 ["u", "\(testMintURL!)"],
                 ["p", "\(testRecipientPubkey!)"],
                 ["amount", "50"],
+                ["unit", "sat"],
                 ["proof", "invalid_json"],
                 ["proof", "{\\"amount\\":50,\\"C\\":\\"02277c66191736eb72fce9d975d08e3191f8f96afb73ab1eec37e4465683066d3f\\",\\"id\\":\\"keyset1\\",\\"secret\\":\\"[P2PK_secret]\\"}"]
             ],
@@ -457,6 +469,7 @@ final class NDKNutzapEventTests: XCTestCase {
                 ["u", "\(testMintURL!)"],
                 ["p", "\(testRecipientPubkey!)"],
                 ["amount", "1"],
+                ["unit", "sat"],
                 ["proof", "{\\"amount\\":1,\\"C\\":\\"02277c66191736eb72fce9d975d08e3191f8f96afb73ab1eec37e4465683066d3f\\",\\"id\\":\\"000a93d6f8a1d2c4\\",\\"secret\\":\\"[\\\\\\"P2PK\\\\\\",{\\\\\\"nonce\\\\\\":\\\\\\"b00bdd0467b0090a25bdf2d2f0d45ac4e355c482c1418350f273a04fedaaee83\\\\\\",\\\\\\"data\\\\\\":\\\\\\"02eaee8939e3565e48cc62967e2fde9d8e2a4b3ec0081f29eceff5c64ef10ac1ed\\\\\\"}]\\"}"],
                 ["e", "nutzapped-event-id"]
             ],
@@ -501,6 +514,8 @@ final class NDKNutzapEventTests: XCTestCase {
             "pubkey": "\(testSenderPubkey!)",
             "created_at": 1234567890,
             "tags": [
+                ["amount", "1"],
+                ["unit", "sat"],
                 ["proof", "{\\"amount\\":1,\\"C\\":\\"02277c66191736eb72fce9d975d08e3191f8f96afb73ab1eec37e4465683066d3f\\",\\"id\\":\\"000a93d6f8a1d2c4\\",\\"secret\\":\\"[P2PK_secret]\\"}"],
                 ["mint", "\(testMintURL!)"],
                 ["u", "sat"]

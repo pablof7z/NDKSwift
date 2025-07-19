@@ -167,6 +167,7 @@ final class NDKNutzapTests: XCTestCase {
                 ["u", "\(testMintURL.absoluteString)"],
                 ["p", "\(testRecipientPubkey!)"],
                 ["amount", "100"],
+                ["unit", "sat"],
                 ["proof", "{\\"amount\\":100,\\"C\\":\\"02277c66191736eb72fce9d975d08e3191f8f96afb73ab1eec37e4465683066d3f\\",\\"id\\":\\"keyset1\\",\\"secret\\":\\"[P2PK_secret]\\"}"],
                 ["e", "zapped_event_id"]
             ],
@@ -210,6 +211,7 @@ final class NDKNutzapTests: XCTestCase {
                 ["u", "\(testMintURL.absoluteString)"],
                 ["p", "\(testRecipientPubkey!)"],
                 ["amount", "50"],
+                ["unit", "sat"],
                 ["proof", "invalid_json_here"],
                 ["proof", "{\\"amount\\":50,\\"C\\":\\"02277c66191736eb72fce9d975d08e3191f8f96afb73ab1eec37e4465683066d3f\\",\\"id\\":\\"keyset1\\",\\"secret\\":\\"[P2PK_secret]\\"}"]
             ],
@@ -245,7 +247,8 @@ final class NDKNutzapTests: XCTestCase {
             "tags": [
                 ["u", "\(testMintURL.absoluteString)"],
                 ["p", "\(testRecipientPubkey!)"],
-                ["amount", "0"]
+                ["amount", "0"],
+                ["unit", "sat"]
             ],
             "sig": "signature_here"
         }
