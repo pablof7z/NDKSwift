@@ -297,12 +297,10 @@ public actor Negentropy {
                     var responseIds = Data()
                     var numResponseIds = 0
                     var endBound = currBound
-                    var actualUpper = upper
                     
                     try await storage.iterate(lower, upper) { item, index in
                         if exceededFrameSizeLimit(fullOutput.count + responseIds.count) {
                             endBound = NegentropyBound(timestamp: item.timestamp, id: item.id)
-                            actualUpper = index
                             return false
                         }
                         

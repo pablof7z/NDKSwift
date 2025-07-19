@@ -125,8 +125,8 @@ struct AuthenticationView: View {
                         Label("Log In with nsec", systemImage: "key.fill")
                             .frame(maxWidth: .infinity)
                             .padding()
-                            .background(Color.secondary.opacity(0.3))
-                            .foregroundColor(.white)
+                            .background(Color(.secondarySystemFill))
+                            .foregroundColor(Color(.label))
                             .cornerRadius(12)
                     }
                 }

@@ -167,7 +167,7 @@ actor WalletEventProcessor {
     /// Process incoming nutzap events
     private func processNutzapEvent(_ event: NDKEvent, context: WalletEventContext) async throws {
         print("⚡️ Processing incoming nutzap event")
-        try await context.wallet.processIncomingNutzapEvent(event)
+        try await context.wallet.processIncomingNutzap(event)
     }
     
     // MARK: - Helper Methods
