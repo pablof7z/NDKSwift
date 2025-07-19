@@ -1,3 +1,5 @@
+import Foundation
+
 /// A dummy relay protocol implementation for optimistic events
 final class OptimisticEventSource: RelayProtocol, @unchecked Sendable {
     let url: String = "optimistic://local"
