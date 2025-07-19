@@ -1,5 +1,3 @@
-import Foundation
-
 /// Common string constants used throughout NDKSwift
 public enum StringConstants {
     

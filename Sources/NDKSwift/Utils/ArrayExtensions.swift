@@ -1,5 +1,3 @@
-import Foundation
-
 // MARK: - Safe Array Access
 
 public extension Array {
