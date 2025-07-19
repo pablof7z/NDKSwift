@@ -122,7 +122,7 @@ public actor BlossomClient {
         }
 
         let authHeader = try auth.authorizationHeaderValue()
-        request.setValue(authHeader, forHTTPHeaderField: "Authorization")
+        request.setValue(authHeader, forHTTPHeaderField: Self.authorizationHeader)
 
         do {
             let (responseData, response) = try await urlSession.data(for: request)
@@ -204,7 +204,7 @@ public actor BlossomClient {
         request.setValue(Self.applicationJSON, forHTTPHeaderField: Self.acceptHeader)
 
         let authHeader = try auth.authorizationHeaderValue()
-        request.setValue(authHeader, forHTTPHeaderField: "Authorization")
+        request.setValue(authHeader, forHTTPHeaderField: Self.authorizationHeader)
 
         do {
             let (data, response) = try await urlSession.data(for: request)
@@ -255,7 +255,7 @@ public actor BlossomClient {
         request.httpMethod = "DELETE"
 
         let authHeader = try auth.authorizationHeaderValue()
-        request.setValue(authHeader, forHTTPHeaderField: "Authorization")
+        request.setValue(authHeader, forHTTPHeaderField: Self.authorizationHeader)
 
         do {
             let (data, response) = try await urlSession.data(for: request)
