@@ -1,4 +1,3 @@
-import Foundation
 import CashuSwift
 
 // MARK: - CashuSwift Helper Functions

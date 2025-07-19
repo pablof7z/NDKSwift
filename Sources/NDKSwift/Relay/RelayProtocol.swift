@@ -1,5 +1,3 @@
-import Foundation
-
 /// Protocol defining the interface for Nostr relays
 /// This allows for both real relay implementations and test mocks
 public protocol RelayProtocol: AnyObject, Sendable {
