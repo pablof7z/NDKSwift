@@ -61,6 +61,7 @@ public enum EventKind {
     public static let reaction = 7
     public static let badgeAward = 8
     public static let genericRepost = 16
+    public static let genericReply = 1111  // NIP-22 comment
     public static let image = 20
     public static let fileMetadata = 1063
     public static let zapRequest = 9734

@@ -84,7 +84,7 @@ final class NDKNutzapEventTests: XCTestCase {
             XCTAssertEqual(proofTag.count, 2)
             
             guard let proofData = proofTag[1].data(using: .utf8),
-                  let decodedProof = try? JSONDecoder().decode(CashuSwift.Proof.self, from: proofData) else {
+                  let decodedProof = try? JSONCoding.decoder.decode(CashuSwift.Proof.self, from: proofData) else {
                 XCTFail("Failed to decode proof at index \(index)")
                 continue
             }
@@ -195,7 +195,7 @@ final class NDKNutzapEventTests: XCTestCase {
         }
         
         let eventJSONData = try JSONSerialization.data(withJSONObject: eventDict)
-        let event = try JSONDecoder().decode(NDKEvent.self, from: eventJSONData)
+        let event = try JSONCoding.decoder.decode(NDKEvent.self, from: eventJSONData)
         let nutzapEvent = NDKNutzapEvent(event: event)
         
         // Test parsing properties
@@ -246,7 +246,7 @@ final class NDKNutzapEventTests: XCTestCase {
         }
         
         let eventJSONData = try JSONSerialization.data(withJSONObject: eventDict)
-        let event = try JSONDecoder().decode(NDKEvent.self, from: eventJSONData)
+        let event = try JSONCoding.decoder.decode(NDKEvent.self, from: eventJSONData)
         let nutzapEvent = NDKNutzapEvent(event: event)
         
         // Test token with multiple proofs
@@ -290,7 +290,7 @@ final class NDKNutzapEventTests: XCTestCase {
         }
         
         let eventJSONData = try JSONSerialization.data(withJSONObject: eventDict)
-        let event = try JSONDecoder().decode(NDKEvent.self, from: eventJSONData)
+        let event = try JSONCoding.decoder.decode(NDKEvent.self, from: eventJSONData)
         let nutzapEvent = NDKNutzapEvent(event: event)
         
         // Empty content should return nil comment
@@ -323,7 +323,7 @@ final class NDKNutzapEventTests: XCTestCase {
         }
         
         let eventJSONData = try JSONSerialization.data(withJSONObject: eventDict)
-        let event = try JSONDecoder().decode(NDKEvent.self, from: eventJSONData)
+        let event = try JSONCoding.decoder.decode(NDKEvent.self, from: eventJSONData)
         let nutzapEvent = NDKNutzapEvent(event: event)
         
         // Should return nil token when no valid proofs
@@ -355,7 +355,7 @@ final class NDKNutzapEventTests: XCTestCase {
         }
         
         let eventJSONData = try JSONSerialization.data(withJSONObject: eventDict)
-        let event = try JSONDecoder().decode(NDKEvent.self, from: eventJSONData)
+        let event = try JSONCoding.decoder.decode(NDKEvent.self, from: eventJSONData)
         let nutzapEvent = NDKNutzapEvent(event: event)
         
         XCTAssertNil(nutzapEvent.mintURL)
@@ -389,7 +389,7 @@ final class NDKNutzapEventTests: XCTestCase {
         }
         
         let eventJSONData = try JSONSerialization.data(withJSONObject: eventDict)
-        let event = try JSONDecoder().decode(NDKEvent.self, from: eventJSONData)
+        let event = try JSONCoding.decoder.decode(NDKEvent.self, from: eventJSONData)
         let nutzapEvent = NDKNutzapEvent(event: event)
         
         // Should only parse valid proofs, ignoring invalid ones
@@ -484,7 +484,7 @@ final class NDKNutzapEventTests: XCTestCase {
         }
         
         let eventJSONData = try JSONSerialization.data(withJSONObject: eventDict)
-        let event = try JSONDecoder().decode(NDKEvent.self, from: eventJSONData)
+        let event = try JSONCoding.decoder.decode(NDKEvent.self, from: eventJSONData)
         let nutzapEvent = NDKNutzapEvent(event: event)
         
         // Extract and verify proof structure
@@ -531,7 +531,7 @@ final class NDKNutzapEventTests: XCTestCase {
         }
         
         let eventJSONData = try JSONSerialization.data(withJSONObject: eventDict)
-        let event = try JSONDecoder().decode(NDKEvent.self, from: eventJSONData)
+        let event = try JSONCoding.decoder.decode(NDKEvent.self, from: eventJSONData)
         let nutzapEvent = NDKNutzapEvent(event: event)
         
         XCTAssertNil(nutzapEvent.recipient)
@@ -562,7 +562,7 @@ final class NDKNutzapEventTests: XCTestCase {
         }
         
         let eventJSONData = try JSONSerialization.data(withJSONObject: eventDict)
-        let event = try JSONDecoder().decode(NDKEvent.self, from: eventJSONData)
+        let event = try JSONCoding.decoder.decode(NDKEvent.self, from: eventJSONData)
         let nutzapEvent = NDKNutzapEvent(event: event)
         
         XCTAssertEqual(nutzapEvent.amount, 1)

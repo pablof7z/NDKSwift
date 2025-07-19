@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **NIP-22 Comments Support** - Generic replies to any event type
+  - `ndk.reply(to:)` - Create properly structured comment events
+  - Automatic kind 1111 for non-kind-1 events
+  - Smart tag propagation for threaded conversations
+  - Uppercase tags (A, E, I, K, P) for root event references
+  - Lowercase tags (a, e, i, k, p) for parent references
+  - Support for replying to comments with automatic thread tracking
+  - `EventKind.genericReply` constant for kind 1111
+  - Comprehensive test suite for all NIP-22 scenarios
+- Comprehensive test suites for NDKErrorFactories and JSONCoding utilities
+
 ### Changed
 - Added centralized error factory methods in NDKErrorFactories to reduce duplication (DRY principle)
   - Created factory methods for common error patterns: failedTo, invalidDataFormat, missingRequired, networkError, parseError, cryptoOperation
@@ -16,9 +28,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Added serialize and serializeToString methods for JSON serialization
   - Added safe parsing methods that return optionals
   - Refactored NostrMessage, NDKEvent, and NDKBunkerSigner to use centralized JSON helpers
-
-### Added
-- Comprehensive test suites for NDKErrorFactories and JSONCoding utilities
 
 ## [0.3.2] - 2025-01-19
 

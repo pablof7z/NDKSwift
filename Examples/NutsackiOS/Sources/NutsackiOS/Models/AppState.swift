@@ -91,7 +91,7 @@ class AppState: ObservableObject {
                 return
             }
             
-            guard let prices = try? JSONDecoder().decode(ExchangeRateResponse.self, from: data).bitcoin else {
+            guard let prices = try? JSONCoding.decoder.decode(ExchangeRateResponse.self, from: data).bitcoin else {
                 print("Unable to decode exchange rate data from request response.")
                 return
             }

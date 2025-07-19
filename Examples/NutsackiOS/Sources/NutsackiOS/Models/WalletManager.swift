@@ -215,7 +215,7 @@ class WalletManager {
             
             // Parse the tags from decrypted content
             guard let tagsData = decryptedContent.data(using: .utf8),
-                  let tags = try? JSONDecoder().decode([[String]].self, from: tagsData) else {
+                  let tags = try? JSONCoding.decoder.decode([[String]].self, from: tagsData) else {
                 print("Failed to parse history event tags")
                 return
             }
@@ -556,9 +556,8 @@ class WalletManager {
             )
             
             // Encode token
-            let encoder = JSONEncoder()
-            encoder.outputFormatting = .sortedKeys
-            let tokenData = try encoder.encode(token)
+            // Note: JSONCoding.encoder already has sorted keys formatting
+            let tokenData = try JSONCoding.encoder.encode(token)
             guard String(data: tokenData, encoding: .utf8) != nil else {
                 throw WalletError.encodingError
             }
@@ -634,7 +633,7 @@ class WalletManager {
         }
         
         guard let tokenData = Data(base64Encoded: base64),
-              let token = try? JSONDecoder().decode(CashuSwift.Token.self, from: tokenData) else {
+              let token = try? JSONCoding.decoder.decode(CashuSwift.Token.self, from: tokenData) else {
             throw WalletError.invalidToken
         }
         
@@ -986,7 +985,7 @@ class WalletManager {
             return nil
         }
         
-        return try JSONDecoder().decode(NIP60TokenEvent.self, from: data)
+        return try JSONCoding.decoder.decode(NIP60TokenEvent.self, from: data)
     }
     
     /// Check proof states for specific proofs

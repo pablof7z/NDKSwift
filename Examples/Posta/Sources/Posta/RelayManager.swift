@@ -154,7 +154,7 @@ class RelayManager: ObservableObject {
     
     private func loadRelays() {
         if let data = UserDefaults.standard.data(forKey: "relay_list"),
-           let decoded = try? JSONDecoder().decode([RelayInfo].self, from: data) {
+           let decoded = try? JSONCoding.decoder.decode([RelayInfo].self, from: data) {
             relays = decoded
         } else {
             relays = defaultRelays.map { RelayInfo(url: $0) }
@@ -162,7 +162,7 @@ class RelayManager: ObservableObject {
     }
     
     private func saveRelays() {
-        if let encoded = try? JSONEncoder().encode(relays) {
+        if let encoded = try? JSONCoding.encoder.encode(relays) {
             UserDefaults.standard.set(encoded, forKey: "relay_list")
         }
     }
