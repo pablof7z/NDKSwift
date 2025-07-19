@@ -146,8 +146,23 @@ class WalletManager {
                         self.currentBalance = newBalance
                     }
                     
-                case .nutzapReceived(let amount, let from):
-                    print("WalletManager - Nutzap received: \(amount) sats from \(from ?? "unknown")")
+                case .nutzapReceived(let amount, let from, let eventId):
+                    print("WalletManager - Nutzap received: \(amount) sats from \(from ?? "unknown"), event: \(eventId)")
+                    
+                    // Create a pending transaction for the incoming nutzap
+                    await MainActor.run {
+                        let transaction = Transaction(
+                            type: .nutzap,
+                            amount: Int(amount),
+                            memo: "Nutzap received"
+                        )
+                        transaction.status = .pending
+                        transaction.senderPubkey = from
+                        transaction.nostrEventID = eventId
+                        
+                        // Insert at the beginning of the list
+                        self.transactions.insert(transaction, at: 0)
+                    }
                 }
             }
         }
@@ -313,6 +328,24 @@ class WalletManager {
             
             // Add to published transactions array
             await MainActor.run {
+                // For nutzaps, check if we have a pending transaction to update
+                if transactionType == .nutzap && redeemedEventId != nil {
+                    // Look for a pending nutzap transaction with matching event ID
+                    if let pendingIndex = self.transactions.firstIndex(where: {
+                        $0.type == .nutzap &&
+                        $0.status == .pending &&
+                        $0.nostrEventID == redeemedEventId
+                    }) {
+                        // Update the pending transaction to completed
+                        self.transactions[pendingIndex].status = .completed
+                        self.transactions[pendingIndex].createdAt = transaction.createdAt
+                        if let memo = transaction.memo {
+                            self.transactions[pendingIndex].memo = memo
+                        }
+                        return // Don't add a duplicate
+                    }
+                }
+                
                 // Check if we already have this transaction
                 if !self.transactions.contains(where: { 
                     $0.createdAt == transaction.createdAt && 
@@ -467,79 +500,112 @@ class WalletManager {
             throw WalletError.noActiveWallet
         }
         
-        // Select mint if not specified
-        let selectedMintURL: URL
-        if let fromMint = fromMint {
-            selectedMintURL = fromMint
-        } else {
-            // Auto-select mint with sufficient balance
-            let mintURLs = await wallet.mints.getMintURLs()
-            let mints = mintURLs.compactMap { URL(string: $0) }
-            var selectedMint: URL?
+        // Create pending transaction immediately
+        let transaction = Transaction(
+            type: .send,
+            amount: Int(amount),
+            memo: memo ?? "Sent ecash"
+        )
+        transaction.status = .pending
+        
+        // Add to transactions list immediately
+        await MainActor.run {
+            self.transactions.insert(transaction, at: 0)
+        }
+        
+        do {
+            // Select mint if not specified
+            let selectedMintURL: URL
+            if let fromMint = fromMint {
+                selectedMintURL = fromMint
+            } else {
+                // Auto-select mint with sufficient balance
+                let mintURLs = await wallet.mints.getMintURLs()
+                let mints = mintURLs.compactMap { URL(string: $0) }
+                var selectedMint: URL?
+                
+                for mint in mints {
+                    let balance = await wallet.getBalance(mint: mint)
+                    if balance >= amount {
+                        selectedMint = mint
+                        break
+                    }
+                }
+                
+                guard let selected = selectedMint else {
+                    throw WalletError.insufficientBalance
+                }
+                selectedMintURL = selected
+            }
             
-            for mint in mints {
-                let balance = await wallet.getBalance(mint: mint)
-                if balance >= amount {
-                    selectedMint = mint
-                    break
+            // Generate P2PK pubkey for locking
+            let p2pkPubkey = try await wallet.getP2PKPubkey()
+            
+            // Send tokens (creates P2PK locked proofs)
+            let (proofs, _) = try await wallet.send(
+                amount: amount,
+                to: p2pkPubkey,
+                mint: selectedMintURL
+            )
+            
+            // Create token from proofs
+            let token = CashuSwift.Token(
+                proofs: [selectedMintURL.absoluteString: proofs],
+                unit: "sat",
+                memo: memo
+            )
+            
+            // Encode token
+            let encoder = JSONEncoder()
+            encoder.outputFormatting = .sortedKeys
+            let tokenData = try encoder.encode(token)
+            guard String(data: tokenData, encoding: .utf8) != nil else {
+                throw WalletError.encodingError
+            }
+            
+            // Create base64url encoded token
+            let base64Token = tokenData.base64EncodedString()
+                .replacingOccurrences(of: "+", with: "-")
+                .replacingOccurrences(of: "/", with: "_")
+                .replacingOccurrences(of: "=", with: "")
+            
+            let tokenString = "cashuA\(base64Token)"
+            
+            // Update transaction status to completed
+            await MainActor.run {
+                if let index = self.transactions.firstIndex(where: { $0.transactionID == transaction.transactionID }) {
+                    self.transactions[index].status = .completed
+                    self.transactions[index].offlineToken = tokenString
                 }
             }
             
-            guard let selected = selectedMint else {
-                throw WalletError.insufficientBalance
+            // Create history event for sending ecash
+            Task {
+                do {
+                    guard let ndk = nostrManager.ndk,
+                          let signer = ndk.signer else { return }
+                    
+                    try await wallet.eventManager.createSpendingHistoryEvent(
+                        direction: .out,
+                        amount: amount,
+                        memo: memo ?? "Sent ecash",
+                        signer: signer
+                    )
+                } catch {
+                    print("Failed to create history event for send: \(error)")
+                }
             }
-            selectedMintURL = selected
-        }
-        
-        // Generate P2PK pubkey for locking
-        let p2pkPubkey = try await wallet.getP2PKPubkey()
-        
-        // Send tokens (creates P2PK locked proofs)
-        let (proofs, _) = try await wallet.send(
-            amount: amount,
-            to: p2pkPubkey,
-            mint: selectedMintURL
-        )
-        
-        // Create token from proofs
-        let token = CashuSwift.Token(
-            proofs: [selectedMintURL.absoluteString: proofs],
-            unit: "sat",
-            memo: memo
-        )
-        
-        // Encode token
-        let encoder = JSONEncoder()
-        encoder.outputFormatting = .sortedKeys
-        let tokenData = try encoder.encode(token)
-        guard String(data: tokenData, encoding: .utf8) != nil else {
-            throw WalletError.encodingError
-        }
-        
-        // Create base64url encoded token
-        let base64Token = tokenData.base64EncodedString()
-            .replacingOccurrences(of: "+", with: "-")
-            .replacingOccurrences(of: "/", with: "_")
-            .replacingOccurrences(of: "=", with: "")
-        
-        // Create history event for sending ecash
-        Task {
-            do {
-                guard let ndk = nostrManager.ndk,
-                      let signer = ndk.signer else { return }
-                
-                try await wallet.eventManager.createSpendingHistoryEvent(
-                    direction: .out,
-                    amount: amount,
-                    memo: memo ?? "Sent ecash",
-                    signer: signer
-                )
-            } catch {
-                print("Failed to create history event for send: \(error)")
+            
+            return tokenString
+        } catch {
+            // Update transaction status to failed
+            await MainActor.run {
+                if let index = self.transactions.firstIndex(where: { $0.transactionID == transaction.transactionID }) {
+                    self.transactions[index].status = .failed
+                }
             }
+            throw error
         }
-        
-        return "cashuA\(base64Token)"
     }
     
     // MARK: - Receive Operations
@@ -550,7 +616,7 @@ class WalletManager {
             throw WalletError.noActiveWallet
         }
         
-        // Parse token string
+        // Parse token string to get amount first
         guard tokenString.hasPrefix("cashuA") else {
             throw WalletError.invalidToken
         }
@@ -572,37 +638,72 @@ class WalletManager {
             throw WalletError.invalidToken
         }
         
-        var totalReceived: Int64 = 0
-        
-        // Process proofs from each mint
-        for (_, proofs) in token.proofsByMint {
-            // Receive the proofs - wallet can handle proofs from any mint
-            try await wallet.receive(proofs: proofs)
-            
-            // Calculate total
-            totalReceived += proofs.reduce(0) { $0 + Int64($1.amount) }
+        // Calculate total amount from token
+        let totalAmount = token.proofsByMint.values.reduce(0) { sum, proofs in
+            sum + proofs.reduce(0) { $0 + Int64($1.amount) }
         }
         
-        // Create history event for receiving ecash
-        if totalReceived > 0 {
-            Task {
-                do {
-                    guard let ndk = nostrManager.ndk,
-                          let signer = ndk.signer else { return }
-                    
-                    try await wallet.eventManager.createSpendingHistoryEvent(
-                        direction: .in,
-                        amount: totalReceived,
-                        memo: token.memo ?? "Received ecash",
-                        signer: signer
-                    )
-                } catch {
-                    print("Failed to create history event for receive: \(error)")
+        // Create pending transaction immediately
+        let transaction = Transaction(
+            type: .receive,
+            amount: Int(totalAmount),
+            memo: token.memo ?? "Received ecash"
+        )
+        transaction.status = .pending
+        
+        // Add to transactions list immediately
+        await MainActor.run {
+            self.transactions.insert(transaction, at: 0)
+        }
+        
+        do {
+            var totalReceived: Int64 = 0
+            
+            // Process proofs from each mint
+            for (_, proofs) in token.proofsByMint {
+                // Receive the proofs - wallet can handle proofs from any mint
+                try await wallet.receive(proofs: proofs)
+                
+                // Calculate total
+                totalReceived += proofs.reduce(0) { $0 + Int64($1.amount) }
+            }
+            
+            // Update transaction status to completed
+            await MainActor.run {
+                if let index = self.transactions.firstIndex(where: { $0.transactionID == transaction.transactionID }) {
+                    self.transactions[index].status = .completed
                 }
             }
+            
+            // Create history event for receiving ecash
+            if totalReceived > 0 {
+                Task {
+                    do {
+                        guard let ndk = nostrManager.ndk,
+                              let signer = ndk.signer else { return }
+                        
+                        try await wallet.eventManager.createSpendingHistoryEvent(
+                            direction: .in,
+                            amount: totalReceived,
+                            memo: token.memo ?? "Received ecash",
+                            signer: signer
+                        )
+                    } catch {
+                        print("Failed to create history event for receive: \(error)")
+                    }
+                }
+            }
+            
+            return totalReceived
+        } catch {
+            // Update transaction status to failed
+            await MainActor.run {
+                if let index = self.transactions.firstIndex(where: { $0.transactionID == transaction.transactionID }) {
+                    self.transactions[index].status = .failed
+                }
+            }
+            throw error
         }
-        
-        return totalReceived
     }
     
     // MARK: - Lightning Operations
@@ -613,14 +714,46 @@ class WalletManager {
             throw WalletError.noActiveWallet
         }
         
-        let (preimage, feePaid) = try await wallet.payLightning(
-            invoice: invoice,
-            amount: amount
+        // Create pending transaction immediately
+        let transaction = Transaction(
+            type: .melt,
+            amount: Int(amount),
+            memo: "Lightning payment"
         )
+        transaction.status = .pending
+        transaction.lightningInvoice = invoice
         
-        print("Paid Lightning invoice: \(amount) sats, fee: \(feePaid ?? 0) sats")
+        // Add to transactions list immediately
+        await MainActor.run {
+            self.transactions.insert(transaction, at: 0)
+        }
         
-        return preimage
+        do {
+            let (preimage, feePaid) = try await wallet.payLightning(
+                invoice: invoice,
+                amount: amount
+            )
+            
+            print("Paid Lightning invoice: \(amount) sats, fee: \(feePaid ?? 0) sats")
+            
+            // Update transaction status to completed
+            await MainActor.run {
+                if let index = self.transactions.firstIndex(where: { $0.transactionID == transaction.transactionID }) {
+                    self.transactions[index].status = .completed
+                    // The history event will provide more details
+                }
+            }
+            
+            return preimage
+        } catch {
+            // Update transaction status to failed
+            await MainActor.run {
+                if let index = self.transactions.firstIndex(where: { $0.transactionID == transaction.transactionID }) {
+                    self.transactions[index].status = .failed
+                }
+            }
+            throw error
+        }
     }
     
     // MARK: - Nutzap Operations
@@ -639,21 +772,52 @@ class WalletManager {
             throw WalletError.noActiveWallet
         }
         
-        // Create nutzap request
-        let request = NutzapPaymentRequest(
-            amountSats: amount,
-            recipientPubkey: recipient,
-            recipientP2PK: "", // Empty P2PK for now, will be set by wallet
-            acceptedMints: acceptedMints,
-            comment: comment
+        // Create pending transaction immediately
+        let transaction = Transaction(
+            type: .send,  // Use send type for outgoing nutzaps
+            amount: Int(amount),
+            memo: comment ?? "Nutzap sent"
         )
+        transaction.status = .pending
+        // Note: For outgoing nutzaps, we don't set senderPubkey as that's for incoming
         
-        print("💳 Created NutzapPaymentRequest, calling wallet.pay()")
+        // Add to transactions list immediately
+        await MainActor.run {
+            self.transactions.insert(transaction, at: 0)
+        }
         
-        // Send nutzap
-        _ = try await wallet.pay(request)
-        
-        print("✅ Nutzap completed successfully!")
+        do {
+            // Create nutzap request
+            let request = NutzapPaymentRequest(
+                amountSats: amount,
+                recipientPubkey: recipient,
+                recipientP2PK: "", // Empty P2PK for now, will be set by wallet
+                acceptedMints: acceptedMints,
+                comment: comment
+            )
+            
+            print("💳 Created NutzapPaymentRequest, calling wallet.pay()")
+            
+            // Send nutzap
+            _ = try await wallet.pay(request)
+            
+            print("✅ Nutzap completed successfully!")
+            
+            // Update transaction status to completed
+            await MainActor.run {
+                if let index = self.transactions.firstIndex(where: { $0.transactionID == transaction.transactionID }) {
+                    self.transactions[index].status = .completed
+                }
+            }
+        } catch {
+            // Update transaction status to failed
+            await MainActor.run {
+                if let index = self.transactions.firstIndex(where: { $0.transactionID == transaction.transactionID }) {
+                    self.transactions[index].status = .failed
+                }
+            }
+            throw error
+        }
     }
     
     // MARK: - Mint Management
@@ -895,6 +1059,22 @@ class WalletManager {
     /// Get wallet reference for health monitoring
     var wallet: NIP60Wallet? {
         return activeWallet
+    }
+    
+    // MARK: - Pending Transactions
+    
+    /// Calculate total pending amount (outgoing is negative, incoming is positive)
+    var pendingAmount: Int64 {
+        transactions
+            .filter { $0.status == .pending }
+            .reduce(0) { sum, transaction in
+                switch transaction.type {
+                case .send, .melt, .nutzap:
+                    return sum - Int64(transaction.amount)
+                case .receive, .mint:
+                    return sum + Int64(transaction.amount)
+                }
+            }
     }
     
     // MARK: - Private Methods
