@@ -25,7 +25,7 @@ extension Tag {
         switch tagType {
         case "e", "p":
             // Event and pubkey tags must have 64-character hex IDs
-            return count >= 2 && self[1].count == 64 && self[1].allSatisfy { $0.isHexDigit }
+            return count >= 2 && HexValidator.isValid32ByteHex(self[1])
         case "a":
             // Addressable event references: kind:pubkey:d-tag
             guard count >= 2 else { return false }

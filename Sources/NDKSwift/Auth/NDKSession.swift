@@ -164,7 +164,7 @@ public struct NDKSession: Codable, Identifiable, Sendable {
     /// - Throws: NDKSessionError if validation fails
     public func validate() throws {
         // Validate pubkey format
-        guard pubkey.count == 64, pubkey.allSatisfy({ $0.isHexDigit }) else {
+        guard HexValidator.isValid32ByteHex(pubkey) else {
             throw NDKSessionError.invalidPubkey(pubkey)
         }
         
