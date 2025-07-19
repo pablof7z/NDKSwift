@@ -89,9 +89,7 @@ public final class NDKUser: Equatable, Hashable, Sendable {
 
         // Build the well-known URL
         let urlString = "https://\(domain)/.well-known/nostr.json?name=\(name)"
-        guard let url = URL(string: urlString) else {
-            throw NDKError.invalidURL("Invalid NIP-05 URL: \(urlString)")
-        }
+        let url = try URLUtils.validateURL(urlString)
 
         // Fetch the data
         let (data, _): (Data, URLResponse)

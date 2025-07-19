@@ -41,9 +41,7 @@ public actor BlossomClient {
             return cached
         }
 
-        guard let baseURL = URL(string: serverURL) else {
-            throw NDKError.invalidURL(serverURL)
-        }
+        let baseURL = try URLUtils.validateURL(serverURL)
 
         let wellKnownURL = baseURL.appendingPathComponent(".well-known/blossom")
 
@@ -81,9 +79,7 @@ public actor BlossomClient {
         to serverURL: String,
         auth: BlossomAuth
     ) async throws -> BlossomBlob {
-        guard let baseURL = URL(string: serverURL) else {
-            throw NDKError.invalidURL(serverURL)
-        }
+        let baseURL = try URLUtils.validateURL(serverURL)
 
         // Calculate SHA256
         let sha256 = SHA256.hash(data: data)
@@ -169,9 +165,7 @@ public actor BlossomClient {
         since: Date? = nil,
         until: Date? = nil
     ) async throws -> [BlossomBlob] {
-        guard let baseURL = URL(string: serverURL) else {
-            throw NDKError.invalidURL(serverURL)
-        }
+        let baseURL = try URLUtils.validateURL(serverURL)
 
         let descriptor = try? await discoverServer(serverURL)
         let listPath = descriptor?.listUrl ?? "/list"
@@ -241,9 +235,7 @@ public actor BlossomClient {
         from serverURL: String,
         auth: BlossomAuth
     ) async throws {
-        guard let baseURL = URL(string: serverURL) else {
-            throw NDKError.invalidURL(serverURL)
-        }
+        let baseURL = try URLUtils.validateURL(serverURL)
 
         let deleteURL = baseURL.appendingPathComponent(sha256)
 
@@ -285,9 +277,7 @@ public actor BlossomClient {
         sha256: String,
         from serverURL: String
     ) async throws -> Data {
-        guard let url = URL(string: "\(serverURL)/\(sha256)") else {
-            throw NDKError.invalidURL(serverURL)
-        }
+        let url = try URLUtils.validateURL("\(serverURL)/\(sha256)")
 
         var request = URLRequest(url: url)
         request.httpMethod = Self.httpMethodGet
