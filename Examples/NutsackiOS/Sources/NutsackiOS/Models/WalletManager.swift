@@ -632,7 +632,10 @@ class WalletManager {
         comment: String?,
         acceptedMints: [URL]
     ) async throws {
+        print("🚀 WalletManager.sendNutzap called - recipient: \(recipient), amount: \(amount), acceptedMints: \(acceptedMints)")
+        
         guard let wallet = activeWallet else {
+            print("❌ No active wallet!")
             throw WalletError.noActiveWallet
         }
         
@@ -645,10 +648,12 @@ class WalletManager {
             comment: comment
         )
         
+        print("💳 Created NutzapPaymentRequest, calling wallet.pay()")
+        
         // Send nutzap
         _ = try await wallet.pay(request)
         
-        print("Sent nutzap: \(amount) sats to \(recipient)")
+        print("✅ Nutzap completed successfully!")
     }
     
     // MARK: - Mint Management

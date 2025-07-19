@@ -144,6 +144,7 @@ public actor WalletHealthMonitor {
     public func checkAndReconcileProofStates(
         proofStateManager: ProofStateManager,
         mints: [String: CashuSwift.Mint],
+        mintManager: MintManager,
         signer: NDKSigner
     ) async throws -> ProofReconciliationResult {
         print("🔍 Starting proof state reconciliation...")
@@ -167,7 +168,32 @@ public actor WalletHealthMonitor {
         
         // Check each mint
         for (mintURL, proofEntries) in proofsByMint {
-            guard let mint = mints[mintURL] else {
+            // Try to get mint from current snapshot first
+            var mint = mints[mintURL]
+            
+            // If not found, try to load it and add to mint manager
+            if mint == nil, let url = URL(string: mintURL) {
+                do {
+                    print("🔄 Auto-loading mint: \(mintURL)")
+                    let loadedMint = try await mintManager.loadMint(url: url)
+                    
+                    // Add to mint manager (following the pattern from requestMintQuote)
+                    await mintManager.addMintURL(url: url)
+                    // Store keysets in mint manager
+                    for keyset in loadedMint.keysets {
+                        await mintManager.addKeyset(keyset)
+                    }
+                    
+                    mint = loadedMint
+                    print("✅ Successfully loaded mint: \(mintURL)")
+                } catch {
+                    print("⚠️ Failed to load mint \(mintURL): \(error)")
+                    errorCount += 1
+                    continue
+                }
+            }
+            
+            guard let mint = mint else {
                 print("⚠️ Mint not found for URL: \(mintURL)")
                 errorCount += 1
                 continue

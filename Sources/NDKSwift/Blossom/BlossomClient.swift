@@ -13,6 +13,22 @@ public actor BlossomClient {
     public init(urlSession: URLSession = .shared) {
         self.urlSession = urlSession
     }
+    
+    // MARK: - Private Helpers
+    
+    /// Helper method to handle HTTP responses and extract error messages
+    private func handleHTTPResponse(_ response: URLResponse?, data: Data, serverURL: String) throws -> HTTPURLResponse {
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw NDKError.invalidResponse(from: "Blossom server")
+        }
+        return httpResponse
+    }
+    
+    /// Helper method to create server error with message extraction
+    private func createServerError(response: HTTPURLResponse, data: Data, serverURL: String) -> NDKError {
+        let errorMessage = String(data: data, encoding: .utf8)
+        return NDKError.serverError(relay: serverURL, code: response.statusCode, message: errorMessage)
+    }
 
     // MARK: - BUD-01: Server Discovery
 
@@ -35,13 +51,10 @@ public actor BlossomClient {
 
         do {
             let (data, response) = try await urlSession.data(for: request)
-
-            guard let httpResponse = response as? HTTPURLResponse else {
-                throw NDKError.invalidResponse(from: "Blossom server")
-            }
+            let httpResponse = try handleHTTPResponse(response, data: data, serverURL: serverURL)
 
             guard httpResponse.statusCode == 200 else {
-                throw NDKError.serverError(relay: serverURL, code: httpResponse.statusCode, message: nil)
+                throw createServerError(response: httpResponse, data: data, serverURL: serverURL)
             }
 
             let descriptor = try JSONDecoder().decode(BlossomServerDescriptor.self, from: data)
@@ -107,10 +120,7 @@ public actor BlossomClient {
 
         do {
             let (responseData, response) = try await urlSession.data(for: request)
-
-            guard let httpResponse = response as? HTTPURLResponse else {
-                throw NDKError.invalidResponse(from: "Blossom server")
-            }
+            let httpResponse = try handleHTTPResponse(response, data: responseData, serverURL: serverURL)
 
             switch httpResponse.statusCode {
             case 200, 201:
@@ -139,8 +149,7 @@ public actor BlossomClient {
                 throw NDKError.unsupportedMimeType(mimeType ?? "unknown")
 
             default:
-                let errorMessage = String(data: responseData, encoding: .utf8)
-                throw NDKError.serverError(relay: serverURL, code: httpResponse.statusCode, message: errorMessage)
+                throw createServerError(response: httpResponse, data: responseData, serverURL: serverURL)
             }
         } catch let error as NDKError {
             throw error
@@ -193,10 +202,7 @@ public actor BlossomClient {
 
         do {
             let (data, response) = try await urlSession.data(for: request)
-
-            guard let httpResponse = response as? HTTPURLResponse else {
-                throw NDKError.invalidResponse(from: "Blossom server")
-            }
+            let httpResponse = try handleHTTPResponse(response, data: data, serverURL: serverURL)
 
             switch httpResponse.statusCode {
             case 200:
@@ -216,8 +222,7 @@ public actor BlossomClient {
                 throw NDKError.unauthorized(relay: serverURL, message: "Blossom authorization failed")
 
             default:
-                let errorMessage = String(data: data, encoding: .utf8)
-                throw NDKError.serverError(relay: serverURL, code: httpResponse.statusCode, message: errorMessage)
+                throw createServerError(response: httpResponse, data: data, serverURL: serverURL)
             }
         } catch let error as NDKError {
             throw error
@@ -248,10 +253,7 @@ public actor BlossomClient {
 
         do {
             let (data, response) = try await urlSession.data(for: request)
-
-            guard let httpResponse = response as? HTTPURLResponse else {
-                throw NDKError.invalidResponse(from: "Blossom server")
-            }
+            let httpResponse = try handleHTTPResponse(response, data: data, serverURL: serverURL)
 
             switch httpResponse.statusCode {
             case 200, 204:
@@ -265,8 +267,7 @@ public actor BlossomClient {
                 throw NDKError.blobNotFound(sha256: sha256)
 
             default:
-                let errorMessage = String(data: data, encoding: .utf8)
-                throw NDKError.serverError(relay: serverURL, code: httpResponse.statusCode, message: errorMessage)
+                throw createServerError(response: httpResponse, data: data, serverURL: serverURL)
             }
         } catch let error as NDKError {
             throw error
@@ -291,10 +292,7 @@ public actor BlossomClient {
 
         do {
             let (data, response) = try await urlSession.data(for: request)
-
-            guard let httpResponse = response as? HTTPURLResponse else {
-                throw NDKError.invalidResponse(from: "Blossom server")
-            }
+            let httpResponse = try handleHTTPResponse(response, data: data, serverURL: serverURL)
 
             switch httpResponse.statusCode {
             case 200:
@@ -312,8 +310,7 @@ public actor BlossomClient {
                 throw NDKError.blobNotFound(sha256: sha256)
 
             default:
-                let errorMessage = String(data: data, encoding: .utf8)
-                throw NDKError.serverError(relay: serverURL, code: httpResponse.statusCode, message: errorMessage)
+                throw createServerError(response: httpResponse, data: data, serverURL: serverURL)
             }
         } catch let error as NDKError {
             throw error
