@@ -1,6 +1,9 @@
 import Foundation
 
 /// URL utility functions for common URL operations
+/// 
+/// This utility provides generic URL validation for any URL type.
+/// For Nostr relay-specific URL normalization (ws://, wss://), use URLNormalizer instead.
 public enum URLUtils {
     /// Validates a URL string and returns a URL instance, throwing NDKError.invalidURL if invalid
     /// - Parameter urlString: The URL string to validate
