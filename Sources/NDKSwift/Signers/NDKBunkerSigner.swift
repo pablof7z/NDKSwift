@@ -15,49 +15,64 @@ struct BunkerURLParser {
             return (nil, nil, [], nil)
         }
         
-        var bunkerPubkey: String?
+        // Extract bunker pubkey from hostname or path
+        let bunkerPubkey = extractBunkerPubkey(from: url)
+        
+        // Parse query parameters
+        guard let components = URLComponents(url: url, resolvingAgainstBaseURL: false) else {
+            NDKLogger.shared.log(.debug, category: .auth, "[BunkerSigner] No query parameters found")
+            return (bunkerPubkey, nil, [], nil)
+        }
+        
+        let (userPubkey, relays, secret) = parseQueryParameters(from: components)
+        
+        NDKLogger.shared.log(.debug, category: .auth, "[BunkerSigner] Parse complete - bunkerPubkey: \(bunkerPubkey ?? "nil"), userPubkey: \(userPubkey ?? "nil"), relays: \(relays), hasSecret: \(secret != nil)")
+        return (bunkerPubkey, userPubkey, relays, secret)
+    }
+    
+    private func extractBunkerPubkey(from url: URL) -> String? {
+        // First check hostname
+        if let host = url.host {
+            NDKLogger.shared.log(.debug, category: .auth, "[BunkerSigner] Extracted bunker pubkey from host: \(host)")
+            return host
+        }
+        
+        // Handle bunker://pubkey format
+        let path = url.path
+        guard path.hasPrefix("//") else { return nil }
+        
+        let bunkerPubkey = String(path.dropFirst(2))
+        NDKLogger.shared.log(.debug, category: .auth, "[BunkerSigner] Extracted bunker pubkey from path: \(bunkerPubkey)")
+        return bunkerPubkey
+    }
+    
+    private func parseQueryParameters(from components: URLComponents) -> (userPubkey: String?, relays: [String], secret: String?) {
         var userPubkey: String?
         var relays: [String] = []
         var secret: String?
         
-        // Extract bunker pubkey from hostname or path
-        if let host = url.host {
-            bunkerPubkey = host
-            NDKLogger.shared.log(.debug, category: .auth, "[BunkerSigner] Extracted bunker pubkey from host: \(host)")
-        } else {
-            // Handle bunker://pubkey format
-            let path = url.path
-            if path.hasPrefix("//") {
-                bunkerPubkey = String(path.dropFirst(2))
-                NDKLogger.shared.log(.debug, category: .auth, "[BunkerSigner] Extracted bunker pubkey from path: \(bunkerPubkey ?? "nil")")
-            }
-        }
+        let queryItems = components.queryItems ?? []
+        NDKLogger.shared.log(.debug, category: .auth, "[BunkerSigner] Query items: \(queryItems.map { "\($0.name)=\($0.value ?? "nil")" }.joined(separator: ", "))")
         
-        // Parse query parameters
-        if let components = URLComponents(url: url, resolvingAgainstBaseURL: false) {
-            NDKLogger.shared.log(.debug, category: .auth, "[BunkerSigner] Query items: \(components.queryItems?.map { "\($0.name)=\($0.value ?? "nil")" }.joined(separator: ", ") ?? "none")")
-            
-            for item in components.queryItems ?? [] {
-                switch item.name {
-                case "pubkey":
-                    userPubkey = item.value
-                    NDKLogger.shared.log(.debug, category: .auth, "[BunkerSigner] Found user pubkey: \(item.value ?? "nil")")
-                case "relay":
-                    if let relay = item.value {
-                        relays.append(relay)
-                        NDKLogger.shared.log(.debug, category: .auth, "[BunkerSigner] Added relay: \(relay)")
-                    }
-                case "secret":
-                    secret = item.value
-                    NDKLogger.shared.log(.debug, category: .auth, "[BunkerSigner] Found secret: \(item.value != nil ? "***" : "nil")")
-                default:
-                    NDKLogger.shared.log(.warning, category: .auth, "[BunkerSigner] Unknown parameter: \(item.name)=\(item.value ?? "nil")")
+        for item in queryItems {
+            switch item.name {
+            case "pubkey":
+                userPubkey = item.value
+                NDKLogger.shared.log(.debug, category: .auth, "[BunkerSigner] Found user pubkey: \(item.value ?? "nil")")
+            case "relay":
+                if let relay = item.value {
+                    relays.append(relay)
+                    NDKLogger.shared.log(.debug, category: .auth, "[BunkerSigner] Added relay: \(relay)")
                 }
+            case "secret":
+                secret = item.value
+                NDKLogger.shared.log(.debug, category: .auth, "[BunkerSigner] Found secret: \(item.value != nil ? "***" : "nil")")
+            default:
+                NDKLogger.shared.log(.warning, category: .auth, "[BunkerSigner] Unknown parameter: \(item.name)=\(item.value ?? "nil")")
             }
         }
         
-        NDKLogger.shared.log(.debug, category: .auth, "[BunkerSigner] Parse complete - bunkerPubkey: \(bunkerPubkey ?? "nil"), userPubkey: \(userPubkey ?? "nil"), relays: \(relays), hasSecret: \(secret != nil)")
-        return (bunkerPubkey, userPubkey, relays, secret)
+        return (userPubkey, relays, secret)
     }
 }
 
