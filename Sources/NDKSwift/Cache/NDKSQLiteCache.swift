@@ -279,7 +279,7 @@ public actor NDKSQLiteCache: NDKCache {
                     profile.lud16,
                     profile.banner,
                     profile.website,
-                    Int64(Date().timeIntervalSince1970),
+                    Timestamp.now,
                     jsonString
                 ]
             )
@@ -344,7 +344,7 @@ public actor NDKSQLiteCache: NDKCache {
     
     public func saveMintInfo(_ info: NDKMintInfo, url: String) async throws {
         let jsonString = try JSONCoding.encodeToString(info)
-        let currentTime = Int64(Date().timeIntervalSince1970)
+        let currentTime = Timestamp.now
         
         // Extract units for searching
         var units: [String] = []
@@ -380,7 +380,7 @@ public actor NDKSQLiteCache: NDKCache {
                 // Update last_accessed time
                 try db.execute(
                     sql: "UPDATE mint_info SET last_accessed = ? WHERE url = ?",
-                    arguments: [Int64(Date().timeIntervalSince1970), url]
+                    arguments: [Timestamp.now, url]
                 )
                 
                 // Fetch the data
@@ -400,7 +400,7 @@ public actor NDKSQLiteCache: NDKCache {
     }
     
     public func isMintInfoStale(url: String, maxAge: TimeInterval = 86400) async -> Bool {
-        let staleThreshold = Int64(Date().timeIntervalSince1970 - maxAge)
+        let staleThreshold = Timestamp.now - Timestamp(maxAge)
         return (try? await dbQueue.read { db in
             if let lastUpdated = try Int64.fetchOne(db, sql: "SELECT last_updated FROM mint_info WHERE url = ?", arguments: [url]) {
                 return lastUpdated < staleThreshold
@@ -421,7 +421,7 @@ public actor NDKSQLiteCache: NDKCache {
     public func saveKeyset(_ keyset: CashuSwift.Keyset, mintUrl: String) async throws {
         let jsonString = try JSONCoding.encodeToString(keyset)
         let keysJsonString = try JSONCoding.encodeToString(keyset.keys)
-        let currentTime = Int64(Date().timeIntervalSince1970)
+        let currentTime = Timestamp.now
         
         try await dbQueue.write { db in
             // Ensure mint_info exists first to avoid foreign key constraint violation
@@ -455,7 +455,7 @@ public actor NDKSQLiteCache: NDKCache {
     }
     
     public func saveKeysets(_ keysets: [CashuSwift.Keyset], mintUrl: String) async throws {
-        let currentTime = Int64(Date().timeIntervalSince1970)
+        let currentTime = Timestamp.now
         
         try await dbQueue.write { db in
             // Ensure mint_info exists first to avoid foreign key constraint violation
@@ -499,7 +499,7 @@ public actor NDKSQLiteCache: NDKCache {
                 // Update last_accessed time
                 try db.execute(
                     sql: "UPDATE keysets SET last_accessed = ? WHERE keyset_id = ?",
-                    arguments: [Int64(Date().timeIntervalSince1970), id]
+                    arguments: [Timestamp.now, id]
                 )
                 
                 // Fetch the data
@@ -559,7 +559,7 @@ public actor NDKSQLiteCache: NDKCache {
     }
     
     public func areKeysetsStale(mintUrl: String, maxAge: TimeInterval = 3600) async -> Bool {
-        let staleThreshold = Int64(Date().timeIntervalSince1970 - maxAge)
+        let staleThreshold = Timestamp.now - Timestamp(maxAge)
         return (try? await dbQueue.read { db in
             if let oldestUpdate = try Int64.fetchOne(
                 db, 
@@ -760,7 +760,7 @@ public actor NDKSQLiteCache: NDKCache {
     public func addUnpublishedEvent(_ event: NDKEvent, relays: Set<String>) async throws {
         let eventId = event.id
         let targetRelaysJson = try JSONCoding.encodeToString(Array(relays))
-        let currentTime = Int64(Date().timeIntervalSince1970)
+        let currentTime = Timestamp.now
         
         try await dbQueue.write { db in
             // First save the event if it doesn't exist
@@ -806,7 +806,7 @@ public actor NDKSQLiteCache: NDKCache {
     }
     
     public func confirmEvent(eventId: String, onRelay relay: String) async throws {
-        let confirmedTime = Int64(Date().timeIntervalSince1970)
+        let confirmedTime = Timestamp.now
         
         try await dbQueue.write { db in
             try db.execute(
@@ -855,7 +855,7 @@ public actor NDKSQLiteCache: NDKCache {
     }
     
     public func getUnpublishedEvents(maxAge: TimeInterval = 3600, limit: Int? = nil) async -> [(event: NDKEvent, targetRelays: Set<String>)] {
-        let cutoffTime = Int64(Date().timeIntervalSince1970 - maxAge)
+        let cutoffTime = Timestamp.now - Timestamp(maxAge)
         
         do {
             return try await dbQueue.read { db in

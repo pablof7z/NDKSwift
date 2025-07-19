@@ -98,7 +98,7 @@ public actor WalletEventManager {
                 await proofStateManager.updateProofOwnership(
                     proofs,
                     eventId: eventId,
-                    timestamp: Timestamp(Date().timeIntervalSince1970)
+                    timestamp: Timestamp.now
                 )
             }
         }

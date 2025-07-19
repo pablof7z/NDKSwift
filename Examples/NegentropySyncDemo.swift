@@ -41,7 +41,7 @@ struct NegentropySyncDemo {
             try await ndk.connect(relayURLs: [relayURL])
             
             // Create a filter for sync (e.g., all text notes from the last hour)
-            let oneHourAgo = Timestamp(Date().timeIntervalSince1970 - 3600)
+            let oneHourAgo = Timestamp.now - 3600
             let filter = NDKFilter(
                 kinds: [1], // Text notes
                 since: oneHourAgo

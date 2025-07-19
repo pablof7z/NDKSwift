@@ -11,7 +11,7 @@ var relayURL = "wss://nostr.oxtr.dev"
 var filterKinds: [Int] = [1]
 var filterAuthors: [String] = []
 var filterLimit: Int? = nil
-var filterSince: Timestamp? = Timestamp(Date().timeIntervalSince1970 - 3600) // Default to last hour
+var filterSince: Timestamp? = Timestamp.now - 3600 // Default to last hour
 var showProgress = false
 var debugMode = false
 
@@ -42,7 +42,7 @@ while i < args.count {
     case "--since", "-s":
         if i + 1 < args.count {
             if let hours = Int(args[i + 1]) {
-                filterSince = Timestamp(Date().timeIntervalSince1970 - Double(hours * 3600))
+                filterSince = Timestamp.now - Timestamp(hours * 3600)
             }
             i += 1
         }
@@ -130,7 +130,7 @@ func runDemo() async throws {
         print("  - Limit: \(limit)")
     }
     if let since = filterSince {
-        let hours = Int((Date().timeIntervalSince1970 - Double(since)) / 3600)
+        let hours = Int((Double(Timestamp.now - since)) / 3600)
         print("  - Since: \(hours) hours ago")
     }
     

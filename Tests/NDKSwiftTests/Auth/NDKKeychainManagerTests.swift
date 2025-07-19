@@ -124,7 +124,7 @@ final class NDKKeychainManagerTests: XCTestCase {
             "id": testSessionId.uuidString,
             "pubkey": "d30effaa4e7090322e07b7b95b2c2f42c23bb16b12582d358fb088993a26e53f",
             "signerType": "privatekey",
-            "createdAt": Date().timeIntervalSince1970
+            "createdAt": Timestamp.now
         ] as [String: Any]
         
         let data = try JSONSerialization.data(withJSONObject: metadata)
@@ -151,14 +151,14 @@ final class NDKKeychainManagerTests: XCTestCase {
             "id": id1.uuidString,
             "pubkey": "pubkey1",
             "signerType": "privatekey",
-            "createdAt": Date().timeIntervalSince1970
+            "createdAt": Timestamp.now
         ] as [String: Any]
         
         let metadata2 = [
             "id": id2.uuidString,
             "pubkey": "pubkey2",
             "signerType": "nip46",
-            "createdAt": Date().timeIntervalSince1970
+            "createdAt": Timestamp.now
         ] as [String: Any]
         
         let data1 = try JSONSerialization.data(withJSONObject: metadata1)
@@ -173,7 +173,7 @@ final class NDKKeychainManagerTests: XCTestCase {
     }
     
     func testUpdateSessionMetadata() async throws {
-        let createdAt = Date().timeIntervalSince1970
+        let createdAt = Timestamp.now
         
         let originalMetadata = [
             "id": testSessionId.uuidString,
@@ -217,14 +217,14 @@ final class NDKKeychainManagerTests: XCTestCase {
             "id": id1.uuidString,
             "pubkey": "pubkey1",
             "signerType": "privatekey",
-            "createdAt": Date().timeIntervalSince1970
+            "createdAt": Timestamp.now
         ] as [String: Any]
         
         let metadata2 = [
             "id": testSessionId.uuidString,
             "pubkey": "pubkey2",
             "signerType": "privatekey",
-            "createdAt": Date().timeIntervalSince1970
+            "createdAt": Timestamp.now
         ] as [String: Any]
         
         let data1 = try JSONSerialization.data(withJSONObject: metadata1)

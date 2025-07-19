@@ -65,7 +65,7 @@ try await ndk.addRelay("wss://relay.example.com")
 let filter = NDKFilter(
     authors: ["your_pubkey_here"],
     kinds: [1, 6, 7], // text notes, reposts, reactions
-    since: Timestamp(Date().timeIntervalSince1970 - 86400) // last 24 hours
+    since: Timestamp.now - 86400 // last 24 hours
 )
 
 // Perform Negentropy sync
