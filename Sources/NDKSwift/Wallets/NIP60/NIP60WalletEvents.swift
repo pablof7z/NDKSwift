@@ -14,7 +14,7 @@ public struct NIP60WalletEvent {
         /// Wallet balance changed to new amount (in satoshis)
         case balanceChanged(Int64)
         /// Nutzap payment received
-        case nutzapReceived(amount: Int64, from: String?)
+        case nutzapReceived(amount: Int64, from: String?, eventId: String)
     }
     
     /// The type of event that occurred

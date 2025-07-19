@@ -45,6 +45,14 @@ struct BalanceCard: View {
                 }
                 .animation(.spring(response: 0.4, dampingFraction: 0.8), value: isExpanded)
                 
+                // Show pending amount if any
+                if walletManager.pendingAmount != 0 {
+                    Text("\(walletManager.pendingAmount > 0 ? "+" : "")\(abs(walletManager.pendingAmount)) pending")
+                        .font(.system(size: 14, weight: .medium, design: .rounded))
+                        .foregroundStyle(.orange)
+                        .opacity(0.8)
+                }
+                
                 // Fiat conversion with mini pie chart
                 if appState.preferredConversionUnit != .sat && !convertedBalance.isEmpty && convertedBalance != "..." {
                     HStack(spacing: 12) {

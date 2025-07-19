@@ -43,6 +43,7 @@ struct RecentTransactionsView: View {
                 VStack(spacing: 8) {
                     ForEach(recentTransactions) { transaction in
                         TransactionRow(transaction: transaction)
+                            .animation(.easeInOut(duration: 0.3), value: transaction.status)
                     }
                 }
                 .background(Color.secondary.opacity(0.1))
@@ -156,10 +157,20 @@ struct TransactionRow: View {
             Spacer()
             
             VStack(alignment: .trailing, spacing: 2) {
-                Text("\(sign)\(transaction.amount)")
-                    .font(.subheadline)
-                    .fontWeight(.medium)
-                    .foregroundStyle(color)
+                HStack(spacing: 4) {
+                    Text("\(sign)\(transaction.amount)")
+                        .font(.subheadline)
+                        .fontWeight(.medium)
+                        .foregroundStyle(color)
+                    
+                    // Show pending indicator
+                    if transaction.status == .pending {
+                        ProgressView()
+                            .progressViewStyle(CircularProgressViewStyle())
+                            .scaleEffect(0.7)
+                            .frame(width: 16, height: 16)
+                    }
+                }
                 
                 Text(transaction.createdAt.formatted(.relative(presentation: .numeric)))
                     .font(.caption2)
@@ -168,6 +179,7 @@ struct TransactionRow: View {
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 8)
+        .opacity(transaction.status == .pending ? 0.85 : 1.0)
         .task {
             // Fetch sender profile for nutzaps
             if transaction.type == .nutzap, 

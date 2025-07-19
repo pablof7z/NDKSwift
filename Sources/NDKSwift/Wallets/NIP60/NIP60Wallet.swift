@@ -377,7 +377,7 @@ public actor NIP60Wallet: NDKPaymentProvider {
                 
                 // Emit event
                 let sender = event.pubkey
-                events.yield(NIP60WalletEvent(type: .nutzapReceived(amount: totalAmount, from: sender)))
+                events.yield(NIP60WalletEvent(type: .nutzapReceived(amount: totalAmount, from: sender, eventId: event.id)))
             }
         }
     }

@@ -364,12 +364,16 @@ struct NutzapView: View {
         
         isSending = true
         
+        // Show success immediately for better UX
+        showSuccess = true
+        
         Task {
             do {
                 if paymentMethod == .nutzap && !acceptedMints.isEmpty {
                     // Convert accepted mints to URLs
                     let mintURLs = acceptedMints.compactMap { URL(string: $0) }
                     
+                    // This creates a pending transaction immediately
                     try await walletManager.sendNutzap(
                         to: recipientPubkey,
                         amount: Int64(amountInt),
@@ -396,9 +400,8 @@ struct NutzapView: View {
                     throw ZapError.zapManagerNotAvailable
                 }
                 
-                // Transaction will be recorded automatically
+                // Keep success showing
                 await MainActor.run {
-                    showSuccess = true
                     isSending = false
                 }
             } catch {
@@ -406,6 +409,7 @@ struct NutzapView: View {
                     errorMessage = error.localizedDescription
                     showError = true
                     isSending = false
+                    showSuccess = false  // Hide success on error
                 }
             }
         }

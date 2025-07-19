@@ -355,17 +355,16 @@ struct SendView: View {
             Text(errorMessage)
         }
         .sheet(isPresented: $showTokenView) {
-            if let token = generatedToken {
-                if isOfflineMode {
-                    OfflineTokenView(
-                        token: token,
-                        amount: Int(selectedAmount ?? 0),
-                        memo: memo,
-                        mintURL: selectedMintURL
-                    )
-                } else {
-                    TokenView(token: token, amount: amountInt, memo: memo)
-                }
+            if isOfflineMode, let token = generatedToken {
+                OfflineTokenView(
+                    token: token,
+                    amount: Int(selectedAmount ?? 0),
+                    memo: memo,
+                    mintURL: selectedMintURL
+                )
+            } else {
+                // Pass the token even if it's nil - TokenView handles the loading state
+                TokenView(token: generatedToken, amount: amountInt, memo: memo)
             }
         }
         .onAppear {
@@ -432,17 +431,21 @@ struct SendView: View {
             
             Task {
                 do {
-                    // Generate ecash token
+                    // Show success immediately - the transaction appears as pending
+                    await MainActor.run {
+                        showTokenView = true
+                    }
+                    
+                    // Generate ecash token (this creates pending transaction immediately)
                     let tokenString = try await walletManager.send(
                         amount: Int64(amountInt),
                         memo: memo.isEmpty ? nil : memo,
                         fromMint: selectedMintURL
                     )
                     
-                    // Transaction will be recorded automatically via NIP-60 history events
+                    // Update with actual token
                     await MainActor.run {
                         generatedToken = tokenString
-                        showTokenView = true
                         isSending = false
                     }
                 } catch {
@@ -450,6 +453,7 @@ struct SendView: View {
                         errorMessage = error.localizedDescription
                         showError = true
                         isSending = false
+                        showTokenView = false
                     }
                 }
             }
@@ -633,22 +637,39 @@ struct SendView: View {
 
 // MARK: - Token View
 struct TokenView: View {
-    let token: String
+    let token: String?
     let amount: Int
     let memo: String
     
     @State private var copied = false
     @Environment(\.dismiss) private var dismiss
     
+    var isGenerating: Bool {
+        token == nil || token?.isEmpty == true
+    }
+    
     var body: some View {
         NavigationStack {
             ScrollView {
                 VStack(spacing: 30) {
-                    // Success indicator
-                    Image(systemName: "checkmark.circle.fill")
-                        .font(.system(size: 60))
-                        .foregroundStyle(.green)
-                        .padding(.top, 40)
+                    // Status indicator
+                    if isGenerating {
+                        VStack(spacing: 16) {
+                            ProgressView()
+                                .progressViewStyle(CircularProgressViewStyle())
+                                .scaleEffect(1.5)
+                                .padding(.top, 40)
+                            
+                            Text("Generating token...")
+                                .font(.headline)
+                                .foregroundStyle(.secondary)
+                        }
+                    } else {
+                        Image(systemName: "checkmark.circle.fill")
+                            .font(.system(size: 60))
+                            .foregroundStyle(.green)
+                            .padding(.top, 40)
+                    }
                     
                     // Amount
                     VStack(spacing: 8) {
@@ -665,36 +686,54 @@ struct TokenView: View {
                         }
                     }
                     
-                    // QR Code
-                    QRCodeView(content: token)
-                    
-                    // Token text
-                    VStack(spacing: 12) {
-                        Text(token)
-                            .font(.system(.caption, design: .monospaced))
-                            .lineLimit(3)
-                            .truncationMode(.middle)
-                            .padding()
-                            .background(Color.secondary.opacity(0.2))
-                            .cornerRadius(8)
+                    if let token = token, !token.isEmpty {
+                        // QR Code
+                        QRCodeView(content: token)
                         
-                        Button(action: copyToken) {
-                            Label(
-                                copied ? "Copied!" : "Copy Token",
-                                systemImage: copied ? "checkmark.circle.fill" : "doc.on.doc"
-                            )
-                            .frame(maxWidth: .infinity)
-                        }
-                        .buttonStyle(.borderedProminent)
-                        .tint(copied ? .green : .orange)
-                        
-                        Button(action: shareToken) {
-                            Label("Share Token", systemImage: "square.and.arrow.up")
+                        // Token text
+                        VStack(spacing: 12) {
+                            Text(token)
+                                .font(.system(.caption, design: .monospaced))
+                                .lineLimit(3)
+                                .truncationMode(.middle)
+                                .padding()
+                                .background(Color.secondary.opacity(0.2))
+                                .cornerRadius(8)
+                            
+                            Button(action: copyToken) {
+                                Label(
+                                    copied ? "Copied!" : "Copy Token",
+                                    systemImage: copied ? "checkmark.circle.fill" : "doc.on.doc"
+                                )
                                 .frame(maxWidth: .infinity)
+                            }
+                            .buttonStyle(.borderedProminent)
+                            .tint(copied ? .green : .orange)
+                            
+                            Button(action: shareToken) {
+                                Label("Share Token", systemImage: "square.and.arrow.up")
+                                    .frame(maxWidth: .infinity)
+                            }
+                            .buttonStyle(.bordered)
                         }
-                        .buttonStyle(.bordered)
+                        .padding(.horizontal)
+                    } else {
+                        // Placeholder while generating
+                        VStack(spacing: 12) {
+                            RoundedRectangle(cornerRadius: 12)
+                                .fill(Color.secondary.opacity(0.2))
+                                .frame(width: 250, height: 250)
+                                .overlay(
+                                    ProgressView()
+                                        .progressViewStyle(CircularProgressViewStyle())
+                                )
+                            
+                            Text("The token will appear here once generated")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                                .padding(.horizontal)
+                        }
                     }
-                    .padding(.horizontal)
                     
                     Spacer(minLength: 40)
                 }
@@ -710,6 +749,8 @@ struct TokenView: View {
     }
     
     private func copyToken() {
+        guard let token = token else { return }
+        
         #if os(iOS)
         UIPasteboard.general.string = token
         #else
@@ -728,6 +769,8 @@ struct TokenView: View {
     }
     
     private func shareToken() {
+        guard let token = token else { return }
+        
         #if os(iOS)
         let activityController = UIActivityViewController(
             activityItems: [token],
