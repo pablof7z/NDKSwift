@@ -19,6 +19,14 @@ public enum JSONCoding {
         return encoder
     }()
     
+    /// Snake-case JSON encoder for NWC and other protocols requiring snake_case
+    public static let snakeCaseEncoder: JSONEncoder = {
+        let encoder = JSONEncoder()
+        encoder.keyEncodingStrategy = .convertToSnakeCase
+        encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
+        return encoder
+    }()
+    
     // MARK: - Decoders
     
     /// Standard JSON decoder
@@ -75,6 +83,15 @@ public enum JSONCoding {
         let data = try encoder.encode(value)
         guard let string = String(data: data, encoding: .utf8) else {
             throw NDKError.unknown("Failed to encode Nostr message")
+        }
+        return string
+    }
+    
+    /// Encode with snake_case keys to string
+    public static func encodeSnakeCaseToString<T: Encodable>(_ value: T) throws -> String {
+        let data = try snakeCaseEncoder.encode(value)
+        guard let string = String(data: data, encoding: .utf8) else {
+            throw NDKError.unknown("Failed to encode with snake_case")
         }
         return string
     }

@@ -20,10 +20,9 @@ extension NDKSQLiteCache {
             while let row = try cursor.next() {
                 if let url = row["url"] as? String,
                    let jsonString = row["json"] as? String,
-                   let jsonData = jsonString.data(using: .utf8),
-                   let info = try? JSONDecoder().decode(NDKMintInfo.self, from: jsonData) {
+                   let info = JSONCoding.safeDecode(NDKMintInfo.self, from: jsonString) {
                     
-                    let unitsJson = (try? JSONEncoder().encode(info.nuts?.nut04?.methods?.map { $0.unit } ?? [])) ?? Data()
+                    let unitsJson = (try? JSONCoding.encode(info.nuts?.nut04?.methods?.map { $0.unit } ?? [])) ?? Data()
                     let unitsString = String(data: unitsJson, encoding: .utf8)
                     
                     try db.execute(

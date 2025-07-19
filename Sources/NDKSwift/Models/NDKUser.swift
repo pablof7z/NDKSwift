@@ -131,8 +131,7 @@ public final class NDKUser: Equatable, Hashable, Sendable {
     public func processMetadataEvent(_ event: NDKEvent) {
         Task {
             let eventContent = event.content
-            if let profileData = eventContent.data(using: .utf8),
-               let profile = try? JSONDecoder().decode(NDKUserProfile.self, from: profileData) {
+            if let profile = JSONCoding.safeDecode(NDKUserProfile.self, from: eventContent) {
                 await updateProfile(profile)
                 
                 // Save to cache if available
@@ -293,7 +292,7 @@ public final class NDKUser: Equatable, Hashable, Sendable {
             switch event.kind {
             case EventKind.metadata:
                 // Check for Lightning support (lud06/lud16)
-                if let profileData = try? JSONDecoder().decode(NDKUserProfile.self, from: event.content.data(using: String.Encoding.utf8) ?? Data()) {
+                if let profileData = JSONCoding.safeDecode(NDKUserProfile.self, from: event.content) {
                     if profileData.lud06 != nil || profileData.lud16 != nil {
                         methods.insert(.lightning)
                     }

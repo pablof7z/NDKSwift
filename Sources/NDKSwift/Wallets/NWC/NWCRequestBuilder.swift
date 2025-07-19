@@ -18,11 +18,7 @@ public struct NWCRequestBuilder {
         let envelope = NWCRequestEnvelope(method: method, params: params)
         
         // Encode to JSON with snake_case keys
-        let encoder = JSONEncoder()
-        encoder.keyEncodingStrategy = .convertToSnakeCase
-        encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
-        let jsonData = try encoder.encode(envelope)
-        let jsonString = String(data: jsonData, encoding: .utf8)!
+        let jsonString = try JSONCoding.encodeSnakeCaseToString(envelope)
         
         // Get signer pubkey
         let signerPubkey = try await signer.pubkey
