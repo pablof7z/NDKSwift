@@ -8,7 +8,9 @@ public final class NDKPrivateKeySigner: NDKSigner {
 
     /// Initialize with a private key
     public init(privateKey: PrivateKey) throws {
-        guard let keyData = Data(hexString: privateKey), keyData.count == 32 else {
+        do {
+            _ = try HexValidator.validate32ByteHex(privateKey)
+        } catch {
             throw NDKError.invalidPrivateKey(privateKey)
         }
 
@@ -43,7 +45,10 @@ public final class NDKPrivateKeySigner: NDKSigner {
     }
 
     public func sign(_ event: NDKEvent) async throws -> Signature {
-        guard let idData = Data(hexString: event.id) else {
+        let idData: Data
+        do {
+            idData = try HexValidator.validate32ByteHex(event.id)
+        } catch {
             throw NDKError.signingFailed("Failed to sign event: invalid event ID")
         }
 
