@@ -253,7 +253,7 @@ public actor NDKZapManager {
             )
             
             if !validDLEQ {
-                print("⚠️ Warning: DLEQ verification failed for minted proofs")
+                NDKLogger.shared.log(.warning, category: .general, "⚠️ Warning: DLEQ verification failed for minted proofs")
             }
             
             // Now we need to swap these proofs to P2PK-locked ones
