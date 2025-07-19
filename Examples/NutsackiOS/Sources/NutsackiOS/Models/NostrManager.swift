@@ -15,7 +15,10 @@ class NostrManager {
     var cache: NDKSQLiteCache?
     
     // Default relays for the app
-    let defaultRelays = [ "wss://relay.primal.net" ]
+    let defaultRelays = [ "wss://relay.primal.net", "wss://purplepag.es" ]
+    
+    // Key for storing user-added relays
+    private static let userRelaysKey = "UserAddedRelays"
     
     init(from: String) {
         print("🏚️ [NostrManager] Initializing...", from)
@@ -30,12 +33,15 @@ class NostrManager {
         // Initialize SQLite cache for better performance and offline access
         do {
             cache = try await NDKSQLiteCache()
-            ndk = NDK(relayUrls: defaultRelays, cache: cache)
-            print("NDK initialized with SQLite cache")
+            let allRelays = getAllRelays()
+            ndk = NDK(relayUrls: allRelays, cache: cache)
+            print("NDK initialized with SQLite cache and \(allRelays.count) relays: \(allRelays)")
         } catch {
             print("Failed to initialize SQLite cache: \(error). Continuing without cache.")
             // Fall back to no cache if initialization fails
-            ndk = NDK(relayUrls: defaultRelays)
+            let allRelays = getAllRelays()
+            ndk = NDK(relayUrls: allRelays)
+            print("NDK initialized without cache and \(allRelays.count) relays: \(allRelays)")
         }
         
         // Set NDK on auth manager
@@ -243,6 +249,231 @@ class NostrManager {
             guard ndkAuthManager.isAuthenticated else { return nil }
             return try? await ndkAuthManager.activeSigner?.user()
         }
+    }
+    
+    // MARK: - Negentropy Sync
+    
+    /// Perform startup sync after wallet has loaded
+    func performStartupSync() async {
+        guard let ndk = ndk, isAuthenticated else {
+            print("NostrManager - Cannot perform startup sync: NDK not ready or user not authenticated")
+            return
+        }
+        
+        // Check if we already have connected relays
+        let (connectedCount, totalCount) = await ndk.getRelayConnectionSummary()
+        print("NostrManager - Initial relay status: \(connectedCount)/\(totalCount) connected")
+        
+        if connectedCount > 0 {
+            print("NostrManager - NDK is ready, proceeding with startup sync immediately")
+        } else {
+            print("NostrManager - No relays connected yet, waiting for first connection...")
+            
+            // Wait for the first relay to connect with timeout
+            let timeoutTask = Task {
+                try await Task.sleep(nanoseconds: 10_000_000_000) // 10 seconds
+                throw CancellationError()
+            }
+            
+            let observerTask = Task {
+                let relayChanges = await ndk.relayChanges
+                for await change in relayChanges {
+                    switch change {
+                    case .relayConnected(let relay):
+                        print("NostrManager - Relay connected: \(relay.url), proceeding with startup sync")
+                        return // Exit successfully
+                    case .relayDisconnected(let relay):
+                        print("NostrManager - Relay disconnected: \(relay.url)")
+                        continue // Keep waiting
+                    case .relayAdded(let relay):
+                        print("NostrManager - Relay added: \(relay.url)")
+                        continue // Keep waiting for connection
+                    case .relayRemoved(let url):
+                        print("NostrManager - Relay removed: \(url)")
+                        continue // Keep waiting
+                    }
+                }
+            }
+            
+            do {
+                _ = try await withThrowingTaskGroup(of: Void.self) { group in
+                    group.addTask { try await timeoutTask.value }
+                    group.addTask { try await observerTask.value }
+                    
+                    // Wait for first task to complete
+                    try await group.next()
+                    
+                    // Cancel remaining tasks
+                    group.cancelAll()
+                }
+            } catch {
+                print("NostrManager - Timeout waiting for relay connections, proceeding anyway")
+            }
+        }
+        
+        print("NostrManager - Starting negentropy sync...")
+        
+        // Run both syncs concurrently
+        async let contactsSync = syncContactsMetadata()
+        async let walletEventsSync = syncWalletEvents()
+        
+        // Wait for both to complete
+        await contactsSync
+        await walletEventsSync
+        
+        print("NostrManager - Startup sync completed")
+    }
+    
+    /// Sync kind:0 metadata events for user's contacts
+    private func syncContactsMetadata() async {
+        guard let ndk = ndk, let signer = ndk.signer else { return }
+        
+        do {
+            let userPubkey = try await signer.pubkey
+            print("NostrManager - Syncing contacts metadata for user: \(userPubkey.prefix(8))...")
+            
+            // First, fetch user's contact list (kind:3)
+            let contactListFilter = NDKFilter(
+                authors: [userPubkey],
+                kinds: [3], // Contact list events
+                limit: 1
+            )
+            
+            let contactEvents = try await ndk.fetchEvents([contactListFilter])
+            guard let latestContactEvent = contactEvents.first else {
+                print("NostrManager - No contact list found, skipping contacts sync")
+                return
+            }
+            
+            // Extract followed pubkeys from p tags
+            let followedPubkeys = latestContactEvent.tags
+                .filter { $0.count >= 2 && $0[0] == "p" }
+                .map { $0[1] }
+            
+            guard !followedPubkeys.isEmpty else {
+                print("NostrManager - No contacts found in contact list")
+                return
+            }
+            
+            print("NostrManager - Found \(followedPubkeys.count) contacts to sync metadata for")
+            
+            // Create filter for contacts' metadata, relay lists, and zap configs
+            let contactsFilter = NDKFilter(
+                authors: followedPubkeys,
+                kinds: [
+                    0,     // Profile metadata
+                    10002, // Relay list metadata  
+                    10019  // Zap configuration
+                ]
+            )
+            
+            // Sync with all connected relays
+            let results = try await ndk.syncWithAllRelays(filter: contactsFilter)
+            
+            var totalDownloaded = 0
+            var totalEfficiency = 0
+            var eventsByKind: [Int: Int] = [:]
+            
+            for (relay, result) in results {
+                totalDownloaded += result.downloadedEvents.count
+                totalEfficiency += result.efficiencyRatio
+                
+                // Count events by kind for detailed logging
+                for event in result.downloadedEvents {
+                    eventsByKind[event.kind, default: 0] += 1
+                }
+                
+                print("NostrManager - Contacts sync on \(relay): \(result.downloadedEvents.count) new events, \(result.efficiencyRatio)% efficient")
+            }
+            
+            let avgEfficiency = results.isEmpty ? 0 : totalEfficiency / results.count
+            let metadataCount = eventsByKind[0] ?? 0
+            let relayListCount = eventsByKind[10002] ?? 0
+            let zapConfigCount = eventsByKind[10019] ?? 0
+            
+            print("NostrManager - Contacts sync completed: \(totalDownloaded) total events (\(metadataCount) metadata, \(relayListCount) relay lists, \(zapConfigCount) zap configs), \(avgEfficiency)% avg efficiency")
+            
+        } catch {
+            print("NostrManager - Error syncing contacts metadata: \(error)")
+        }
+    }
+    
+    /// Sync user's wallet events (kind:7376 and 9321)
+    private func syncWalletEvents() async {
+        guard let ndk = ndk, let signer = ndk.signer else { return }
+        
+        do {
+            let userPubkey = try await signer.pubkey
+            print("NostrManager - Syncing wallet events for user: \(userPubkey.prefix(8))...")
+            
+            // Create filter for user's wallet events
+            let walletEventsFilter = NDKFilter(
+                authors: [userPubkey],
+                kinds: [
+                    EventKind.cashuSpendingHistory, // 7376
+                    EventKind.cashuToken            // 9321
+                ]
+            )
+            
+            // Sync with all connected relays
+            let results = try await ndk.syncWithAllRelays(filter: walletEventsFilter)
+            
+            var totalDownloaded = 0
+            var totalEfficiency = 0
+            for (relay, result) in results {
+                totalDownloaded += result.downloadedEvents.count
+                totalEfficiency += result.efficiencyRatio
+                print("NostrManager - Wallet events sync on \(relay): \(result.downloadedEvents.count) new events, \(result.efficiencyRatio)% efficient")
+            }
+            
+            let avgEfficiency = results.isEmpty ? 0 : totalEfficiency / results.count
+            print("NostrManager - Wallet events sync completed: \(totalDownloaded) new events, \(avgEfficiency)% avg efficiency")
+            
+        } catch {
+            print("NostrManager - Error syncing wallet events: \(error)")
+        }
+    }
+    
+    // MARK: - Relay Management
+    
+    /// Get all relays (default + user-added)
+    private func getAllRelays() -> [String] {
+        let userRelays = getUserAddedRelays()
+        let allRelays = defaultRelays + userRelays
+        return Array(Set(allRelays)) // Remove duplicates
+    }
+    
+    /// Get user-added relays from UserDefaults
+    private func getUserAddedRelays() -> [String] {
+        return UserDefaults.standard.stringArray(forKey: Self.userRelaysKey) ?? []
+    }
+    
+    /// Add a user relay and persist it
+    func addUserRelay(_ relayURL: String) {
+        var userRelays = getUserAddedRelays()
+        guard !userRelays.contains(relayURL) && !defaultRelays.contains(relayURL) else {
+            print("NostrManager - Relay \(relayURL) already exists")
+            return
+        }
+        
+        userRelays.append(relayURL)
+        UserDefaults.standard.set(userRelays, forKey: Self.userRelaysKey)
+        print("NostrManager - Added user relay: \(relayURL)")
+        print("NostrManager - User relays now: \(userRelays)")
+    }
+    
+    /// Remove a user relay and persist the change
+    func removeUserRelay(_ relayURL: String) {
+        var userRelays = getUserAddedRelays()
+        userRelays.removeAll { $0 == relayURL }
+        UserDefaults.standard.set(userRelays, forKey: Self.userRelaysKey)
+        print("NostrManager - Removed user relay: \(relayURL)")
+        print("NostrManager - User relays now: \(userRelays)")
+    }
+    
+    /// Get list of user-added relays (for UI display)
+    var userAddedRelays: [String] {
+        return getUserAddedRelays()
     }
 }
 

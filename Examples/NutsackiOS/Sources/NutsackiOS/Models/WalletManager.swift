@@ -115,6 +115,11 @@ class WalletManager {
         
         // Start monitoring transaction history
         startHistoryEventMonitoring()
+        
+        // Trigger negentropy sync after wallet has loaded
+        Task {
+            await nostrManager.performStartupSync()
+        }
     }
     
     /// Start monitoring wallet configuration changes

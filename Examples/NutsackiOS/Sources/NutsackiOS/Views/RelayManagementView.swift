@@ -287,6 +287,14 @@ struct RelayDetailView: View {
                         Label("Connect", systemImage: "arrow.clockwise")
                     }
                 }
+                
+                // Allow removing user-added relays
+                if nostrManager.userAddedRelays.contains(relay.url) {
+                    Button(role: .destructive, action: removeRelay) {
+                        Label("Remove from App", systemImage: "trash")
+                            .foregroundColor(.red)
+                    }
+                }
             }
         }
         .navigationTitle(relay.url)
@@ -337,6 +345,20 @@ struct RelayDetailView: View {
                 dismiss()
             } catch {
                 print("Failed to reconnect: \(error)")
+            }
+        }
+    }
+    
+    private func removeRelay() {
+        Task {
+            // Remove relay from NDK
+            await relay.disconnect()
+            
+            // Remove from persistent storage
+            nostrManager.removeUserRelay(relay.url)
+            
+            await MainActor.run {
+                dismiss()
             }
         }
     }
@@ -457,6 +479,9 @@ struct AddRelayView: View {
                 guard let _ = await ndk.addRelayAndConnect(relayURL) else {
                     throw NSError(domain: "NutsackiOS", code: 0, userInfo: [NSLocalizedDescriptionKey: "Failed to add relay"])
                 }
+                
+                // Persist the relay for future app launches
+                nostrManager.addUserRelay(relayURL)
                 
                 await MainActor.run {
                     dismiss()

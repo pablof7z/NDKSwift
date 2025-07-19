@@ -1,12 +1,12 @@
 import SwiftUI
 
-struct MintBalance: Identifiable, Equatable {
+struct BalanceCardMint: Identifiable, Equatable {
     let id = UUID()
     let mint: String
     let balance: Int64
     let percentage: Double
     
-    static func == (lhs: MintBalance, rhs: MintBalance) -> Bool {
+    static func == (lhs: BalanceCardMint, rhs: BalanceCardMint) -> Bool {
         lhs.mint == rhs.mint && lhs.balance == rhs.balance && lhs.percentage == rhs.percentage
     }
 }
@@ -16,7 +16,7 @@ struct BalanceCard: View {
     @Environment(WalletManager.self) private var walletManager
     
     @State private var convertedBalance: String = ""
-    @State private var mintBalances: [MintBalance] = []
+    @State private var mintBalances: [BalanceCardMint] = []
     @State private var isLoadingMints = false
     @State private var isExpanded = false
     
@@ -220,13 +220,13 @@ struct BalanceCard: View {
         // Use the efficient getBalancesByMint method instead of looping
         let balancesByMint = await wallet.getBalancesByMint()
         
-        var balances: [MintBalance] = []
+        var balances: [BalanceCardMint] = []
         let totalBalance = balancesByMint.values.reduce(0, +)
         
-        // Convert to MintBalance array with percentages
+        // Convert to BalanceCardMint array with percentages
         for (mint, balance) in balancesByMint where balance > 0 {
             let percentage = totalBalance > 0 ? (Double(balance) / Double(totalBalance)) * 100 : 0
-            balances.append(MintBalance(mint: mint, balance: balance, percentage: percentage))
+            balances.append(BalanceCardMint(mint: mint, balance: balance, percentage: percentage))
         }
         
         // Sort by balance (largest first) and take top 4
@@ -242,7 +242,7 @@ struct BalanceCard: View {
 }
 
 struct ExpandablePieChart: View {
-    let mintBalances: [MintBalance]
+    let mintBalances: [BalanceCardMint]
     let mintColors: [Color]
     let size: CGFloat
     var useGrayscale: Bool = false

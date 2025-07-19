@@ -15,16 +15,45 @@ actor WalletPaymentRouter {
         ndk: NDK,
         signer: NDKSigner
     ) async throws -> PaymentConfirmation {
-        guard let nutzapRequest = request as? NutzapPaymentRequest else {
-            throw NDKError.invalidRequest("NIP60Wallet only supports nutzap payments")
+        switch request {
+        case let nutzapRequest as NutzapPaymentRequest:
+            return try await executeNutzapPayment(
+                nutzapRequest,
+                wallet: wallet,
+                mints: mints,
+                proofStateManager: proofStateManager,
+                eventManager: eventManager,
+                ndk: ndk,
+                signer: signer
+            )
+        case let lightningRequest as LightningInvoiceRequest:
+            return try await executeLightningPayment(
+                lightningRequest,
+                wallet: wallet,
+                mints: mints,
+                proofStateManager: proofStateManager
+            )
+        default:
+            throw NDKError.invalidRequest("Unsupported payment request type")
         }
-        
-        print("WalletPaymentRouter.executePayment - amount: \(nutzapRequest.amountSats)")
-        print("WalletPaymentRouter.executePayment - proofStateManager: \(ObjectIdentifier(proofStateManager))")
+    }
+    
+    /// Execute a nutzap payment
+    static func executeNutzapPayment(
+        _ nutzapRequest: NutzapPaymentRequest,
+        wallet: NIP60Wallet,
+        mints: MintManager,
+        proofStateManager: ProofStateManager,
+        eventManager: WalletEventManager,
+        ndk: NDK,
+        signer: NDKSigner
+    ) async throws -> PaymentConfirmation {
+        print("WalletPaymentRouter.executeNutzapPayment - amount: \(nutzapRequest.amountSats)")
+        print("WalletPaymentRouter.executeNutzapPayment - proofStateManager: \(ObjectIdentifier(proofStateManager))")
         
         // Find the best payment route
         let acceptedMintURLs = Set(nutzapRequest.acceptedMints.map { $0.absoluteString })
-        print("WalletPaymentRouter.executePayment - acceptedMints: \(acceptedMintURLs)")
+        print("WalletPaymentRouter.executeNutzapPayment - acceptedMints: \(acceptedMintURLs)")
         
         let paymentRoute = await CrossMintTransfer.findBestPaymentRoute(
             amount: nutzapRequest.amountSats,
@@ -101,6 +130,31 @@ actor WalletPaymentRouter {
             timestamp: Date(),
             nutzapEvent: nutzapEvent,
             mintUsed: mintUsed
+        )
+    }
+    
+    /// Execute a Lightning invoice payment
+    static func executeLightningPayment(
+        _ lightningRequest: LightningInvoiceRequest,
+        wallet: NIP60Wallet,
+        mints: MintManager,
+        proofStateManager: ProofStateManager
+    ) async throws -> PaymentConfirmation {
+        print("WalletPaymentRouter.executeLightningPayment - amount: \(lightningRequest.amountSats)")
+        print("WalletPaymentRouter.executeLightningPayment - invoice: \(lightningRequest.invoice)")
+        
+        // Pay Lightning invoice through the mint
+        let (preimage, feePaid) = try await wallet.payLightning(
+            invoice: lightningRequest.invoice,
+            amount: lightningRequest.amountSats
+        )
+        
+        return LightningPaymentConfirmation(
+            amountSats: lightningRequest.amountSats,
+            timestamp: Date(),
+            preimage: preimage,
+            paymentHash: nil, // Could extract from invoice if needed
+            feePaid: feePaid
         )
     }
 }

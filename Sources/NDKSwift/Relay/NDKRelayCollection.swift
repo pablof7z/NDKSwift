@@ -215,6 +215,11 @@ public final class NDKRelayCollection: ObservableObject {
                     
                 case .relayRemoved(let url):
                     await handleRelayRemoved(url)
+                    
+                case .relayConnected(_), .relayDisconnected(_):
+                    // State changes are already handled by individual relay observers
+                    // Pool events are primarily for external consumers like NostrManager
+                    break
                 }
             }
         }
@@ -222,6 +227,15 @@ public final class NDKRelayCollection: ObservableObject {
     
     /// Handle a relay being added to the pool
     private func handleRelayAdded(_ relay: NDKRelay) async {
+        // Check if relay already exists to prevent duplicates from race conditions
+        let alreadyExists = await MainActor.run {
+            relays.contains { $0.url == relay.url }
+        }
+        
+        guard !alreadyExists else {
+            return
+        }
+        
         let state = await relay.connectionState
         let info = RelayInfo(relay: relay, state: state)
         

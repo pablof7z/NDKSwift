@@ -121,6 +121,10 @@ struct SettingsView: View {
                 // Debug section
                 #if DEBUG
                 Section {
+                    NavigationLink(destination: DebugView()) {
+                        Label("Debug", systemImage: "ladybug")
+                    }
+                    
                     Button(action: { showPaymentAnimation = true }) {
                         Label("Trigger Deposit Animation", systemImage: "sparkles")
                     }
@@ -132,7 +136,7 @@ struct SettingsView: View {
                 } header: {
                     Text("Debug")
                 } footer: {
-                    Text("Test the payment animation without making a real deposit")
+                    Text("Debug tools and test animations")
                 }
                 #endif
                 
@@ -1017,3 +1021,277 @@ struct UnpublishedEventRow: View {
         }
     }
 }
+
+// MARK: - Debug View
+#if DEBUG
+struct DebugView: View {
+    @Environment(NostrManager.self) private var nostrManager
+    @State private var cacheStats: CacheStatistics?
+    @State private var isLoading = false
+    @State private var errorMessage: String?
+    @State private var lastUpdateTime: Date?
+    
+    var body: some View {
+        NavigationStack {
+            List {
+                // Cache Statistics Section
+                Section {
+                    NavigationLink(destination: CacheStatsView()) {
+                        HStack {
+                            Label("Cache Statistics", systemImage: "cylinder.split.1x2")
+                            Spacer()
+                            if let stats = cacheStats {
+                                Text("\(stats.totalEvents) events")
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
+                    }
+                } header: {
+                    Text("Database")
+                } footer: {
+                    if let lastUpdate = lastUpdateTime {
+                        Text("Last updated: \(lastUpdate, style: .relative)")
+                    } else {
+                        Text("View detailed cache statistics and event counts")
+                    }
+                }
+                
+                // Quick Stats Overview
+                if let stats = cacheStats {
+                    Section {
+                        VStack(alignment: .leading, spacing: 12) {
+                            HStack {
+                                Image(systemName: "cylinder.fill")
+                                    .foregroundColor(.blue)
+                                Text("Cache Overview")
+                                    .font(.headline)
+                            }
+                            
+                            Grid(alignment: .leading, horizontalSpacing: 16, verticalSpacing: 8) {
+                                GridRow {
+                                    Text("Total Events:")
+                                        .foregroundStyle(.secondary)
+                                    Text("\(stats.totalEvents)")
+                                        .fontWeight(.medium)
+                                }
+                                
+                                GridRow {
+                                    Text("Event Types:")
+                                        .foregroundStyle(.secondary)
+                                    Text("\(stats.eventsByKind.count) kinds")
+                                        .fontWeight(.medium)
+                                }
+                                
+                                GridRow {
+                                    Text("Most Common:")
+                                        .foregroundStyle(.secondary)
+                                    Text(stats.mostCommonKind)
+                                        .fontWeight(.medium)
+                                }
+                            }
+                            .font(.subheadline)
+                        }
+                        .padding(.vertical, 8)
+                    } header: {
+                        Text("Quick Stats")
+                    }
+                }
+                
+                // Error Display
+                if let error = errorMessage {
+                    Section {
+                        Text(error)
+                            .foregroundColor(.red)
+                            .font(.caption)
+                    } header: {
+                        Text("Error")
+                    }
+                }
+            }
+            .navigationTitle("Debug")
+            #if os(iOS)
+            .navigationBarTitleDisplayMode(.inline)
+            #endif
+            .refreshable {
+                await loadCacheStats()
+            }
+            .onAppear {
+                Task {
+                    await loadCacheStats()
+                }
+            }
+        }
+    }
+    
+    private func loadCacheStats() async {
+        guard let cache = nostrManager.cache else {
+            await MainActor.run {
+                errorMessage = "No cache available"
+                isLoading = false
+            }
+            return
+        }
+        
+        await MainActor.run {
+            isLoading = true
+            errorMessage = nil
+        }
+        
+        do {
+            let stats = try await cache.getStatistics()
+            await MainActor.run {
+                cacheStats = stats
+                lastUpdateTime = Date()
+                isLoading = false
+            }
+        } catch {
+            await MainActor.run {
+                errorMessage = "Failed to load cache stats: \(error.localizedDescription)"
+                isLoading = false
+            }
+        }
+    }
+}
+
+// MARK: - Cache Statistics View
+struct CacheStatsView: View {
+    @Environment(NostrManager.self) private var nostrManager
+    @State private var cacheStats: CacheStatistics?
+    @State private var isLoading = true
+    @State private var errorMessage: String?
+    
+    var body: some View {
+        List {
+            // Total Events Section
+            Section {
+                if let stats = cacheStats {
+                    HStack {
+                        Image(systemName: "cylinder.fill")
+                            .foregroundColor(.blue)
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("Total Events")
+                                .font(.headline)
+                            Text("\(stats.totalEvents) events in database")
+                                .font(.subheadline)
+                                .foregroundStyle(.secondary)
+                        }
+                        Spacer()
+                        Text("\(stats.totalEvents)")
+                            .font(.title2)
+                            .fontWeight(.bold)
+                            .foregroundColor(.blue)
+                    }
+                    .padding(.vertical, 8)
+                } else if isLoading {
+                    HStack {
+                        ProgressView()
+                            .scaleEffect(0.8)
+                        Text("Loading cache statistics...")
+                            .foregroundStyle(.secondary)
+                    }
+                } else {
+                    Text("No cache data available")
+                        .foregroundStyle(.secondary)
+                }
+            } header: {
+                Text("Overview")
+            }
+            
+            // Events by Kind Section
+            if let stats = cacheStats, !stats.eventsByKind.isEmpty {
+                Section {
+                    ForEach(stats.sortedEventKinds, id: \.kind) { kindStat in
+                        HStack {
+                            Text("Kind \(kindStat.kind)")
+                                .font(.subheadline)
+                                .fontWeight(.medium)
+                            
+                            Spacer()
+                            
+                            Text("\(kindStat.count)")
+                                .font(.subheadline)
+                                .fontWeight(.medium)
+                        }
+                        .padding(.vertical, 4)
+                    }
+                } header: {
+                    Text("Events by Kind")
+                } footer: {
+                    Text("Breakdown of events stored in the cache by Nostr event kind")
+                }
+            }
+            
+            // Error Display
+            if let error = errorMessage {
+                Section {
+                    Text(error)
+                        .foregroundColor(.red)
+                        .font(.caption)
+                } header: {
+                    Text("Error")
+                }
+            }
+        }
+        .navigationTitle("Cache Statistics")
+        #if os(iOS)
+        .navigationBarTitleDisplayMode(.inline)
+        #endif
+        .refreshable {
+            await loadCacheStats()
+        }
+        .onAppear {
+            Task {
+                await loadCacheStats()
+            }
+        }
+    }
+    
+    private func loadCacheStats() async {
+        guard let cache = nostrManager.cache else {
+            await MainActor.run {
+                errorMessage = "No cache available"
+                isLoading = false
+            }
+            return
+        }
+        
+        await MainActor.run {
+            isLoading = true
+            errorMessage = nil
+        }
+        
+        do {
+            let stats = try await cache.getStatistics()
+            await MainActor.run {
+                cacheStats = stats
+                isLoading = false
+            }
+        } catch {
+            await MainActor.run {
+                errorMessage = "Failed to load cache stats: \(error.localizedDescription)"
+                isLoading = false
+            }
+        }
+    }
+}
+
+// MARK: - Cache Statistics Extensions
+extension CacheStatistics {
+    var sortedEventKinds: [EventKindStatistic] {
+        eventsByKind.map { kind, count in
+            EventKindStatistic(kind: kind, count: count)
+        }.sorted { $0.count > $1.count }
+    }
+    
+    var mostCommonKind: String {
+        guard let mostCommon = sortedEventKinds.first else { return "None" }
+        return "Kind \(mostCommon.kind) (\(mostCommon.count))"
+    }
+}
+
+struct EventKindStatistic {
+    let kind: Int
+    let count: Int
+}
+
+#endif

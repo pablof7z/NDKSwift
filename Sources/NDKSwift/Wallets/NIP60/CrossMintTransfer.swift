@@ -13,21 +13,22 @@ public enum CrossMintTransfer {
         mints: MintManager,
         proofStateManager: ProofStateManager
     ) async -> String? {
-        // Get our mints
-        let ourMints = await mints.getMintURLs()
+        // Get mints that actually have proofs
+        let proofsByMint = await proofStateManager.getAvailableProofsByMint()
+        let ourMints = Set(proofsByMint.keys)
         
         // Find intersection
-        let commonMints = Set(ourMints).intersection(acceptedMints)
+        let commonMints = ourMints.intersection(acceptedMints)
+        print("CrossMintTransfer.findMintWithSufficientBalance - ourMints: \(ourMints)")
+        print("CrossMintTransfer.findMintWithSufficientBalance - acceptedMints: \(acceptedMints)")
+        print("CrossMintTransfer.findMintWithSufficientBalance - commonMints: \(commonMints)")
         
-        // Check each common mint for sufficient balance
-        for mintURL in commonMints {
-            let balance = await proofStateManager.getBalance(mint: mintURL)
-            if balance >= requiredAmount {
-                return mintURL
-            }
-        }
-        
-        return nil
+        // Get mints with sufficient balance, then find first one in accepted mints
+        let mintsWithBalance = await proofStateManager.getMintsWithSufficientBalance(amount: requiredAmount)
+        print("CrossMintTransfer.findMintWithSufficientBalance - mintsWithBalance: \(mintsWithBalance)")
+        let result = mintsWithBalance.first { commonMints.contains($0) }
+        print("CrossMintTransfer.findMintWithSufficientBalance - result: \(String(describing: result))")
+        return result
     }
     
     /// Find all mints that have sufficient balance and are in the intersection of accepted mints
@@ -37,37 +38,16 @@ public enum CrossMintTransfer {
         mints: MintManager,
         proofStateManager: ProofStateManager
     ) async -> [String] {
-        // Get our mints
-        let ourMints = await mints.getMintURLs()
+        // Get mints that actually have proofs
+        let proofsByMint = await proofStateManager.getAvailableProofsByMint()
+        let ourMints = Set(proofsByMint.keys)
         
         // Find intersection
-        let commonMints = Set(ourMints).intersection(acceptedMints)
+        let commonMints = ourMints.intersection(acceptedMints)
         
-        var viableMints: [String] = []
-        
-        // Check each common mint for sufficient balance
-        for mintURL in commonMints {
-            let balance = await proofStateManager.getBalance(mint: mintURL)
-            if balance >= requiredAmount {
-                viableMints.append(mintURL)
-            }
-        }
-        
-        // Sort by balance (highest first) to try the mint with most balance first
-        let sortedMints = await withTaskGroup(of: (String, Int64).self) { group in
-            for mintURL in viableMints {
-                group.addTask {
-                    let balance = await proofStateManager.getBalance(mint: mintURL)
-                    return (mintURL, balance)
-                }
-            }
-            
-            var results: [(String, Int64)] = []
-            for await result in group {
-                results.append(result)
-            }
-            return results.sorted { $0.1 > $1.1 }.map { $0.0 }
-        }
+        // Get all mints with sufficient balance, then filter by accepted mints
+        let mintsWithBalance = await proofStateManager.getMintsWithSufficientBalance(amount: requiredAmount)
+        let sortedMints = mintsWithBalance.filter { commonMints.contains($0) }
         
         return sortedMints
     }
@@ -81,16 +61,18 @@ public enum CrossMintTransfer {
         feeBuffer: Int64 = 1000
     ) async -> String? {
         let requiredAmount = amount + feeBuffer
-        let ourMints = await mints.getMintURLs()
+        
+        // Get mints that actually have proofs, not just configured mints
+        let proofsByMint = await proofStateManager.getAvailableProofsByMint()
         
         // Find mint with highest balance that can cover the transfer
         var bestMint: (url: String, balance: Int64)? = nil
         
-        for mintURL in ourMints {
+        for (mintURL, proofs) in proofsByMint {
             // Skip the target mint (no self-transfer)
             if mintURL == targetMint { continue }
             
-            let balance = await proofStateManager.getBalance(mint: mintURL)
+            let balance = proofs.reduce(0) { $0 + Int64($1.amount) }
             if balance >= requiredAmount {
                 if bestMint == nil || balance > bestMint!.balance {
                     bestMint = (url: mintURL, balance: balance)
@@ -270,17 +252,19 @@ public enum CrossMintTransfer {
     
     // MARK: - Helper Functions
     
-    /// Get total balance across all mints
+    /// Get total balance across all mints that actually have proofs
     private static func getTotalBalance(
         mints: MintManager,
         proofStateManager: ProofStateManager
     ) async -> Int64 {
-        let mintURLs = await mints.getMintURLs()
-        print("CrossMintTransfer.getTotalBalance - checking balance for \(mintURLs.count) mints: \(mintURLs)")
-        var total: Int64 = 0
+        // Get mints with actual proofs, not configured mints
+        let proofsByMint = await proofStateManager.getAvailableProofsByMint()
+        let mintsWithProofs = Array(proofsByMint.keys)
+        print("CrossMintTransfer.getTotalBalance - checking balance for \(mintsWithProofs.count) mints with proofs: \(mintsWithProofs)")
         
-        for mint in mintURLs {
-            let balance = await proofStateManager.getBalance(mint: mint)
+        var total: Int64 = 0
+        for (mint, proofs) in proofsByMint {
+            let balance = proofs.reduce(0) { $0 + Int64($1.amount) }
             print("CrossMintTransfer.getTotalBalance - mint: \(mint), balance: \(balance)")
             total += balance
         }
