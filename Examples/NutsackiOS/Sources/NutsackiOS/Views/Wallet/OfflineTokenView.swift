@@ -24,8 +24,8 @@ struct OfflineTokenView: View {
                     VStack(spacing: 20) {
                         ZStack {
                             RoundedRectangle(cornerRadius: 20)
-                                .fill(Color.white)
-                                .shadow(color: .black.opacity(0.1), radius: 10, x: 0, y: 5)
+                                .fill(Color(.systemBackground))
+                                .shadow(color: Color(.label).opacity(0.1), radius: 10, x: 0, y: 5)
                             
                             QRCodeView(content: token)
                                 .padding(20)

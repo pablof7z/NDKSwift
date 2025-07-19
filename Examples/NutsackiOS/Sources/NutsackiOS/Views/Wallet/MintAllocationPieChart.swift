@@ -186,7 +186,7 @@ struct MintAllocationPieChart: View {
                 .frame(width: 16, height: 16)
                 .overlay(
                     RoundedRectangle(cornerRadius: 4)
-                        .stroke(selectedSlice == item.mint ? Color.white : Color.clear, lineWidth: 2)
+                        .stroke(selectedSlice == item.mint ? Color(.label) : Color.clear, lineWidth: 2)
                 )
             
             VStack(alignment: .leading, spacing: 2) {

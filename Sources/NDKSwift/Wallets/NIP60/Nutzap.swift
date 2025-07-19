@@ -34,20 +34,8 @@ public enum Nutzap {
     ) async throws -> NDKEvent {
         // Get mints with sufficient balance, ordered by balance (highest first)
         let viableMintURLs = await proofStateManager.getMintsWithSufficientBalance(amount: amount)
-        print("Nutzap.send - viableMintURLs: \(viableMintURLs)")
-        print("Nutzap.send - configured mints: \(mints.keys)")
         
-        // Filter to only configured mints and map to (url, mint) pairs
-        let viableMints: [(url: String, mint: CashuSwift.Mint)] = viableMintURLs.compactMap { mintURL in
-            guard let mint = mints[mintURL] else { 
-                print("Nutzap.send - mint \(mintURL) not found in configured mints")
-                return nil 
-            }
-            return (url: mintURL, mint: mint)
-        }
-        print("Nutzap.send - viableMints count: \(viableMints.count)")
-        
-        guard !viableMints.isEmpty else {
+        guard !viableMintURLs.isEmpty else {
             throw NDKError.insufficientBalance(amount: amount)
         }
         
@@ -56,7 +44,21 @@ public enum Nutzap {
         
         // Try each viable mint until one succeeds
         var lastError: Error?
-        for (mintURL, mint) in viableMints {
+        for mintURL in viableMintURLs {
+            // Load mint dynamically
+            guard let mintUrl = URL(string: mintURL) else {
+                print("Invalid mint URL: \(mintURL)")
+                continue
+            }
+            
+            let mint: CashuSwift.Mint
+            do {
+                mint = try await wallet.mints.loadMint(url: mintUrl)
+            } catch {
+                print("Failed to load mint \(mintURL): \(error)")
+                lastError = error
+                continue
+            }
             // Select and lock proofs
             let selectedProofs = await proofStateManager.selectProofs(amount: amount, mint: mintURL)
             guard !selectedProofs.isEmpty else {
@@ -204,8 +206,17 @@ public enum Nutzap {
         
         // Process proofs by mint
         for mintURL in mintURLs {
-            guard let mint = mints[mintURL] else {
-                print("Unknown mint in nutzap: \(mintURL)")
+            // Load mint dynamically
+            guard let mintUrl = URL(string: mintURL) else {
+                print("Invalid mint URL in nutzap: \(mintURL)")
+                continue
+            }
+            
+            let mint: CashuSwift.Mint
+            do {
+                mint = try await wallet.mints.loadMint(url: mintUrl)
+            } catch {
+                print("Failed to load mint \(mintURL) for nutzap: \(error)")
                 continue
             }
             

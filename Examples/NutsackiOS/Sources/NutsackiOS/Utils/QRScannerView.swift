@@ -64,10 +64,10 @@ class QRScannerViewController: UIViewController, AVCaptureMetadataOutputObjectsD
         
         // Create camera preview container with square shape
         let cameraContainer = UIView()
-        cameraContainer.backgroundColor = .black
+        cameraContainer.backgroundColor = .systemBackground
         cameraContainer.layer.cornerRadius = 12
         cameraContainer.layer.borderWidth = 3
-        cameraContainer.layer.borderColor = UIColor.white.cgColor
+        cameraContainer.layer.borderColor = UIColor.label.cgColor
         cameraContainer.clipsToBounds = true
         cameraContainer.translatesAutoresizingMaskIntoConstraints = false
         view.addSubview(cameraContainer)

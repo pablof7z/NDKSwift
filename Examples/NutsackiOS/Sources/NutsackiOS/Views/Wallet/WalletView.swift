@@ -325,7 +325,7 @@ struct ActionButtonsView: View {
                         )
                     )
             )
-            .shadow(color: Color.black.opacity(0.3), radius: 20, x: 0, y: 10)
+            .shadow(color: Color(.label).opacity(0.2), radius: 20, x: 0, y: 10)
             
             // Floating scan button on top
             Button(action: { 
@@ -504,7 +504,7 @@ struct ContactAvatarView: View {
                 }
                 .overlay(
                     Circle()
-                        .stroke(Color.white.opacity(0.1), lineWidth: 1)
+                        .stroke(Color(.separator).opacity(0.3), lineWidth: 1)
                 )
                 
                 Text(displayName)
