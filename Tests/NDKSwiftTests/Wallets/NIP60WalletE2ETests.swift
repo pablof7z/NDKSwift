@@ -72,7 +72,7 @@ final class NIP60WalletE2ETests: XCTestCase {
         ndk.signer = signer
         
         // 2. Create a nutsack wallet
-        wallet = NIP60Wallet(ndk: ndk)
+        wallet = try NIP60Wallet(ndk: ndk)
         
         // Setup wallet with testnut mint
         let testMint = "https://testnut.cashu.space"

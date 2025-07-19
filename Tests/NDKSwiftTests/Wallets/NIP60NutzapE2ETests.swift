@@ -101,8 +101,8 @@ final class NIP60NutzapE2ETests: XCTestCase {
         
         // 2. Create nutsack wallets for both pubkeys
         print("\n📦 Creating wallets...")
-        wallet1 = NIP60Wallet(ndk: ndk1)
-        wallet2 = NIP60Wallet(ndk: ndk2)
+        wallet1 = try NIP60Wallet(ndk: ndk1)
+        wallet2 = try NIP60Wallet(ndk: ndk2)
         print("✅ Wallets created")
         
         let testMint = "https://testnut.cashu.space"

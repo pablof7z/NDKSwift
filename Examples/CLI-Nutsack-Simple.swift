@@ -23,7 +23,7 @@ struct CLINutsackSimple {
         
         // Create wallet
         print("💰 Creating wallet...")
-        let wallet = NIP60Wallet(ndk: ndk)
+        let wallet = try NIP60Wallet(ndk: ndk)
         
         // Setup wallet with test mint
         try await wallet.setup(

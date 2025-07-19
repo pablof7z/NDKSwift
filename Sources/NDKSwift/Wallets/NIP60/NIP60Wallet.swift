@@ -42,8 +42,13 @@ public actor NIP60Wallet: NDKPaymentProvider {
     
     // MARK: - Initialization
     
-    public init(ndk: NDK, cache: NDKCache? = nil) {
+    public init(ndk: NDK, cache: NDKCache? = nil) throws {
+        guard let signer = ndk.signer else {
+            throw NDKError.notConfigured("NIP60Wallet requires a signer configured on NDK")
+        }
+        
         self.ndk = ndk
+        self.signer = signer
         self.p2pkManager = P2PKManager()
         self.eventManager = WalletEventManager(ndk: ndk)
         self.mints = MintManager(cache: cache ?? ndk.cache)
@@ -51,10 +56,6 @@ public actor NIP60Wallet: NDKPaymentProvider {
             eventManager: eventManager,
             ndk: ndk
         )
-        guard let signer = ndk.signer else {
-            fatalError("NIP60Wallet requires a signer configured on NDK")
-        }
-        self.signer = signer
     }
     
     // MARK: - Unified Wallet State Subscription
