@@ -833,14 +833,21 @@ public extension NDKRelay {
     
     /// Publish an event and wait for response
     func publish(_ event: NDKEvent) async throws -> (success: Bool, message: String?) {
-        // Send the event
-        let message = NostrMessage.event(subscriptionId: nil, event: event)
-        try await send(message.serialize())
-
-        // Wait for OK response (this would need proper implementation)
-        // For now, return success
-        // In a real implementation, would need to wait for ["OK", event.id, success, message]
-        return (success: true, message: nil)
+        guard let connection = await connection else {
+            throw NDKError.connectionFailed(relay: url, message: "No connection available")
+        }
+        
+        do {
+            let success = try await connection.publishEvent(event)
+            return (success: success, message: nil)
+        } catch let error as NDKError {
+            if case let .publishFailed(_, message) = error {
+                print("[NDK] Event \(event.id) rejected by relay \(url): \(message)")
+                return (success: false, message: message)
+            } else {
+                throw error
+            }
+        }
     }
 
     /// Fetch events with a filter

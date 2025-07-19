@@ -73,10 +73,7 @@ public struct NDKCashuTokenEvent {
             del: deletedEventIds
         )
         
-        let tokenData = try JSONEncoder().encode(nip60Token)
-        guard let plaintext = String(data: tokenData, encoding: .utf8) else {
-            throw NDKError.encodingError("Failed to encode token data")
-        }
+        let plaintext = try JSONCoding.encodeToString(nip60Token)
         
         let tokenEvent = try await ndk.event()
             .content(plaintext)
@@ -123,10 +120,7 @@ public struct NDKCashuQuoteEvent {
         quote: CashuMintQuote,
         signer: NDKSigner
     ) async throws -> NDKCashuQuoteEvent {
-        let quoteData = try JSONEncoder().encode(quote)
-        guard let plaintext = String(data: quoteData, encoding: .utf8) else {
-            throw NDKError.encodingError("Failed to encode quote data")
-        }
+        let plaintext = try JSONCoding.encodeToString(quote)
         
         let quoteEvent = try await ndk.event()
             .content(plaintext)
@@ -230,10 +224,7 @@ public struct NDKCashuWalletEvent {
         print("🔐 NDKCashuWalletEvent - Complete encrypted tags structure: \(walletTags)")
         
         // Encrypt wallet configuration
-        let walletDataJSON = try JSONEncoder().encode(walletTags)
-        guard let plaintext = String(data: walletDataJSON, encoding: .utf8) else {
-            throw NDKError.encodingError("Failed to encode wallet data")
-        }
+        let plaintext = try JSONCoding.encodeToString(walletTags)
         
         print("🔐 NDKCashuWalletEvent - Pre-encryption plaintext JSON: \(plaintext)")
         print("🔐 NDKCashuWalletEvent - Pre-encryption plaintext size: \(plaintext.count) characters")
@@ -422,10 +413,7 @@ public struct NDKCashuSpendingHistory {
             clearTags.append(["e", redeemedId, "", "redeemed"])
         }
         
-        let tagsData = try JSONEncoder().encode(encryptedTags)
-        guard let plaintext = String(data: tagsData, encoding: .utf8) else {
-            throw NDKError.encodingError("Failed to encode spending history")
-        }
+        let plaintext = try JSONCoding.encodeToString(encryptedTags)
         
         let historyEvent = try await ndk.event()
             .content(plaintext)
@@ -740,19 +728,19 @@ public struct NDKNutzapEvent {
             throw NDKError.invalidRequest("No proofs found for mint \(mintURL)")
         }
         
+        // Calculate total amount
+        let totalAmount = proofs.reduce(0) { $0 + $1.amount }
+        
+        // Add mint URL tag (u tag per NIP-61)
+        _ = builder.tag(["u", mintURL])
+        
+        // Add amount tag
+        _ = builder.tag(["amount", String(totalAmount)])
+        
         for proof in proofs {
-            let proofData = try JSONEncoder().encode(proof)
-            guard let proofJSON = String(data: proofData, encoding: .utf8) else {
-                throw NDKError.encodingError("Failed to encode proof")
-            }
+            let proofJSON = try JSONCoding.encodeToString(proof)
             _ = builder.tag(["proof", proofJSON])
         }
-        
-        // Add mint tag for the mint URL
-        _ = builder.tag(["mint", mintURL])
-        
-        // Add unit tag
-        _ = builder.tag(["u", "sat"])
         
         let nutzapEvent = try await builder.build(signer: signer)
         return NDKNutzapEvent(event: nutzapEvent)
@@ -785,12 +773,21 @@ public struct NDKNutzapEvent {
     
     /// Extract the mint URL from the nutzap event
     public var mintURL: String? {
-        event.tags.first(where: { $0.count >= 2 && $0[0] == "mint" })?[1]
+        event.tags.first(where: { $0.count >= 2 && $0[0] == "u" })?[1]
     }
     
-    /// Extract the unit from the nutzap event
+    /// Extract the total amount from the amount tag
+    public var amount: Int64? {
+        guard let amountString = event.tags.first(where: { $0.count >= 2 && $0[0] == "amount" })?[1] else {
+            return nil
+        }
+        return Int64(amountString)
+    }
+    
+    /// Extract the unit from the nutzap event (deprecated, use mintURL for mint URL)
     public var unit: String? {
-        event.tags.first(where: { $0.count >= 2 && $0[0] == "u" })?[1]
+        // For backward compatibility, keep this but it's not used in NIP-61
+        return "sat"
     }
     
     /// Extract the recipient from the p tag

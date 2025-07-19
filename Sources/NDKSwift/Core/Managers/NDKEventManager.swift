@@ -53,10 +53,7 @@ public actor NDKEventManager {
         }
         
         if logRawJSON {
-            let encoder = JSONEncoder()
-            encoder.outputFormatting = .sortedKeys
-            if let jsonData = try? encoder.encode(event),
-               let jsonString = String(data: jsonData, encoding: .utf8) {
+            if let jsonString = try? JSONCoding.encodeToString(event) {
                 print("[NDKEventManager] Publishing event JSON: \(jsonString)")
             }
         }
@@ -92,6 +89,7 @@ public actor NDKEventManager {
         
         // Publish to relays
         var publishedRelays = Set<NDKRelay>()
+        var failedRelays = Set<NDKRelay>()
         await withTaskGroup(of: (NDKRelay, Bool).self) { group in
             for relay in targetRelays {
                 group.addTask {
@@ -117,7 +115,20 @@ public actor NDKEventManager {
                             print("[NDKEventManager] Warning: Failed to confirm event: \(error)")
                         }
                     }
+                } else {
+                    failedRelays.insert(relay)
                 }
+            }
+        }
+        
+        // For non-optimistic publishing, add failed events to unpublished cache for retry
+        if !optimisticPublishingConfig.enabled && !failedRelays.isEmpty {
+            let failedRelayUrls = Set(failedRelays.map { $0.url })
+            do {
+                try await cache.addUnpublishedEvent(event, relays: failedRelayUrls)
+                print("[NDKEventManager] Added failed event \(event.id) to retry queue for relays: \(failedRelayUrls)")
+            } catch {
+                print("[NDKEventManager] Warning: Failed to add failed event to cache: \(error)")
             }
         }
         

@@ -25,19 +25,23 @@ public struct NDKNutzap {
         
         var tags: [[String]] = []
         
-        // Add proof tags
-        for proof in proofs {
-            let proofJSON = try JSONEncoder().encode(proof)
-            if let proofString = String(data: proofJSON, encoding: .utf8) {
-                tags.append(["proof", proofString])
-            }
-        }
+        // Calculate total amount
+        let totalAmount = proofs.reduce(0) { $0 + Int64($1.amount) }
         
-        // Add mint URL
+        // Add mint URL (u tag per NIP-61)
         tags.append(["u", mint.absoluteString])
         
         // Add recipient
         tags.append(["p", recipient.pubkey])
+        
+        // Add amount tag
+        tags.append(["amount", String(totalAmount)])
+        
+        // Add proof tags
+        for proof in proofs {
+            let proofString = try JSONCoding.encodeToString(proof)
+            tags.append(["proof", proofString])
+        }
         
         // Add zapped event if present
         if let zappedEvent = zappedEvent {
