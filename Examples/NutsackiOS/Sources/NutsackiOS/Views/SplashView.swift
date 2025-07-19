@@ -1,6 +1,7 @@
 import SwiftUI
 
 struct SplashView: View {
+    @Environment(\.colorScheme) private var colorScheme
     @State private var logoScale: CGFloat = 0.3
     @State private var logoOpacity: Double = 0
     @State private var titleOffset: CGFloat = 50
@@ -17,8 +18,8 @@ struct SplashView: View {
             // Background gradient
             LinearGradient(
                 gradient: Gradient(colors: [
-                    Color(red: 0.05, green: 0.05, blue: 0.05),
-                    Color.black
+                    colorScheme == .dark ? Color(red: 0.05, green: 0.05, blue: 0.05) : Color(UIColor.systemBackground),
+                    colorScheme == .dark ? Color.black : Color(UIColor.secondarySystemBackground)
                 ]),
                 startPoint: .topLeading,
                 endPoint: .bottomTrailing
@@ -109,8 +110,8 @@ struct SplashView: View {
                         .foregroundStyle(
                             LinearGradient(
                                 gradient: Gradient(colors: [
-                                    .white,
-                                    .white.opacity(0.8)
+                                    Color(UIColor.label),
+                                    Color(UIColor.label).opacity(0.8)
                                 ]),
                                 startPoint: .top,
                                 endPoint: .bottom
@@ -121,7 +122,7 @@ struct SplashView: View {
                     
                     Text("Lightning-fast payments with Nostr")
                         .font(.system(size: 16, weight: .medium, design: .rounded))
-                        .foregroundColor(.white.opacity(0.7))
+                        .foregroundColor(Color(UIColor.secondaryLabel))
                         .opacity(subtitleOpacity)
                 }
             }
@@ -229,6 +230,5 @@ struct Particle: Identifiable {
 struct SplashView_Previews: PreviewProvider {
     static var previews: some View {
         SplashView(onComplete: {})
-            .preferredColorScheme(.dark)
     }
 }

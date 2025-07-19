@@ -313,7 +313,7 @@ public enum Nutzap {
         let mints = await wallet.mints.getAllMints()
         
         // Build nutzap event (kind 9321)
-        let eventBuilder = wallet.ndk.event()
+        let eventBuilder = await wallet.ndk.event()
             .content(comment ?? "") // Content is the comment, not the token
             .kind(9321) // Nutzap kind
         

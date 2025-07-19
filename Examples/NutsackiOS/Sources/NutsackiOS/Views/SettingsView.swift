@@ -58,6 +58,12 @@ struct SettingsView: View {
                 
                 // Preferences
                 Section {
+                    Picker("Theme", selection: $appState.themeMode) {
+                        ForEach(ThemeMode.allCases, id: \.self) { mode in
+                            Text(mode.displayName).tag(mode)
+                        }
+                    }
+                    
                     Picker("Currency", selection: $appState.preferredConversionUnit) {
                         ForEach(CurrencyUnit.allCases, id: \.self) { unit in
                             Text(unit.symbol).tag(unit)

@@ -17,7 +17,7 @@ struct ContentView: View {
     
     var body: some View {
         ZStack {
-            Color.black.ignoresSafeArea()
+            Color(UIColor.systemBackground).ignoresSafeArea()
             
             NDKAuthView(authManager: nostrManager.authManager, ndk: nostrManager.ndk) {
                 // Main app interface - shown when authenticated
@@ -28,7 +28,6 @@ struct ContentView: View {
             }
         }
         .ignoresSafeArea()
-        .preferredColorScheme(.dark)
         .onOpenURL { url in
             handleUrl(url)
         }
@@ -137,7 +136,10 @@ struct AuthenticationView: View {
             }
             .background(
                 RadialGradient(
-                    gradient: Gradient(colors: [Color(white: 0.1), .black]),
+                    gradient: Gradient(colors: [
+                        Color(UIColor.systemBackground).opacity(0.8), 
+                        Color(UIColor.systemBackground)
+                    ]),
                     center: .top,
                     startRadius: 100,
                     endRadius: 600

@@ -55,7 +55,7 @@ struct NutsackApp: App {
                     .transition(.opacity.combined(with: .scale(scale: 1.1)))
                 }
             }
-            .preferredColorScheme(.dark)
+            .preferredColorScheme(appState.themeMode.colorScheme)
         }
         .modelContainer(modelContainer)
     }
