@@ -204,7 +204,7 @@ public actor NDKSubscriptionCoordinator {
         
         // Parse profile from event content
         guard let profileData = event.content.data(using: String.Encoding.utf8),
-              let profile = try? JSONDecoder().decode(NDKUserProfile.self, from: profileData) else {
+              let profile = JSONCoding.safeDecode(NDKUserProfile.self, from: profileData) else {
             return nil
         }
         

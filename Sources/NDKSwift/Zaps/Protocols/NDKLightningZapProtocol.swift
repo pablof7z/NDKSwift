@@ -281,7 +281,7 @@ public class NDKLightningZapProtocol: NDKZapProtocol {
             let tag: String?
         }
         
-        let lnurlResponse = try JSONDecoder().decode(LNURLResponse.self, from: data)
+        let lnurlResponse = try JSONCoding.decode(LNURLResponse.self, from: data)
         
         guard let callbackURL = URL(string: lnurlResponse.callback) else {
             throw ZapError.invalidLNURL("Invalid callback URL")
@@ -337,7 +337,7 @@ public class NDKLightningZapProtocol: NDKZapProtocol {
             let pr: String  // Payment request (invoice)
         }
         
-        let invoiceResponse = try JSONDecoder().decode(InvoiceResponse.self, from: data)
+        let invoiceResponse = try JSONCoding.decode(InvoiceResponse.self, from: data)
         return invoiceResponse.pr
     }
     
