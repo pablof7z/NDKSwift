@@ -9,6 +9,12 @@ import Foundation
 public actor BlossomClient {
     private let urlSession: URLSession
     private var serverCache: [String: BlossomServerDescriptor] = [:]
+    
+    // MARK: - Constants
+    private static let acceptHeader = "Accept"
+    private static let contentTypeHeader = "Content-Type"
+    private static let authorizationHeader = "Authorization"
+    private static let applicationJSON = "application/json"
 
     public init(urlSession: URLSession = .shared) {
         self.urlSession = urlSession
@@ -47,7 +53,7 @@ public actor BlossomClient {
 
         var request = URLRequest(url: wellKnownURL)
         request.httpMethod = "GET"
-        request.setValue("application/json", forHTTPHeaderField: "Accept")
+        request.setValue(Self.applicationJSON, forHTTPHeaderField: Self.acceptHeader)
 
         do {
             let (data, response) = try await urlSession.data(for: request)
@@ -112,7 +118,7 @@ public actor BlossomClient {
 
         // Set headers
         if let mimeType = mimeType {
-            request.setValue(mimeType, forHTTPHeaderField: "Content-Type")
+            request.setValue(mimeType, forHTTPHeaderField: Self.contentTypeHeader)
         }
 
         let authHeader = try auth.authorizationHeaderValue()
@@ -195,7 +201,7 @@ public actor BlossomClient {
 
         var request = URLRequest(url: listURL)
         request.httpMethod = "GET"
-        request.setValue("application/json", forHTTPHeaderField: "Accept")
+        request.setValue(Self.applicationJSON, forHTTPHeaderField: Self.acceptHeader)
 
         let authHeader = try auth.authorizationHeaderValue()
         request.setValue(authHeader, forHTTPHeaderField: "Authorization")
