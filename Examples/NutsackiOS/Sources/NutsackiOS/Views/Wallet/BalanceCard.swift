@@ -284,7 +284,7 @@ struct ExpandablePieChart: View {
                     .stroke(
                         LinearGradient(
                             gradient: Gradient(colors: [
-                                Color.black.opacity(0.2),
+                                Color(.label).opacity(0.2),
                                 Color.clear
                             ]),
                             startPoint: .topLeading,

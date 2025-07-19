@@ -75,7 +75,10 @@ struct WalletView: View {
             }
             .background(
                 RadialGradient(
-                    gradient: Gradient(colors: [Color(white: 0.12), Color.black]),
+                    gradient: Gradient(colors: [
+                        Color(.systemBackground),
+                        Color(.secondarySystemBackground)
+                    ]),
                     center: .top,
                     startRadius: 0,
                     endRadius: 400

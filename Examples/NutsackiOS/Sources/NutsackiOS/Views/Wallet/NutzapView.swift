@@ -69,194 +69,209 @@ struct NutzapView: View {
         amount = "\(preset)"
     }
     
+    // MARK: - View Components
+    private var recipientSection: some View {
+        Group {
+            if let user = resolvedUser {
+                VStack(spacing: 16) {
+                    // Profile picture centered on top
+                    UserProfilePicture(user: user, size: 80)
+                    
+                    VStack(spacing: 4) {
+                        // User name centered below avatar
+                        UserDisplayName(user: user)
+                            .font(.title2)
+                            .fontWeight(.semibold)
+                            .multilineTextAlignment(.center)
+                        
+                        // NIP-05 or identifier below name
+                        UserNIP05(user: user)
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                            .multilineTextAlignment(.center)
+                    }
+                }
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 8)
+            } else if isLoadingProfile {
+                VStack(spacing: 16) {
+                    ProgressView()
+                        .scaleEffect(1.2)
+                    Text("Loading profile...")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                }
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 32)
+            }
+        }
+    }
+    
+    private var amountInputSection: some View {
+        VStack(spacing: 16) {
+            // Hidden text field that drives the amount
+            TextField("0", text: $amount)
+                .keyboardType(.numberPad)
+                .opacity(0)
+                .frame(height: 0)
+                .focused($amountFieldFocused)
+            
+            // Visual amount display
+            VStack(spacing: 8) {
+                HStack(alignment: .firstTextBaseline, spacing: 8) {
+                    Text(formattedAmount)
+                        .font(.system(size: 48, weight: .semibold, design: .rounded))
+                        .foregroundStyle(.primary)
+                    
+                    Text("sats")
+                        .font(.system(size: 20, weight: .medium, design: .rounded))
+                        .foregroundStyle(.secondary)
+                }
+                .contentShape(Rectangle())
+                .onTapGesture {
+                    amountFieldFocused = true
+                }
+                
+                // USD equivalent (placeholder)
+                Text("≈ $0.00 USD")
+                    .font(.system(size: 16, weight: .regular, design: .rounded))
+                    .foregroundStyle(.secondary)
+                    .opacity(0.6)
+            }
+            
+            // Quick amount buttons
+            HStack(spacing: 12) {
+                ForEach([1000, 5000, 10000, 50000], id: \.self) { preset in
+                    Button(action: { setAmount(preset) }) {
+                        Text("\(preset / 1000)k")
+                            .font(.system(size: 14, weight: .medium, design: .rounded))
+                            .foregroundColor(.orange)
+                            .padding(.horizontal, 14)
+                            .padding(.vertical, 6)
+                            .background(Color.orange.opacity(0.15))
+                            .cornerRadius(16)
+                    }
+                }
+            }
+        }
+        .padding(.horizontal)
+    }
+    
+    private var commentSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Comment")
+                .font(.headline)
+                .padding(.horizontal)
+            
+            TextField("Comment (optional)", text: $comment, axis: .vertical)
+                .lineLimit(2...4)
+                .padding(.horizontal)
+        }
+    }
+    
+    private var paymentMethodSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                if paymentMethod == .nutzap {
+                    Image(systemName: "bitcoinsign.square.fill")
+                        .foregroundColor(.orange)
+                    Text("Nutzap")
+                        .font(.headline)
+                } else {
+                    Image(systemName: "bolt.fill")
+                        .foregroundColor(.yellow)
+                    Text("Lightning Zap")
+                        .font(.headline)
+                }
+                Spacer()
+            }
+            .padding(.horizontal)
+            
+            if paymentMethod == .nutzap && !acceptedMints.isEmpty {
+                VStack(alignment: .leading, spacing: 4) {
+                    ForEach(acceptedMints, id: \.self) { mint in
+                        Text(URL(string: mint)?.host ?? mint)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                .padding(.horizontal)
+            }
+        }
+    }
+    
+    private var sendButton: some View {
+        VStack {
+            Divider()
+            
+            Button(action: sendPayment) {
+                if isSending {
+                    HStack {
+                        ProgressView()
+                            .scaleEffect(0.8)
+                        Text("Sending...")
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding()
+                    .background(Color.orange.opacity(0.3))
+                    .foregroundColor(.orange)
+                    .cornerRadius(12)
+                } else {
+                    HStack {
+                        if paymentMethod == .nutzap {
+                            Image(systemName: "bitcoinsign.square.fill")
+                            Text("Send Nutzap")
+                        } else {
+                            Image(systemName: "bolt.fill")
+                            Text("Send Lightning Zap")
+                        }
+                    }
+                    .frame(maxWidth: .infinity)
+                    .fontWeight(.semibold)
+                    .padding()
+                    .background(paymentMethod == .nutzap ? Color.orange : Color.yellow)
+                    .foregroundColor(paymentMethod == .nutzap ? .white : .black)
+                    .cornerRadius(12)
+                }
+            }
+            .disabled(isButtonDisabled)
+            .padding()
+        }
+        .background(Color(.systemBackground))
+        .frame(maxWidth: .infinity)
+    }
+    
+    
     var body: some View {
         VStack(spacing: 0) {
             ScrollView {
                 VStack(spacing: 24) {
-                    // Recipient Section - Centered display
-                    if let user = resolvedUser {
-                        VStack(spacing: 16) {
-                            // Profile picture centered on top
-                            UserProfilePicture(user: user, size: 80)
-                            
-                            VStack(spacing: 4) {
-                                // User name centered below avatar
-                                UserDisplayName(user: user)
-                                    .font(.title2)
-                                    .fontWeight(.semibold)
-                                    .multilineTextAlignment(.center)
-                                
-                                // NIP-05 or identifier below name
-                                UserNIP05(user: user)
-                                    .font(.subheadline)
-                                    .foregroundStyle(.secondary)
-                                    .multilineTextAlignment(.center)
-                            }
-                        }
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 8)
-                    } else if isLoadingProfile {
-                        VStack(spacing: 16) {
-                            ProgressView()
-                                .scaleEffect(1.2)
-                            Text("Loading profile...")
-                                .font(.subheadline)
-                                .foregroundStyle(.secondary)
-                        }
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 32)
-                    }
-                        
-                        // Amount Section
-                        VStack(spacing: 16) {
-                            // Hidden text field that drives the amount
-                            TextField("0", text: $amount)
-                                .keyboardType(.numberPad)
-                                .opacity(0)
-                                .frame(height: 0)
-                                .focused($amountFieldFocused)
-                            
-                            // Visual amount display
-                            VStack(spacing: 8) {
-                                HStack(alignment: .firstTextBaseline, spacing: 8) {
-                                    Text(formattedAmount)
-                                        .font(.system(size: 48, weight: .semibold, design: .rounded))
-                                        .foregroundStyle(.primary)
-                                    
-                                    Text("sats")
-                                        .font(.system(size: 20, weight: .medium, design: .rounded))
-                                        .foregroundStyle(.secondary)
-                                }
-                                .contentShape(Rectangle())
-                                .onTapGesture {
-                                    amountFieldFocused = true
-                                }
-                                
-                                // USD equivalent (placeholder)
-                                Text("≈ $0.00 USD")
-                                    .font(.system(size: 16, weight: .regular, design: .rounded))
-                                    .foregroundStyle(.secondary)
-                                    .opacity(0.6)
-                            }
-                            
-                            // Quick amount buttons
-                            HStack(spacing: 12) {
-                                ForEach([1000, 5000, 10000, 50000], id: \.self) { preset in
-                                    Button(action: { setAmount(preset) }) {
-                                        Text("\(preset / 1000)k")
-                                            .font(.system(size: 14, weight: .medium, design: .rounded))
-                                            .foregroundColor(.orange)
-                                            .padding(.horizontal, 14)
-                                            .padding(.vertical, 6)
-                                            .background(Color.orange.opacity(0.15))
-                                            .cornerRadius(16)
-                                    }
-                                }
-                            }
-                        }
-                        .padding(.horizontal)
-                        
-                    // Comment Section
-                    if resolvedUser != nil {
-                        VStack(alignment: .leading, spacing: 12) {
-                            Text("Comment")
-                                .font(.headline)
-                                .padding(.horizontal)
-                            
-                            TextField("Comment (optional)", text: $comment, axis: .vertical)
-                                .lineLimit(2...4)
-                                .padding(.horizontal)
-                        }
-                    }
+                    recipientSection
+                    amountInputSection
                     
-                    // Payment method indicator
                     if resolvedUser != nil {
-                        VStack(alignment: .leading, spacing: 12) {
-                            HStack {
-                                if paymentMethod == .nutzap {
-                                    Image(systemName: "bitcoinsign.square.fill")
-                                        .foregroundColor(.orange)
-                                    Text("Nutzap")
-                                        .font(.headline)
-                                } else {
-                                    Image(systemName: "bolt.fill")
-                                        .foregroundColor(.yellow)
-                                    Text("Lightning Zap")
-                                        .font(.headline)
-                                }
-                                Spacer()
-                            }
-                            .padding(.horizontal)
-                            
-                            if paymentMethod == .nutzap && !acceptedMints.isEmpty {
-                                VStack(alignment: .leading, spacing: 4) {
-                                    ForEach(acceptedMints, id: \.self) { mint in
-                                        Text(URL(string: mint)?.host ?? mint)
-                                            .font(.caption)
-                                            .foregroundStyle(.secondary)
-                                    }
-                                }
-                                .padding(.horizontal)
-                            }
-                        }
+                        commentSection
+                        paymentMethodSection
                     }
                 }
                 .padding(.vertical)
                 .padding(.bottom, 120) // Add space for the fixed button and keyboard
             }
             
-            // Send Nutzap Button - Fixed at bottom
-            VStack {
-                Divider()
-                
-                Button(action: sendPayment) {
-                    if isSending {
-                        HStack {
-                            ProgressView()
-                                .scaleEffect(0.8)
-                            Text("Sending...")
-                        }
-                        .frame(maxWidth: .infinity)
-                        .padding()
-                        .background(Color.orange.opacity(0.3))
-                        .foregroundColor(.orange)
-                        .cornerRadius(12)
-                    } else {
-                        HStack {
-                            if paymentMethod == .nutzap {
-                                Image(systemName: "bitcoinsign.square.fill")
-                                Text("Send Nutzap")
-                            } else {
-                                Image(systemName: "bolt.fill")
-                                Text("Send Lightning Zap")
-                            }
-                        }
-                        .frame(maxWidth: .infinity)
-                        .fontWeight(.semibold)
-                        .padding()
-                        .background(paymentMethod == .nutzap ? Color.orange : Color.yellow)
-                        .foregroundColor(paymentMethod == .nutzap ? .white : .black)
-                        .cornerRadius(12)
-                    }
-                }
-                .disabled(isButtonDisabled)
-                .padding()
-            }
-            .background(Color(.systemBackground))
-            .frame(maxWidth: .infinity)
-            #if os(iOS)
-            .keyboardAdaptive()
-            #endif
+            sendButton
         }
         .navigationTitle(paymentMethod == .nutzap ? "Nutzap" : "Lightning Zap")
         .platformNavigationBarTitleDisplayMode(inline: true)
+        #if os(iOS)
+        .ignoresSafeArea(.keyboard, edges: [])
+        #endif
         .toolbar {
             ToolbarItem(placement: .confirmationAction) {
                 Button(paymentMethod == .nutzap ? "Send Nutzap" : "Send Zap") { 
                     sendPayment()
                 }
                 .foregroundColor(.orange)
-                .disabled(resolvedUser == nil || amount.isEmpty || amountInt <= 0 || (paymentMethod == .nutzap && amountInt > availableBalance) || isSending || (!supportsLightning && acceptedMints.isEmpty))
+                .disabled(isButtonDisabled)
             }
         }
         .alert("Error", isPresented: $showError) {

@@ -323,12 +323,12 @@ struct SendView: View {
                 .padding()
             }
             .background(Color(.systemBackground))
-            #if os(iOS)
-            .keyboardAdaptive()
-            #endif
         }
         .navigationTitle("Send Ecash")
         .platformNavigationBarTitleDisplayMode(inline: true)
+        #if os(iOS)
+        .ignoresSafeArea(.keyboard, edges: [])
+        #endif
         .toolbar {
             ToolbarItemGroup(placement: .keyboard) {
                 Spacer()

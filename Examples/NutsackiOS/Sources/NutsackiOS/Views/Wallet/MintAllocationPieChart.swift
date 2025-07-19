@@ -216,7 +216,7 @@ struct MintAllocationPieChart: View {
     
     private var backgroundView: some View {
         RoundedRectangle(cornerRadius: 16)
-            .fill(Color.black.opacity(0.3))
+            .fill(Color(.secondarySystemBackground))
             .overlay(
                 RoundedRectangle(cornerRadius: 16)
                     .stroke(Color.gray.opacity(0.3), lineWidth: 1)
