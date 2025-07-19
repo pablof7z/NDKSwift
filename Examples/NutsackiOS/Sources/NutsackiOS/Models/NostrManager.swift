@@ -367,8 +367,8 @@ class NostrManager {
                 ]
             )
             
-            // Sync with all connected relays
-            let results = try await ndk.syncWithAllRelays(filter: contactsFilter)
+            // Sync with all connected relays (receive-only for wallet security)
+            let results = try await ndk.syncWithAllRelays(filter: contactsFilter, direction: .receive)
             
             var totalDownloaded = 0
             var totalEfficiency = 0
@@ -415,8 +415,8 @@ class NostrManager {
                 ]
             )
             
-            // Sync with all connected relays
-            let results = try await ndk.syncWithAllRelays(filter: walletEventsFilter)
+            // Sync with all connected relays (receive-only for wallet security)
+            let results = try await ndk.syncWithAllRelays(filter: walletEventsFilter, direction: .receive)
             
             var totalDownloaded = 0
             var totalEfficiency = 0

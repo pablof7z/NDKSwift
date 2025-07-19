@@ -38,9 +38,10 @@ extension NDK {
     /// - Parameters:
     ///   - filter: Filter to apply for sync
     ///   - relay: Relay URL to sync with
+    ///   - direction: Sync direction (.send, .receive, or .both) - default is .both
     /// - Returns: Sync result with statistics
     /// - Throws: NIP77Error if sync fails
-    public func syncEvents(filter: NDKFilter, relay relayURL: String) async throws -> NegentropySyncResult {
+    public func syncEvents(filter: NDKFilter, relay relayURL: String, direction: SyncDirection = .both) async throws -> NegentropySyncResult {
         let startTime = Date()
         
         // Get or create relay connection
@@ -56,6 +57,9 @@ extension NDK {
         
         // Create sync handler
         let syncHandler = NIP77SyncHandler(ndk: self, cache: cache)
+        
+        // Configure sync direction
+        await syncHandler.setSyncDirection(direction)
         
         // Store handler for message routing
         await pool.setSyncHandler(syncHandler, for: relayURL)
@@ -101,16 +105,18 @@ extension NDK {
     }
     
     /// Sync with all connected relays
-    /// - Parameter filter: Filter to apply for sync
+    /// - Parameters:
+    ///   - filter: Filter to apply for sync
+    ///   - direction: Sync direction (.send, .receive, or .both) - default is .both
     /// - Returns: Dictionary of relay URLs to sync results
-    public func syncWithAllRelays(filter: NDKFilter) async throws -> [String: NegentropySyncResult] {
+    public func syncWithAllRelays(filter: NDKFilter, direction: SyncDirection = .both) async throws -> [String: NegentropySyncResult] {
         let relays = await pool.connectedRelays()
         
         return await withTaskGroup(of: (String, NegentropySyncResult?).self) { group in
             for relay in relays {
                 group.addTask {
                     do {
-                        let result = try await self.syncEvents(filter: filter, relay: relay.url)
+                        let result = try await self.syncEvents(filter: filter, relay: relay.url, direction: direction)
                         return (relay.url, result)
                     } catch {
                         // Log error but don't fail entire sync
