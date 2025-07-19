@@ -1,3 +1,5 @@
+import Foundation
+
 /// Simple ID generator for Nostr subscriptions and requests
 /// Uses connection-scoped counters for efficiency
 public actor IDGenerator {
