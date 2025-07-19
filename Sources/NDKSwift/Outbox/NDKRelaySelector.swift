@@ -221,25 +221,39 @@ actor NDKRelaySelector {
             }
         }
 
-        // Extract from p tags (mentioned users)
-        for pubkey in event.pTags {
-            if let item = await tracker.getRelaysSyncFor(pubkey: pubkey) {
-                switch purpose {
-                case .publishing:
-                    // Publish to where mentioned users write and read
-                    relays.formUnion(item.writeRelays.map { $0.url })
-                    if item.writeRelays.isEmpty {
-                        relays.formUnion(item.readRelays.map { $0.url })
+        // Extract from p tags (mentioned users) - NIP-65 outbox model
+        let pTags = event.pTags
+        if purpose == .publishing && pTags.count < 10 {
+            // For events with less than 10 p-tags, apply NIP-65 outbox model:
+            // Send to read relays of each tagged user
+            for pubkey in pTags {
+                if let item = await tracker.getRelaysSyncFor(pubkey: pubkey) {
+                    // According to NIP-65: "Send the event to all read relays of each tagged user"
+                    relays.formUnion(item.readRelays.map { $0.url })
+                    // If no read relays available, fallback to write relays
+                    if item.readRelays.isEmpty {
+                        relays.formUnion(item.writeRelays.map { $0.url })
                     }
-                case .fetching:
+                } else {
+                    missingPubkeys.insert(pubkey)
+                }
+            }
+        } else if purpose == .publishing {
+            // For events with 10+ p-tags, don't apply outbox model to avoid too many relays
+            // Just use author's own relays (handled in selectRelaysForPublishing)
+            print("[NDKRelaySelector] Event has \(pTags.count) p-tags, skipping outbox model for p-tagged users")
+        } else {
+            // For fetching, always consider p-tagged users regardless of count
+            for pubkey in pTags {
+                if let item = await tracker.getRelaysSyncFor(pubkey: pubkey) {
                     // Fetch from where mentioned users read
                     relays.formUnion(item.readRelays.map { $0.url })
                     if item.readRelays.isEmpty {
                         relays.formUnion(item.writeRelays.map { $0.url })
                     }
+                } else {
+                    missingPubkeys.insert(pubkey)
                 }
-            } else {
-                missingPubkeys.insert(pubkey)
             }
         }
 
