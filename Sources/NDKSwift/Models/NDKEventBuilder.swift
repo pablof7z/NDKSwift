@@ -359,18 +359,18 @@ public final class NDKEventBuilder {
     public func tagBech32(_ bech32String: String) async -> NDKEventBuilder {
         do {
             // Determine the type by prefix
-            if bech32String.hasPrefix("npub1") {
+            if bech32String.hasPrefix(NostrConstants.npubPrefix) {
                 // Decode npub to get public key
                 if let pubkey = try? PublicKey.fromNpub(bech32String) {
                     return await self.tagUser(pubkey)
                 }
                 
-            } else if bech32String.hasPrefix("note1") {
+            } else if bech32String.hasPrefix(NostrConstants.notePrefix) {
                 // Decode note to get event ID
                 let eventId = try Bech32.eventId(from: bech32String)
                 return self.tag(["e", eventId])
                 
-            } else if bech32String.hasPrefix("naddr1") {
+            } else if bech32String.hasPrefix(NostrConstants.naddrPrefix) {
                 // For naddr, we need to parse the TLV data manually
                 let (hrp, data) = try Bech32.decode(bech32String)
                 guard hrp == "naddr" else { return self }
@@ -427,7 +427,7 @@ public final class NDKEventBuilder {
                     return self.tag(tag)
                 }
                 
-            } else if bech32String.hasPrefix("nevent1") {
+            } else if bech32String.hasPrefix(NostrConstants.neventPrefix) {
                 // For nevent, parse TLV data
                 let (hrp, data) = try Bech32.decode(bech32String)
                 guard hrp == "nevent" else { return self }
@@ -492,7 +492,7 @@ public final class NDKEventBuilder {
                     return self.tag(tag)
                 }
                 
-            } else if bech32String.hasPrefix("nprofile1") {
+            } else if bech32String.hasPrefix(NostrConstants.nprofilePrefix) {
                 // For nprofile, parse TLV data  
                 let (hrp, data) = try Bech32.decode(bech32String)
                 guard hrp == "nprofile" else { return self }
