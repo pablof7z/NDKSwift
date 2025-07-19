@@ -57,7 +57,7 @@ actor WalletEventProcessor {
         
         // Parse token data
         guard let tokenData = decryptedContent.data(using: .utf8),
-              let nip60Token = try? JSONDecoder().decode(NIP60TokenEvent.self, from: tokenData) else {
+              let nip60Token = JSONCoding.safeDecode(NIP60TokenEvent.self, from: tokenData) else {
             print("❌ Failed to parse NIP-60 token event data from decrypted content")
             throw NDKError.invalidContent("Failed to parse NIP-60 token event data")
         }
@@ -120,7 +120,7 @@ actor WalletEventProcessor {
         
         // Parse quote data
         guard let quoteData = decryptedContent.data(using: .utf8),
-              let quote = try? JSONDecoder().decode(CashuMintQuote.self, from: quoteData) else {
+              let quote = JSONCoding.safeDecode(CashuMintQuote.self, from: quoteData) else {
             throw NDKError.invalidContent("Failed to parse quote event data")
         }
         
