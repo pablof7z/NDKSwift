@@ -30,149 +30,20 @@ struct MintView: View {
         VStack(spacing: 0) {
             ScrollView {
                 VStack(spacing: 24) {
-                    // Amount Section
-                    VStack(spacing: 16) {
-                        // Hidden text field that drives the amount
-                        TextField("0", text: $amount)
-                            .keyboardType(.numberPad)
-                            .opacity(0)
-                            .frame(height: 0)
-                            .focused($amountFieldFocused)
-                        
-                        // Visual amount display
-                        VStack(spacing: 8) {
-                            HStack(alignment: .firstTextBaseline, spacing: 8) {
-                                Text(formattedAmount)
-                                    .font(.system(size: 48, weight: .semibold, design: .rounded))
-                                    .foregroundStyle(.primary)
-                                
-                                Text("sats")
-                                    .font(.system(size: 20, weight: .medium, design: .rounded))
-                                    .foregroundStyle(.secondary)
-                            }
-                            .contentShape(Rectangle())
-                            .onTapGesture {
-                                amountFieldFocused = true
-                            }
-                            
-                            // USD equivalent (placeholder)
-                            Text("≈ $0.00 USD")
-                                .font(.system(size: 16, weight: .regular, design: .rounded))
-                                .foregroundStyle(.secondary)
-                                .opacity(0.6)
-                        }
-                        
-                        // Quick amount buttons
-                        HStack(spacing: 12) {
-                            ForEach([1000, 5000, 10000, 50000], id: \.self) { preset in
-                                Button(action: { setAmount(preset) }) {
-                                    Text("\(preset / 1000)k")
-                                        .font(.system(size: 14, weight: .medium, design: .rounded))
-                                        .foregroundColor(.orange)
-                                        .padding(.horizontal, 14)
-                                        .padding(.vertical, 6)
-                                        .background(Color.orange.opacity(0.15))
-                                        .cornerRadius(16)
-                                }
-                            }
-                        }
-                    }
-                    .padding(.horizontal)
-                    
-                    // Mint Selection
-                    VStack(alignment: .leading, spacing: 12) {
-                        Text("Select Mint")
-                            .font(.headline)
-                            .padding(.horizontal)
-                        
-                    if availableMints.isEmpty {
-                        HStack {
-                            ProgressView()
-                                .scaleEffect(0.8)
-                            Text("Loading mints...")
-                                .foregroundStyle(.secondary)
-                        }
-                        .padding(.vertical, 8)
-                    } else {
-                        VStack(spacing: 8) {
-                            ForEach(availableMints, id: \.url.absoluteString) { mint in
-                            HStack {
-                                // Mint icon
-                                Circle()
-                                    .fill(Color.orange.opacity(0.15))
-                                    .frame(width: 40, height: 40)
-                                    .overlay(
-                                        Image(systemName: "building.columns")
-                                            .font(.system(size: 16))
-                                            .foregroundColor(.orange)
-                                    )
-                                
-                                VStack(alignment: .leading, spacing: 2) {
-                                    Text(mint.name ?? mint.url.host ?? "Unknown Mint")
-                                        .font(.system(size: 16, weight: .medium))
-                                    
-                                    Text(mint.url.host ?? mint.url.absoluteString)
-                                        .font(.system(size: 12))
-                                        .foregroundStyle(.secondary)
-                                }
-                                
-                                Spacer()
-                                
-                                if selectedMintURL == mint.url.absoluteString {
-                                    Image(systemName: "checkmark.circle.fill")
-                                        .foregroundColor(.orange)
-                                }
-                            }
-                            .contentShape(Rectangle())
-                            .onTapGesture {
-                                selectedMintURL = mint.url.absoluteString
-                            }
-                            .padding(.horizontal)
-                        }
-                        }
-                    }
-                    }
+                    amountInputSection
+                    mintSelectionSection
                 }
                 .padding(.vertical)
                 .padding(.bottom, 120) // Add space for the fixed button and keyboard
             }
             
-            // Create Invoice Button - Outside ScrollView
-            VStack {
-                Divider()
-                
-                Button(action: createMintQuote) {
-                    if isMinting {
-                        HStack {
-                            ProgressView()
-                                .scaleEffect(0.8)
-                            Text("Creating...")
-                        }
-                        .frame(maxWidth: .infinity)
-                        .padding()
-                        .background(Color.orange.opacity(0.3))
-                        .foregroundColor(.orange)
-                        .cornerRadius(12)
-                    } else {
-                        Text("Create Invoice")
-                            .frame(maxWidth: .infinity)
-                            .fontWeight(.semibold)
-                            .padding()
-                            .background(Color.orange)
-                            .foregroundColor(.white)
-                            .cornerRadius(12)
-                    }
-                }
-                .disabled(!isValidAmount || isMinting)
-                .padding()
-            }
-            .background(Color(.systemBackground))
-            #if os(iOS)
-            .keyboardAdaptive()
-            #endif
+            createInvoiceButton
         }
         .navigationTitle("Mint Ecash")
         .platformNavigationBarTitleDisplayMode(inline: true)
+        #if os(iOS)
+        .ignoresSafeArea(.keyboard, edges: [])
+        #endif
         .toolbar {
             ToolbarItem(placement: .navigationBarTrailing) {
                 Button("Create Invoice") { 
@@ -203,7 +74,7 @@ struct MintView: View {
             depositTask?.cancel()
             loadMintTask?.cancel()
         }
-        .background(Color.black)
+        .background(Color(.systemBackground))
         .fullScreenCover(isPresented: $showPaymentAnimation) {
             PaymentReceivedAnimation(amount: mintedAmount) {
                 dismiss()
@@ -268,6 +139,148 @@ struct MintView: View {
         return !selectedMintURL.isEmpty
     }
     
+    // MARK: - View Components
+    private var amountInputSection: some View {
+        VStack(spacing: 16) {
+            // Hidden text field that drives the amount
+            TextField("0", text: $amount)
+                .keyboardType(.numberPad)
+                .opacity(0)
+                .frame(height: 0)
+                .focused($amountFieldFocused)
+            
+            // Visual amount display
+            VStack(spacing: 8) {
+                HStack(alignment: .firstTextBaseline, spacing: 8) {
+                    Text(formattedAmount)
+                        .font(.system(size: 48, weight: .semibold, design: .rounded))
+                        .foregroundStyle(.primary)
+                    
+                    Text("sats")
+                        .font(.system(size: 20, weight: .medium, design: .rounded))
+                        .foregroundStyle(.secondary)
+                }
+                .contentShape(Rectangle())
+                .onTapGesture {
+                    amountFieldFocused = true
+                }
+                
+                // USD equivalent (placeholder)
+                Text("≈ $0.00 USD")
+                    .font(.system(size: 16, weight: .regular, design: .rounded))
+                    .foregroundStyle(.secondary)
+                    .opacity(0.6)
+            }
+            
+            // Quick amount buttons
+            HStack(spacing: 12) {
+                ForEach([1000, 5000, 10000, 50000], id: \.self) { preset in
+                    Button(action: { setAmount(preset) }) {
+                        Text("\(preset / 1000)k")
+                            .font(.system(size: 14, weight: .medium, design: .rounded))
+                            .foregroundColor(.orange)
+                            .padding(.horizontal, 14)
+                            .padding(.vertical, 6)
+                            .background(Color.orange.opacity(0.15))
+                            .cornerRadius(16)
+                    }
+                }
+            }
+        }
+        .padding(.horizontal)
+    }
+    
+    private var mintSelectionSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Select Mint")
+                .font(.headline)
+                .padding(.horizontal)
+            
+            if availableMints.isEmpty {
+                HStack {
+                    ProgressView()
+                        .scaleEffect(0.8)
+                    Text("Loading mints...")
+                        .foregroundStyle(.secondary)
+                }
+                .padding(.vertical, 8)
+            } else {
+                VStack(spacing: 8) {
+                    ForEach(availableMints, id: \.url.absoluteString) { mint in
+                        mintRow(for: mint)
+                    }
+                }
+            }
+        }
+    }
+    
+    private func mintRow(for mint: MintInfo) -> some View {
+        HStack {
+            // Mint icon
+            Circle()
+                .fill(Color.orange.opacity(0.15))
+                .frame(width: 40, height: 40)
+                .overlay(
+                    Image(systemName: "building.columns")
+                        .font(.system(size: 16))
+                        .foregroundColor(.orange)
+                )
+            
+            VStack(alignment: .leading, spacing: 2) {
+                Text(mint.name ?? mint.url.host ?? "Unknown Mint")
+                    .font(.system(size: 16, weight: .medium))
+                
+                Text(mint.url.host ?? mint.url.absoluteString)
+                    .font(.system(size: 12))
+                    .foregroundStyle(.secondary)
+            }
+            
+            Spacer()
+            
+            if selectedMintURL == mint.url.absoluteString {
+                Image(systemName: "checkmark.circle.fill")
+                    .foregroundColor(.orange)
+            }
+        }
+        .contentShape(Rectangle())
+        .onTapGesture {
+            selectedMintURL = mint.url.absoluteString
+        }
+        .padding(.horizontal)
+    }
+    
+    private var createInvoiceButton: some View {
+        VStack {
+            Divider()
+            
+            Button(action: createMintQuote) {
+                if isMinting {
+                    HStack {
+                        ProgressView()
+                            .scaleEffect(0.8)
+                        Text("Creating...")
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding()
+                    .background(Color.orange.opacity(0.3))
+                    .foregroundColor(.orange)
+                    .cornerRadius(12)
+                } else {
+                    Text("Create Invoice")
+                        .frame(maxWidth: .infinity)
+                        .fontWeight(.semibold)
+                        .padding()
+                        .background(Color.orange)
+                        .foregroundColor(.white)
+                        .cornerRadius(12)
+                }
+            }
+            .disabled(!isValidAmount || isMinting)
+            .padding()
+        }
+        .background(Color(.systemBackground))
+    }
+
     // MARK: - Helper Functions
     private func setAmount(_ preset: Int) {
         amount = "\(preset)"

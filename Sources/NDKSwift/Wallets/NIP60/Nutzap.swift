@@ -34,12 +34,18 @@ public enum Nutzap {
     ) async throws -> NDKEvent {
         // Get mints with sufficient balance, ordered by balance (highest first)
         let viableMintURLs = await proofStateManager.getMintsWithSufficientBalance(amount: amount)
+        print("Nutzap.send - viableMintURLs: \(viableMintURLs)")
+        print("Nutzap.send - configured mints: \(mints.keys)")
         
         // Filter to only configured mints and map to (url, mint) pairs
         let viableMints: [(url: String, mint: CashuSwift.Mint)] = viableMintURLs.compactMap { mintURL in
-            guard let mint = mints[mintURL] else { return nil }
+            guard let mint = mints[mintURL] else { 
+                print("Nutzap.send - mint \(mintURL) not found in configured mints")
+                return nil 
+            }
             return (url: mintURL, mint: mint)
         }
+        print("Nutzap.send - viableMints count: \(viableMints.count)")
         
         guard !viableMints.isEmpty else {
             throw NDKError.insufficientBalance(amount: amount)
