@@ -175,36 +175,8 @@ final class cashu_swiftTests: XCTestCase {
         let p2n = try await CashuSwift.swap(mint: mint, proofs: p2, amount: 5)
         XCTAssert(CashuSwift.sum(p2n.new) == 5)
         print("input: \(CashuSwift.sum(p2)), swap return sum: \(CashuSwift.sum(p2n.new)), change sum: \(CashuSwift.sum(p2n.change))")
-        
-        // test invalid amount (no room for fees)
-//        do {
-//            _ = try await CashuSwift.swap(mint: mint, proofs: p3, amount: 31)
-//            XCTFail("Swapping without enough room for input fees, should have failed but didn't.")
-//        } catch {
-//            
-//        }
     }
     
-    func testMintingWithDetSec() async throws {
-//        let mintURL = URL(string: "http://localhost:3339")!
-//        
-//        let mint = try await CashuSwift.loadMint(url: mintURL)
-//        
-//        let amount = 31
-//        
-//        let quote = try await CashuSwift.getQuote(mint: mint, quoteRequest: CashuSwift.Bolt11.RequestMintQuote(unit: "sat", amount: amount))
-//        let mnemmonic = Mnemonic()
-//        let seed = String(bytes: mnemmonic.seed)
-//        
-//        var proofs = try await CashuSwift.issue(for: quote, on: mint, seed: seed)
-//        mint.keysets.first(where: { $0.keysetID == proofs.first?.keysetID })!.derivationCounter += proofs.count
-//        
-//        
-//        // triple swap to make sure detsec counter increments correctly
-//        for _ in 0...3 {
-//            (proofs, _) = try await CashuSwift.swap(mint: mint, proofs: proofs, seed: seed)
-//        }
-    }
     
     func testSendReceive() async throws {
         let url = URL(string: "http://localhost:3339")!
