@@ -10,7 +10,6 @@ public actor NIP60Wallet: NDKPaymentProvider {
     public let displayName = "Cashu Wallet"
     
     internal let ndk: NDK
-    internal var proofs: [CashuSwift.Proof] = []
     public let p2pkManager: P2PKManager // Manages P2PK keys for receiving nutzaps
     
     // Relay health monitoring
@@ -809,10 +808,6 @@ public actor NIP60Wallet: NDKPaymentProvider {
             await proofStateManager.addProof(proof, mint: stateChange.mint)
             print("  Added proof: amount=\(proof.amount), C=\(proof.C)")
         }
-        
-        // Update internal proofs array
-        let availableByMint = await proofStateManager.getAvailableProofsByMint()
-        self.proofs = availableByMint.values.flatMap { $0 }
     }
     
     /// Updates token events on relays based on state changes
@@ -909,28 +904,79 @@ public actor NIP60Wallet: NDKPaymentProvider {
     
     /// Repair relay by re-publishing missing events
     public func repairRelay(_ relay: NDKRelay, missingEventIds: [String]) async throws {
-        // Re-publish missing events to the relay
         let relayURLs = Set([relay.url])
+        var repairedCount = 0
+        var failedCount = 0
         
-        // For each missing event ID, we need to fetch it from our local cache
-        // and republish it to the specific relay
+        // Group missing events by current token events
+        let currentTokenEventIds = await eventManager.getCurrentTokenEventIds()
+        
         for eventId in missingEventIds {
-            // Try to fetch the event from cache
-            let filter = NDKFilter(ids: [eventId])
-            let cache = ndk.cache
-            let cachedEvents = try await cache.queryEvents(filter)
-            if let event = cachedEvents.first {
-                _ = try await ndk.publish(event: event, to: relayURLs)
+            if currentTokenEventIds.contains(eventId) {
+                // This is a current token event - recreate it from proofs
+                let proofs = await proofStateManager.getProofsForEvent(eventId)
+                
+                if !proofs.isEmpty {
+                    // Group proofs by mint
+                    var proofsByMint: [String: [CashuSwift.Proof]] = [:]
+                    for proof in proofs {
+                        if let mint = await proofStateManager.getMintForProof(proof) {
+                            proofsByMint[mint, default: []].append(proof)
+                        }
+                    }
+                    
+                    // Create token event for each mint
+                    for (mint, mintProofs) in proofsByMint {
+                        let token = CashuSwift.Token(
+                            proofs: [mint: mintProofs],
+                            unit: "sat"
+                        )
+                        
+                        do {
+                            let tokenEvent = try await NDKCashuTokenEvent.create(
+                                ndk: ndk,
+                                token: token,
+                                signer: signer
+                            )
+                            
+                            // Republish to specific relay
+                            let published = try await ndk.publish(event: tokenEvent.event, to: relayURLs)
+                            if published.contains(relay) {
+                                repairedCount += 1
+                                print("✅ Repaired token event \(eventId) on relay \(relay.url)")
+                            } else {
+                                failedCount += 1
+                                print("❌ Failed to repair token event \(eventId) on relay \(relay.url)")
+                            }
+                        } catch {
+                            failedCount += 1
+                            print("❌ Error creating token event for repair: \(error)")
+                        }
+                    }
+                }
+            } else {
+                // Try to fetch non-token events from cache (wallet config, etc.)
+                let filter = NDKFilter(ids: [eventId])
+                let cachedEvents = try await ndk.cache.queryEvents(filter)
+                if let event = cachedEvents.first {
+                    let published = try await ndk.publish(event: event, to: relayURLs)
+                    if published.contains(relay) {
+                        repairedCount += 1
+                        print("✅ Repaired event \(eventId) on relay \(relay.url)")
+                    } else {
+                        failedCount += 1
+                    }
+                } else {
+                    failedCount += 1
+                    print("⚠️ Event \(eventId) not found in cache")
+                }
             }
         }
+        
+        print("🔧 Relay repair complete: \(repairedCount) repaired, \(failedCount) failed")
     }
     
     // MARK: - Internal Helpers
-    
-    /// Update internal proofs array from state manager
-    internal func updateProofsFromStateManager() async {
-        self.proofs = await proofStateManager.getAvailableProofs()
-    }
     
     
     /// Stop the wallet and clean up resources

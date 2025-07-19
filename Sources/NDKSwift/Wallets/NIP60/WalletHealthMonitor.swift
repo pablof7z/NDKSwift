@@ -35,7 +35,6 @@ public actor WalletHealthMonitor {
     
     private let eventManager: WalletEventManager
     private let ndk: NDK
-    private var relayEventSets: [String: Set<String>] = [:] // relay URL -> event IDs
     private var lastHealthCheck: Date?
     
     // MARK: - Initialization
@@ -55,21 +54,34 @@ public actor WalletHealthMonitor {
         let canonicalEventSet = await calculateCanonicalEventSet()
         
         for relay in walletRelays {
-            let relayEvents = relayEventSets[relay.url] ?? Set<String>()
+            var missingEvents: [String] = []
+            var knownEvents = 0
             
-            // Find missing events (in canonical but not on relay)
-            let missingEvents = Array(canonicalEventSet.subtracting(relayEvents))
+            // Check each canonical event using NDK's event tracker
+            for eventId in canonicalEventSet {
+                let seenOnRelays = await ndk.eventTracker.getSeenOnRelays(eventId: eventId)
+                if seenOnRelays.contains(relay.url) {
+                    knownEvents += 1
+                } else {
+                    // Also check if it was successfully published to this relay
+                    let publishedRelays = await ndk.eventTracker.getSuccessfullyPublishedRelays(eventId: eventId)
+                    if publishedRelays.contains(relay.url) {
+                        knownEvents += 1
+                    } else {
+                        missingEvents.append(eventId)
+                    }
+                }
+            }
             
-            // Find extra events (on relay but not in canonical)
-            let extraEvents = Array(relayEvents.subtracting(canonicalEventSet))
-            
-            let isHealthy = missingEvents.isEmpty && extraEvents.isEmpty
+            // Trust that relays handle deletion events properly (NIP-09)
+            // so we don't track "extra events"
+            let isHealthy = missingEvents.isEmpty
             
             let health = RelayHealth(
                 relay: relay,
-                knownEvents: relayEvents.count,
+                knownEvents: knownEvents,
                 missingEvents: missingEvents,
-                extraEvents: extraEvents,
+                extraEvents: [], // Not tracking as per requirements
                 isHealthy: isHealthy
             )
             
@@ -98,30 +110,8 @@ public actor WalletHealthMonitor {
         )
     }
     
-    /// Update relay event set for tracking
-    public func updateRelayEventSet(relay: String, events: Set<String>) {
-        relayEventSets[relay] = events
-    }
-    
-    /// Track event on relay
-    public func trackEventOnRelay(eventId: String, relay: String) {
-        relayEventSets[relay, default: Set<String>()].insert(eventId)
-    }
-    
-    /// Remove event from relay tracking
-    public func removeEventFromRelay(eventId: String, relay: String) {
-        relayEventSets[relay]?.remove(eventId)
-    }
-    
-    /// Clear all relay event sets
-    public func clearRelayEventSets() {
-        relayEventSets.removeAll()
-    }
-    
-    /// Get relay event set
-    public func getRelayEventSet(relay: String) -> Set<String> {
-        return relayEventSets[relay] ?? Set<String>()
-    }
+    // Note: Relay tracking is now handled by NDKEventTracker
+    // These methods have been removed to avoid duplication
     
     // MARK: - Private Methods
     
