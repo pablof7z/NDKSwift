@@ -30,7 +30,7 @@ public struct NDKZapReceipt {
     public var zapRequest: NDKZapRequest? {
         guard let json = descriptionJSON,
               let data = json.data(using: .utf8),
-              let requestEvent = try? JSONDecoder().decode(NDKEvent.self, from: data) else {
+              let requestEvent = JSONCoding.safeDecode(NDKEvent.self, from: data) else {
             return nil
         }
         return NDKZapRequest(event: requestEvent)

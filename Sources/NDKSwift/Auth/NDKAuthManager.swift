@@ -177,7 +177,7 @@ public class NDKAuthManager {
                 for sessionId in sessionIds {
                     do {
                         let data = try await keychainManager.retrieveSessionMetadata(identifier: sessionId)
-                        let session = try JSONDecoder().decode(NDKSession.self, from: data)
+                        let session = try JSONCoding.decode(NDKSession.self, from: data)
                         sessions.append(session)
                     } catch {
                         NDKLogger.shared.log(.error, category: .auth, "Failed to load session \(sessionId): \(error)")
