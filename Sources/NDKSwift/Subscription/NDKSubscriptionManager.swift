@@ -23,61 +23,13 @@ public actor NDKSubscriptionManager {
         let delay: TimeInterval
     }
 
-    /// Filter fingerprint for grouping compatibility
-    /// Follows ndk-core's approach: uses filter keys (not values) to determine groupability
-    struct FilterFingerprint: Hashable {
-        let value: String
-        
-        /// Create fingerprint from filters following ndk-core pattern:
-        /// Format: [+][filter-keys-sorted|filter-keys-sorted|...]
-        /// - Prefix '+' indicates closeOnEose
-        /// - Filter keys are sorted alphabetically
-        /// - Multiple filters separated by '|'
-        /// - Time constraints (since/until) include actual values
-        init(filters: [NDKFilter], closeOnEose: Bool) {
-            var parts: [String] = []
-            
-            for filter in filters {
-                var keys: [String] = []
-                
-                // Add keys for non-nil properties (not values, except for time)
-                if filter.ids != nil { keys.append("ids") }
-                if filter.authors != nil { keys.append("authors") }
-                if filter.kinds != nil { keys.append("kinds") }
-                if filter.events != nil { keys.append("#e") }
-                if filter.pubkeys != nil { keys.append("#p") }
-                
-                // Time constraints include values to prevent mixing different windows
-                if let since = filter.since { keys.append("since:\(since)") }
-                if let until = filter.until { keys.append("until:\(until)") }
-                
-                // Limit affects groupability
-                if filter.limit != nil { keys.append("limit") }
-                
-                // Add generic tag filters
-                if let tags = filter.tags {
-                    for tagName in tags.keys.sorted() {
-                        keys.append("#\(tagName)")
-                    }
-                }
-                
-                // Sort keys and join
-                let filterPart = keys.sorted().joined(separator: "-")
-                parts.append(filterPart)
-            }
-            
-            // Build final fingerprint
-            let prefix = closeOnEose ? "+" : ""
-            self.value = prefix + parts.joined(separator: "|")
-        }
-    }
 
     // MARK: - Properties
 
     private weak var ndk: NDK?
     private var activeSubscriptions: [String: NDKSubscription] = [:]
     private var subscriptionStates: [String: SubscriptionState] = [:]
-    private var pendingGroups: [FilterFingerprint: PendingGroup] = [:]
+    private var pendingGroups: [NDKFilterFingerprint: PendingGroup] = [:]
     private var eventDeduplication: [EventID: Timestamp] = [:]
     private var eoseTracking: [String: EOSETracker] = [:]
     
@@ -463,12 +415,12 @@ public actor NDKSubscriptionManager {
         }
     }
 
-    private func createFingerprint(for subscription: NDKSubscription) async -> FilterFingerprint {
+    private func createFingerprint(for subscription: NDKSubscription) async -> NDKFilterFingerprint {
         let options = await subscription.options
-        return FilterFingerprint(filters: subscription.filters, closeOnEose: options.closeOnEose)
+        return NDKFilterFingerprint(filters: subscription.filters, closeOnEose: options.closeOnEose)
     }
 
-    private func executeGroup(fingerprint: FilterFingerprint) async {
+    private func executeGroup(fingerprint: NDKFilterFingerprint) async {
         guard var group = pendingGroups[fingerprint] else { return }
 
         pendingGroups.removeValue(forKey: fingerprint)
