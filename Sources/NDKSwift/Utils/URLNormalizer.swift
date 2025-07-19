@@ -102,6 +102,26 @@ public enum URLNormalizer {
 
         return Array(normalized).sorted()
     }
+    
+    /// Converts WebSocket schemes to HTTP schemes for non-WebSocket operations
+    /// - Parameter url: URL to convert
+    /// - Returns: URL with ws:// converted to http:// and wss:// converted to https://
+    public static func convertWebSocketToHTTP(_ url: URL) -> URL? {
+        guard var components = URLComponents(url: url, resolvingAgainstBaseURL: false) else {
+            return nil
+        }
+        
+        switch components.scheme {
+        case "ws":
+            components.scheme = "http"
+        case "wss":
+            components.scheme = "https"
+        default:
+            return url // Return original URL if not a WebSocket scheme
+        }
+        
+        return components.url
+    }
 }
 
 /// Errors that can occur during URL normalization

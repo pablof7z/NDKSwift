@@ -521,15 +521,7 @@ public final class NDKRelay: RelayProtocol, Hashable, Equatable, @unchecked Send
             return
         }
         
-        var components = URLComponents(url: url, resolvingAgainstBaseURL: false)
-        // Change ws:// or wss:// to http:// or https://
-        if components?.scheme == "ws" {
-            components?.scheme = "http"
-        } else if components?.scheme == "wss" {
-            components?.scheme = "https"
-        }
-        
-        guard let httpURL = components?.url else {
+        guard let httpURL = URLNormalizer.convertWebSocketToHTTP(url) else {
             return
         }
         
