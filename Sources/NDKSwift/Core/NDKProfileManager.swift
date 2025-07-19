@@ -102,7 +102,7 @@ public actor NDKProfileManager {
             // Process events
             for event in events {
                 guard let profileData = event.content.data(using: String.Encoding.utf8),
-                      let profile = try? JSONDecoder().decode(NDKUserProfile.self, from: profileData) else {
+                      let profile = JSONCoding.safeDecode(NDKUserProfile.self, from: profileData) else {
                     continue
                 }
                 
@@ -169,7 +169,7 @@ public actor NDKProfileManager {
                 do {
                     for try await event in subscription {
                         if let profileData = event.content.data(using: .utf8),
-                           let profile = try? JSONDecoder().decode(NDKUserProfile.self, from: profileData) {
+                           let profile = JSONCoding.safeDecode(NDKUserProfile.self, from: profileData) {
                             // Update cache
                             updateCache(pubkey: pubkey, profile: profile)
                             
@@ -271,7 +271,7 @@ public actor NDKProfileManager {
         
         // Parse the profile from event content
         guard let profileData = event.content.data(using: .utf8),
-              let profile = try? JSONDecoder().decode(NDKUserProfile.self, from: profileData) else {
+              let profile = JSONCoding.safeDecode(NDKUserProfile.self, from: profileData) else {
             return nil
         }
         
