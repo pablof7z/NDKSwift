@@ -14,7 +14,7 @@ final class WalletHealthMonitorTests: XCTestCase {
         
         // Create signer
         let privateKey = Crypto.generatePrivateKey()
-        signer = NDKPrivateKeySigner(privateKey: privateKey)
+        signer = try NDKPrivateKeySigner(privateKey: privateKey)
         
         // Create NDK instance with SQLite cache
         let cache = try await NDKSQLiteCache()
@@ -24,8 +24,8 @@ final class WalletHealthMonitorTests: XCTestCase {
         wallet = NIP60Wallet(ndk: ndk, cache: cache)
         
         // Get references to internal components
-        eventManager = wallet.eventManager
-        healthMonitor = wallet.healthMonitor
+        eventManager = await wallet.eventManager
+        healthMonitor = await wallet.healthMonitor
     }
     
     override func tearDown() async throws {

@@ -61,14 +61,14 @@ public actor NDKCacheNegentropyStorage: NegentropyStorage {
     public func removeItems(_ ids: [Data]) async throws {
         // Convert Data IDs to hex strings
         for idData in ids {
-            let hexId = idData.hexEncodedString()
+            let hexId = idData.hexString
             try await cache.deleteEvent(id: hexId)
         }
     }
     
     /// Get items that match specific IDs (for reconciliation)
     public func getItemsById(_ ids: [Data]) async throws -> [NegentropyItem] {
-        let hexIds = ids.map { $0.hexEncodedString() }
+        let hexIds = ids.map { $0.hexString }
         let existence = await cache.hasEvents(ids: hexIds)
         
         var items: [NegentropyItem] = []
@@ -101,26 +101,3 @@ public actor NDKCacheNegentropyStorage: NegentropyStorage {
     }
 }
 
-// Extension for Data hex encoding
-extension Data {
-    func hexEncodedString() -> String {
-        return self.map { String(format: "%02x", $0) }.joined()
-    }
-    
-    init?(hex: String) {
-        let len = hex.count / 2
-        var data = Data(capacity: len)
-        var index = hex.startIndex
-        
-        for _ in 0..<len {
-            let nextIndex = hex.index(index, offsetBy: 2)
-            guard let b = UInt8(hex[index..<nextIndex], radix: 16) else {
-                return nil
-            }
-            data.append(b)
-            index = nextIndex
-        }
-        
-        self = data
-    }
-}

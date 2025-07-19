@@ -29,7 +29,7 @@ final class DeletionEventTests: XCTestCase {
         try await super.setUp()
         
         // Create test signer
-        let privateKey = try generatePrivateKey()
+        let privateKey = Crypto.generatePrivateKey()
         signer = try NDKPrivateKeySigner(privateKey: privateKey)
         
         // Create cache
@@ -130,7 +130,7 @@ final class DeletionEventTests: XCTestCase {
         try await cache.saveEvent(originalEvent)
         
         // Create another signer (different author)
-        let otherPrivateKey = try generatePrivateKey()
+        let otherPrivateKey = Crypto.generatePrivateKey()
         let otherSigner = try NDKPrivateKeySigner(privateKey: otherPrivateKey)
         
         // Try to delete from different author
@@ -313,15 +313,4 @@ final class DeletionEventTests: XCTestCase {
 }
 
 // MARK: - Test Helpers
-
-private extension DeletionEventTests {
-    func generatePrivateKey() throws -> String {
-        var bytes = [UInt8](repeating: 0, count: 32)
-        let result = SecRandomCopyBytes(kSecRandomDefault, 32, &bytes)
-        guard result == errSecSuccess else {
-            throw NDKError.signingFailed("Failed to generate random bytes")
-        }
-        return bytes.map { String(format: "%02x", $0) }.joined()
-    }
-}
 

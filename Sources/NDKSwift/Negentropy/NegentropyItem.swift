@@ -124,33 +124,3 @@ public enum NegentropyError: LocalizedError {
         }
     }
 }
-
-// Extension for hex encoding/decoding
-extension String {
-    func hexDecoded() -> Data? {
-        var data = Data()
-        var hex = self
-        
-        // Remove 0x prefix if present
-        if hex.hasPrefix("0x") {
-            hex = String(hex.dropFirst(2))
-        }
-        
-        // Ensure even number of characters
-        if hex.count % 2 != 0 {
-            hex = "0" + hex
-        }
-        
-        var index = hex.startIndex
-        while index < hex.endIndex {
-            let nextIndex = hex.index(index, offsetBy: 2)
-            guard let byte = UInt8(hex[index..<nextIndex], radix: 16) else {
-                return nil
-            }
-            data.append(byte)
-            index = nextIndex
-        }
-        
-        return data
-    }
-}

@@ -6,7 +6,7 @@ final class OutboxModelPTagTests: XCTestCase {
     
     func testEventWithFewerThan10PTagsUsesOutboxModel() async throws {
         let cache = MemoryCache()
-        let signer = try NDKPrivateKeySigner(privateKey: PrivateKey.generate())
+        let signer = try NDKPrivateKeySigner(privateKey: Crypto.generatePrivateKey())
         let ndk = NDK(relayUrls: [], signer: signer, cache: cache)
         
         // Create test event with 3 p-tags (< 10)
@@ -35,7 +35,7 @@ final class OutboxModelPTagTests: XCTestCase {
     
     func testEventWith10OrMorePTagsSkipsOutboxModel() async throws {
         let cache = MemoryCache()
-        let signer = try NDKPrivateKeySigner(privateKey: PrivateKey.generate())
+        let signer = try NDKPrivateKeySigner(privateKey: Crypto.generatePrivateKey())
         let ndk = NDK(relayUrls: [], signer: signer, cache: cache)
         
         // Create test event with 11 p-tags (>= 10)
@@ -64,7 +64,7 @@ final class OutboxModelPTagTests: XCTestCase {
     
     func testEventWithNoPTagsWorksNormally() async throws {
         let cache = MemoryCache()
-        let signer = try NDKPrivateKeySigner(privateKey: PrivateKey.generate())
+        let signer = try NDKPrivateKeySigner(privateKey: Crypto.generatePrivateKey())
         let ndk = NDK(relayUrls: [], signer: signer, cache: cache)
         
         // Create test event with no p-tags
@@ -88,7 +88,7 @@ final class OutboxModelPTagTests: XCTestCase {
     
     func testPTagExtractionWorksCorrectly() async throws {
         let cache = MemoryCache()
-        let signer = try NDKPrivateKeySigner(privateKey: PrivateKey.generate())
+        let signer = try NDKPrivateKeySigner(privateKey: Crypto.generatePrivateKey())
         let ndk = NDK(relayUrls: [], signer: signer, cache: cache)
         
         // Create test event with mixed tags
@@ -116,7 +116,7 @@ final class OutboxModelPTagTests: XCTestCase {
     
     func testFetchingIgnoresPTagCount() async throws {
         let cache = MemoryCache()
-        let signer = try NDKPrivateKeySigner(privateKey: PrivateKey.generate())
+        let signer = try NDKPrivateKeySigner(privateKey: Crypto.generatePrivateKey())
         let ndk = NDK(relayUrls: [], signer: signer, cache: cache)
         
         // Create filter with many p-tags

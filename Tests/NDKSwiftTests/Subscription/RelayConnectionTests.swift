@@ -74,7 +74,7 @@ final class RelayConnectionTests: XCTestCase {
     
     func testPublishingConnectsToExplicitlyRequestedRelays() async throws {
         // Given: A signer and a relay URL not in the pool
-        let signer = try NDKPrivateKeySigner.generate()
+        let signer = try NDKPrivateKeySigner(privateKey: Crypto.generatePrivateKey())
         ndk.signer = signer
         
         let relayUrl = "wss://localhost:8084"
@@ -111,7 +111,7 @@ final class RelayConnectionTests: XCTestCase {
     
     func testPublishingConnectsToRelaysFromRelaySelector() async throws {
         // Given: A signer
-        let signer = try NDKPrivateKeySigner.generate()
+        let signer = try NDKPrivateKeySigner(privateKey: Crypto.generatePrivateKey())
         ndk.signer = signer
         
         // Add some relays to the pool but don't connect them

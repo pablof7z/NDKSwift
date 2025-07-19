@@ -3,6 +3,13 @@ import Foundation
 import CashuSwift
 import GRDB
 
+// MARK: - SQLite Constants
+
+private enum SQLiteConstants {
+    /// SQLite cache size in KB (negative means KB, positive means pages)
+    static let cacheSize = -64000 // 64MB
+}
+
 
 /// SQLite-backed cache implementation for NDKSwift
 /// Provides efficient storage and querying of Nostr events with proper migration support
@@ -36,7 +43,7 @@ public actor NDKSQLiteCache: NDKCache {
         try await dbQueue.writeWithoutTransaction { db in
             try db.execute(sql: "PRAGMA journal_mode = WAL")
             try db.execute(sql: "PRAGMA synchronous = NORMAL")
-            try db.execute(sql: "PRAGMA cache_size = -64000") // 64MB cache
+            try db.execute(sql: "PRAGMA cache_size = \(SQLiteConstants.cacheSize)") // \(abs(SQLiteConstants.cacheSize) / 1024)MB cache
             try db.execute(sql: "PRAGMA temp_store = MEMORY")
             try db.execute(sql: "PRAGMA foreign_keys = ON")
         }

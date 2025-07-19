@@ -1,6 +1,16 @@
 import Foundation
 import CashuSwift
 
+// MARK: - Cache Constants
+
+public enum CacheConstants {
+    /// Default max age for mint info (24 hours)
+    public static let defaultMintInfoMaxAge: TimeInterval = 86400
+    
+    /// Default max age for keysets (1 hour)
+    public static let defaultKeysetMaxAge: TimeInterval = 3600
+}
+
 /// A simple wrapper that provides mint caching with automatic refresh
 public actor CachedMintLoader {
     private let cache: NDKCache
@@ -14,8 +24,8 @@ public actor CachedMintLoader {
     ///   - keysetMaxAge: How long before keysets are considered stale (default: 1 hour)
     public init(
         cache: NDKCache,
-        mintInfoMaxAge: TimeInterval = 86400,  // 24 hours
-        keysetMaxAge: TimeInterval = 3600      // 1 hour
+        mintInfoMaxAge: TimeInterval = CacheConstants.defaultMintInfoMaxAge,
+        keysetMaxAge: TimeInterval = CacheConstants.defaultKeysetMaxAge
     ) {
         self.cache = cache
         self.mintInfoMaxAge = mintInfoMaxAge

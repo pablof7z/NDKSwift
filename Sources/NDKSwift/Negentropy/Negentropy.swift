@@ -238,7 +238,7 @@ public actor Negentropy {
             let lower = prevIndex
             let upper = try await storage.findLowerBound(prevIndex, storageSize, currBound)
             
-            print("[Negentropy] Processing bound: timestamp=\(currBound.timestamp), id=\(currBound.id.hexEncodedString()), mode=\(mode), lower=\(lower), upper=\(upper), storageSize=\(storageSize)")
+            print("[Negentropy] Processing bound: timestamp=\(currBound.timestamp), id=\(currBound.id.hexString), mode=\(mode), lower=\(lower), upper=\(upper), storageSize=\(storageSize)")
             
             if mode == NegentropyMode.skip {
                 skip = true
@@ -268,7 +268,7 @@ public actor Negentropy {
                         throw NegentropyError.decodingError
                     }
                     theirIds.insert(id)
-                    print("[Negentropy] ID \(i): \(id.hexEncodedString())")
+                    print("[Negentropy] ID \(i): \(id.hexString)")
                 }
                 
                 if isInitiator {
@@ -277,7 +277,7 @@ public actor Negentropy {
                     // Find what we have that they don't
                     try await storage.iterate(lower, upper) { item in
                         if !theirIds.contains(item.id) {
-                            haveIds.append(item.id.hexEncodedString())
+                            haveIds.append(item.id.hexString)
                         } else {
                             theirIds.remove(item.id)
                         }
@@ -286,7 +286,7 @@ public actor Negentropy {
                     
                     // What they have that we don't
                     for id in theirIds {
-                        needIds.append(id.hexEncodedString())
+                        needIds.append(id.hexString)
                     }
                     
                     print("[Negentropy] After ID list: have \(haveIds.count) to send, need \(needIds.count) to receive")
@@ -342,7 +342,7 @@ public actor Negentropy {
         let finalOutput = (fullOutput.count == 1 && haveIds.isEmpty && needIds.isEmpty) ? nil : fullOutput
         
         if let output = finalOutput {
-            print("[Negentropy] Sending response: \(output.hexEncodedString())")
+            print("[Negentropy] Sending response: \(output.hexString)")
         } else {
             print("[Negentropy] No response to send (reconciliation complete)")
         }

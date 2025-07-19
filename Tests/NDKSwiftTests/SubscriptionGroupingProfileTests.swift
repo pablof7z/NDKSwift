@@ -15,7 +15,7 @@ final class SubscriptionGroupingProfileTests: XCTestCase {
         ndk = NDK(
             relayUrls: [],
             signer: nil,
-            cache: SimpleMemoryCache()
+            cache: MemoryCache()
         )
     }
     
