@@ -49,7 +49,7 @@ public struct NDKCashuTokenEvent {
         )
         
         let publishedRelays = try await ndk.publish(tokenEvent.event)
-        print("NDKCashuTokenEvent - Published to \(publishedRelays.count) relays")
+        NDKLogger.shared.log(.info, category: .event, "NDKCashuTokenEvent - Published to \(publishedRelays.count) relays")
         
         return tokenEvent
     }
@@ -109,7 +109,7 @@ public struct NDKCashuQuoteEvent {
         )
         
         _ = try await ndk.publish(quoteEvent.event)
-        print("NDKCashuQuoteEvent - Published quote event: \(quoteEvent.event.id)")
+        NDKLogger.shared.log(.info, category: .event, "NDKCashuQuoteEvent - Published quote event: \(quoteEvent.event.id)")
         
         return quoteEvent
     }
@@ -177,16 +177,16 @@ public struct NDKCashuWalletEvent {
             signer: signer
         )
         
-        print("NDKCashuWalletEvent - Publishing wallet configuration event: \(walletEvent.event.id)")
-        print("NDKCashuWalletEvent - Event kind: \(walletEvent.event.kind)")
-        print("NDKCashuWalletEvent - Event tags: \(walletEvent.event.tags)")
-        print("NDKCashuWalletEvent - Event author: \(walletEvent.event.pubkey)")
+        NDKLogger.shared.log(.info, category: .event, "NDKCashuWalletEvent - Publishing wallet configuration event: \(walletEvent.event.id)")
+        NDKLogger.shared.log(.debug, category: .event, "NDKCashuWalletEvent - Event kind: \(walletEvent.event.kind)")
+        NDKLogger.shared.log(.debug, category: .event, "NDKCashuWalletEvent - Event tags: \(walletEvent.event.tags)")
+        NDKLogger.shared.log(.debug, category: .event, "NDKCashuWalletEvent - Event author: \(walletEvent.event.pubkey)")
         
         do {
             let publishedRelays = try await ndk.publish(walletEvent.event)
-            print("NDKCashuWalletEvent - Successfully published wallet configuration to \(publishedRelays.count) relays: \(publishedRelays)")
+            NDKLogger.shared.log(.info, category: .event, "NDKCashuWalletEvent - Successfully published wallet configuration to \(publishedRelays.count) relays: \(publishedRelays)")
         } catch {
-            print("NDKCashuWalletEvent - ERROR: Failed to publish wallet event: \(error)")
+            NDKLogger.shared.log(.error, category: .event, "NDKCashuWalletEvent - ERROR: Failed to publish wallet event: \(error)")
             throw error
         }
         
@@ -201,8 +201,8 @@ public struct NDKCashuWalletEvent {
         p2pkPrivateKey: String? = nil,
         signer: NDKSigner
     ) async throws -> NDKCashuWalletEvent {
-        print("🔐 NDKCashuWalletEvent - Creating Kind 17375 wallet configuration event")
-        print("🔐 NDKCashuWalletEvent - Input parameters:")
+        NDKLogger.shared.log(.debug, category: .event, "🔐 NDKCashuWalletEvent - Creating Kind 17375 wallet configuration event")
+        NDKLogger.shared.log(.debug, category: .event, "🔐 NDKCashuWalletEvent - Input parameters:")
         print("🔐   - mints: \(mints)")
         print("🔐   - relays: \(relays ?? [])")
         print("🔐   - p2pkPrivateKey: \(p2pkPrivateKey?.prefix(8) ?? "nil")...")
