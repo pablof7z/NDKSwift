@@ -36,7 +36,7 @@ public struct NegentropyAccumulator {
     /// Get the current fingerprint
     public func fingerprint() -> Data {
         // Create a copy to avoid mutating the accumulator
-        var hashCopy = hash
+        let hashCopy = hash
         return Data(hashCopy.finalize())
     }
     
