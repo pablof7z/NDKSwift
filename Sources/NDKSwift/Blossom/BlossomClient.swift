@@ -83,7 +83,7 @@ public actor BlossomClient {
 
         // Calculate SHA256
         let sha256 = SHA256.hash(data: data)
-        let sha256Hex = sha256.compactMap { String(format: "%02x", $0) }.joined()
+        let sha256Hex = Data(sha256).hexString
 
         // Check if we need to discover the server first
         let descriptor = try? await discoverServer(serverURL)
@@ -290,7 +290,7 @@ public actor BlossomClient {
             case 200:
                 // Verify SHA256
                 let downloadedSHA256 = SHA256.hash(data: data)
-                let downloadedHex = downloadedSHA256.compactMap { String(format: "%02x", $0) }.joined()
+                let downloadedHex = Data(downloadedSHA256).hexString
 
                 guard downloadedHex == sha256 else {
                     throw NDKError.invalidSHA256(sha256)
@@ -323,7 +323,7 @@ public actor BlossomClient {
     ) async throws -> BlossomBlob {
         // Calculate SHA256
         let sha256 = SHA256.hash(data: data)
-        let sha256Hex = sha256.compactMap { String(format: "%02x", $0) }.joined()
+        let sha256Hex = Data(sha256).hexString
 
         // Create auth
         let auth = try await BlossomAuth.createUploadAuth(
