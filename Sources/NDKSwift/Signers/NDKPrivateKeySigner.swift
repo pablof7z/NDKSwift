@@ -172,23 +172,25 @@ public final class NDKPrivateKeySigner: NDKSigner {
     
     /// Creates appropriate encryption error based on the underlying error type
     private func createEncryptionError(for nip: String, from error: Error) -> NDKError {
-        if let cryptoError = error as? Crypto.CryptoError {
-            return NDKError.encryptionFailed("\(nip) encryption failed: \(cryptoError.errorDescription ?? "")", underlying: error)
-        } else if let nip44Error = error as? Crypto.NIP44Error {
-            return NDKError.encryptionFailed("\(nip) encryption failed: \(nip44Error.errorDescription ?? "")", underlying: error)
-        } else {
-            return NDKError.encryptionFailed("\(nip) encryption failed", underlying: error)
-        }
+        let errorMessage = createErrorMessage(for: nip, from: error, operation: "encryption")
+        return NDKError.encryptionFailed(errorMessage, underlying: error)
     }
     
     /// Creates appropriate decryption error based on the underlying error type
     private func createDecryptionError(for nip: String, from error: Error) -> NDKError {
-        if let cryptoError = error as? Crypto.CryptoError {
-            return NDKError.decryptionFailed("\(nip) decryption failed: \(cryptoError.errorDescription ?? "")", underlying: error)
-        } else if let nip44Error = error as? Crypto.NIP44Error {
-            return NDKError.decryptionFailed("\(nip) decryption failed: \(nip44Error.errorDescription ?? "")", underlying: error)
-        } else {
-            return NDKError.decryptionFailed("\(nip) decryption failed", underlying: error)
+        let errorMessage = createErrorMessage(for: nip, from: error, operation: "decryption")
+        return NDKError.decryptionFailed(errorMessage, underlying: error)
+    }
+    
+    /// Creates error message based on the underlying error type
+    private func createErrorMessage(for nip: String, from error: Error, operation: String) -> String {
+        switch error {
+        case let cryptoError as Crypto.CryptoError:
+            return "\(nip) \(operation) failed: \(cryptoError.errorDescription ?? "")"
+        case let nip44Error as Crypto.NIP44Error:
+            return "\(nip) \(operation) failed: \(nip44Error.errorDescription ?? "")"
+        default:
+            return "\(nip) \(operation) failed"
         }
     }
 }
