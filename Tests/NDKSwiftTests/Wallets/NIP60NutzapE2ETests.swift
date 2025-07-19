@@ -31,11 +31,8 @@ final class NIP60NutzapE2ETests: XCTestCase {
         print("✅ Not in CI environment, proceeding with test")
         
         // 1. Create two pubkeys
-        let privateKey1 = Crypto.generatePrivateKey()
-        let privateKey2 = Crypto.generatePrivateKey()
-        
-        signer1 = try NDKPrivateKeySigner(privateKey: privateKey1)
-        signer2 = try NDKPrivateKeySigner(privateKey: privateKey2)
+        signer1 = try NDKPrivateKeySigner.generate()
+        signer2 = try NDKPrivateKeySigner.generate()
         
         pubkey1 = try await signer1.pubkey
         pubkey2 = try await signer2.pubkey

@@ -19,8 +19,7 @@ struct NegentropySyncDemo {
             await ndk.setCacheAdapter(cache)
             
             // Create test signer
-            let privateKey = try NDKPrivateKeySigner.generatePrivateKey()
-            let signer = NDKPrivateKeySigner(privateKey: privateKey)
+            let signer = try NDKPrivateKeySigner.generate()
             ndk.signer = signer
             
             print("📝 Creating test events...")

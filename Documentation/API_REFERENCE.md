@@ -48,7 +48,6 @@ public var outboxConfig: NDKOutboxConfig         // Outbox configuration
 public var outbox: NDKOutboxManager { get }      // Simplified outbox API
 public var subscriptionTracker: NDKSubscriptionTracker { get }
 public var signatureVerificationConfig: NDKSignatureVerificationConfig { get }
-public var optimisticPublishingConfig: NDKOptimisticPublishingConfig // Optimistic publishing configuration
 public var relays: [NDKRelay] { get }           // All configured relays
 public var pool: NDKRelayPool { get }           // Relay pool manager
 ```
@@ -78,11 +77,7 @@ public func publish(_ event: NDKEvent) async throws -> Set<NDKRelay>
 // Publish to specific relays
 public func publish(event: NDKEvent, to relayUrls: Set<String>) async throws -> Set<NDKRelay>
 
-// Optimistic publishing configuration
-public var optimisticPublishingConfig: NDKOptimisticPublishingConfig
-// Configure: enabled, cacheUnpublishedEvents, dispatchToSubscriptions
-
-// Retry publishing unpublished events
+// Retry publishing unpublished events (optimistic publishing is always enabled)
 public func retryUnpublishedEvents(maxAge: TimeInterval, limit: Int?) async throws -> [(event: NDKEvent, relays: Set<NDKRelay>)]
 ```
 
@@ -842,18 +837,6 @@ public enum EventConfirmationState: Equatable, Sendable {
     case confirmed(fromRelay: String)           // Event confirmed by relay
     
     public var isConfirmed: Bool { get }        // True if confirmed
-}
-```
-
-#### NDKOptimisticPublishingConfig
-
-```swift
-public struct NDKOptimisticPublishingConfig: Sendable {
-    public var enabled: Bool = true                      // Enable optimistic publishing
-    public var cacheUnpublishedEvents: Bool = true      // Cache unpublished events
-    public var dispatchToSubscriptions: Bool = true     // Dispatch to subscriptions
-    
-    public static let disabled: NDKOptimisticPublishingConfig // Disabled configuration
 }
 ```
 

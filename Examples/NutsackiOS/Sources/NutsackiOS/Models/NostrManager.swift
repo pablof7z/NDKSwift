@@ -138,8 +138,7 @@ class NostrManager {
         }
         
         // Generate new private key
-        let privateKeyHex = Crypto.generatePrivateKey()
-        let signer = try NDKPrivateKeySigner(privateKey: privateKeyHex)
+        let signer = try NDKPrivateKeySigner.generate()
         
         // Create session with auth manager
         let session = try await ndkAuthManager.createSession(

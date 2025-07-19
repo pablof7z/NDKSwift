@@ -398,29 +398,3 @@ public enum EventConfirmationState: Equatable, Sendable {
         }
     }
 }
-
-// MARK: - Optimistic Publishing Configuration
-
-/// Configuration for optimistic publishing behavior
-public struct NDKOptimisticPublishingConfig: Sendable {
-    /// Whether optimistic publishing is enabled
-    public var enabled: Bool = true
-    
-    /// Whether to add unpublished events to cache
-    public var cacheUnpublishedEvents: Bool = true
-    
-    /// Whether to immediately dispatch to subscriptions
-    public var dispatchToSubscriptions: Bool = true
-    
-    public init(enabled: Bool = true, cacheUnpublishedEvents: Bool = true, dispatchToSubscriptions: Bool = true) {
-        self.enabled = enabled
-        self.cacheUnpublishedEvents = cacheUnpublishedEvents
-        self.dispatchToSubscriptions = dispatchToSubscriptions
-    }
-    
-    public static let disabled = NDKOptimisticPublishingConfig(
-        enabled: false,
-        cacheUnpublishedEvents: false,
-        dispatchToSubscriptions: false
-    )
-}

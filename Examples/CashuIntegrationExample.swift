@@ -34,8 +34,7 @@ struct CashuIntegrationExample {
             print("✅ Initialized NDK with unified cache")
             
             // Step 3: Create a signer (required for wallet operations)
-            let privateKey = try generatePrivateKey()
-            let signer = NDKPrivateKeySigner(privateKey: privateKey)
+            let signer = try NDKPrivateKeySigner.generate()
             ndk.signer = signer
             print("✅ Created and configured signer")
             

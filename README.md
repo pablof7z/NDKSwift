@@ -99,13 +99,8 @@ let event = try await ndk.event()
     .tags([["t", "nostr"], ["t", "swift"]])
     .build()
 
-// Publish (automatically handled offline)
+// Publish (automatically handled offline with optimistic publishing)
 try await ndk.publish(event)
-
-// Configure optimistic publishing
-ndk.optimisticPublishingConfig.enabled = true
-ndk.optimisticPublishingConfig.cacheUnpublishedEvents = true
-ndk.optimisticPublishingConfig.dispatchToSubscriptions = true
 
 // Retry unpublished events
 try await ndk.retryUnpublishedEvents()
@@ -156,7 +151,7 @@ for await event in subscription {
     // Process events as they arrive
 }
 
-// Skip optimistic events
+// Skip optimistic events (only show relay-confirmed events)
 var options = NDKSubscriptionOptions()
 options.skipOptimisticEvents = true
 let strictSubscription = ndk.subscribe(filters: [filter], options: options)

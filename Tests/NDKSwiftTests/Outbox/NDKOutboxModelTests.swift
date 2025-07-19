@@ -8,7 +8,7 @@ final class NDKOutboxModelTests: XCTestCase {
     
     override func setUp() async throws {
         cache = MemoryCache()
-        signer = try NDKPrivateKeySigner(privateKey: Crypto.generatePrivateKey())
+        signer = try NDKPrivateKeySigner.generate()
         ndk = NDK(
             relayUrls: [
                 "wss://relay1.example.com",

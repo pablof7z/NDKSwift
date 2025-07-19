@@ -191,6 +191,7 @@ public actor NDKRelaySubscriptionManager {
 
     /// Handle EOSE for a relay subscription
     public func handleEOSE(relaySubscriptionId: String) {
+<<<<<<< HEAD
         #if DEBUG
         NDKLogger.shared.log(.debug, category: .subscription, "Handling EOSE for relay subscription: \(relaySubscriptionId)")
         NDKLogger.shared.log(.trace, category: .subscription, "Available relay subscriptions: \(Array(relaySubscriptions.keys))")
@@ -206,6 +207,17 @@ public actor NDKRelaySubscriptionManager {
         #if DEBUG
         NDKLogger.shared.log(.debug, category: .subscription, "Found relay subscription with \(relaySub.subscriptions.count) subscriptions")
         #endif
+=======
+        NDKLogger.debug("SubscriptionManager: Handling EOSE for relay subscription: \(relaySubscriptionId)")
+        NDKLogger.debug("Available relay subscriptions: \(Array(relaySubscriptions.keys))")
+        
+        guard var relaySub = relaySubscriptions[relaySubscriptionId] else {
+            NDKLogger.debug("SubscriptionManager: No relay subscription found for ID: \(relaySubscriptionId)")
+            return
+        }
+
+        NDKLogger.debug("SubscriptionManager: Found relay subscription with \(relaySub.subscriptions.count) subscriptions")
+>>>>>>> 1708f88 (refactor: improve separation of concerns and standardize key generation)
 
         relaySub.status = .eoseReceived
         relaySubscriptions[relaySubscriptionId] = relaySub

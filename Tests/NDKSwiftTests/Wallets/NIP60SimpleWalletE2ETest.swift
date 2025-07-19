@@ -13,8 +13,7 @@ final class NIP60SimpleWalletE2ETest: XCTestCase {
         try? await relay.connect()
         
         // Create signer and wallet
-        let privateKey = Crypto.generatePrivateKey()
-        let signer = try NDKPrivateKeySigner(privateKey: privateKey)
+        let signer = try NDKPrivateKeySigner.generate()
         let pubkey = try await signer.pubkey
         ndk.signer = signer
         

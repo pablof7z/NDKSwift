@@ -43,8 +43,8 @@ public enum Crypto {
         
     }
 
-    /// Generate a new private key
-    public static func generatePrivateKey() -> PrivateKey {
+    /// Generate a new private key (internal use only - use NDKPrivateKeySigner.generate() instead)
+    internal static func generatePrivateKey() -> PrivateKey {
         return randomBytes(count: Constants.privateKeySize).hexString
     }
 

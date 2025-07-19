@@ -33,9 +33,6 @@ public final class NDK {
     /// Outbox configuration
     public var outboxConfig: NDKOutboxConfig = .default
     
-    /// Configuration for optimistic publishing
-    public var optimisticPublishingConfig: NDKOptimisticPublishingConfig = NDKOptimisticPublishingConfig()
-    
     /// Configuration for automatic client tagging (NIP-89)
     public var clientTagConfig: NDKClientTagConfig?
     
@@ -124,8 +121,7 @@ public final class NDK {
         // Initialize managers
         self.eventManager = NDKEventManager(
             ndk: self,
-            cache: self.cache,
-            optimisticPublishingConfig: optimisticPublishingConfig
+            cache: self.cache
         )
         
         self.pool = NDKPool(
@@ -576,13 +572,11 @@ public final class NDK {
         if accepted {
             print("[NDK] Event \(eventId) accepted by relay \(relay.url)")
             
-            // Confirm event if optimistic publishing is enabled
-            if optimisticPublishingConfig.enabled {
-                do {
-                    try await cache.confirmEvent(eventId: eventId, onRelay: relay.url)
-                } catch {
-                    print("[NDK] Warning: Failed to confirm event: \(error)")
-                }
+            // Always confirm event in cache
+            do {
+                try await cache.confirmEvent(eventId: eventId, onRelay: relay.url)
+            } catch {
+                print("[NDK] Warning: Failed to confirm event: \(error)")
             }
         } else {
             print("[NDK] Event \(eventId) rejected by relay \(relay.url): \(message ?? "No reason given")")
