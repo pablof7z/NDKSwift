@@ -60,11 +60,6 @@ public final class NDKPrivateKeySigner: NDKSigner {
             throw NDKError.signingFailed("Failed to sign event", underlying: error)
         }
     }
-    
-    public func sign(event: inout NDKEvent) async throws {
-        // This method is deprecated and should not be used with immutable events
-        throw NDKError.notImplemented("Mutating sign method is deprecated. Use NDKEventBuilder instead.")
-    }
 
     public func blockUntilReady() async throws {
         // Private key signer is always ready
@@ -127,21 +122,6 @@ public final class NDKPrivateKeySigner: NDKSigner {
     /// Get the private key (for testing purposes)
     public var privateKeyValue: PrivateKey {
         return privateKey
-    }
-
-    /// Serialize the signer to a payload string (deprecated)
-    /// - Throws: An error if JSON serialization fails
-    @available(*, deprecated, message: "Use serialize() instead")
-    public func toPayload() throws -> String {
-        let payload: [String: Any] = [
-            "type": "privatekey",
-            "privateKey": privateKey
-        ]
-        let data = try JSONSerialization.data(withJSONObject: payload)
-        guard let string = String(data: data, encoding: .utf8) else {
-            throw NDKError.serializationFailed("Failed to convert JSON data to UTF-8 string")
-        }
-        return string
     }
     
     // MARK: - Serialization (NDKSigner Protocol)
