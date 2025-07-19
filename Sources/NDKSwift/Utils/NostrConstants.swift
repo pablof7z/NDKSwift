@@ -1,5 +1,3 @@
-import Foundation
-
 /// Nostr protocol constants for consistent usage across the codebase  
 public enum NostrConstants {
     public static let nostrPrefix = "nostr:"
