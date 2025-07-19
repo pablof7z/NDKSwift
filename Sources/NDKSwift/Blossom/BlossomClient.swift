@@ -1,9 +1,4 @@
 import Foundation
-#if canImport(CryptoKit)
-    import CryptoKit
-#else
-    import Crypto
-#endif
 
 /// Blossom client for interacting with Blossom servers
 public actor BlossomClient {
@@ -82,8 +77,7 @@ public actor BlossomClient {
         let baseURL = try URLUtils.validateURL(serverURL)
 
         // Calculate SHA256
-        let sha256 = SHA256.hash(data: data)
-        let sha256Hex = Data(sha256).hexString
+        let sha256Hex = Crypto.sha256(data).hexString
 
         // Check if we need to discover the server first
         let descriptor = try? await discoverServer(serverURL)
@@ -289,8 +283,7 @@ public actor BlossomClient {
             switch httpResponse.statusCode {
             case 200:
                 // Verify SHA256
-                let downloadedSHA256 = SHA256.hash(data: data)
-                let downloadedHex = Data(downloadedSHA256).hexString
+                let downloadedHex = Crypto.sha256(data).hexString
 
                 guard downloadedHex == sha256 else {
                     throw NDKError.invalidSHA256(sha256)
@@ -322,8 +315,7 @@ public actor BlossomClient {
         expiration: Date? = nil
     ) async throws -> BlossomBlob {
         // Calculate SHA256
-        let sha256 = SHA256.hash(data: data)
-        let sha256Hex = Data(sha256).hexString
+        let sha256Hex = Crypto.sha256(data).hexString
 
         // Create auth
         let auth = try await BlossomAuth.createUploadAuth(
