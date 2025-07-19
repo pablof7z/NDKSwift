@@ -48,24 +48,38 @@ extension Tag {
     }
 }
 
-/// Content tagging result
+/// Result of content tagging operations
+/// Contains the extracted tags and the processed content after tag extraction
 public struct ContentTag {
+    /// Array of Nostr tags extracted from the content
     public let tags: [Tag]
+    /// The processed content string (may be modified from original)
     public let content: String
 
+    /// Initialize a new ContentTag result
+    /// - Parameters:
+    ///   - tags: Array of extracted Nostr tags
+    ///   - content: The processed content string
     public init(tags: [Tag], content: String) {
         self.tags = tags
         self.content = content
     }
 }
 
-/// Decoded Nostr entity information
+/// Represents a decoded Nostr entity from a bech32-encoded string
+/// Contains all information extracted from npub, nevent, nprofile, naddr, and other Nostr entity formats
 public struct DecodedNostrEntity {
+    /// The type of entity (e.g., "npub", "nevent", "nprofile", "naddr")
     public let type: String
+    /// Event ID for nevent/naddr entities
     public let eventId: String?
+    /// Public key for npub/nprofile entities
     public let pubkey: String?
+    /// Relay hints included in the entity
     public let relays: [String]?
+    /// Event kind for nevent/naddr entities
     public let kind: Int?
+    /// Identifier tag value for naddr entities
     public let identifier: String?
 }
 

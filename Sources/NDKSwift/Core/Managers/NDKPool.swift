@@ -1,10 +1,15 @@
 import Foundation
 
-/// Relay pool change event
+/// Represents a change in the relay pool state
+/// Used to notify observers about relay additions, removals, and connection state changes
 public enum NDKPoolChangeEvent: Sendable {
+    /// A new relay was added to the pool
     case relayAdded(NDKRelay)
+    /// A relay was removed from the pool
     case relayRemoved(RelayURL)
+    /// A relay successfully connected
     case relayConnected(NDKRelay)
+    /// A relay disconnected or failed to connect
     case relayDisconnected(NDKRelay)
 }
 
