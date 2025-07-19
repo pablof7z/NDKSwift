@@ -858,6 +858,7 @@ public actor NIP60Wallet: NDKPaymentProvider {
         return await proofStateManager.getAvailableProofsByMint()
     }
     
+    
     /// Create a token from specific proofs without P2PK locking
     /// This is used for offline token generation where exact proofs are specified
     public func createTokenFromProofs(

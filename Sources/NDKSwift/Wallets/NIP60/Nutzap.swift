@@ -32,19 +32,14 @@ public enum Nutzap {
         ndk: NDK,
         signer: NDKSigner
     ) async throws -> NDKEvent {
-        // Find mints with sufficient balance, ordered by balance (highest first)
-        var mintsWithBalance: [(url: String, mint: CashuSwift.Mint, balance: Int64)] = []
-        for (mintURL, mint) in mints {
-            let balance = await proofStateManager.getBalance(mint: mintURL)
-            if balance >= amount {
-                mintsWithBalance.append((url: mintURL, mint: mint, balance: balance))
-            }
-        }
+        // Get mints with sufficient balance, ordered by balance (highest first)
+        let viableMintURLs = await proofStateManager.getMintsWithSufficientBalance(amount: amount)
         
-        // Sort by balance (highest first) to try the mint with most balance first
-        let viableMints = mintsWithBalance
-            .sorted { $0.balance > $1.balance }
-            .map { (url: $0.url, mint: $0.mint) }
+        // Filter to only configured mints and map to (url, mint) pairs
+        let viableMints: [(url: String, mint: CashuSwift.Mint)] = viableMintURLs.compactMap { mintURL in
+            guard let mint = mints[mintURL] else { return nil }
+            return (url: mintURL, mint: mint)
+        }
         
         guard !viableMints.isEmpty else {
             throw NDKError.insufficientBalance(amount: amount)

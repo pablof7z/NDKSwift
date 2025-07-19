@@ -19,16 +19,18 @@ public enum Payment {
         // For now, use the provided amount
         let invoiceAmount = amount
         
-        // Find a mint that can handle this payment
-        for (mintURL, mint) in mints {
-            let mintBalance = await proofStateManager.getBalance(mint: mintURL)
-            
-            // Skip if insufficient balance (with buffer for fees)
-            if mintBalance < invoiceAmount + 1000 { // 1000 sat fee buffer
-                continue
-            }
-            
+        // Get mints with sufficient balance
+        let viableMintURLs = await proofStateManager.getMintsWithSufficientBalance(amount: invoiceAmount)
+        
+        for mintURL in viableMintURLs {
             do {
+                // Get mint with cached keysets
+                guard let mintUrl = URL(string: mintURL) else {
+                    print("Invalid mint URL: \(mintURL)")
+                    continue
+                }
+                let mint = try await wallet.mints.loadMint(url: mintUrl)
+                
                 return try await payLightningFromMint(
                     wallet: wallet,
                     invoice: invoice,

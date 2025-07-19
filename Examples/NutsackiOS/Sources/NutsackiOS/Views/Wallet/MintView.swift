@@ -134,7 +134,7 @@ struct MintView: View {
                     }
                 }
                 .padding(.vertical)
-                .padding(.bottom, 80) // Add space for the fixed button
+                .padding(.bottom, 120) // Add space for the fixed button and keyboard
             }
             
             // Create Invoice Button - Outside ScrollView
@@ -167,16 +167,19 @@ struct MintView: View {
                 .padding()
             }
             .background(Color(.systemBackground))
+            #if os(iOS)
+            .keyboardAdaptive()
+            #endif
         }
         .navigationTitle("Mint Ecash")
         .platformNavigationBarTitleDisplayMode(inline: true)
-        #if os(iOS)
-        .ignoresSafeArea(.keyboard, edges: .bottom)
-        #endif
         .toolbar {
             ToolbarItem(placement: .navigationBarTrailing) {
-                Button("Cancel") { dismiss() }
-                    .foregroundColor(.orange)
+                Button("Create Invoice") { 
+                    createMintQuote()
+                }
+                .foregroundColor(.orange)
+                .disabled(!isValidAmount || isMinting)
             }
         }
         .alert("Error", isPresented: $showError) {

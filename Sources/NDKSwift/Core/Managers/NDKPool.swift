@@ -4,6 +4,8 @@ import Foundation
 public enum NDKPoolChangeEvent: Sendable {
     case relayAdded(NDKRelay)
     case relayRemoved(RelayURL)
+    case relayConnected(NDKRelay)
+    case relayDisconnected(NDKRelay)
 }
 
 /// Thread-safe actor that manages a pool of relay connections
@@ -46,13 +48,22 @@ public actor NDKPool {
         }
         relayMap[normalizedUrl] = relay
         
-        // Set up connection state observer to publish queued events
+        // Set up connection state observer to publish queued events and emit pool events
         await relay.observeConnectionState { [weak self, weak relay] state in
             guard let self = self, let relay = relay else { return }
-            if case .connected = state {
+            switch state {
+            case .connected:
+                // Emit pool connection event
+                self.poolChangeContinuation.yield(.relayConnected(relay))
                 Task {
                     await self.handleRelayConnected(relay)
                 }
+            case .disconnected, .failed(_):
+                // Emit pool disconnection event
+                self.poolChangeContinuation.yield(.relayDisconnected(relay))
+            case .connecting, .disconnecting:
+                // Don't emit events for transitional states
+                break
             }
         }
         

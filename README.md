@@ -365,11 +365,15 @@ NDKSwift implements the following Nostr Implementation Possibilities:
 ### Payments & Wallet
 - **NIP-47**: Wallet Connect
 - **NIP-57**: Lightning Zaps
-- **NIP-60**: Cashu Ecash Wallet
+- **NIP-60**: Cashu Wallet
 - **NIP-61**: Nutzaps
+
+### Negentropy
+- **NIP-77**: Negentropy Protocol for efficient set reconciliation
 
 ### Storage & Files
 - **Blossom**: Decentralized file storage protocol
+
 
 ### Additional Features
 - Content tagging and parsing
@@ -387,6 +391,7 @@ Comprehensive documentation is available in the [Documentation](Documentation/) 
 - [Examples](Documentation/EXAMPLES.md) - Practical code examples
 - [Architecture Overview](Documentation/ARCHITECTURE.md) - System design and patterns
 - [Optimistic Publishing](Documentation/OPTIMISTIC_PUBLISHING.md) - Deep dive into offline features
+- [NIP-77 Implementation](Documentation/NIP77Implementation.md) - Negentropy sync protocol details
 
 ## Examples
 

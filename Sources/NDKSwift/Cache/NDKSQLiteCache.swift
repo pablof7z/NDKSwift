@@ -1060,4 +1060,39 @@ public actor NDKSQLiteCache: NDKCache {
             return [:]
         }
     }
+    
+    // MARK: - Statistics
+    
+    /// Get cache statistics including total events and breakdown by kind
+    public func getStatistics() async throws -> CacheStatistics {
+        return try await dbQueue.read { db in
+            // Get total event count
+            let totalEvents = try Int.fetchOne(db, sql: "SELECT COUNT(*) FROM events") ?? 0
+            
+            // Get events grouped by kind
+            let rows = try Row.fetchAll(db, sql: "SELECT kind, COUNT(*) as count FROM events GROUP BY kind ORDER BY count DESC")
+            
+            var eventsByKind: [Int: Int] = [:]
+            for row in rows {
+                let kind = row["kind"] as Int
+                let count = row["count"] as Int
+                eventsByKind[kind] = count
+            }
+            
+            return CacheStatistics(totalEvents: totalEvents, eventsByKind: eventsByKind)
+        }
+    }
+}
+
+// MARK: - Cache Statistics Models
+
+/// Statistics about cached events
+public struct CacheStatistics {
+    public let totalEvents: Int
+    public let eventsByKind: [Int: Int]
+    
+    public init(totalEvents: Int, eventsByKind: [Int: Int]) {
+        self.totalEvents = totalEvents
+        self.eventsByKind = eventsByKind
+    }
 }
