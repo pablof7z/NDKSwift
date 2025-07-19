@@ -504,7 +504,7 @@ public final class NDKRelay: RelayProtocol, Hashable, Equatable, @unchecked Send
         await stateActor.updateReconnectDelay(delay * 2)
 
         let reconnectTask = Task {
-            try? await Task.sleep(nanoseconds: UInt64(actualDelay * 1_000_000_000))
+            try? await Task.sleep(nanoseconds: UInt64(actualDelay * Double(TimeConstants.nanosecondsPerSecond)))
             if !Task.isCancelled {
                 try? await self.connect()
             }

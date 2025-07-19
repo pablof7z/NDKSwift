@@ -71,7 +71,7 @@ extension NDK {
             if Date().timeIntervalSince(startWait) > timeout {
                 throw NIP77Error.timeout("Sync timeout after \(timeout) seconds")
             }
-            try await Task.sleep(nanoseconds: 100_000_000) // 100ms
+            try await Task.sleep(nanoseconds: 100 * TimeConstants.nanosecondsPerMillisecond) // 100ms
         }
         
         // Get completed session data

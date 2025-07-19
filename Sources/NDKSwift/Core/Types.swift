@@ -15,6 +15,16 @@ public typealias Signature = String
 /// Unix timestamp in seconds
 public typealias Timestamp = Int64
 
+// MARK: - Time Constants
+
+/// Constants for time conversion
+public enum TimeConstants {
+    /// Nanoseconds per second (for Task.sleep conversion)
+    public static let nanosecondsPerSecond: UInt64 = 1_000_000_000
+    /// Nanoseconds per millisecond (for Task.sleep conversion)
+    public static let nanosecondsPerMillisecond: UInt64 = 1_000_000
+}
+
 // MARK: - Timestamp utilities
 public extension Timestamp {
     /// Get the current timestamp

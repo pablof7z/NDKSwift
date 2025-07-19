@@ -98,7 +98,7 @@ public struct NWCResponseHandler {
         
         // 5. Set up timeout
         let timeoutTask = Task {
-            try await Task.sleep(nanoseconds: UInt64(timeout * 1_000_000_000))
+            try await Task.sleep(nanoseconds: UInt64(timeout * Double(TimeConstants.nanosecondsPerSecond)))
             await subscription.close()
             throw NDKError.timeout(operation: "NWC response", seconds: Int(timeout))
         }
@@ -218,7 +218,7 @@ public struct NWCResponseHandler {
         }
         
         let timeoutTask = Task<[String: Result<T, NDKError>], Error> {
-            try await Task.sleep(nanoseconds: UInt64(timeout * 1_000_000_000))
+            try await Task.sleep(nanoseconds: UInt64(timeout * Double(TimeConstants.nanosecondsPerSecond)))
             throw NDKError.timeout(operation: "NWC multi-response", seconds: Int(timeout))
         }
         
