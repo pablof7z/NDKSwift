@@ -353,15 +353,3 @@ public struct NegentropyDecoder {
             .paddedToLength(32) // Extend to full 32 bytes
     }
 }
-
-// Helper extension for padding data
-extension Data {
-    func paddedToLength(_ length: Int) -> Data {
-        if count >= length {
-            return self
-        }
-        var padded = self
-        padded.append(Data(repeating: 0, count: length - count))
-        return padded
-    }
-}
