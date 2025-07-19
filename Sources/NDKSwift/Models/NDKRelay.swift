@@ -535,7 +535,7 @@ public final class NDKRelay: RelayProtocol, Hashable, Equatable, @unchecked Send
         
         var request = URLRequest(url: httpURL)
         request.setValue(HTTPConstants.contentTypeNostrJSON, forHTTPHeaderField: HTTPConstants.headerAccept)
-        request.timeoutInterval = 10
+        request.timeoutInterval = HTTPConstants.timeoutRelayInfo
         
         do {
             let (data, _) = try await URLSession.shared.data(for: request)
