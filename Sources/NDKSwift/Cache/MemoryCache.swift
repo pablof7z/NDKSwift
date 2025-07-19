@@ -23,12 +23,12 @@ public actor MemoryCache: NDKCache {
     public func saveEvent(_ event: NDKEvent) async throws {
         let eventId = event.id
         events[eventId] = event
-        print("[MemoryCache] Saved event \(eventId)")
+        NDKLogger.shared.log(.trace, category: .cache, "Saved event \(eventId)")
     }
     
     public func getEvent(id: String) async -> NDKEvent? {
         let event = events[id]
-        print("[MemoryCache] Retrieved event \(id): \(event != nil ? "found" : "not found")")
+        NDKLogger.shared.log(.trace, category: .cache, "Retrieved event \(id): \(event != nil ? "found" : "not found")")
         return event
     }
     
@@ -69,25 +69,25 @@ public actor MemoryCache: NDKCache {
         
         results = sortedResults
         
-        print("[MemoryCache] Query returned \(results.count) events")
+        NDKLogger.shared.log(.trace, category: .cache, "Query returned \(results.count) events")
         return results
     }
     
     public func deleteEvent(id: String) async throws {
         events.removeValue(forKey: id)
-        print("[MemoryCache] Deleted event \(id)")
+        NDKLogger.shared.log(.debug, category: .cache, "Deleted event \(id)")
     }
     
     // MARK: - Profile Operations
     
     public func saveProfile(_ profile: NDKUserProfile, pubkey: String) async throws {
         profiles[pubkey] = profile
-        print("[MemoryCache] Saved profile for \(pubkey)")
+        NDKLogger.shared.log(.trace, category: .cache, "Saved profile for \(pubkey)")
     }
     
     public func getProfile(pubkey: String) async -> NDKUserProfile? {
         let profile = profiles[pubkey]
-        print("[MemoryCache] Retrieved profile for \(pubkey): \(profile != nil ? "found" : "not found")")
+        NDKLogger.shared.log(.trace, category: .cache, "Retrieved profile for \(pubkey): \(profile != nil ? "found" : "not found")")
         return profile
     }
     
@@ -101,7 +101,7 @@ public actor MemoryCache: NDKCache {
         keysets.removeAll()
         mintKeysets.removeAll()
         await decryptedContent.clear()
-        print("[MemoryCache] Cleared all cache data")
+        NDKLogger.shared.log(.info, category: .cache, "Cleared all cache data")
     }
     
     // MARK: - Optimistic Publishing Support
@@ -112,7 +112,7 @@ public actor MemoryCache: NDKCache {
         eventConfirmations[eventId] = .optimistic
         unpublishedEventRelays[eventId] = relays
         eventCreationTimes[eventId] = Date()
-        print("[MemoryCache] Added unpublished event \(eventId) for relays: \(relays.joined(separator: ", "))")
+        NDKLogger.shared.log(.debug, category: .cache, "Added unpublished event \(eventId) for relays: \(relays.joined(separator: ", "))")
     }
     
     public func confirmEvent(eventId: String, onRelay relay: String) async throws {
@@ -120,14 +120,14 @@ public actor MemoryCache: NDKCache {
             switch existingState {
             case .optimistic:
                 eventConfirmations[eventId] = .confirmed(fromRelay: relay)
-                print("[MemoryCache] Confirmed event \(eventId) on relay \(relay)")
+                NDKLogger.shared.log(.debug, category: .cache, "Confirmed event \(eventId) on relay \(relay)")
             case .confirmed:
-                print("[MemoryCache] Event \(eventId) already confirmed")
+                NDKLogger.shared.log(.trace, category: .cache, "Event \(eventId) already confirmed")
             }
         } else {
             // Event not found, might have been confirmed directly
             eventConfirmations[eventId] = .confirmed(fromRelay: relay)
-            print("[MemoryCache] Marked event \(eventId) as confirmed on relay \(relay)")
+            NDKLogger.shared.log(.debug, category: .cache, "Marked event \(eventId) as confirmed on relay \(relay)")
         }
     }
     
@@ -167,7 +167,7 @@ public actor MemoryCache: NDKCache {
             results = Array(results.prefix(limit))
         }
         
-        print("[MemoryCache] Found \(results.count) unpublished events (maxAge: \(maxAge)s)")
+        NDKLogger.shared.log(.trace, category: .cache, "Found \(results.count) unpublished events (maxAge: \(maxAge)s)")
         return results
     }
     
@@ -181,12 +181,12 @@ public actor MemoryCache: NDKCache {
     public func storeDecryptedContent(_ content: String, for eventId: String, viewerPubkey: String) async {
         let key = "\(eventId):\(viewerPubkey)"
         await decryptedContent.set(key, value: content)
-        print("[MemoryCache] Cached decrypted content for event \(eventId) viewer \(viewerPubkey)")
+        NDKLogger.shared.log(.trace, category: .cache, "Cached decrypted content for event \(eventId) viewer \(viewerPubkey)")
     }
     
     public func clearDecryptedContent() async {
         await decryptedContent.clear()
-        print("[MemoryCache] Cleared all decrypted content")
+        NDKLogger.shared.log(.debug, category: .cache, "Cleared all decrypted content")
     }
     
     public func clearDecryptedContent(for viewerPubkey: String) async {
@@ -195,7 +195,7 @@ public actor MemoryCache: NDKCache {
         for (key, _) in allItems where key.hasSuffix(":\(viewerPubkey)") {
             await decryptedContent.remove(key)
         }
-        print("[MemoryCache] Cleared decrypted content for viewer \(viewerPubkey)")
+        NDKLogger.shared.log(.debug, category: .cache, "Cleared decrypted content for viewer \(viewerPubkey)")
     }
     
     // MARK: - Debug Helpers
@@ -216,26 +216,26 @@ public actor MemoryCache: NDKCache {
     
     public func saveMintInfo(_ info: NDKMintInfo, url: String) async throws {
         mintInfos[url] = (info, Date())
-        print("[MemoryCache] Saved mint info for \(url)")
+        NDKLogger.shared.log(.trace, category: .cache, "Saved mint info for \(url)")
     }
     
     public func getMintInfo(url: String) async -> NDKMintInfo? {
         let info = mintInfos[url]?.info
-        print("[MemoryCache] Retrieved mint info for \(url): \(info != nil ? "found" : "not found")")
+        NDKLogger.shared.log(.trace, category: .cache, "Retrieved mint info for \(url): \(info != nil ? "found" : "not found")")
         return info
     }
     
     public func isMintInfoStale(url: String, maxAge: TimeInterval) async -> Bool {
         guard let entry = mintInfos[url] else { return true }
         let isStale = Date().timeIntervalSince(entry.timestamp) > maxAge
-        print("[MemoryCache] Mint info for \(url) is \(isStale ? "stale" : "fresh")")
+        NDKLogger.shared.log(.trace, category: .cache, "Mint info for \(url) is \(isStale ? "stale" : "fresh")")
         return isStale
     }
     
     public func invalidateMintCache(url: String) async throws {
         mintInfos.removeValue(forKey: url)
         mintKeysets.removeValue(forKey: url)
-        print("[MemoryCache] Invalidated mint cache for \(url)")
+        NDKLogger.shared.log(.debug, category: .cache, "Invalidated mint cache for \(url)")
     }
     
     public func saveKeyset(_ keyset: CashuSwift.Keyset, mintUrl: String) async throws {
@@ -245,7 +245,7 @@ public actor MemoryCache: NDKCache {
         mintList.append((keyset, Date()))
         mintKeysets[mintUrl] = mintList
         
-        print("[MemoryCache] Saved keyset \(keyset.keysetID) for mint \(mintUrl)")
+        NDKLogger.shared.log(.trace, category: .cache, "Saved keyset \(keyset.keysetID) for mint \(mintUrl)")
     }
     
     public func saveKeysets(_ keysets: [CashuSwift.Keyset], mintUrl: String) async throws {
@@ -258,18 +258,18 @@ public actor MemoryCache: NDKCache {
         }
         
         mintKeysets[mintUrl] = mintList
-        print("[MemoryCache] Saved \(keysets.count) keysets for mint \(mintUrl)")
+        NDKLogger.shared.log(.debug, category: .cache, "Saved \(keysets.count) keysets for mint \(mintUrl)")
     }
     
     public func getKeyset(id: String) async -> CashuSwift.Keyset? {
         let keyset = keysets[id]
-        print("[MemoryCache] Retrieved keyset \(id): \(keyset != nil ? "found" : "not found")")
+        NDKLogger.shared.log(.trace, category: .cache, "Retrieved keyset \(id): \(keyset != nil ? "found" : "not found")")
         return keyset
     }
     
     public func getKeysets(mintUrl: String) async -> [CashuSwift.Keyset] {
         let keysets = mintKeysets[mintUrl]?.map { $0.keyset } ?? []
-        print("[MemoryCache] Retrieved \(keysets.count) keysets for mint \(mintUrl)")
+        NDKLogger.shared.log(.trace, category: .cache, "Retrieved \(keysets.count) keysets for mint \(mintUrl)")
         return keysets
     }
     
@@ -277,19 +277,19 @@ public actor MemoryCache: NDKCache {
         let activeKeysets = mintKeysets[mintUrl]?
             .map { $0.keyset }
             .filter { $0.unit == unit && $0.active } ?? []
-        print("[MemoryCache] Retrieved \(activeKeysets.count) active keysets for mint \(mintUrl) unit \(unit)")
+        NDKLogger.shared.log(.trace, category: .cache, "Retrieved \(activeKeysets.count) active keysets for mint \(mintUrl) unit \(unit)")
         return activeKeysets
     }
     
     public func areKeysetsStale(mintUrl: String, maxAge: TimeInterval) async -> Bool {
         guard let entries = mintKeysets[mintUrl], !entries.isEmpty else { 
-            print("[MemoryCache] No keysets found for mint \(mintUrl), considering stale")
+            NDKLogger.shared.log(.debug, category: .cache, "No keysets found for mint \(mintUrl), considering stale")
             return true 
         }
         
         let oldestTimestamp = entries.map { $0.timestamp }.min() ?? Date()
         let isStale = Date().timeIntervalSince(oldestTimestamp) > maxAge
-        print("[MemoryCache] Keysets for mint \(mintUrl) are \(isStale ? "stale" : "fresh")")
+        NDKLogger.shared.log(.trace, category: .cache, "Keysets for mint \(mintUrl) are \(isStale ? "stale" : "fresh")")
         return isStale
     }
     
@@ -316,7 +316,7 @@ public actor MemoryCache: NDKCache {
         
         // Sort by timestamp for consistent ordering
         let sorted = results.sorted { $0.createdAt < $1.createdAt }
-        print("[MemoryCache] Found \(sorted.count) events in range [\(from), \(to))")
+        NDKLogger.shared.log(.trace, category: .cache, "Found \(sorted.count) events in range [\(from), \(to))")
         return sorted
     }
     
@@ -341,7 +341,7 @@ public actor MemoryCache: NDKCache {
         
         // Sort by timestamp for consistent ordering
         let sorted = results.sorted { $0.timestamp < $1.timestamp }
-        print("[MemoryCache] Found \(sorted.count) event IDs in range [\(from), \(to))")
+        NDKLogger.shared.log(.trace, category: .cache, "Found \(sorted.count) event IDs in range [\(from), \(to))")
         return sorted
     }
     
@@ -353,7 +353,7 @@ public actor MemoryCache: NDKCache {
         }
         
         let foundCount = result.values.filter { $0 }.count
-        print("[MemoryCache] Checked \(ids.count) event IDs, found \(foundCount)")
+        NDKLogger.shared.log(.trace, category: .cache, "Checked \(ids.count) event IDs, found \(foundCount)")
         return result
     }
 }
