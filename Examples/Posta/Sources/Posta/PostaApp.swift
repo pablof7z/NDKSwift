@@ -25,24 +25,40 @@ struct PostaApp: App {
     }
     
     private func setupNDK() {
-        // Create NDK instance with relay URLs from RelayManager
-        let activeRelayUrls = relayManager.relays
-            .filter { $0.isActive }
-            .map { $0.url }
-        
-        let ndkInstance = NDK(relayUrls: activeRelayUrls.isEmpty ? [
-            "wss://relay.damus.io",
-            "wss://nos.lol",
-            "wss://relay.snort.social"
-        ] : activeRelayUrls)
-        
-        // Set NDK on managers
-        ndkManager.setNDK(ndkInstance)
-        authManager.setNDK(ndkInstance)
-        relayManager.setNDK(ndkInstance)
-        
-        // If we have an active session, initialize subscription manager
         Task {
+            // Create NDK instance with relay URLs from RelayManager
+            let activeRelayUrls = relayManager.relays
+                .filter { $0.isActive }
+                .map { $0.url }
+            
+            let relayUrls = activeRelayUrls.isEmpty ? [
+                "wss://relay.damus.io",
+                "wss://nos.lol",
+                "wss://relay.snort.social"
+            ] : activeRelayUrls
+            
+            // Initialize with SQLite cache for better performance and negentropy sync support
+            let ndkInstance: NDK
+            do {
+                let cache = try await NDKSQLiteCache()
+                ndkInstance = NDK(relayUrls: relayUrls, cache: cache)
+                print("PostaApp - NDK initialized with SQLite cache")
+            } catch {
+                print("PostaApp - Failed to initialize SQLite cache: \(error). Continuing without cache.")
+                ndkInstance = NDK(relayUrls: relayUrls)
+            }
+            
+            // Set NDK on managers
+            await MainActor.run {
+                ndkManager.setNDK(ndkInstance)
+                authManager.setNDK(ndkInstance)
+                relayManager.setNDK(ndkInstance)
+            }
+            
+            // Connect to relays
+            await ndkInstance.connect()
+            
+            // If we have an active session, initialize subscription manager
             if let activeSession = authManager.activeSession {
                 await subscriptionManager.initialize(ndk: ndkInstance, userPubkey: activeSession.pubkey)
             }

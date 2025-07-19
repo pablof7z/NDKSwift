@@ -52,40 +52,78 @@ struct HomeView: View {
             VisualEffectBlur(blurStyle: .systemUltraThinMaterial)
                 .opacity(0.9)
             
-            HStack(spacing: 16) {
-                Text("Messages")
-                    .font(.system(size: 34, weight: .bold, design: .default))
-                    .foregroundColor(.primary)
-                
-                Spacer()
-                
-                // Profile button
-                Button(action: {
-                    if let activeSession = authManager.activeSession {
-                        selectedProfile = activeSession.pubkey
+            VStack(spacing: 0) {
+                HStack(spacing: 16) {
+                    Text("Messages")
+                        .font(.system(size: 34, weight: .bold, design: .default))
+                        .foregroundColor(.primary)
+                    
+                    Spacer()
+                    
+                    // Sync button
+                    Button(action: {
+                        Task {
+                            await subscriptionManager.triggerSync()
+                        }
+                    }) {
+                        ZStack {
+                            Circle()
+                                .fill(Color(.tertiarySystemFill))
+                                .frame(width: 38, height: 38)
+                            
+                            if subscriptionManager.isSyncing {
+                                ProgressView()
+                                    .scaleEffect(0.7)
+                                    .tint(.secondary)
+                            } else {
+                                Image(systemName: "arrow.clockwise")
+                                    .font(.system(size: 16, weight: .medium))
+                                    .foregroundColor(.secondary)
+                            }
+                        }
                     }
-                }) {
-                    ZStack {
-                        Circle()
-                            .fill(Color(.tertiarySystemFill))
-                            .frame(width: 38, height: 38)
-                        
-                        Image(systemName: "person.circle")
-                            .font(.system(size: 20, weight: .medium))
-                            .foregroundColor(.secondary)
+                    .disabled(subscriptionManager.isSyncing)
+                    
+                    // Profile button
+                    Button(action: {
+                        if let activeSession = authManager.activeSession {
+                            selectedProfile = activeSession.pubkey
+                        }
+                    }) {
+                        ZStack {
+                            Circle()
+                                .fill(Color(.tertiarySystemFill))
+                                .frame(width: 38, height: 38)
+                            
+                            Image(systemName: "person.circle")
+                                .font(.system(size: 20, weight: .medium))
+                                .foregroundColor(.secondary)
+                        }
                     }
                 }
+                .padding(.horizontal, 20)
+                .padding(.vertical, 16)
+                
+                // Sync status
+                if !subscriptionManager.syncStatus.isEmpty {
+                    Text(subscriptionManager.syncStatus)
+                        .font(.system(size: 12))
+                        .foregroundColor(.secondary)
+                        .padding(.horizontal, 20)
+                        .padding(.bottom, 8)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .transition(.opacity.combined(with: .move(edge: .top)))
+                }
             }
-            .padding(.horizontal, 20)
-            .padding(.vertical, 16)
         }
-        .frame(height: 98)
+        .frame(minHeight: 98)
         .overlay(
             Rectangle()
                 .fill(Color(.separator).opacity(0.2))
                 .frame(height: 0.5),
             alignment: .bottom
         )
+        .animation(.easeInOut(duration: 0.2), value: subscriptionManager.syncStatus)
     }
     
     private var loadingFollowsView: some View {

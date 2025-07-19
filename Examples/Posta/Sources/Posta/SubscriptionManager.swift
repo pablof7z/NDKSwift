@@ -7,6 +7,8 @@ class SubscriptionManager: ObservableObject {
     @Published var latestFollowList: Set<String> = []
     @Published var isLoadingFollows = true
     @Published var isLoadingNotes = false
+    @Published var isSyncing = false
+    @Published var syncStatus: String = ""
     
     private var ndk: NDK?
     private var currentUserPubkey: String?
@@ -100,6 +102,9 @@ class SubscriptionManager: ObservableObject {
         
         // Start the notes subscription now that we have the follow list
         await startNotesSubscription()
+        
+        // Perform negentropy sync now that we have the follow list
+        await performNegentropySync()
     }
     
     private func startNotesSubscription() async {
@@ -158,5 +163,75 @@ class SubscriptionManager: ObservableObject {
                 notes.sort { $0.createdAt > $1.createdAt }
             }
         }
+    }
+    
+    // MARK: - Negentropy Sync
+    
+    /// Perform NIP-77 negentropy sync for contacts' metadata and relay lists
+    func performNegentropySync() async {
+        guard let ndk = ndk, !latestFollowList.isEmpty else {
+            print("SubscriptionManager - Cannot perform sync: NDK not ready or no follow list")
+            return
+        }
+        
+        isSyncing = true
+        syncStatus = "Starting sync..."
+        
+        print("SubscriptionManager - Starting negentropy sync for \(latestFollowList.count) contacts...")
+        
+        // Create filter for contacts' metadata and relay lists
+        let contactsFilter = NDKFilter(
+            authors: Array(latestFollowList),
+            kinds: [
+                0,     // Profile metadata (kind:0)
+                10002  // Relay list metadata (kind:10002)
+            ]
+        )
+        
+        do {
+            // Sync with all connected relays
+            syncStatus = "Syncing profiles..."
+            let results = try await ndk.syncWithAllRelays(filter: contactsFilter)
+            
+            var totalDownloaded = 0
+            var totalEfficiency = 0
+            var eventsByKind: [Int: Int] = [:]
+            
+            for (relay, result) in results {
+                totalDownloaded += result.downloadedEvents.count
+                totalEfficiency += result.efficiencyRatio
+                
+                // Count events by kind for detailed logging
+                for event in result.downloadedEvents {
+                    eventsByKind[event.kind, default: 0] += 1
+                }
+                
+                print("SubscriptionManager - Sync on \(relay): \(result.downloadedEvents.count) new events, \(result.efficiencyRatio)% efficient")
+            }
+            
+            let avgEfficiency = results.isEmpty ? 0 : totalEfficiency / results.count
+            let metadataCount = eventsByKind[0] ?? 0
+            let relayListCount = eventsByKind[10002] ?? 0
+            
+            syncStatus = "Sync complete: \(metadataCount) profiles, \(relayListCount) relay lists"
+            print("SubscriptionManager - Sync completed: \(totalDownloaded) total events (\(metadataCount) metadata, \(relayListCount) relay lists), \(avgEfficiency)% avg efficiency")
+            
+            // Clear sync status after a delay
+            Task {
+                try? await Task.sleep(nanoseconds: 3_000_000_000) // 3 seconds
+                syncStatus = ""
+                isSyncing = false
+            }
+            
+        } catch {
+            print("SubscriptionManager - Error during negentropy sync: \(error)")
+            syncStatus = "Sync failed"
+            isSyncing = false
+        }
+    }
+    
+    /// Manually trigger a sync (can be called from UI)
+    func triggerSync() async {
+        await performNegentropySync()
     }
 }
