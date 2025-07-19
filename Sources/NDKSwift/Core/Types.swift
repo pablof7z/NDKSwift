@@ -70,6 +70,7 @@ public enum EventKind {
     public static let nwcRequest = 23194
     public static let nwcResponse = 23195
     public static let nostrConnect = 24133
+    public static let blossomAuth = 24242
     public static let httpAuth = 27235
     public static let categorizedPeople = 30000
     public static let categorizedBookmarks = 30001
