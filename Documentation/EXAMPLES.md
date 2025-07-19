@@ -573,7 +573,7 @@ func publishArticle(title: String, content: String, summary: String) async throw
     let tags: [Tag] = [
         ["title", title],
         ["summary", summary],
-        ["published_at", "\(Int(Date().timeIntervalSince1970))"],
+        ["published_at", "\(Timestamp.now)"],
         ["t", "blog"],
         ["t", "article"]
     ]
@@ -927,7 +927,7 @@ class FileStorage {
             kind: EventKind.blossomUpload,
             tags: [
                 ["t", "upload"],
-                ["expiration", "\(Int(Date().timeIntervalSince1970) + 3600)"]
+                ["expiration", "\(Timestamp.now + 3600)"]
             ],
             content: "Upload authorization"
         )

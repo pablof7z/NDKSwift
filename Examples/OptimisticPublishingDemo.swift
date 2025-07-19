@@ -84,7 +84,7 @@ class OptimisticPublishingDemo {
         let note = NDKEvent(
             id: "abcd1234",
             pubkey: "user_pubkey",
-            createdAt: Int64(Date().timeIntervalSince1970),
+            createdAt: Timestamp.now,
             kind: 1,
             tags: [],
             content: "Hello Nostr! This is my first note.",

@@ -47,7 +47,7 @@ class BasicSyncExample {
         let postsFilter = NDKFilter(
             authors: [pubkey],
             kinds: [1], // text notes
-            since: Timestamp(Date().timeIntervalSince1970 - 86400 * 7) // last week
+            since: Timestamp.now - 86400 * 7 // last week
         )
         
         print("Syncing posts...")
@@ -58,7 +58,7 @@ class BasicSyncExample {
         let interactionsFilter = NDKFilter(
             authors: [pubkey],
             kinds: [6, 7], // reposts and reactions
-            since: Timestamp(Date().timeIntervalSince1970 - 86400 * 3) // last 3 days
+            since: Timestamp.now - 86400 * 3 // last 3 days
         )
         
         print("Syncing interactions...")
@@ -94,7 +94,7 @@ class TimelineSyncExample {
         let timelineFilter = NDKFilter(
             authors: Array(followedPubkeys.prefix(500)), // Limit to 500 follows
             kinds: [1], // text notes
-            since: Timestamp(Date().timeIntervalSince1970 - 86400) // last 24 hours
+            since: Timestamp.now - 86400 // last 24 hours
         )
         
         let result = try await ndk.syncEvents(filter: timelineFilter)
@@ -186,7 +186,7 @@ class MobileNegentropyManager: ObservableObject {
         let recentFilter = NDKFilter(
             authors: [pubkey],
             kinds: [1],
-            since: Timestamp(Date().timeIntervalSince1970 - Double(timeWindow))
+            since: Timestamp.now - Timestamp(timeWindow)
         )
         _ = try await syncWithSettings(filter: recentFilter, frameSize: frameSize)
         
@@ -350,7 +350,7 @@ class BackgroundSyncManager {
         let essentialFilter = NDKFilter(
             authors: [currentUser.pubkey],
             kinds: [1, 6, 7], // notes, reposts, reactions
-            since: Timestamp(Date().timeIntervalSince1970 - 3600) // last hour
+            since: Timestamp.now - 3600 // last hour
         )
         
         // Use very small frame size for background

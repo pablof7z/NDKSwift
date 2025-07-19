@@ -758,7 +758,7 @@ func syncUserData(pubkey: String) async throws {
     let filter = NDKFilter(
         authors: [pubkey],
         kinds: [1, 6, 7], // notes, reposts, reactions
-        since: Timestamp(Date().timeIntervalSince1970 - 86400 * 7) // last week
+        since: Timestamp.now - 86400 * 7 // last week
     )
     
     // Perform efficient sync
@@ -843,7 +843,7 @@ func performBackgroundSync() async {
     let essentialFilter = NDKFilter(
         authors: [currentUser.pubkey],
         kinds: [1, 7], // Just notes and reactions
-        since: Timestamp(Date().timeIntervalSince1970 - 3600) // Last hour only
+        since: Timestamp.now - 3600 // Last hour only
     )
     
     // Use short timeout for background operations

@@ -235,7 +235,7 @@ func retryFailedEvents() async throws {
     
     for event in unpublished {
         // Check event age
-        let age = Date().timeIntervalSince1970 - TimeInterval(event.createdAt)
+        let age = TimeInterval(Timestamp.now - event.createdAt)
         
         // Skip old events
         if age > 3600 { continue }

@@ -208,7 +208,7 @@ class SecureChat {
         // Create and publish encrypted event
         let event = NDKEvent(
             pubkey: try await signer.pubkey,
-            createdAt: Timestamp(Date().timeIntervalSince1970),
+            createdAt: Timestamp.now,
             kind: 14,
             tags: [["p", recipient.pubkey]],
             content: encrypted

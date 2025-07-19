@@ -31,7 +31,7 @@ struct TestRealRelay {
             let filter = NDKFilter(
                 kinds: [1],
                 limit: 10,
-                since: Timestamp(Date().timeIntervalSince1970 - 3600) // Last hour
+                since: Timestamp.now - 3600 // Last hour
             )
             
             print("Starting sync with filter:")

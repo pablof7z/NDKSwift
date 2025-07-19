@@ -102,7 +102,7 @@ Events are the core data structure in Nostr:
 // Create event with full control
 let event = NDKEvent(
     pubkey: signer.publicKey,
-    createdAt: Timestamp(Date().timeIntervalSince1970),
+    createdAt: Timestamp.now,
     kind: 1,  // Text note
     tags: [
         ["p", "recipient-pubkey"],  // Mention someone
@@ -129,7 +129,7 @@ let authorFilter = NDKFilter(
 // Filter by time range
 let timeFilter = NDKFilter(
     kinds: [1],
-    since: Timestamp(Date().timeIntervalSince1970 - 3600),  // Last hour
+    since: Timestamp.now - 3600,  // Last hour
     limit: 50
 )
 

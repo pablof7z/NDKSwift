@@ -189,7 +189,7 @@ Represents a Nostr event.
 // Full initializer
 public init(
     pubkey: PublicKey = "",
-    createdAt: Timestamp = Timestamp(Date().timeIntervalSince1970),
+    createdAt: Timestamp = Timestamp.now,
     kind: Kind,
     tags: [Tag] = [],
     content: String = ""
