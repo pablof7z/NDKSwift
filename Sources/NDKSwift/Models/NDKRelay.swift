@@ -534,7 +534,7 @@ public final class NDKRelay: RelayProtocol, Hashable, Equatable, @unchecked Send
         }
         
         var request = URLRequest(url: httpURL)
-        request.setValue("application/nostr+json", forHTTPHeaderField: "Accept")
+        request.setValue(HTTPConstants.contentTypeNostrJSON, forHTTPHeaderField: HTTPConstants.headerAccept)
         request.timeoutInterval = 10
         
         do {

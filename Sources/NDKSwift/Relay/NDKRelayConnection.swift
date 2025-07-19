@@ -131,7 +131,7 @@ public actor NDKRelayConnection {
             
             // Create WebSocket request
             var request = URLRequest(url: url)
-            request.addValue("nostr", forHTTPHeaderField: "Sec-WebSocket-Protocol")
+            request.addValue(HTTPConstants.webSocketProtocolNostr, forHTTPHeaderField: HTTPConstants.headerSecWebSocketProtocol)
             
             // Create WebSocket task
             webSocketTask = Self.sharedURLSession.webSocketTask(with: request)
