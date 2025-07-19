@@ -6,12 +6,12 @@ struct BunkerURLParser {
     let urlString: String
     
     func parse() -> (bunkerPubkey: String?, userPubkey: String?, relays: [String], secret: String?) {
-        print("[BunkerSigner] Parsing bunker URL: \(urlString)")
+        NDKLogger.shared.log(.debug, category: .auth, "[BunkerSigner] Parsing bunker URL: \(urlString)")
         
         guard let url = URL(string: urlString),
               url.scheme == "bunker"
         else {
-            print("[BunkerSigner] ERROR: Invalid URL scheme or format")
+            NDKLogger.shared.log(.error, category: .auth, "[BunkerSigner] ERROR: Invalid URL scheme or format")
             return (nil, nil, [], nil)
         }
         
@@ -23,13 +23,13 @@ struct BunkerURLParser {
         // Extract bunker pubkey from hostname or path
         if let host = url.host {
             bunkerPubkey = host
-            print("[BunkerSigner] Extracted bunker pubkey from host: \(host)")
+            NDKLogger.shared.log(.debug, category: .auth, "[BunkerSigner] Extracted bunker pubkey from host: \(host)")
         } else {
             // Handle bunker://pubkey format
             let path = url.path
             if path.hasPrefix("//") {
                 bunkerPubkey = String(path.dropFirst(2))
-                print("[BunkerSigner] Extracted bunker pubkey from path: \(bunkerPubkey ?? "nil")")
+                NDKLogger.shared.log(.debug, category: .auth, "[BunkerSigner] Extracted bunker pubkey from path: \(bunkerPubkey ?? "nil")")
             }
         }
         

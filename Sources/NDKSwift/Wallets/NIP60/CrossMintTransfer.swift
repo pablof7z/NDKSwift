@@ -92,7 +92,7 @@ public enum CrossMintTransfer {
         mints: MintManager,
         proofStateManager: ProofStateManager
     ) async -> PaymentRoute {
-        print("CrossMintTransfer.findBestPaymentRoute - amount: \(amount), acceptedMints: \(acceptedMints)")
+        NDKLogger.shared.log(.debug, category: .general, "CrossMintTransfer.findBestPaymentRoute - amount: \(amount), acceptedMints: \(acceptedMints)")
         // First, try to find a direct payment option
         if let directMint = await findMintWithSufficientBalance(
             acceptedMints: acceptedMints,
@@ -146,7 +146,7 @@ public enum CrossMintTransfer {
             mints: mints,
             proofStateManager: proofStateManager
         )
-        print("CrossMintTransfer.evaluateTransferRoute - totalBalance: \(totalBalance), required amount: \(amount)")
+        NDKLogger.shared.log(.debug, category: .general, "CrossMintTransfer.evaluateTransferRoute - totalBalance: \(totalBalance), required amount: \(amount)")
         if totalBalance < amount {
             return .impossible(reason: "Insufficient total balance: \(totalBalance) < \(amount)")
         } else {
@@ -260,7 +260,7 @@ public enum CrossMintTransfer {
         // Get mints with actual proofs, not configured mints
         let proofsByMint = await proofStateManager.getAvailableProofsByMint()
         let mintsWithProofs = Array(proofsByMint.keys)
-        print("CrossMintTransfer.getTotalBalance - checking balance for \(mintsWithProofs.count) mints with proofs: \(mintsWithProofs)")
+        NDKLogger.shared.log(.debug, category: .general, "CrossMintTransfer.getTotalBalance - checking balance for \(mintsWithProofs.count) mints with proofs: \(mintsWithProofs)")
         
         var total: Int64 = 0
         for (mint, proofs) in proofsByMint {
