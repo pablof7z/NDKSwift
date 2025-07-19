@@ -49,7 +49,7 @@ public final class NDKPrivateKeySigner: NDKSigner {
         do {
             idData = try HexValidator.validate32ByteHex(event.id)
         } catch {
-            throw NDKError.signingFailed("Failed to sign event: invalid event ID")
+            throw NDKError.signingFailed("Failed to sign event: invalid event ID", underlying: error)
         }
 
         do {

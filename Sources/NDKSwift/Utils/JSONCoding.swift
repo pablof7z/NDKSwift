@@ -43,7 +43,7 @@ public enum JSONCoding {
     public static func encodeToString<T: Encodable>(_ value: T) throws -> String {
         let data = try encode(value)
         guard let string = String(data: data, encoding: .utf8) else {
-            throw NDKError.unknown("Failed to convert JSON data to string")
+            throw NDKError.unknown("Failed to convert JSON data to UTF-8 string for type \(T.self)")
         }
         return string
     }
@@ -65,7 +65,7 @@ public enum JSONCoding {
     public static func encodeToDictionary<T: Encodable>(_ value: T) throws -> [String: Any] {
         let data = try encode(value)
         guard let dictionary = try JSONSerialization.jsonObject(with: data) as? [String: Any] else {
-            throw NDKError.unknown("Failed to convert to dictionary")
+            throw NDKError.unknown("Failed to convert JSON data to dictionary for type \(T.self)")
         }
         return dictionary
     }
@@ -82,7 +82,7 @@ public enum JSONCoding {
     public static func encodeForNostr<T: Encodable>(_ value: T) throws -> String {
         let data = try encoder.encode(value)
         guard let string = String(data: data, encoding: .utf8) else {
-            throw NDKError.unknown("Failed to encode Nostr message")
+            throw NDKError.unknown("Failed to encode Nostr message to UTF-8 string for type \(T.self)")
         }
         return string
     }
@@ -91,7 +91,7 @@ public enum JSONCoding {
     public static func encodeSnakeCaseToString<T: Encodable>(_ value: T) throws -> String {
         let data = try snakeCaseEncoder.encode(value)
         guard let string = String(data: data, encoding: .utf8) else {
-            throw NDKError.unknown("Failed to encode with snake_case")
+            throw NDKError.unknown("Failed to encode snake_case JSON to UTF-8 string for type \(T.self)")
         }
         return string
     }
