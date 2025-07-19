@@ -57,7 +57,7 @@ public actor BlossomClient {
                 throw createServerError(response: httpResponse, data: data, serverURL: serverURL)
             }
 
-            let descriptor = try JSONDecoder().decode(BlossomServerDescriptor.self, from: data)
+            let descriptor = try JSONCoding.decode(BlossomServerDescriptor.self, from: data)
 
             // Cache the descriptor
             serverCache[serverURL] = descriptor
@@ -122,7 +122,7 @@ public actor BlossomClient {
 
             switch httpResponse.statusCode {
             case 200, 201:
-                let uploadDescriptor = try JSONDecoder().decode(BlossomUploadDescriptor.self, from: responseData)
+                let uploadDescriptor = try JSONCoding.decode(BlossomUploadDescriptor.self, from: responseData)
 
                 // Verify SHA256 matches
                 guard uploadDescriptor.sha256 == sha256Hex else {
@@ -202,7 +202,7 @@ public actor BlossomClient {
 
             switch httpResponse.statusCode {
             case 200:
-                let listResponse = try JSONDecoder().decode(BlossomListResponse.self, from: data)
+                let listResponse = try JSONCoding.decode(BlossomListResponse.self, from: data)
 
                 return listResponse.blobs.map { item in
                     BlossomBlob(
