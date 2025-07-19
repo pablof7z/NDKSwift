@@ -347,7 +347,7 @@ public actor NIP60Wallet: NDKPaymentProvider {
     // MARK: - Nutzap Receiving
     
     /// Process an incoming nutzap event
-    private func processIncomingNutzap(_ event: NDKEvent) async throws {
+    internal func processIncomingNutzap(_ event: NDKEvent) async throws {
         let mints = await mints.getAllMints()
         let keysets = mints.values.flatMap { $0.keysets }.reduce(into: [:]) { result, keyset in
             result[keyset.keysetID] = keyset
@@ -931,10 +931,6 @@ public actor NIP60Wallet: NDKPaymentProvider {
         self.proofs = await proofStateManager.getAvailableProofs()
     }
     
-    /// Process incoming nutzap event (for handler)
-    internal func processIncomingNutzapEvent(_ event: NDKEvent) async throws {
-        try await processIncomingNutzap(event)
-    }
     
     /// Stop the wallet and clean up resources
     public func stop() async {

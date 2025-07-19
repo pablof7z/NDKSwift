@@ -476,7 +476,7 @@ public final class NDKSubscription: AsyncSequence, Sendable {
         
         for relay in relaysToUse {
             await stateActor.addRelay(relay)
-            await relay.subscriptionManager.addSubscription(self, filters: filters)
+            _ = await relay.subscriptionManager.addSubscription(self, filters: filters)
         }
     }
 
