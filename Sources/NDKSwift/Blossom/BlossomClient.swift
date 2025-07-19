@@ -46,8 +46,8 @@ public actor BlossomClient {
         let wellKnownURL = baseURL.appendingPathComponent(".well-known/blossom")
 
         var request = URLRequest(url: wellKnownURL)
-        request.httpMethod = Self.httpMethodGet
-        request.setValue(Self.applicationJSON, forHTTPHeaderField: HTTPConstants.headerAccept)
+        request.httpMethod = HTTPConstants.methodGet
+        request.setValue(HTTPConstants.contentTypeApplicationJSON, forHTTPHeaderField: HTTPConstants.headerAccept)
 
         do {
             let (data, response) = try await urlSession.data(for: request)
@@ -105,16 +105,16 @@ public actor BlossomClient {
         let uploadURL = baseURL.appendingPathComponent(uploadPath)
 
         var request = URLRequest(url: uploadURL)
-        request.httpMethod = Self.httpMethodPut
+        request.httpMethod = HTTPConstants.methodPut
         request.httpBody = data
 
         // Set headers
         if let mimeType = mimeType {
-            request.setValue(mimeType, forHTTPHeaderField: Self.contentTypeHeader)
+            request.setValue(mimeType, forHTTPHeaderField: HTTPConstants.headerContentType)
         }
 
         let authHeader = try auth.authorizationHeaderValue()
-        request.setValue(authHeader, forHTTPHeaderField: Self.authorizationHeader)
+        request.setValue(authHeader, forHTTPHeaderField: HTTPConstants.headerAuthorization)
 
         do {
             let (responseData, response) = try await urlSession.data(for: request)
@@ -190,11 +190,11 @@ public actor BlossomClient {
         }
 
         var request = URLRequest(url: listURL)
-        request.httpMethod = Self.httpMethodGet
-        request.setValue(Self.applicationJSON, forHTTPHeaderField: HTTPConstants.headerAccept)
+        request.httpMethod = HTTPConstants.methodGet
+        request.setValue(HTTPConstants.contentTypeApplicationJSON, forHTTPHeaderField: HTTPConstants.headerAccept)
 
         let authHeader = try auth.authorizationHeaderValue()
-        request.setValue(authHeader, forHTTPHeaderField: Self.authorizationHeader)
+        request.setValue(authHeader, forHTTPHeaderField: HTTPConstants.headerAuthorization)
 
         do {
             let (data, response) = try await urlSession.data(for: request)
@@ -240,10 +240,10 @@ public actor BlossomClient {
         let deleteURL = baseURL.appendingPathComponent(sha256)
 
         var request = URLRequest(url: deleteURL)
-        request.httpMethod = Self.httpMethodDelete
+        request.httpMethod = HTTPConstants.methodDelete
 
         let authHeader = try auth.authorizationHeaderValue()
-        request.setValue(authHeader, forHTTPHeaderField: Self.authorizationHeader)
+        request.setValue(authHeader, forHTTPHeaderField: HTTPConstants.headerAuthorization)
 
         do {
             let (data, response) = try await urlSession.data(for: request)
@@ -280,7 +280,7 @@ public actor BlossomClient {
         let url = try URLUtils.validateURL("\(serverURL)/\(sha256)")
 
         var request = URLRequest(url: url)
-        request.httpMethod = Self.httpMethodGet
+        request.httpMethod = HTTPConstants.methodGet
 
         do {
             let (data, response) = try await urlSession.data(for: request)
