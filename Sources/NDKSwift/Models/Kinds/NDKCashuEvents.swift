@@ -317,7 +317,7 @@ public struct NDKCashuWalletEvent {
         print("🔓 Decrypted content (raw): \(String(describing: decryptedContent.data(using: .utf8)))")
         
         guard let tagsData = decryptedContent.data(using: .utf8),
-              let walletTags = try? JSONDecoder().decode([[String]].self, from: tagsData) else {
+              let walletTags = JSONCoding.safeDecode([[String]].self, from: tagsData) else {
             print("❌ Failed to parse wallet configuration from decrypted content")
             throw NDKError.invalidContent("Failed to parse wallet configuration")
         }
@@ -756,7 +756,7 @@ public struct NDKNutzapEvent {
         var proofs: [CashuSwift.Proof] = []
         for proofTag in proofTags {
             guard let proofJSON = proofTag[1].data(using: .utf8),
-                  let proof = try? JSONDecoder().decode(CashuSwift.Proof.self, from: proofJSON) else {
+                  let proof = JSONCoding.safeDecode(CashuSwift.Proof.self, from: proofJSON) else {
                 continue
             }
             proofs.append(proof)
