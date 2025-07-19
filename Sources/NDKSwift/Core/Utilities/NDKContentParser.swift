@@ -153,10 +153,8 @@ public enum NDKContentParser {
         )
     }
     
-    // Helper to decode note ID (simplified version)
+    // Helper to decode note ID
     private static func decodeNoteId(_ noteId: String) throws -> String? {
-        // This would use proper bech32 decoding
-        // For now, return nil to indicate we need proper implementation
-        return nil
+        return try Bech32.eventId(from: noteId)
     }
 }

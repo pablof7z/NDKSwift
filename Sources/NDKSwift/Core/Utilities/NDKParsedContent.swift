@@ -43,15 +43,11 @@ public struct NDKParsedContent {
 public extension String {
     /// Convert a hex pubkey to npub format
     static func toNpub(_ pubkey: String) throws -> String {
-        // This is a placeholder - in a real implementation, you'd use proper bech32 encoding
-        // For now, just return a shortened version for display
-        return "npub1\(pubkey.prefix(8))..."
+        return try Bech32.npub(from: pubkey)
     }
     
     /// Convert an npub to hex pubkey
     static func fromNpub(_ npub: String) throws -> String? {
-        // This is a placeholder - in a real implementation, you'd use proper bech32 decoding
-        // For now, return nil to indicate we need proper implementation
-        return nil
+        return try Bech32.pubkey(from: npub)
     }
 }
