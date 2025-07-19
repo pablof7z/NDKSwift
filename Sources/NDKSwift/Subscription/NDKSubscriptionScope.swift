@@ -61,7 +61,7 @@ public extension NDK {
     func withSubscriptionGroup<T>(
         handler: (NDKSubscriptionGroup) async throws -> T
     ) async rethrows -> T {
-        let group = subscriptionGroup()
+        let group = NDKSubscriptionGroup(ndk: self)
         
         do {
             let result = try await handler(group)
@@ -159,6 +159,53 @@ public struct SubscriptionHandle {
     public var isActive: Bool {
         get async {
             return !subscription.isClosed
+        }
+    }
+}
+
+/// Manages a group of subscriptions for bulk operations
+public class NDKSubscriptionGroup {
+    private var subscriptions: [NDKSubscription] = []
+    private let ndk: NDK
+    
+    public init(ndk: NDK) {
+        self.ndk = ndk
+    }
+    
+    /// Add a subscription to the group
+    @discardableResult
+    public func subscribe(_ filter: NDKFilter) async -> NDKSubscription {
+        let subscription = await ndk.subscribe(filters: [filter])
+        subscriptions.append(subscription)
+        return subscription
+    }
+    
+    /// Add multiple filters as a single subscription
+    @discardableResult
+    public func subscribe(filters: [NDKFilter]) async -> NDKSubscription {
+        let subscription = await ndk.subscribe(filters: filters)
+        subscriptions.append(subscription)
+        return subscription
+    }
+    
+    /// Close all subscriptions in the group
+    public func closeAll() async {
+        for subscription in subscriptions {
+            await subscription.close()
+        }
+        subscriptions.removeAll()
+    }
+    
+    /// Get all active subscriptions
+    public var activeSubscriptions: [NDKSubscription] {
+        get async {
+            var active: [NDKSubscription] = []
+            for subscription in subscriptions {
+                if await subscription.state != .closed {
+                    active.append(subscription)
+                }
+            }
+            return active
         }
     }
 }

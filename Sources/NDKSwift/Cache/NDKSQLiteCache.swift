@@ -64,6 +64,17 @@ public actor NDKSQLiteCache: NDKCache {
     
     // MARK: - Helper Methods
     
+    /// Log an error if debugMode is enabled
+    /// - Parameters:
+    ///   - operation: The operation that failed (e.g., "save event", "get profile")
+    ///   - parameter: The parameter involved in the operation (e.g., event ID, pubkey)
+    ///   - error: The error that occurred
+    private func logError(operation: String, parameter: String, error: Error) {
+        if debugMode {
+            print("NDKSQLiteCache: Failed to \(operation) \(parameter). Error: \(error)")
+        }
+    }
+    
     /// Helper method to decode NDKEvent from database row JSON
     /// - Parameter row: Database row containing JSON data
     /// - Returns: Decoded NDKEvent or nil if decoding fails
@@ -124,9 +135,7 @@ public actor NDKSQLiteCache: NDKCache {
                 }
             }
         } catch {
-            if debugMode {
-                NDKLogger.shared.log(.error, category: .cache, "Failed to save event \(eventId). Error: \(error)")
-            }
+            logError(operation: "save event", parameter: eventId, error: error)
             throw error
         }
     }
@@ -140,9 +149,7 @@ public actor NDKSQLiteCache: NDKCache {
                 return nil
             }
         } catch {
-            if debugMode {
-                NDKLogger.shared.log(.error, category: .cache, "Failed to get event \(id). Error: \(error)")
-            }
+            logError(operation: "get event", parameter: id, error: error)
             return nil
         }
     }
@@ -297,9 +304,7 @@ public actor NDKSQLiteCache: NDKCache {
                 return nil
             }
         } catch {
-            if debugMode {
-                NDKLogger.shared.log(.error, category: .cache, "Failed to get profile \(pubkey). Error: \(error)")
-            }
+            logError(operation: "get profile", parameter: pubkey, error: error)
             return nil
         }
     }
@@ -333,9 +338,7 @@ public actor NDKSQLiteCache: NDKCache {
                 }
             }
         } catch {
-            if debugMode {
-                NDKLogger.shared.log(.error, category: .cache, "Failed to search profiles. Error: \(error)")
-            }
+            logError(operation: "search profiles", parameter: "query", error: error)
             return []
         }
     }
@@ -392,9 +395,7 @@ public actor NDKSQLiteCache: NDKCache {
                 return nil
             }
         } catch {
-            if debugMode {
-                NDKLogger.shared.log(.error, category: .cache, "Failed to get mint info \(url). Error: \(error)")
-            }
+            logError(operation: "get mint info", parameter: url, error: error)
             return nil
         }
     }
@@ -511,9 +512,7 @@ public actor NDKSQLiteCache: NDKCache {
                 return nil
             }
         } catch {
-            if debugMode {
-                NDKLogger.shared.log(.error, category: .cache, "Failed to get keyset \(id). Error: \(error)")
-            }
+            logError(operation: "get keyset", parameter: id, error: error)
             return nil
         }
     }
@@ -529,9 +528,7 @@ public actor NDKSQLiteCache: NDKCache {
                 }
             }
         } catch {
-            if debugMode {
-                NDKLogger.shared.log(.error, category: .cache, "Failed to get keysets for mint \(mintUrl). Error: \(error)")
-            }
+            logError(operation: "get keysets for mint", parameter: mintUrl, error: error)
             return []
         }
     }
@@ -551,9 +548,7 @@ public actor NDKSQLiteCache: NDKCache {
                 }
             }
         } catch {
-            if debugMode {
-                NDKLogger.shared.log(.error, category: .cache, "Failed to get active keysets. Error: \(error)")
-            }
+            logError(operation: "get active keysets", parameter: "all", error: error)
             return []
         }
     }
@@ -586,9 +581,7 @@ public actor NDKSQLiteCache: NDKCache {
                 try String.fetchAll(db, sql: "SELECT url FROM mint_info ORDER BY url")
             }
         } catch {
-            if debugMode {
-                NDKLogger.shared.log(.error, category: .cache, "Failed to get cached mint URLs. Error: \(error)")
-            }
+            logError(operation: "get cached mint URLs", parameter: "all", error: error)
             return []
         }
     }
@@ -847,9 +840,7 @@ public actor NDKSQLiteCache: NDKCache {
                 return nil
             }
         } catch {
-            if debugMode {
-                NDKLogger.shared.log(.error, category: .cache, "Failed to get confirmation state for \(eventId). Error: \(error)")
-            }
+            logError(operation: "get confirmation state for", parameter: eventId, error: error)
             return nil
         }
     }
@@ -890,9 +881,7 @@ public actor NDKSQLiteCache: NDKCache {
                 }
             }
         } catch {
-            if debugMode {
-                NDKLogger.shared.log(.error, category: .cache, "Failed to get unpublished events. Error: \(error)")
-            }
+            logError(operation: "get unpublished events", parameter: "all", error: error)
             return []
         }
     }
@@ -1082,9 +1071,7 @@ public actor NDKSQLiteCache: NDKCache {
                 return result
             }
         } catch {
-            if debugMode {
-                NDKLogger.shared.log(.error, category: .cache, "Failed to check event existence. Error: \(error)")
-            }
+            logError(operation: "check event existence", parameter: "multiple events", error: error)
             // Return empty dictionary on error
             return [:]
         }
