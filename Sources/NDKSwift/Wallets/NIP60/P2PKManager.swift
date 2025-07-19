@@ -49,13 +49,13 @@ public actor P2PKManager {
         
         // Convert hex private key back to PrivateKey object
         guard let privateKeyData = Data(hexString: privateKeyHex) else {
-            throw P2PKError.invalidPrivateKey
+            throw NDKError.invalidPrivateKey("Invalid P2PK private key format")
         }
         let privateKey = try secp256k1.Schnorr.PrivateKey(dataRepresentation: privateKeyData)
         
         // Create message to sign (secret)
         guard let messageData = secret.data(using: .utf8) else {
-            throw P2PKError.invalidSecret
+            throw NDKError.invalidInput(message: "Invalid secret for P2PK signing")
         }
         
         // Sign the secret - using same pattern as Crypto.swift
@@ -70,12 +70,12 @@ public actor P2PKManager {
         // Validate keys
         guard let privateKeyData = Data(hexString: privateKey),
               privateKeyData.count == 32 else {
-            throw P2PKError.invalidPrivateKey
+            throw NDKError.invalidPrivateKey("Invalid P2PK private key: must be 32 bytes")
         }
         
         guard let publicKeyData = Data(hexString: publicKey),
               publicKeyData.count == 32 else {
-            throw P2PKError.invalidPublicKey
+            throw NDKError.invalidPublicKey("Invalid P2PK public key: must be 32 bytes")
         }
         
         currentKeypair = (privateKey, publicKey)
@@ -86,7 +86,7 @@ public actor P2PKManager {
     public func restoreFromPrivateKey(_ privateKeyHex: String) throws {
         guard let privateKeyData = Data(hexString: privateKeyHex),
               privateKeyData.count == 32 else {
-            throw P2PKError.invalidPrivateKey
+            throw NDKError.invalidPrivateKey("Invalid P2PK private key: must be 32 bytes")
         }
         
         // Derive public key from private key
@@ -103,7 +103,7 @@ public actor P2PKManager {
     /// Export keypair for backup
     func exportKeypair() async throws -> (privateKey: String, publicKey: String) {
         guard let keypair = currentKeypair else {
-            throw P2PKError.noKeypairAvailable
+            throw NDKError.notConfigured("No P2PK keypair available")
         }
         return keypair
     }
@@ -112,31 +112,6 @@ public actor P2PKManager {
     func clearKeypair() {
         currentKeypair = nil
         keyCreatedAt = nil
-    }
-}
-
-// MARK: - Errors
-
-enum P2PKError: LocalizedError {
-    case noKeypairAvailable
-    case invalidPrivateKey
-    case invalidPublicKey
-    case invalidSecret
-    case signingFailed
-    
-    var errorDescription: String? {
-        switch self {
-        case .noKeypairAvailable:
-            return "No P2PK keypair available"
-        case .invalidPrivateKey:
-            return "Invalid private key format"
-        case .invalidPublicKey:
-            return "Invalid public key format"
-        case .invalidSecret:
-            return "Invalid secret for signing"
-        case .signingFailed:
-            return "Failed to create signature"
-        }
     }
 }
 
