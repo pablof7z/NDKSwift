@@ -19,6 +19,11 @@ public enum HTTPConstants {
     
     // WebSocket Protocol
     public static let webSocketProtocolNostr = "nostr"
+    
+    // Common Timeout Values (in seconds)
+    public static let timeoutRelayInfo: TimeInterval = 10
+    public static let timeoutRequest: TimeInterval = 30
+    public static let timeoutResource: TimeInterval = 300
 }
 
 /// Nostr protocol constants for consistent usage across the codebase  

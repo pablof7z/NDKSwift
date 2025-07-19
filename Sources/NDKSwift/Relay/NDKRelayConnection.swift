@@ -19,8 +19,8 @@ public actor NDKRelayConnection {
         // Shared URLSession for all connections (as per Gemini's suggestion)
         private static let sharedURLSession: URLSession = {
             let config = URLSessionConfiguration.default
-            config.timeoutIntervalForRequest = 30
-            config.timeoutIntervalForResource = 300
+            config.timeoutIntervalForRequest = HTTPConstants.timeoutRequest
+            config.timeoutIntervalForResource = HTTPConstants.timeoutResource
             config.httpAdditionalHeaders = [
                 "User-Agent": "NDKSwift 1.0"
             ]
