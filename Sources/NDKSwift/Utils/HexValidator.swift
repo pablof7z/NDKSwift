@@ -4,7 +4,7 @@ import Foundation
 public enum HexValidator {
     
     /// Errors that can occur during hex validation
-    public enum HexValidationError: Error, LocalizedError {
+    public enum HexValidationError: LocalizedError {
         case invalidHexString(String)
         case invalidLength(expected: Int, actual: Int)
         case invalidFormat
