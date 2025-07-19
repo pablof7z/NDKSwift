@@ -8,7 +8,7 @@ final class NDKOutboxModelTests: XCTestCase {
     
     override func setUp() async throws {
         cache = MemoryCache()
-        signer = NDKPrivateKeySigner()
+        signer = try NDKPrivateKeySigner(privateKey: PrivateKey.generate())
         ndk = NDK(
             relayUrls: [
                 "wss://relay1.example.com",
@@ -198,9 +198,10 @@ final class NDKOutboxModelTests: XCTestCase {
         }
         
         // Create a filter that would target events with many p-tags
-        var filter = NDKFilter()
-        filter.kinds = [1]
-        filter.tags = ["p": Array(users)]
+        let filter = NDKFilter(
+            kinds: [1],
+            tags: ["p": Set(users)]
+        )
         
         let relaySelector = ndk.relaySelector
         let selection = await relaySelector.selectRelaysForFetching(filter: filter)
@@ -259,7 +260,7 @@ final class NDKOutboxModelTests: XCTestCase {
     // MARK: - Helper Methods
     
     private func setupMockRelayList(for pubkey: String, readRelays: [String], writeRelays: [String]) async {
-        // Create a mock NIP-65 relay list event
+        // Create a mock NIP-65 relay list event for cache
         var tags: [[String]] = []
         
         // Add read relays
@@ -283,24 +284,20 @@ final class NDKOutboxModelTests: XCTestCase {
             sig: "mock_signature"
         )
         
-        // Cache the event so the outbox tracker can find it
-        try await cache.saveEvent(relayListEvent)
+        // Cache the event so the outbox tracker can find it when fetching
+        do {
+            try await cache.saveEvent(relayListEvent)
+        } catch {
+            // Handle cache errors gracefully in tests
+            print("Warning: Failed to cache relay list event: \(error)")
+        }
         
-        // Also manually populate the outbox tracker cache
-        let relayList = NDKRelayList.fromEvent(relayListEvent)
-        let readRelayItems = relayList.readRelays.map { NDKRelayItem(url: $0.url, healthScore: 1.0) }
-        let writeRelayItems = relayList.writeRelays.map { NDKRelayItem(url: $0.url, healthScore: 1.0) }
-        
-        let outboxItem = NDKOutboxItem(
+        // Manually populate the outbox tracker cache using the track method
+        await ndk.outboxTracker.track(
             pubkey: pubkey,
-            readRelays: readRelayItems,
-            writeRelays: writeRelayItems,
-            source: .nip65,
-            lastUpdated: Date(),
-            validUntil: Date().addingTimeInterval(3600)
+            readRelays: Set(readRelays),
+            writeRelays: Set(writeRelays),
+            source: .nip65
         )
-        
-        // Add to outbox tracker cache
-        await ndk.outboxTracker.setCachedRelays(pubkey: pubkey, item: outboxItem)
     }
 }

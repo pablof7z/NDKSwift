@@ -1,6 +1,11 @@
 import Foundation
 
 /// Intelligently selects relays for publishing and fetching based on the outbox model
+/// 
+/// Implements NIP-65 outbox model:
+/// - When publishing events with <10 p-tags: sends to read relays of each tagged user
+/// - When publishing events with ≥10 p-tags: uses only author's relays to avoid relay spam
+/// - When fetching: considers p-tagged users regardless of count
 actor NDKRelaySelector {
     private let ndk: NDK
     let tracker: NDKOutboxTracker

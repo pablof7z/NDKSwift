@@ -167,7 +167,240 @@ let publishedRelays = try await ndk.publish(event)
 
 Always design your UI to handle this optimistic state. You can check an event's confirmation status via the cache's `getEventConfirmationState(eventId:)` method. See section 5 for detailed implementation guidance.
 
-**Outbox Model (NIP-65):** NDKSwift automatically uses a user's NIP-65 relay list to intelligently select the best relays for publishing and fetching, ensuring events are written to the user's preferred relays and read from where their contacts write. This is a critical feature for building a good citizen Nostr client.
+**Outbox Model (NIP-65):** NDKSwift implements intelligent relay selection that balances deliverability with network courtesy. See section 4.1 for comprehensive coverage of outbox model behavior, including p-tag count limits, read vs. write relay handling, and performance considerations.
+
+### 4.1. NIP-65 Outbox Model: Intelligent Relay Selection
+
+NDKSwift implements the NIP-65 outbox model with intelligent p-tag handling that balances event deliverability with network courtesy. Understanding this behavior is crucial for building responsible Nostr clients.
+
+**Core Principles:**
+
+1. **Author's Events → Author's Write Relays**: Your events are published to relays where you write
+2. **P-tagged Users → Their Read Relays**: Mentions go to where tagged users check for mentions
+3. **P-tag Count Limits**: Events with 10+ p-tags don't trigger outbox model to prevent relay spam
+4. **Intelligent Fallbacks**: Uses write relays when read relays aren't available
+
+**How It Works:**
+
+```swift
+// Events with < 10 p-tags: Full outbox model applied
+let replyEvent = try await ndk.event()
+    .content("Thanks @alice and @bob for the feedback!")
+    .tag(["p", alicePubkey])
+    .tag(["p", bobPubkey])
+    .build()
+
+let publishedRelays = try await ndk.publish(replyEvent)
+// → Publishes to:
+//   - Your write relays (so your followers see it)
+//   - Alice's read relays (so Alice sees the mention)
+//   - Bob's read relays (so Bob sees the mention)
+
+// Events with ≥ 10 p-tags: Only uses author's relays
+let massReplyEvent = try await ndk.event()
+    .content("Thanks everyone for the great discussion!")
+    // ... 15 p-tags ...
+    .build()
+
+let publishedRelays = try await ndk.publish(massReplyEvent)
+// → Publishes only to your write relays
+//   (prevents spamming 15+ users' read relays)
+```
+
+**Read vs Write Relay Strategy:**
+
+NDKSwift follows NIP-65 specifications precisely:
+
+```swift
+// Publishing behavior:
+// - Author's content → Author's WRITE relays
+// - Mentions (p-tags) → Tagged users' READ relays
+// - Fallback: If no read relays, uses write relays
+
+// Example: Alice mentions Bob
+let event = try await ndk.event()
+    .content("Hey @bob, check this out!")
+    .tag(["p", bobPubkey])
+    .build()
+
+// Result:
+// ✅ Published to Alice's write relays (alice_write_1.com, alice_write_2.com)
+// ✅ Published to Bob's read relays (bob_read_1.com, bob_read_2.com)
+// ❌ NOT published to Bob's write relays (follows NIP-65 spec)
+```
+
+**Network Courtesy Features:**
+
+```swift
+// 1. P-tag count protection
+let selection = await ndk.relaySelector.selectRelaysForPublishing(event: event)
+if event.pTags.count >= 10 {
+    print("Skipping outbox model for \(event.pTags.count) p-tags to prevent relay spam")
+}
+
+// 2. Missing relay information tracking
+if !selection.missingRelayInfoPubkeys.isEmpty {
+    print("Users without relay lists: \(selection.missingRelayInfoPubkeys)")
+    // Optionally fetch their relay lists
+    for pubkey in selection.missingRelayInfoPubkeys {
+        try? await ndk.outboxTracker.getRelaysFor(pubkey: pubkey)
+    }
+}
+
+// 3. Relay health consideration
+let healthyRelays = selection.relays.filter { relayUrl in
+    await !ndk.isRelayBlacklisted(relayUrl)
+}
+```
+
+**Monitoring and Debugging:**
+
+```swift
+// Monitor relay selection decisions
+let selection = await ndk.relaySelector.selectRelaysForPublishing(event: event)
+print("Selected \(selection.relays.count) relays via \(selection.selectionMethod)")
+print("Target relays: \(selection.relays.joined(separator: ", "))")
+print("Missing relay info for: \(selection.missingRelayInfoPubkeys)")
+
+// Check outbox tracker status
+let userRelays = await ndk.outboxTracker.getRelaysSyncFor(pubkey: userPubkey)
+if let relays = userRelays {
+    print("User has \(relays.readRelays.count) read relays, \(relays.writeRelays.count) write relays")
+} else {
+    print("No relay information cached for user")
+}
+```
+
+**Common Scenarios and Behavior:**
+
+```swift
+// 1. Simple reply (2 p-tags) - Uses outbox model
+let reply = try await ndk.event()
+    .content("Great point @alice! @bob what do you think?")
+    .tag(["p", alicePubkey])
+    .tag(["p", bobPubkey])
+    .build()
+// → Publishes to your write relays + alice's read relays + bob's read relays
+
+// 2. Mass mention (15 p-tags) - Skips outbox model
+let massEvent = try await ndk.event()
+    .content("Thanks everyone who joined the discussion!")
+    .tag(["p", user1]) .tag(["p", user2]) /* ... 15 total ... */
+    .build()
+// → Publishes ONLY to your write relays (network courtesy)
+
+// 3. Public post (no p-tags) - Author's relays only
+let publicPost = try await ndk.event()
+    .content("Good morning, Nostr!")
+    .build()
+// → Publishes to your write relays
+
+// 4. DM (1 p-tag) - Uses outbox model
+let dm = try await ndk.event()
+    .content("Hey, can we chat privately?")
+    .kind(EventKind.encryptedDirectMessage)
+    .tag(["p", recipientPubkey])
+    .build()
+// → Publishes to your write relays + recipient's read relays
+```
+
+**Testing Outbox Model Behavior:**
+
+```swift
+// Test setup for outbox model
+func setupTestRelayLists() async {
+    // Mock relay lists for test users
+    await ndk.outboxTracker.track(
+        pubkey: "alice_pubkey",
+        readRelays: ["wss://alice-read1.com", "wss://alice-read2.com"],
+        writeRelays: ["wss://alice-write1.com"],
+        source: .nip65
+    )
+    
+    await ndk.outboxTracker.track(
+        pubkey: "bob_pubkey", 
+        readRelays: ["wss://bob-read1.com"],
+        writeRelays: ["wss://bob-write1.com", "wss://bob-write2.com"],
+        source: .nip65
+    )
+}
+
+func testOutboxModelBehavior() async throws {
+    await setupTestRelayLists()
+    
+    // Test < 10 p-tags: should use outbox model
+    let event = try await ndk.event()
+        .content("Hello @alice and @bob!")
+        .tag(["p", "alice_pubkey"])
+        .tag(["p", "bob_pubkey"])
+        .build()
+    
+    let selection = await ndk.relaySelector.selectRelaysForPublishing(event: event)
+    
+    // Should include read relays of p-tagged users
+    XCTAssertTrue(selection.relays.contains("wss://alice-read1.com"))
+    XCTAssertTrue(selection.relays.contains("wss://alice-read2.com"))
+    XCTAssertTrue(selection.relays.contains("wss://bob-read1.com"))
+    
+    // Should NOT include write relays of p-tagged users
+    XCTAssertFalse(selection.relays.contains("wss://alice-write1.com"))
+    XCTAssertFalse(selection.relays.contains("wss://bob-write1.com"))
+    
+    // Test ≥ 10 p-tags: should skip outbox model
+    var massEvent = ndk.event().content("Thanks everyone!")
+    for i in 1...11 {
+        massEvent = massEvent.tag(["p", "user\(i)_pubkey"])
+    }
+    let massEventBuilt = try await massEvent.build()
+    
+    let massSelection = await ndk.relaySelector.selectRelaysForPublishing(event: massEventBuilt)
+    // Should not include alice or bob's relays when 10+ p-tags
+    XCTAssertFalse(massSelection.relays.contains("wss://alice-read1.com"))
+    XCTAssertEqual(massSelection.missingRelayInfoPubkeys.count, 0) // No tracking for 10+ p-tags
+}
+```
+
+**Fetching vs Publishing Behavior:**
+
+```swift
+// Fetching behavior (different from publishing):
+// - Considers ALL p-tagged users regardless of count
+// - Uses their READ relays to find events about them
+
+let filter = NDKFilter(
+    kinds: [1], 
+    tags: ["p": Set(["alice_pubkey", "bob_pubkey", /* ... 15 users ... */])]
+)
+
+let fetchSelection = await ndk.relaySelector.selectRelaysForFetching(filter: filter)
+// ✅ Will consider all 15 users' read relays for fetching
+// (No 10-user limit for fetching, only for publishing)
+```
+
+**Best Practices:**
+
+1. **Monitor Missing Relay Info**: Check `selection.missingRelayInfoPubkeys` and optionally fetch relay lists
+2. **Respect P-tag Limits**: The 10-p-tag limit protects the network - don't try to circumvent it
+3. **Handle Fallbacks Gracefully**: Users may not have read relays configured
+4. **Test Edge Cases**: Users with no relay lists, mixed relay availability, etc.
+5. **Cache Relay Lists**: Use `NDKOutboxTracker` efficiently to avoid repeated fetches
+6. **Monitor Relay Health**: Blacklisted or failing relays are automatically avoided
+
+**Performance Considerations:**
+
+```swift
+// Relay selection is cached and optimized
+let selection = await ndk.relaySelector.selectRelaysForPublishing(event: event)
+// ✅ Fast - uses cached relay lists when available
+// ✅ Efficient - only fetches missing relay lists as needed
+// ✅ Smart - considers relay health and blacklists
+
+// Monitor performance
+print("Relay selection took \(selection.selectionMethod)")
+// Outputs: .outbox, .contextual, or .fallback
+```
+
+The outbox model ensures your app delivers events effectively while being a good Nostr network citizen. Always test your implementation with various p-tag counts and relay availability scenarios.
 
 ---
 
@@ -691,5 +924,108 @@ By integrating Negentropy thoughtfully, you can provide users with dramatically 
 *   **Signature Verification Sampling:** NDKSwift does not verify every single signature by default to save CPU. It uses a sampling strategy defined by `NDKSignatureVerificationConfig`. For most apps, the default is fine. You can configure it to be more or less strict. It also automatically detects and can blacklist "evil relays" that serve events with invalid signatures.
 *   **Caching:** Use `NDKSQLiteCache` to persist events, profiles, and other Nostr data. This dramatically improves launch times and provides a basic offline experience. The `NDKProfileManager` also uses this cache to avoid re-fetching profile metadata.
 *   **Relay Health:** `NDKCashuWallet` includes a relay health system to ensure that a user's wallet state is consistent across their defined relays. It can detect and repair missing or stale events.
+
+#### 9.1. Relay Selection Strategy and Network Courtesy
+
+NDKSwift implements sophisticated relay selection algorithms that balance performance, deliverability, and network courtesy. Understanding these strategies helps you build apps that are both effective and respectful to the Nostr ecosystem.
+
+**Relay Selection Methods:**
+
+```swift
+enum SelectionMethod {
+    case outbox      // Used NIP-65 outbox model
+    case contextual  // Used relay hints from e-tags or limited p-tags
+    case fallback    // Used default/configured relays
+}
+
+let selection = await ndk.relaySelector.selectRelaysForPublishing(event: event)
+print("Selection method: \(selection.selectionMethod)")
+```
+
+**Network Courtesy Protections:**
+
+1. **P-tag Count Limits**: Prevents relay spam from mass mentions
+2. **Relay Health Tracking**: Avoids repeatedly failing relays
+3. **Blacklist Support**: Automatically filters out problematic relays
+4. **Connection Limits**: Respects relay connection limits and rate limiting
+5. **Intelligent Fallbacks**: Graceful degradation when preferred relays unavailable
+
+**Monitoring Relay Selection:**
+
+```swift
+// Monitor relay selection effectiveness
+func monitorRelaySelection() async {
+    let stats = await ndk.getSubscriptionStats()
+    print("Active subscriptions: \(stats.activeCount)")
+    print("Total relay connections: \(await ndk.getRelayConnectionSummary())")
+    
+    // Check relay health
+    let blacklistedRelays = await ndk.getBlacklistedRelays()
+    if !blacklistedRelays.isEmpty {
+        print("Warning: \(blacklistedRelays.count) relays blacklisted due to issues")
+    }
+}
+
+// Check individual relay status
+let relayUrl = "wss://relay.example.com"
+let isBlacklisted = await ndk.isRelayBlacklisted(relayUrl)
+if isBlacklisted {
+    print("Relay \(relayUrl) is blacklisted - will not be used")
+}
+```
+
+**Optimizing for Your Use Case:**
+
+```swift
+// Configure relay selection behavior
+var config = PublishingConfig()
+config.minRelayCount = 3  // Minimum relays for redundancy
+config.maxRelayCount = 8  // Maximum to avoid spam
+config.includeUserReadRelays = true  // Include read relays as fallback
+
+let selection = await ndk.relaySelector.selectRelaysForPublishing(
+    event: event,
+    config: config
+)
+
+// For fetching, different strategy
+var fetchConfig = FetchingConfig()
+fetchConfig.maxRelayCount = 15  // More relays for better discovery
+fetchConfig.preferWriteRelaysIfNoRead = true  // Fallback strategy
+
+let fetchSelection = await ndk.relaySelector.selectRelaysForFetching(
+    filter: filter,
+    config: fetchConfig
+)
+```
+
+**Best Practices for Network Citizenship:**
+
+1. **Respect P-tag Limits**: Don't circumvent the 10-p-tag protection
+2. **Monitor Failed Publishes**: Handle and retry appropriately
+3. **Cache Relay Lists**: Avoid unnecessary NIP-65 fetches
+4. **Handle Missing Info Gracefully**: Some users may not have relay lists
+5. **Consider Mobile Networks**: Adjust relay count for cellular vs WiFi
+6. **Monitor Relay Health**: Remove persistently failing relays
+
+```swift
+// Example: Mobile-aware relay selection
+func publishWithNetworkAwareness(event: NDKEvent) async throws {
+    let networkType = await getCurrentNetworkType() // Your network detection
+    
+    var config = PublishingConfig()
+    switch networkType {
+    case .cellular:
+        config.maxRelayCount = 5  // Conservative on cellular
+    case .wifi:
+        config.maxRelayCount = 10 // More aggressive on WiFi
+    case .unknown:
+        config.maxRelayCount = 3  // Very conservative
+    }
+    
+    let publishedRelays = try await ndk.publish(event)
+    print("Published to \(publishedRelays.count) relays on \(networkType)")
+}
+```
 
 By understanding and applying these principles, you can build truly native, performant, and reliable Nostr applications on Apple platforms using NDKSwift.
