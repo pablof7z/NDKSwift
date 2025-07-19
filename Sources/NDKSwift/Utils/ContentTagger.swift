@@ -1,18 +1,5 @@
 import Foundation
 
-// MARK: - Safe Array Access
-
-extension Array {
-    /// Safe subscript that returns nil for out-of-bounds indices
-    func at(_ index: Int) -> Element? {
-        return indices.contains(index) ? self[index] : nil
-    }
-    
-    /// Safe subscript that returns nil for out-of-bounds indices
-    subscript(safe index: Int) -> Element? {
-        return indices.contains(index) ? self[index] : nil
-    }
-}
 
 // MARK: - Tag Validation
 
