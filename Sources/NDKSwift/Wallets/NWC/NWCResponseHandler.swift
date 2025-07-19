@@ -299,7 +299,7 @@ public struct NWCResponseHandler {
                         
                         // Convert notification data back to JSON for parsing
                         let notificationJSON = try JSONSerialization.data(withJSONObject: notificationData)
-                        let paymentNotification = try JSONDecoder().decode(PaymentNotification.self, from: notificationJSON)
+                        let paymentNotification = try JSONCoding.decode(PaymentNotification.self, from: notificationJSON)
                         
                         let notification = NWCNotification(
                             notificationType: notificationType,
@@ -330,7 +330,7 @@ public struct NWCResponseHandler {
             throw NDKError.invalidResponse(from: "Invalid response content")
         }
         
-        let response = try JSONDecoder().decode(NWCResponse<T>.self, from: data)
+        let response = try JSONCoding.decode(NWCResponse<T>.self, from: data)
         
         if let error = response.error {
             throw NDKError.walletError(message: error.message)
