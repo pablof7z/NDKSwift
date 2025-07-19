@@ -2,6 +2,12 @@ import Foundation
 
 /// Utility functions for parsing Nostr content
 public enum NDKContentParser {
+    private static let nostrPrefix = "nostr:"
+    
+    /// Remove "nostr:" prefix from a string
+    private static func removeNostrPrefix(_ text: String) -> String {
+        return text.replacingOccurrences(of: nostrPrefix, with: "")
+    }
     
     /// Parse content and extract mentions, hashtags, and other references
     public static func parseContent(
@@ -101,7 +107,7 @@ public enum NDKContentParser {
                                 components.append(.url(url))
                             }
                         case .npubMention:
-                            let npub = matchedText.replacingOccurrences(of: "nostr:", with: "")
+                            let npub = removeNostrPrefix(matchedText)
                             if let pubkey = try? String.fromNpub(npub) {
                                 components.append(.userMention(pubkey: pubkey, npub: npub))
                             }
