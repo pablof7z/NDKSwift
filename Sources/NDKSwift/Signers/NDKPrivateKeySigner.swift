@@ -79,20 +79,14 @@ public final class NDKPrivateKeySigner: NDKSigner {
         case .nip04:
             do {
                 return try Crypto.nip04Encrypt(message: value, privateKey: privateKey, publicKey: recipient.pubkey)
-            } catch let error as Crypto.CryptoError {
-                throw NDKError.encryptionFailed("NIP-04 encryption failed: \(error.errorDescription ?? "")", underlying: error)
             } catch {
-                throw NDKError.encryptionFailed("NIP-04 encryption failed", underlying: error)
+                throw createEncryptionError(for: "NIP-04", from: error)
             }
         case .nip44:
             do {
                 return try Crypto.nip44Encrypt(message: value, privateKey: privateKey, publicKey: recipient.pubkey)
-            } catch let error as Crypto.NIP44Error {
-                throw NDKError.encryptionFailed("NIP-44 encryption failed: \(error.errorDescription ?? "")", underlying: error)
-            } catch let error as Crypto.CryptoError {
-                throw NDKError.encryptionFailed("NIP-44 encryption failed: \(error.errorDescription ?? "")", underlying: error)
             } catch {
-                throw NDKError.encryptionFailed("NIP-44 encryption failed", underlying: error)
+                throw createEncryptionError(for: "NIP-44", from: error)
             }
         }
     }
@@ -102,20 +96,14 @@ public final class NDKPrivateKeySigner: NDKSigner {
         case .nip04:
             do {
                 return try Crypto.nip04Decrypt(encrypted: value, privateKey: privateKey, publicKey: sender.pubkey)
-            } catch let error as Crypto.CryptoError {
-                throw NDKError.decryptionFailed("NIP-04 decryption failed: \(error.errorDescription ?? "")", underlying: error)
             } catch {
-                throw NDKError.decryptionFailed("NIP-04 decryption failed", underlying: error)
+                throw createDecryptionError(for: "NIP-04", from: error)
             }
         case .nip44:
             do {
                 return try Crypto.nip44Decrypt(encrypted: value, privateKey: privateKey, publicKey: sender.pubkey)
-            } catch let error as Crypto.NIP44Error {
-                throw NDKError.decryptionFailed("NIP-44 decryption failed: \(error.errorDescription ?? "")", underlying: error)
-            } catch let error as Crypto.CryptoError {
-                throw NDKError.decryptionFailed("NIP-44 decryption failed: \(error.errorDescription ?? "")", underlying: error)
             } catch {
-                throw NDKError.decryptionFailed("NIP-44 decryption failed", underlying: error)
+                throw createDecryptionError(for: "NIP-44", from: error)
             }
         }
     }
@@ -173,5 +161,29 @@ public final class NDKPrivateKeySigner: NDKSigner {
         }
         
         return try NDKPrivateKeySigner(privateKey: privateKey)
+    }
+    
+    // MARK: - Error Handling Helpers
+    
+    /// Creates appropriate encryption error based on the underlying error type
+    private func createEncryptionError(for nip: String, from error: Error) -> NDKError {
+        if let cryptoError = error as? Crypto.CryptoError {
+            return NDKError.encryptionFailed("\(nip) encryption failed: \(cryptoError.errorDescription ?? "")", underlying: error)
+        } else if let nip44Error = error as? Crypto.NIP44Error {
+            return NDKError.encryptionFailed("\(nip) encryption failed: \(nip44Error.errorDescription ?? "")", underlying: error)
+        } else {
+            return NDKError.encryptionFailed("\(nip) encryption failed", underlying: error)
+        }
+    }
+    
+    /// Creates appropriate decryption error based on the underlying error type
+    private func createDecryptionError(for nip: String, from error: Error) -> NDKError {
+        if let cryptoError = error as? Crypto.CryptoError {
+            return NDKError.decryptionFailed("\(nip) decryption failed: \(cryptoError.errorDescription ?? "")", underlying: error)
+        } else if let nip44Error = error as? Crypto.NIP44Error {
+            return NDKError.decryptionFailed("\(nip) decryption failed: \(nip44Error.errorDescription ?? "")", underlying: error)
+        } else {
+            return NDKError.decryptionFailed("\(nip) decryption failed", underlying: error)
+        }
     }
 }
