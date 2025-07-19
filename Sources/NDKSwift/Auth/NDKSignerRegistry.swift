@@ -67,7 +67,7 @@ public class NDKSignerRegistry {
         // Parse the outer container to get the signer type
         let container: SignerContainer
         do {
-            container = try JSONDecoder().decode(SignerContainer.self, from: data)
+            container = try JSONCoding.decode(SignerContainer.self, from: data)
         } catch {
             
             throw error
@@ -167,7 +167,7 @@ public enum NDKSignerSerialization {
     /// - Parameter data: The serialized container data
     /// - Returns: The signer type and payload
     public static func extractPayload(from data: Data) throws -> (type: String, payload: [String: Any]) {
-        let container = try JSONDecoder().decode(SignerContainer.self, from: data)
+        let container = try JSONCoding.decode(SignerContainer.self, from: data)
         let payload = container.payload.mapValues { $0.value }
         return (type: container.type, payload: payload)
     }

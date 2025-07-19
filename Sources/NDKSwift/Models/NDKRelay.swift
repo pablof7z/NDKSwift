@@ -531,7 +531,7 @@ public final class NDKRelay: RelayProtocol, Hashable, Equatable, @unchecked Send
         
         do {
             let (data, _) = try await URLSession.shared.data(for: request)
-            let relayInfo = try JSONDecoder().decode(NDKRelayInformation.self, from: data)
+            let relayInfo = try JSONCoding.decode(NDKRelayInformation.self, from: data)
             await stateActor.setInfo(relayInfo)
         } catch {
             // Silently fail - not all relays support NIP-11
