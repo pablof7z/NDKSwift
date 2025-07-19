@@ -243,12 +243,12 @@ public final class NDK {
     ///   - logRawJSON: If true, logs the raw JSON for debugging
     /// - Returns: Set of relays that accepted the event
     /// - Throws: NDKError if publishing fails
-    public func publish(_ event: NDKEvent, logRawJSON: Bool = false) async throws -> Set<NDKRelay> {
-        try await eventManager.publish(event, logRawJSON: logRawJSON)
-    }
-    
-    public func publish(event: NDKEvent, to relayUrls: Set<String>) async throws -> Set<NDKRelay> {
-        try await eventManager.publish(event: event, to: relayUrls)
+    public func publish(_ event: NDKEvent, to relayUrls: Set<String>? = nil, logRawJSON: Bool = false) async throws -> Set<NDKRelay> {
+        if let relayUrls = relayUrls {
+            try await eventManager.publish(event: event, to: relayUrls, logRawJSON: logRawJSON)
+        } else {
+            try await eventManager.publish(event, logRawJSON: logRawJSON)
+        }
     }
     
     public func publish(_ builder: (NDKEventBuilder) -> NDKEventBuilder) async throws -> (event: NDKEvent, relays: Set<NDKRelay>) {

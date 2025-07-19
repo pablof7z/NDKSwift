@@ -940,7 +940,7 @@ public actor NIP60Wallet: NDKPaymentProvider {
                             )
                             
                             // Republish to specific relay
-                            let published = try await ndk.publish(event: tokenEvent.event, to: relayURLs)
+                            let published = try await ndk.publish(tokenEvent.event, to: relayURLs)
                             if published.contains(relay) {
                                 repairedCount += 1
                                 print("✅ Repaired token event \(eventId) on relay \(relay.url)")
@@ -959,7 +959,7 @@ public actor NIP60Wallet: NDKPaymentProvider {
                 let filter = NDKFilter(ids: [eventId])
                 let cachedEvents = try await ndk.cache.queryEvents(filter)
                 if let event = cachedEvents.first {
-                    let published = try await ndk.publish(event: event, to: relayURLs)
+                    let published = try await ndk.publish(event, to: relayURLs)
                     if published.contains(relay) {
                         repairedCount += 1
                         print("✅ Repaired event \(eventId) on relay \(relay.url)")

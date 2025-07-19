@@ -282,7 +282,7 @@ public actor NIP77SyncHandler {
         // Send events to relay
         do {
             for event in eventsToSend {
-                _ = try await ndk.publish(event: event, to: [relayURL])
+                _ = try await ndk.publish(event, to: [relayURL])
                 // Estimate EVENT message size
                 let eventJson = try? event.toJSON()
                 totalBytes += (eventJson?.count ?? 500) + 10 // +10 for ["EVENT", wrapper]

@@ -88,7 +88,7 @@ public class NDKNutzapProtocol: NDKZapProtocol {
         )
         
         // Publish to recipient's preferred relays
-        _ = try await ndk.publish(event: nutzap.event, to: Set(relays))
+        _ = try await ndk.publish(nutzap.event, to: Set(relays))
         
         // Create result - Nutzaps are complete immediately
         return ZapResult(

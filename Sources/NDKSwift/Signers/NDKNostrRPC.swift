@@ -118,9 +118,7 @@ public actor NDKNostrRPC {
         let publishDescription = targetRelayUrls != nil ? "to specific relays: \(relayUrls)" : "to all connected relays"
         NDKLogger.shared.log(.info, category: .auth, "Publishing \(publishDescription)")
         
-        let publishedRelays = try await (targetRelayUrls != nil 
-            ? ndk.publish(event: event, to: targetRelayUrls!)
-            : ndk.publish(event))
+        let publishedRelays = try await ndk.publish(event, to: targetRelayUrls)
         
         NDKLogger.shared.log(.info, category: .auth, "Published to relays: \(publishedRelays.map { $0.url })")
 
