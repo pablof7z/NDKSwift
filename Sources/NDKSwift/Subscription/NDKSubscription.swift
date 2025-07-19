@@ -598,7 +598,7 @@ public final class NDKSubscription: AsyncSequence, Sendable {
         guard let timeout = options.timeout else { return }
         
         let timeoutTask = Task { [weak self] in
-            try? await Task.sleep(nanoseconds: UInt64(timeout * 1_000_000_000))
+            try? await Task.sleep(nanoseconds: UInt64(timeout) * TimeConstants.nanosecondsPerSecond)
             
             // If the task wasn't cancelled, the timeout was reached
             if !Task.isCancelled {

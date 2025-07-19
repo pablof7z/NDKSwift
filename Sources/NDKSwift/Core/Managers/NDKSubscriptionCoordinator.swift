@@ -135,7 +135,7 @@ public actor NDKSubscriptionCoordinator {
         
         // Set up timeout
         let timeoutTask = Task {
-            try await Task.sleep(nanoseconds: UInt64(timeoutSeconds) * 1_000_000_000)
+            try await Task.sleep(nanoseconds: UInt64(timeoutSeconds) * TimeConstants.nanosecondsPerSecond)
             if !hasSeenEose {
                 await subscription.close()
             }

@@ -174,7 +174,7 @@ extension RetryPolicy {
                 }
                 
                 // Wait for the delay
-                try await Task.sleep(nanoseconds: UInt64(delay * 1_000_000_000))
+                try await Task.sleep(nanoseconds: UInt64(delay) * TimeConstants.nanosecondsPerSecond)
             }
         }
     }
@@ -196,7 +196,7 @@ extension RetryPolicy {
             
             // Add timeout task
             group.addTask {
-                try await Task.sleep(nanoseconds: UInt64(timeout * 1_000_000_000))
+                try await Task.sleep(nanoseconds: UInt64(timeout) * TimeConstants.nanosecondsPerSecond)
                 throw NDKError.timeout(operation: "Retry operation", seconds: Int(timeout))
             }
             
