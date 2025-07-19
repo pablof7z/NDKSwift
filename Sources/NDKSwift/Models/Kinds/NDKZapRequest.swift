@@ -99,8 +99,7 @@ public struct NDKZapRequest {
     
     /// Encode as JSON for sending to LNURL callback
     public func encodeForCallback() throws -> String {
-        let jsonData = try JSONEncoder().encode(event)
-        return String(data: jsonData, encoding: .utf8) ?? ""
+        return try JSONCoding.encodeToString(event)
     }
 }
 

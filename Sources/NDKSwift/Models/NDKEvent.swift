@@ -292,13 +292,7 @@ public struct NDKEvent: Codable, Equatable, Hashable, Sendable {
 
     /// Serialize event to JSON string
     public func serialize() throws -> String {
-        let encoder = JSONEncoder()
-        encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
-        let data = try encoder.encode(self)
-        guard let string = String(data: data, encoding: .utf8) else {
-            throw NDKError.unknown("Failed to convert JSON data to string")
-        }
-        return string
+        return try JSONCoding.encodeToString(self)
     }
 
     /// Alias for serialize() - serialize event to JSON string
