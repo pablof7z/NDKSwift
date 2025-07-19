@@ -41,7 +41,7 @@ public enum NIP44 {
             case .invalidPadding:
                 return "Invalid padding format"
             case .invalidNonce:
-                return "Invalid nonce (must be 32 bytes)"
+                return "Invalid nonce (must be \(Constants.nonceSize) bytes)"
             }
         }
     }
@@ -57,18 +57,27 @@ public enum NIP44 {
         static let maxPayloadSize = 87472
         static let minDataSize = 99
         static let maxDataSize = 65603
+        static let nonceSize = 32
+        static let sharedSecretSize = 32
+        static let conversationKeySize = 32
+        static let macSize = 32
+        static let chunkSizeThreshold = 256
+        static let expandedKeySize = 76  // 32 (chacha key) + 12 (nonce) + 32 (hmac key)
+        static let chachaKeySize = 32
+        static let chachaNonceSize = 12
+        static let hmacKeySize = 32
     }
     
     /// Calculate padded length for NIP-44
     public static func calcPaddedLen(_ unpadded: Int) -> Int {
-        if unpadded <= 32 {
-            return 32
+        if unpadded <= Constants.minPaddedSize {
+            return Constants.minPaddedSize
         }
         
         // Use floor(log2()) explicitly to match nostr-tools
         let log = floor(log2(Double(unpadded - 1)))
         let nextPower = 1 << (Int(log) + 1)
-        let chunk = nextPower <= 256 ? 32 : nextPower / 8
+        let chunk = nextPower <= Constants.chunkSizeThreshold ? Constants.minPaddedSize : nextPower / 8
         
         // Use floor division explicitly
         return chunk * (((unpadded - 1) / chunk) + 1)
@@ -156,13 +165,13 @@ public enum NIP44 {
         }
         
         // Compute shared secret using custom ECDH that extracts only x-coordinate
-        var sharedSecret = [UInt8](repeating: 0, count: 32)
+        var sharedSecret = [UInt8](repeating: 0, count: Constants.sharedSecretSize)
         let privateKeyBytes = [UInt8](privKeyData)
         
         // Use secp256k1_ecdh with custom callback to extract only x-coordinate
         guard secp256k1_ecdh(secp256k1.Context.rawRepresentation, &sharedSecret, &pubkey, privateKeyBytes, { (output, x32, _, _) in
-            // Copy only the x-coordinate (32 bytes)
-            memcpy(output, x32, 32)
+            // Copy only the x-coordinate (32 bytes for secp256k1)
+            memcpy(output, x32, Constants.sharedSecretSize)
             return 1
         }, nil) != 0 else {
             throw Crypto.CryptoError.invalidPoint
@@ -180,10 +189,10 @@ public enum NIP44 {
     
     /// Get message keys for NIP-44
     static func getMessageKeys(conversationKey: Data, nonce: Data) throws -> (chachaKey: Data, chachaNonce: Data, hmacKey: Data) {
-        guard conversationKey.count == 32 else {
+        guard conversationKey.count == Constants.conversationKeySize else {
             throw Crypto.CryptoError.invalidKeyLength
         }
-        guard nonce.count == 32 else {
+        guard nonce.count == Constants.nonceSize else {
             throw NIP44Error.invalidNonce
         }
         
@@ -191,7 +200,7 @@ public enum NIP44 {
         let keys = CryptoKit.HKDF<CryptoKit.SHA256>.expand(
             pseudoRandomKey: SymmetricKey(data: conversationKey),
             info: nonce,
-            outputByteCount: 76
+            outputByteCount: Constants.expandedKeySize
         )
         
         // Convert SymmetricKey to Data
@@ -267,9 +276,9 @@ public enum NIP44 {
             throw NIP44Error.unsupportedVersion
         }
         
-        let nonce = data[1..<33]
-        let ciphertext = data[33..<(dlen - 32)]
-        let mac = data[(dlen - 32)..<dlen]
+        let nonce = data[1..<(1 + Constants.nonceSize)]
+        let ciphertext = data[(1 + Constants.nonceSize)..<(dlen - Constants.macSize)]
+        let mac = data[(dlen - Constants.macSize)..<dlen]
         
         // Get message keys
         let (chachaKey, chachaNonce, hmacKey) = try getMessageKeys(conversationKey: conversationKey, nonce: Data(nonce))
@@ -306,7 +315,7 @@ public enum NIP44 {
     /// - Returns: Base64-encoded encrypted payload
     public static func encrypt(message: String, privateKey: PrivateKey, publicKey: PublicKey) throws -> String {
         let conversationKey = try getConversationKey(privateKey: privateKey, publicKey: publicKey)
-        let nonce = Crypto.randomBytes(count: 32)
+        let nonce = Crypto.randomBytes(count: Constants.nonceSize)
         return try encrypt(plaintext: message, conversationKey: conversationKey, nonce: nonce)
     }
     
