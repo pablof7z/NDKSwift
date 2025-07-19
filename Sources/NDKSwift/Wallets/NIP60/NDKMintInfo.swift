@@ -121,11 +121,11 @@ public struct NDKMintInfo: Codable, Equatable, Sendable {
     
     /// Initialize from JSON data
     public init(from jsonData: Data) throws {
-        self = try JSONDecoder().decode(NDKMintInfo.self, from: jsonData)
+        self = try JSONCoding.decode(NDKMintInfo.self, from: jsonData)
     }
     
     /// Convert to JSON data
     public func toJSONData() throws -> Data {
-        return try JSONEncoder().encode(self)
+        return try JSONCoding.encode(self)
     }
 }

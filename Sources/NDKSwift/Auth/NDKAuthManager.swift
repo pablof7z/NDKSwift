@@ -433,7 +433,7 @@ public class NDKAuthManager {
     /// Save session metadata to keychain
     /// - Parameter session: The session to save
     private func saveSessionMetadata(_ session: NDKSession) async throws {
-        let data = try JSONEncoder().encode(session)
+        let data = try JSONCoding.encode(session)
         try await keychainManager.storeSessionMetadata(identifier: session.id.uuidString, data: data)
     }
 }
