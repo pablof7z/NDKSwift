@@ -91,7 +91,7 @@ final class RelayConnectionTests: XCTestCase {
                     .content("Test event")
             }
             // Then publish to specific relay
-            _ = try await ndk.publish(event: event, to: [relayUrl])
+            _ = try await ndk.publish(event, to: [relayUrl])
             print("Published event: \(event.id)")
         } catch {
             // Publishing might fail if relay is not actually reachable, but that's OK for this test

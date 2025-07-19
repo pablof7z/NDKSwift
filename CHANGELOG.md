@@ -11,6 +11,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Refactored `processEvent` in NDKSubscriptionManager to follow Single Responsibility Principle by extracting focused helper methods
 - Simplified BunkerURLParser by reducing nesting levels and extracting methods for better readability
 - Eliminated duplicate error handling code in NDKPrivateKeySigner by extracting common logic
+- Consolidated publish method overloads in NDK and NDKEventManager using default parameters (DRY principle)
+  - Reduced code duplication by extracting common publish logic into `publishToRelays` method
+  - Updated method signatures to use single `publish(_:to:logRawJSON:)` with optional relay URLs
 
 ### Fixed
 - Removed duplicate hex conversion implementations from test files to use centralized DataExtensions (DRY principle)
