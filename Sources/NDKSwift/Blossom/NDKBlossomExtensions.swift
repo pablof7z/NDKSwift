@@ -1,5 +1,16 @@
 import Foundation
 
+// MARK: - Blossom Constants
+
+public enum BlossomConstants {
+    /// Default Blossom servers
+    public static let defaultServers = [
+        "https://blossom.primal.net",
+        "https://media.nostr.band",
+        "https://nostr.build"
+    ]
+}
+
 // MARK: - NDK Extensions for Blossom
 
 extension NDK {
@@ -75,11 +86,7 @@ extension NDK {
         // 3. Check user's preferred servers from kind 10096 events
 
         // For now, return some known Blossom servers
-        return [
-            "https://blossom.primal.net",
-            "https://media.nostr.band",
-            "https://nostr.build"
-        ]
+        return BlossomConstants.defaultServers
     }
 }
 

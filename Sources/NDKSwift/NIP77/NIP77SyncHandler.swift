@@ -78,7 +78,7 @@ public actor NIP77SyncHandler {
         let nostrMessage = NostrMessage.negOpen(
             subscriptionId: subscriptionId,
             filter: filter,
-            message: initialMessage.hexEncodedString()
+            message: initialMessage.hexString
         )
         
         let negOpenMessage = try nostrMessage.serialize()
@@ -115,7 +115,7 @@ public actor NIP77SyncHandler {
         case let .negMsg(_, dataHex):
             NDKLogger.shared.log(.debug, category: .network, "[NIP77] Received NEG-MSG with data: \(dataHex)")
             
-            guard let data = Data(hex: dataHex) else {
+            guard let data = Data(hexString: dataHex) else {
                 throw NIP77Error.invalidMessage
             }
             
@@ -150,7 +150,7 @@ public actor NIP77SyncHandler {
                 if let relay = relay {
                     let nostrMessage = NostrMessage.negMsg(
                         subscriptionId: subscriptionId,
-                        message: responseData.hexEncodedString()
+                        message: responseData.hexString
                     )
                     try? await relay.send(nostrMessage.serialize())
                 }

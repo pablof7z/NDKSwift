@@ -185,7 +185,7 @@ public class NDKKeychainManager {
         case errSecItemNotFound:
             throw NDKKeychainError.itemNotFound
             
-        case OSStatus(-25293): // errSecUserCancel equivalent
+        case OSStatus(NDKKeychainError.keychainUserCancelledCode):
             throw NDKKeychainError.userCancelled
             
         case errSecAuthFailed:
@@ -465,6 +465,9 @@ public enum NDKKeychainError: LocalizedError {
     case authenticationFailed
     case biometricNotAvailable
     case biometricNotEnrolled
+    
+    // Keychain error codes
+    static let keychainUserCancelledCode: Int32 = -25293
     
     public var errorDescription: String? {
         switch self {

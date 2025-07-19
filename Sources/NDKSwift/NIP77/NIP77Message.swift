@@ -111,12 +111,12 @@ public struct NIP77Message {
         case .negOpen:
             if let filter = filter, let data = data {
                 array.append(filter.toDictionary())
-                array.append(data.hexEncodedString())
+                array.append(data.hexString)
             }
             
         case .negMsg:
             if let data = data {
-                array.append(data.hexEncodedString())
+                array.append(data.hexString)
             }
             
         case .negErr:

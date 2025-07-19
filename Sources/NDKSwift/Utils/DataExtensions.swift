@@ -4,9 +4,19 @@ import Foundation
 
 public extension Data {
     /// Initialize Data from hex string
+    /// - Parameter hexString: Hex string to convert (supports "0x" prefix and odd-length strings)
     init?(hexString: String) {
-        let hex = hexString.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard hex.count % 2 == 0 else { return nil }
+        var hex = hexString.trimmingCharacters(in: .whitespacesAndNewlines)
+        
+        // Remove 0x prefix if present
+        if hex.hasPrefix("0x") {
+            hex = String(hex.dropFirst(2))
+        }
+        
+        // Ensure even number of characters by padding with leading zero if needed
+        if hex.count % 2 != 0 {
+            hex = "0" + hex
+        }
 
         var data = Data(capacity: hex.count / 2)
         var index = hex.startIndex
@@ -24,6 +34,16 @@ public extension Data {
     /// Convert Data to hex string
     var hexString: String {
         return map { String(format: "%02x", $0) }.joined()
+    }
+}
+
+// MARK: - String extensions for hex conversion
+
+public extension String {
+    /// Convert hex string to Data
+    /// - Returns: Data representation of the hex string, or nil if invalid
+    func hexDecoded() -> Data? {
+        return Data(hexString: self)
     }
 }
 

@@ -33,9 +33,9 @@ public enum NIP44 {
             case .unsupportedVersion:
                 return "Unsupported NIP-44 version"
             case .invalidPayloadSize:
-                return "Invalid payload size (must be 132-87472 chars)"
+                return "Invalid payload size (must be \(Constants.minPayloadSize)-\(Constants.maxPayloadSize) chars)"
             case .invalidDataSize:
-                return "Invalid data size (must be 99-65603 bytes)"
+                return "Invalid data size (must be \(Constants.minDataSize)-\(Constants.maxDataSize) bytes)"
             case .invalidMAC:
                 return "Invalid message authentication code"
             case .invalidPadding:
@@ -53,6 +53,10 @@ public enum NIP44 {
         static let minPlaintextSize = 1
         static let maxPlaintextSize = 65535
         static let minPaddedSize = 32
+        static let minPayloadSize = 132
+        static let maxPayloadSize = 87472
+        static let minDataSize = 99
+        static let maxDataSize = 65603
     }
     
     /// Calculate padded length for NIP-44
@@ -243,7 +247,7 @@ public enum NIP44 {
         
         // Validate base64 length
         let plen = payload.count
-        guard plen >= 132 && plen <= 87472 else {
+        guard plen >= Constants.minPayloadSize && plen <= Constants.maxPayloadSize else {
             throw NIP44Error.invalidPayloadSize
         }
         
@@ -253,7 +257,7 @@ public enum NIP44 {
         }
         
         let dlen = data.count
-        guard dlen >= 99 && dlen <= 65603 else {
+        guard dlen >= Constants.minDataSize && dlen <= Constants.maxDataSize else {
             throw NIP44Error.invalidDataSize
         }
         

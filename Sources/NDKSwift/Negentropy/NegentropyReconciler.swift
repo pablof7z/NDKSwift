@@ -80,13 +80,13 @@ public actor NegentropyReconciler {
         if let data = responseData {
             return .continuing(
                 data: data, 
-                haveIds: haveIds.map { Data(hex: $0)! }, 
-                needIds: needIds.map { Data(hex: $0)! }
+                haveIds: haveIds.compactMap { Data(hexString: $0) }, 
+                needIds: needIds.compactMap { Data(hexString: $0) }
             )
         } else {
             return .terminated(
-                haveIds: haveIds.map { Data(hex: $0)! }, 
-                needIds: needIds.map { Data(hex: $0)! }, 
+                haveIds: haveIds.compactMap { Data(hexString: $0) }, 
+                needIds: needIds.compactMap { Data(hexString: $0) }, 
                 isDone: true
             )
         }
