@@ -191,7 +191,7 @@ public enum Nutzap {
         var allProofs: [CashuSwift.Proof] = []
         for proofTag in proofTags {
             guard let proofData = proofTag[1].data(using: .utf8),
-                  let proof = try? JSONDecoder().decode(CashuSwift.Proof.self, from: proofData) else {
+                  let proof = try? JSONCoding.decode(CashuSwift.Proof.self, from: proofData) else {
                 NDKLogger.shared.log(.error, category: .general, "Failed to decode proof from tag")
                 continue
             }

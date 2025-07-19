@@ -122,6 +122,6 @@ extension NDKEvent {
         
         let eventContent = self.content
         let data = eventContent.data(using: .utf8) ?? Data()
-        return try JSONDecoder().decode(NDKMintAnnouncement.self, from: data)
+        return try JSONCoding.decode(NDKMintAnnouncement.self, from: data)
     }
 }

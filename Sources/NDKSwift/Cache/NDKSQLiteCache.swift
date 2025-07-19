@@ -60,7 +60,7 @@ public actor NDKSQLiteCache: NDKCache {
     /// Helper method to decode NDKEvent from database row JSON
     /// - Parameter row: Database row containing JSON data
     /// - Returns: Decoded NDKEvent or nil if decoding fails
-    private func decodeEventFromRow(_ row: Row) -> NDKEvent? {
+    private nonisolated func decodeEventFromRow(_ row: Row) -> NDKEvent? {
         guard let jsonString = row["json"] as? String,
               let jsonData = jsonString.data(using: .utf8) else {
             return nil
@@ -72,7 +72,7 @@ public actor NDKSQLiteCache: NDKCache {
     /// - Parameter row: Database row containing JSON data
     /// - Returns: Decoded NDKEvent
     /// - Throws: Decoding error if JSON is invalid
-    private func decodeEventFromRowThrowing(_ row: Row) throws -> NDKEvent? {
+    private nonisolated func decodeEventFromRowThrowing(_ row: Row) throws -> NDKEvent? {
         guard let jsonString = row["json"] as? String,
               let jsonData = jsonString.data(using: .utf8) else {
             return nil
@@ -126,9 +126,9 @@ public actor NDKSQLiteCache: NDKCache {
     
     public func getEvent(id: String) async -> NDKEvent? {
         do {
-            return try await dbQueue.read { db in
+            return try await dbQueue.read { [self] db in
                 if let row = try Row.fetchOne(db, sql: "SELECT json FROM events WHERE id = ?", arguments: [id]) {
-                    return try decodeEventFromRowThrowing(row)
+                    return try self.decodeEventFromRowThrowing(row)
                 }
                 return nil
             }
@@ -143,7 +143,7 @@ public actor NDKSQLiteCache: NDKCache {
     public func queryEvents(_ filter: NDKFilter) async throws -> [NDKEvent] {
         print("[NDKSQLiteCache.queryEvents] Starting query with filter: ids=\(filter.ids?.joined(separator: ",") ?? "nil"), authors=\(filter.authors?.joined(separator: ",") ?? "nil"), kinds=\(filter.kinds?.map { String($0) }.joined(separator: ",") ?? "nil")")
         
-        return try await dbQueue.read { db in
+        return try await dbQueue.read { [self] db in
             print("[NDKSQLiteCache.queryEvents] Inside dbQueue.read block")
             var sql = "SELECT DISTINCT e.json FROM events e"
             var arguments = StatementArguments()
@@ -235,7 +235,7 @@ public actor NDKSQLiteCache: NDKCache {
             print("[NDKSQLiteCache.queryEvents] Query returned \(rows.count) rows")
             
             let events: [NDKEvent] = rows.compactMap { row in
-                return decodeEventFromRow(row)
+                return self.decodeEventFromRow(row)
             }
             
             print("[NDKSQLiteCache.queryEvents] Decoded \(events.count) events")
@@ -875,7 +875,7 @@ public actor NDKSQLiteCache: NDKCache {
                           let event = JSONCoding.safeDecode(NDKEvent.self, from: jsonData),
                           let targetRelaysJson = row["target_relays"] as? String,
                           let targetRelaysData = targetRelaysJson.data(using: .utf8),
-                          let targetRelaysArray = try? JSONDecoder().decode([String].self, from: targetRelaysData) else {
+                          let targetRelaysArray = try? JSONCoding.decode([String].self, from: targetRelaysData) else {
                         return nil
                     }
                     

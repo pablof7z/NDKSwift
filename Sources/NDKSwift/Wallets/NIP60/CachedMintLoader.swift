@@ -71,7 +71,7 @@ public actor CachedMintLoader {
         let data = try await URLSession.shared.data(from: infoUrl).0
         
         // Decode to our local type
-        let info = try JSONDecoder().decode(NDKMintInfo.self, from: data)
+        let info = try JSONCoding.decode(NDKMintInfo.self, from: data)
         
         // Cache the result
         try await cache.saveMintInfo(info, url: urlString)

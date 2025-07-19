@@ -1,6 +1,7 @@
 import Foundation
 
 /// Handles NIP-77 Negentropy sync operations
+/// Note: Modified for wallet use - only downloads events, does not upload
 public actor NIP77SyncHandler {
     private let ndk: NDK
     private let cache: any NDKCache
@@ -120,9 +121,13 @@ public actor NIP77SyncHandler {
                 session.downloadedEventIds.insert(id)
             }
             
-            // Track what they need from us
+            // Track what they need from us (but we won't send)
             for id in haveIds {
                 session.uploadedEventIds.insert(id)
+            }
+            
+            if !haveIds.isEmpty {
+                print("[NIP77] Relay requested \(haveIds.count) events, but upload is disabled for wallet sync")
             }
             
             // Update session
@@ -151,7 +156,9 @@ public actor NIP77SyncHandler {
                     session.bytesTransferred += fetchBytes
                 }
                 
-                // Send our events if requested
+                // Skip uploading events - wallet should only receive
+                // Comment out the upload phase to make sync one-directional
+                /*
                 if !session.uploadedEventIds.isEmpty {
                     let (uploadedEvents, publishBytes) = await sendEvents(
                         ids: Array(session.uploadedEventIds),
@@ -161,6 +168,7 @@ public actor NIP77SyncHandler {
                     session.eventPublishBytes = publishBytes
                     session.bytesTransferred += publishBytes
                 }
+                */
                 
                 // Close the sync through relay
                 let relay = await ndk.pool.getRelay(for: session.relayURL)
