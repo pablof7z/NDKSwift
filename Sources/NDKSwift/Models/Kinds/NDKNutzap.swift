@@ -67,23 +67,17 @@ public struct NDKNutzap {
     
     /// Cashu proofs
     public var proofs: [CashuSwift.Proof] {
-        let tags = event.tags
-        return tags
+        return event.tags
             .filter { $0.first == "proof" }
             .compactMap { tag in
-                guard let proofJSON = tag[safe: 1],
-                      let data = proofJSON.data(using: .utf8),
-                      let proof = try? JSONDecoder().decode(CashuSwift.Proof.self, from: data) else {
-                    return nil
-                }
-                return proof
+                guard let proofJSON = tag[safe: 1] else { return nil }
+                return JSONCoding.safeDecode(CashuSwift.Proof.self, from: proofJSON)
             }
     }
     
     /// Mint URL
     public var mintURL: URL? {
-        let tags = event.tags
-        guard let urlString = tags.first(where: { $0.first == "u" })?[safe: 1] else {
+        guard let urlString = event.tags.first(where: { $0.first == "u" })?[safe: 1] else {
             return nil
         }
         return URL(string: urlString)
@@ -91,19 +85,16 @@ public struct NDKNutzap {
     
     /// Recipient's pubkey
     public var recipientPubkey: String? {
-        let tags = event.tags
-        return tags.first(where: { $0.first == "p" })?[safe: 1]
+        return event.tags.first(where: { $0.first == "p" })?[safe: 1]
     }
     
     /// Zapped event ID if this is zapping an event
     public var zappedEventId: String? {
-        let tags = event.tags
-        return tags.first(where: { $0.first == "e" })?[safe: 1]
+        return event.tags.first(where: { $0.first == "e" })?[safe: 1]
     }
     
     /// Total amount in the proofs
     public var totalAmount: Int64 {
-        let proofs = self.proofs
         return proofs.reduce(0) { $0 + Int64($1.amount) }
     }
     
@@ -191,8 +182,7 @@ public struct NDKNutzapPreferences {
     /// Get configured mints
     public var mints: [MintConfig] {
         get async {
-            let tags = event.tags
-            return tags
+            return event.tags
                 .filter { $0.first == "mint" }
                 .compactMap { tag in
                     guard let urlString = tag[safe: 1],
@@ -209,9 +199,8 @@ public struct NDKNutzapPreferences {
     /// Get P2PK pubkey for receiving nutzaps
     public var p2pkPubkey: String {
         get async {
-            let tags = event.tags
             // Look for p2pk tag (as per NIP-61)
-            if let pubkey = tags.first(where: { $0.first == "p2pk" })?[safe: 1] {
+            if let pubkey = event.tags.first(where: { $0.first == "p2pk" })?[safe: 1] {
                 return pubkey
             }
             // Fall back to event author's pubkey
