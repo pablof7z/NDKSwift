@@ -462,6 +462,7 @@ public actor NIP60Wallet: NDKPaymentProvider {
         let result = try await healthMonitor.checkAndReconcileProofStates(
             proofStateManager: proofStateManager,
             mints: mints,
+            mintManager: self.mints,
             signer: signer
         )
         
@@ -987,6 +988,7 @@ public actor NIP60Wallet: NDKPaymentProvider {
         return try await healthMonitor.checkAndReconcileProofStates(
             proofStateManager: proofStateManager,
             mints: allMints,
+            mintManager: self.mints,
             signer: signer
         )
     }
