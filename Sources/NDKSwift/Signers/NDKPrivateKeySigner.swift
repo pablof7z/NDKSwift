@@ -18,9 +18,9 @@ public final class NDKPrivateKeySigner: NDKSigner {
         do {
             self._pubkey = try Crypto.getPublicKey(from: privateKey)
         } catch let error as Crypto.CryptoError {
-            throw NDKError.keyDerivationFailed(error.errorDescription ?? "Failed to derive public key", underlying: error)
+            throw NDKError.cryptoOperation("Key derivation", nip: nil, error: error)
         } catch {
-            throw NDKError.keyDerivationFailed("Failed to derive public key", underlying: error)
+            throw NDKError.cryptoOperation("Key derivation", nip: nil, error: error)
         }
     }
 
@@ -49,15 +49,15 @@ public final class NDKPrivateKeySigner: NDKSigner {
         do {
             idData = try HexValidator.validate32ByteHex(event.id)
         } catch {
-            throw NDKError.signingFailed("Failed to sign event: invalid event ID", underlying: error)
+            throw NDKError.parseError(for: "event ID", details: error.localizedDescription)
         }
 
         do {
             return try Crypto.sign(message: idData, privateKey: privateKey)
         } catch let error as Crypto.CryptoError {
-            throw NDKError.signingFailed(error.errorDescription ?? "Failed to sign event", underlying: error)
+            throw NDKError.cryptoOperation("Signing", nip: nil, error: error)
         } catch {
-            throw NDKError.signingFailed("Failed to sign event", underlying: error)
+            throw NDKError.cryptoOperation("Signing", nip: nil, error: error)
         }
     }
 
@@ -75,13 +75,13 @@ public final class NDKPrivateKeySigner: NDKSigner {
             do {
                 return try Crypto.nip04Encrypt(message: value, privateKey: privateKey, publicKey: recipient.pubkey)
             } catch {
-                throw createEncryptionError(for: "NIP-04", from: error)
+                throw NDKError.cryptoOperation("Encryption", nip: "NIP-04", error: error)
             }
         case .nip44:
             do {
                 return try Crypto.nip44Encrypt(message: value, privateKey: privateKey, publicKey: recipient.pubkey)
             } catch {
-                throw createEncryptionError(for: "NIP-44", from: error)
+                throw NDKError.cryptoOperation("Encryption", nip: "NIP-44", error: error)
             }
         }
     }
@@ -92,13 +92,13 @@ public final class NDKPrivateKeySigner: NDKSigner {
             do {
                 return try Crypto.nip04Decrypt(encrypted: value, privateKey: privateKey, publicKey: sender.pubkey)
             } catch {
-                throw createDecryptionError(for: "NIP-04", from: error)
+                throw NDKError.cryptoOperation("Decryption", nip: "NIP-04", error: error)
             }
         case .nip44:
             do {
                 return try Crypto.nip44Decrypt(encrypted: value, privateKey: privateKey, publicKey: sender.pubkey)
             } catch {
-                throw createDecryptionError(for: "NIP-44", from: error)
+                throw NDKError.cryptoOperation("Decryption", nip: "NIP-44", error: error)
             }
         }
     }
@@ -146,31 +146,5 @@ public final class NDKPrivateKeySigner: NDKSigner {
         }
         
         return try NDKPrivateKeySigner(privateKey: privateKey)
-    }
-    
-    // MARK: - Error Handling Helpers
-    
-    /// Creates appropriate encryption error based on the underlying error type
-    private func createEncryptionError(for nip: String, from error: Error) -> NDKError {
-        let errorMessage = createErrorMessage(for: nip, from: error, operation: "encryption")
-        return NDKError.encryptionFailed(errorMessage, underlying: error)
-    }
-    
-    /// Creates appropriate decryption error based on the underlying error type
-    private func createDecryptionError(for nip: String, from error: Error) -> NDKError {
-        let errorMessage = createErrorMessage(for: nip, from: error, operation: "decryption")
-        return NDKError.decryptionFailed(errorMessage, underlying: error)
-    }
-    
-    /// Creates error message based on the underlying error type
-    private func createErrorMessage(for nip: String, from error: Error, operation: String) -> String {
-        switch error {
-        case let cryptoError as Crypto.CryptoError:
-            return "\(nip) \(operation) failed: \(cryptoError.errorDescription ?? "")"
-        case let nip44Error as Crypto.NIP44Error:
-            return "\(nip) \(operation) failed: \(nip44Error.errorDescription ?? "")"
-        default:
-            return "\(nip) \(operation) failed"
-        }
     }
 }
