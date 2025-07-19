@@ -182,15 +182,3 @@ public actor NDKPool {
     }
 }
 
-// Helper extension for async filter
-extension Array {
-    func asyncFilter(_ isIncluded: (Element) async -> Bool) async -> [Element] {
-        var result: [Element] = []
-        for element in self {
-            if await isIncluded(element) {
-                result.append(element)
-            }
-        }
-        return result
-    }
-}

@@ -1,10 +1,5 @@
 import Foundation
 
-private extension Array where Element: Hashable {
-    var set: Set<Element> {
-        Set(self)
-    }
-}
 
 /// Provides scoped subscription management with automatic cleanup
 public extension NDK {
