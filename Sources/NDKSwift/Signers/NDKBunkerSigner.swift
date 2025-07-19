@@ -120,20 +120,20 @@ public actor NDKBunkerSigner: NDKSigner, Sendable {
     // MARK: - Static Factory Methods
 
     /// Create a bunker signer with bunker:// connection string
-    public static func bunker(ndk: NDK, connectionToken: String, localSigner: NDKPrivateKeySigner? = nil) -> NDKBunkerSigner {
-        let signer = localSigner ?? (try! NDKPrivateKeySigner.generate())
+    public static func bunker(ndk: NDK, connectionToken: String, localSigner: NDKPrivateKeySigner? = nil) throws -> NDKBunkerSigner {
+        let signer = try localSigner ?? NDKPrivateKeySigner.generate()
         return NDKBunkerSigner(ndk: ndk, connectionType: .bunker(connectionToken), localSigner: signer)
     }
 
     /// Create a bunker signer with NIP-05
-    public static func nip05(ndk: NDK, nip05: String, localSigner: NDKPrivateKeySigner? = nil) -> NDKBunkerSigner {
-        let signer = localSigner ?? (try! NDKPrivateKeySigner.generate())
+    public static func nip05(ndk: NDK, nip05: String, localSigner: NDKPrivateKeySigner? = nil) throws -> NDKBunkerSigner {
+        let signer = try localSigner ?? NDKPrivateKeySigner.generate()
         return NDKBunkerSigner(ndk: ndk, connectionType: .nip05(nip05), localSigner: signer)
     }
 
     /// Create a nostrconnect signer
-    public static func nostrConnect(ndk: NDK, relay: String, localSigner: NDKPrivateKeySigner? = nil, options: NostrConnectOptions? = nil) -> NDKBunkerSigner {
-        let signer = localSigner ?? (try! NDKPrivateKeySigner.generate())
+    public static func nostrConnect(ndk: NDK, relay: String, localSigner: NDKPrivateKeySigner? = nil, options: NostrConnectOptions? = nil) throws -> NDKBunkerSigner {
+        let signer = try localSigner ?? NDKPrivateKeySigner.generate()
         return NDKBunkerSigner(ndk: ndk, connectionType: .nostrConnect(relay: relay, options: options), localSigner: signer)
     }
 

@@ -173,9 +173,9 @@ struct PostaAuthView: View {
                     guard let connectionToken = extractConnectionToken(from: loginInput) else {
                         throw AuthError.invalidBunkerUrl
                     }
-                    signer = NDKBunkerSigner.bunker(ndk: ndk, connectionToken: connectionToken)
+                    signer = try NDKBunkerSigner.bunker(ndk: ndk, connectionToken: connectionToken)
                 } else if loginInput.contains("@") {
-                    signer = NDKBunkerSigner.nip05(ndk: ndk, nip05: loginInput)
+                    signer = try NDKBunkerSigner.nip05(ndk: ndk, nip05: loginInput)
                 } else {
                     throw AuthError.invalidBunkerUrl
                 }
