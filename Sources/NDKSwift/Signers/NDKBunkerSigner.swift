@@ -1,5 +1,5 @@
-import Combine
 import Foundation
+import Combine
 
 /// Helper struct for parsing bunker URLs
 struct BunkerURLParser {

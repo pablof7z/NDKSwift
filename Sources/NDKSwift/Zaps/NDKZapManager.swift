@@ -1,6 +1,7 @@
 import Foundation
-import CashuSwift
 import CryptoKit
+
+import CashuSwift
 
 /// Manages zapping functionality with decoupled protocol and payment handling
 public actor NDKZapManager {

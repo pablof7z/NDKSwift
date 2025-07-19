@@ -1,6 +1,7 @@
-import CryptoSwift
-import CryptoKit
 import Foundation
+import CryptoKit
+
+import CryptoSwift
 import secp256k1
 
 /// NIP-44: Encrypted Direct Messages (Version 2)
