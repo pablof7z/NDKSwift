@@ -1,10 +1,18 @@
 import Foundation
 import Combine
 
-/// Helper struct for parsing bunker URLs
+/// Parser for NIP-46 bunker:// URLs
+/// Extracts connection parameters from bunker URLs for remote signing
 struct BunkerURLParser {
+    /// The bunker URL string to parse
     let urlString: String
     
+    /// Parses the bunker URL and extracts connection parameters
+    /// - Returns: A tuple containing:
+    ///   - bunkerPubkey: The public key of the bunker service (optional)
+    ///   - userPubkey: The user's public key (optional)
+    ///   - relays: Array of relay URLs to connect through
+    ///   - secret: Connection secret for authentication (optional)
     func parse() -> (bunkerPubkey: String?, userPubkey: String?, relays: [String], secret: String?) {
         NDKLogger.shared.log(.debug, category: .auth, "[BunkerSigner] Parsing bunker URL: \(urlString)")
         
