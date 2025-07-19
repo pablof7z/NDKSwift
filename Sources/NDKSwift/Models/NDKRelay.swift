@@ -444,9 +444,7 @@ public final class NDKRelay: RelayProtocol, Hashable, Equatable, @unchecked Send
         }
         print("[NDKRelay] Stats updated for \(url)")
 
-        guard let url = URL(string: normalizedURL) else {
-            throw NDKError.invalidURL(normalizedURL)
-        }
+        let url = try URLUtils.validateURL(normalizedURL)
 
         print("[NDKRelay] Creating connection for \(url)")
         let newConnection = NDKRelayConnection(url: url)
