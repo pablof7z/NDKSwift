@@ -80,6 +80,13 @@ struct NegentropySyncDemo {
             print("\n🌐 Testing multi-relay sync...")
             let multiRelayResults = try await ndk.syncWithAllRelays(filter: filter)
             
+            // Also demonstrate receive-only sync (for wallet apps)
+            // .receive = download only (wallet apps, privacy-sensitive)
+            // .send = upload only (backup, broadcasting)
+            // .both = bidirectional sync (default, full sync)
+            print("\n📥 Testing receive-only sync...")
+            let receiveOnlyResults = try await ndk.syncWithAllRelays(filter: filter, direction: .receive)
+            
             for (relay, result) in multiRelayResults {
                 print("\nRelay: \(relay)")
                 print("  - Downloaded: \(result.downloadedEvents.count)")

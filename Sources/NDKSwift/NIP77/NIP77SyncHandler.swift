@@ -1,11 +1,21 @@
 import Foundation
 
+/// Direction of sync operations
+public enum SyncDirection {
+    case send     // Only upload events to relay
+    case receive  // Only download events from relay
+    case both     // Bidirectional sync (default)
+}
+
 /// Handles NIP-77 Negentropy sync operations
-/// Note: Modified for wallet use - only downloads events, does not upload
 public actor NIP77SyncHandler {
     private let ndk: NDK
     private let cache: any NDKCache
     private let storage: NDKCacheNegentropyStorage
+    
+    /// Direction of sync operations
+    /// Default is .both for bidirectional sync
+    public var syncDirection: SyncDirection = .both
     
     /// Current sync sessions indexed by subscription ID
     var activeSessions: [String: SyncSession] = [:]
@@ -33,6 +43,11 @@ public actor NIP77SyncHandler {
         self.ndk = ndk
         self.cache = cache
         self.storage = NDKCacheNegentropyStorage(cache: cache)
+    }
+    
+    /// Set the sync direction
+    public func setSyncDirection(_ direction: SyncDirection) {
+        self.syncDirection = direction
     }
     
     /// Start a sync operation with a relay
@@ -121,13 +136,9 @@ public actor NIP77SyncHandler {
                 session.downloadedEventIds.insert(id)
             }
             
-            // Track what they need from us (but we won't send)
+            // Track what they need from us
             for id in haveIds {
                 session.uploadedEventIds.insert(id)
-            }
-            
-            if !haveIds.isEmpty {
-                print("[NIP77] Relay requested \(haveIds.count) events, but upload is disabled for wallet sync")
             }
             
             // Update session
@@ -145,8 +156,8 @@ public actor NIP77SyncHandler {
                 }
             } else {
                 // Reconciliation complete
-                // Fetch missing events
-                if !session.downloadedEventIds.isEmpty {
+                // Handle downloads based on sync direction
+                if !session.downloadedEventIds.isEmpty && syncDirection != .send {
                     let (downloadedEvents, fetchBytes) = await fetchMissingEvents(
                         ids: Array(session.downloadedEventIds),
                         relayURL: session.relayURL
@@ -154,12 +165,12 @@ public actor NIP77SyncHandler {
                     session.actualDownloadedEvents = downloadedEvents
                     session.eventFetchBytes = fetchBytes
                     session.bytesTransferred += fetchBytes
+                } else if !session.downloadedEventIds.isEmpty && syncDirection == .send {
+                    print("[NIP77] Relay has \(session.downloadedEventIds.count) events we don't have, but sync direction is send-only")
                 }
                 
-                // Skip uploading events - wallet should only receive
-                // Comment out the upload phase to make sync one-directional
-                /*
-                if !session.uploadedEventIds.isEmpty {
+                // Handle uploads based on sync direction
+                if !session.uploadedEventIds.isEmpty && syncDirection != .receive {
                     let (uploadedEvents, publishBytes) = await sendEvents(
                         ids: Array(session.uploadedEventIds),
                         relayURL: session.relayURL
@@ -167,8 +178,9 @@ public actor NIP77SyncHandler {
                     session.actualUploadedEvents = uploadedEvents
                     session.eventPublishBytes = publishBytes
                     session.bytesTransferred += publishBytes
+                } else if !session.uploadedEventIds.isEmpty && syncDirection == .receive {
+                    print("[NIP77] Relay requested \(session.uploadedEventIds.count) events, but sync direction is receive-only")
                 }
-                */
                 
                 // Close the sync through relay
                 let relay = await ndk.pool.getRelay(for: session.relayURL)

@@ -161,7 +161,8 @@ func runDemo() async throws {
     
     let syncResult = try await ndk.syncEvents(
         filter: filter,
-        relay: relayURL
+        relay: relayURL,
+        direction: .both  // Use .receive for download-only, .send for upload-only
     )
     
     let syncDuration = Date().timeIntervalSince(startTime)
