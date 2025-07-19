@@ -1,9 +1,32 @@
 import Foundation
 import SwiftUI
 
+enum ThemeMode: String, CaseIterable {
+    case system = "system"
+    case light = "light"
+    case dark = "dark"
+    
+    var displayName: String {
+        switch self {
+        case .system: return "System"
+        case .light: return "Light"
+        case .dark: return "Dark"
+        }
+    }
+    
+    var colorScheme: ColorScheme? {
+        switch self {
+        case .system: return nil
+        case .light: return .light
+        case .dark: return .dark
+        }
+    }
+}
+
 @MainActor
 class AppState: ObservableObject {
     private static let conversionUnitKey = "PreferredCurrencyConversionUnit"
+    private static let themeKey = "PreferredTheme"
     private static let lastRNackHashKey = "LastReleaseNotesAcknoledgedHash"
     private static let firstLaunchFlag = "HasLaunchedBefore"
     
@@ -22,6 +45,12 @@ class AppState: ObservableObject {
         }
     }
     
+    @Published var themeMode: ThemeMode {
+        didSet {
+            UserDefaults.standard.setValue(themeMode.rawValue, forKey: AppState.themeKey)
+        }
+    }
+    
     @Published var exchangeRates: ExchangeRate?
     
     static var showOnboarding: Bool {
@@ -37,6 +66,12 @@ class AppState: ObservableObject {
             preferredConversionUnit = unit
         } else {
             preferredConversionUnit = .usd
+        }
+        
+        if let theme = ThemeMode(rawValue: UserDefaults.standard.string(forKey: AppState.themeKey) ?? "") {
+            themeMode = theme
+        } else {
+            themeMode = .system
         }
         
         loadExchangeRates()

@@ -54,6 +54,17 @@ struct NutzapView: View {
         return amount
     }
     
+    private var isButtonDisabled: Bool {
+        let hasNoUser = resolvedUser == nil
+        let hasNoAmount = amount.isEmpty
+        let hasInvalidAmount = amountInt <= 0
+        let hasInsufficientBalance = (paymentMethod == .nutzap && amountInt > availableBalance)
+        let isCurrentlySending = isSending
+        let hasNoPaymentMethod = (!supportsLightning && acceptedMints.isEmpty)
+        
+        return hasNoUser || hasNoAmount || hasInvalidAmount || hasInsufficientBalance || isCurrentlySending || hasNoPaymentMethod
+    }
+    
     private func setAmount(_ preset: Int) {
         amount = "\(preset)"
     }
@@ -191,7 +202,7 @@ struct NutzapView: View {
                     }
                 }
                 .padding(.vertical)
-                .padding(.bottom, 100) // Add space for the fixed button
+                .padding(.bottom, 120) // Add space for the fixed button and keyboard
             }
             
             // Send Nutzap Button - Fixed at bottom
@@ -228,21 +239,24 @@ struct NutzapView: View {
                         .cornerRadius(12)
                     }
                 }
-                .disabled(resolvedUser == nil || amount.isEmpty || amountInt <= 0 || (paymentMethod == .nutzap && amountInt > availableBalance) || isSending || (!supportsLightning && acceptedMints.isEmpty))
+                .disabled(isButtonDisabled)
                 .padding()
             }
             .background(Color(.systemBackground))
             .frame(maxWidth: .infinity)
+            #if os(iOS)
+            .keyboardAdaptive()
+            #endif
         }
         .navigationTitle(paymentMethod == .nutzap ? "Nutzap" : "Lightning Zap")
         .platformNavigationBarTitleDisplayMode(inline: true)
-        #if os(iOS)
-        .ignoresSafeArea(.keyboard, edges: .bottom)
-        #endif
         .toolbar {
             ToolbarItem(placement: .confirmationAction) {
-                Button("Cancel") { dismiss() }
-                    .foregroundColor(.orange)
+                Button(paymentMethod == .nutzap ? "Send Nutzap" : "Send Zap") { 
+                    sendPayment()
+                }
+                .foregroundColor(.orange)
+                .disabled(resolvedUser == nil || amount.isEmpty || amountInt <= 0 || (paymentMethod == .nutzap && amountInt > availableBalance) || isSending || (!supportsLightning && acceptedMints.isEmpty))
             }
         }
         .alert("Error", isPresented: $showError) {

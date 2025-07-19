@@ -11,7 +11,7 @@ actor WalletEventProcessor {
         do {
             switch event.kind {
             case EventKind.cashuWalletConfig:
-                try await context.wallet.processWalletConfiguration(event: event)
+                await context.wallet.processWalletConfiguration(event: event)
             case EventKind.cashuToken:
                 try await processTokenEvent(event, context: context)
             case EventKind.cashuQuote:

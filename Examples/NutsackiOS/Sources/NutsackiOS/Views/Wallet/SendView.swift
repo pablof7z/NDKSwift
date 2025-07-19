@@ -37,7 +37,6 @@ struct SendView: View {
     @State private var isLoadingOfflineAmounts = false
     
     @FocusState private var amountFieldFocused: Bool
-    @State private var keyboardHeight: CGFloat = 0
     
     // Common amounts to suggest
     private let commonAmounts: [Int64] = [100, 500, 1000, 5000, 10000, 50000, 100000]
@@ -77,16 +76,6 @@ struct SendView: View {
                                 .opacity(0)
                                 .frame(height: 0)
                                 .focused($amountFieldFocused)
-                                .toolbar {
-                                    ToolbarItemGroup(placement: .keyboard) {
-                                        Spacer()
-                                        Button("Done") {
-                                            amountFieldFocused = false
-                                        }
-                                        .fontWeight(.semibold)
-                                        .foregroundColor(.orange)
-                                    }
-                                }
                             
                             // Visual amount display (same style as MintView)
                             VStack(spacing: 8) {
@@ -298,7 +287,7 @@ struct SendView: View {
                     }
                 }
                 .padding(.vertical)
-                .padding(.bottom, 120) // Add more space for the fixed button
+                .padding(.bottom, 140) // Add space for the fixed button and keyboard
             }
             
             // Generate Token Button - Outside ScrollView
@@ -334,14 +323,30 @@ struct SendView: View {
                 .padding()
             }
             .background(Color(.systemBackground))
-            .padding(.bottom, keyboardHeight > 0 ? keyboardHeight : 0)
+            #if os(iOS)
+            .keyboardAdaptive()
+            #endif
         }
         .navigationTitle("Send Ecash")
         .platformNavigationBarTitleDisplayMode(inline: true)
         .toolbar {
+            ToolbarItemGroup(placement: .keyboard) {
+                Spacer()
+                Button("Done") {
+                    amountFieldFocused = false
+                }
+                .fontWeight(.semibold)
+                .foregroundColor(.orange)
+            }
+            
             ToolbarItem(placement: .navigationBarTrailing) {
-                Button("Cancel") { dismiss() }
-                    .foregroundColor(.orange)
+                Button("Generate Token") { 
+                    generateToken()
+                }
+                .foregroundColor(.orange)
+                .disabled(isOfflineMode ? 
+                    (selectedAmount == nil || isSending || selectedMintURL == nil) :
+                    (amount.isEmpty || amountInt <= 0 || amountInt > availableBalanceForMint || isSending || availableBalanceForMint == 0))
             }
         }
         .alert("Error", isPresented: $showError) {
@@ -366,10 +371,6 @@ struct SendView: View {
         .onAppear {
             loadMints()
             updateAvailableBalance()
-            setupKeyboardObservers()
-        }
-        .onDisappear {
-            removeKeyboardObservers()
         }
         .onChange(of: selectedMintURL) { _, _ in
             updateAvailableBalance()
@@ -627,39 +628,6 @@ struct SendView: View {
         }
     }
     
-    #if os(iOS)
-    private func setupKeyboardObservers() {
-        NotificationCenter.default.addObserver(
-            forName: UIResponder.keyboardWillShowNotification,
-            object: nil,
-            queue: .main
-        ) { notification in
-            if let keyboardFrame = notification.userInfo?[UIResponder.keyboardFrameEndUserInfoKey] as? CGRect {
-                withAnimation(.easeInOut(duration: 0.3)) {
-                    keyboardHeight = keyboardFrame.height
-                }
-            }
-        }
-        
-        NotificationCenter.default.addObserver(
-            forName: UIResponder.keyboardWillHideNotification,
-            object: nil,
-            queue: .main
-        ) { _ in
-            withAnimation(.easeInOut(duration: 0.3)) {
-                keyboardHeight = 0
-            }
-        }
-    }
-    
-    private func removeKeyboardObservers() {
-        NotificationCenter.default.removeObserver(self, name: UIResponder.keyboardWillShowNotification, object: nil)
-        NotificationCenter.default.removeObserver(self, name: UIResponder.keyboardWillHideNotification, object: nil)
-    }
-    #else
-    private func setupKeyboardObservers() {}
-    private func removeKeyboardObservers() {}
-    #endif
     
 }
 
