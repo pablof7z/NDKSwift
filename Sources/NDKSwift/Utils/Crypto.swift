@@ -42,7 +42,10 @@ public enum Crypto {
 
     /// Derive public key from private key using secp256k1
     public static func getPublicKey(from privateKey: PrivateKey) throws -> PublicKey {
-        guard let privKeyData = Data(hexString: privateKey), privKeyData.count == 32 else {
+        let privKeyData: Data
+        do {
+            privKeyData = try HexValidator.validate32ByteHex(privateKey)
+        } catch {
             throw CryptoError.invalidKeyLength
         }
 
