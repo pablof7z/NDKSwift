@@ -2,23 +2,38 @@ import Foundation
 
 // MARK: - RPC Types
 
+/// Represents a Nostr RPC request
+/// Encapsulates the data needed to make RPC calls via Nostr events
 public struct NDKRPCRequest {
+    /// Unique identifier for this request
     let id: String
+    /// Public key of the RPC service to send the request to
     let pubkey: String
+    /// RPC method name to invoke
     let method: String
+    /// Array of parameters for the RPC method
     let params: [String]
+    /// The underlying Nostr event containing this request
     let event: NDKEvent
 }
 
+/// Represents a Nostr RPC response
+/// Contains the result or error from an RPC call made via Nostr events
 public struct NDKRPCResponse {
+    /// Identifier matching the original request
     let id: String
+    /// Result data if the RPC call succeeded
     let result: String
+    /// Error message if the RPC call failed
     let error: String?
+    /// The underlying Nostr event containing this response
     let event: NDKEvent
 }
 
 // MARK: - Nostr RPC Client
 
+/// Nostr RPC client for making remote procedure calls via Nostr events
+/// Implements NIP-46 for remote signing and other RPC operations
 public actor NDKNostrRPC {
     private let ndk: NDK
     private let localSigner: NDKPrivateKeySigner
