@@ -41,7 +41,7 @@ struct CashuIntegrationExample {
             
             // Step 4: Initialize Cashu wallet with the same cache instance
             // The wallet will use the mint cache functionality from NDKCache
-            let cashuWallet = NIP60Wallet(
+            let cashuWallet = try NIP60Wallet(
                 ndk: ndk,
                 cache: unifiedCache  // Same cache instance!
             )
@@ -167,7 +167,7 @@ struct CashuIntegrationExample {
     
     // Share with all components
     let ndk = NDK(cache: cache)
-    let wallet = NIP60Wallet(ndk: ndk, mintCache: cache)
+    let wallet = try NIP60Wallet(ndk: ndk, mintCache: cache)
     ```
  
  2. **Cache Configuration**:

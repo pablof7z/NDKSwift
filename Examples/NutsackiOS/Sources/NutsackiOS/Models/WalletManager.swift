@@ -52,7 +52,7 @@ class WalletManager {
         }
         
         // Create NIP60Wallet instance with mint cache if available
-        let ndkWallet = NIP60Wallet(ndk: ndk, cache: nostrManager.cache)
+        let ndkWallet = try NIP60Wallet(ndk: ndk, cache: nostrManager.cache)
         
         // Set as active wallet
         self.activeWallet = ndkWallet

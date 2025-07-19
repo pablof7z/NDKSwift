@@ -22,6 +22,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Removed duplicate hex conversion implementations from test files to use centralized DataExtensions (DRY principle)
 - Fixed package reference in Examples/Package.swift (NDKSwift-z94ws0 -> NDKSwift-sfodj5)
 - Changed mutable variable to immutable constant in NegentropyAccumulator (var hashCopy -> let hashCopy)
+- Replaced dangerous fatalError in NIP60Wallet with proper error handling
+  - Changed initializer to throwing and uses NDKError.notConfigured
+  - Updated all call sites to handle the throwing behavior
 
 ## [0.3.1] - 2025-01-18
 

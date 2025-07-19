@@ -21,7 +21,7 @@ final class WalletHealthMonitorTests: XCTestCase {
         ndk = NDK(signer: signer, cache: cache)
         
         // Create wallet
-        wallet = NIP60Wallet(ndk: ndk, cache: cache)
+        wallet = try NIP60Wallet(ndk: ndk, cache: cache)
         
         // Get references to internal components
         eventManager = await wallet.eventManager

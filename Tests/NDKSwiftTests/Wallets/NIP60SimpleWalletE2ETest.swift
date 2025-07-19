@@ -21,7 +21,7 @@ final class NIP60SimpleWalletE2ETest: XCTestCase {
         print("✅ Created pubkey: \(pubkey)")
         
         // Create wallet
-        let wallet = NIP60Wallet(ndk: ndk)
+        let wallet = try NIP60Wallet(ndk: ndk)
         
         // Setup wallet - this should create a 17375 event
         try await wallet.setup(
