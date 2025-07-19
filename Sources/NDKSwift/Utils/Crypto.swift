@@ -7,6 +7,14 @@ import secp256k1
 
 /// Cryptographic utilities for Nostr
 public enum Crypto {
+    /// Cryptographic constants
+    public enum Constants {
+        /// secp256k1 private key size in bytes
+        public static let privateKeySize = 32
+        /// secp256k1 signature size in bytes
+        public static let signatureSize = 64
+    }
+    
     /// Errors that can occur during cryptographic operations
     public enum CryptoError: Error, LocalizedError {
         case invalidKeyLength
@@ -19,9 +27,9 @@ public enum Crypto {
         public var errorDescription: String? {
             switch self {
             case .invalidKeyLength:
-                return "Invalid key length (expected 32 bytes)"
+                return "Invalid key length (expected \(Constants.privateKeySize) bytes)"
             case .invalidSignatureLength:
-                return "Invalid signature length (expected 64 bytes)"
+                return "Invalid signature length (expected \(Constants.signatureSize) bytes)"
             case .signingFailed:
                 return "Failed to sign message"
             case .verificationFailed:
@@ -37,7 +45,7 @@ public enum Crypto {
 
     /// Generate a new private key
     public static func generatePrivateKey() -> PrivateKey {
-        return randomBytes(count: 32).hexString
+        return randomBytes(count: Constants.privateKeySize).hexString
     }
 
     /// Derive public key from private key using secp256k1
