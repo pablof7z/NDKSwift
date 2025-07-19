@@ -458,7 +458,7 @@ public struct NDKFilter: Codable, Equatable, Sendable {
         // Otherwise, hash it and take first 15 chars
         let data = filterString.data(using: .utf8)!
         let hash = SHA256.hash(data: data)
-        let hashHex = hash.compactMap { String(format: "%02x", $0) }.joined()
+        let hashHex = Data(hash).hexString
         return String(hashHex.prefix(15))
     }
 }
