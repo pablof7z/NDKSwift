@@ -457,7 +457,7 @@ public actor NDKBunkerSigner: NDKSigner, Sendable {
 
     private func performSign(_ event: NDKEvent) async throws -> Signature {
         guard let bunkerPubkey = bunkerPubkey else {
-            throw NDKError.connectionLost(relay: "bunker", message: "Not connected")
+            throw NDKError.connectionLost(relay: "bunker", message: StringConstants.ErrorMessages.notConnected)
         }
 
         let eventJson = try event.serialize()
@@ -496,7 +496,7 @@ public actor NDKBunkerSigner: NDKSigner, Sendable {
         }
 
         guard let bunkerPubkey = bunkerPubkey else {
-            throw NDKError.connectionLost(relay: "bunker", message: "Not connected")
+            throw NDKError.connectionLost(relay: "bunker", message: StringConstants.ErrorMessages.notConnected)
         }
 
         let response = try await rpcClient?.sendRequest(
@@ -516,7 +516,7 @@ public actor NDKBunkerSigner: NDKSigner, Sendable {
 
     private func performCrypto(method: String, params: [String], errorMessage: String) async throws -> String {
         guard let bunkerPubkey = bunkerPubkey else {
-            throw NDKError.connectionLost(relay: "bunker", message: "Not connected")
+            throw NDKError.connectionLost(relay: "bunker", message: StringConstants.ErrorMessages.notConnected)
         }
 
         let response = try await rpcClient?.sendRequest(

@@ -132,9 +132,9 @@ extension NDKCashuSpendingHistory {
             
             switch transactionType {
             case .mint:
-                return "Lightning deposit"
+                return StringConstants.Transactions.lightningDeposit
             case .melt:
-                return "Lightning payment"
+                return StringConstants.Transactions.lightningPayment
             case .send:
                 return "Sent ecash"
             case .receive:

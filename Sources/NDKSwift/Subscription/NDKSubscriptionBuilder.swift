@@ -191,7 +191,7 @@ extension NDK {
             
             group.addTask {
                 try await Task.sleep(nanoseconds: UInt64(timeout * Double(TimeConstants.nanosecondsPerSecond)))
-                throw NDKError.timeout(operation: "Fetch events", seconds: Int(timeout))
+                throw NDKError.timeout(operation: StringConstants.Operations.fetchEvents, seconds: Int(timeout))
             }
             
             try await group.next()
@@ -242,7 +242,7 @@ extension NDK {
             
             group.addTask {
                 try await Task.sleep(nanoseconds: UInt64(timeout * Double(TimeConstants.nanosecondsPerSecond)))
-                throw NDKError.timeout(operation: "Fetch events", seconds: Int(timeout))
+                throw NDKError.timeout(operation: StringConstants.Operations.fetchEvents, seconds: Int(timeout))
             }
             
             try await group.next()

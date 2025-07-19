@@ -140,7 +140,7 @@ public enum Payment {
                 store: change ?? [],
                 destroy: selectedProofs,
                 mint: mintURL,
-                memo: "Lightning payment"
+                memo: StringConstants.Transactions.lightningPayment
             )
             let newEventIds = try await wallet.update(stateChange: stateChange)
             
@@ -148,7 +148,7 @@ public enum Payment {
             try await eventManager.createSpendingHistoryEvent(
                 direction: .out,
                 amount: amount,
-                memo: "Lightning payment",
+                memo: StringConstants.Transactions.lightningPayment,
                 destroyedEventIds: nil,
                 createdEventIds: newEventIds,
                 redeemedEventId: nil,
