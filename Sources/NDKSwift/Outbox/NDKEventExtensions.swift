@@ -1,4 +1,3 @@
-import CryptoKit
 import Foundation
 
 /// Extensions to NDKEvent for outbox model support
