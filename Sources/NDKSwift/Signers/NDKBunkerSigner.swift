@@ -35,28 +35,28 @@ struct BunkerURLParser {
         
         // Parse query parameters
         if let components = URLComponents(url: url, resolvingAgainstBaseURL: false) {
-            print("[BunkerSigner] Query items: \(components.queryItems?.map { "\($0.name)=\($0.value ?? "nil")" }.joined(separator: ", ") ?? "none")")
+            NDKLogger.shared.log(.debug, category: .auth, "[BunkerSigner] Query items: \(components.queryItems?.map { "\($0.name)=\($0.value ?? "nil")" }.joined(separator: ", ") ?? "none")")
             
             for item in components.queryItems ?? [] {
                 switch item.name {
                 case "pubkey":
                     userPubkey = item.value
-                    print("[BunkerSigner] Found user pubkey: \(item.value ?? "nil")")
+                    NDKLogger.shared.log(.debug, category: .auth, "[BunkerSigner] Found user pubkey: \(item.value ?? "nil")")
                 case "relay":
                     if let relay = item.value {
                         relays.append(relay)
-                        print("[BunkerSigner] Added relay: \(relay)")
+                        NDKLogger.shared.log(.debug, category: .auth, "[BunkerSigner] Added relay: \(relay)")
                     }
                 case "secret":
                     secret = item.value
-                    print("[BunkerSigner] Found secret: \(item.value != nil ? "***" : "nil")")
+                    NDKLogger.shared.log(.debug, category: .auth, "[BunkerSigner] Found secret: \(item.value != nil ? "***" : "nil")")
                 default:
-                    print("[BunkerSigner] Unknown parameter: \(item.name)=\(item.value ?? "nil")")
+                    NDKLogger.shared.log(.warning, category: .auth, "[BunkerSigner] Unknown parameter: \(item.name)=\(item.value ?? "nil")")
                 }
             }
         }
         
-        print("[BunkerSigner] Parse complete - bunkerPubkey: \(bunkerPubkey ?? "nil"), userPubkey: \(userPubkey ?? "nil"), relays: \(relays), hasSecret: \(secret != nil)")
+        NDKLogger.shared.log(.debug, category: .auth, "[BunkerSigner] Parse complete - bunkerPubkey: \(bunkerPubkey ?? "nil"), userPubkey: \(userPubkey ?? "nil"), relays: \(relays), hasSecret: \(secret != nil)")
         return (bunkerPubkey, userPubkey, relays, secret)
     }
 }
@@ -213,89 +213,89 @@ public actor NDKBunkerSigner: NDKSigner, Sendable {
 
     /// Connect and authenticate with the bunker
     public func connect() async throws -> NDKUser {
-        print("[BunkerSigner] Starting connection process...")
+        NDKLogger.shared.log(.info, category: .auth, "[BunkerSigner] Starting connection process...")
 
         if isConnected, let pubkey = userPubkey {
-            print("[BunkerSigner] Already connected with pubkey: \(pubkey)")
+            NDKLogger.shared.log(.info, category: .auth, "[BunkerSigner] Already connected with pubkey: \(pubkey)")
             return NDKUser(pubkey: pubkey)
         }
 
         // Handle NIP-05 flow
         if case let .nip05(nip05) = connectionType {
-            print("[BunkerSigner] Using NIP-05 flow for: \(nip05)")
+            NDKLogger.shared.log(.info, category: .auth, "[BunkerSigner] Using NIP-05 flow for: \(nip05)")
             let user = try await NDKUser.fromNip05(nip05, ndk: ndk)
             self.userPubkey = user.pubkey
             let nip46Urls = await user.nip46Urls
             if let nip46Urls = nip46Urls {
                 self.relayUrls = nip46Urls
-                print("[BunkerSigner] Found NIP-46 relays from NIP-05: \(nip46Urls)")
+                NDKLogger.shared.log(.info, category: .auth, "[BunkerSigner] Found NIP-46 relays from NIP-05: \(nip46Urls)")
             }
             if bunkerPubkey == nil {
                 self.bunkerPubkey = user.pubkey
             }
         }
 
-        print("[BunkerSigner] Using relays: \(relayUrls)")
+        NDKLogger.shared.log(.info, category: .auth, "[BunkerSigner] Using relays: \(relayUrls)")
 
         // Ensure relays are added and connected
         if !relayUrls.isEmpty {
-            print("[BunkerSigner] Adding and connecting to bunker relays...")
+            NDKLogger.shared.log(.info, category: .auth, "[BunkerSigner] Adding and connecting to bunker relays...")
             for relayUrl in relayUrls {
                 let relay = await ndk.addRelay(relayUrl)
-                print("[BunkerSigner] Added relay: \(relayUrl), current state: \(await relay.connectionState)")
+                NDKLogger.shared.log(.debug, category: .auth, "[BunkerSigner] Added relay: \(relayUrl), current state: \(await relay.connectionState)")
 
                 // Connect to the relay if not already connected
                 if await relay.connectionState != .connected {
-                    print("[BunkerSigner] Connecting to relay: \(relayUrl)")
+                    NDKLogger.shared.log(.debug, category: .auth, "[BunkerSigner] Connecting to relay: \(relayUrl)")
                     do {
                         try await relay.connect()
-                        print("[BunkerSigner] Successfully connected to relay: \(relayUrl)")
+                        NDKLogger.shared.log(.info, category: .auth, "[BunkerSigner] Successfully connected to relay: \(relayUrl)")
                     } catch {
-                        print("[BunkerSigner] Failed to connect to relay \(relayUrl): \(error)")
+                        NDKLogger.shared.log(.error, category: .auth, "[BunkerSigner] Failed to connect to relay \(relayUrl): \(error)")
                     }
                 }
             }
             
             // No need to wait - relay.connect() already waits for full connection including initial ping
         } else {
-            print("[BunkerSigner] WARNING: No relays specified for bunker connection!")
+            NDKLogger.shared.log(.warning, category: .auth, "[BunkerSigner] WARNING: No relays specified for bunker connection!")
         }
 
         // Initialize RPC client
-        print("[BunkerSigner] Initializing RPC client with relays: \(relayUrls)")
+        NDKLogger.shared.log(.info, category: .auth, "[BunkerSigner] Initializing RPC client with relays: \(relayUrls)")
         let rpcClient = NDKNostrRPC(ndk: ndk, localSigner: localSigner, relayUrls: relayUrls)
         self.rpcClient = rpcClient
 
         // Start listening for responses
-        print("[BunkerSigner] Starting to listen for responses...")
+        NDKLogger.shared.log(.info, category: .auth, "[BunkerSigner] Starting to listen for responses...")
         try await startListening()
 
         // Handle different connection flows
         switch connectionType {
         case .nostrConnect:
-            print("[BunkerSigner] Using nostrConnect flow")
+            NDKLogger.shared.log(.info, category: .auth, "[BunkerSigner] Using nostrConnect flow")
             return try await connectNostrConnect()
         default:
-            print("[BunkerSigner] Using bunker flow")
+            NDKLogger.shared.log(.info, category: .auth, "[BunkerSigner] Using bunker flow")
             return try await connectBunker()
         }
     }
 
     private func startListening() async throws {
         guard subscription == nil else {
-            print("[BunkerSigner] Already listening for responses")
+            NDKLogger.shared.log(.debug, category: .auth, "[BunkerSigner] Already listening for responses")
             return
         }
 
         let localPubkey = try await localSigner.pubkey
-        print("[BunkerSigner] Setting up listener for local pubkey: \(localPubkey)")
+        NDKLogger.shared.log(.debug, category: .auth, "[BunkerSigner] Setting up listener for local pubkey: \(localPubkey)")
 
         let filter = NDKFilter(
             kinds: [24133], // NostrConnect kind
             tags: ["p": [localPubkey]]
         )
 
-        print("[BunkerSigner] Creating subscription with filter: kinds=[\(filter.kinds?.map { String($0) }.joined(separator: ",") ?? "")], p=\(localPubkey)")
+        NDKLogger.shared.log(.debug, category: .auth, "[BunkerSigner] Creating subscription with filter: kinds=[\(filter.kinds?.map { String($0) }.joined(separator: ",") ?? "")], p=\(localPubkey)")
 
         // Create subscription with specific relays if available
         if !relayUrls.isEmpty {
@@ -307,28 +307,28 @@ public actor NDKBunkerSigner: NDKSigner, Sendable {
             options.relays = Set(relayObjects)
             let relayUrlSet = Set(relayUrls)
             subscription = await ndk.subscribe(filters: [filter], relays: relayUrlSet)
-            print("[BunkerSigner] Subscription created for specific relays: \(relayUrls)")
+            NDKLogger.shared.log(.info, category: .auth, "[BunkerSigner] Subscription created for specific relays: \(relayUrls)")
         } else {
             subscription = await ndk.subscribe(filters: [filter])
-            print("[BunkerSigner] Subscription created for all relays")
+            NDKLogger.shared.log(.info, category: .auth, "[BunkerSigner] Subscription created for all relays")
         }
 
         // Start subscription and listen for events
         if let subscription = subscription {
             Task { [weak self] in
                 await subscription.start()
-                print("[BunkerSigner] Subscription started")
+                NDKLogger.shared.log(.info, category: .auth, "[BunkerSigner] Subscription started")
                 
                 do {
                     for try await event in subscription {
                         let eventKind = event.kind
                         let eventPubkey = event.pubkey
-                        print("[BunkerSigner] Received event: kind=\(eventKind), from=\(eventPubkey)")
+                        NDKLogger.shared.log(.debug, category: .auth, "[BunkerSigner] Received event: kind=\(eventKind), from=\(eventPubkey)")
                         await self?.handleIncomingEvent(event)
                     }
-                    print("[BunkerSigner] EOSE received from relay")
+                    NDKLogger.shared.log(.debug, category: .auth, "[BunkerSigner] EOSE received from relay")
                 } catch {
-                    print("[BunkerSigner] Subscription error: \(error)")
+                    NDKLogger.shared.log(.error, category: .auth, "[BunkerSigner] Subscription error: \(error)")
                 }
             }
         }
@@ -347,36 +347,36 @@ public actor NDKBunkerSigner: NDKSigner, Sendable {
 
     private func connectBunker() async throws -> NDKUser {
         guard let bunkerPubkey = bunkerPubkey else {
-            print("[BunkerSigner] ERROR: Bunker pubkey not set!")
+            NDKLogger.shared.log(.error, category: .auth, "[BunkerSigner] ERROR: Bunker pubkey not set!")
             throw NDKError.notConfigured("Bunker pubkey not set")
         }
 
-        print("[BunkerSigner] Connecting to bunker with pubkey: \(bunkerPubkey)")
+        NDKLogger.shared.log(.info, category: .auth, "[BunkerSigner] Connecting to bunker with pubkey: \(bunkerPubkey)")
 
         let params = [userPubkey ?? "", secret ?? ""].filter { !$0.isEmpty }
         let maskedParams = params.enumerated().map { index, param in
             index == 1 && !param.isEmpty ? "***" : param
         }
-        print("[BunkerSigner] Connect params: \(maskedParams)")
+        NDKLogger.shared.log(.debug, category: .auth, "[BunkerSigner] Connect params: \(maskedParams)")
 
         return try await withCheckedThrowingContinuation { continuation in
             self.connectionContinuation = continuation
 
             Task {
                 do {
-                    print("[BunkerSigner] Sending connect request to bunker...")
+                    NDKLogger.shared.log(.info, category: .auth, "[BunkerSigner] Sending connect request to bunker...")
                     try await rpcClient?.sendRequest(
                         to: bunkerPubkey,
                         method: "connect",
                         params: params
                     ) { [weak self] response in
                         Task { [weak self] in
-                            print("[BunkerSigner] Received response from bunker: result=\(response.result), error=\(response.error ?? "nil")")
+                            NDKLogger.shared.log(.debug, category: .auth, "[BunkerSigner] Received response from bunker: result=\(response.result), error=\(response.error ?? "nil")")
                             await self?.handleConnectResponse(response)
                         }
                     }
                 } catch {
-                    print("[BunkerSigner] ERROR: Failed to send connect request: \(error)")
+                    NDKLogger.shared.log(.error, category: .auth, "[BunkerSigner] ERROR: Failed to send connect request: \(error)")
                     continuation.resume(throwing: error)
                 }
             }
@@ -394,7 +394,7 @@ public actor NDKBunkerSigner: NDKSigner, Sendable {
                 await handleResponse(response)
             }
         } catch {
-            print("Error parsing event: \(error)")
+            NDKLogger.shared.log(.error, category: .auth, "Error parsing event: \(error)")
         }
     }
 
