@@ -1,5 +1,3 @@
-import Foundation
-
 /// Configuration for signature verification sampling
 public struct NDKSignatureVerificationConfig: Sendable {
     /// The signature verification validation ratio for new relays (1.0 = verify all)
