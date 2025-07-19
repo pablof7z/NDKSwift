@@ -221,7 +221,7 @@ public class NDKAuthManager {
             }
             
             // Load the signer data
-            let signerData = try await keychainManager.retrieveSignerData(identifier: session.id.uuidString)
+            let signerData = try await keychainManager.retrieveSignerData(identifier: session.id)
             
             // Deserialize the signer
             let signer = try signerRegistry.createSigner(from: signerData, ndk: ndk)
@@ -262,11 +262,11 @@ public class NDKAuthManager {
             
             // Try to clean up keychain data
             do {
-                try await keychainManager.deleteSignerData(identifier: session.id.uuidString)
-                try await keychainManager.deleteSessionMetadata(identifier: session.id.uuidString)
-                print("Cleaned up corrupted session data for \(session.id)")
+                try await keychainManager.deleteSignerData(identifier: session.id)
+                try await keychainManager.deleteSessionMetadata(identifier: session.id)
+                NDKLogger.shared.log(.info, category: .auth, "Cleaned up corrupted session data for \(session.id)")
             } catch {
-                print("Failed to clean up corrupted session: \(error)")
+                NDKLogger.shared.log(.warning, category: .auth, "Failed to clean up corrupted session: \(error)")
             }
             
             // Re-throw the original error
@@ -306,7 +306,7 @@ public class NDKAuthManager {
         // Store in keychain
         let biometricRequirement: NDKKeychainManager.BiometricRequirement = requiresBiometric ? .required : .none
         try await keychainManager.storeSignerData(
-            identifier: session.id.uuidString,
+            identifier: session.id,
             data: signerData,
             requiresBiometric: biometricRequirement
         )
@@ -346,8 +346,8 @@ public class NDKAuthManager {
         availableSessions.removeAll { $0.id == session.id }
         
         // Delete from keychain
-        try await keychainManager.deleteSignerData(identifier: session.id.uuidString)
-        try await keychainManager.deleteSessionMetadata(identifier: session.id.uuidString)
+        try await keychainManager.deleteSignerData(identifier: session.id)
+        try await keychainManager.deleteSessionMetadata(identifier: session.id)
         
         // If this was the active session, clear it
         if activeSession?.id == session.id {
@@ -434,7 +434,7 @@ public class NDKAuthManager {
     /// - Parameter session: The session to save
     private func saveSessionMetadata(_ session: NDKSession) async throws {
         let data = try JSONCoding.encode(session)
-        try await keychainManager.storeSessionMetadata(identifier: session.id.uuidString, data: data)
+        try await keychainManager.storeSessionMetadata(identifier: session.id, data: data)
     }
 }
 
