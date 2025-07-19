@@ -216,16 +216,33 @@ public final class NDK {
         await pool.getConnectionSummary()
     }
     
+    /// Connect to all configured relays
+    /// 
+    /// Initiates WebSocket connections to all relays in the pool.
+    /// Connections are managed automatically with reconnection logic.
     public func connect() async {
         await pool.connectAll()
     }
     
+    /// Disconnect from all relays
+    /// 
+    /// Closes all active WebSocket connections.
+    /// Subscriptions will be preserved for reconnection.
     public func disconnect() async {
         await pool.disconnectAll()
     }
     
     // MARK: - Event Publishing (Delegated to EventManager)
     
+    /// Publish an event to the network
+    /// 
+    /// The event will be published according to the configured publishing strategy.
+    /// 
+    /// - Parameters:
+    ///   - event: The event to publish (must be signed)
+    ///   - logRawJSON: If true, logs the raw JSON for debugging
+    /// - Returns: Set of relays that accepted the event
+    /// - Throws: NDKError if publishing fails
     public func publish(_ event: NDKEvent, logRawJSON: Bool = false) async throws -> Set<NDKRelay> {
         try await eventManager.publish(event, logRawJSON: logRawJSON)
     }
@@ -238,6 +255,15 @@ public final class NDK {
         try await eventManager.publish(builder)
     }
     
+    /// Retry publishing events that failed to publish
+    /// 
+    /// Attempts to republish events from the optimistic publishing queue.
+    /// 
+    /// - Parameters:
+    ///   - maxAge: Maximum age of events to retry in seconds (default: 1 hour)
+    ///   - limit: Maximum number of events to retry (nil for all)
+    /// - Returns: Array of successfully republished events and their relays
+    /// - Throws: NDKError if retry fails
     public func retryUnpublishedEvents(maxAge: TimeInterval = 3600, limit: Int? = nil) async throws -> [(event: NDKEvent, relays: Set<NDKRelay>)] {
         try await eventManager.retryUnpublishedEvents(maxAge: maxAge, limit: limit)
     }
@@ -262,6 +288,17 @@ public final class NDK {
         await subscriptionCoordinator.subscribe(filters: filters, relays: relays, id: id, closeOnEose: closeOnEose, groupingDelay: groupingDelay)
     }
     
+    /// Fetch events matching the given filters
+    /// 
+    /// This is a one-shot query that returns after receiving EOSE from relays.
+    /// For continuous event streams, use `subscribe` instead.
+    /// 
+    /// - Parameters:
+    ///   - filters: Array of filters to match events against
+    ///   - relays: Specific relays to query (nil uses relay selection strategy)
+    ///   - timeoutSeconds: Maximum time to wait for responses (default: 5s)
+    /// - Returns: Array of events matching the filters
+    /// - Throws: NDKError if the query times out or fails
     public func fetchEvents(
         _ filters: [NDKFilter],
         relays: Set<RelayURL>? = nil,
@@ -270,6 +307,14 @@ public final class NDK {
         try await subscriptionCoordinator.fetchEvents(filters, relays: relays, timeoutSeconds: timeoutSeconds)
     }
     
+    /// Fetch a single event by its ID
+    /// 
+    /// - Parameters:
+    ///   - id: The event ID to fetch
+    ///   - relays: Specific relays to query (nil uses relay selection strategy)
+    ///   - timeoutSeconds: Maximum time to wait for response (default: 5s)
+    /// - Returns: The event if found, nil otherwise
+    /// - Throws: NDKError if the query fails
     public func fetchEvent(
         id: EventID,
         relays: Set<RelayURL>? = nil,
@@ -286,6 +331,16 @@ public final class NDK {
         }
     }
     
+    /// Fetch a single event matching the given filter
+    /// 
+    /// Returns the first event that matches the filter criteria.
+    /// 
+    /// - Parameters:
+    ///   - filter: Filter criteria to match
+    ///   - relays: Specific relays to query (nil uses relay selection strategy)
+    ///   - timeoutSeconds: Maximum time to wait for response (default: 5s)
+    /// - Returns: The first matching event if found, nil otherwise
+    /// - Throws: NDKError if the query fails
     public func fetchEvent(
         _ filter: NDKFilter,
         relays: Set<RelayURL>? = nil,
@@ -302,6 +357,16 @@ public final class NDK {
         }
     }
     
+    /// Fetch a user's profile metadata
+    /// 
+    /// Retrieves the most recent kind:0 (metadata) event for the given user.
+    /// Results are cached for efficient repeated queries.
+    /// 
+    /// - Parameters:
+    ///   - pubkey: The user's public key
+    ///   - forceRefresh: If true, bypasses cache and fetches from relays
+    /// - Returns: The user's profile if found, nil otherwise
+    /// - Throws: NDKError if the query fails
     public func fetchProfile(
         for pubkey: PublicKey,
         forceRefresh: Bool = false
@@ -319,11 +384,19 @@ public final class NDK {
         await profileManager.observeProfile(for: pubkey, closeOnEose: closeOnEose)
     }
     
+    /// Get current subscription statistics
+    /// 
+    /// Provides insight into the subscription system's current state and performance.
+    /// 
+    /// - Returns: Statistics including active subscriptions, event counts, and performance metrics
     public func getSubscriptionStats() async -> NDKSubscriptionManager.SubscriptionStats {
         await subscriptionCoordinator.getSubscriptionStats()
     }
     
-    /// Clear the relay list cache
+    /// Clear the entire relay list cache
+    /// 
+    /// Forces fresh fetching of relay lists (kind:10002) on next access.
+    /// Useful when relay configurations have changed.
     public func clearRelayListCache() async {
         await subscriptionCoordinator.clearRelayListCache()
     }
@@ -355,12 +428,22 @@ public final class NDK {
     
     // MARK: - User Management
     
+    /// Get or create an NDKUser instance for a public key
+    /// 
+    /// User instances are cached and reused for efficiency.
+    /// 
+    /// - Parameter pubkey: The user's public key (hex format)
+    /// - Returns: An NDKUser instance
     public func getUser(_ pubkey: PublicKey) -> NDKUser {
         let user = NDKUser(pubkey: pubkey)
         user.ndk = self
         return user
     }
     
+    /// Get or create an NDKUser instance from an npub
+    /// 
+    /// - Parameter npub: The user's public key in bech32 format
+    /// - Returns: An NDKUser instance if the npub is valid, nil otherwise
     public func getUser(npub: String) -> NDKUser? {
         guard let pubkey = try? PublicKey.fromNpub(npub) else {
             return nil
