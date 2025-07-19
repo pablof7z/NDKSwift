@@ -229,7 +229,7 @@ public actor NDKZapManager {
             }
             
             // Generate a seed for deterministic output generation
-            let seed = Data(UUID().uuidString.utf8).sha256().hexString
+            let seed = Crypto.randomBytes(count: 32).hexString
             
             // Since CashuSwift has already verified the quote is paid,
             // we can now issue the tokens
