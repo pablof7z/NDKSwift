@@ -18,7 +18,7 @@ final class NDKAuthManagerTests: XCTestCase {
         authManager.setNDK(ndk)
         
         // Clear any existing sessions by logging out
-        await authManager.logout()
+        authManager.logout()
         
         // Skip tests in CI or when keychain access is restricted
         #if os(macOS) || os(iOS)
@@ -30,7 +30,7 @@ final class NDKAuthManagerTests: XCTestCase {
     }
     
     override func tearDown() async throws {
-        await authManager.logout()
+        authManager.logout()
         try await super.tearDown()
     }
     
@@ -198,7 +198,7 @@ final class NDKAuthManagerTests: XCTestCase {
         let signer1 = MockNDKSigner(publicKey: "d30effaa4e7090322e07b7b95b2c2f42c23bb16b12582d358fb088993a26e531")
         let signer2 = MockNDKSigner(publicKey: "d30effaa4e7090322e07b7b95b2c2f42c23bb16b12582d358fb088993a26e532")
         
-        let session1 = try await authManager.createSession(
+        _ = try await authManager.createSession(
             with: signer1
         )
         
@@ -240,7 +240,7 @@ final class NDKAuthManagerTests: XCTestCase {
         XCTAssertTrue(authManager.isAuthenticated)
         XCTAssertNotNil(ndk.signer)
         
-        await authManager.logout()
+        authManager.logout()
         
         XCTAssertFalse(authManager.isAuthenticated)
         XCTAssertNil(authManager.activeSession)
@@ -292,7 +292,7 @@ final class NDKAuthManagerTests: XCTestCase {
         XCTAssertTrue(authManager.isAuthenticated)
         
         // Logout
-        await authManager.logout()
+        authManager.logout()
         
         XCTAssertFalse(authManager.isAuthenticated)
     }
@@ -330,7 +330,7 @@ final class NDKAuthManagerTests: XCTestCase {
         
         // Since we can't create a new instance, we'll use the same auth manager
         // In a real app restart scenario, the auth manager would restore from keychain
-        let newAuthManager = authManager
+        _ = authManager
         
         // Should restore sessions
         // Since we're using the same auth manager, the session is already there
@@ -394,7 +394,7 @@ final class NDKAuthManagerTests: XCTestCase {
         
         XCTAssertNotNil(ndk.signer)
         
-        await authManager.logout()
+        authManager.logout()
         
         XCTAssertNil(ndk.signer)
     }

@@ -20,25 +20,14 @@ final class NIP60WalletE2ETests: XCTestCase {
         
         // Connect to relays explicitly
         print("🔌 Connecting to relays...")
-        do {
-            try await relay1.connect()
-            print("   ✅ Connected to \(relay1.url)")
-        } catch {
-            print("   ❌ Failed to connect to \(relay1.url): \(error)")
-        }
-        
-        do {
-            try await relay2.connect()
-            print("   ✅ Connected to \(relay2.url)")
-        } catch {
-            print("   ❌ Failed to connect to \(relay2.url): \(error)")
-        }
-        
-        do {
-            try await relay3.connect()
-            print("   ✅ Connected to \(relay3.url)")
-        } catch {
-            print("   ❌ Failed to connect to \(relay3.url): \(error)")
+        let relays = [relay1, relay2, relay3]
+        for relay in relays {
+            do {
+                try await relay.connect()
+                print("   ✅ Connected to \(relay.url)")
+            } catch {
+                print("   ❌ Failed to connect to \(relay.url): \(error)")
+            }
         }
         
         // Wait for connections to establish
@@ -207,7 +196,7 @@ final class NIP60WalletE2ETests: XCTestCase {
                 // Fetch from specific relay
                 let relaySet = Set([relay.url])
                 do {
-                    if let _ = try await ndk.fetchEvent(verifyFilter, relays: relaySet, timeoutSeconds: 5) {
+                    if try await ndk.fetchEvent(verifyFilter, relays: relaySet, timeoutSeconds: 5) != nil {
                         publishedRelays.insert(relay.url)
                         print("   ✅ Found event on \(relay.url)")
                     } else {
