@@ -30,7 +30,7 @@ public actor NDKEventManager {
         do {
             try await cache.saveEvent(event)
         } catch {
-            print("[NDKEventManager] Warning: Failed to cache event: \(error)")
+            NDKLogger.shared.log(.warning, category: .cache, "Failed to cache event: \(error)")
         }
         
         // Determine relays for publication
@@ -38,14 +38,14 @@ public actor NDKEventManager {
         let selection = await relaySelector.selectRelaysForPublishing(event: event)
         let targetRelayUrls = Array(selection.relays)
         
-        print("[NDKEventManager] Event kind: \(event.kind), Selected \(targetRelayUrls.count) relays for publishing: \(targetRelayUrls)")
+        NDKLogger.shared.log(.debug, category: .event, "Event kind: \(event.kind), Selected \(targetRelayUrls.count) relays for publishing: \(targetRelayUrls)")
         
         // Handle optimistic publishing
         if optimisticPublishingConfig.enabled && event.kind != 10002 {
             do {
                 try await cache.addUnpublishedEvent(event, relays: Set(targetRelayUrls))
             } catch {
-                print("[NDKEventManager] Warning: Failed to add unpublished event to cache: \(error)")
+                NDKLogger.shared.log(.warning, category: .cache, "Failed to add unpublished event to cache: \(error)")
             }
             
             // Dispatch optimistically via subscription coordinator
@@ -54,7 +54,7 @@ public actor NDKEventManager {
         
         if logRawJSON {
             if let jsonString = try? JSONCoding.encodeToString(event) {
-                print("[NDKEventManager] Publishing event JSON: \(jsonString)")
+                NDKLogger.shared.log(.debug, category: .event, "Publishing event JSON: \(jsonString)")
             }
         }
         
@@ -74,12 +74,12 @@ public actor NDKEventManager {
                     group.addTask {
                         let connectionState = await relay.connectionState
                         if connectionState != .connected && connectionState != .connecting {
-                            print("[NDKEventManager] Starting connection to relay for publishing: \(relay.url)")
+                            NDKLogger.shared.log(.debug, category: .relay, "Starting connection to relay for publishing: \(relay.url)")
                             do {
                                 try await relay.connect()
-                                print("[NDKEventManager] Connected to relay: \(relay.url)")
+                                NDKLogger.shared.log(.info, category: .relay, "Connected to relay: \(relay.url)")
                             } catch {
-                                print("[NDKEventManager] Failed to connect to relay \(relay.url): \(error)")
+                                NDKLogger.shared.log(.error, category: .relay, "Failed to connect to relay \(relay.url): \(error)")
                             }
                         }
                     }
@@ -97,7 +97,7 @@ public actor NDKEventManager {
                         let result = try await relay.publish(event)
                         return (relay, result.success)
                     } catch {
-                        print("[NDKEventManager] Failed to publish to \(relay.url): \(error)")
+                        NDKLogger.shared.log(.error, category: .event, "Failed to publish to \(relay.url): \(error)")
                         return (relay, false)
                     }
                 }
@@ -107,16 +107,23 @@ public actor NDKEventManager {
                 if success {
                     publishedRelays.insert(relay)
                     
+                    // Update event tracker with successful publish
+                    await ndk.eventTracker.updatePublishStatus(eventId: event.id, relay: relay.url, status: .succeeded)
+                    await ndk.eventTracker.markSeen(eventId: event.id, relay: relay.url)
+                    
                     // Confirm event if optimistic publishing is enabled
                     if optimisticPublishingConfig.enabled {
                         do {
                             try await cache.confirmEvent(eventId: event.id, onRelay: relay.url)
                         } catch {
-                            print("[NDKEventManager] Warning: Failed to confirm event: \(error)")
+                            NDKLogger.shared.log(.warning, category: .event, "Failed to confirm event: \(error)")
                         }
                     }
                 } else {
                     failedRelays.insert(relay)
+                    
+                    // Update event tracker with failed publish
+                    await ndk.eventTracker.updatePublishStatus(eventId: event.id, relay: relay.url, status: .failed(.connectionFailed))
                 }
             }
         }
@@ -126,9 +133,9 @@ public actor NDKEventManager {
             let failedRelayUrls = Set(failedRelays.map { $0.url })
             do {
                 try await cache.addUnpublishedEvent(event, relays: failedRelayUrls)
-                print("[NDKEventManager] Added failed event \(event.id) to retry queue for relays: \(failedRelayUrls)")
+                NDKLogger.shared.log(.info, category: .event, "Added failed event \(event.id) to retry queue for relays: \(failedRelayUrls)")
             } catch {
-                print("[NDKEventManager] Warning: Failed to add failed event to cache: \(error)")
+                NDKLogger.shared.log(.warning, category: .cache, "Failed to add failed event to cache: \(error)")
             }
         }
         
@@ -150,7 +157,7 @@ public actor NDKEventManager {
         do {
             try await cache.saveEvent(event)
         } catch {
-            print("[NDKEventManager] Warning: Failed to cache event: \(error)")
+            NDKLogger.shared.log(.warning, category: .cache, "Failed to cache event: \(error)")
         }
         
         // Get relay instances and start connecting them in parallel
@@ -169,12 +176,12 @@ public actor NDKEventManager {
                     group.addTask {
                         let connectionState = await relay.connectionState
                         if connectionState != .connected && connectionState != .connecting {
-                            print("[NDKEventManager] Starting connection to relay for publishing: \(relay.url)")
+                            NDKLogger.shared.log(.debug, category: .relay, "Starting connection to relay for publishing: \(relay.url)")
                             do {
                                 try await relay.connect()
-                                print("[NDKEventManager] Connected to relay: \(relay.url)")
+                                NDKLogger.shared.log(.info, category: .relay, "Connected to relay: \(relay.url)")
                             } catch {
-                                print("[NDKEventManager] Failed to connect to relay \(relay.url): \(error)")
+                                NDKLogger.shared.log(.error, category: .relay, "Failed to connect to relay \(relay.url): \(error)")
                             }
                         }
                     }
@@ -191,7 +198,7 @@ public actor NDKEventManager {
                         let result = try await relay.publish(event)
                         return (relay, result.success)
                     } catch {
-                        print("[NDKEventManager] Failed to publish to \(relay.url): \(error)")
+                        NDKLogger.shared.log(.error, category: .event, "Failed to publish to \(relay.url): \(error)")
                         return (relay, false)
                     }
                 }
@@ -200,6 +207,13 @@ public actor NDKEventManager {
             for await (relay, success) in group {
                 if success {
                     publishedRelays.insert(relay)
+                    
+                    // Update event tracker with successful publish
+                    await ndk.eventTracker.updatePublishStatus(eventId: event.id, relay: relay.url, status: .succeeded)
+                    await ndk.eventTracker.markSeen(eventId: event.id, relay: relay.url)
+                } else {
+                    // Update event tracker with failed publish
+                    await ndk.eventTracker.updatePublishStatus(eventId: event.id, relay: relay.url, status: .failed(.connectionFailed))
                 }
             }
         }
@@ -244,7 +258,7 @@ public actor NDKEventManager {
                 let publishedRelays = try await publish(event: event, to: targetRelayUrls)
                 results.append((event: event, relays: publishedRelays))
             } catch {
-                print("[NDKEventManager] Failed to retry publishing event \(event.id): \(error)")
+                NDKLogger.shared.log(.error, category: .event, "Failed to retry publishing event \(event.id): \(error)")
             }
         }
         
@@ -263,7 +277,7 @@ public actor NDKEventManager {
                         try await cache.confirmEvent(eventId: event.id, onRelay: relay.url)
                     }
                 } catch {
-                    print("[NDKEventManager] Failed to publish queued event to \(relay.url): \(error)")
+                    NDKLogger.shared.log(.error, category: .event, "Failed to publish queued event to \(relay.url): \(error)")
                 }
             }
         }
