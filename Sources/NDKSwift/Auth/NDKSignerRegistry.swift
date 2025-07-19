@@ -80,7 +80,7 @@ public class NDKSignerRegistry {
         }
         
         // Extract the payload data
-        let payloadData = try JSONEncoder().encode(container.payload)
+        let payloadData = try JSONCoding.encode(container.payload)
         
         // Deserialize the signer
         return try signerType.deserialize(payloadData, ndk: ndk)
@@ -160,7 +160,7 @@ public enum NDKSignerSerialization {
             type: type,
             payload: payload.mapValues { AnyCodable($0) }
         )
-        return try JSONEncoder().encode(container)
+        return try JSONCoding.encode(container)
     }
     
     /// Extract payload from serialized container

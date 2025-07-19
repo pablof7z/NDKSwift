@@ -83,7 +83,7 @@ public actor MintManager {
             // Fallback to direct network fetch
             let infoUrl = url.appending(path: "/v1/info")
             let data = try await URLSession.shared.data(from: infoUrl).0
-            return try JSONDecoder().decode(NDKMintInfo.self, from: data)
+            return try JSONCoding.decode(NDKMintInfo.self, from: data)
         }
     }
     

@@ -17,7 +17,7 @@ extension NDKCashuSpendingHistory {
         
         // Parse tags from decrypted content
         guard let tagsData = decryptedContent.data(using: .utf8),
-              let tags = try? JSONDecoder().decode([[String]].self, from: tagsData) else {
+              let tags = try? JSONCoding.decode([[String]].self, from: tagsData) else {
             throw NDKError.invalidContent("Failed to parse history event tags")
         }
         

@@ -124,7 +124,7 @@ extension NDKEvent {
         // Parse metadata from content if present
         let metadata: NIP89HandlerMetadata?
         if !content.isEmpty {
-            metadata = try? JSONDecoder().decode(NIP89HandlerMetadata.self, from: content.data(using: .utf8) ?? Data())
+            metadata = try? JSONCoding.decode(NIP89HandlerMetadata.self, from: content.data(using: .utf8) ?? Data())
         } else {
             metadata = nil
         }
