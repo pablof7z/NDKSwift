@@ -658,7 +658,7 @@ public actor NIP60Wallet: NDKPaymentProvider {
                             store: proofs, 
                             destroy: [], 
                             mint: quote.mintURL,
-                            memo: "Lightning deposit"
+                            memo: StringConstants.Transactions.lightningDeposit
                         )
                         return try await self.update(stateChange: stateChange)
                     }

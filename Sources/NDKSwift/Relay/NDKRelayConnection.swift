@@ -252,7 +252,7 @@ public actor NDKRelayConnection {
     /// Send raw JSON to relay
     public func send(_ json: String) async throws {
         guard isConnected else {
-            throw NDKError.connectionFailed(relay: url.absoluteString, message: "Not connected")
+            throw NDKError.connectionFailed(relay: url.absoluteString, message: StringConstants.ErrorMessages.notConnected)
         }
         
         // Log network traffic

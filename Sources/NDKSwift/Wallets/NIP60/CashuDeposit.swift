@@ -90,7 +90,7 @@ public enum CashuDeposit {
                                         try await eventManager.createSpendingHistoryEvent(
                                             direction: .in,
                                             amount: Int64(quote.amount),
-                                            memo: "Lightning deposit",
+                                            memo: StringConstants.Transactions.lightningDeposit,
                                             createdEventIds: createdEventIds,
                                             signer: signer
                                         )

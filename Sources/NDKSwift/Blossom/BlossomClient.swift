@@ -66,7 +66,7 @@ public actor BlossomClient {
         } catch let error as NDKError {
             throw error
         } catch {
-            throw NDKError.connectionFailed(relay: serverURL, message: "Network error", underlying: error)
+            throw NDKError.connectionFailed(relay: serverURL, message: StringConstants.ErrorMessages.networkError, underlying: error)
         }
     }
 
@@ -152,7 +152,7 @@ public actor BlossomClient {
         } catch let error as NDKError {
             throw error
         } catch {
-            throw NDKError.connectionFailed(relay: serverURL, message: "Network error", underlying: error)
+            throw NDKError.connectionFailed(relay: serverURL, message: StringConstants.ErrorMessages.networkError, underlying: error)
         }
     }
 
@@ -223,7 +223,7 @@ public actor BlossomClient {
         } catch let error as NDKError {
             throw error
         } catch {
-            throw NDKError.connectionFailed(relay: serverURL, message: "Network error", underlying: error)
+            throw NDKError.connectionFailed(relay: serverURL, message: StringConstants.ErrorMessages.networkError, underlying: error)
         }
     }
 
@@ -266,7 +266,7 @@ public actor BlossomClient {
         } catch let error as NDKError {
             throw error
         } catch {
-            throw NDKError.connectionFailed(relay: serverURL, message: "Network error", underlying: error)
+            throw NDKError.connectionFailed(relay: serverURL, message: StringConstants.ErrorMessages.networkError, underlying: error)
         }
     }
 
@@ -307,7 +307,7 @@ public actor BlossomClient {
         } catch let error as NDKError {
             throw error
         } catch {
-            throw NDKError.connectionFailed(relay: serverURL, message: "Network error", underlying: error)
+            throw NDKError.connectionFailed(relay: serverURL, message: StringConstants.ErrorMessages.networkError, underlying: error)
         }
     }
 
