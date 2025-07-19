@@ -1,6 +1,7 @@
 import Foundation
-import GRDB
+
 import CashuSwift
+import GRDB
 
 
 /// SQLite-backed cache implementation for NDKSwift
