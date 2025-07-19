@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- Refactored `processEvent` in NDKSubscriptionManager to follow Single Responsibility Principle by extracting focused helper methods
+- Simplified BunkerURLParser by reducing nesting levels and extracting methods for better readability
+- Eliminated duplicate error handling code in NDKPrivateKeySigner by extracting common logic
+
+### Fixed
+- Removed duplicate hex conversion implementations from test files to use centralized DataExtensions (DRY principle)
+- Fixed package reference in Examples/Package.swift (NDKSwift-z94ws0 -> NDKSwift-sfodj5)
+- Changed mutable variable to immutable constant in NegentropyAccumulator (var hashCopy -> let hashCopy)
+
 ## [0.3.1] - 2025-01-18
 
 ### Fixed
