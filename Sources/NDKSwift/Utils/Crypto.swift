@@ -57,7 +57,10 @@ public enum Crypto {
 
     /// Sign a message with a private key using Schnorr signatures
     public static func sign(message: Data, privateKey: PrivateKey) throws -> Signature {
-        guard let privKeyData = Data(hexString: privateKey), privKeyData.count == 32 else {
+        let privKeyData: Data
+        do {
+            privKeyData = try HexValidator.validate32ByteHex(privateKey)
+        } catch {
             throw CryptoError.invalidKeyLength
         }
 
@@ -73,11 +76,17 @@ public enum Crypto {
 
     /// Verify a signature using Schnorr verification
     public static func verify(signature: Signature, message: Data, publicKey: PublicKey) throws -> Bool {
-        guard let sigData = Data(hexString: signature), sigData.count == 64 else {
+        let sigData: Data
+        do {
+            sigData = try HexValidator.validate64ByteHex(signature)
+        } catch {
             throw CryptoError.invalidSignatureLength
         }
 
-        guard let pubKeyData = Data(hexString: publicKey), pubKeyData.count == 32 else {
+        let pubKeyData: Data
+        do {
+            pubKeyData = try HexValidator.validate32ByteHex(publicKey)
+        } catch {
             throw CryptoError.invalidKeyLength
         }
 

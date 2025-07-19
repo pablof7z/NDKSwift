@@ -160,7 +160,10 @@ public extension Bech32 {
     }
     /// Encode a public key to npub format
     static func npub(from pubkey: PublicKey) throws -> String {
-        guard pubkey.count == 64, let data = Data(hexString: pubkey), data.count == 32 else {
+        let data: Data
+        do {
+            data = try HexValidator.validate32ByteHex(pubkey)
+        } catch {
             throw NDKError.invalidInput(message: "Invalid bech32 data")
         }
         return try encode(hrp: "npub", data: Array(data))
@@ -203,7 +206,10 @@ public extension Bech32 {
 
     /// Encode an event ID to note format
     static func note(from eventId: EventID) throws -> String {
-        guard eventId.count == 64, let data = Data(hexString: eventId), data.count == 32 else {
+        let data: Data
+        do {
+            data = try HexValidator.validate32ByteHex(eventId)
+        } catch {
             throw NDKError.invalidInput(message: "Invalid bech32 data")
         }
         return try encode(hrp: "note", data: Array(data))
@@ -225,7 +231,10 @@ public extension Bech32 {
         author: PublicKey? = nil,
         kind: Int? = nil
     ) throws -> String {
-        guard eventId.count == 64, let eventData = Data(hexString: eventId), eventData.count == 32 else {
+        let eventData: Data
+        do {
+            eventData = try HexValidator.validate32ByteHex(eventId)
+        } catch {
             throw NDKError.invalidInput(message: "Invalid bech32 data")
         }
 
@@ -247,7 +256,7 @@ public extension Bech32 {
         }
 
         // Type 2: Author (optional)
-        if let author = author, author.count == 64, let authorData = Data(hexString: author), authorData.count == 32 {
+        if let author = author, HexValidator.isValid32ByteHex(author), let authorData = try? HexValidator.validate32ByteHex(author) {
             tlvData.append(2)
             tlvData.append(32)
             tlvData.append(contentsOf: authorData)
@@ -271,7 +280,10 @@ public extension Bech32 {
         author: PublicKey,
         relays: [String]? = nil
     ) throws -> String {
-        guard author.count == 64, let authorData = Data(hexString: author), authorData.count == 32 else {
+        let authorData: Data
+        do {
+            authorData = try HexValidator.validate32ByteHex(author)
+        } catch {
             throw NDKError.invalidInput(message: "Invalid bech32 data")
         }
 

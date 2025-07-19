@@ -115,17 +115,17 @@ public struct NDKEvent: Codable, Equatable, Hashable, Sendable {
     /// Validate event structure
     public func validate() throws {
         // Validate public key
-        guard pubkey.count == 64, pubkey.allSatisfy({ $0.isHexDigit }) else {
+        guard HexValidator.isValid32ByteHex(pubkey) else {
             throw NDKError.invalidPublicKey(pubkey)
         }
 
         // Validate ID
-        guard id.count == 64, id.allSatisfy({ $0.isHexDigit }) else {
+        guard HexValidator.isValid32ByteHex(id) else {
             throw NDKError.invalidEventID(id)
         }
 
         // Validate signature
-        guard sig.count == 128, sig.allSatisfy({ $0.isHexDigit }) else {
+        guard HexValidator.isValid64ByteHex(sig) else {
             throw NDKError.invalidSignature(sig)
         }
 
