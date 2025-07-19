@@ -37,6 +37,9 @@ public actor NDKEventTracker {
     /// Custom properties for events (extensibility)
     private var customProperties: [EventID: [String: Any]] = [:]
     
+    /// Tracks when events were first seen (for cleanup)
+    private var firstSeenTimestamps: [EventID: Date] = [:]
+    
     // MARK: - Relay Tracking
     
     /// Mark an event as seen on a specific relay
@@ -45,6 +48,11 @@ public actor NDKEventTracker {
     ///   - relay: The relay URL
     public func markSeen(eventId: EventID, relay: String) {
         seenOnRelays[eventId, default: Set()].insert(relay)
+        
+        // Track first seen timestamp if not already tracked
+        if firstSeenTimestamps[eventId] == nil {
+            firstSeenTimestamps[eventId] = Date()
+        }
     }
     
     /// Get all relays where an event has been seen
@@ -190,6 +198,13 @@ public actor NDKEventTracker {
         return customProperties[eventId] ?? [:]
     }
     
+    /// Get the timestamp when an event was first seen
+    /// - Parameter eventId: The event ID
+    /// - Returns: The date when the event was first seen, if tracked
+    public func getFirstSeenTimestamp(eventId: EventID) -> Date? {
+        return firstSeenTimestamps[eventId]
+    }
+    
     // MARK: - Cleanup
     
     /// Remove all tracking data for an event
@@ -200,25 +215,24 @@ public actor NDKEventTracker {
         relayOKMessages.removeValue(forKey: eventId)
         sourceRelays.removeValue(forKey: eventId)
         customProperties.removeValue(forKey: eventId)
+        firstSeenTimestamps.removeValue(forKey: eventId)
     }
     
     /// Remove tracking data for events older than the specified date
     /// - Parameter cutoffDate: Events older than this date will be removed
     public func cleanupOldEvents(cutoffDate: Date) {
-        let _ = Timestamp(cutoffDate.timeIntervalSince1970)
-        
-        // Note: This is a simplified cleanup that assumes we can parse timestamps from event IDs
-        // In a real implementation, you might want to track creation timestamps separately
-        // or pass them in when adding events to the tracker
-        
-        let eventIdsToRemove = seenOnRelays.keys.filter { eventId in
-            // This is a heuristic - in practice you'd want to track creation timestamps
-            // For now, we'll keep this method but it won't do much without timestamp tracking
-            return false
+        // Find events older than the cutoff date
+        let eventIdsToRemove = firstSeenTimestamps.compactMap { eventId, timestamp in
+            timestamp < cutoffDate ? eventId : nil
         }
         
+        // Remove old events
         for eventId in eventIdsToRemove {
             removeEvent(eventId: eventId)
+        }
+        
+        if !eventIdsToRemove.isEmpty {
+            print("[NDKEventTracker] Cleaned up \(eventIdsToRemove.count) events older than \(cutoffDate)")
         }
     }
     
@@ -230,7 +244,8 @@ public actor NDKEventTracker {
             "totalSeenRelays": seenOnRelays.values.reduce(0) { $0 + $1.count },
             "eventsWithPublishStatus": relayPublishStatuses.count,
             "eventsWithOKMessages": relayOKMessages.count,
-            "eventsWithCustomProperties": customProperties.count
+            "eventsWithCustomProperties": customProperties.count,
+            "eventsWithTimestamps": firstSeenTimestamps.count
         ]
     }
 }
