@@ -214,8 +214,6 @@ final class NegentropyTests: XCTestCase {
         let cache = MemoryCache()
         let storage = NDKCacheNegentropyStorage(cache: cache)
         
-        let ndk = NDK()
-        
         // Create events with specific timestamps
         let baseTime = Timestamp(1000000)
         for i in 0..<20 {
@@ -355,7 +353,7 @@ final class NegentropyTests: XCTestCase {
         let negentropy2 = Negentropy(storage: storage2)
         
         let initMessage = try await negentropy1.initiate()
-        let (responseData, haveIds, needIds) = try await negentropy2.reconcile(initMessage)
+        let (_, haveIds, needIds) = try await negentropy2.reconcile(initMessage)
         
         // Cache2 should need all events from cache1
         XCTAssertEqual(needIds.count, 5)

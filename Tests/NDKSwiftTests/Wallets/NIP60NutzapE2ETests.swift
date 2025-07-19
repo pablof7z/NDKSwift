@@ -65,14 +65,16 @@ final class NIP60NutzapE2ETests: XCTestCase {
         
         // Connect to relays explicitly
         print("🔌 Connecting relays for NDK1...")
-        try? await relay1_1.connect()
-        try? await relay1_2.connect()
-        try? await relay1_3.connect()
+        let relays1 = [relay1_1, relay1_2, relay1_3]
+        for relay in relays1 {
+            try? await relay.connect()
+        }
         
         print("🔌 Connecting relays for NDK2...")
-        try? await relay2_1.connect()
-        try? await relay2_2.connect()
-        try? await relay2_3.connect()
+        let relays2 = [relay2_1, relay2_2, relay2_3]
+        for relay in relays2 {
+            try? await relay.connect()
+        }
         
         // Wait for relay connections
         try await Task.sleep(nanoseconds: 3_000_000_000) // 3 seconds

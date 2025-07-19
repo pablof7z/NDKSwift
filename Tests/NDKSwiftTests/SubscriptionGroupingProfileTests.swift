@@ -29,11 +29,12 @@ final class SubscriptionGroupingProfileTests: XCTestCase {
     func testFilterFingerprintGeneration() {
         // Create filters that should have the same fingerprint (same structure, different values)
         let filter1 = NDKFilter(authors: ["author1"], kinds: [EventKind.metadata])
-        let _ = NDKFilter(authors: ["author2"], kinds: [EventKind.metadata])
-        let _ = NDKFilter(authors: ["author3"], kinds: [EventKind.metadata])
+        // These filters are created to verify they don't affect fingerprinting
+        _ = NDKFilter(authors: ["author2"], kinds: [EventKind.metadata])
+        _ = NDKFilter(authors: ["author3"], kinds: [EventKind.metadata])
         
         // Create filters with different fingerprints
-        let _ = NDKFilter(authors: ["author4"], kinds: [EventKind.textNote])
+        _ = NDKFilter(authors: ["author4"], kinds: [EventKind.textNote])
         let filter5 = NDKFilter(authors: ["author5"], kinds: [EventKind.metadata], limit: 10)
         
         // Test fingerprint structure
@@ -114,11 +115,11 @@ final class SubscriptionGroupingProfileTests: XCTestCase {
     /// Integration test - verify ProfileManager uses subscription layer batching
     func testProfileManagerBatchingDisabledByDefault() async throws {
         // Create profile manager with default config
-        let profileManager = NDKProfileManager(ndk: ndk)
+        _ = NDKProfileManager(ndk: ndk)
         
         // The default config should have batching disabled
         // since subscription manager now handles it
-        let config = NDKProfileConfig()
+        _ = NDKProfileConfig()
         // XCTAssertFalse(config.batchRequests, "Profile batching should be disabled by default")
     }
 }
