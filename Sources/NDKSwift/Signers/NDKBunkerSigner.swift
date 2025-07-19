@@ -452,7 +452,7 @@ public actor NDKBunkerSigner: NDKSigner, Sendable {
                 connectionContinuation?.resume(throwing: error)
             }
         } else {
-            let error = NDKError.connectionFailed(relay: "bunker", message: response.error ?? "Connection failed")
+            let error = NDKError.networkError(for: "bunker", operation: "connect", error: NSError(domain: "BunkerError", code: -1, userInfo: [NSLocalizedDescriptionKey: response.error ?? "Connection failed"]))
             connectionContinuation?.resume(throwing: error)
         }
         connectionContinuation = nil
@@ -472,7 +472,7 @@ public actor NDKBunkerSigner: NDKSigner, Sendable {
 
     private func performSign(_ event: NDKEvent) async throws -> Signature {
         guard let bunkerPubkey = bunkerPubkey else {
-            throw NDKError.connectionLost(relay: "bunker", message: StringConstants.ErrorMessages.notConnected)
+            throw NDKError.missingRequired("bunker connection")
         }
 
         let eventJson = try event.serialize()
@@ -489,7 +489,7 @@ public actor NDKBunkerSigner: NDKSigner, Sendable {
               let json = try? JSONSerialization.jsonObject(with: resultData) as? [String: Any],
               let sig = json["sig"] as? String
         else {
-            throw NDKError.signingFailed("Failed to sign event")
+            throw NDKError.failedTo("sign event", message: response?.error)
         }
 
         return sig
