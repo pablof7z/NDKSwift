@@ -621,6 +621,12 @@ public final class NDKEventBuilder {
                 await self.tagBech32(bech32)
             case .hashtag(let tag):
                 self.tagHashtag(tag.lowercased()) // NIP-24: hashtags must be lowercase
+            case .userMention(let pubkey, _):
+                // These are already handled by #[index] references in tags
+                await self.tagUser(pubkey)
+            case .eventMention(let eventId):
+                // These are already handled by #[index] references in tags
+                self.tag(["e", eventId])
             case .text(_), .url(_):
                 // These don't generate tags
                 break
