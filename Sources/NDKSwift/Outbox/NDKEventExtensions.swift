@@ -1,5 +1,3 @@
-import Foundation
-
 /// Extensions to NDKEvent for outbox model support
 public extension NDKEvent {
 
