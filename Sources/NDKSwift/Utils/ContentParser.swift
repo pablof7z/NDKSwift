@@ -94,15 +94,15 @@ public enum ContentParser {
                 }
                 
                 // Identify entity type by prefix
-                if bech32.hasPrefix("npub1") {
+                if bech32.hasPrefix(NostrConstants.npubPrefix) {
                     entities.append(.npub(bech32))
-                } else if bech32.hasPrefix("nprofile1") {
+                } else if bech32.hasPrefix(NostrConstants.nprofilePrefix) {
                     entities.append(.nprofile(bech32))
-                } else if bech32.hasPrefix("note1") {
+                } else if bech32.hasPrefix(NostrConstants.notePrefix) {
                     entities.append(.note(bech32))
-                } else if bech32.hasPrefix("nevent1") {
+                } else if bech32.hasPrefix(NostrConstants.neventPrefix) {
                     entities.append(.nevent(bech32))
-                } else if bech32.hasPrefix("naddr1") {
+                } else if bech32.hasPrefix(NostrConstants.naddrPrefix) {
                     entities.append(.naddr(bech32))
                 } else {
                     entities.append(.text(fullMatch))
