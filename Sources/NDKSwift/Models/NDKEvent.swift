@@ -156,8 +156,7 @@ public struct NDKEvent: Codable, Equatable, Hashable, Sendable {
             content
         ]
 
-        let data = try JSONSerialization.data(withJSONObject: array, options: [.withoutEscapingSlashes])
-        return String(data: data, encoding: .utf8)!
+        return try JSONCoding.serializeToString(array)
     }
 
     // MARK: - Tag Helpers

@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- Added centralized error factory methods in NDKErrorFactories to reduce duplication (DRY principle)
+  - Created factory methods for common error patterns: failedTo, invalidDataFormat, missingRequired, networkError, parseError, cryptoOperation
+  - Refactored BlossomClient, NDKPrivateKeySigner, and NDKBunkerSigner to use error factories
+- Enhanced JSONCoding utility with JSONSerialization helper methods (DRY principle)
+  - Added parseJSON, parseDictionary, parseArray methods for parsing JSON
+  - Added serialize and serializeToString methods for JSON serialization
+  - Added safe parsing methods that return optionals
+  - Refactored NostrMessage, NDKEvent, and NDKBunkerSigner to use centralized JSON helpers
+
+### Added
+- Comprehensive test suites for NDKErrorFactories and JSONCoding utilities
+
 ## [0.3.2] - 2025-01-19
 
 ### Changed

@@ -35,13 +35,9 @@ public enum NostrMessage {
 
     /// Parse a message from relay
     public static func parse(from json: String) throws -> NostrMessage {
-        guard let data = json.data(using: .utf8) else {
-            throw NDKError.invalidMessage("Invalid JSON string")
-        }
-
-        let array = try JSONSerialization.jsonObject(with: data) as? [Any]
-        guard let array = array, !array.isEmpty else {
-            throw NDKError.invalidMessage("Invalid message format")
+        let array = try JSONCoding.parseArray(from: json)
+        guard !array.isEmpty else {
+            throw NDKError.invalidMessage("Invalid message format: empty array")
         }
 
         guard let typeString = array[0] as? String,
@@ -243,12 +239,7 @@ public enum NostrMessage {
             array.append(error)
         }
 
-        let data = try JSONSerialization.data(withJSONObject: array, options: [.withoutEscapingSlashes])
-        guard let json = String(data: data, encoding: .utf8) else {
-            throw NDKError.invalidMessage( "Failed to serialize message")
-        }
-
-        return json
+        return try JSONCoding.serializeToString(array)
     }
 
     /// Get the subscription ID if applicable
