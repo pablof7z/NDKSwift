@@ -41,7 +41,7 @@ public actor NDKSubscriptionManager {
     private let maxFiltersPerRequest = 10
     private let groupingDelay: TimeInterval = 0.1
     private let deduplicationWindow: TimeInterval = 300 // 5 minutes
-    private let eoseTimeoutRatio: Double = 0.5 // 50% of relays for timeout
+    private let eoseTimeoutRatio = NetworkConstants.eoseTimeoutRatio // 50% of relays for timeout
 
     /// Statistics
     private var stats = SubscriptionStats()

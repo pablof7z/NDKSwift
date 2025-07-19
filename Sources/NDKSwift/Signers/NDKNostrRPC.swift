@@ -186,7 +186,7 @@ public actor NDKNostrRPC {
         }
     }
 
-    private func setupTimeout(for id: String, continuation: CheckedContinuation<NDKRPCResponse, Error>, timeoutSeconds: UInt64 = 30) {
+    private func setupTimeout(for id: String, continuation: CheckedContinuation<NDKRPCResponse, Error>, timeoutSeconds: UInt64 = UInt64(NetworkConstants.timeoutRPCRequest)) {
         let timeoutTask = Task {
             try? await Task.sleep(nanoseconds: timeoutSeconds * TimeConstants.nanosecondsPerSecond)
             await self.handleTimeout(id: id, continuation: continuation)
