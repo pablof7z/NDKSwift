@@ -22,8 +22,8 @@ import Foundation
 /// )
 /// ```
 public struct NDKSession: Codable, Identifiable, Sendable {
-    /// Unique session identifier
-    public let id: UUID
+    /// Unique session identifier based on pubkey and signer type
+    public let id: String
     
     /// User's public key (hex format)
     public let pubkey: String
@@ -82,7 +82,7 @@ public struct NDKSession: Codable, Identifiable, Sendable {
         isHardwareBacked: Bool = false,
         autoLockTimeout: TimeInterval? = nil
     ) {
-        self.id = UUID()
+        self.id = "\(pubkey):\(signerType)"
         self.pubkey = pubkey
         self.signerType = signerType
         self.createdAt = Date()
