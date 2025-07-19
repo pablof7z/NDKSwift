@@ -627,17 +627,3 @@ extension NDKEvent {
         // The publish status tracking should be handled by NDKEventTracker
     }
 }
-
-// MARK: - Data Extension
-
-private extension Data {
-    func sha256() -> Data {
-        SHA256.hash(data: self).data
-    }
-}
-
-private extension SHA256.Digest {
-    var data: Data {
-        Data(self)
-    }
-}
