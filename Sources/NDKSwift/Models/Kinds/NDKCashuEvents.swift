@@ -666,6 +666,149 @@ public struct NDKCashuMintAnnouncement {
     }
 }
 
+// MARK: - NDKNutzapEvent
+
+/// NIP-61 Nutzap Event (kind: 9321)
+/// Public event that sends Cashu tokens to a recipient
+public struct NDKNutzapEvent {
+    public let event: NDKEvent
+    
+    public init(event: NDKEvent) {
+        self.event = event
+    }
+    
+    /// Create and publish a nutzap event
+    /// - Parameters:
+    ///   - ndk: NDK instance
+    ///   - token: Cashu token containing the proofs to send
+    ///   - mintURL: URL of the mint the proofs are from
+    ///   - recipient: Recipient's nostr pubkey
+    ///   - comment: Optional comment
+    ///   - eventId: Optional event ID if nutzapping an event
+    ///   - signer: Signer for signing the event
+    /// - Returns: The published nutzap event
+    @discardableResult
+    public static func createAndPublish(
+        ndk: NDK,
+        token: CashuSwift.Token,
+        mintURL: String,
+        recipient: PublicKey,
+        comment: String? = nil,
+        eventId: String? = nil,
+        signer: NDKSigner
+    ) async throws -> NDKNutzapEvent {
+        let nutzapEvent = try await create(
+            ndk: ndk,
+            token: token,
+            mintURL: mintURL,
+            recipient: recipient,
+            comment: comment,
+            eventId: eventId,
+            signer: signer
+        )
+        
+        _ = try await ndk.publish(nutzapEvent.event)
+        print("NDKNutzapEvent - Published nutzap event: \(nutzapEvent.event.id)")
+        
+        return nutzapEvent
+    }
+    
+    /// Create without publishing
+    public static func create(
+        ndk: NDK,
+        token: CashuSwift.Token,
+        mintURL: String,
+        recipient: PublicKey,
+        comment: String? = nil,
+        eventId: String? = nil,
+        signer: NDKSigner
+    ) async throws -> NDKNutzapEvent {
+        let builder = ndk.event()
+            .content(comment ?? "") // Content is the comment
+            .kind(EventKind.nutzap) // 9321
+        
+        // Add p tag for recipient
+        _ = builder.tag(["p", recipient])
+        
+        // Add e tag if nutzapping an event
+        if let eventId = eventId {
+            _ = builder.tag(["e", eventId])
+        }
+        
+        // Add individual proof tags for each proof (per NIP-61)
+        guard let proofs = token.proofsByMint[mintURL] else {
+            throw NDKError.invalidRequest("No proofs found for mint \(mintURL)")
+        }
+        
+        for proof in proofs {
+            let proofData = try JSONEncoder().encode(proof)
+            guard let proofJSON = String(data: proofData, encoding: .utf8) else {
+                throw NDKError.encodingError("Failed to encode proof")
+            }
+            _ = builder.tag(["proof", proofJSON])
+        }
+        
+        // Add mint tag for the mint URL
+        _ = builder.tag(["mint", mintURL])
+        
+        // Add unit tag
+        _ = builder.tag(["u", "sat"])
+        
+        let nutzapEvent = try await builder.build(signer: signer)
+        return NDKNutzapEvent(event: nutzapEvent)
+    }
+    
+    /// Extract the token from the nutzap event
+    public var token: CashuSwift.Token? {
+        // Get all proof tags
+        let proofTags = event.tags.filter { $0.count >= 2 && $0[0] == "proof" }
+        guard !proofTags.isEmpty else { return nil }
+        
+        // Parse all proofs
+        var proofs: [CashuSwift.Proof] = []
+        for proofTag in proofTags {
+            guard let proofJSON = proofTag[1].data(using: .utf8),
+                  let proof = try? JSONDecoder().decode(CashuSwift.Proof.self, from: proofJSON) else {
+                continue
+            }
+            proofs.append(proof)
+        }
+        
+        guard !proofs.isEmpty, let mintURL = self.mintURL else { return nil }
+        
+        // Create token with proofs grouped by mint
+        return CashuSwift.Token(
+            proofs: [mintURL: proofs],
+            unit: unit ?? "sat"
+        )
+    }
+    
+    /// Extract the mint URL from the nutzap event
+    public var mintURL: String? {
+        event.tags.first(where: { $0.count >= 2 && $0[0] == "mint" })?[1]
+    }
+    
+    /// Extract the unit from the nutzap event
+    public var unit: String? {
+        event.tags.first(where: { $0.count >= 2 && $0[0] == "u" })?[1]
+    }
+    
+    /// Extract the recipient from the p tag
+    public var recipient: String? {
+        event.tags.first(where: { $0.count >= 2 && $0[0] == "p" })?[1]
+    }
+    
+    /// Extract the nutzapped event ID from the e tag
+    public var nutzappedEventId: String? {
+        event.tags.first(where: { $0.count >= 2 && $0[0] == "e" })?[1]
+    }
+    
+    /// Get the comment from the event content
+    public var comment: String? {
+        event.content.isEmpty ? nil : event.content
+    }
+}
+
 // MARK: - NDKMintRecommendation
 
 /// NIP-87 Mint Recommendation Event (kind: 38000)

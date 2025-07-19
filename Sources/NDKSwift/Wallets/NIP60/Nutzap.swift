@@ -84,19 +84,23 @@ public enum Nutzap {
                     mintURL: mintURL
                 )
                 
-                // Create nutzap event
-                let nutzapEvent = try await createNutzapEvent(
-                    wallet: wallet,
-                    proofs: lockedProofs,
+                // Create nutzap event using proper framework
+                let token = CashuSwift.Token(
+                    proofs: [mintURL: lockedProofs],
+                    unit: "sat"
+                )
+                
+                let nutzapWrapper = try await NDKNutzapEvent.createAndPublish(
+                    ndk: ndk,
+                    token: token,
+                    mintURL: mintURL,
                     recipient: recipient,
-                    amount: amount,
                     comment: comment,
                     eventId: eventId,
                     signer: signer
                 )
                 
-                // Publish the nutzap
-                _ = try await ndk.publish(nutzapEvent)
+                let nutzapEvent = nutzapWrapper.event
                 
                 // Update wallet state
                 await proofStateManager.markProofsAsDeleted(selectedProofs)
@@ -317,61 +321,6 @@ public enum Nutzap {
         return (proofs: lockedProofs, change: changeProofs)
     }
     
-    private static func createNutzapEvent(
-        wallet: NIP60Wallet,
-        proofs: [CashuSwift.Proof],
-        recipient: PublicKey,
-        amount: Int64,
-        comment: String?,
-        eventId: String?,
-        signer: NDKSigner
-    ) async throws -> NDKEvent {
-        // Get mints reference
-        let mints = await wallet.mints.getAllMints()
-        
-        // Build nutzap event (kind 9321)
-        let eventBuilder = await wallet.ndk.event()
-            .content(comment ?? "") // Content is the comment, not the token
-            .kind(9321) // Nutzap kind
-        
-        // Add p tag for recipient
-        _ = eventBuilder.tag(["p", recipient])
-        
-        // Add e tag if nutzapping an event
-        if let eventId = eventId {
-            _ = eventBuilder.tag(["e", eventId])
-        }
-        
-        // Group proofs by mint and add proof/u tags for each mint
-        var mintURLs = Set<String>()
-        
-        for proof in proofs {
-            // Find mint URL for this proof
-            for (mintURL, mint) in mints {
-                if mint.keysets.contains(where: { $0.keysetID == proof.keysetID }) {
-                    mintURLs.insert(mintURL)
-                    
-                    // Encode the proof as JSON
-                    let proofData = try JSONEncoder().encode(proof)
-                    let proofJSON = String(data: proofData, encoding: .utf8) ?? ""
-                    
-                    // Add proof tag
-                    _ = eventBuilder.tag(["proof", proofJSON])
-                    
-                    break
-                }
-            }
-        }
-        
-        // Add u tag for each mint URL
-        for mintURL in mintURLs {
-            _ = eventBuilder.tag(["u", mintURL])
-        }
-        
-        let nutzapEvent = try await eventBuilder.build(signer: signer)
-        
-        return nutzapEvent
-    }
     
     private static func emitNutzapReceived(event: NDKEvent, amount: Int64) async {
         // Emit notification for UI updates
