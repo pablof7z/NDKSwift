@@ -2,11 +2,10 @@ import Foundation
 
 /// Utility functions for parsing Nostr content
 public enum NDKContentParser {
-    private static let nostrPrefix = "nostr:"
     
     /// Remove "nostr:" prefix from a string
     private static func removeNostrPrefix(_ text: String) -> String {
-        return text.replacingOccurrences(of: nostrPrefix, with: "")
+        return text.replacingOccurrences(of: NostrConstants.nostrPrefix, with: "")
     }
     
     /// Parse content and extract mentions, hashtags, and other references
@@ -112,15 +111,15 @@ public enum NDKContentParser {
                                 components.append(.userMention(pubkey: pubkey, npub: npub))
                             }
                         case .noteMention:
-                            let noteId = matchedText.replacingOccurrences(of: "nostr:", with: "")
+                            let noteId = removeNostrPrefix(matchedText)
                             if let eventId = try? decodeNoteId(noteId) {
                                 components.append(.eventMention(eventId))
                             }
                         case .neventMention:
-                            let nevent = matchedText.replacingOccurrences(of: "nostr:", with: "")
+                            let nevent = removeNostrPrefix(matchedText)
                             components.append(.neventMention(nevent))
                         case .nprofileMention:
-                            let nprofile = matchedText.replacingOccurrences(of: "nostr:", with: "")
+                            let nprofile = removeNostrPrefix(matchedText)
                             components.append(.nprofileMention(nprofile))
                         default:
                             break

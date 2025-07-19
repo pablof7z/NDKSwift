@@ -205,7 +205,7 @@ public actor NIP77SyncHandler {
     // MARK: - Helper Methods
     
     private func generateSubscriptionId() -> String {
-        return UUID().uuidString.lowercased().replacingOccurrences(of: "-", with: "")
+        return IDGenerator.randomId(prefix: "sync", length: 16)
     }
     
     private func fetchMissingEvents(ids: [String], relayURL: String) async -> (events: [NDKEvent], bytesUsed: Int) {
