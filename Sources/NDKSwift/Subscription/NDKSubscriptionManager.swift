@@ -231,27 +231,14 @@ public actor NDKSubscriptionManager {
         let eventId = event.id
 
         // Check if this event was previously deleted (tombstone check)
-        if deletionTombstones[eventId] != nil {
-            // This event was deleted before it arrived, discard it
+        if isEventDeleted(eventId) {
             return
         }
 
         // Check deduplication (skip for optimistic events to allow immediate UI updates)
-        let now = Timestamp.now
-        let isUnique: Bool
-        
-        switch source {
-        case .optimistic:
-            // Optimistic events are always considered unique for immediate dispatch
-            isUnique = true
-        case .relay, .cache:
-            // Check normal deduplication for relay/cache events
-            isUnique = eventDeduplication[eventId] == nil
-            if !isUnique {
-                stats.eventsDeduped += 1
-                return
-            }
-            eventDeduplication[eventId] = now
+        let isUnique = checkAndRecordEventUniqueness(eventId: eventId, source: source)
+        if !isUnique {
+            return
         }
 
         // Process deletion events (NIP-09) before dispatching to subscriptions
@@ -259,55 +246,115 @@ public actor NDKSubscriptionManager {
             await processDeletionEvent(event)
         }
 
-        // Find matching subscriptions and dispatch
+        // Find and dispatch to matching subscriptions
+        await dispatchEventToMatchingSubscriptions(event: event, source: source, isUnique: isUnique)
+    }
+    
+    /// Check if event was previously deleted
+    private func isEventDeleted(_ eventId: EventID) -> Bool {
+        return deletionTombstones[eventId] != nil
+    }
+    
+    /// Check and record event uniqueness for deduplication
+    private func checkAndRecordEventUniqueness(eventId: EventID, source: EventSource) -> Bool {
+        switch source {
+        case .optimistic:
+            // Optimistic events are always considered unique for immediate dispatch
+            return true
+        case .relay, .cache:
+            // Check normal deduplication for relay/cache events
+            let isUnique = eventDeduplication[eventId] == nil
+            if !isUnique {
+                stats.eventsDeduped += 1
+            } else {
+                eventDeduplication[eventId] = Timestamp.now
+            }
+            return isUnique
+        }
+    }
+    
+    /// Find matching subscriptions and dispatch the event
+    private func dispatchEventToMatchingSubscriptions(event: NDKEvent, source: EventSource, isUnique: Bool) async {
         for (subscriptionId, subscription) in activeSubscriptions {
-            var matches = false
-            for filter in subscription.filters {
-                if filter.matches(event: event) {
-                    matches = true
-                    break
-                }
+            if subscriptionMatchesEvent(subscription: subscription, event: event) {
+                // Dispatch event to subscription
+                await dispatchEventToSubscription(
+                    event: event,
+                    subscription: subscription,
+                    subscriptionId: subscriptionId,
+                    source: source
+                )
+                
+                // Track event metrics
+                await trackEventMetrics(
+                    eventId: event.id,
+                    subscriptionId: subscriptionId,
+                    source: source,
+                    isUnique: isUnique
+                )
             }
-            if matches {
-                Task {
-                    let relay: RelayProtocol? = {
-                        switch source {
-                        case .relay(let relay):
-                            return relay
-                        case .optimistic, .cache:
-                            return nil
-                        }
-                    }()
-                    await subscription.handleEvent(event, fromRelay: relay)
-                }
-
-                // Track event received (only for relay events)
-                if case .relay(let relay) = source, let ndk = ndk {
-                    Task {
-                        await ndk.subscriptionTracker.trackEventReceived(
-                            subscriptionId: subscriptionId,
-                            eventId: eventId,
-                            relayUrl: relay.url,
-                            isUnique: isUnique
-                        )
-                        
-                        // Track relay information in eventTracker
-                        if isUnique {
-                            // This is the first time we've seen this event, so set as source relay
-                            await ndk.eventTracker.setSourceRelay(eventId: eventId, relay: relay.url)
-                        } else {
-                            // We've seen this event before, just mark it as seen on this relay
-                            await ndk.eventTracker.markSeen(eventId: eventId, relay: relay.url)
-                        }
-                    }
-                }
-
-                // Update EOSE tracking (only for relay events)
-                if case .relay = source, var tracker = eoseTracking[subscriptionId] {
-                    tracker.recordEvent()
-                    eoseTracking[subscriptionId] = tracker
-                }
+        }
+    }
+    
+    /// Check if a subscription's filters match the event
+    private func subscriptionMatchesEvent(subscription: NDKSubscription, event: NDKEvent) -> Bool {
+        for filter in subscription.filters {
+            if filter.matches(event: event) {
+                return true
             }
+        }
+        return false
+    }
+    
+    /// Dispatch event to a specific subscription
+    private func dispatchEventToSubscription(
+        event: NDKEvent,
+        subscription: NDKSubscription,
+        subscriptionId: String,
+        source: EventSource
+    ) async {
+        let relay = extractRelay(from: source)
+        await subscription.handleEvent(event, fromRelay: relay)
+    }
+    
+    /// Extract relay from event source
+    private func extractRelay(from source: EventSource) -> RelayProtocol? {
+        switch source {
+        case .relay(let relay):
+            return relay
+        case .optimistic, .cache:
+            return nil
+        }
+    }
+    
+    /// Track event metrics and update EOSE tracking
+    private func trackEventMetrics(
+        eventId: EventID,
+        subscriptionId: String,
+        source: EventSource,
+        isUnique: Bool
+    ) async {
+        // Track event received (only for relay events)
+        if case .relay(let relay) = source, let ndk = ndk {
+            await ndk.subscriptionTracker.trackEventReceived(
+                subscriptionId: subscriptionId,
+                eventId: eventId,
+                relayUrl: relay.url,
+                isUnique: isUnique
+            )
+            
+            // Track relay information in eventTracker
+            if isUnique {
+                await ndk.eventTracker.setSourceRelay(eventId: eventId, relay: relay.url)
+            } else {
+                await ndk.eventTracker.markSeen(eventId: eventId, relay: relay.url)
+            }
+        }
+        
+        // Update EOSE tracking (only for relay events)
+        if case .relay = source, var tracker = eoseTracking[subscriptionId] {
+            tracker.recordEvent()
+            eoseTracking[subscriptionId] = tracker
         }
     }
 
