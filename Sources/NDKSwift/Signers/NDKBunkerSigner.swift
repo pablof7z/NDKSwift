@@ -499,12 +499,6 @@ public actor NDKBunkerSigner: NDKSigner, Sendable {
         return try await performSign(event)
     }
 
-    public func sign(event: inout NDKEvent) async throws {
-        // This method is deprecated - NDKBunkerSigner doesn't support direct signing
-        // Use NDKEventBuilder instead
-        throw NDKError.signingFailed("NDKBunkerSigner requires using NDKEventBuilder for signing")
-    }
-
     public func getPublicKey() async throws -> String {
         if let pubkey = userPubkey {
             return pubkey
