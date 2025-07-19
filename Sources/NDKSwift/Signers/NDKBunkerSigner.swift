@@ -485,8 +485,7 @@ public actor NDKBunkerSigner: NDKSigner, Sendable {
 
         guard let response = response,
               response.error == nil,
-              let resultData = response.result.data(using: String.Encoding.utf8),
-              let json = try? JSONSerialization.jsonObject(with: resultData) as? [String: Any],
+              let json = try? JSONCoding.parseDictionary(from: response.result),
               let sig = json["sig"] as? String
         else {
             throw NDKError.failedTo("sign event", message: response?.error)
@@ -595,10 +594,7 @@ public actor NDKBunkerSigner: NDKSigner, Sendable {
     
     public static func deserialize(_ data: Data, ndk: NDK?) throws -> NDKBunkerSigner {
         // The registry already extracted the payload, so we decode it directly
-        let payloadDict = try JSONSerialization.jsonObject(with: data) as? [String: Any]
-        guard let payload = payloadDict else {
-            throw NDKSignerRegistryError.deserializationError("Invalid payload format")
-        }
+        let payload = try JSONCoding.parseDictionary(from: data)
         
         guard let ndk = ndk else {
             throw NDKSignerRegistryError.deserializationError("NDK instance required for bunker signer")

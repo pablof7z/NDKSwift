@@ -105,4 +105,80 @@ public enum JSONCoding {
     public static func safeDecode<T: Decodable>(_ type: T.Type, from string: String) -> T? {
         try? decode(type, from: string)
     }
+    
+    // MARK: - JSONSerialization Helpers
+    
+    /// Parse JSON data to Any (object or array)
+    public static func parseJSON(from data: Data) throws -> Any {
+        try JSONSerialization.jsonObject(with: data)
+    }
+    
+    /// Parse JSON string to Any (object or array)
+    public static func parseJSON(from string: String) throws -> Any {
+        guard let data = string.data(using: .utf8) else {
+            throw NDKError.invalidInput(message: "Invalid UTF-8 string")
+        }
+        return try parseJSON(from: data)
+    }
+    
+    /// Parse JSON data to dictionary
+    public static func parseDictionary(from data: Data) throws -> [String: Any] {
+        guard let dict = try parseJSON(from: data) as? [String: Any] else {
+            throw NDKError.parseError(for: "JSON dictionary", details: "Expected dictionary but got different type")
+        }
+        return dict
+    }
+    
+    /// Parse JSON string to dictionary
+    public static func parseDictionary(from string: String) throws -> [String: Any] {
+        guard let data = string.data(using: .utf8) else {
+            throw NDKError.invalidInput(message: "Invalid UTF-8 string")
+        }
+        return try parseDictionary(from: data)
+    }
+    
+    /// Parse JSON data to array
+    public static func parseArray(from data: Data) throws -> [Any] {
+        guard let array = try parseJSON(from: data) as? [Any] else {
+            throw NDKError.parseError(for: "JSON array", details: "Expected array but got different type")
+        }
+        return array
+    }
+    
+    /// Parse JSON string to array
+    public static func parseArray(from string: String) throws -> [Any] {
+        guard let data = string.data(using: .utf8) else {
+            throw NDKError.invalidInput(message: "Invalid UTF-8 string")
+        }
+        return try parseArray(from: data)
+    }
+    
+    /// Serialize object to JSON data
+    public static func serialize(_ object: Any) throws -> Data {
+        try JSONSerialization.data(withJSONObject: object, options: [.withoutEscapingSlashes])
+    }
+    
+    /// Serialize object to JSON string
+    public static func serializeToString(_ object: Any) throws -> String {
+        let data = try serialize(object)
+        guard let string = String(data: data, encoding: .utf8) else {
+            throw NDKError.serializationFailed("Failed to convert JSON data to UTF-8 string")
+        }
+        return string
+    }
+    
+    /// Safe parse JSON with optional result
+    public static func safeParseJSON(from data: Data) -> Any? {
+        try? parseJSON(from: data)
+    }
+    
+    /// Safe parse dictionary with optional result
+    public static func safeParseDictionary(from data: Data) -> [String: Any]? {
+        try? parseDictionary(from: data)
+    }
+    
+    /// Safe parse array with optional result
+    public static func safeParseArray(from data: Data) -> [Any]? {
+        try? parseArray(from: data)
+    }
 }
