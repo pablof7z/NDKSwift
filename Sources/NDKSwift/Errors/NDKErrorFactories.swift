@@ -37,6 +37,8 @@ extension NDKError {
             return .signingFailed(message, underlying: error)
         case "verification", "verify":
             return .verificationFailed(message, underlying: error)
+        case "key derivation":
+            return .keyDerivationFailed(message, underlying: error)
         default:
             return .unknown(message, underlying: error)
         }

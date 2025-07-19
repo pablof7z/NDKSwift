@@ -86,6 +86,15 @@ final class NDKErrorFactoriesTests: XCTestCase {
             XCTFail("Expected verificationFailed error")
         }
         
+        // Test key derivation
+        let keyError = NDKError.cryptoOperation("Key derivation", nip: nil, error: underlyingError)
+        if case .keyDerivationFailed(let message, let underlying) = keyError {
+            XCTAssertEqual(message, "Key derivation failed")
+            XCTAssertNotNil(underlying)
+        } else {
+            XCTFail("Expected keyDerivationFailed error")
+        }
+        
         // Test unknown operation
         let unknownError = NDKError.cryptoOperation("Unknown", nip: nil, error: underlyingError)
         if case .unknown(let message, let underlying) = unknownError {
