@@ -2,9 +2,11 @@ import Foundation
 import CryptoKit
 
 // Protocol constants
-let PROTOCOL_VERSION: UInt8 = 0x61
-let ID_SIZE = 32
-let FINGERPRINT_SIZE = 16
+enum NegentropyConstants {
+    static let protocolVersion: UInt8 = 0x61
+    static let idSize = 32
+    static let fingerprintSize = 16
+}
 
 // Modes
 enum NegentropyMode {
@@ -117,7 +119,7 @@ public actor Negentropy {
         isInitiator = true
         
         var output = Data()
-        output.append(PROTOCOL_VERSION)
+        output.append(NegentropyConstants.protocolVersion)
         
         let storageSize = try await storage.size()
         try await splitRange(
@@ -184,7 +186,7 @@ public actor Negentropy {
         lastTimestampOut = 0
         
         var fullOutput = Data()
-        fullOutput.append(PROTOCOL_VERSION)
+        fullOutput.append(NegentropyConstants.protocolVersion)
         
         // Check protocol version
         guard let protocolVersion = input.readByte() else {
@@ -195,7 +197,7 @@ public actor Negentropy {
             throw NegentropyError.protocolError("invalid protocol version")
         }
         
-        if protocolVersion != PROTOCOL_VERSION {
+        if protocolVersion != NegentropyConstants.protocolVersion {
             if isInitiator {
                 throw NegentropyError.protocolError("unsupported protocol version")
             } else {
@@ -243,7 +245,7 @@ public actor Negentropy {
             if mode == NegentropyMode.skip {
                 skip = true
             } else if mode == NegentropyMode.fingerprint {
-                guard let theirFingerprint = input.readBytes(FINGERPRINT_SIZE) else {
+                guard let theirFingerprint = input.readBytes(NegentropyConstants.fingerprintSize) else {
                     throw NegentropyError.decodingError
                 }
                 
@@ -264,7 +266,7 @@ public actor Negentropy {
                 
                 var theirIds = Set<Data>()
                 for i in 0..<numIds {
-                    guard let id = input.readBytes(ID_SIZE) else {
+                    guard let id = input.readBytes(NegentropyConstants.idSize) else {
                         throw NegentropyError.decodingError
                     }
                     theirIds.insert(id)
@@ -498,8 +500,8 @@ public actor Negentropy {
         
         print("[Negentropy] decodeBound: timestamp=\(timestamp), id_length=\(len)")
         
-        if len > ID_SIZE {
-            print("[Negentropy] decodeBound: ID length \(len) exceeds maximum \(ID_SIZE)")
+        if len > NegentropyConstants.idSize {
+            print("[Negentropy] decodeBound: ID length \(len) exceeds maximum \(NegentropyConstants.idSize)")
             throw NegentropyError.decodingError
         }
         
@@ -563,7 +565,7 @@ extension NegentropyStorage {
         let rangeItems = Array(items[lower..<min(upper, items.count)])
         
         let accumulator = NegentropyAccumulator.from(rangeItems)
-        return accumulator.fingerprint().prefix(FINGERPRINT_SIZE)
+        return accumulator.fingerprint().prefix(NegentropyConstants.fingerprintSize)
     }
     
     func iterate(_ lower: Int, _ upper: Int, _ callback: (NegentropyItem, Int) async throws -> Bool) async throws {
