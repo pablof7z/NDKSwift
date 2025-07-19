@@ -149,11 +149,14 @@ public final class NDKEventBuilder {
         if let relay = relay {
             // Use explicitly provided relay
             relayHint = relay
-        } else if self.ndk != nil {
+        } else if let ndk = self.ndk {
             // Try to get relay hint from user's relay list or outbox
-            // TODO: Implement relay hint lookup from cache/outbox
-            // For now, just use empty relay
-            relayHint = ""
+            if let outboxItem = await ndk.outboxTracker.getRelaysSyncFor(pubkey: pubkey, type: .read),
+               let firstRelay = outboxItem.readRelays.first?.url {
+                relayHint = firstRelay
+            } else {
+                relayHint = ""
+            }
         } else {
             relayHint = ""
         }
