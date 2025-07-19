@@ -14,6 +14,8 @@ public enum ContentEntity: Equatable {
 
 /// Pure content parser - only identifies entities, no tag generation
 public enum ContentParser {
+    private static let nostrPrefix = "nostr:"
+    private static let nostrPrefixLength = 6
     
     /// Parse content and return identified entities
     /// 
@@ -83,7 +85,7 @@ public enum ContentParser {
                 if fullMatch.hasPrefix("@") {
                     bech32 = String(fullMatch.dropFirst())
                     // Record replacement for @ mentions
-                    replacements.append((range: match.range, replacement: "nostr:\(bech32)"))
+                    replacements.append((range: match.range, replacement: "\(nostrPrefix)\(bech32)"))
                 } else if fullMatch.hasPrefix("nostr:") {
                     bech32 = String(fullMatch.dropFirst(6))
                 } else {
