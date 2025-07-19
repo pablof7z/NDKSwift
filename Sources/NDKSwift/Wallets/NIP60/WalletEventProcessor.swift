@@ -7,7 +7,7 @@ actor WalletEventProcessor {
     
     /// Process a wallet event based on its kind
     func processEvent(_ event: NDKEvent, context: WalletEventContext) async {
-        print("wallet event received", event.kind)
+        NDKLogger.shared.log(.debug, category: .wallet, "Wallet event received: kind=\(event.kind)")
         do {
             switch event.kind {
             case EventKind.cashuWalletConfig:
@@ -21,10 +21,10 @@ actor WalletEventProcessor {
             case EventKind.nutzap:
                 try await processNutzapEvent(event, context: context)
             default:
-                print("⚠️ No handler for event kind \(event.kind)")
+                NDKLogger.shared.log(.warning, category: .wallet, "No handler for event kind \(event.kind)")
             }
         } catch {
-            print("❌ Failed to process wallet event \(event.id): \(error)")
+            NDKLogger.shared.log(.error, category: .wallet, "Failed to process wallet event \(event.id): \(error)")
         }
     }
     
@@ -92,9 +92,6 @@ actor WalletEventProcessor {
         }
         
         await context.eventManager.addCurrentTokenEventId(event.id)
-        
-        // Update wallet's internal proofs array
-        await context.wallet.updateProofsFromStateManager()
     }
     
     /// Process quote events
@@ -184,9 +181,6 @@ actor WalletEventProcessor {
         let deletedProofs = await context.proofStateManager.markProofsOwnedByEventAsDeleted(eventId)
         if !deletedProofs.isEmpty {
             print("🗑️ Marked \(deletedProofs.count) proofs as deleted from event: \(eventId)")
-            
-            // Update wallet's internal proofs array
-            await context.wallet.updateProofsFromStateManager()
         }
     }
 }
