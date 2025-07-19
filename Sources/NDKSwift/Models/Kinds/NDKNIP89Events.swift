@@ -230,10 +230,6 @@ extension NDKEventBuilder {
 extension NIP89HandlerMetadata {
     /// Convert to JSON string
     func toJSON() -> String {
-        guard let data = try? JSONEncoder().encode(self),
-              let json = String(data: data, encoding: .utf8) else {
-            return ""
-        }
-        return json
+        return (try? JSONCoding.encodeToString(self)) ?? ""
     }
 }
