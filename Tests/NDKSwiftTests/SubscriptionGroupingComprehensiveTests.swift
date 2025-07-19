@@ -27,8 +27,8 @@ final class SubscriptionGroupingComprehensiveTests: XCTestCase {
         let filter2 = NDKFilter(authors: ["author2"], kinds: [0])
         
         // Create fingerprints
-        let fp1 = NDKSubscriptionManager.FilterFingerprint(filters: [filter1], closeOnEose: false)
-        let fp2 = NDKSubscriptionManager.FilterFingerprint(filters: [filter2], closeOnEose: false)
+        let fp1 = NDKFilterFingerprint(filters: [filter1], closeOnEose: false)
+        let fp2 = NDKFilterFingerprint(filters: [filter2], closeOnEose: false)
         
         // Same structure should produce same fingerprint
         XCTAssertEqual(fp1.value, fp2.value, "Filters with same structure should have same fingerprint")
@@ -36,12 +36,12 @@ final class SubscriptionGroupingComprehensiveTests: XCTestCase {
         // IMPORTANT: Following ndk-core, different kinds values should produce SAME fingerprint
         // Only the presence of "kinds" matters, not the values
         let filter3 = NDKFilter(authors: ["author3"], kinds: [1])
-        let fp3 = NDKSubscriptionManager.FilterFingerprint(filters: [filter3], closeOnEose: false)
+        let fp3 = NDKFilterFingerprint(filters: [filter3], closeOnEose: false)
         XCTAssertEqual(fp1.value, fp3.value, "Filters with different kind values should have same fingerprint (ndk-core behavior)")
         
         // Different structure (missing kinds) should produce different fingerprint
         let filter4 = NDKFilter(authors: ["author4"]) // No kinds
-        let fp5 = NDKSubscriptionManager.FilterFingerprint(filters: [filter4], closeOnEose: false)
+        let fp5 = NDKFilterFingerprint(filters: [filter4], closeOnEose: false)
         XCTAssertNotEqual(fp1.value, fp5.value, "Filters with different structure should have different fingerprints")
         
         // Verify the fingerprints contain the expected structure
@@ -49,7 +49,7 @@ final class SubscriptionGroupingComprehensiveTests: XCTestCase {
         XCTAssertFalse(fp5.value.contains("kinds"), "Fingerprint without kinds should not contain 'kinds'")
         
         // closeOnEose should affect fingerprint
-        let fp6 = NDKSubscriptionManager.FilterFingerprint(filters: [filter1], closeOnEose: true)
+        let fp6 = NDKFilterFingerprint(filters: [filter1], closeOnEose: true)
         XCTAssertTrue(fp6.value.hasPrefix("+"), "closeOnEose fingerprints should start with +")
         XCTAssertNotEqual(fp1.value, fp6.value, "Different closeOnEose should produce different fingerprints")
     }
@@ -59,8 +59,8 @@ final class SubscriptionGroupingComprehensiveTests: XCTestCase {
         let filter1 = NDKFilter(kinds: [1], since: 1000000)
         let filter2 = NDKFilter(kinds: [1], since: 2000000)
         
-        let fp1 = NDKSubscriptionManager.FilterFingerprint(filters: [filter1], closeOnEose: false)
-        let fp2 = NDKSubscriptionManager.FilterFingerprint(filters: [filter2], closeOnEose: false)
+        let fp1 = NDKFilterFingerprint(filters: [filter1], closeOnEose: false)
+        let fp2 = NDKFilterFingerprint(filters: [filter2], closeOnEose: false)
         
         // Different time values should produce different fingerprints
         XCTAssertNotEqual(fp1.value, fp2.value, "Different time constraints should produce different fingerprints")
@@ -72,8 +72,8 @@ final class SubscriptionGroupingComprehensiveTests: XCTestCase {
         let filter1 = NDKFilter(kinds: [1], limit: 10)
         let filter2 = NDKFilter(kinds: [1])
         
-        let fp1 = NDKSubscriptionManager.FilterFingerprint(filters: [filter1], closeOnEose: false)
-        let fp2 = NDKSubscriptionManager.FilterFingerprint(filters: [filter2], closeOnEose: false)
+        let fp1 = NDKFilterFingerprint(filters: [filter1], closeOnEose: false)
+        let fp2 = NDKFilterFingerprint(filters: [filter2], closeOnEose: false)
         
         XCTAssertNotEqual(fp1.value, fp2.value, "Filters with/without limits should have different fingerprints")
         XCTAssertTrue(fp1.value.contains("limit"))

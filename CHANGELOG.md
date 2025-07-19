@@ -14,6 +14,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Consolidated publish method overloads in NDK and NDKEventManager using default parameters (DRY principle)
   - Reduced code duplication by extracting common publish logic into `publishToRelays` method
   - Updated method signatures to use single `publish(_:to:logRawJSON:)` with optional relay URLs
+- Extracted NDKFilterFingerprint from NDKSubscriptionManager into separate file (SRP principle)
+  - Improved modularity and testability of filter fingerprinting logic
+  - Added comprehensive unit tests for NDKFilterFingerprint
 
 ### Fixed
 - Removed duplicate hex conversion implementations from test files to use centralized DataExtensions (DRY principle)
