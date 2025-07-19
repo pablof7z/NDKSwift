@@ -377,7 +377,8 @@ public final class NDK {
         tags: [[String]] = [],
         currentUser: NDKUser? = nil
     ) async -> NDKParsedContent {
-        await NDKContentParser.parseContent(content, tags: tags, currentUser: currentUser)
+        let result = ContentParser.parseContentWithContext(content, tags: tags, currentUser: currentUser)
+        return result.parsedContent
     }
     
     // MARK: - Internal Methods (for relay communication)
