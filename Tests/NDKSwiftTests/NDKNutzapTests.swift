@@ -181,7 +181,7 @@ final class NDKNutzapTests: XCTestCase {
         }
         
         let eventJSONData = try JSONSerialization.data(withJSONObject: eventDict)
-        let event = try JSONDecoder().decode(NDKEvent.self, from: eventJSONData)
+        let event = try JSONCoding.decode(NDKEvent.self, from: eventJSONData)
         let nutzap = NDKNutzap(event: event)
         
         // Test all parsed properties
@@ -224,7 +224,7 @@ final class NDKNutzapTests: XCTestCase {
         }
         
         let eventJSONData = try JSONSerialization.data(withJSONObject: eventDict)
-        let event = try JSONDecoder().decode(NDKEvent.self, from: eventJSONData)
+        let event = try JSONCoding.decode(NDKEvent.self, from: eventJSONData)
         let nutzap = NDKNutzap(event: event)
         
         // Should parse only valid proofs
@@ -258,7 +258,7 @@ final class NDKNutzapTests: XCTestCase {
         }
         
         let eventJSONData = try JSONSerialization.data(withJSONObject: eventDict)
-        let event = try JSONDecoder().decode(NDKEvent.self, from: eventJSONData)
+        let event = try JSONCoding.decode(NDKEvent.self, from: eventJSONData)
         let nutzap = NDKNutzap(event: event)
         
         // Should return empty proofs array and zero amount
@@ -326,7 +326,7 @@ final class NDKNutzapTests: XCTestCase {
         }
         
         let eventJSONData = try JSONSerialization.data(withJSONObject: eventDict)
-        let event = try JSONDecoder().decode(NDKEvent.self, from: eventJSONData)
+        let event = try JSONCoding.decode(NDKEvent.self, from: eventJSONData)
         let preferences = NDKNutzapPreferences(event: event)
         
         Task {
@@ -372,7 +372,7 @@ final class NDKNutzapTests: XCTestCase {
         }
         
         let eventJSONData = try JSONSerialization.data(withJSONObject: eventDict)
-        let event = try JSONDecoder().decode(NDKEvent.self, from: eventJSONData)
+        let event = try JSONCoding.decode(NDKEvent.self, from: eventJSONData)
         let preferences = NDKNutzapPreferences(event: event)
         
         Task {

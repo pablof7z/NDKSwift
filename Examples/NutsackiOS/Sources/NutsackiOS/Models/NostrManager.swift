@@ -117,8 +117,7 @@ class NostrManager {
             // Subscribe to profile updates
             if let subscription = await ndk?.subscribe(filters: [metadataFilter]) {
                 for try await event in subscription {
-                    if let contentData = event.content.data(using: .utf8),
-                       let _ = try? JSONDecoder().decode(NDKUserProfile.self, from: contentData) {
+                    if let _ = JSONCoding.safeDecode(NDKUserProfile.self, from: event.content) {
                         // Profile is automatically cached by NDK's SQLite cache
                         print("Profile metadata received and cached for \(publicKey)")
                         break // Only need first profile event
@@ -165,9 +164,9 @@ class NostrManager {
         if ndkAuthManager.isAuthenticated {
             print("🏚️ [NostrManager] User is authenticated, publishing metadata...")
             // Create metadata event
-            let metadataContent = try JSONEncoder().encode(metadata)
+            let metadataContent = try JSONCoding.encodeToString(metadata)
             let metadataEvent = try await ndk.event()
-                .content(String(data: metadataContent, encoding: .utf8) ?? "{}")
+                .content(metadataContent)
                 .kind(0)
                 .build(signer: signer)
             

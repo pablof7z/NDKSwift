@@ -151,11 +151,9 @@ final class NDKSessionTests: XCTestCase {
         originalSession.profileName = "Test User"
         originalSession.about = "Bio"
         
-        let encoder = JSONEncoder()
-        let data = try encoder.encode(originalSession)
+        let data = try JSONCoding.encode(originalSession)
         
-        let decoder = JSONDecoder()
-        let decodedSession = try decoder.decode(NDKSession.self, from: data)
+        let decodedSession = try JSONCoding.decode(NDKSession.self, from: data)
         
         XCTAssertEqual(originalSession.id, decodedSession.id)
         XCTAssertEqual(originalSession.pubkey, decodedSession.pubkey)
