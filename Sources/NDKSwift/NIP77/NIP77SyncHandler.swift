@@ -113,7 +113,7 @@ public actor NIP77SyncHandler {
         
         switch message {
         case let .negMsg(_, dataHex):
-            print("[NIP77] Received NEG-MSG with data: \(dataHex)")
+            NDKLogger.shared.log(.debug, category: .network, "[NIP77] Received NEG-MSG with data: \(dataHex)")
             
             guard let data = Data(hex: dataHex) else {
                 throw NIP77Error.invalidMessage
@@ -124,12 +124,12 @@ public actor NIP77SyncHandler {
             session.negentropyBytes += data.count
             session.bytesTransferred += data.count
             
-            print("[NIP77] Processing message with negentropy...")
+            NDKLogger.shared.log(.debug, category: .network, "[NIP77] Processing message with negentropy...")
             
             // Process with negentropy (use session's instance)
             let (responseData, haveIds, needIds) = try await session.negentropy.reconcile(data)
             
-            print("[NIP77] Negentropy response - have: \(haveIds.count), need: \(needIds.count), hasResponse: \(responseData != nil)")
+            NDKLogger.shared.log(.debug, category: .network, "[NIP77] Negentropy response - have: \(haveIds.count), need: \(needIds.count), hasResponse: \(responseData != nil)")
             
             // Track what we need to download
             for id in needIds {
@@ -166,7 +166,7 @@ public actor NIP77SyncHandler {
                     session.eventFetchBytes = fetchBytes
                     session.bytesTransferred += fetchBytes
                 } else if !session.downloadedEventIds.isEmpty && syncDirection == .send {
-                    print("[NIP77] Relay has \(session.downloadedEventIds.count) events we don't have, but sync direction is send-only")
+                    NDKLogger.shared.log(.info, category: .network, "[NIP77] Relay has \(session.downloadedEventIds.count) events we don't have, but sync direction is send-only")
                 }
                 
                 // Handle uploads based on sync direction
@@ -179,7 +179,7 @@ public actor NIP77SyncHandler {
                     session.eventPublishBytes = publishBytes
                     session.bytesTransferred += publishBytes
                 } else if !session.uploadedEventIds.isEmpty && syncDirection == .receive {
-                    print("[NIP77] Relay requested \(session.uploadedEventIds.count) events, but sync direction is receive-only")
+                    NDKLogger.shared.log(.info, category: .network, "[NIP77] Relay requested \(session.uploadedEventIds.count) events, but sync direction is receive-only")
                 }
                 
                 // Close the sync through relay
@@ -232,7 +232,7 @@ public actor NIP77SyncHandler {
         // Create filter for specific event IDs
         let filter = NDKFilter(ids: ids)
         
-        print("[NIP77] Fetching \(ids.count) events from \(relayURL)")
+        NDKLogger.shared.log(.info, category: .network, "[NIP77] Fetching \(ids.count) events from \(relayURL)")
         
         // Estimate bandwidth for REQ message
         let reqMessage = "[\"REQ\",\"sub\",{\"ids\":[\(ids.map { "\"\($0)\"" }.joined(separator: ","))]}]"
@@ -253,10 +253,10 @@ public actor NIP77SyncHandler {
             // Add EOSE message
             totalBytes += 15 // ["EOSE","sub"]
             
-            print("[NIP77] Successfully fetched and cached \(events.count) events (bandwidth: \(totalBytes) bytes)")
+            NDKLogger.shared.log(.info, category: .network, "[NIP77] Successfully fetched and cached \(events.count) events (bandwidth: \(totalBytes) bytes)")
             return (Array(events), totalBytes)
         } catch {
-            print("[NIP77] Error fetching events: \(error)")
+            NDKLogger.shared.log(.error, category: .network, "[NIP77] Error fetching events: \(error)")
             return ([], totalBytes)
         }
     }
@@ -273,11 +273,11 @@ public actor NIP77SyncHandler {
         }
         
         if eventsToSend.isEmpty {
-            print("[NIP77] No events found in cache to send")
+            NDKLogger.shared.log(.warning, category: .network, "[NIP77] No events found in cache to send")
             return ([], 0)
         }
         
-        print("[NIP77] Sending \(eventsToSend.count) events to \(relayURL)")
+        NDKLogger.shared.log(.info, category: .network, "[NIP77] Sending \(eventsToSend.count) events to \(relayURL)")
         
         // Send events to relay
         do {
@@ -287,10 +287,10 @@ public actor NIP77SyncHandler {
                 let eventJson = try? event.toJSON()
                 totalBytes += (eventJson?.count ?? 500) + 10 // +10 for ["EVENT", wrapper]
             }
-            print("[NIP77] Successfully sent \(eventsToSend.count) events (bandwidth: \(totalBytes) bytes)")
+            NDKLogger.shared.log(.info, category: .network, "[NIP77] Successfully sent \(eventsToSend.count) events (bandwidth: \(totalBytes) bytes)")
             return (eventsToSend, totalBytes)
         } catch {
-            print("[NIP77] Error sending events: \(error)")
+            NDKLogger.shared.log(.error, category: .network, "[NIP77] Error sending events: \(error)")
             return ([], totalBytes)
         }
     }

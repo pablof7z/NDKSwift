@@ -232,7 +232,7 @@ public actor NDKEventTracker {
         }
         
         if !eventIdsToRemove.isEmpty {
-            print("[NDKEventTracker] Cleaned up \(eventIdsToRemove.count) events older than \(cutoffDate)")
+            NDKLogger.shared.log(.debug, category: .event, "Cleaned up \(eventIdsToRemove.count) events older than \(cutoffDate)")
         }
     }
     

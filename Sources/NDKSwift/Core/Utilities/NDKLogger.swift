@@ -22,6 +22,7 @@ public enum NDKLogCategory: String {
     case event = "EVENT"
     case cache = "CACHE"
     case auth = "AUTH"
+    case wallet = "WALLET"
     case general = "GENERAL"
 }
 

@@ -118,7 +118,7 @@ public actor NDKSQLiteCache: NDKCache {
             }
         } catch {
             if debugMode {
-                print("NDKSQLiteCache: Failed to save event \(eventId). Error: \(error)")
+                NDKLogger.shared.log(.error, category: .cache, "Failed to save event \(eventId). Error: \(error)")
             }
             throw error
         }
@@ -134,17 +134,17 @@ public actor NDKSQLiteCache: NDKCache {
             }
         } catch {
             if debugMode {
-                print("NDKSQLiteCache: Failed to get event \(id). Error: \(error)")
+                NDKLogger.shared.log(.error, category: .cache, "Failed to get event \(id). Error: \(error)")
             }
             return nil
         }
     }
     
     public func queryEvents(_ filter: NDKFilter) async throws -> [NDKEvent] {
-        print("[NDKSQLiteCache.queryEvents] Starting query with filter: ids=\(filter.ids?.joined(separator: ",") ?? "nil"), authors=\(filter.authors?.joined(separator: ",") ?? "nil"), kinds=\(filter.kinds?.map { String($0) }.joined(separator: ",") ?? "nil")")
+        NDKLogger.shared.log(.debug, category: .cache, "Starting query with filter: ids=\(filter.ids?.joined(separator: ",") ?? "nil"), authors=\(filter.authors?.joined(separator: ",") ?? "nil"), kinds=\(filter.kinds?.map { String($0) }.joined(separator: ",") ?? "nil")")
         
         return try await dbQueue.read { [self] db in
-            print("[NDKSQLiteCache.queryEvents] Inside dbQueue.read block")
+            NDKLogger.shared.log(.trace, category: .cache, "Inside dbQueue.read block")
             var sql = "SELECT DISTINCT e.json FROM events e"
             var arguments = StatementArguments()
             var whereClauses: [String] = []
@@ -155,7 +155,7 @@ public actor NDKSQLiteCache: NDKCache {
             
             // IDs filter
             if let ids = filter.ids, !ids.isEmpty {
-                print("[NDKSQLiteCache.queryEvents] Adding IDs filter for \(ids.count) IDs")
+                NDKLogger.shared.log(.trace, category: .cache, "Adding IDs filter for \(ids.count) IDs")
                 let placeholders = ids.map { _ in "?" }.joined(separator: ", ")
                 whereClauses.append("e.id IN (\(placeholders))")
                 for id in ids {
@@ -165,7 +165,7 @@ public actor NDKSQLiteCache: NDKCache {
             
             // Authors filter
             if let authors = filter.authors, !authors.isEmpty {
-                print("[NDKSQLiteCache.queryEvents] Adding authors filter for \(authors.count) authors")
+                NDKLogger.shared.log(.trace, category: .cache, "Adding authors filter for \(authors.count) authors")
                 let placeholders = authors.map { _ in "?" }.joined(separator: ", ")
                 whereClauses.append("e.pubkey IN (\(placeholders))")
                 for author in authors {
@@ -229,17 +229,17 @@ public actor NDKSQLiteCache: NDKCache {
             }
             
             // Execute query
-            print("[NDKSQLiteCache.queryEvents] Executing SQL: \(sql)")
+            NDKLogger.shared.log(.trace, category: .cache, "Executing SQL: \(sql)")
             
             let rows = try Row.fetchAll(db, sql: sql, arguments: arguments)
-            print("[NDKSQLiteCache.queryEvents] Query returned \(rows.count) rows")
+            NDKLogger.shared.log(.debug, category: .cache, "Query returned \(rows.count) rows")
             
             let events: [NDKEvent] = rows.compactMap { row in
                 return self.decodeEventFromRow(row)
             }
             
-            print("[NDKSQLiteCache.queryEvents] Decoded \(events.count) events")
-            print("[NDKSQLiteCache.queryEvents] Exiting dbQueue.read block")
+            NDKLogger.shared.log(.debug, category: .cache, "Decoded \(events.count) events")
+            NDKLogger.shared.log(.trace, category: .cache, "Exiting dbQueue.read block")
             return events
         }
     }
@@ -291,7 +291,7 @@ public actor NDKSQLiteCache: NDKCache {
             }
         } catch {
             if debugMode {
-                print("NDKSQLiteCache: Failed to get profile \(pubkey). Error: \(error)")
+                NDKLogger.shared.log(.error, category: .cache, "Failed to get profile \(pubkey). Error: \(error)")
             }
             return nil
         }
@@ -327,7 +327,7 @@ public actor NDKSQLiteCache: NDKCache {
             }
         } catch {
             if debugMode {
-                print("NDKSQLiteCache: Failed to search profiles. Error: \(error)")
+                NDKLogger.shared.log(.error, category: .cache, "Failed to search profiles. Error: \(error)")
             }
             return []
         }
@@ -386,7 +386,7 @@ public actor NDKSQLiteCache: NDKCache {
             }
         } catch {
             if debugMode {
-                print("NDKSQLiteCache: Failed to get mint info \(url). Error: \(error)")
+                NDKLogger.shared.log(.error, category: .cache, "Failed to get mint info \(url). Error: \(error)")
             }
             return nil
         }
@@ -505,7 +505,7 @@ public actor NDKSQLiteCache: NDKCache {
             }
         } catch {
             if debugMode {
-                print("NDKSQLiteCache: Failed to get keyset \(id). Error: \(error)")
+                NDKLogger.shared.log(.error, category: .cache, "Failed to get keyset \(id). Error: \(error)")
             }
             return nil
         }
@@ -523,7 +523,7 @@ public actor NDKSQLiteCache: NDKCache {
             }
         } catch {
             if debugMode {
-                print("NDKSQLiteCache: Failed to get keysets for mint \(mintUrl). Error: \(error)")
+                NDKLogger.shared.log(.error, category: .cache, "Failed to get keysets for mint \(mintUrl). Error: \(error)")
             }
             return []
         }
@@ -545,7 +545,7 @@ public actor NDKSQLiteCache: NDKCache {
             }
         } catch {
             if debugMode {
-                print("NDKSQLiteCache: Failed to get active keysets. Error: \(error)")
+                NDKLogger.shared.log(.error, category: .cache, "Failed to get active keysets. Error: \(error)")
             }
             return []
         }
@@ -580,7 +580,7 @@ public actor NDKSQLiteCache: NDKCache {
             }
         } catch {
             if debugMode {
-                print("NDKSQLiteCache: Failed to get cached mint URLs. Error: \(error)")
+                NDKLogger.shared.log(.error, category: .cache, "Failed to get cached mint URLs. Error: \(error)")
             }
             return []
         }
@@ -620,7 +620,7 @@ public actor NDKSQLiteCache: NDKCache {
                 }
                 
                 if self.debugMode {
-                    print("NDKSQLiteCache: Pruned \(urlsToDelete.count) mints from cache")
+                    NDKLogger.shared.log(.info, category: .cache, "Pruned \(urlsToDelete.count) mints from cache")
                 }
             }
         }
@@ -651,7 +651,7 @@ public actor NDKSQLiteCache: NDKCache {
             }
         } catch {
             if debugMode {
-                print("[NDKSQLiteCache] Error fetching decrypted content for \(eventId): \(error)")
+                NDKLogger.shared.log(.error, category: .cache, "Error fetching decrypted content for \(eventId): \(error)")
             }
             return nil
         }
@@ -667,11 +667,11 @@ public actor NDKSQLiteCache: NDKCache {
                 )
             }
             if debugMode {
-                print("[NDKSQLiteCache] Stored decrypted content for event \(eventId) viewer \(viewerPubkey)")
+                NDKLogger.shared.log(.debug, category: .cache, "Stored decrypted content for event \(eventId) viewer \(viewerPubkey)")
             }
         } catch {
             if debugMode {
-                print("[NDKSQLiteCache] Error storing decrypted content for \(eventId): \(error)")
+                NDKLogger.shared.log(.error, category: .cache, "Error storing decrypted content for \(eventId): \(error)")
             }
         }
     }
@@ -682,11 +682,11 @@ public actor NDKSQLiteCache: NDKCache {
                 try db.execute(sql: "DELETE FROM decrypted_content")
             }
             if debugMode {
-                print("[NDKSQLiteCache] Cleared all decrypted content")
+                NDKLogger.shared.log(.info, category: .cache, "Cleared all decrypted content")
             }
         } catch {
             if debugMode {
-                print("[NDKSQLiteCache] Error clearing decrypted content: \(error)")
+                NDKLogger.shared.log(.error, category: .cache, "Error clearing decrypted content: \(error)")
             }
         }
     }
@@ -700,11 +700,11 @@ public actor NDKSQLiteCache: NDKCache {
                 )
             }
             if debugMode {
-                print("[NDKSQLiteCache] Cleared decrypted content for viewer \(viewerPubkey)")
+                NDKLogger.shared.log(.info, category: .cache, "Cleared decrypted content for viewer \(viewerPubkey)")
             }
         } catch {
             if debugMode {
-                print("[NDKSQLiteCache] Error clearing decrypted content for viewer: \(error)")
+                NDKLogger.shared.log(.error, category: .cache, "Error clearing decrypted content for viewer: \(error)")
             }
         }
     }
@@ -841,7 +841,7 @@ public actor NDKSQLiteCache: NDKCache {
             }
         } catch {
             if debugMode {
-                print("NDKSQLiteCache: Failed to get confirmation state for \(eventId). Error: \(error)")
+                NDKLogger.shared.log(.error, category: .cache, "Failed to get confirmation state for \(eventId). Error: \(error)")
             }
             return nil
         }
@@ -884,7 +884,7 @@ public actor NDKSQLiteCache: NDKCache {
             }
         } catch {
             if debugMode {
-                print("NDKSQLiteCache: Failed to get unpublished events. Error: \(error)")
+                NDKLogger.shared.log(.error, category: .cache, "Failed to get unpublished events. Error: \(error)")
             }
             return []
         }
@@ -1076,7 +1076,7 @@ public actor NDKSQLiteCache: NDKCache {
             }
         } catch {
             if debugMode {
-                print("NDKSQLiteCache: Failed to check event existence. Error: \(error)")
+                NDKLogger.shared.log(.error, category: .cache, "Failed to check event existence. Error: \(error)")
             }
             // Return empty dictionary on error
             return [:]
