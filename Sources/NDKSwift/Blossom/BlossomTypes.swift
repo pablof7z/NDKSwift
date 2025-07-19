@@ -109,7 +109,7 @@ public struct BlossomAuth {
 
         let event = try await NDKEventBuilder()
             .content("Authorize upload")
-            .kind(24242) // Blossom auth kind
+            .kind(EventKind.blossomAuth)
             .tags(tags)
             .build(signer: signer)
 
@@ -129,7 +129,7 @@ public struct BlossomAuth {
 
         let event = try await NDKEventBuilder()
             .content(reason ?? "Delete blob")
-            .kind(24242)
+            .kind(EventKind.blossomAuth)
             .tags(tags)
             .build(signer: signer)
 
@@ -156,7 +156,7 @@ public struct BlossomAuth {
 
         let event = try await NDKEventBuilder()
             .content("List blobs")
-            .kind(24242)
+            .kind(EventKind.blossomAuth)
             .tags(tags)
             .build(signer: signer)
 
