@@ -20,28 +20,28 @@ let package = Package(
         .executableTarget(
             name: "RelayCollectionDemo",
             dependencies: [
-                .product(name: "NDKSwift", package: "NDKSwift-sfodj5")
+                .product(name: "NDKSwift", package: "NDKSwift-z94ws0")
             ],
             path: "Sources/RelayCollectionDemo"
         ),
         .executableTarget(
             name: "DebugKind0Fetcher",
             dependencies: [
-                .product(name: "NDKSwift", package: "NDKSwift-sfodj5")
+                .product(name: "NDKSwift", package: "NDKSwift-z94ws0")
             ],
             path: "Sources/DebugKind0Fetcher"
         ),
         .executableTarget(
             name: "NIP77Demo",
             dependencies: [
-                .product(name: "NDKSwift", package: "NDKSwift-sfodj5")
+                .product(name: "NDKSwift", package: "NDKSwift-z94ws0")
             ],
             path: "Sources/NIP77Demo"
         ),
         .executableTarget(
             name: "TestNegentropyProtocol",
             dependencies: [
-                .product(name: "NDKSwift", package: "NDKSwift-sfodj5")
+                .product(name: "NDKSwift", package: "NDKSwift-z94ws0")
             ],
             path: "Sources/TestNegentropyProtocol"
         )
