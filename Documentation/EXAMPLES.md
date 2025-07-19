@@ -83,13 +83,9 @@ class OptimisticPublishingExample {
     let ndk: NDK
     
     init() {
-        // Optimistic publishing is enabled by default
+        // Optimistic publishing is now always enabled
         ndk = NDK(relayUrls: ["wss://relay.damus.io"])
-        
-        // Configure optimistic behavior (optional)
-        ndk.optimisticPublishingConfig.enabled = true
-        ndk.optimisticPublishingConfig.cacheUnpublishedEvents = true
-        ndk.optimisticPublishingConfig.dispatchToSubscriptions = true
+        // No configuration needed - it just works!
     }
     
     func publishWithInstantFeedback() async throws {
@@ -373,15 +369,11 @@ class EventStatusMonitor: ObservableObject {
 ### Disabling Optimistic Publishing
 
 ```swift
-func configureTraditionalPublishing() {
-    // Disable optimistic publishing for traditional behavior
-    ndk.optimisticPublishingConfig = .disabled
-    
-    // Or configure granularly
-    ndk.optimisticPublishingConfig.enabled = false
-    ndk.optimisticPublishingConfig.cacheUnpublishedEvents = false
-    ndk.optimisticPublishingConfig.dispatchToSubscriptions = false
-}
+// Note: Optimistic publishing is now always enabled
+// If you need relay-only events, use subscription options:
+var options = NDKSubscriptionOptions()
+options.skipOptimisticEvents = true
+let relayOnlySubscription = ndk.subscribe(filters: [filter], options: options)
 ```
 
 ## Social Features

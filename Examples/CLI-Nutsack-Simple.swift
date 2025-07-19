@@ -10,8 +10,7 @@ struct CLINutsackSimple {
         print("=========================================\n")
         
         // Create a test private key
-        let privateKey = Crypto.generatePrivateKey()
-        let signer = try NDKPrivateKeySigner(privateKey: privateKey)
+        let signer = try NDKPrivateKeySigner.generate()
         
         // Initialize NDK
         let ndk = NDK(relayUrls: ["wss://relay.primal.net"])

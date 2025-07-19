@@ -28,12 +28,7 @@ ndk.signer = signer
 
 print("📱 User pubkey: \(signer.publicKey.hex)")
 
-// Configure optimistic publishing (enabled by default)
-ndk.optimisticPublishingConfig = NDKOptimisticPublishingConfig(
-    enabled: true,
-    cacheUnpublishedEvents: true,
-    dispatchToSubscriptions: true
-)
+// Optimistic publishing is now always enabled - no configuration needed!
 
 // Start a subscription BEFORE connecting
 // This will receive optimistic events immediately

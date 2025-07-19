@@ -152,31 +152,39 @@ public actor NDKPool {
         }
     }
     
-    /// Publish an event to all connected relays
-    public func publishEvent(_ event: NDKEvent) async -> Set<NDKRelay> {
-        var publishedRelays = Set<NDKRelay>()
+    /// Prepare relays for use by ensuring they exist in the pool and optionally connecting them
+    /// - Parameters:
+    ///   - urls: The relay URLs to prepare
+    ///   - autoConnect: Whether to automatically connect to disconnected relays
+    /// - Returns: Array of prepared relay instances
+    public func prepareRelays(_ urls: [String], autoConnect: Bool = false) async -> [NDKRelay] {
+        var preparedRelays: [NDKRelay] = []
         
-        await withTaskGroup(of: (NDKRelay, Bool).self) { group in
-            for relay in await connectedRelays() {
-                group.addTask {
-                    do {
-                        let result = try await relay.publish(event)
-                        return (relay, result.success)
-                    } catch {
-                        print("[NDKPool] Failed to publish to \(relay.url): \(error)")
-                        return (relay, false)
+        // First, ensure all relays exist in the pool
+        for url in urls {
+            let relay = await addRelay(url)
+            preparedRelays.append(relay)
+        }
+        
+        // Optionally connect to disconnected relays
+        if autoConnect {
+            await withTaskGroup(of: Void.self) { group in
+                for relay in preparedRelays {
+                    group.addTask {
+                        let connectionState = await relay.connectionState
+                        if connectionState != .connected && connectionState != .connecting {
+                            do {
+                                try await relay.connect()
+                            } catch {
+                                print("[NDKPool] Failed to connect to relay \(relay.url): \(error)")
+                            }
+                        }
                     }
-                }
-            }
-            
-            for await (relay, success) in group {
-                if success {
-                    publishedRelays.insert(relay)
                 }
             }
         }
         
-        return publishedRelays
+        return preparedRelays
     }
     
     // MARK: - Private Helpers

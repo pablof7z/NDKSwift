@@ -202,8 +202,7 @@ struct PostaAuthView: View {
         
         do {
             // Generate new private key
-            let privateKey = Crypto.generatePrivateKey()
-            let signer = try NDKPrivateKeySigner(privateKey: privateKey)
+            let signer = try NDKPrivateKeySigner.generate()
             
             // Create session with the new signer
             _ = try await authManager.createSession(with: signer)

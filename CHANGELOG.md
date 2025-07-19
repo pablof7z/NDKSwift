@@ -50,6 +50,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Changed initializer to throwing and uses NDKError.notConfigured
   - Updated all call sites to handle the throwing behavior
 
+### Changed
+- **Standardized Private Key Generation** - All key generation now uses `NDKPrivateKeySigner.generate()`
+  - Deprecated direct use of `Crypto.generatePrivateKey()` (now internal)
+  - Updated all examples and tests to use the standardized method
+  - Provides a single, documented way to generate new key pairs
+
+### Fixed
+- **Improved Separation of Concerns** - Refactored relay management responsibilities
+  - Removed unused `publishEvent` method from NDKPool
+  - Added `prepareRelays` method to NDKPool for relay preparation
+  - Removed duplicate relay connection logic from NDKEventManager
+  - NDKPool now exclusively handles relay lifecycle management
+  - NDKEventManager focuses solely on event publishing orchestration
+- **Technical Debt Cleanup**
+  - Fixed all remaining usages of `Crypto.generatePrivateKey()` in examples
+  - Fixed broken test references (`SimpleMemoryCache` → `MemoryCache`)
+  - Removed custom private key generation helper in DeletionEventTests
+  - Fixed compilation errors in NIP22Tests (removed non-existent `clientName` parameter)
+
 ## [0.3.1] - 2025-01-18
 
 ### Fixed

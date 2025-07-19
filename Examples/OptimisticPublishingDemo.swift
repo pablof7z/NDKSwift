@@ -35,17 +35,7 @@ struct NDKFilter {
     }
 }
 
-struct NDKOptimisticPublishingConfig {
-    var enabled: Bool = true
-    var cacheUnpublishedEvents: Bool = true
-    var dispatchToSubscriptions: Bool = true
-    
-    static let disabled = NDKOptimisticPublishingConfig(
-        enabled: false,
-        cacheUnpublishedEvents: false,
-        dispatchToSubscriptions: false
-    )
-}
+// Optimistic publishing is now always enabled - no configuration needed
 
 struct NDKSubscriptionOptions {
     var skipOptimisticEvents: Bool = false
@@ -73,7 +63,7 @@ class OptimisticPublishingDemo {
         await demonstrateOptimisticPublishing()
         await demonstrateEventConfirmation()
         await demonstrateSubscriptionOptions()
-        await demonstrateDisabledOptimisticPublishing()
+        await demonstrateAlwaysOptimistic()
     }
     
     private func demonstrateOptimisticPublishing() async {
@@ -141,16 +131,15 @@ class OptimisticPublishingDemo {
         print("   → Will only receive confirmed events from relays")
     }
     
-    private func demonstrateDisabledOptimisticPublishing() async {
-        print("\n🚫 Demo 4: Disabled Optimistic Publishing")
+    private func demonstrateAlwaysOptimistic() async {
+        print("\n✨ Demo 4: Optimistic Publishing is Always On")
         print("----------------------------------------")
         
-        let config = NDKOptimisticPublishingConfig.disabled
-        print("Optimistic publishing disabled:")
-        print("   - enabled: \(config.enabled)")
-        print("   - cacheUnpublishedEvents: \(config.cacheUnpublishedEvents)")
-        print("   - dispatchToSubscriptions: \(config.dispatchToSubscriptions)")
-        print("   → Traditional behavior: wait for relay confirmation")
+        print("Optimistic publishing is now the default behavior:")
+        print("   - Events always appear immediately in local subscriptions")
+        print("   - No configuration needed - it just works!")
+        print("   - Use skipOptimisticEvents on subscriptions if needed")
+        print("   → Better UX: instant feedback for all published events")
     }
     
     // Helper methods for simulation

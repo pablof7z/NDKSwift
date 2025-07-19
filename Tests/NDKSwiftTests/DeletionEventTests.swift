@@ -29,8 +29,7 @@ final class DeletionEventTests: XCTestCase {
         try await super.setUp()
         
         // Create test signer
-        let privateKey = Crypto.generatePrivateKey()
-        signer = try NDKPrivateKeySigner(privateKey: privateKey)
+        signer = try NDKPrivateKeySigner.generate()
         
         // Create cache
         cache = MemoryCache()
@@ -130,8 +129,7 @@ final class DeletionEventTests: XCTestCase {
         try await cache.saveEvent(originalEvent)
         
         // Create another signer (different author)
-        let otherPrivateKey = Crypto.generatePrivateKey()
-        let otherSigner = try NDKPrivateKeySigner(privateKey: otherPrivateKey)
+        let otherSigner = try NDKPrivateKeySigner.generate()
         
         // Try to delete from different author
         let deletionEvent = try await ndk.event()
@@ -314,3 +312,6 @@ final class DeletionEventTests: XCTestCase {
 
 // MARK: - Test Helpers
 
+private extension DeletionEventTests {
+    // Helper methods can be added here if needed
+}

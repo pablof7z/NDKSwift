@@ -71,8 +71,7 @@ NDKSwift provides a powerful, self-contained authentication system via `NDKAuthM
 
     ```swift
     // In YourLoginOrCreateAccountView.swift
-    let privateKey = Crypto.generatePrivateKey() // Assuming a helper
-    let signer = try NDKPrivateKeySigner(privateKey: privateKey)
+    let signer = try NDKPrivateKeySigner.generate()
     let session = try await authManager.createSession(
         with: signer,
         displayName: "My New Account",

@@ -88,8 +88,7 @@ func printHelp() {
 // Main function to allow early return
 func runDemo() async throws {
     // Create test signer (for testing local events)
-    let privateKey = Crypto.generatePrivateKey()
-    let signer = try NDKPrivateKeySigner(privateKey: privateKey)
+    let signer = try NDKPrivateKeySigner.generate()
     
     // Setup NDK with SQLite cache for persistence
     let cacheURL = FileManager.default.temporaryDirectory.appendingPathComponent("nip77_demo_cache.db")

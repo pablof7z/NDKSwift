@@ -62,8 +62,7 @@ final class NIP60WalletE2ETests: XCTestCase {
         #endif
         
         // 1. Create a new pubkey
-        let privateKey = Crypto.generatePrivateKey()
-        let signer = try NDKPrivateKeySigner(privateKey: privateKey)
+        let signer = try NDKPrivateKeySigner.generate()
         let pubkey = try await signer.pubkey
         
         print("\n✅ Created new pubkey: \(pubkey)")
