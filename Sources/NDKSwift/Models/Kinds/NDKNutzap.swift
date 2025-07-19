@@ -37,6 +37,9 @@ public struct NDKNutzap {
         // Add amount tag
         tags.append(["amount", String(totalAmount)])
         
+        // Add unit tag (hardcoded to "sat")
+        tags.append(["unit", "sat"])
+        
         // Add proof tags
         for proof in proofs {
             let proofString = try JSONCoding.encodeToString(proof)

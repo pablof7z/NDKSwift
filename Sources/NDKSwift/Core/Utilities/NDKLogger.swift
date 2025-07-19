@@ -24,6 +24,15 @@ public enum NDKLogCategory: String {
     case auth = "AUTH"
     case wallet = "WALLET"
     case general = "GENERAL"
+    
+    // New categories for complex areas
+    case connection = "CONNECTION"     // WebSocket lifecycle, retry logic
+    case outbox = "OUTBOX"            // Relay selection, scoring, NIP-65
+    case signer = "SIGNER"            // Signing flows, NWC, Bunker
+    case sync = "SYNC"                // Negentropy, sync operations
+    case performance = "PERFORMANCE"   // Timing, throughput, latency
+    case security = "SECURITY"        // Encryption, key management
+    case database = "DATABASE"        // SQL operations, migrations
 }
 
 /// NDK Logger for configurable logging
@@ -43,15 +52,154 @@ public struct NDKLogger {
     /// Categories to log
     public var enabledCategories: Set<NDKLogCategory> = Set(NDKLogCategory.allCases)
     
+    /// Rate limiting to prevent log spam
+    public var rateLimitEnabled: Bool = true
+    private var rateLimitWindow: TimeInterval = 1.0
+    private var maxLogsPerWindow: Int = 100
+    private var logCounts: [String: (count: Int, windowStart: Date)] = [:]
+    
+    /// Production safety - sanitize sensitive data
+    public var sanitizeSensitiveData: Bool = true
+    
     private init() {}
     
+    #if DEBUG
+    /// Default log level for debug builds
+    private static let defaultLogLevel: NDKLogLevel = .debug
+    #else
+    /// Default log level for release builds
+    private static let defaultLogLevel: NDKLogLevel = .warning
+    #endif
+    
     /// Log a message at the specified level
-    public func log(_ level: NDKLogLevel, category: NDKLogCategory, _ message: String) {
+    public mutating func log(_ level: NDKLogLevel, category: NDKLogCategory, _ message: String) {
         guard level <= logLevel else { return }
         guard enabledCategories.contains(category) else { return }
         
+        // Apply rate limiting if enabled
+        if rateLimitEnabled {
+            let key = "\(category.rawValue)-\(level.rawValue)"
+            let now = Date()
+            
+            if let existing = logCounts[key] {
+                let timeSinceWindowStart = now.timeIntervalSince(existing.windowStart)
+                if timeSinceWindowStart < rateLimitWindow {
+                    if existing.count >= maxLogsPerWindow {
+                        return // Rate limited
+                    }
+                    logCounts[key] = (count: existing.count + 1, windowStart: existing.windowStart)
+                } else {
+                    // New window
+                    logCounts[key] = (count: 1, windowStart: now)
+                }
+            } else {
+                logCounts[key] = (count: 1, windowStart: now)
+            }
+        }
+        
+        let sanitizedMessage = sanitizeSensitiveData ? sanitizeMessage(message) : message
         let timestamp = ISO8601DateFormatter().string(from: Date())
-        print("[\(timestamp)] [\(category.rawValue)] [\(level)] \(message)")
+        let emoji = emojiForCategory(category)
+        print("[\(timestamp)] [\(category.rawValue)] [\(level)] \(emoji) \(sanitizedMessage)")
+    }
+    
+    /// Log a message with correlation ID for tracking across components
+    public mutating func log(_ level: NDKLogLevel, category: NDKLogCategory, _ message: String, correlationId: String) {
+        let messageWithCorrelation = "[\(correlationId)] \(message)"
+        log(level, category: category, messageWithCorrelation)
+    }
+    
+    /// Log structured data for searchable logs
+    public mutating func logStructured(_ level: NDKLogLevel, category: NDKLogCategory, _ data: [String: Any]) {
+        guard level <= logLevel else { return }
+        guard enabledCategories.contains(category) else { return }
+        
+        let jsonData = try? JSONSerialization.data(withJSONObject: data, options: [.sortedKeys])
+        let jsonString = jsonData.flatMap { String(data: $0, encoding: .utf8) } ?? "<invalid JSON>"
+        log(level, category: category, jsonString)
+    }
+    
+    /// Log performance timing automatically
+    public mutating func logTiming<T>(_ level: NDKLogLevel, category: NDKLogCategory, operation: String, correlationId: String? = nil, _ block: () throws -> T) rethrows -> T {
+        let startTime = CFAbsoluteTimeGetCurrent()
+        let result = try block()
+        let duration = CFAbsoluteTimeGetCurrent() - startTime
+        let durationMs = String(format: "%.2f", duration * 1000)
+        
+        let message = "⏱️ \(operation) completed in \(durationMs)ms"
+        if let correlationId = correlationId {
+            log(level, category: category, message, correlationId: correlationId)
+        } else {
+            log(level, category: category, message)
+        }
+        return result
+    }
+    
+    /// Log performance timing for async operations
+    public mutating func logTiming<T>(_ level: NDKLogLevel, category: NDKLogCategory, operation: String, correlationId: String? = nil, _ block: () async throws -> T) async rethrows -> T {
+        let startTime = CFAbsoluteTimeGetCurrent()
+        let result = try await block()
+        let duration = CFAbsoluteTimeGetCurrent() - startTime
+        let durationMs = String(format: "%.2f", duration * 1000)
+        
+        let message = "⏱️ \(operation) completed in \(durationMs)ms"
+        if let correlationId = correlationId {
+            log(level, category: category, message, correlationId: correlationId)
+        } else {
+            log(level, category: category, message)
+        }
+        return result
+    }
+    
+    // MARK: - Private Helpers
+    
+    private func sanitizeMessage(_ message: String) -> String {
+        var sanitized = message
+        
+        // Sanitize potential private keys (64 char hex)
+        sanitized = sanitized.replacingOccurrences(
+            of: "\\b[a-fA-F0-9]{64}\\b",
+            with: "<PRIVATE_KEY>",
+            options: .regularExpression
+        )
+        
+        // Sanitize potential secrets and tokens
+        let secretPatterns = [
+            ("secret=\\w+", "secret=***"),
+            ("token=\\w+", "token=***"),
+            ("key=\\w+", "key=***"),
+            ("password=\\w+", "password=***")
+        ]
+        
+        for (pattern, replacement) in secretPatterns {
+            sanitized = sanitized.replacingOccurrences(
+                of: pattern,
+                with: replacement,
+                options: [.regularExpression, .caseInsensitive]
+            )
+        }
+        
+        return sanitized
+    }
+    
+    private func emojiForCategory(_ category: NDKLogCategory) -> String {
+        switch category {
+        case .network: return "📡"
+        case .relay: return "🔗"
+        case .subscription: return "🔍"
+        case .event: return "📝"
+        case .cache: return "💾"
+        case .auth: return "🔐"
+        case .wallet: return "💰"
+        case .general: return "ℹ️"
+        case .connection: return "🔌"
+        case .outbox: return "🎯"
+        case .signer: return "✍️"
+        case .sync: return "🔄"
+        case .performance: return "⚡"
+        case .security: return "🛡️"
+        case .database: return "🗄️"
+        }
     }
     
     /// Log network traffic (special handling)
