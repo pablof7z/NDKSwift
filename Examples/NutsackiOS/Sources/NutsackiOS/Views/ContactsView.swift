@@ -19,7 +19,7 @@ struct ContactsView: View {
         }
         return contacts.filter { user in
             // Since profile is async, we'll filter by npub only for now
-            let npub = NostrIdentifier.npub(fromHex: user.pubkey) ?? user.pubkey
+            let npub = (try? Bech32.npub(from: user.pubkey)) ?? user.pubkey
             return npub.localizedCaseInsensitiveContains(searchText)
         }
     }
@@ -188,7 +188,7 @@ struct ContactsView: View {
                 
                 // Try to parse as npub
                 if searchText.starts(with: "npub1") {
-                    pubkey = NostrIdentifier.hex(fromNpub: searchText)
+                    pubkey = try? Bech32.pubkey(from: searchText)
                 }
                 // Try as hex pubkey
                 else if searchText.count == 64 {
@@ -282,7 +282,7 @@ struct ContactRow: View {
     }
     
     var npub: String {
-        NostrIdentifier.npub(fromHex: user.pubkey) ?? user.pubkey
+        (try? Bech32.npub(from: user.pubkey)) ?? user.pubkey
     }
     
     var body: some View {
