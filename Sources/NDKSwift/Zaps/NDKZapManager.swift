@@ -244,7 +244,7 @@ public actor NDKZapManager {
             ]
             
             let jsonData = try JSONSerialization.data(withJSONObject: mintQuoteData)
-            let mintQuote = try JSONDecoder().decode(CashuSwift.Bolt11.MintQuote.self, from: jsonData)
+            let mintQuote = try JSONCoding.decode(CashuSwift.Bolt11.MintQuote.self, from: jsonData)
             
             // Issue tokens for the paid quote
             let (proofs, validDLEQ) = try await CashuSwift.issue(
