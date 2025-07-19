@@ -55,7 +55,7 @@ public extension NDKEvent {
     func quoteRepost(comment: String, signer: NDKSigner, ndk: NDK) async throws -> NDKEvent {
         // Create nevent/note reference
         let reference = try self.encode()
-        let fullContent = "\(comment)\n\nnostr:\(reference)"
+        let fullContent = "\(comment)\n\n\(NostrConstants.nostrPrefix)\(reference)"
         
         // Create quote repost as a text note with q tag
         let builder = await ndk.event()
