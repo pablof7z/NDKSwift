@@ -194,7 +194,7 @@ actor NDKPublishingStrategy {
             case .rateLimited:
                 await item.updateRelayStatus(relayURL, status: .rateLimited)
                 // Exponential backoff
-                try? await Task.sleep(nanoseconds: UInt64(backoffInterval * 1_000_000_000))
+                try? await Task.sleep(nanoseconds: UInt64(backoffInterval) * TimeConstants.nanosecondsPerSecond)
                 backoffInterval *= config.backoffMultiplier
 
             case .authRequired:
@@ -215,7 +215,7 @@ actor NDKPublishingStrategy {
             case .temporaryFailure:
                 if attempts < config.maxRetries {
                     await item.updateRelayStatus(relayURL, status: .retrying(attempt: attempts))
-                    try? await Task.sleep(nanoseconds: UInt64(backoffInterval * 1_000_000_000))
+                    try? await Task.sleep(nanoseconds: UInt64(backoffInterval) * TimeConstants.nanosecondsPerSecond)
                     backoffInterval *= config.backoffMultiplier
                 } else {
                     await item.updateRelayStatus(relayURL, status: .failed(.maxRetriesExceeded))

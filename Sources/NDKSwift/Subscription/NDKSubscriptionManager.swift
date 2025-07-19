@@ -407,7 +407,7 @@ public actor NDKSubscriptionManager {
 
             // Set timer to execute group
             group.timer = Task {
-                try? await Task.sleep(nanoseconds: UInt64(delay * 1_000_000_000))
+                try? await Task.sleep(nanoseconds: UInt64(delay) * TimeConstants.nanosecondsPerSecond)
                 await executeGroup(fingerprint: fingerprint)
             }
 

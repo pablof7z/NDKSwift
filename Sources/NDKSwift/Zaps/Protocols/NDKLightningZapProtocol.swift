@@ -170,7 +170,7 @@ public class NDKLightningZapProtocol: NDKZapProtocol {
         
         // Create timeout task
         let timeoutTask = Task {
-            try await Task.sleep(nanoseconds: UInt64(timeout * 1_000_000_000))
+            try await Task.sleep(nanoseconds: UInt64(timeout) * TimeConstants.nanosecondsPerSecond)
             await subscription.close()
             throw ZapError.timeoutWaitingForReceipt
         }
