@@ -709,7 +709,7 @@ public actor NDKSubscriptionManager {
 
     private func startPeriodicCleanup() async {
         while true {
-            try? await Task.sleep(nanoseconds: 60_000_000_000) // 1 minute
+            try? await Task.sleep(nanoseconds: 60 * TimeConstants.nanosecondsPerSecond) // 1 minute
             await performCleanup()
         }
     }

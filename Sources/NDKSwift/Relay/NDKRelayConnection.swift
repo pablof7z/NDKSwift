@@ -223,7 +223,7 @@ public actor NDKRelayConnection {
             
             // Timeout task
             group.addTask {
-                try await Task.sleep(nanoseconds: UInt64(timeout * 1_000_000_000))
+                try await Task.sleep(nanoseconds: UInt64(timeout * Double(TimeConstants.nanosecondsPerSecond)))
                 await self.handleTimeout(eventId: eventId)
             }
             

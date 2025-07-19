@@ -129,7 +129,7 @@ public enum CashuDeposit {
                         print("📜 Quote \(quote.quoteId) still pending - next check in \(Int(interval)) seconds")
                         
                         // Wait before next check
-                        try await Task.sleep(nanoseconds: UInt64(interval * 1_000_000_000))
+                        try await Task.sleep(nanoseconds: UInt64(interval * Double(TimeConstants.nanosecondsPerSecond)))
                     }
                     
                     // Timeout reached - persist quote and mark as expired
