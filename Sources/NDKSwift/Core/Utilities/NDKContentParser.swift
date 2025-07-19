@@ -42,13 +42,13 @@ public enum NDKContentParser {
             // URLs
             (#"https?://[^\s]+"#, .url(URL(string: "")!)),
             // npub mentions
-            (#"nostr:npub1[qpzry9x8gf2tvdw0s3jn54khce6mua7l]+"#, .npubMention("")),
+            ("\(NostrConstants.nostrPrefix)npub1[qpzry9x8gf2tvdw0s3jn54khce6mua7l]+", .npubMention("")),
             // note mentions
-            (#"nostr:note1[qpzry9x8gf2tvdw0s3jn54khce6mua7l]+"#, .noteMention("")),
+            ("\(NostrConstants.nostrPrefix)note1[qpzry9x8gf2tvdw0s3jn54khce6mua7l]+", .noteMention("")),
             // nevent mentions
-            (#"nostr:nevent1[qpzry9x8gf2tvdw0s3jn54khce6mua7l]+"#, .neventMention("")),
+            ("\(NostrConstants.nostrPrefix)nevent1[qpzry9x8gf2tvdw0s3jn54khce6mua7l]+", .neventMention("")),
             // nprofile mentions
-            (#"nostr:nprofile1[qpzry9x8gf2tvdw0s3jn54khce6mua7l]+"#, .nprofileMention(""))
+            ("\(NostrConstants.nostrPrefix)nprofile1[qpzry9x8gf2tvdw0s3jn54khce6mua7l]+", .nprofileMention(""))
         ]
         
         var processedContent = content
