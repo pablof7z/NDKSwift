@@ -110,7 +110,11 @@ public enum JSONCoding {
     
     /// Parse JSON data to Any (object or array)
     public static func parseJSON(from data: Data) throws -> Any {
-        try JSONSerialization.jsonObject(with: data)
+        do {
+            return try JSONSerialization.jsonObject(with: data)
+        } catch {
+            throw NDKError.parseError(for: "JSON", details: "Failed to parse JSON: \(error.localizedDescription)")
+        }
     }
     
     /// Parse JSON string to Any (object or array)
@@ -139,14 +143,19 @@ public enum JSONCoding {
     
     /// Parse JSON data to array
     public static func parseArray(from data: Data) throws -> [Any] {
-        guard let array = try parseJSON(from: data) as? [Any] else {
-            throw NDKError.parseError(for: "JSON array", details: "Expected array but got different type")
+        let parsed = try parseJSON(from: data)
+        guard let array = parsed as? [Any] else {
+            let actualType = String(describing: type(of: parsed))
+            throw NDKError.parseError(for: "JSON array", details: "Expected array but got \(actualType): \(String(describing: parsed).prefix(100))")
         }
         return array
     }
     
     /// Parse JSON string to array
     public static func parseArray(from string: String) throws -> [Any] {
+        guard !string.isEmpty else {
+            throw NDKError.invalidInput(message: "Empty string cannot be parsed as JSON array")
+        }
         guard let data = string.data(using: .utf8) else {
             throw NDKError.invalidInput(message: "Invalid UTF-8 string")
         }

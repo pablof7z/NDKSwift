@@ -302,6 +302,12 @@ public actor NDKRelayConnection {
     #endif
     
     private func handleReceivedMessage(_ json: String) async {
+        // Validate input
+        guard !json.isEmpty else {
+            NDKLogger.shared.log(.warning, category: .relay, "Received empty message from relay \(url)")
+            return
+        }
+        
         do {
             let message = try NostrMessage.parse(from: json)
             

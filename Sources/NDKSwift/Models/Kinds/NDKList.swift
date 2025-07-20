@@ -607,3 +607,58 @@ public extension NDKList {
         }
     }
 }
+
+// MARK: - Blacklist/Blocklist Helpers
+
+public extension NDKList {
+    /// Check if this is a mute list (kind 10000)
+    var isMuteList: Bool {
+        return kind == 10000
+    }
+    
+    /// Check if this is a blocked relays list (kind 10006)
+    var isBlockedRelaysList: Bool {
+        return kind == 10006
+    }
+    
+    /// Check if a specific mint URL is blacklisted (for mute lists containing mint URLs)
+    func isMintBlacklisted(_ mintUrl: String) -> Bool {
+        guard isMuteList else { return false }
+        return urls.contains(mintUrl)
+    }
+    
+    /// Check if a specific relay URL is blocked
+    func isRelayBlocked(_ relayUrl: String) -> Bool {
+        guard isBlockedRelaysList else { return false }
+        // Normalize the relay URL before checking
+        let normalizedUrl = normalizeRelayUrl(relayUrl)
+        return urls.contains { url in
+            normalizeRelayUrl(url) == normalizedUrl
+        }
+    }
+    
+    /// Normalize relay URL for comparison (add trailing slash, lowercase, etc.)
+    private func normalizeRelayUrl(_ url: String) -> String {
+        var normalized = url.lowercased()
+        // Ensure trailing slash for relay URLs
+        if !normalized.hasSuffix("/") && !normalized.contains("?") {
+            normalized += "/"
+        }
+        return normalized
+    }
+    
+    /// Get all blacklisted mint URLs from a mute list
+    var blacklistedMints: [String] {
+        guard isMuteList else { return [] }
+        return urls.filter { url in
+            // Check if URL looks like a mint URL (contains cashu or fedimint patterns)
+            url.contains("cashu") || url.contains("fedimint") || url.contains("mint")
+        }
+    }
+    
+    /// Get all blocked relay URLs
+    var blockedRelays: [String] {
+        guard isBlockedRelaysList else { return [] }
+        return urls
+    }
+}
