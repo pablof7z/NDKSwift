@@ -106,6 +106,7 @@ public actor NDKSubscriptionCoordinator {
     }
     
     /// Fetch events matching multiple filters
+    @available(*, deprecated, message: "Use NDKDataSource instead. fetchEvents blocks until all events arrive. NDKDataSource allows reactive UI updates and configurable cache freshness with maxAge parameter.")
     public func fetchEvents(
         _ filters: [NDKFilter],
         relays: Set<RelayURL>? = nil,
@@ -164,6 +165,7 @@ public actor NDKSubscriptionCoordinator {
     }
     
     /// Fetch a single event by ID
+    @available(*, deprecated, message: "Use NDKDataSource instead. fetchEvent blocks until event arrives. NDKDataSource allows reactive UI updates and configurable cache freshness with maxAge parameter.")
     public func fetchEvent(
         id: EventID,
         relays: Set<RelayURL>? = nil,
@@ -175,6 +177,7 @@ public actor NDKSubscriptionCoordinator {
     }
     
     /// Fetch a single event matching the filter
+    @available(*, deprecated, message: "Use NDKDataSource instead. fetchEvent blocks until event arrives. NDKDataSource allows reactive UI updates and configurable cache freshness with maxAge parameter.")
     public func fetchEvent(
         _ filter: NDKFilter,
         relays: Set<RelayURL>? = nil,

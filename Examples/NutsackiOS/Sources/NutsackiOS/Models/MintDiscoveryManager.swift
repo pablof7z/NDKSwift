@@ -23,7 +23,12 @@ class MintDiscoveryManager {
                     limit: 100
                 )
                 
-                let announcementSub = await ndk.subscribe(filters: [announcementFilter])
+                // Use declarative data source for announcements
+                let announcementDataSource = ndk.observe(
+                    filter: announcementFilter,
+                    maxAge: 0, // Real-time updates
+                    cachePolicy: .cacheWithNetwork
+                )
                 
                 // Subscribe to recommendations (kind: 38000)
                 let recommendationFilter = NDKFilter(
@@ -31,42 +36,44 @@ class MintDiscoveryManager {
                     limit: 100
                 )
                 
-                let recommendationSub = await ndk.subscribe(filters: [recommendationFilter])
+                // Use declarative data source for recommendations
+                let recommendationDataSource = ndk.observe(
+                    filter: recommendationFilter,
+                    maxAge: 0, // Real-time updates
+                    cachePolicy: .cacheWithNetwork
+                )
                 
                 // Process announcements as they stream in
                 Task {
                     do {
-                        for try await announcementEvent in announcementSub {
+                        for await announcementEvent in announcementDataSource.events {
                             let announcement = NDKCashuMintAnnouncement(event: announcementEvent)
                         
                         if let mintURL = announcement.mintURL,
                            let url = URL(string: mintURL) {
                             
                             let discoveredMint = DiscoveredMint(
-                                url: url,
-                                name: announcement.name,
+                                url: url.absoluteString,
+                                name: announcement.name ?? url.host ?? "Unknown Mint",
+                                announcedBy: announcement.event.pubkey,
+                                announcementId: announcementEvent.id,
+                                announcementCreatedAt: announcementEvent.createdAt,
+                                recommendedBy: [],
                                 description: announcement.description,
-                                contact: announcement.contact,
-                                pubkey: announcement.event.pubkey,
-                                supportedNuts: announcement.supportedNuts,
-                                network: announcement.network ?? "mainnet",
-                                recommendedBy: nil,
-                                recommendationReason: nil,
-                                announcementEvent: announcementEvent,
-                                recommendationEvent: nil
+                                pubkey: announcement.event.pubkey
                             )
                             
                             mintsByURL[url] = discoveredMint
                             
                             // Rebuild and sort the array
                             discoveredMints = Array(mintsByURL.values).sorted { first, second in
-                                if first.recommendedBy != nil && second.recommendedBy == nil {
+                                if !first.recommendedBy.isEmpty && second.recommendedBy.isEmpty {
                                     return true
-                                } else if first.recommendedBy == nil && second.recommendedBy != nil {
+                                } else if first.recommendedBy.isEmpty && !second.recommendedBy.isEmpty {
                                     return false
                                 }
-                                let firstDate = first.announcementEvent?.createdAt ?? 0
-                                let secondDate = second.announcementEvent?.createdAt ?? 0
+                                let firstDate = first.announcementCreatedAt ?? 0
+                                let secondDate = second.announcementCreatedAt ?? 0
                                 return firstDate > secondDate
                             }
                             
@@ -82,7 +89,7 @@ class MintDiscoveryManager {
                 // Process recommendations as they stream in
                 Task {
                     do {
-                        for try await recommendationEvent in recommendationSub {
+                        for await recommendationEvent in recommendationDataSource.events {
                         let recommendation = NDKMintRecommendation(event: recommendationEvent)
                         
                         if let mintURL = recommendation.mintURL,
@@ -90,37 +97,34 @@ class MintDiscoveryManager {
                             
                             if var existingMint = mintsByURL[url] {
                                 // Update existing mint with recommendation
-                                existingMint.recommendedBy = recommendationEvent.pubkey
-                                existingMint.recommendationReason = recommendation.reason
-                                existingMint.recommendationEvent = recommendationEvent
+                                if !existingMint.recommendedBy.contains(recommendationEvent.pubkey) {
+                                    existingMint.recommendedBy.append(recommendationEvent.pubkey)
+                                }
                                 mintsByURL[url] = existingMint
                             } else {
                                 // Create new mint from recommendation only
                                 let discoveredMint = DiscoveredMint(
-                                    url: url,
-                                    name: nil,
+                                    url: url.absoluteString,
+                                    name: url.host ?? "Unknown Mint",
+                                    announcedBy: nil,
+                                    announcementId: nil,
+                                    announcementCreatedAt: nil,
+                                    recommendedBy: [recommendationEvent.pubkey],
                                     description: recommendation.reason,
-                                    contact: nil,
-                                    pubkey: recommendationEvent.pubkey,
-                                    supportedNuts: [],
-                                    network: "mainnet",
-                                    recommendedBy: recommendationEvent.pubkey,
-                                    recommendationReason: recommendation.reason,
-                                    announcementEvent: nil,
-                                    recommendationEvent: recommendationEvent
+                                    pubkey: nil
                                 )
                                 mintsByURL[url] = discoveredMint
                             }
                             
                             // Rebuild and sort the array
                             discoveredMints = Array(mintsByURL.values).sorted { first, second in
-                                if first.recommendedBy != nil && second.recommendedBy == nil {
+                                if !first.recommendedBy.isEmpty && second.recommendedBy.isEmpty {
                                     return true
-                                } else if first.recommendedBy == nil && second.recommendedBy != nil {
+                                } else if first.recommendedBy.isEmpty && !second.recommendedBy.isEmpty {
                                     return false
                                 }
-                                let firstDate = first.announcementEvent?.createdAt ?? 0
-                                let secondDate = second.announcementEvent?.createdAt ?? 0
+                                let firstDate = first.announcementCreatedAt ?? 0
+                                let secondDate = second.announcementCreatedAt ?? 0
                                 return firstDate > secondDate
                             }
                             
@@ -135,42 +139,11 @@ class MintDiscoveryManager {
                 
                 // Clean up on cancellation
                 continuation.onTermination = { @Sendable _ in
-                    Task {
-                        await announcementSub.close()
-                        await recommendationSub.close()
-                    }
+                    // Data sources clean up automatically
                 }
             }
         }
     }
 }
 
-/// Represents a discovered mint with all available information
-struct DiscoveredMint {
-    let url: URL
-    let name: String?
-    let description: String?
-    let contact: String?
-    let pubkey: String
-    let supportedNuts: [String]
-    let network: String
-    var recommendedBy: String?
-    var recommendationReason: String?
-    let announcementEvent: NDKEvent?
-    var recommendationEvent: NDKEvent?
-    
-    /// Check if this mint is on mainnet
-    var isMainnet: Bool {
-        network == "mainnet"
-    }
-    
-    /// Get a display name for the mint
-    var displayName: String {
-        name ?? url.host ?? url.absoluteString
-    }
-    
-    /// Check if mint supports a specific NUT
-    func supports(nut: String) -> Bool {
-        supportedNuts.contains(nut)
-    }
-}
+// DiscoveredMint is now defined in WalletDataSources.swift

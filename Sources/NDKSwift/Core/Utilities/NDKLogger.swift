@@ -36,66 +36,32 @@ public enum NDKLogCategory: String {
 }
 
 /// NDK Logger for configurable logging
-public struct NDKLogger {
-    /// Shared logger instance
-    public static var shared = NDKLogger()
-    
+public enum NDKLogger {
     /// Current log level
-    public var logLevel: NDKLogLevel = .info
+    public static var logLevel: NDKLogLevel = {
+        #if DEBUG
+        return .debug
+        #else
+        return .warning
+        #endif
+    }()
     
     /// Enable/disable network traffic logging
-    public var logNetworkTraffic: Bool = true
+    public static var logNetworkTraffic: Bool = true
     
     /// Enable/disable pretty printing for network messages
-    public var prettyPrintNetworkMessages: Bool = true
+    public static var prettyPrintNetworkMessages: Bool = true
     
     /// Categories to log
-    public var enabledCategories: Set<NDKLogCategory> = Set(NDKLogCategory.allCases)
-    
-    /// Rate limiting to prevent log spam
-    public var rateLimitEnabled: Bool = true
-    private var rateLimitWindow: TimeInterval = 1.0
-    private var maxLogsPerWindow: Int = 100
-    private var logCounts: [String: (count: Int, windowStart: Date)] = [:]
+    public static var enabledCategories: Set<NDKLogCategory> = Set(NDKLogCategory.allCases)
     
     /// Production safety - sanitize sensitive data
-    public var sanitizeSensitiveData: Bool = true
-    
-    private init() {}
-    
-    #if DEBUG
-    /// Default log level for debug builds
-    private static let defaultLogLevel: NDKLogLevel = .debug
-    #else
-    /// Default log level for release builds
-    private static let defaultLogLevel: NDKLogLevel = .warning
-    #endif
+    public static var sanitizeSensitiveData: Bool = true
     
     /// Log a message at the specified level
-    public mutating func log(_ level: NDKLogLevel, category: NDKLogCategory, _ message: String) {
+    public static func log(_ level: NDKLogLevel, category: NDKLogCategory, _ message: String) {
         guard level <= logLevel else { return }
         guard enabledCategories.contains(category) else { return }
-        
-        // Apply rate limiting if enabled
-        if rateLimitEnabled {
-            let key = "\(category.rawValue)-\(level.rawValue)"
-            let now = Date()
-            
-            if let existing = logCounts[key] {
-                let timeSinceWindowStart = now.timeIntervalSince(existing.windowStart)
-                if timeSinceWindowStart < rateLimitWindow {
-                    if existing.count >= maxLogsPerWindow {
-                        return // Rate limited
-                    }
-                    logCounts[key] = (count: existing.count + 1, windowStart: existing.windowStart)
-                } else {
-                    // New window
-                    logCounts[key] = (count: 1, windowStart: now)
-                }
-            } else {
-                logCounts[key] = (count: 1, windowStart: now)
-            }
-        }
         
         let sanitizedMessage = sanitizeSensitiveData ? sanitizeMessage(message) : message
         let timestamp = ISO8601DateFormatter().string(from: Date())
@@ -104,13 +70,13 @@ public struct NDKLogger {
     }
     
     /// Log a message with correlation ID for tracking across components
-    public mutating func log(_ level: NDKLogLevel, category: NDKLogCategory, _ message: String, correlationId: String) {
+    public static func log(_ level: NDKLogLevel, category: NDKLogCategory, _ message: String, correlationId: String) {
         let messageWithCorrelation = "[\(correlationId)] \(message)"
         log(level, category: category, messageWithCorrelation)
     }
     
     /// Log structured data for searchable logs
-    public mutating func logStructured(_ level: NDKLogLevel, category: NDKLogCategory, _ data: [String: Any]) {
+    public static func logStructured(_ level: NDKLogLevel, category: NDKLogCategory, _ data: [String: Any]) {
         guard level <= logLevel else { return }
         guard enabledCategories.contains(category) else { return }
         
@@ -120,7 +86,7 @@ public struct NDKLogger {
     }
     
     /// Log performance timing automatically
-    public mutating func logTiming<T>(_ level: NDKLogLevel, category: NDKLogCategory, operation: String, correlationId: String? = nil, _ block: () throws -> T) rethrows -> T {
+    public static func logTiming<T>(_ level: NDKLogLevel, category: NDKLogCategory, operation: String, correlationId: String? = nil, _ block: () throws -> T) rethrows -> T {
         let startTime = CFAbsoluteTimeGetCurrent()
         let result = try block()
         let duration = CFAbsoluteTimeGetCurrent() - startTime
@@ -136,7 +102,7 @@ public struct NDKLogger {
     }
     
     /// Log performance timing for async operations
-    public mutating func logTiming<T>(_ level: NDKLogLevel, category: NDKLogCategory, operation: String, correlationId: String? = nil, _ block: () async throws -> T) async rethrows -> T {
+    public static func logTiming<T>(_ level: NDKLogLevel, category: NDKLogCategory, operation: String, correlationId: String? = nil, _ block: () async throws -> T) async rethrows -> T {
         let startTime = CFAbsoluteTimeGetCurrent()
         let result = try await block()
         let duration = CFAbsoluteTimeGetCurrent() - startTime
@@ -153,7 +119,7 @@ public struct NDKLogger {
     
     // MARK: - Private Helpers
     
-    private func sanitizeMessage(_ message: String) -> String {
+    private static func sanitizeMessage(_ message: String) -> String {
         var sanitized = message
         
         // Sanitize potential private keys (64 char hex)
@@ -182,7 +148,7 @@ public struct NDKLogger {
         return sanitized
     }
     
-    private func emojiForCategory(_ category: NDKLogCategory) -> String {
+    private static func emojiForCategory(_ category: NDKLogCategory) -> String {
         switch category {
         case .network: return "📡"
         case .relay: return "🔗"
@@ -203,7 +169,7 @@ public struct NDKLogger {
     }
     
     /// Log network traffic (special handling)
-    public func logNetworkSend(to relay: URL, message: String, parsed: NostrMessage? = nil) {
+    public static func logNetworkSend(to relay: URL, message: String, parsed: NostrMessage? = nil) {
         guard logNetworkTraffic else { return }
         
         print("\n📤 SENDING TO \(relay.host ?? relay.absoluteString):")
@@ -216,7 +182,7 @@ public struct NDKLogger {
     }
     
     /// Log received network traffic
-    public func logNetworkReceive(from relay: URL, message: String, parsed: NostrMessage? = nil) {
+    public static func logNetworkReceive(from relay: URL, message: String, parsed: NostrMessage? = nil) {
         guard logNetworkTraffic else { return }
         
         print("\n📥 RECEIVED FROM \(relay.host ?? relay.absoluteString):")
@@ -229,7 +195,7 @@ public struct NDKLogger {
     }
     
     /// Log parsing errors
-    public func logNetworkParseError(from relay: URL, message: String, error: Error) {
+    public static func logNetworkParseError(from relay: URL, message: String, error: Error) {
         guard logNetworkTraffic else { return }
         
         print("\n📥 RECEIVED FROM \(relay.host ?? relay.absoluteString):")
@@ -237,7 +203,7 @@ public struct NDKLogger {
         print("   RAW: \(message)")
     }
     
-    private func logParsedMessage(_ message: NostrMessage) {
+    private static func logParsedMessage(_ message: NostrMessage) {
         switch message {
         case let .event(subscriptionId, event):
             print("   TYPE: EVENT")

@@ -329,16 +329,24 @@ struct NutzapView: View {
                 isLoadingProfile = false
             }
             
-            // Observe profile updates
+            // Use declarative data source for profile
+            let profileDataSource = NDKDataSource(
+                ndk: ndk,
+                filter: NDKFilter(
+                    authors: [pubkey],
+                    kinds: [0]
+                ),
+                maxAge: 3600, // Cache for 1 hour
+                cachePolicy: .cacheWithNetwork
+            )
+            
             profileTask = Task {
-                let profileStream = await ndk.observeProfile(for: pubkey, closeOnEose: true)
-                
-                for await profile in profileStream {
-                    await MainActor.run {
-                        self.recipientProfile = profile
-                    }
-                    // For nutzap, we can close after first profile
-                    if profile != nil {
+                for await event in profileDataSource.events {
+                    if let profileData = event.content.data(using: .utf8),
+                       let profile = try? JSONDecoder().decode(NDKUserProfile.self, from: profileData) {
+                        await MainActor.run {
+                            self.recipientProfile = profile
+                        }
                         break
                     }
                 }
@@ -426,7 +434,27 @@ struct NutzapView: View {
                 limit: 1
             )
             
-            let events = try await ndk.fetchEvents([filter])
+            // Use declarative data source to fetch preferences
+            let preferencesDataSource = NDKDataSource(
+                ndk: ndk,
+                filter: filter,
+                maxAge: 3600,
+                cachePolicy: .cacheWithNetwork
+            )
+            
+            var events: [NDKEvent] = []
+            let fetchTask = Task {
+                for await event in preferencesDataSource.events {
+                    events.append(event)
+                    if events.count >= 1 {
+                        break // Only need first event
+                    }
+                }
+            }
+            
+            // Wait a bit for the event
+            try? await Task.sleep(nanoseconds: 2_000_000_000) // 2 seconds
+            fetchTask.cancel()
             guard let preferencesEvent = events.first else {
                 // If recipient has no nutzap preferences, they can't receive nutzaps
                 await MainActor.run {
@@ -485,7 +513,24 @@ struct NutzapView: View {
         guard let ndk = nostrManager.ndk else { return }
         
         do {
-            let profile = try await ndk.fetchProfile(for: pubkey)
+            // Use declarative data source to fetch profile
+            let profileDataSource = NDKDataSource(
+                ndk: ndk,
+                filter: NDKFilter(
+                    authors: [pubkey],
+                    kinds: [0]
+                ),
+                maxAge: 3600,
+                cachePolicy: .cacheWithNetwork
+            )
+            
+            var profile: NDKUserProfile?
+            for await event in profileDataSource.events {
+                if let profileData = event.content.data(using: .utf8) {
+                    profile = try? JSONDecoder().decode(NDKUserProfile.self, from: profileData)
+                    break
+                }
+            }
             await MainActor.run {
                 supportsLightning = profile?.lud16 != nil || profile?.lud06 != nil
             }

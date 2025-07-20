@@ -14,6 +14,11 @@ class NostrManager {
     private var ndkAuthManager: NDKAuthManager
     var cache: NDKSQLiteCache?
     
+    // Declarative data sources
+    private(set) var contactListDataSource: ContactListDataSource?
+    private(set) var userProfileDataSource: UserProfileDataSource?
+    private(set) var contactsMetadataDataSource: MultipleProfilesDataSource?
+    
     // Default relays for the app
     let defaultRelays = [ "wss://relay.primal.net", "wss://purplepag.es" ]
     
@@ -96,35 +101,18 @@ class NostrManager {
     }
     
     func login(with privateKey: String) async throws {
-        guard ndk != nil else { throw NostrError.ndkNotInitialized }
+        guard let ndk = ndk else { throw NostrError.ndkNotInitialized }
         
         let signer = try NDKPrivateKeySigner(privateKey: privateKey)
-        ndk?.signer = signer
+        ndk.signer = signer
         
         // Zap manager gets signer from NDK automatically
         
         let publicKey = try await signer.pubkey
         print("Logged in with public key: \(publicKey)")
         
-        // Start profile subscription in background (non-blocking)
-        Task {
-            let metadataFilter = NDKFilter(
-                authors: [publicKey],
-                kinds: [0],
-                limit: 1
-            )
-            
-            // Subscribe to profile updates
-            if let subscription = await ndk?.subscribe(filters: [metadataFilter]) {
-                for try await event in subscription {
-                    if let _ = JSONCoding.safeDecode(NDKUserProfile.self, from: event.content) {
-                        // Profile is automatically cached by NDK's SQLite cache
-                        print("Profile metadata received and cached for \(publicKey)")
-                        break // Only need first profile event
-                    }
-                }
-            }
-        }
+        // Initialize declarative data sources
+        await initializeDataSources(for: publicKey)
     }
     
     func createNewAccount(displayName: String, about: String? = nil) async throws -> NDKSession {
@@ -175,11 +163,19 @@ class NostrManager {
             try await ndkAuthManager.updateActiveSessionProfile(metadata)
         }
         
+        // Initialize declarative data sources
+        await initializeDataSources(for: session.pubkey)
+        
         print("🏚️ [NostrManager] createNewAccount() completed successfully with pubkey: \(session.pubkey)")
         return session
     }
     
     func logout() {
+        // Clean up data sources
+        contactListDataSource = nil
+        userProfileDataSource = nil
+        contactsMetadataDataSource = nil
+        
         // Clear all cached data and sessions
         Task {
             if let cache = cache {
@@ -237,6 +233,9 @@ class NostrManager {
         
         // Zap manager gets signer from NDK automatically
         
+        // Initialize declarative data sources
+        await initializeDataSources(for: session.pubkey)
+        
         print("🏚️ [NostrManager] createAccountFromNsec() completed successfully with pubkey: \(session.pubkey)")
         return session
     }
@@ -246,6 +245,36 @@ class NostrManager {
         get async {
             guard ndkAuthManager.isAuthenticated else { return nil }
             return try? await ndkAuthManager.activeSigner?.user()
+        }
+    }
+    
+    // MARK: - Declarative Data Sources
+    
+    private func initializeDataSources(for pubkey: String) async {
+        guard let ndk = ndk else { return }
+        
+        print("NostrManager - Initializing declarative data sources for user: \(pubkey.prefix(8))...")
+        
+        // Initialize user profile data source
+        userProfileDataSource = UserProfileDataSource(ndk: ndk, pubkey: pubkey)
+        
+        // Initialize contact list data source
+        contactListDataSource = ContactListDataSource(ndk: ndk, pubkey: pubkey)
+        
+        // Observe contact list changes to update contacts metadata
+        Task {
+            guard let contactListDataSource = contactListDataSource else { return }
+            
+            for await contactPubkeys in contactListDataSource.$contactPubkeys.values {
+                if !contactPubkeys.isEmpty {
+                    print("NostrManager - Contact list updated with \(contactPubkeys.count) contacts")
+                    // Update contacts metadata data source
+                    self.contactsMetadataDataSource = MultipleProfilesDataSource(
+                        ndk: ndk,
+                        pubkeys: contactPubkeys
+                    )
+                }
+            }
         }
     }
     
@@ -296,7 +325,7 @@ class NostrManager {
             do {
                 _ = try await withThrowingTaskGroup(of: Void.self) { group in
                     group.addTask { try await timeoutTask.value }
-                    group.addTask { try await observerTask.value }
+                    group.addTask { await observerTask.value }
                     
                     // Wait for first task to complete
                     try await group.next()
@@ -311,89 +340,11 @@ class NostrManager {
         
         print("NostrManager - Starting negentropy sync...")
         
-        // Run both syncs concurrently
-        async let contactsSync = syncContactsMetadata()
-        async let walletEventsSync = syncWalletEvents()
-        
-        // Wait for both to complete
-        await contactsSync
-        await walletEventsSync
+        // The declarative data sources will automatically sync when they start observing
+        // We just need to trigger the sync manually for wallet events
+        await syncWalletEvents()
         
         print("NostrManager - Startup sync completed")
-    }
-    
-    /// Sync kind:0 metadata events for user's contacts
-    private func syncContactsMetadata() async {
-        guard let ndk = ndk, let signer = ndk.signer else { return }
-        
-        do {
-            let userPubkey = try await signer.pubkey
-            print("NostrManager - Syncing contacts metadata for user: \(userPubkey.prefix(8))...")
-            
-            // First, fetch user's contact list (kind:3)
-            let contactListFilter = NDKFilter(
-                authors: [userPubkey],
-                kinds: [3], // Contact list events
-                limit: 1
-            )
-            
-            let contactEvents = try await ndk.fetchEvents([contactListFilter])
-            guard let latestContactEvent = contactEvents.first else {
-                print("NostrManager - No contact list found, skipping contacts sync")
-                return
-            }
-            
-            // Extract followed pubkeys from p tags
-            let followedPubkeys = latestContactEvent.tags
-                .filter { $0.count >= 2 && $0[0] == "p" }
-                .map { $0[1] }
-            
-            guard !followedPubkeys.isEmpty else {
-                print("NostrManager - No contacts found in contact list")
-                return
-            }
-            
-            print("NostrManager - Found \(followedPubkeys.count) contacts to sync metadata for")
-            
-            // Create filter for contacts' metadata, relay lists, and zap configs
-            let contactsFilter = NDKFilter(
-                authors: followedPubkeys,
-                kinds: [
-                    0,     // Profile metadata
-                    10002, // Relay list metadata  
-                    10019  // Zap configuration
-                ]
-            )
-            
-            // Sync with all connected relays (receive-only for wallet security)
-            let results = try await ndk.syncWithAllRelays(filter: contactsFilter, direction: .receive)
-            
-            var totalDownloaded = 0
-            var totalEfficiency = 0
-            var eventsByKind: [Int: Int] = [:]
-            
-            for (relay, result) in results {
-                totalDownloaded += result.downloadedEvents.count
-                totalEfficiency += result.efficiencyRatio
-                
-                // Count events by kind for detailed logging
-                for event in result.downloadedEvents {
-                    eventsByKind[event.kind, default: 0] += 1
-                }
-                
-                print("NostrManager - Contacts sync on \(relay): \(result.downloadedEvents.count) new events, \(result.efficiencyRatio)% efficient")
-            }
-            
-            let avgEfficiency = results.isEmpty ? 0 : totalEfficiency / results.count
-            let metadataCount = eventsByKind[0] ?? 0
-            let relayListCount = eventsByKind[10002] ?? 0
-            let zapConfigCount = eventsByKind[10019] ?? 0
-            
-            print("NostrManager - Contacts sync completed: \(totalDownloaded) total events (\(metadataCount) metadata, \(relayListCount) relay lists, \(zapConfigCount) zap configs), \(avgEfficiency)% avg efficiency")
-            
-        } catch {
-            print("NostrManager - Error syncing contacts metadata: \(error)")
-        }
     }
     
     /// Sync user's wallet events (kind:7376 and 9321)

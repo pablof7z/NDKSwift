@@ -23,9 +23,21 @@ final class RelayConnectionTests: XCTestCase {
         let initialRelay = await ndk.pool.getRelay(for: relayUrl)
         XCTAssertNil(initialRelay, "Relay should not exist in pool initially")
         
-        // When: Creating a subscription with explicit relay
+        // When: Creating a data source with explicit relay
         let filter = NDKFilter(kinds: [1], limit: 10)
-        let subscription = await ndk.subscribe(filters: [filter], relays: [relayUrl])
+        let dataSource = ndk.observe(
+            filter: filter,
+            maxAge: 0, // Real-time monitoring
+            cachePolicy: .networkOnly,
+            relays: Set([relayUrl])
+        )
+        
+        // Consume the stream in a task
+        let task = Task {
+            for await _ in dataSource.events {
+                // Just consume events
+            }
+        }
         
         // Then: The relay should be added to the pool
         let relay = await ndk.pool.getRelay(for: relayUrl)
@@ -40,7 +52,7 @@ final class RelayConnectionTests: XCTestCase {
             "Relay should not be in disconnected state after subscription - connection attempt should have been made")
         
         // Cleanup
-        await subscription.close()
+        task.cancel()
     }
     
     func testSubscriptionConnectsToMultipleExplicitRelays() async throws {
@@ -51,9 +63,21 @@ final class RelayConnectionTests: XCTestCase {
             "wss://localhost:8083"
         ]
         
-        // When: Creating a subscription with multiple explicit relays
+        // When: Creating a data source with multiple explicit relays
         let filter = NDKFilter(kinds: [1], limit: 10)
-        let subscription = await ndk.subscribe(filters: [filter], relays: Set(relayUrls))
+        let dataSource = ndk.observe(
+            filter: filter,
+            maxAge: 0, // Real-time monitoring
+            cachePolicy: .networkOnly,
+            relays: Set(relayUrls)
+        )
+        
+        // Consume the stream in a task
+        let task = Task {
+            for await _ in dataSource.events {
+                // Just consume events
+            }
+        }
         
         // Then: All relays should be added to the pool
         for url in relayUrls {
@@ -69,7 +93,7 @@ final class RelayConnectionTests: XCTestCase {
         }
         
         // Cleanup
-        await subscription.close()
+        task.cancel()
     }
     
     func testPublishingConnectsToExplicitlyRequestedRelays() async throws {
@@ -175,14 +199,29 @@ final class RelayConnectionTests: XCTestCase {
         // Note: In a real test, we'd need a mock relay or test double
         // For now, we'll just verify the logic doesn't crash
         
-        // When: Creating a subscription with the already-connected relay
+        // When: Creating a data source with the already-connected relay
         let filter = NDKFilter(kinds: [1], limit: 10)
-        let subscription = await ndk.subscribe(filters: [filter], relays: [relayUrl])
+        let dataSource = ndk.observe(
+            filter: filter,
+            maxAge: 0, // Real-time monitoring
+            cachePolicy: .networkOnly,
+            relays: Set([relayUrl])
+        )
         
-        // Then: The code should not crash and subscription should be created
-        XCTAssertNotNil(subscription, "Subscription should be created")
+        // Consume the stream in a task
+        let task = Task {
+            for await _ in dataSource.events {
+                // Just consume events
+            }
+        }
+        
+        // Give it a moment
+        try await Task.sleep(nanoseconds: 50_000_000)
+        
+        // Then: The code should not crash
+        XCTAssertTrue(true, "Code should not crash when using already-connected relay")
         
         // Cleanup
-        await subscription.close()
+        task.cancel()
     }
 }

@@ -51,23 +51,23 @@ public final class NDK {
     /// Relay pool management
     internal var pool: NDKPool!
     
-    /// Subscription coordination
-    internal var subscriptionCoordinator: NDKSubscriptionCoordinator!
-    
     /// User and profile management
     internal var profileManager: NDKProfileManager!
     
     /// Event tracker for managing event metadata
     public let eventTracker: NDKEventTracker = NDKEventTracker()
     
-    /// Subscription manager
-    internal var subscriptionManager: NDKSubscriptionManager!
+    /// Internal subscription manager for DataRequirementManager
+    internal var internalSubscriptionManager: InternalSubscriptionManager!
     
     /// Signature verification sampler
     private let signatureVerificationSampler: NDKSignatureVerificationSampler
     
     /// Subscription tracker for monitoring and debugging
     internal let subscriptionTracker: NDKSubscriptionTracker
+    
+    /// Data requirement manager for declarative data access
+    internal var dataRequirementManager: NDKDataRequirementManager?
     
     // MARK: - Lazy Internal Components
     
@@ -115,8 +115,8 @@ public final class NDK {
             maxClosedSubscriptions: subscriptionTrackingConfig.maxClosedSubscriptions
         )
         
-        // Initialize subscription manager
-        self.subscriptionManager = NDKSubscriptionManager(ndk: self)
+        // Initialize internal subscription manager
+        self.internalSubscriptionManager = InternalSubscriptionManager(ndk: self)
         
         // Initialize managers
         self.eventManager = NDKEventManager(
@@ -128,16 +128,14 @@ public final class NDK {
             ndk: self
         )
         
-        self.subscriptionCoordinator = NDKSubscriptionCoordinator(
-            ndk: self,
-            subscriptionManager: subscriptionManager,
-            subscriptionTracker: subscriptionTracker,
-            cache: self.cache
-        )
+        // Subscription coordinator removed - using declarative API instead
         
         self.profileManager = NDKProfileManager(
             ndk: self
         )
+        
+        // Initialize data requirement manager for declarative API
+        self.dataRequirementManager = NDKDataRequirementManager(ndk: self)
         
         // Set shared NDK instance for NDKEventBuilder
         NDKEventBuilder.setSharedNDK(self)
@@ -168,6 +166,64 @@ public final class NDK {
     }
     
     // MARK: - Relay Management (Delegated to Pool)
+    
+    /// Wait for relay connections using proper async stream observation
+    /// - Parameters:
+    ///   - minimumRelays: Minimum number of relays to wait for (default: 1)
+    ///   - timeout: Maximum time to wait in seconds (default: 5)
+    /// - Returns: Number of connected relays
+    @discardableResult
+    public func waitForRelayConnections(minimumRelays: Int = 1, timeout: TimeInterval = 5.0) async -> Int {
+        // Create a task that will timeout
+        let timeoutTask = Task {
+            try? await Task.sleep(nanoseconds: UInt64(timeout * 1_000_000_000))
+            return -1 // Sentinel value for timeout
+        }
+        
+        // Create a task that monitors relay connections
+        let connectionTask = Task { () -> Int in
+            var connectedCount = 0
+            
+            // Check initial state
+            connectedCount = await pool.connectedRelays().count
+            if connectedCount >= minimumRelays {
+                return connectedCount
+            }
+            
+            // Monitor pool changes
+            for await change in await pool.relayChanges {
+                switch change {
+                case .relayConnected:
+                    connectedCount = await pool.connectedRelays().count
+                    if connectedCount >= minimumRelays {
+                        return connectedCount
+                    }
+                case .relayDisconnected:
+                    connectedCount = await pool.connectedRelays().count
+                default:
+                    break
+                }
+            }
+            
+            return connectedCount
+        }
+        
+        // Race between timeout and connection
+        let result = await withTaskGroup(of: Int.self) { group in
+            group.addTask { await timeoutTask.value }
+            group.addTask { await connectionTask.value }
+            
+            if let firstResult = await group.next() {
+                // Cancel the other task
+                group.cancelAll()
+                return firstResult == -1 ? await pool.connectedRelays().count : firstResult
+            }
+            
+            return 0
+        }
+        
+        return result
+    }
     
     /// Add a relay to the pool (async version)
     @discardableResult
@@ -264,147 +320,110 @@ public final class NDK {
         try await eventManager.retryUnpublishedEvents(maxAge: maxAge, limit: limit)
     }
     
-    // MARK: - Subscriptions (Delegated to SubscriptionCoordinator)
+    // MARK: - Declarative Data Access
     
-    /// Subscribe to events matching the provided filters
+    /// Create a declarative data source for observing events
+    /// 
+    /// The returned data source automatically manages subscriptions, caching,
+    /// and lifecycle. It's the primary API for accessing Nostr data.
+    /// 
+    /// ## Usage
+    /// ```swift
+    /// let profileData = NDKDataSource<NDKUserProfile>(
+    ///     ndk: ndk,
+    ///     filter: NDKFilter(authors: [pubkey], kinds: [0])
+    /// ) { event in
+    ///     // Transform event to profile
+    ///     try? JSONDecoder().decode(NDKUserProfile.self, from: event.content.data(using: .utf8)!)
+    /// }
+    /// ```
+    /// 
     /// - Parameters:
-    ///   - filters: Array of filters to match events against
-    ///   - relays: Specific relays to use (nil uses default relay selection)
-    ///   - id: Custom subscription ID (auto-generated if nil)
-    ///   - closeOnEose: Whether to close subscription after receiving EOSE
-    ///   - groupingDelay: Time to wait for batching subscriptions (default: 0.1s, set to 0 to disable)
-    /// - Returns: An NDKSubscription that can be iterated over as an AsyncSequence
-    public func subscribe(
-        filters: [NDKFilter],
+    ///   - filter: The filter to match events against
+    ///   - transform: Optional transform function to convert NDKEvent to custom type
+    /// - Returns: A data source that can be observed for changes
+    @MainActor
+    public func dataSource(
+        filter: NDKFilter
+    ) -> NDKDataSource<NDKEvent> {
+        NDKDataSource(ndk: self, filter: filter) { $0 }
+    }
+    
+    @MainActor
+    public func dataSource<T>(
+        filter: NDKFilter,
+        transform: @escaping (NDKEvent) -> T?
+    ) -> NDKDataSource<T> {
+        NDKDataSource(ndk: self, filter: filter, transform: transform)
+    }
+    
+    /// Observe events matching a filter with automatic subscription management
+    /// 
+    /// This is the primary API for declarative data access in NDKSwift.
+    /// The returned data source automatically manages subscriptions, caching,
+    /// and lifecycle.
+    /// 
+    /// ## Usage
+    /// ```swift
+    /// // Simple event observation
+    /// let notes = ndk.observe(filter: NDKFilter(kinds: [1], limit: 20))
+    /// 
+    /// // With transform
+    /// let profiles = ndk.observe(
+    ///     filter: NDKFilter(authors: [pubkey], kinds: [0])
+    /// ) { event in
+    ///     try? JSONDecoder().decode(NDKUserProfile.self, from: event.content.data(using: .utf8)!)
+    /// }
+    /// 
+    /// // With options
+    /// let cachedEvents = ndk.observe(
+    ///     filter: myFilter,
+    ///     maxAge: 300,  // Use cache if less than 5 minutes old
+    ///     cachePolicy: .cacheWithNetwork
+    /// )
+    /// ```
+    /// 
+    /// - Parameters:
+    ///   - filter: The filter to match events against
+    ///   - maxAge: Maximum age of cached data to consider fresh (in seconds).
+    ///             0 = keep subscription open for real-time updates.
+    ///             >0 = use cache if fresh enough, otherwise fetch and close after EOSE
+    ///   - cachePolicy: Defines how the cache should be used for this request
+    ///   - relays: Optional set of specific relay URLs to query
+    ///   - transform: Optional transform function to convert NDKEvent to custom type
+    /// - Returns: A data source that can be observed for changes
+    @MainActor
+    public func observe(
+        filter: NDKFilter,
+        maxAge: TimeInterval = 0,
+        cachePolicy: CachePolicy = .cacheWithNetwork,
+        relays: Set<RelayURL>? = nil
+    ) -> NDKDataSource<NDKEvent> {
+        NDKDataSource(
+            ndk: self,
+            filter: filter,
+            maxAge: maxAge,
+            cachePolicy: cachePolicy,
+            relays: relays
+        )
+    }
+    
+    @MainActor
+    public func observe<T>(
+        filter: NDKFilter,
+        maxAge: TimeInterval = 0,
+        cachePolicy: CachePolicy = .cacheWithNetwork,
         relays: Set<RelayURL>? = nil,
-        id: String? = nil,
-        closeOnEose: Bool = false,
-        groupingDelay: TimeInterval? = nil
-    ) async -> NDKSubscription {
-        await subscriptionCoordinator.subscribe(filters: filters, relays: relays, id: id, closeOnEose: closeOnEose, groupingDelay: groupingDelay)
-    }
-    
-    /// Fetch events matching the given filters
-    /// 
-    /// This is a one-shot query that returns after receiving EOSE from relays.
-    /// For continuous event streams, use `subscribe` instead.
-    /// 
-    /// - Parameters:
-    ///   - filters: Array of filters to match events against
-    ///   - relays: Specific relays to query (nil uses relay selection strategy)
-    ///   - timeoutSeconds: Maximum time to wait for responses (default: 5s)
-    /// - Returns: Array of events matching the filters
-    /// - Throws: NDKError if the query times out or fails
-    public func fetchEvents(
-        _ filters: [NDKFilter],
-        relays: Set<RelayURL>? = nil,
-        timeoutSeconds: Int = 5
-    ) async throws -> [NDKEvent] {
-        try await subscriptionCoordinator.fetchEvents(filters, relays: relays, timeoutSeconds: timeoutSeconds)
-    }
-    
-    /// Fetch a single event by its ID
-    /// 
-    /// - Parameters:
-    ///   - id: The event ID to fetch
-    ///   - relays: Specific relays to query (nil uses relay selection strategy)
-    ///   - timeoutSeconds: Maximum time to wait for response (default: 5s)
-    /// - Returns: The event if found, nil otherwise
-    /// - Throws: NDKError if the query fails
-    public func fetchEvent(
-        id: EventID,
-        relays: Set<RelayURL>? = nil,
-        timeoutSeconds: Int = 5
-    ) async throws -> NDKEvent? {
-        print("[NDK.fetchEvent] Starting fetch for event ID: \(id), relays: \(relays?.joined(separator: ", ") ?? "nil"), timeout: \(timeoutSeconds)s")
-        do {
-            let result = try await subscriptionCoordinator.fetchEvent(id: id, relays: relays, timeoutSeconds: timeoutSeconds)
-            print("[NDK.fetchEvent] Completed fetch for event ID: \(id), result: \(result != nil ? "found" : "not found")")
-            return result
-        } catch {
-            print("[NDK.fetchEvent] Error fetching event ID: \(id), error: \(error)")
-            throw error
-        }
-    }
-    
-    /// Fetch a single event matching the given filter
-    /// 
-    /// Returns the first event that matches the filter criteria.
-    /// 
-    /// - Parameters:
-    ///   - filter: Filter criteria to match
-    ///   - relays: Specific relays to query (nil uses relay selection strategy)
-    ///   - timeoutSeconds: Maximum time to wait for response (default: 5s)
-    /// - Returns: The first matching event if found, nil otherwise
-    /// - Throws: NDKError if the query fails
-    public func fetchEvent(
-        _ filter: NDKFilter,
-        relays: Set<RelayURL>? = nil,
-        timeoutSeconds: Int = 5
-    ) async throws -> NDKEvent? {
-        print("[NDK.fetchEvent] Starting fetch with filter, relays: \(relays?.joined(separator: ", ") ?? "nil"), timeout: \(timeoutSeconds)s")
-        do {
-            let result = try await subscriptionCoordinator.fetchEvent(filter, relays: relays, timeoutSeconds: timeoutSeconds)
-            print("[NDK.fetchEvent] Completed fetch with filter, result: \(result != nil ? "found" : "not found")")
-            return result
-        } catch {
-            print("[NDK.fetchEvent] Error fetching with filter, error: \(error)")
-            throw error
-        }
-    }
-    
-    /// Fetch a user's profile metadata
-    /// 
-    /// Retrieves the most recent kind:0 (metadata) event for the given user.
-    /// Results are cached for efficient repeated queries.
-    /// 
-    /// - Parameters:
-    ///   - pubkey: The user's public key
-    ///   - forceRefresh: If true, bypasses cache and fetches from relays
-    /// - Returns: The user's profile if found, nil otherwise
-    /// - Throws: NDKError if the query fails
-    public func fetchProfile(
-        for pubkey: PublicKey,
-        forceRefresh: Bool = false
-    ) async throws -> NDKUserProfile? {
-        try await profileManager.fetchProfile(for: pubkey, forceRefresh: forceRefresh)
-    }
-    
-    /// Observe profile updates for a given pubkey
-    /// Returns an AsyncSequence that yields the profile immediately if cached,
-    /// then yields updates as they arrive from relays
-    /// - Parameters:
-    ///   - pubkey: The public key to observe
-    ///   - closeOnEose: If true, closes the subscription after receiving initial data (EOSE)
-    public func observeProfile(for pubkey: PublicKey, closeOnEose: Bool = false) async -> AsyncStream<NDKUserProfile?> {
-        await profileManager.observeProfile(for: pubkey, closeOnEose: closeOnEose)
-    }
-    
-    /// Get current subscription statistics
-    /// 
-    /// Provides insight into the subscription system's current state and performance.
-    /// 
-    /// - Returns: Statistics including active subscriptions, event counts, and performance metrics
-    public func getSubscriptionStats() async -> NDKSubscriptionManager.SubscriptionStats {
-        await subscriptionCoordinator.getSubscriptionStats()
-    }
-    
-    /// Clear the entire relay list cache
-    /// 
-    /// Forces fresh fetching of relay lists (kind:10002) on next access.
-    /// Useful when relay configurations have changed.
-    public func clearRelayListCache() async {
-        await subscriptionCoordinator.clearRelayListCache()
-    }
-    
-    /// Fetch multiple user profiles
-    public func fetchProfiles(_ pubkeys: [PublicKey]) async throws -> [PublicKey: NDKUserProfile] {
-        return try await profileManager.fetchProfiles(for: pubkeys)
-    }
-    
-    /// Clear relay list cache for specific author
-    public func clearRelayListCache(for author: String) async {
-        await subscriptionCoordinator.clearRelayListCache(for: author)
+        transform: @escaping (NDKEvent) -> T?
+    ) -> NDKDataSource<T> {
+        NDKDataSource(
+            ndk: self,
+            filter: filter,
+            maxAge: maxAge,
+            cachePolicy: cachePolicy,
+            relays: relays,
+            transform: transform
+        )
     }
     
     // MARK: - Event Building
@@ -559,12 +578,21 @@ public final class NDK {
     // MARK: - Internal Methods (for relay communication)
     
     func processEvent(_ event: NDKEvent, from relay: RelayProtocol) async {
-        await subscriptionCoordinator.processEvent(event, from: relay)
+        // Process event through cache for observation
+        try? await cache.processEvent(event, from: relay.url, subscriptionId: "")
+        
+        // Also process through internal subscription manager
+        // The relay should include subscription ID in the event
+        // For now, we'll need to extract it from the relay's internal state
+        if let ndkRelay = relay as? NDKRelay {
+            // Process through internal subscription manager
+            await internalSubscriptionManager.processEvent(event, subscriptionId: "", from: ndkRelay)
+        }
     }
     
     func processEOSE(subscriptionId: String, from relay: RelayProtocol) {
         Task {
-            await subscriptionCoordinator.processEOSE(subscriptionId: subscriptionId, from: relay)
+            await internalSubscriptionManager.processEOSE(subscriptionId: subscriptionId, from: relay)
         }
     }
     
@@ -588,9 +616,8 @@ public final class NDK {
     }
     
     func processCount(subscriptionId: String, count: Int, from relay: RelayProtocol) {
-        Task {
-            await subscriptionCoordinator.processCount(subscriptionId: subscriptionId, count: count, from: relay)
-        }
+        // Count messages not supported in declarative API yet
+        print("[NDK] Received COUNT from \(relay.url): \(count)")
     }
     
     func handleAuthChallenge(challenge: String, from relay: RelayProtocol) async {

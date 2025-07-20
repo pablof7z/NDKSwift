@@ -120,7 +120,7 @@ extension NDK {
                         return (relay.url, result)
                     } catch {
                         // Log error but don't fail entire sync
-                        NDKLogger.shared.log(.warning, category: .relay, "Sync failed for \(relay.url): \(error)")
+                        NDKLogger.log(.warning, category: .relay, "Sync failed for \(relay.url): \(error)")
                         return (relay.url, nil)
                     }
                 }

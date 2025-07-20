@@ -27,23 +27,28 @@ final class SubscriptionGroupingProfileTests: XCTestCase {
     
     /// Test that NDKFilter properly generates fingerprints for grouping
     func testFilterFingerprintGeneration() {
-        // Create filters that should have the same fingerprint (same structure, different values)
+        // Create filters with same structure but different values
         let filter1 = NDKFilter(authors: ["author1"], kinds: [EventKind.metadata])
-        // These filters are created to verify they don't affect fingerprinting
-        _ = NDKFilter(authors: ["author2"], kinds: [EventKind.metadata])
-        _ = NDKFilter(authors: ["author3"], kinds: [EventKind.metadata])
+        let filter2 = NDKFilter(authors: ["author2"], kinds: [EventKind.metadata])
+        let filter3 = NDKFilter(authors: ["author3"], kinds: [EventKind.metadata])
         
-        // Create filters with different fingerprints
-        _ = NDKFilter(authors: ["author4"], kinds: [EventKind.textNote])
+        // Create filters with different structures
+        let filter4 = NDKFilter(authors: ["author4"], kinds: [EventKind.textNote])
         let filter5 = NDKFilter(authors: ["author5"], kinds: [EventKind.metadata], limit: 10)
         
-        // Test fingerprint structure
-        XCTAssertTrue(filter1.fingerprint.contains("authors"))
-        XCTAssertTrue(filter1.fingerprint.contains("kinds"))
+        // Filters with same structure should have same fingerprint structure
+        // (they'll have different fingerprints due to different values, but same structure)
+        XCTAssertFalse(filter1.fingerprint.isEmpty)
+        XCTAssertFalse(filter2.fingerprint.isEmpty)
+        XCTAssertFalse(filter3.fingerprint.isEmpty)
         
-        // Filters with limits should have "limit" in fingerprint
-        XCTAssertTrue(filter5.fingerprint.contains("limit"))
-        XCTAssertFalse(filter1.fingerprint.contains("limit"))
+        // Filters with different structures should have different fingerprints
+        XCTAssertNotEqual(filter1.fingerprint, filter4.fingerprint) // Different kinds
+        XCTAssertNotEqual(filter1.fingerprint, filter5.fingerprint) // Different limit
+        
+        // All fingerprints should be hex strings (hashes)
+        XCTAssertTrue(filter1.fingerprint.allSatisfy { $0.isHexDigit })
+        XCTAssertTrue(filter5.fingerprint.allSatisfy { $0.isHexDigit })
     }
     
     /// Test filter merging logic
@@ -85,31 +90,28 @@ final class SubscriptionGroupingProfileTests: XCTestCase {
     
     /// Test subscription fingerprint creation
     func testSubscriptionFingerprinting() async {
-        // Create subscriptions with the same fingerprint pattern
-        let sub1 = await ndk.subscribe(
-            filters: [NDKFilter(authors: ["author1"], kinds: [EventKind.metadata])],
-            closeOnEose: true
+        // Create data sources with the same fingerprint pattern
+        let dataSource1 = ndk.observe(
+            filter: NDKFilter(authors: ["author1"], kinds: [EventKind.metadata]),
+            maxAge: 0
         )
         
-        let sub2 = await ndk.subscribe(
-            filters: [NDKFilter(authors: ["author2"], kinds: [EventKind.metadata])],
-            closeOnEose: true
+        let dataSource2 = ndk.observe(
+            filter: NDKFilter(authors: ["author2"], kinds: [EventKind.metadata]),
+            maxAge: 0
         )
         
-        let sub3 = await ndk.subscribe(
-            filters: [NDKFilter(authors: ["author3"], kinds: [EventKind.textNote])],
-            closeOnEose: true
+        let dataSource3 = ndk.observe(
+            filter: NDKFilter(authors: ["author3"], kinds: [EventKind.textNote]),
+            maxAge: 0
         )
         
-        // Basic test - subscriptions were created
-        XCTAssertNotNil(sub1)
-        XCTAssertNotNil(sub2)
-        XCTAssertNotNil(sub3)
+        // Basic test - data sources were created
+        XCTAssertNotNil(dataSource1)
+        XCTAssertNotNil(dataSource2)
+        XCTAssertNotNil(dataSource3)
         
-        // Close subscriptions
-        await sub1.close()
-        await sub2.close()
-        await sub3.close()
+        // No need to close AsyncStreams - they clean up automatically
     }
     
     /// Integration test - verify ProfileManager uses subscription layer batching

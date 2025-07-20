@@ -254,36 +254,45 @@ actor NDKFetchingStrategy {
         options.relays = Set([relay])
 
         let relayUrls = options.relays?.map { $0.url }
-        let relaySubscription = await ndk.subscribe(
-            filters: subscription.filters,
-            relays: relayUrls.map { Set($0) }
-        )
+        
+        // Create data sources for each filter
+        var dataSources: [NDKDataSource<NDKEvent>] = []
+        for filter in subscription.filters {
+            let dataSource = NDKDataSource(
+                ndk: ndk,
+                filter: filter,
+                maxAge: 0, // Always fresh for outbox fetching
+                cachePolicy: .cacheWithNetwork, // Use cache but also fetch from network
+                relays: relayUrls.map { Set($0) }
+            )
+            dataSources.append(dataSource)
+        }
 
         // Start async event handling
-        Task { [weak subscription, weak relaySubscription] in
-            guard let subscription = subscription,
-                  let relaySubscription = relaySubscription else { return }
+        Task { [weak subscription] in
+            guard let subscription = subscription else { return }
             
-            // Use async sequence for events
-            do {
-                for try await event in relaySubscription {
-                    // Deduplicate events
-                    let eventId = event.id
-                    if !subscription.seenEventIds.contains(eventId) {
-                        subscription.seenEventIds.insert(eventId)
-                        subscription.eventCount += 1
-                        subscription.eventHandler(event)
+            // Process events from all data sources
+            await withTaskGroup(of: Void.self) { group in
+                for dataSource in dataSources {
+                    group.addTask {
+                        for await event in await dataSource.events {
+                            // Deduplicate events
+                            let eventId = event.id
+                            if !subscription.seenEventIds.contains(eventId) {
+                                subscription.seenEventIds.insert(eventId)
+                                subscription.eventCount += 1
+                                subscription.eventHandler(event)
+                            }
+                        }
+                        // If loop completes normally, we got EOSE
+                        subscription.updateRelayStatus(relayURL, status: .eose)
                     }
                 }
-                // If loop completes normally, we got EOSE
-                subscription.updateRelayStatus(relayURL, status: .eose)
-            } catch {
-                // Handle subscription errors
-                subscription.updateRelayStatus(relayURL, status: .error)
             }
         }
 
-        subscription.relaySubscriptions[relayURL] = relaySubscription
+        // Note: We no longer store subscription references as they're managed internally
         subscription.updateRelayStatus(relayURL, status: .active)
     }
 

@@ -157,7 +157,14 @@ public final class NDKUser: Equatable, Hashable, Sendable {
         )
 
         // Fetch the relay list event
-        if let event = try await ndk.fetchEvent(filter) {
+        let dataSource = NDKDataSource(
+            ndk: ndk,
+            filter: filter,
+            maxAge: 86400 // 24 hours - relay lists rarely change
+        )
+        
+        let events = await dataSource.currentValue()
+        if let event = events.first {
             // Parse relay tags
             let eventTags = event.tags
             let relays = eventTags
@@ -196,7 +203,14 @@ public final class NDKUser: Equatable, Hashable, Sendable {
         )
 
         // Fetch the contact list event
-        if let event = try await ndk.fetchEvent(filter) {
+        let dataSource = NDKDataSource(
+            ndk: ndk,
+            filter: filter,
+            maxAge: 600 // 10 minutes - contact lists don't change frequently
+        )
+        
+        let events = await dataSource.currentValue()
+        if let event = events.first {
             // Parse 'p' tags from contact list
             let eventTags = event.tags
             let followedPubkeys = eventTags
@@ -286,7 +300,15 @@ public final class NDKUser: Equatable, Hashable, Sendable {
             kinds: [EventKind.metadata, EventKind.nutzapPreferences]  // Fetch BOTH in one request
         )
         
-        let events = try await ndk.fetchEvents([filter])
+        // Use NDKDataSource with reasonable maxAge for payment methods
+        let dataSource = NDKDataSource(
+            ndk: ndk,
+            filter: filter,
+            maxAge: 300 // 5 minutes - payment methods don't change often
+        )
+        
+        // Get current value
+        let events = await dataSource.currentValue()
         
         for event in events {
             switch event.kind {

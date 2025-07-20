@@ -7,7 +7,7 @@ actor WalletEventProcessor {
     
     /// Process a wallet event based on its kind
     func processEvent(_ event: NDKEvent, context: WalletEventContext) async {
-        NDKLogger.shared.log(.debug, category: .wallet, "Wallet event received: kind=\(event.kind)")
+        NDKLogger.log(.debug, category: .wallet, "Wallet event received: kind=\(event.kind)")
         do {
             switch event.kind {
             case EventKind.cashuWalletConfig:
@@ -21,10 +21,10 @@ actor WalletEventProcessor {
             case EventKind.nutzap:
                 try await processNutzapEvent(event, context: context)
             default:
-                NDKLogger.shared.log(.warning, category: .wallet, "No handler for event kind \(event.kind)")
+                NDKLogger.log(.warning, category: .wallet, "No handler for event kind \(event.kind)")
             }
         } catch {
-            NDKLogger.shared.log(.error, category: .wallet, "Failed to process wallet event \(event.id): \(error)")
+            NDKLogger.log(.error, category: .wallet, "Failed to process wallet event \(event.id): \(error)")
         }
     }
     
@@ -34,13 +34,13 @@ actor WalletEventProcessor {
     private func processTokenEvent(_ event: NDKEvent, context: WalletEventContext) async throws {
         // First check if we should process this event
         if await context.eventManager.shouldFilterEvent(event.id) {
-            NDKLogger.shared.log(.debug, category: .wallet, "Skipping deleted or superseded token event: \(event.id)")
+            NDKLogger.log(.debug, category: .wallet, "Skipping deleted or superseded token event: \(event.id)")
             return
         }
         
-        NDKLogger.shared.log(.debug, category: .wallet, "Processing token event: \(event.id)")
-        NDKLogger.shared.log(.debug, category: .wallet, "Event Kind: \(event.kind)")
-        NDKLogger.shared.log(.debug, category: .wallet, "Event Author: \(event.pubkey)")
+        NDKLogger.log(.debug, category: .wallet, "Processing token event: \(event.id)")
+        NDKLogger.log(.debug, category: .wallet, "Event Kind: \(event.kind)")
+        NDKLogger.log(.debug, category: .wallet, "Event Author: \(event.pubkey)")
         
         // Decrypt and process token
         let sender = NDKUser(pubkey: event.pubkey)
@@ -50,33 +50,33 @@ actor WalletEventProcessor {
             scheme: .nip44
         )
         
-        NDKLogger.shared.log(.debug, category: .wallet, "DECRYPTED TOKEN CONTENT:")
-        NDKLogger.shared.log(.debug, category: .wallet, "Decrypted length: \(decryptedContent.count) characters")
-        NDKLogger.shared.log(.debug, category: .wallet, "Decrypted content: \(decryptedContent)")
-        NDKLogger.shared.log(.debug, category: .wallet, "Decrypted content (raw): \(String(describing: decryptedContent.data(using: .utf8)))")
+        NDKLogger.log(.debug, category: .wallet, "DECRYPTED TOKEN CONTENT:")
+        NDKLogger.log(.debug, category: .wallet, "Decrypted length: \(decryptedContent.count) characters")
+        NDKLogger.log(.debug, category: .wallet, "Decrypted content: \(decryptedContent)")
+        NDKLogger.log(.debug, category: .wallet, "Decrypted content (raw): \(String(describing: decryptedContent.data(using: .utf8)))")
         
         // Parse token data
         guard let tokenData = decryptedContent.data(using: .utf8),
               let nip60Token = JSONCoding.safeDecode(NIP60TokenEvent.self, from: tokenData) else {
-            NDKLogger.shared.log(.error, category: .wallet, "Failed to parse NIP-60 token event data from decrypted content")
+            NDKLogger.log(.error, category: .wallet, "Failed to parse NIP-60 token event data from decrypted content")
             throw NDKError.invalidContent("Failed to parse NIP-60 token event data")
         }
         
-        NDKLogger.shared.log(.debug, category: .wallet, "PARSED TOKEN EVENT:")
-        NDKLogger.shared.log(.debug, category: .wallet, "Mint URL: \(nip60Token.mint)")
-        NDKLogger.shared.log(.debug, category: .wallet, "Proofs count: \(nip60Token.proofs.count)")
-        NDKLogger.shared.log(.debug, category: .wallet, "Del tags count: \(nip60Token.del?.count ?? 0)")
+        NDKLogger.log(.debug, category: .wallet, "PARSED TOKEN EVENT:")
+        NDKLogger.log(.debug, category: .wallet, "Mint URL: \(nip60Token.mint)")
+        NDKLogger.log(.debug, category: .wallet, "Proofs count: \(nip60Token.proofs.count)")
+        NDKLogger.log(.debug, category: .wallet, "Del tags count: \(nip60Token.del?.count ?? 0)")
         if let delTags = nip60Token.del {
-            NDKLogger.shared.log(.debug, category: .wallet, "Del tags: \(delTags)")
+            NDKLogger.log(.debug, category: .wallet, "Del tags: \(delTags)")
         }
         for (index, proof) in nip60Token.proofs.enumerated() {
-            NDKLogger.shared.log(.debug, category: .wallet, "Proof \(index): amount=\(proof.amount), keysetID=\(proof.keysetID), C=\(proof.C.prefix(20))...")
+            NDKLogger.log(.debug, category: .wallet, "Proof \(index): amount=\(proof.amount), keysetID=\(proof.keysetID), C=\(proof.C.prefix(20))...")
         }
         
         // Handle del tags - these events are no longer valid
         if let delIds = nip60Token.del {
             for delId in delIds {
-                NDKLogger.shared.log(.debug, category: .wallet, "Processing del tag for event: \(delId)")
+                NDKLogger.log(.debug, category: .wallet, "Processing del tag for event: \(delId)")
                 await deleteEventAndProofs(delId, context: context)
             }
         }
@@ -96,12 +96,12 @@ actor WalletEventProcessor {
     
     /// Process quote events
     private func processQuoteEvent(_ event: NDKEvent, context: WalletEventContext) async throws {
-        NDKLogger.shared.log(.debug, category: .wallet, "Processing quote event")
-        NDKLogger.shared.log(.debug, category: .wallet, "Event ID: \(event.id)")
-        NDKLogger.shared.log(.debug, category: .wallet, "Event Kind: \(event.kind)")
-        NDKLogger.shared.log(.debug, category: .wallet, "Event Author: \(event.pubkey)")
-        NDKLogger.shared.log(.debug, category: .wallet, "Encrypted content length: \(event.content.count) characters")
-        NDKLogger.shared.log(.debug, category: .wallet, "Encrypted content (first 100 chars): \(event.content.prefix(100))")
+        NDKLogger.log(.debug, category: .wallet, "Processing quote event")
+        NDKLogger.log(.debug, category: .wallet, "Event ID: \(event.id)")
+        NDKLogger.log(.debug, category: .wallet, "Event Kind: \(event.kind)")
+        NDKLogger.log(.debug, category: .wallet, "Event Author: \(event.pubkey)")
+        NDKLogger.log(.debug, category: .wallet, "Encrypted content length: \(event.content.count) characters")
+        NDKLogger.log(.debug, category: .wallet, "Encrypted content (first 100 chars): \(event.content.prefix(100))")
         
         // Decrypt content
         let sender = NDKUser(pubkey: event.pubkey)
@@ -111,9 +111,9 @@ actor WalletEventProcessor {
             scheme: .nip44
         )
         
-        NDKLogger.shared.log(.debug, category: .wallet, "DECRYPTED QUOTE CONTENT:")
-        NDKLogger.shared.log(.debug, category: .wallet, "Decrypted length: \(decryptedContent.count) characters")
-        NDKLogger.shared.log(.debug, category: .wallet, "Decrypted content: \(decryptedContent)")
+        NDKLogger.log(.debug, category: .wallet, "DECRYPTED QUOTE CONTENT:")
+        NDKLogger.log(.debug, category: .wallet, "Decrypted length: \(decryptedContent.count) characters")
+        NDKLogger.log(.debug, category: .wallet, "Decrypted content: \(decryptedContent)")
         
         // Parse quote data
         guard let quoteData = decryptedContent.data(using: .utf8),
@@ -121,7 +121,7 @@ actor WalletEventProcessor {
             throw NDKError.invalidContent("Failed to parse quote event data")
         }
         
-        NDKLogger.shared.log(.debug, category: .wallet, "Loaded quote: \(quote.quoteId) for \(quote.amount) sats")
+        NDKLogger.log(.debug, category: .wallet, "Loaded quote: \(quote.quoteId) for \(quote.amount) sats")
         
         // Start tracking the quote for automatic minting
         await context.wallet.trackQuote(quote: quote, event: event)
@@ -131,7 +131,7 @@ actor WalletEventProcessor {
     
     /// Process delete events (kind 5)
     private func processDeleteEvent(_ event: NDKEvent, context: WalletEventContext) async throws {
-        NDKLogger.shared.log(.debug, category: .wallet, "Processing delete event")
+        NDKLogger.log(.debug, category: .wallet, "Processing delete event")
         
         // Find 'e' tags that reference events to delete
         let eventIdsToDelete = event.tags.compactMap { tag -> String? in
@@ -150,20 +150,20 @@ actor WalletEventProcessor {
         let shouldDeleteKinds = kindsToDelete.isEmpty || !Set(kindsToDelete).isDisjoint(with: relevantKinds)
         
         guard shouldDeleteKinds else {
-            NDKLogger.shared.log(.debug, category: .wallet, "Delete event doesn't target wallet kinds, ignoring")
+            NDKLogger.log(.debug, category: .wallet, "Delete event doesn't target wallet kinds, ignoring")
             return
         }
         
         // Process each event to delete
         for eventId in eventIdsToDelete {
-            NDKLogger.shared.log(.debug, category: .wallet, "Processing deletion for event: \(eventId)")
+            NDKLogger.log(.debug, category: .wallet, "Processing deletion for event: \(eventId)")
             await deleteEventAndProofs(eventId, context: context)
         }
     }
     
     /// Process incoming nutzap events
     private func processNutzapEvent(_ event: NDKEvent, context: WalletEventContext) async throws {
-        NDKLogger.shared.log(.debug, category: .wallet, "Processing incoming nutzap event")
+        NDKLogger.log(.debug, category: .wallet, "Processing incoming nutzap event")
         try await context.wallet.processIncomingNutzap(event)
     }
     
@@ -180,7 +180,7 @@ actor WalletEventProcessor {
         // Mark proofs that are still owned by this event as deleted
         let deletedProofs = await context.proofStateManager.markProofsOwnedByEventAsDeleted(eventId)
         if !deletedProofs.isEmpty {
-            NDKLogger.shared.log(.debug, category: .wallet, "Marked \(deletedProofs.count) proofs as deleted from event: \(eventId)")
+            NDKLogger.log(.debug, category: .wallet, "Marked \(deletedProofs.count) proofs as deleted from event: \(eventId)")
         }
     }
 }

@@ -188,13 +188,17 @@ final class NIP60NutzapE2ETests: XCTestCase {
             kinds: [EventKind.cashuToken]
         )
         
-        let subscription7375_1 = await ndk1.subscribe(filters: [filter7375_1], closeOnEose: false)
-        print("✅ Subscription created for pubkey1's 7375 events")
+        let dataSource7375_1 = ndk1.observe(
+            filter: filter7375_1,
+            maxAge: 0, // Real-time monitoring
+            cachePolicy: .networkOnly
+        )
+        print("✅ Data source created for pubkey1's 7375 events")
         
         Task {
             print("👂 Listening for pubkey1's 7375 events...")
             do {
-                for try await event in subscription7375_1 {
+                for await event in dataSource7375_1.events {
                     print("📨 Pubkey1 published 7375 event: \(event.id)")
                     if depositEvent == nil {
                         depositEvent = event
@@ -212,11 +216,15 @@ final class NIP60NutzapE2ETests: XCTestCase {
             tags: ["p": Set([pubkey2])]
         )
         
-        let subscription9321 = await ndk1.subscribe(filters: [filter9321], closeOnEose: false)
+        let dataSource9321 = ndk1.observe(
+            filter: filter9321,
+            maxAge: 0, // Real-time monitoring
+            cachePolicy: .networkOnly
+        )
         
         Task {
             do {
-                for try await event in subscription9321 {
+                for await event in dataSource9321.events {
                     print("📨 Nutzap event published: \(event.id)")
                     if nutzapEvent == nil {
                         nutzapEvent = event
@@ -234,11 +242,15 @@ final class NIP60NutzapE2ETests: XCTestCase {
             kinds: [EventKind.cashuToken]
         )
         
-        let subscription7375_2 = await ndk2.subscribe(filters: [filter7375_2], closeOnEose: false)
+        let dataSource7375_2 = ndk2.observe(
+            filter: filter7375_2,
+            maxAge: 0, // Real-time monitoring
+            cachePolicy: .networkOnly
+        )
         
         Task {
             do {
-                for try await event in subscription7375_2 {
+                for await event in dataSource7375_2.events {
                     print("📨 Pubkey2 published 7375 event: \(event.id)")
                     if redeemEvent == nil {
                         redeemEvent = event
@@ -329,7 +341,12 @@ final class NIP60NutzapE2ETests: XCTestCase {
             limit: 1
         )
         
-        let preferencesEvents = try await ndk1.fetchEvents([preferencesFilter])
+        let dataSource = ndk1.observe(
+            filter: preferencesFilter,
+            maxAge: 0, // Always fresh for tests
+            cachePolicy: .networkOnly
+        )
+        let preferencesEvents = await dataSource.currentValue()
         guard let preferencesEvent = preferencesEvents.first else {
             XCTFail("Pubkey2 should have published nutzap preferences")
             return

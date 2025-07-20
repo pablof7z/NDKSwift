@@ -44,18 +44,22 @@ public struct NWCResponseHandler {
         options.relays = Set(connectedRelays)
         options.closeOnEose = false // Keep subscription open to catch the response
         
-        let relayUrls = options.relays?.map { $0.url }
-        let subscription = await ndk.subscribe(
-            filters: [filter], 
-            relays: relayUrls.map { Set($0) },
-            closeOnEose: options.closeOnEose
+        let relayUrls = Set(connectedRelays.map { $0.url })
+        
+        // Use NDKDataSource for NWC response monitoring
+        let dataSource = NDKDataSource(
+            ndk: ndk,
+            filter: filter,
+            maxAge: 0, // Always fresh for real-time response monitoring
+            cachePolicy: .networkOnly, // Skip cache for NWC responses
+            relays: relayUrls
         )
         
         // Collect response in a task
         let responseTask = Task { () -> T in
             print("[NWC Response] Waiting for response event...")
             
-            for try await responseEvent in subscription {
+            for await responseEvent in await dataSource.events {
                 print("[NWC Response] Got response event:")
                 print("[NWC Response]   ID: \(responseEvent.id)")
                 print("[NWC Response]   Pubkey: \(responseEvent.pubkey)")
@@ -76,9 +80,7 @@ public struct NWCResponseHandler {
                 // Parse and return the response
                 let result = try parseResponse(decryptedContent, expectedType: responseType)
                 
-                // Close the subscription
-                await subscription.close()
-                
+                // AsyncStream will clean up automatically
                 return result
             }
             
@@ -86,10 +88,7 @@ public struct NWCResponseHandler {
             throw NDKError.timeout(operation: "NWC response", seconds: Int(timeout))
         }
         
-        // 3. Wait for subscription to be ready by waiting for EOSE
-        print("[NWC Response] Waiting for subscription to receive EOSE before publishing request")
-        await subscription.waitForEOSE()
-        print("[NWC Response] Subscription ready (EOSE received)")
+        // 3. AsyncStream starts immediately, no need to wait for EOSE
         
         // 4. Now publish the request
         print("[NWC Response] Publishing request event \(requestId)")
@@ -99,7 +98,7 @@ public struct NWCResponseHandler {
         // 5. Set up timeout
         let timeoutTask = Task {
             try await Task.sleep(nanoseconds: UInt64(timeout * Double(TimeConstants.nanosecondsPerSecond)))
-            await subscription.close()
+            // AsyncStream will clean up automatically when task is cancelled
             throw NDKError.timeout(operation: "NWC response", seconds: Int(timeout))
         }
         
@@ -166,15 +165,20 @@ public struct NWCResponseHandler {
         
         // Create subscription
         let relayUrls = Set(connectedRelays.map { $0.url })
-        let subscription = await ndk.subscribe(
-            filters: [filter],
+        
+        // Use NDKDataSource for batch NWC response monitoring
+        let dataSource = NDKDataSource(
+            ndk: ndk,
+            filter: filter,
+            maxAge: 0, // Always fresh for real-time response monitoring
+            cachePolicy: .networkOnly, // Skip cache for NWC responses
             relays: relayUrls
         )
         
         var responses: [String: Result<T, NDKError>] = [:]
         
         let responseTask = Task<[String: Result<T, NDKError>], Error> {
-            for try await event in subscription {
+            for await event in await dataSource.events {
                 // Get the d-tag for this response
                 let eventTags = event.tags
                 guard let dTag = eventTags.first(where: { $0.count >= 2 && $0[0] == "d" }),
@@ -260,13 +264,18 @@ public struct NWCResponseHandler {
                 
                 // Create subscription
                 let relayUrls = Set(connectedRelays.map { $0.url })
-                let subscription = await ndk.subscribe(
-                    filters: [filter],
+                
+                // Use NDKDataSource for NWC notification monitoring
+                let dataSource = NDKDataSource(
+                    ndk: ndk,
+                    filter: filter,
+                    maxAge: 0, // Always fresh for real-time notification monitoring
+                    cachePolicy: .networkOnly, // Skip cache for NWC notifications
                     relays: relayUrls
                 )
                 
                 let task = Task {
-                for try await event in subscription {
+                for await event in await dataSource.events {
                     // Check if this is an NWC notification (no e-tag)
                     let eventTags = event.tags
                     guard !eventTags.contains(where: { $0.count >= 1 && $0[0] == "e" }) else {

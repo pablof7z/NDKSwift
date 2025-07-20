@@ -11,7 +11,11 @@ let package = Package(
         .executable(name: "RelayCollectionDemo", targets: ["RelayCollectionDemo"]),
         .executable(name: "DebugKind0Fetcher", targets: ["DebugKind0Fetcher"]),
         .executable(name: "NIP77Demo", targets: ["NIP77Demo"]),
-        .executable(name: "TestNegentropyProtocol", targets: ["TestNegentropyProtocol"])
+        .executable(name: "TestNegentropyProtocol", targets: ["TestNegentropyProtocol"]),
+        .executable(name: "DeclarativeDemo", targets: ["DeclarativeDemo"]),
+        .executable(name: "ComprehensiveDeclarativeDemo", targets: ["ComprehensiveDeclarativeDemo"]),
+        .executable(name: "BasicDataSourceDemo", targets: ["BasicDataSourceDemo"]),
+        .executable(name: "MinimalDeclarativeDemo", targets: ["MinimalDeclarativeDemo"])
     ],
     dependencies: [
         .package(path: "..")
@@ -20,30 +24,62 @@ let package = Package(
         .executableTarget(
             name: "RelayCollectionDemo",
             dependencies: [
-                .product(name: "NDKSwift", package: "NDKSwift-sfodj5")
+                .product(name: "NDKSwift", package: "NDKSwift")
             ],
             path: "Sources/RelayCollectionDemo"
         ),
         .executableTarget(
             name: "DebugKind0Fetcher",
             dependencies: [
-                .product(name: "NDKSwift", package: "NDKSwift-sfodj5")
+                .product(name: "NDKSwift", package: "NDKSwift")
             ],
             path: "Sources/DebugKind0Fetcher"
         ),
         .executableTarget(
             name: "NIP77Demo",
             dependencies: [
-                .product(name: "NDKSwift", package: "NDKSwift-sfodj5")
+                .product(name: "NDKSwift", package: "NDKSwift")
             ],
             path: "Sources/NIP77Demo"
         ),
         .executableTarget(
             name: "TestNegentropyProtocol",
             dependencies: [
-                .product(name: "NDKSwift", package: "NDKSwift-sfodj5")
+                .product(name: "NDKSwift", package: "NDKSwift")
             ],
             path: "Sources/TestNegentropyProtocol"
+        ),
+        .executableTarget(
+            name: "DeclarativeDemo",
+            dependencies: [
+                .product(name: "NDKSwift", package: "NDKSwift")
+            ],
+            path: ".",
+            sources: ["DeclarativeDemo.swift"]
+        ),
+        .executableTarget(
+            name: "ComprehensiveDeclarativeDemo",
+            dependencies: [
+                .product(name: "NDKSwift", package: "NDKSwift")
+            ],
+            path: ".",
+            sources: ["ComprehensiveDeclarativeDemo.swift"]
+        ),
+        .executableTarget(
+            name: "BasicDataSourceDemo",
+            dependencies: [
+                .product(name: "NDKSwift", package: "NDKSwift")
+            ],
+            path: ".",
+            sources: ["FeatureShowcase.swift"]
+        ),
+        .executableTarget(
+            name: "MinimalDeclarativeDemo",
+            dependencies: [
+                .product(name: "NDKSwift", package: "NDKSwift")
+            ],
+            path: ".",
+            sources: ["MinimalDeclarativeDemo.swift"]
         )
     ]
 )

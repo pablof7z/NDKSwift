@@ -330,7 +330,7 @@ struct MintView: View {
         depositTask = Task {
             do {
                 guard let wallet = walletManager.activeWallet else { return }
-                let depositSequence = wallet.monitorDeposit(quote: quote)
+                let depositSequence = await wallet.monitorDeposit(quote: quote)
                 for try await status in depositSequence {
                     switch status {
                     case .pending:

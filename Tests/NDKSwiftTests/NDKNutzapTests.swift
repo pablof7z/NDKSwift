@@ -64,7 +64,7 @@ final class NDKNutzapTests: XCTestCase {
         let parsedProofs = nutzap.proofs
         XCTAssertEqual(parsedProofs.count, 1)
         XCTAssertEqual(parsedProofs.first?.amount, 42)
-        XCTAssertEqual(parsedProofs.first?.id, "keyset123")
+        XCTAssertEqual(parsedProofs.first?.keysetID, "keyset123")
         XCTAssertEqual(parsedProofs.first?.C, "02277c66191736eb72fce9d975d08e3191f8f96afb73ab1eec37e4465683066d3f")
     }
     
@@ -196,7 +196,7 @@ final class NDKNutzapTests: XCTestCase {
         let proofs = nutzap.proofs
         XCTAssertEqual(proofs.count, 1)
         XCTAssertEqual(proofs.first?.amount, 100)
-        XCTAssertEqual(proofs.first?.id, "keyset1")
+        XCTAssertEqual(proofs.first?.keysetID, "keyset1")
     }
     
     func testParseNutzapWithMalformedProof() throws {
@@ -316,7 +316,7 @@ final class NDKNutzapTests: XCTestCase {
             "tags": [
                 ["mint", "https://mint1.example.com", "wss://relay1.com", "wss://relay2.com"],
                 ["mint", "https://mint2.example.com"],
-                ["pubkey", "02custom_p2pk_key_here"]
+                ["p2pk", "02custom_p2pk_key_here"]
             ],
             "sig": "signature_here"
         }

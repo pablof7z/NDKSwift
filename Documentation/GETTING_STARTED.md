@@ -41,36 +41,52 @@ await ndk.connect()
 
 ### 2. Subscribe to Events
 
-NDKSwift uses modern AsyncSequence for subscriptions:
+NDKSwift uses a declarative data access pattern:
 
 ```swift
 // Subscribe to text notes (kind 1)
-let subscription = ndk.subscribe(filters: [
-    NDKFilter(kinds: [1], limit: 20)
-])
+let textNotes = await NDKDataSource<NDKEvent>(
+    ndk: ndk,
+    filter: NDKFilter(kinds: [1], limit: 20)
+)
 
-// Process events as they arrive
-for await event in subscription {
-    print("New note from \(event.pubkey): \(event.content)")
+// Use in SwiftUI views - automatically updates
+struct NotesView: View {
+    @StateObject var notes = textNotes
+    
+    var body: some View {
+        List(notes.data, id: \.id) { event in
+            Text("Note from \(event.pubkey): \(event.content)")
+        }
+    }
 }
 ```
 
-### 3. Fetch Events (One-time Query)
+### 3. Access Specific Data
 
-For one-time queries, use the fetch methods:
+Use data sources with filters to access specific events:
 
 ```swift
-// Fetch user profile
+// Get user profile
 let user = ndk.getUser(npub: "npub1...")
-let profile = try await user?.fetchProfile()
+let profileData = await NDKDataSource<NDKUserProfile>(
+    ndk: ndk,
+    filter: NDKFilter(kinds: [0], authors: [user.pubkey])
+) { event in
+    try? JSONDecoder().decode(NDKUserProfile.self, from: event.content.data(using: .utf8)!)
+}
 
-// Fetch recent notes
-let events = try await ndk.fetchEvents(
-    NDKFilter(kinds: [1], limit: 10)
+// Access recent notes
+let recentNotes = await NDKDataSource<NDKEvent>(
+    ndk: ndk,
+    filter: NDKFilter(kinds: [1], limit: 10)
 )
 
-// Fetch specific event
-let event = try await ndk.fetchEvent("note1...")
+// Get specific event by ID
+let specificEvent = await NDKDataSource<NDKEvent>(
+    ndk: ndk,
+    filter: NDKFilter(eventIds: ["eventId..."])
+)
 ```
 
 ### 4. Publish Events

@@ -165,18 +165,22 @@ public class NDKLightningZapProtocol: NDKZapProtocol {
             filter.addTagFilter("e", values: [eventId])
         }
         
-        // Subscribe with timeout
-        let subscription = await ndk.subscribe(filters: [filter])
+        // Use NDKDataSource for real-time zap receipt monitoring
+        let dataSource = NDKDataSource(
+            ndk: ndk,
+            filter: filter,
+            maxAge: 0, // Always fresh for real-time monitoring
+            cachePolicy: .networkOnly // Skip cache for zap receipts
+        )
         
         // Create timeout task
         let timeoutTask = Task {
             try await Task.sleep(nanoseconds: UInt64(timeout) * TimeConstants.nanosecondsPerSecond)
-            await subscription.close()
             throw ZapError.timeoutWaitingForReceipt
         }
         
         do {
-            for try await event in subscription {
+            for await event in await dataSource.events {
                 let receipt = NDKZapReceipt(event: event)
                 
                 // Check if this receipt matches our zap request
@@ -188,20 +192,17 @@ public class NDKLightningZapProtocol: NDKZapProtocol {
                         let isValid = receipt.validate(lnurlProviderPubkey: providerPubkey)
                         if isValid {
                             timeoutTask.cancel()
-                            await subscription.close()
                             return event
                         }
                     } else {
                         // No provider pubkey to validate against, accept the receipt
                         timeoutTask.cancel()
-                        await subscription.close()
                         return event
                     }
                 }
             }
         } catch {
             timeoutTask.cancel()
-            await subscription.close()
             throw error
         }
         
@@ -347,7 +348,15 @@ public class NDKLightningZapProtocol: NDKZapProtocol {
         relayListFilter.authors = [recipient.pubkey]
         relayListFilter.kinds = [EventKind.relayList]
         
-        if let relayListEvent = try? await ndk.fetchEvent(relayListFilter) {
+        // Use NDKDataSource for fetching relay list
+        let dataSource = NDKDataSource(
+            ndk: ndk,
+            filter: relayListFilter,
+            maxAge: 3600 // 1 hour - relay lists don't change frequently
+        )
+        
+        let events = await dataSource.currentValue()
+        if let relayListEvent = events.first {
             let eventTags = relayListEvent.tags
             let relays = eventTags
                 .filter { $0.first == "r" }

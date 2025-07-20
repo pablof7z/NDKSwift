@@ -423,18 +423,18 @@ public final class NDKRelay: RelayProtocol, Hashable, Equatable, @unchecked Send
     /// - Throws: `NDKError.connectionFailed` if the initial connection attempt fails
     public func connect() async throws {
         let currentState = await stateActor.getConnectionState()
-        NDKLogger.shared.log(.debug, category: .relay, "connect() called for \(url), current state: \(currentState)")
+        NDKLogger.log(.debug, category: .relay, "connect() called for \(url), current state: \(currentState)")
         
         switch currentState {
         case .disconnected, .failed:
             break
         default:
-            NDKLogger.shared.log(.debug, category: .relay, "Skipping connect for \(url) - already in state: \(currentState)")
+            NDKLogger.log(.debug, category: .relay, "Skipping connect for \(url) - already in state: \(currentState)")
             return
         }
 
         await stateActor.updateConnectionState(.connecting)
-        NDKLogger.shared.log(.debug, category: .relay, "State updated to connecting for \(url)")
+        NDKLogger.log(.debug, category: .relay, "State updated to connecting for \(url)")
         
         // Reset manual disconnection flag when explicitly connecting
         await stateActor.setManuallyDisconnected(false)
@@ -442,23 +442,23 @@ public final class NDKRelay: RelayProtocol, Hashable, Equatable, @unchecked Send
         await stateActor.updateStats {
             $0.connectionAttempts += 1
         }
-        NDKLogger.shared.log(.debug, category: .relay, "Stats updated for \(url)")
+        NDKLogger.log(.debug, category: .relay, "Stats updated for \(url)")
 
         let url = try URLUtils.validateURL(normalizedURL)
 
-        NDKLogger.shared.log(.debug, category: .relay, "Creating connection for \(url)")
+        NDKLogger.log(.debug, category: .relay, "Creating connection for \(url)")
         let newConnection = NDKRelayConnection(url: url)
         await stateActor.setConnection(newConnection)
         await newConnection.setDelegate(self)
         
-        NDKLogger.shared.log(.debug, category: .relay, "Calling connection.connect() for \(url)")
+        NDKLogger.log(.debug, category: .relay, "Calling connection.connect() for \(url)")
         if let conn = await stateActor.getConnection() {
             try await conn.connect()
         } else {
-            NDKLogger.shared.log(.error, category: .relay, "ERROR: connection is nil for \(url)")
+            NDKLogger.log(.error, category: .relay, "ERROR: connection is nil for \(url)")
             throw NDKError.connectionFailed(relay: url.absoluteString, message: "Connection is nil")
         }
-        NDKLogger.shared.log(.debug, category: .relay, "connection.connect() completed for \(url)")
+        NDKLogger.log(.debug, category: .relay, "connection.connect() completed for \(url)")
     }
 
     /// Disconnect from the relay
@@ -494,7 +494,7 @@ public final class NDKRelay: RelayProtocol, Hashable, Equatable, @unchecked Send
         // Don't auto-reconnect if the relay was manually disconnected
         let isManuallyDisconnected = await stateActor.isManuallyDisconnected()
         if isManuallyDisconnected {
-            NDKLogger.shared.log(.debug, category: .relay, "Skipping auto-reconnect for \(url) - manually disconnected")
+            NDKLogger.log(.debug, category: .relay, "Skipping auto-reconnect for \(url) - manually disconnected")
             return
         }
 
@@ -536,7 +536,7 @@ public final class NDKRelay: RelayProtocol, Hashable, Equatable, @unchecked Send
         } catch {
             // Silently fail - not all relays support NIP-11
             if ndk?.debugMode == true {
-                NDKLogger.shared.log(.warning, category: .relay, "Failed to fetch relay information from \(url): \(error)")
+                NDKLogger.log(.warning, category: .relay, "Failed to fetch relay information from \(url): \(error)")
             }
         }
     }
@@ -600,7 +600,7 @@ public final class NDKRelay: RelayProtocol, Hashable, Equatable, @unchecked Send
         } catch {
             // Log parsing error but don't crash
             if ndk?.debugMode == true {
-                NDKLogger.shared.log(.warning, category: .relay, "Failed to parse message from \(url): \(error)")
+                NDKLogger.log(.warning, category: .relay, "Failed to parse message from \(url): \(error)")
             }
         }
     }
@@ -632,13 +632,13 @@ public final class NDKRelay: RelayProtocol, Hashable, Equatable, @unchecked Send
             
         case .negOpen, .negMsg, .negClose, .negErr:
             // NIP-77 messages - route to sync handler via NDK
-            NDKLogger.shared.log(.debug, category: .relay, "Routing NIP-77 message to handler: \(message)")
+            NDKLogger.log(.debug, category: .relay, "Routing NIP-77 message to handler: \(message)")
             if let ndk = ndk {
                 Task {
                     await ndk.processNIP77Message(message, from: self)
                 }
             } else {
-                NDKLogger.shared.log(.error, category: .relay, "No NDK instance to route NIP-77 message!")
+                NDKLogger.log(.error, category: .relay, "No NDK instance to route NIP-77 message!")
             }
         }
     }
@@ -664,7 +664,7 @@ public final class NDKRelay: RelayProtocol, Hashable, Equatable, @unchecked Send
         if ndk?.debugMode == true {
             let status = accepted ? "✅ Accepted" : "❌ Rejected"
             let msg = message.map { ": \($0)" } ?? ""
-            NDKLogger.shared.log(.info, category: .relay, "\(status) event \(eventId) at \(url)\(msg)")
+            NDKLogger.log(.info, category: .relay, "\(status) event \(eventId) at \(url)\(msg)")
         }
 
         // Notify NDK about OK message
@@ -678,7 +678,7 @@ public final class NDKRelay: RelayProtocol, Hashable, Equatable, @unchecked Send
     /// Handle NOTICE message
     private func handleNoticeMessage(_ message: String) async {
         if ndk?.debugMode == true {
-            NDKLogger.shared.log(.info, category: .relay, "Notice from \(url): \(message)")
+            NDKLogger.log(.info, category: .relay, "Notice from \(url): \(message)")
         }
 
         // Notify NDK about notice message
@@ -688,7 +688,7 @@ public final class NDKRelay: RelayProtocol, Hashable, Equatable, @unchecked Send
     /// Handle AUTH message
     private func handleAuthMessage(challenge: String) async {
         if ndk?.debugMode == true {
-            NDKLogger.shared.log(.info, category: .relay, "Auth challenge from \(url): \(challenge)")
+            NDKLogger.log(.info, category: .relay, "Auth challenge from \(url): \(challenge)")
         }
 
         // Notify NDK about auth challenge - implementation requires signer
@@ -698,7 +698,7 @@ public final class NDKRelay: RelayProtocol, Hashable, Equatable, @unchecked Send
     /// Handle COUNT message
     private func handleCountMessage(subscriptionId: String, count: Int) async {
         if ndk?.debugMode == true {
-            NDKLogger.shared.log(.info, category: .relay, "Count for subscription \(subscriptionId): \(count)")
+            NDKLogger.log(.info, category: .relay, "Count for subscription \(subscriptionId): \(count)")
         }
 
         // Route to subscription manager via NDK only
@@ -796,7 +796,7 @@ extension NDKRelay: NDKRelayConnectionDelegate {
             await handleOKMessage(eventId: eventId, accepted: accepted, message: errorMessage)
 
         case let .notice(noticeMessage):
-            NDKLogger.shared.log(.info, category: .relay, "Notice from \(url): \(noticeMessage)")
+            NDKLogger.log(.info, category: .relay, "Notice from \(url): \(noticeMessage)")
 
         case let .auth(challenge):
             // Handle authentication challenge
@@ -832,7 +832,7 @@ public extension NDKRelay {
             return (success: success, message: nil)
         } catch let error as NDKError {
             if case let .publishFailed(_, message) = error {
-                NDKLogger.shared.log(.warning, category: .relay, "Event \(event.id) rejected by relay \(url): \(message)")
+                NDKLogger.log(.warning, category: .relay, "Event \(event.id) rejected by relay \(url): \(message)")
                 return (success: false, message: message)
             } else {
                 throw error

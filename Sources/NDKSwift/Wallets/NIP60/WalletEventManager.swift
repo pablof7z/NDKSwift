@@ -130,7 +130,15 @@ public actor WalletEventManager {
         // First get the event to delete
         let filter = NDKFilter(ids: [eventId])
         
-        if let eventToDelete = try await ndk.fetchEvent(filter) {
+        let dataSource = NDKDataSource(
+            ndk: ndk,
+            filter: filter,
+            maxAge: 0, // Always fresh for deletion
+            cachePolicy: .networkOnly // Need to confirm it exists
+        )
+        
+        let events = await dataSource.currentValue()
+        if let eventToDelete = events.first {
             try await eventToDelete.delete(reason: "Deleted token event", signer: signer, ndk: ndk)
         }
         
@@ -156,7 +164,15 @@ public actor WalletEventManager {
         // First get the event to delete
         let filter = NDKFilter(ids: [eventId])
         
-        if let quoteEvent = try await ndk.fetchEvent(filter) {
+        let dataSource = NDKDataSource(
+            ndk: ndk,
+            filter: filter,
+            maxAge: 0, // Always fresh for deletion
+            cachePolicy: .networkOnly // Need to confirm it exists
+        )
+        
+        let events = await dataSource.currentValue()
+        if let quoteEvent = events.first {
             try await quoteEvent.delete(reason: "Quote expired or used", signer: signer, ndk: ndk)
         }
         

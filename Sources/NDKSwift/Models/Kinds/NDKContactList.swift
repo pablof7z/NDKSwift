@@ -296,8 +296,15 @@ public extension NDK {
     /// Fetch the contact list for a specific user
     func fetchContactList(for user: NDKUser) async throws -> NDKContactList? {
         let filter = NDKFilter(authors: [user.pubkey], kinds: [3], limit: 1)
-        let events = try await fetchEvents([filter])
-
+        
+        // Use NDKDataSource with reasonable maxAge for contact lists
+        let dataSource = NDKDataSource(
+            ndk: self,
+            filter: filter,
+            maxAge: 600 // 10 minutes - contact lists don't change frequently
+        )
+        
+        let events = await dataSource.currentValue()
         guard let event = events.first else { return nil }
         return NDKContactList.fromEvent(event)
     }

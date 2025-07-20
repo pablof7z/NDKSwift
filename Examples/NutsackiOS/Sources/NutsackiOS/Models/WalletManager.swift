@@ -17,8 +17,10 @@ class WalletManager {
     private let modelContext: ModelContext
     private let defaultMintURL = URL(string: "https://testnut.cashu.space")!
     
-    // Subscription for history events
-    private var historySubscription: NDKSubscription?
+    // Declarative data sources
+    private var walletEventDataSource: WalletEventDataSource?
+    private var walletHistoryDataSource: WalletHistoryDataSource?
+    private var nutzapDataSource: NutzapDataSource?
     
     // Task for monitoring wallet events
     private var walletEventTask: Task<Void, Never>?
@@ -47,9 +49,11 @@ class WalletManager {
         }
         
         // Wait for signer to be available before creating wallet
-        guard ndk.signer != nil else {
+        guard let signer = ndk.signer else {
             throw WalletError.signerNotAvailable
         }
+        
+        let userPubkey = try await signer.pubkey
         
         // Create NIP60Wallet instance with mint cache if available
         let ndkWallet = try NIP60Wallet(ndk: ndk, cache: nostrManager.cache)
@@ -63,8 +67,16 @@ class WalletManager {
             print("WalletManager - Registered NIP60Wallet with zap manager")
         }
         
-        // Start monitoring wallet events
+        // Initialize declarative data sources
+        self.walletEventDataSource = WalletEventDataSource(ndk: ndk, pubkey: userPubkey)
+        self.walletHistoryDataSource = WalletHistoryDataSource(ndk: ndk, pubkey: userPubkey)
+        self.nutzapDataSource = NutzapDataSource(ndk: ndk, recipientPubkey: userPubkey)
+        
+        // Start monitoring wallet events through the wallet itself
         startWalletEventMonitoring()
+        
+        // Start observing declarative data sources
+        startDataSourceObservation()
         
         // Load wallet - this will fetch initial config and subscribe to wallet events
         print("WalletManager - Loading wallet...")
@@ -110,11 +122,6 @@ class WalletManager {
         guard activeWallet != nil else {
             throw WalletError.noActiveWallet
         }
-        
-        // Nutzap monitoring is now handled by the unified wallet subscription in load()
-        
-        // Start monitoring transaction history
-        startHistoryEventMonitoring()
         
         // Trigger negentropy sync after wallet has loaded
         Task {
@@ -168,173 +175,197 @@ class WalletManager {
         }
     }
     
-    /// Start monitoring NIP-60 history events (kind 7376)
-    private func startHistoryEventMonitoring() {
-        guard let ndk = nostrManager.ndk else { return }
-        
-        // Close existing subscription if any
+    /// Start observing declarative data sources
+    private func startDataSourceObservation() {
+        // Observe wallet history events
         Task {
-            await historySubscription?.close()
+            guard let historyDataSource = walletHistoryDataSource else { return }
+            
+            for await transactions in historyDataSource.$transactions.values {
+                await processHistoryTransactions(transactions)
+            }
         }
         
+        // Observe nutzap events
         Task {
-            guard let signer = ndk.signer else { return }
-            let userPubkey = try? await signer.pubkey
-            guard let pubkey = userPubkey else { return }
+            guard let nutzapDataSource = nutzapDataSource else { return }
             
-            // Create filter for history events
-            let historyFilter = NDKFilter(
-                authors: [pubkey],
-                kinds: [EventKind.cashuSpendingHistory]  // NIP-60 history events
-            )
-            
-            // Subscribe to history events
-            historySubscription = await ndk.subscribe(filters: [historyFilter])
-            
-            guard let subscription = historySubscription else { return }
-            
-            // Process events as they arrive
-            for try await event in subscription {
-                await processHistoryEvent(event)
+            for await nutzaps in nutzapDataSource.$nutzaps.values {
+                await processNutzaps(nutzaps)
             }
         }
     }
     
-    /// Process incoming history event
-    private func processHistoryEvent(_ event: NDKEvent) async {
+    /// Process history transactions from data source
+    private func processHistoryTransactions(_ events: [NDKEvent]) async {
         guard let signer = nostrManager.ndk?.signer else { return }
         
-        do {
-            // Decrypt the event content
-            let sender = NDKUser(pubkey: event.pubkey)
-            let decryptedContent = try await signer.decrypt(
-                sender: sender,
-                value: event.content,
-                scheme: .nip44
-            )
-            
-            // Parse the tags from decrypted content
-            guard let tagsData = decryptedContent.data(using: .utf8),
-                  let tags = try? JSONCoding.decoder.decode([[String]].self, from: tagsData) else {
-                print("Failed to parse history event tags")
-                return
-            }
+        var newTransactions: [Transaction] = []
+        
+        for event in events {
+            do {
+                // Decrypt the event content
+                let sender = NDKUser(pubkey: event.pubkey)
+                let decryptedContent = try await signer.decrypt(
+                    sender: sender,
+                    value: event.content,
+                    scheme: .nip44
+                )
+                
+                // Parse the tags from decrypted content
+                guard let tagsData = decryptedContent.data(using: .utf8),
+                      let tags = try? JSONCoding.decoder.decode([[String]].self, from: tagsData) else {
+                    print("Failed to parse history event tags")
+                    continue
+                }
 
-            print("tags")
-            print(tags)
-            
-            // Extract transaction info from tags
-            var direction: String?
-            var amount: Int64?
-            var memo: String?
-            
-            for tag in tags {
-                guard tag.count >= 2 else { continue }
-                switch tag[0] {
-                case "description":
-                    memo = tag[1]
-                case "direction":
-                    direction = tag[1]
-                case "amount":
-                    amount = Int64(tag[1])
-                default:
-                    break
+                print("tags")
+                print(tags)
+                
+                // Extract transaction info from tags
+                var direction: String?
+                var amount: Int64?
+                var memo: String?
+                
+                for tag in tags {
+                    guard tag.count >= 2 else { continue }
+                    switch tag[0] {
+                    case "description":
+                        memo = tag[1]
+                    case "direction":
+                        direction = tag[1]
+                    case "amount":
+                        amount = Int64(tag[1])
+                    default:
+                        break
+                    }
                 }
-            }
-            
-            // Check for redeemed marker in clear tags to detect nutzaps
-            var redeemedEventId: String?
-            var nutzapSender: String?
-            if let redeemedTag = event.tags.first(where: { $0.count >= 4 && $0[0] == "e" && $0[3] == "redeemed" }) {
-                redeemedEventId = redeemedTag[1]
-                if redeemedTag.count >= 5 {
-                    nutzapSender = redeemedTag[4] // Sender pubkey is in position 4
+                
+                // Check for redeemed marker in clear tags to detect nutzaps
+                var redeemedEventId: String?
+                var nutzapSender: String?
+                if let redeemedTag = event.tags.first(where: { $0.count >= 4 && $0[0] == "e" && $0[3] == "redeemed" }) {
+                    redeemedEventId = redeemedTag[1]
+                    if redeemedTag.count >= 5 {
+                        nutzapSender = redeemedTag[4] // Sender pubkey is in position 4
+                    }
                 }
-            }
-            
-            // Determine transaction type from tags
-            let transactionType: Transaction.TransactionType
-            
-            // Check for redeemed tag first (indicates nutzap)
-            if redeemedEventId != nil {
-                transactionType = .nutzap
-            } else if let typeTag = event.tags.first(where: { $0.count >= 2 && $0[0] == "type" }) {
-                switch typeTag[1] {
-                case "nutzap":
+                
+                // Determine transaction type from tags
+                let transactionType: Transaction.TransactionType
+                
+                // Check for redeemed tag first (indicates nutzap)
+                if redeemedEventId != nil {
                     transactionType = .nutzap
-                default:
-                    // Fall back to direction-based type
-                    guard let dir = direction else { return }
+                } else if let typeTag = event.tags.first(where: { $0.count >= 2 && $0[0] == "type" }) {
+                    switch typeTag[1] {
+                    case "nutzap":
+                        transactionType = .nutzap
+                    default:
+                        // Fall back to direction-based type
+                        guard let dir = direction else { continue }
+                        switch dir {
+                        case "in": 
+                            transactionType = .receive
+                        case "out": 
+                            transactionType = .send
+                        default: 
+                            continue
+                        }
+                    }
+                } else {
+                    // Use direction to determine type
+                    guard let dir = direction else { continue }
                     switch dir {
                     case "in": 
-                        transactionType = .receive
+                        transactionType = .mint  // Lightning deposits or received ecash
                     case "out": 
-                        transactionType = .send
+                        transactionType = .melt  // Lightning payments or sent ecash
                     default: 
-                        return
+                        continue
                     }
                 }
-            } else {
-                // Use direction to determine type
-                guard let dir = direction else { return }
-                switch dir {
-                case "in": 
-                    transactionType = .mint  // Lightning deposits or received ecash
-                case "out": 
-                    transactionType = .melt  // Lightning payments or sent ecash
-                default: 
-                    return
+                
+                // Get amount from encrypted tags or clear tags
+                guard let amt = amount ?? extractAmountFromTags(event.tags) else {
+                    continue
                 }
-            }
-            
-            // Get amount from encrypted tags or clear tags
-            guard let amt = amount ?? extractAmountFromTags(event.tags) else {
-                return
-            }
 
-            // Create transaction with proper memo
-            let transactionMemo: String?
-            if let memo = memo, !memo.isEmpty {
-                transactionMemo = memo
-            } else {
-                // Fallback to type-based description if no memo
-                switch transactionType {
-                case .mint: transactionMemo = "Lightning deposit"
-                case .melt: transactionMemo = "Lightning payment" 
-                case .send: transactionMemo = "Sent ecash"
-                case .receive: transactionMemo = "Received ecash"
-                case .nutzap: 
-                    if let sender = nutzapSender {
-                        transactionMemo = "Nutzap from \(sender.prefix(8))..."
-                    } else {
-                        transactionMemo = "Nutzap"
+                // Create transaction with proper memo
+                let transactionMemo: String?
+                if let memo = memo, !memo.isEmpty {
+                    transactionMemo = memo
+                } else {
+                    // Fallback to type-based description if no memo
+                    switch transactionType {
+                    case .mint: transactionMemo = "Lightning deposit"
+                    case .melt: transactionMemo = "Lightning payment" 
+                    case .send: transactionMemo = "Sent ecash"
+                    case .receive: transactionMemo = "Received ecash"
+                    case .nutzap: 
+                        if let sender = nutzapSender {
+                            transactionMemo = "Nutzap from \(sender.prefix(8))..."
+                        } else {
+                            transactionMemo = "Nutzap"
+                        }
                     }
                 }
+                
+                let transaction = Transaction(
+                    type: transactionType,
+                    amount: Int(amt),
+                    memo: transactionMemo
+                )
+                transaction.createdAt = Date(timeIntervalSince1970: TimeInterval(event.createdAt))
+                transaction.status = .completed
+                
+                // Store the nutzap event ID and sender if this is a nutzap transaction
+                if let redeemedId = redeemedEventId {
+                    transaction.nostrEventID = redeemedId
+                    transaction.senderPubkey = nutzapSender
+                }
+                
+                newTransactions.append(transaction)
+                
+                // Fetch nutzap comment asynchronously if this is a nutzap
+                if let eventId = redeemedEventId, let ndk = nostrManager.ndk {
+                    Task {
+                        let filter = NDKFilter(ids: [eventId])
+                        let dataSource = NDKDataSource(ndk: ndk, filter: filter, maxAge: 3600)
+                        // Wait for first event
+                        for await event in dataSource.events {
+                            let nutzapEvent = event
+                            let nutzap = NDKNutzap(event: nutzapEvent)
+                            await MainActor.run {
+                                // Update the transaction with the comment
+                                if let existingTransaction = self.transactions.first(where: { 
+                                    $0.createdAt == transaction.createdAt && 
+                                    $0.amount == transaction.amount 
+                                }) {
+                                    if let comment = nutzap.comment, !comment.isEmpty {
+                                        existingTransaction.memo = comment
+                                    }
+                                }
+                            }
+                            break // Only need the first event
+                        }
+                    }
+                }
+            } catch {
+                print("Failed to process history event: \(error)")
             }
-            
-            let transaction = Transaction(
-                type: transactionType,
-                amount: Int(amt),
-                memo: transactionMemo
-            )
-            transaction.createdAt = Date(timeIntervalSince1970: TimeInterval(event.createdAt))
-            transaction.status = .completed
-            
-            // Store the nutzap event ID and sender if this is a nutzap transaction
-            if let redeemedId = redeemedEventId {
-                transaction.nostrEventID = redeemedId
-                transaction.senderPubkey = nutzapSender
-            }
-            
-            // Add to published transactions array
-            await MainActor.run {
-                // For nutzaps, check if we have a pending transaction to update
-                if transactionType == .nutzap && redeemedEventId != nil {
+        }
+        
+        // Update transactions list
+        await MainActor.run {
+            // For nutzaps, check if we have pending transactions to update
+            for transaction in newTransactions {
+                if transaction.type == .nutzap && transaction.nostrEventID != nil {
                     // Look for a pending nutzap transaction with matching event ID
                     if let pendingIndex = self.transactions.firstIndex(where: {
                         $0.type == .nutzap &&
                         $0.status == .pending &&
-                        $0.nostrEventID == redeemedEventId
+                        $0.nostrEventID == transaction.nostrEventID
                     }) {
                         // Update the pending transaction to completed
                         self.transactions[pendingIndex].status = .completed
@@ -342,7 +373,7 @@ class WalletManager {
                         if let memo = transaction.memo {
                             self.transactions[pendingIndex].memo = memo
                         }
-                        return // Don't add a duplicate
+                        continue // Don't add a duplicate
                     }
                 }
                 
@@ -352,34 +383,18 @@ class WalletManager {
                     $0.amount == transaction.amount 
                 }) {
                     self.transactions.append(transaction)
-                    
-                    // Sort by date (newest first)
-                    self.transactions.sort { $0.createdAt > $1.createdAt }
                 }
             }
             
-            // Fetch nutzap comment asynchronously if this is a nutzap
-            if let eventId = redeemedEventId, let ndk = nostrManager.ndk {
-                Task {
-                    if let nutzapEvent = try? await ndk.fetchEvent(id: eventId) {
-                        let nutzap = NDKNutzap(event: nutzapEvent)
-                        await MainActor.run {
-                            // Update the transaction with the comment
-                            if let existingTransaction = self.transactions.first(where: { 
-                                $0.createdAt == transaction.createdAt && 
-                                $0.amount == transaction.amount 
-                            }) {
-                                if let comment = nutzap.comment, !comment.isEmpty {
-                                    existingTransaction.memo = comment
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        } catch {
-            print("Failed to process history event: \(error)")
+            // Sort by date (newest first)
+            self.transactions.sort { $0.createdAt > $1.createdAt }
         }
+    }
+    
+    /// Process nutzaps from data source
+    private func processNutzaps(_ events: [NDKEvent]) async {
+        // Nutzaps will be processed through the wallet event monitoring
+        // This is here for future enhancement if needed
     }
     
     /// Extract amount from clear tags if not in encrypted content
@@ -897,9 +912,34 @@ class WalletManager {
             tags: ["k": Set([String(EventKind.cashuToken)])]
         )
         
-        // Fetch events from cache or relays
-        let tokenEvents = try await ndk.fetchEvents([tokenFilter])
-        let deletionEvents = try await ndk.fetchEvents([deletionFilter])
+        // Fetch events from cache or relays using data sources
+        let tokenDataSource = NDKDataSource(ndk: ndk, filter: tokenFilter, maxAge: 3600)
+        let deletionDataSource = NDKDataSource(ndk: ndk, filter: deletionFilter, maxAge: 3600)
+        
+        // Collect events
+        var tokenEvents: [NDKEvent] = []
+        var deletionEvents: [NDKEvent] = []
+        
+        // Use a timeout for collecting events
+        let fetchTask = Task {
+            await withTaskGroup(of: Void.self) { group in
+                group.addTask {
+                    for await event in tokenDataSource.events {
+                        tokenEvents.append(event)
+                    }
+                }
+                group.addTask {
+                    for await event in deletionDataSource.events {
+                        deletionEvents.append(event)
+                    }
+                }
+                // Wait for a reasonable timeout
+                try? await Task.sleep(nanoseconds: 3_000_000_000) // 3 seconds
+                group.cancelAll()
+            }
+        }
+        
+        try await fetchTask.value
         
         // Build a set of deleted event IDs from deletion events
         var deletedEventIds = Set<String>()
@@ -1040,10 +1080,10 @@ class WalletManager {
         walletEventTask?.cancel()
         walletEventTask = nil
         
-        Task {
-            await historySubscription?.close()
-            historySubscription = nil
-        }
+        // Clear data sources
+        walletEventDataSource = nil
+        walletHistoryDataSource = nil
+        nutzapDataSource = nil
         
         // Clear wallet state
         activeWallet = nil

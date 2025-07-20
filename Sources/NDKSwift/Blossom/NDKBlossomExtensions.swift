@@ -67,7 +67,7 @@ extension NDK {
                 uploadedBlobs.append(blob)
             } catch {
                 lastError = error
-                NDKLogger.shared.log(.warning, category: .network, "Failed to upload to \(server): \(error)")
+                NDKLogger.log(.warning, category: .network, "Failed to upload to \(server): \(error)")
             }
         }
 

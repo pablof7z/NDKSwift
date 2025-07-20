@@ -192,19 +192,19 @@ public actor NDKRelaySubscriptionManager {
     /// Handle EOSE for a relay subscription
     public func handleEOSE(relaySubscriptionId: String) {
         #if DEBUG
-        NDKLogger.shared.log(.debug, category: .subscription, "Handling EOSE for relay subscription: \(relaySubscriptionId)")
-        NDKLogger.shared.log(.trace, category: .subscription, "Available relay subscriptions: \(Array(relaySubscriptions.keys))")
+        NDKLogger.log(.debug, category: .subscription, "Handling EOSE for relay subscription: \(relaySubscriptionId)")
+        NDKLogger.log(.trace, category: .subscription, "Available relay subscriptions: \(Array(relaySubscriptions.keys))")
         #endif
         
         guard var relaySub = relaySubscriptions[relaySubscriptionId] else {
             #if DEBUG
-            NDKLogger.shared.log(.warning, category: .subscription, "No relay subscription found for ID: \(relaySubscriptionId)")
+            NDKLogger.log(.warning, category: .subscription, "No relay subscription found for ID: \(relaySubscriptionId)")
             #endif
             return
         }
 
         #if DEBUG
-        NDKLogger.shared.log(.debug, category: .subscription, "Found relay subscription with \(relaySub.subscriptions.count) subscriptions")
+        NDKLogger.log(.debug, category: .subscription, "Found relay subscription with \(relaySub.subscriptions.count) subscriptions")
         #endif
 
         relaySub.status = .eoseReceived
@@ -213,7 +213,7 @@ public actor NDKRelaySubscriptionManager {
         // Notify all subscriptions in this group
         for subscription in relaySub.subscriptions {
             #if DEBUG
-            NDKLogger.shared.log(.debug, category: .subscription, "Notifying subscription \(subscription.id) of EOSE")
+            NDKLogger.log(.debug, category: .subscription, "Notifying subscription \(subscription.id) of EOSE")
             #endif
             Task {
                 await subscription.handleEOSE(fromRelay: relay)
@@ -233,7 +233,7 @@ public actor NDKRelaySubscriptionManager {
         // Close if all subscriptions want closeOnEose
         if relaySub.closeOnEose {
             #if DEBUG
-            NDKLogger.shared.log(.debug, category: .subscription, "Closing relay subscription \(relaySubscriptionId) (closeOnEose=true)")
+            NDKLogger.log(.debug, category: .subscription, "Closing relay subscription \(relaySubscriptionId) (closeOnEose=true)")
             #endif
             closeRelaySubscription(relaySubscriptionId)
 
@@ -249,15 +249,15 @@ public actor NDKRelaySubscriptionManager {
         let eventId = event.id
 
         #if DEBUG
-        NDKLogger.shared.log(.debug, category: .subscription, "Handling event \(eventId) for relay subscription: \(relaySubscriptionId ?? "nil")")
-        NDKLogger.shared.log(.trace, category: .subscription, "Available relay subscriptions: \(Array(relaySubscriptions.keys))")
+        NDKLogger.log(.debug, category: .subscription, "Handling event \(eventId) for relay subscription: \(relaySubscriptionId ?? "nil")")
+        NDKLogger.log(.trace, category: .subscription, "Available relay subscriptions: \(Array(relaySubscriptions.keys))")
         #endif
 
         // If we have a specific relay subscription ID, route only to those subscriptions
         if let relaySubId = relaySubscriptionId,
            let relaySub = relaySubscriptions[relaySubId] {
             #if DEBUG
-            NDKLogger.shared.log(.debug, category: .subscription, "Found relay subscription with \(relaySub.subscriptions.count) subscriptions")
+            NDKLogger.log(.debug, category: .subscription, "Found relay subscription with \(relaySub.subscriptions.count) subscriptions")
             #endif
             
             for subscription in relaySub.subscriptions {
@@ -269,12 +269,12 @@ public actor NDKRelaySubscriptionManager {
                     }
                 }
                 #if DEBUG
-                NDKLogger.shared.log(.trace, category: .subscription, "Subscription \(subscription.id) matches: \(matches)")
+                NDKLogger.log(.trace, category: .subscription, "Subscription \(subscription.id) matches: \(matches)")
                 #endif
                 
                 if matches {
                     #if DEBUG
-                    NDKLogger.shared.log(.debug, category: .subscription, "Notifying subscription \(subscription.id) of event")
+                    NDKLogger.log(.debug, category: .subscription, "Notifying subscription \(subscription.id) of event")
                     #endif
                     Task {
                         await subscription.handleEvent(event, fromRelay: relay)
@@ -295,7 +295,7 @@ public actor NDKRelaySubscriptionManager {
             }
         } else {
             #if DEBUG
-            NDKLogger.shared.log(.debug, category: .subscription, "No specific relay subscription ID, routing to all matching subscriptions")
+            NDKLogger.log(.debug, category: .subscription, "No specific relay subscription ID, routing to all matching subscriptions")
             #endif
             
             // Route to all matching subscriptions
@@ -412,8 +412,8 @@ public actor NDKRelaySubscriptionManager {
             
             // Log the raw filter being sent
             if let ndk = relay.ndk, ndk.debugMode {
-                NDKLogger.shared.log(.debug, category: .subscription, "Sending subscription \(relaySubId) to relay \(relay.url):")
-                NDKLogger.shared.log(.trace, category: .subscription, "Raw filter: \(serialized)")
+                NDKLogger.log(.debug, category: .subscription, "Sending subscription \(relaySubId) to relay \(relay.url):")
+                NDKLogger.log(.trace, category: .subscription, "Raw filter: \(serialized)")
             }
             
             try await relay.send(serialized)
@@ -466,8 +466,8 @@ public actor NDKRelaySubscriptionManager {
             
             // Log the updated filter being sent
             if let ndk = relay.ndk, ndk.debugMode {
-                NDKLogger.shared.log(.debug, category: .subscription, "Updating subscription \(relaySubId) on relay \(relay.url):")
-                NDKLogger.shared.log(.trace, category: .subscription, "Raw filter: \(serialized)")
+                NDKLogger.log(.debug, category: .subscription, "Updating subscription \(relaySubId) on relay \(relay.url):")
+                NDKLogger.log(.trace, category: .subscription, "Raw filter: \(serialized)")
             }
             
             try await relay.send(serialized)
