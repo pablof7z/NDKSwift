@@ -150,7 +150,15 @@ public class NDKNutzapProtocol: NDKZapProtocol {
         filter.authors = [user.pubkey]
         filter.kinds = [EventKind.nutzapPreferences]
         
-        guard let event = try await ndk.fetchEvent(filter) else {
+        // Use NDKDataSource for fetching preferences
+        let dataSource = NDKDataSource(
+            ndk: ndk,
+            filter: filter,
+            maxAge: 300 // 5 minutes - preferences don't change often
+        )
+        
+        let events = await dataSource.currentValue()
+        guard let event = events.first else {
             return nil
         }
         

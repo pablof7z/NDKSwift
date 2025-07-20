@@ -66,14 +66,14 @@ ndk.clientTagConfig = NDKClientTagConfig(
     autoTag: true
 )
 
-// Subscribe to text notes
-let subscription = ndk.subscribe(filters: [
-    NDKFilter(kinds: [1], limit: 50)
-])
+// Subscribe to text notes using declarative API
+let textNotes = await ndk.observe(
+    filter: NDKFilter(kinds: [1], limit: 50)
+)
 
-// Process events using AsyncSequence
-for await event in subscription {
-    print("\(event.pubkey): \(event.content)")
+// Data automatically updates in SwiftUI views
+ForEach(textNotes.data, id: \.id) { event in
+    Text("\(event.pubkey): \(event.content)")
 }
 
 // Publish event (works offline, syncs when connected)
@@ -111,59 +111,73 @@ try await ndk.retryUnpublishedEvents()
 Reply to any event type with threaded comments:
 
 ```swift
-// Comment on any event type
-let blogPost = try await ndk.fetchEvent(
-    NDKFilter(kinds: [EventKind.longFormContent], limit: 1)
+// Get blog posts using declarative API
+let blogPosts = await ndk.observe(
+    filter: NDKFilter(kinds: [EventKind.longFormContent], limit: 1)
 )
 
-// Create comment with NIP-22 tags
-let comment = try await ndk.reply(to: blogPost!)
-    .content("Great article!")
-    .build()
+// Create comment when post is available
+if let blogPost = blogPosts.data.first {
+    let comment = try await ndk.reply(to: blogPost)
+        .content("Great article!")
+        .build()
+    
+    try await ndk.publish(comment)
+    
+    // Thread replies automatically
+    let reply = try await ndk.reply(to: comment)
+        .content("I agree!")
+        .build()
+}
 
-try await ndk.publish(comment)
-
-// Thread replies automatically
-let reply = try await ndk.reply(to: comment)
-    .content("I agree!")
-    .build()
-
-// Fetch comments on content
-let comments = try await ndk.fetchEvents(
-    NDKFilter(
+// Subscribe to comments on content
+let comments = await ndk.observe(
+    filter: NDKFilter(
         kinds: [EventKind.genericReply],
-        tags: ["A": [blogPost!.tagAddress]]
+        tags: ["A": blogPosts.data.first.map { [$0.tagAddress] } ?? []]
     )
 )
 ```
 
-### Subscriptions
+### Declarative Data Access
 
-Subscribe to events using modern AsyncSequence patterns:
+Access Nostr data declaratively with automatic lifecycle management:
 
 ```swift
-// Real-time subscription
-let subscription = ndk.subscribe(filters: [
-    NDKFilter(authors: [bobPubkey], kinds: [1])
-])
+// Real-time data subscription
+let bobNotes = await ndk.observe(
+    filter: NDKFilter(authors: [bobPubkey], kinds: [1])
+)
 
-for await event in subscription {
-    // Process events as they arrive
+// Use in SwiftUI views - automatically updates
+struct BobNotesView: View {
+    @StateObject var notes = bobNotes
+    
+    var body: some View {
+        List(notes.data, id: \.id) { event in
+            Text(event.content)
+        }
+    }
 }
 
-// Skip optimistic events (only show relay-confirmed events)
-var options = NDKSubscriptionOptions()
-options.skipOptimisticEvents = true
-let strictSubscription = ndk.subscribe(filters: [filter], options: options)
+// Transform events to custom types
+let profiles = await ndk.observe(
+    filter: NDKFilter(kinds: [0], authors: [alicePubkey])
+) { event in
+    // Transform NDKEvent to NDKUserProfile
+    try? JSONDecoder().decode(NDKUserProfile.self, from: event.content.data(using: .utf8)!)
+}
 
-// Control subscription grouping delay
-let sub1 = await ndk.subscribe(filters: [filter], groupingDelay: 0.2)
-let sub2 = await ndk.subscribe(filters: [filter], groupingDelay: 0)
-
-// One-shot fetch
-let events = try await ndk.fetchEvents(
-    NDKFilter(kinds: [0], authors: [alicePubkey])
+// Multiple data sources automatically share subscriptions
+let aliceNotes = await ndk.observe(
+    filter: NDKFilter(authors: [alicePubkey], kinds: [1])
 )
+
+let bobProfile = await ndk.observe(
+    filter: NDKFilter(authors: [bobPubkey], kinds: [0])
+)
+
+// System automatically groups similar requests within 100ms window
 ```
 
 ### Signers
@@ -189,8 +203,8 @@ Enable caching for better performance and offline support:
 let cache = NDKSQLiteCache()
 let ndk = NDK(relayUrls: relayUrls, cache: cache)
 
-// Events are automatically cached
-let cachedEvents = try await ndk.fetchEvents(filter, useCache: true)
+// Events are automatically cached and available through data sources
+let dataSource = await ndk.observe(filter: filter)
 
 // Check event confirmation state
 let confirmationState = await cache.getEventConfirmationState(eventId: event.id)
@@ -280,8 +294,13 @@ let eventZap = try await event.zap(
     comment: "⚡"
 )
 
-// Fetch zaps
-let zaps = try await event.fetchZaps(includeNutzaps: true)
+// Subscribe to zaps on an event
+let zaps = await ndk.observe(
+    filter: NDKFilter(
+        kinds: [EventKind.zap],
+        tags: ["e": [event.id]]
+    )
+)
 ```
 
 #### Client Identification (NIP-89)

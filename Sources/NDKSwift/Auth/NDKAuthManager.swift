@@ -180,7 +180,7 @@ public class NDKAuthManager {
                         let session = try JSONCoding.decode(NDKSession.self, from: data)
                         sessions.append(session)
                     } catch {
-                        NDKLogger.shared.log(.error, category: .auth, "Failed to load session \(sessionId): \(error)")
+                        NDKLogger.log(.error, category: .auth, "Failed to load session \(sessionId): \(error)")
                         // Clean up corrupted session
                         try? await keychainManager.deleteSessionMetadata(identifier: sessionId)
                     }
@@ -252,10 +252,10 @@ public class NDKAuthManager {
             // Save updated session metadata
             try await saveSessionMetadata(updatedSession)
             
-            NDKLogger.shared.log(.info, category: .auth, "Session restored for user: \(updatedSession.pubkey)")
+            NDKLogger.log(.info, category: .auth, "Session restored for user: \(updatedSession.pubkey)")
         } catch {
             // If we fail to restore a session due to corrupted data, clean it up
-            NDKLogger.shared.log(.error, category: .auth, "Failed to restore session \(session.id): \(error)")
+            NDKLogger.log(.error, category: .auth, "Failed to restore session \(session.id): \(error)")
             
             // Remove from available sessions
             availableSessions.removeAll { $0.id == session.id }
@@ -264,9 +264,9 @@ public class NDKAuthManager {
             do {
                 try await keychainManager.deleteSignerData(identifier: session.id)
                 try await keychainManager.deleteSessionMetadata(identifier: session.id)
-                NDKLogger.shared.log(.info, category: .auth, "Cleaned up corrupted session data for \(session.id)")
+                NDKLogger.log(.info, category: .auth, "Cleaned up corrupted session data for \(session.id)")
             } catch {
-                NDKLogger.shared.log(.warning, category: .auth, "Failed to clean up corrupted session: \(error)")
+                NDKLogger.log(.warning, category: .auth, "Failed to clean up corrupted session: \(error)")
             }
             
             // Re-throw the original error
@@ -354,7 +354,7 @@ public class NDKAuthManager {
             logout()
         }
         
-        NDKLogger.shared.log(.info, category: .auth, "Deleted session for user: \(session.pubkey)")
+        NDKLogger.log(.info, category: .auth, "Deleted session for user: \(session.pubkey)")
     }
     
     /// Logout from the current session
@@ -397,7 +397,7 @@ public class NDKAuthManager {
         do {
             return try await context.evaluatePolicy(.deviceOwnerAuthenticationWithBiometrics, localizedReason: reason)
         } catch {
-            NDKLogger.shared.log(.error, category: .auth, "Biometric authentication failed: \(error)")
+            NDKLogger.log(.error, category: .auth, "Biometric authentication failed: \(error)")
             return false
         }
     }
@@ -425,7 +425,7 @@ public class NDKAuthManager {
         // Save updated metadata
         try await saveSessionMetadata(session)
         
-        NDKLogger.shared.log(.info, category: .auth, "Updated profile for session: \(session.pubkey)")
+        NDKLogger.log(.info, category: .auth, "Updated profile for session: \(session.pubkey)")
     }
     
     // MARK: - Private Helpers

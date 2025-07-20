@@ -82,13 +82,17 @@ final class NDKOutboxModelTests: XCTestCase {
     }
     
     func testPublishingWith10OrMorePTags() async throws {
+        // Setup author's relay list first
+        let authorPubkey = try await signer.pubkey
+        await setupMockRelayList(for: authorPubkey, readRelays: ["wss://author-read.com"], writeRelays: ["wss://author-write.com"])
+        
         // Create 11 users to exceed the 10 p-tag limit
         var users: [String] = []
         for i in 1...11 {
             let user = String(format: "user%02d_pubkey_64_chars_hex_abcdef1234567890abcdef1234567890abcd%02d", i, i)
             users.append(user)
             // Setup mock relay lists for each user
-            await setupMockRelayList(for: user, readRelays: ["wss://user\(i)-read.com"], writeRelays: ["wss://user\(i)-write.com"])
+            await setupMockRelayList(for: user, readRelays: [String(format: "wss://user%02d-read.com", i)], writeRelays: [String(format: "wss://user%02d-write.com", i)])
         }
         
         // Create an event with 11 p-tags (>= 10)
@@ -100,7 +104,7 @@ final class NDKOutboxModelTests: XCTestCase {
             eventBuilder = eventBuilder.tag(["p", user])
         }
         
-        let event = try await eventBuilder.build()
+        let event = try await eventBuilder.build(signer: signer)
         
         // Test relay selection
         let relaySelector = ndk.relaySelector
@@ -194,7 +198,7 @@ final class NDKOutboxModelTests: XCTestCase {
         for i in 1...11 {
             let user = String(format: "user%02d_pubkey_64_chars_hex_abcdef1234567890abcdef1234567890abcd%02d", i, i)
             users.append(user)
-            await setupMockRelayList(for: user, readRelays: ["wss://user\(i)-read.com"], writeRelays: ["wss://user\(i)-write.com"])
+            await setupMockRelayList(for: user, readRelays: [String(format: "wss://user%02d-read.com", i)], writeRelays: [String(format: "wss://user%02d-write.com", i)])
         }
         
         // Create a filter that would target events with many p-tags
@@ -220,11 +224,15 @@ final class NDKOutboxModelTests: XCTestCase {
     }
     
     func testEventWithNoTags() async throws {
+        // Setup author's relay list
+        let authorPubkey = try await signer.pubkey
+        await setupMockRelayList(for: authorPubkey, readRelays: ["wss://author-read.com"], writeRelays: ["wss://author-write.com"])
+        
         // Create an event with no p-tags
         let event = try await ndk.event()
             .kind(1)
             .content("Hello world!")
-            .build()
+            .build(signer: signer)
         
         let relaySelector = ndk.relaySelector
         let selection = await relaySelector.selectRelaysForPublishing(event: event)

@@ -146,8 +146,9 @@ struct WalletSettingsView: View {
             .sheet(isPresented: $showDiscoveredMints) {
                 DiscoveredMintsSheet(discoveredMints: discoveredMints) { selectedMints in
                     for mint in selectedMints {
-                        if !mints.contains(where: { $0.url == mint.url }) {
-                            if let mintInfo = try? await fetchMintInfo(url: mint.url) {
+                        if !mints.contains(where: { $0.url.absoluteString == mint.url }) {
+                            if let url = URL(string: mint.url),
+                               let mintInfo = try? await fetchMintInfo(url: url) {
                                 mints.append(mintInfo)
                             }
                         }
@@ -194,12 +195,18 @@ struct WalletSettingsView: View {
             kinds: [17375]
         )
         
-        do {
-            let events = try await ndk.fetchEvents([filter])
-            return !events.isEmpty
-        } catch {
-            return false
+        // Use declarative data source to check if user has published wallet events
+        let dataSource = ndk.observe(
+            filter: filter,
+            maxAge: 3600,
+            cachePolicy: .cacheWithNetwork
+        )
+        
+        for await _ in dataSource.events {
+            return true // Found at least one event
         }
+        
+        return false
     }
     
     
@@ -564,53 +571,88 @@ struct DiscoveredMintsSheet: View {
     
     var body: some View {
         NavigationStack {
-            List {
-                ForEach(discoveredMints, id: \.url) { mint in
-                    HStack {
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text(mint.name ?? mint.url.host ?? "Unknown Mint")
-                                .font(.headline)
-                            Text(mint.url.absoluteString)
-                                .font(.caption)
-                                .foregroundColor(.secondary)
-                                .lineLimit(1)
-                        }
-                        
-                        Spacer()
-                        
-                        if selectedMints.contains(mint.url.absoluteString) {
-                            Image(systemName: "checkmark.circle.fill")
-                                .foregroundColor(.green)
-                        }
-                    }
-                    .contentShape(Rectangle())
-                    .onTapGesture {
-                        if selectedMints.contains(mint.url.absoluteString) {
-                            selectedMints.remove(mint.url.absoluteString)
+            mintsList
+                .navigationTitle("Discovered Mints")
+                .platformNavigationBarTitleDisplayMode(inline: true)
+                .toolbar {
+                    toolbarContent
+                }
+        }
+    }
+    
+    @ViewBuilder
+    private var mintsList: some View {
+        List {
+            ForEach(discoveredMints) { mint in
+                DiscoveredMintRowItem(
+                    mint: mint,
+                    isSelected: selectedMints.contains(mint.url),
+                    onToggle: {
+                        if selectedMints.contains(mint.url) {
+                            selectedMints.remove(mint.url)
                         } else {
-                            selectedMints.insert(mint.url.absoluteString)
+                            selectedMints.insert(mint.url)
                         }
                     }
+                )
+            }
+        }
+    }
+    
+    @ToolbarContentBuilder
+    private var toolbarContent: some ToolbarContent {
+        ToolbarItem(placement: .cancellationAction) {
+            Button("Cancel") { dismiss() }
+        }
+        
+        ToolbarItem(placement: .confirmationAction) {
+            Button("Add Selected") {
+                Task {
+                    let selected = discoveredMints.filter { selectedMints.contains($0.url) }
+                    await onSelect(selected)
+                    dismiss()
                 }
             }
-            .navigationTitle("Discovered Mints")
-            .platformNavigationBarTitleDisplayMode(inline: true)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") { dismiss() }
-                }
-                
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("Add Selected") {
-                        Task {
-                            let selected = discoveredMints.filter { selectedMints.contains($0.url.absoluteString) }
-                            await onSelect(selected)
-                            dismiss()
-                        }
-                    }
-                    .disabled(selectedMints.isEmpty)
-                }
-            }
+            .disabled(selectedMints.isEmpty)
+        }
+    }
+}
+
+// MARK: - Discovered Mint Row Item
+private struct DiscoveredMintRowItem: View {
+    let mint: DiscoveredMint
+    let isSelected: Bool
+    let onToggle: () -> Void
+    
+    var body: some View {
+        HStack {
+            mintInfo
+            
+            Spacer()
+            
+            selectionIndicator
+        }
+        .contentShape(Rectangle())
+        .onTapGesture(perform: onToggle)
+    }
+    
+    @ViewBuilder
+    private var mintInfo: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(mint.name)
+                .font(.headline)
+            Text(mint.url)
+                .font(.caption)
+                .foregroundColor(.secondary)
+                .lineLimit(1)
+        }
+    }
+    
+    @ViewBuilder
+    private var selectionIndicator: some View {
+        if isSelected {
+            Image(systemName: "checkmark.circle.fill")
+                .foregroundColor(.green)
         }
     }
 }

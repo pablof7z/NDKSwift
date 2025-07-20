@@ -64,7 +64,7 @@ public actor NDKPool {
             let userPubkey = try await signer.pubkey
             let filter = NDKFilter(authors: [userPubkey], kinds: [10006], limit: 1)
             
-            if let blockedRelayListEvent = try await ndk.fetchEvent(filter) {
+            if let blockedRelayListEvent = try await fetchEventInternal(filter: filter) {
                 let blockedRelayList = NDKList.from(blockedRelayListEvent, ndk: ndk)
                 cachedBlockedRelays = Set(blockedRelayList.blockedRelays.map { url in
                     URLNormalizer.tryNormalizeRelayUrl(url) ?? url
@@ -72,11 +72,11 @@ public actor NDKPool {
                 blockedRelaysLastFetched = Date()
                 
                 if !cachedBlockedRelays.isEmpty {
-                    NDKLogger.shared.log(.debug, category: .general, "Found \(cachedBlockedRelays.count) blocked relays")
+                    NDKLogger.log(.debug, category: .general, "Found \(cachedBlockedRelays.count) blocked relays")
                 }
             }
         } catch {
-            NDKLogger.shared.log(.error, category: .general, "Failed to fetch blocked relays: \(error)")
+            NDKLogger.log(.error, category: .general, "Failed to fetch blocked relays: \(error)")
         }
         
         return cachedBlockedRelays
@@ -91,7 +91,7 @@ public actor NDKPool {
         // Remove any relays that are now blocked
         for (url, _) in relayMap {
             if blockedRelays.contains(url) {
-                NDKLogger.shared.log(.info, category: .general, "Removing newly blocked relay from pool: \(url)")
+                NDKLogger.log(.info, category: .general, "Removing newly blocked relay from pool: \(url)")
                 await removeRelay(url)
             }
         }
@@ -116,7 +116,7 @@ public actor NDKPool {
                 limit: 1
             )
             
-            if let blockedRelayListEvent = try? await ndk.fetchEvent(initialFilter, timeoutSeconds: 5) {
+            if let blockedRelayListEvent = try? await fetchEventInternal(filter: initialFilter) {
                 await processBlockedRelayListUpdate(blockedRelayListEvent)
             }
             
@@ -129,27 +129,31 @@ public actor NDKPool {
                         limit: 0  // Only get new events
                     )
                     
-                    let subscription = await ndk.subscribe(filters: [filter])
+                    let subscriptionId = UUID().uuidString
+                    let subscription = await ndk.internalSubscriptionManager.createSubscription(
+                        id: subscriptionId,
+                        filters: [filter]
+                    )
                     
-                    for try await event in subscription {
+                    for await (event, _) in await subscription.events {
                         await processBlockedRelayListUpdate(event)
                     }
                 } catch {
                     if error is CancellationError {
-                        NDKLogger.shared.log(.debug, category: .general, "Blocked relay subscription cancelled")
+                        NDKLogger.log(.debug, category: .general, "Blocked relay subscription cancelled")
                     } else {
-                        NDKLogger.shared.log(.error, category: .general, "Blocked relay subscription error: \(error)")
+                        NDKLogger.log(.error, category: .general, "Blocked relay subscription error: \(error)")
                     }
                 }
             }
         } catch {
-            NDKLogger.shared.log(.error, category: .general, "Failed to start blocked relay subscription: \(error)")
+            NDKLogger.log(.error, category: .general, "Failed to start blocked relay subscription: \(error)")
         }
     }
     
     /// Process a blocked relay list update event
     private func processBlockedRelayListUpdate(_ event: NDKEvent) async {
-        NDKLogger.shared.log(.info, category: .general, "Processing blocked relay list update")
+        NDKLogger.log(.info, category: .general, "Processing blocked relay list update")
         
         let blockedRelayList = NDKList.from(event, ndk: ndk)
         let newBlockedRelays = Set(blockedRelayList.blockedRelays.map { url in
@@ -164,12 +168,12 @@ public actor NDKPool {
         let newlyBlocked = newBlockedRelays.subtracting(oldBlockedRelays)
         
         if !newlyBlocked.isEmpty {
-            NDKLogger.shared.log(.info, category: .general, "Found \(newlyBlocked.count) newly blocked relays")
+            NDKLogger.log(.info, category: .general, "Found \(newlyBlocked.count) newly blocked relays")
             
             // Remove any newly blocked relays from pool
             for blockedUrl in newlyBlocked {
                 if relayMap[blockedUrl] != nil {
-                    NDKLogger.shared.log(.warning, category: .general, "Removing newly blocked relay from pool: \(blockedUrl)")
+                    NDKLogger.log(.warning, category: .general, "Removing newly blocked relay from pool: \(blockedUrl)")
                     await removeRelay(blockedUrl)
                 }
             }
@@ -191,7 +195,7 @@ public actor NDKPool {
         // Check if relay is blocked
         let blockedRelays = await getBlockedRelays()
         if blockedRelays.contains(normalizedUrl) {
-            NDKLogger.shared.log(.warning, category: .general, "Attempted to add blocked relay: \(normalizedUrl)")
+            NDKLogger.log(.warning, category: .general, "Attempted to add blocked relay: \(normalizedUrl)")
             // Create a disconnected relay instance to return (won't be added to pool)
             let blockedRelay = NDKRelay(url: normalizedUrl)
             return blockedRelay
@@ -361,6 +365,24 @@ public actor NDKPool {
     deinit {
         // Cancel subscription if not already done
         blockedRelaySubscriptionTask?.cancel()
+    }
+    
+    /// Internal helper to fetch events using NDKDataSource
+    private func fetchEventInternal(filter: NDKFilter) async throws -> NDKEvent? {
+        guard let ndk = ndk else {
+            throw NDKError.notConfigured("NDK instance not available")
+        }
+        
+        // Use NDKDataSource with no cache tolerance
+        let dataSource = NDKDataSource(
+            ndk: ndk,
+            filter: filter,
+            maxAge: 0, // Always fresh
+            cachePolicy: .cacheWithNetwork
+        )
+        
+        let events = await dataSource.currentValue()
+        return events.first
     }
 }
 

@@ -686,7 +686,7 @@ public actor NDKSubscriptionManager {
                         try await ndk.cache.deleteEvent(id: eventId)
                     } catch {
                         // Log error but continue processing other deletions
-                        NDKLogger.shared.log(.error, category: .cache, "Failed to delete event \(eventId) from cache: \(error.localizedDescription)")
+                        NDKLogger.log(.error, category: .cache, "Failed to delete event \(eventId) from cache: \(error.localizedDescription)")
                     }
                 }
             } else {

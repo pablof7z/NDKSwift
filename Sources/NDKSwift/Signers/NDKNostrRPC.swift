@@ -103,7 +103,7 @@ public actor NDKNostrRPC {
 
     func sendRequest(to pubkey: String, method: String, params: [String], handler: ((NDKRPCResponse) -> Void)? = nil) async throws {
         let id = IDGenerator.randomId(length: 8)
-        NDKLogger.shared.log(.debug, category: .auth, "Creating request - id: \(id), method: \(method), to: \(pubkey)")
+        NDKLogger.log(.debug, category: .auth, "Creating request - id: \(id), method: \(method), to: \(pubkey)")
 
         let request: [String: Any] = [
             "id": id,
@@ -113,40 +113,40 @@ public actor NDKNostrRPC {
 
         let requestData = try JSONSerialization.data(withJSONObject: request)
         let requestString = String(data: requestData, encoding: .utf8) ?? ""
-        NDKLogger.shared.log(.debug, category: .auth, "Request JSON: \(requestString)")
+        NDKLogger.log(.debug, category: .auth, "Request JSON: \(requestString)")
 
         let remoteUser = NDKUser(pubkey: pubkey)
         let encryptedContent = try await localSigner.encrypt(recipient: remoteUser, value: requestString, scheme: encryptionScheme)
-        NDKLogger.shared.log(.debug, category: .auth, "Encrypted content using scheme: \(encryptionScheme)")
+        NDKLogger.log(.debug, category: .auth, "Encrypted content using scheme: \(encryptionScheme)")
 
         let event = try await ndk.event()
             .content(encryptedContent)
             .kind(24133)
             .tags([["p", pubkey]])
             .build(signer: localSigner)
-        NDKLogger.shared.log(.debug, category: .auth, "Created and signed event - id: \(event.id)")
+        NDKLogger.log(.debug, category: .auth, "Created and signed event - id: \(event.id)")
 
         // Prepare target relays
         let targetRelayUrls = relayUrls.isEmpty ? nil : Set(relayUrls)
         
         // Publish event
         let publishDescription = targetRelayUrls != nil ? "to specific relays: \(relayUrls)" : "to all connected relays"
-        NDKLogger.shared.log(.info, category: .auth, "Publishing \(publishDescription)")
+        NDKLogger.log(.info, category: .auth, "Publishing \(publishDescription)")
         
         let publishedRelays = try await ndk.publish(event, to: targetRelayUrls)
         
-        NDKLogger.shared.log(.info, category: .auth, "Published to relays: \(publishedRelays.map { $0.url })")
+        NDKLogger.log(.info, category: .auth, "Published to relays: \(publishedRelays.map { $0.url })")
 
         // If publishing to specific relays failed, try direct send as fallback
         if !relayUrls.isEmpty && publishedRelays.isEmpty {
-            NDKLogger.shared.log(.warning, category: .auth, "Failed to publish to any relay! Attempting direct send fallback...")
+            NDKLogger.log(.warning, category: .auth, "Failed to publish to any relay! Attempting direct send fallback...")
             await attemptDirectSend(event: event, to: relayUrls)
         }
 
         // If handler provided, call it when response arrives
         if let handler = handler {
             Task {
-                NDKLogger.shared.log(.debug, category: .auth, "Waiting for response with id: \(id)")
+                NDKLogger.log(.debug, category: .auth, "Waiting for response with id: \(id)")
                 let response = try await waitForResponse(id: id)
                 handler(response)
             }
@@ -204,13 +204,13 @@ public actor NDKNostrRPC {
     private func attemptDirectSend(event: NDKEvent, to relayUrls: [String]) async {
         for url in relayUrls {
             if let relay = (await ndk.relays).first(where: { $0.url == url }) {
-                NDKLogger.shared.log(.debug, category: .auth, "Attempting direct send to \(url)")
+                NDKLogger.log(.debug, category: .auth, "Attempting direct send to \(url)")
                 do {
                     let eventMessage = NostrMessage.event(subscriptionId: nil, event: event)
                     try await relay.send(eventMessage.serialize())
-                    NDKLogger.shared.log(.info, category: .auth, "Direct send successful to \(url)")
+                    NDKLogger.log(.info, category: .auth, "Direct send successful to \(url)")
                 } catch {
-                    NDKLogger.shared.log(.error, category: .auth, "Direct send failed to \(url): \(error)")
+                    NDKLogger.log(.error, category: .auth, "Direct send failed to \(url): \(error)")
                 }
             }
         }

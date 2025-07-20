@@ -254,7 +254,7 @@ public actor NDKZapManager {
             )
             
             if !validDLEQ {
-                NDKLogger.shared.log(.warning, category: .general, "⚠️ Warning: DLEQ verification failed for minted proofs")
+                NDKLogger.log(.warning, category: .general, "⚠️ Warning: DLEQ verification failed for minted proofs")
             }
             
             // Now we need to swap these proofs to P2PK-locked ones
@@ -341,10 +341,16 @@ public actor NDKZapManager {
                         return
                     }
                     
-                    let subscription = await ndk.subscribe(filters: [filter])
+                    // Use NDKDataSource for real-time zap monitoring
+                    let dataSource = NDKDataSource(
+                        ndk: ndk,
+                        filter: filter,
+                        maxAge: 0, // Always fresh for real-time zap monitoring
+                        cachePolicy: .cacheWithNetwork
+                    )
                     
                     do {
-                        for try await event in subscription {
+                        for await event in await dataSource.events {
                             let eventKind = event.kind
                             if eventKind == EventKind.zapReceipt {
                                 let receipt = NDKZapReceipt(event: event)
@@ -401,7 +407,14 @@ public actor NDKZapManager {
             throw NDKError.invalidInput(message: "Must specify either event or user")
         }
         
-        let events = try await ndk.fetchEvents([filter])
+        // Use NDKDataSource for fetching zaps
+        let dataSource = NDKDataSource(
+            ndk: ndk,
+            filter: filter,
+            maxAge: 300 // 5 minutes - zaps are fairly static once created
+        )
+        
+        let events = await dataSource.currentValue()
         
         var zaps: [ZapInfo] = []
         

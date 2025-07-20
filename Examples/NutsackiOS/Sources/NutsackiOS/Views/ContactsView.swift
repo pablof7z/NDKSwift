@@ -5,22 +5,51 @@ struct ContactsView: View {
     @Environment(NostrManager.self) private var nostrManager
     @Environment(WalletManager.self) private var walletManager
     @Binding var navigationDestination: WalletView.WalletDestination?
-    @State private var contacts: [NDKUser] = []
     @State private var searchText = ""
-    @State private var isLoading = true
     @State private var showSettings = false
     @State private var resolvedUser: NDKUser?
     @State private var isResolving = false
     @State private var showQRScanner = false
     
-    var filteredContacts: [NDKUser] {
+    // Get contacts from NostrManager's data source
+    private var contacts: [String] {
+        guard let contactListDataSource = nostrManager.contactListDataSource else {
+            return []
+        }
+        return Array(contactListDataSource.contactPubkeys)
+    }
+    
+    private var isLoading: Bool {
+        nostrManager.contactListDataSource?.isLoading ?? true
+    }
+    
+    var filteredContacts: [String] {
         if searchText.isEmpty {
             return contacts
         }
-        return contacts.filter { user in
-            // Since profile is async, we'll filter by npub only for now
-            let npub = (try? Bech32.npub(from: user.pubkey)) ?? user.pubkey
-            return npub.localizedCaseInsensitiveContains(searchText)
+        
+        return contacts.filter { pubkey in
+            // Filter by pubkey/npub
+            let npub = NDKUser(pubkey: pubkey).npub ?? pubkey
+            if npub.localizedCaseInsensitiveContains(searchText) {
+                return true
+            }
+            
+            // Also check profile data if available
+            if let profileDataSource = nostrManager.contactsMetadataDataSource,
+               let profile = profileDataSource.profile(for: pubkey) {
+                if let name = profile.name, name.localizedCaseInsensitiveContains(searchText) {
+                    return true
+                }
+                if let displayName = profile.displayName, displayName.localizedCaseInsensitiveContains(searchText) {
+                    return true
+                }
+                if let nip05 = profile.nip05, nip05.localizedCaseInsensitiveContains(searchText) {
+                    return true
+                }
+            }
+            
+            return false
         }
     }
     
@@ -120,8 +149,8 @@ struct ContactsView: View {
                         .padding(.vertical, 60)
                         .listRowBackground(Color.clear)
                     } else {
-                        ForEach(filteredContacts, id: \.self) { user in
-                            ContactRow(user: user, navigationDestination: $navigationDestination)
+                        ForEach(filteredContacts, id: \.self) { pubkey in
+                            ContactRow(pubkey: pubkey, navigationDestination: $navigationDestination)
                         }
                     }
                 }
@@ -142,10 +171,7 @@ struct ContactsView: View {
                     .environment(walletManager)
             }
             .refreshable {
-                await loadContacts()
-            }
-            .task {
-                await loadContacts()
+                // Data sources handle refreshing automatically
             }
             .onChange(of: searchText) { _, _ in
                 resolveSearchInput()
@@ -221,111 +247,45 @@ struct ContactsView: View {
             }
         }
     }
-    
-    private func loadContacts() async {
-        isLoading = true
-        
-        guard let currentUser = await nostrManager.currentUser,
-              let ndk = nostrManager.ndk else {
-            await MainActor.run {
-                isLoading = false
-            }
-            return
-        }
-        
-        do {
-            // Fetch contact list
-            let filter = NDKFilter(
-                authors: [currentUser.pubkey],
-                kinds: [3],  // Contact list
-                limit: 1
-            )
-            
-            if let contactListEvent = try await ndk.fetchEvent(filter) {
-                // Extract pubkeys from tags
-                let pTags = contactListEvent.tags.filter { $0.first == "p" }
-                let pubkeys = pTags.compactMap { $0.count > 1 ? $0[1] : nil }
-                
-                // Create NDKUser objects for contacts
-                let users = pubkeys.map { NDKUser(pubkey: $0) }
-                
-                // For now, just show contacts in the order they appear
-                // Individual ContactRow views will handle loading profiles reactively
-                await MainActor.run {
-                    self.contacts = users
-                    isLoading = false
-                }
-            } else {
-                await MainActor.run {
-                    isLoading = false
-                }
-            }
-        } catch {
-            print("Failed to load contacts: \(error)")
-            await MainActor.run {
-                isLoading = false
-            }
-        }
-    }
 }
 
 struct ContactRow: View {
-    let user: NDKUser
+    let pubkey: String
     @Binding var navigationDestination: WalletView.WalletDestination?
-    @State private var profile: NDKUserProfile?
-    @State private var profileTask: Task<Void, Never>?
     @Environment(NostrManager.self) private var nostrManager
     @Environment(\.dismiss) private var dismiss
     
-    var displayName: String {
+    private var user: NDKUser {
+        NDKUser(pubkey: pubkey)
+    }
+    
+    private var profile: NDKUserProfile? {
+        nostrManager.contactsMetadataDataSource?.profile(for: pubkey)
+    }
+    
+    private var displayName: String {
         profile?.displayName ?? profile?.name ?? "Nostr User"
     }
     
-    var npub: String {
-        (try? Bech32.npub(from: user.pubkey)) ?? user.pubkey
+    private var npub: String {
+        user.npub ?? pubkey
     }
     
     var body: some View {
         Button(action: {
-            navigationDestination = .nutzap(pubkey: user.pubkey)
+            navigationDestination = .nutzap(pubkey: pubkey)
             dismiss()
         }) {
             HStack {
                 // Profile picture
-                if let pictureURL = profile?.picture,
-                   let url = URL(string: pictureURL) {
-                    AsyncImage(url: url) { image in
-                        image
-                            .resizable()
-                            .aspectRatio(contentMode: .fill)
-                    } placeholder: {
-                        Circle()
-                            .fill(Color.secondary.opacity(0.3))
-                            .overlay(
-                                Text(displayName.prefix(1).uppercased())
-                                    .font(.headline)
-                                    .foregroundColor(.white)
-                            )
-                    }
-                    .frame(width: 50, height: 50)
-                    .clipShape(Circle())
-                } else {
-                    Circle()
-                        .fill(Color.secondary.opacity(0.3))
-                        .overlay(
-                            Text(displayName.prefix(1).uppercased())
-                                .font(.headline)
-                                .foregroundColor(.white)
-                        )
-                        .frame(width: 50, height: 50)
-                }
+                UserProfilePicture(pubkey: pubkey, size: 50)
                 
                 VStack(alignment: .leading, spacing: 4) {
                     Text(displayName)
                         .font(.headline)
                         .lineLimit(1)
                     
-                    Text(npub)
+                    Text(npub.prefix(16) + "...")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                         .lineLimit(1)
@@ -339,24 +299,5 @@ struct ContactRow: View {
             .padding(.vertical, 4)
         }
         .buttonStyle(.plain)
-        .task {
-            guard let ndk = nostrManager.ndk else { return }
-            
-            profileTask = Task {
-                let profileStream = await ndk.observeProfile(for: user.pubkey, closeOnEose: true)
-                
-                for await profileUpdate in profileStream {
-                    if let profile = profileUpdate {
-                        await MainActor.run {
-                            self.profile = profile
-                        }
-                        break // We only need the first profile for display
-                    }
-                }
-            }
-        }
-        .onDisappear {
-            profileTask?.cancel()
-        }
     }
 }

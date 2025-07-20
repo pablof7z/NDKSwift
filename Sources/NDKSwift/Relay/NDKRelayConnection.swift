@@ -69,16 +69,16 @@ public actor NDKRelayConnection {
     
     /// Connect to the relay (async version that properly waits)
     public func connect() async throws {
-        NDKLogger.shared.log(.debug, category: .relay, "connect() async called for \(url)")
+        NDKLogger.log(.debug, category: .relay, "connect() async called for \(url)")
         
         guard !isConnected else {
-            NDKLogger.shared.log(.debug, category: .relay, "Already connected to \(url)")
+            NDKLogger.log(.debug, category: .relay, "Already connected to \(url)")
             return
         }
         
         // If there's already a connection attempt in progress, wait for it
         if !connectionContinuations.isEmpty {
-            NDKLogger.shared.log(.debug, category: .relay, "Connection already in progress for \(url)")
+            NDKLogger.log(.debug, category: .relay, "Connection already in progress for \(url)")
             try await withCheckedThrowingContinuation { continuation in
                 self.connectionContinuations.append(continuation)
             }
@@ -93,7 +93,7 @@ public actor NDKRelayConnection {
                     await self._connect()
                 }
             }
-            NDKLogger.shared.log(.debug, category: .relay, "connect() async completed for \(url)")
+            NDKLogger.log(.debug, category: .relay, "connect() async completed for \(url)")
         } catch {
             // For initial connection failures, don't auto-retry (as per Gemini's suggestion)
             if isInitialConnection {
@@ -127,7 +127,7 @@ public actor NDKRelayConnection {
                 return
             }
             
-            NDKLogger.shared.log(.info, category: .relay, "Connecting to \(url)")
+            NDKLogger.log(.info, category: .relay, "Connecting to \(url)")
             
             // Create WebSocket request
             var request = URLRequest(url: url)
@@ -137,7 +137,7 @@ public actor NDKRelayConnection {
             webSocketTask = Self.sharedURLSession.webSocketTask(with: request)
             webSocketTask?.resume()
             
-            NDKLogger.shared.log(.debug, category: .relay, "WebSocket task created and resumed")
+            NDKLogger.log(.debug, category: .relay, "WebSocket task created and resumed")
             
             // Start receiving messages
             Task {
@@ -148,7 +148,7 @@ public actor NDKRelayConnection {
             await sendPing()
         #else
             // Mock connection for Linux
-            NDKLogger.shared.log(.info, category: .relay, "Mock WebSocket connection to \(url) (Linux doesn't support WebSockets)")
+            NDKLogger.log(.info, category: .relay, "Mock WebSocket connection to \(url) (Linux doesn't support WebSockets)")
             isConnected = true
             connectedAt = Date()
             // Resume all waiting continuations
@@ -198,7 +198,7 @@ public actor NDKRelayConnection {
         }
         
         let eventId = event.id
-        NDKLogger.shared.log(.debug, category: .relay, "publishEvent called for event \(eventId)")
+        NDKLogger.log(.debug, category: .relay, "publishEvent called for event \(eventId)")
         
         // Store continuation and handle the async work within actor context
         return try await withCheckedThrowingContinuation { continuation in
@@ -218,7 +218,7 @@ public actor NDKRelayConnection {
             group.addTask {
                 let eventMessage = NostrMessage.event(subscriptionId: nil, event: event)
                 try await self.send(eventMessage)
-                NDKLogger.shared.log(.debug, category: .relay, "Event sent, waiting for OK response...")
+                NDKLogger.log(.debug, category: .relay, "Event sent, waiting for OK response...")
             }
             
             // Timeout task
@@ -257,7 +257,7 @@ public actor NDKRelayConnection {
         
         // Log network traffic
         let parsed = try? NostrMessage.parse(from: json)
-        NDKLogger.shared.logNetworkSend(to: url, message: json, parsed: parsed)
+        NDKLogger.logNetworkSend(to: url, message: json, parsed: parsed)
         
         #if os(iOS) || os(macOS) || os(watchOS) || os(tvOS)
             guard let task = webSocketTask else {
@@ -268,7 +268,7 @@ public actor NDKRelayConnection {
             try await task.send(message)
         #else
             // Mock sending for Linux
-            NDKLogger.shared.log(.debug, category: .relay, "Mock send to \(url): \(json)")
+            NDKLogger.log(.debug, category: .relay, "Mock send to \(url): \(json)")
         #endif
         
         messagesSent += 1
@@ -304,7 +304,7 @@ public actor NDKRelayConnection {
     private func handleReceivedMessage(_ json: String) async {
         // Validate input
         guard !json.isEmpty else {
-            NDKLogger.shared.log(.warning, category: .relay, "Received empty message from relay \(url)")
+            NDKLogger.log(.warning, category: .relay, "Received empty message from relay \(url)")
             return
         }
         
@@ -312,7 +312,7 @@ public actor NDKRelayConnection {
             let message = try NostrMessage.parse(from: json)
             
             // Log received message
-            NDKLogger.shared.logNetworkReceive(from: url, message: json, parsed: message)
+            NDKLogger.logNetworkReceive(from: url, message: json, parsed: message)
             
             // Handle OK messages for pending events
             if case let .ok(eventId, accepted, errorMessage) = message {
@@ -334,7 +334,7 @@ public actor NDKRelayConnection {
             }
         } catch {
             // Log parsing error
-            NDKLogger.shared.logNetworkParseError(from: url, message: json, error: error)
+            NDKLogger.logNetworkParseError(from: url, message: json, error: error)
         }
     }
     
@@ -360,11 +360,11 @@ public actor NDKRelayConnection {
                     }
                     
                     if let error = error {
-                        NDKLogger.shared.log(.error, category: .relay, "Ping failed for \(self.url): \(error)")
+                        NDKLogger.log(.error, category: .relay, "Ping failed for \(self.url): \(error)")
                         await self.resumeContinuationWithError(error)
                         await self.handleConnectionError(error)
                     } else {
-                        NDKLogger.shared.log(.debug, category: .relay, "Ping successful for \(self.url)")
+                        NDKLogger.log(.debug, category: .relay, "Ping successful for \(self.url)")
                         await self.markAsConnected()
                     }
                     continuation.resume()
@@ -388,7 +388,7 @@ public actor NDKRelayConnection {
         connectedAt = Date()
         retryPolicy.reset()
         
-        NDKLogger.shared.log(.info, category: .relay, "Marked as connected: \(url)")
+        NDKLogger.log(.info, category: .relay, "Marked as connected: \(url)")
         
         // Resume all waiting continuations
         for continuation in connectionContinuations {

@@ -298,11 +298,11 @@ final class DeletionEventTests: XCTestCase {
             .build(signer: signer)
         
         // Process the deletion event FIRST (before the original event exists in cache)
-        let subscriptionManager = ndk.subscriptionManager!
-        await subscriptionManager.processDeletionEvent(deletionEvent)
+        // In the new architecture, we process events through the cache directly
+        try await cache.processEvent(deletionEvent, from: "test-relay", subscriptionId: "test-sub")
         
         // Now try to process the original event (simulating it arriving from a relay)
-        await subscriptionManager.processEvent(originalEvent, from: MockRelay())
+        try await cache.processEvent(originalEvent, from: "test-relay", subscriptionId: "test-sub")
         
         // The original event should NOT be added to cache because it was tombstoned
         let cachedEvent = await cache.getEvent(id: originalEvent.id)

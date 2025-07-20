@@ -34,7 +34,14 @@ final class MockNDKSigner: NDKSigner {
         signEventCalled = true
         lastSignedEvent = event
         
-        // Simulate signature
+        // Use real signature if we have a private key
+        if let privateKey = privateKey {
+            let idData = try HexValidator.validate32ByteHex(event.id)
+            let signature = try Crypto.sign(message: idData, privateKey: privateKey)
+            return signature
+        }
+        
+        // Fallback to dummy signature (which will fail validation)
         return "9a59a5f40a5b7b9a40a5b7b9a40a5b7b9a40a5b7b9a40a5b7b9a40a5b7b9a40a5b7b9a40a5b7b9a40a5b7b9a40a5b7b9a40a5b7b9a40a5b7b9a40a5b7b"
     }
     

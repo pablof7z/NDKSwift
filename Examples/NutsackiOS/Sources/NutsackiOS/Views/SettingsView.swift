@@ -189,16 +189,23 @@ struct SettingsView: View {
             // Cancel previous profile observation
             profileTask?.cancel()
             
-            // Observe profile updates
+            // Observe profile updates using declarative data source
             profileTask = Task {
-                let profileStream = await ndk.observeProfile(for: user.pubkey, closeOnEose: true)
+                let profileDataSource = ndk.observe(
+                    filter: NDKFilter(
+                        authors: [user.pubkey],
+                        kinds: [0]
+                    ),
+                    maxAge: 3600,
+                    cachePolicy: .cacheWithNetwork
+                )
                 
-                for await profile in profileStream {
-                    await MainActor.run {
-                        self.userProfile = profile
-                    }
-                    // For settings, we can close after first profile
-                    if profile != nil {
+                for await event in profileDataSource.events {
+                    if let profileData = event.content.data(using: .utf8),
+                       let profile = try? JSONDecoder().decode(NDKUserProfile.self, from: profileData) {
+                        await MainActor.run {
+                            self.userProfile = profile
+                        }
                         break
                     }
                 }

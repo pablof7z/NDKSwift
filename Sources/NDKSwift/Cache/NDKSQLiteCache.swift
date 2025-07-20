@@ -18,6 +18,17 @@ public actor NDKSQLiteCache: NDKCache {
     private let dbPath: String
     private let debugMode: Bool
     
+    // Cache observation properties
+    private var observers: [FilterSignature: Set<WeakObserver>] = [:]
+    private var relaySourceTracking: [String: Set<String>] = [:] // eventId -> relay URLs
+    
+    // Tombstone cache for deletion events that arrive before the original event
+    private var deletionTombstones: [String: Timestamp] = [:] // eventId -> deletion timestamp
+    private let tombstoneTTL: TimeInterval = 600 // 10 minutes
+    
+    // Periodic cleanup task
+    private var cleanupTask: Task<Void, Never>?
+    
     /// Initialize SQLite cache with optional custom path
     public init(path: String? = nil, debugMode: Bool = false) async throws {
         self.debugMode = debugMode
@@ -35,6 +46,11 @@ public actor NDKSQLiteCache: NDKCache {
         
         try await self.setupPragmas()
         try await self.migrateDatabase()
+        
+        // Start periodic cleanup task
+        self.cleanupTask = Task {
+            await self.startPeriodicCleanup()
+        }
     }
     
     // MARK: - Database Setup
@@ -58,6 +74,8 @@ public actor NDKSQLiteCache: NDKCache {
         Self.registerV3StructuredMintDataMigration(&migrator)
         Self.registerV4OptimisticPublishingMigration(&migrator)
         Self.registerV5DecryptedContentMigration(&migrator)
+        Self.registerV6RelaySourcesMigration(&migrator)
+        Self.registerV7FetchTimestampsMigration(&migrator)
         
         try migrator.migrate(dbQueue)
     }
@@ -155,10 +173,10 @@ public actor NDKSQLiteCache: NDKCache {
     }
     
     public func queryEvents(_ filter: NDKFilter) async throws -> [NDKEvent] {
-        NDKLogger.shared.log(.debug, category: .cache, "Starting query with filter: ids=\(filter.ids?.joined(separator: ",") ?? "nil"), authors=\(filter.authors?.joined(separator: ",") ?? "nil"), kinds=\(filter.kinds?.map { String($0) }.joined(separator: ",") ?? "nil")")
+        NDKLogger.log(.debug, category: .cache, "Starting query with filter: ids=\(filter.ids?.joined(separator: ",") ?? "nil"), authors=\(filter.authors?.joined(separator: ",") ?? "nil"), kinds=\(filter.kinds?.map { String($0) }.joined(separator: ",") ?? "nil")")
         
         return try await dbQueue.read { [self] db in
-            NDKLogger.shared.log(.trace, category: .cache, "Inside dbQueue.read block")
+            NDKLogger.log(.trace, category: .cache, "Inside dbQueue.read block")
             var sql = "SELECT DISTINCT e.json FROM events e"
             var arguments = StatementArguments()
             var whereClauses: [String] = []
@@ -169,7 +187,7 @@ public actor NDKSQLiteCache: NDKCache {
             
             // IDs filter
             if let ids = filter.ids, !ids.isEmpty {
-                NDKLogger.shared.log(.trace, category: .cache, "Adding IDs filter for \(ids.count) IDs")
+                NDKLogger.log(.trace, category: .cache, "Adding IDs filter for \(ids.count) IDs")
                 let placeholders = ids.map { _ in "?" }.joined(separator: ", ")
                 whereClauses.append("e.id IN (\(placeholders))")
                 for id in ids {
@@ -179,7 +197,7 @@ public actor NDKSQLiteCache: NDKCache {
             
             // Authors filter
             if let authors = filter.authors, !authors.isEmpty {
-                NDKLogger.shared.log(.trace, category: .cache, "Adding authors filter for \(authors.count) authors")
+                NDKLogger.log(.trace, category: .cache, "Adding authors filter for \(authors.count) authors")
                 let placeholders = authors.map { _ in "?" }.joined(separator: ", ")
                 whereClauses.append("e.pubkey IN (\(placeholders))")
                 for author in authors {
@@ -243,17 +261,17 @@ public actor NDKSQLiteCache: NDKCache {
             }
             
             // Execute query
-            NDKLogger.shared.log(.trace, category: .cache, "Executing SQL: \(sql)")
+            NDKLogger.log(.trace, category: .cache, "Executing SQL: \(sql)")
             
             let rows = try Row.fetchAll(db, sql: sql, arguments: arguments)
-            NDKLogger.shared.log(.debug, category: .cache, "Query returned \(rows.count) rows")
+            NDKLogger.log(.debug, category: .cache, "Query returned \(rows.count) rows")
             
             let events: [NDKEvent] = rows.compactMap { row in
                 return self.decodeEventFromRow(row)
             }
             
-            NDKLogger.shared.log(.debug, category: .cache, "Decoded \(events.count) events")
-            NDKLogger.shared.log(.trace, category: .cache, "Exiting dbQueue.read block")
+            NDKLogger.log(.debug, category: .cache, "Decoded \(events.count) events")
+            NDKLogger.log(.trace, category: .cache, "Exiting dbQueue.read block")
             return events
         }
     }
@@ -620,7 +638,7 @@ public actor NDKSQLiteCache: NDKCache {
                 }
                 
                 if self.debugMode {
-                    NDKLogger.shared.log(.info, category: .cache, "Pruned \(urlsToDelete.count) mints from cache")
+                    NDKLogger.log(.info, category: .cache, "Pruned \(urlsToDelete.count) mints from cache")
                 }
             }
         }
@@ -651,7 +669,7 @@ public actor NDKSQLiteCache: NDKCache {
             }
         } catch {
             if debugMode {
-                NDKLogger.shared.log(.error, category: .cache, "Error fetching decrypted content for \(eventId): \(error)")
+                NDKLogger.log(.error, category: .cache, "Error fetching decrypted content for \(eventId): \(error)")
             }
             return nil
         }
@@ -667,11 +685,11 @@ public actor NDKSQLiteCache: NDKCache {
                 )
             }
             if debugMode {
-                NDKLogger.shared.log(.debug, category: .cache, "Stored decrypted content for event \(eventId) viewer \(viewerPubkey)")
+                NDKLogger.log(.debug, category: .cache, "Stored decrypted content for event \(eventId) viewer \(viewerPubkey)")
             }
         } catch {
             if debugMode {
-                NDKLogger.shared.log(.error, category: .cache, "Error storing decrypted content for \(eventId): \(error)")
+                NDKLogger.log(.error, category: .cache, "Error storing decrypted content for \(eventId): \(error)")
             }
         }
     }
@@ -682,11 +700,11 @@ public actor NDKSQLiteCache: NDKCache {
                 try db.execute(sql: "DELETE FROM decrypted_content")
             }
             if debugMode {
-                NDKLogger.shared.log(.info, category: .cache, "Cleared all decrypted content")
+                NDKLogger.log(.info, category: .cache, "Cleared all decrypted content")
             }
         } catch {
             if debugMode {
-                NDKLogger.shared.log(.error, category: .cache, "Error clearing decrypted content: \(error)")
+                NDKLogger.log(.error, category: .cache, "Error clearing decrypted content: \(error)")
             }
         }
     }
@@ -700,11 +718,11 @@ public actor NDKSQLiteCache: NDKCache {
                 )
             }
             if debugMode {
-                NDKLogger.shared.log(.info, category: .cache, "Cleared decrypted content for viewer \(viewerPubkey)")
+                NDKLogger.log(.info, category: .cache, "Cleared decrypted content for viewer \(viewerPubkey)")
             }
         } catch {
             if debugMode {
-                NDKLogger.shared.log(.error, category: .cache, "Error clearing decrypted content for viewer: \(error)")
+                NDKLogger.log(.error, category: .cache, "Error clearing decrypted content for viewer: \(error)")
             }
         }
     }
@@ -746,6 +764,220 @@ public actor NDKSQLiteCache: NDKCache {
         } catch {
             return 0
         }
+    }
+    
+    // MARK: - Reactive Observation
+    
+    public func observeEvents(
+        matching filter: NDKFilter,
+        observer: CacheObserver
+    ) async -> ObservationHandle {
+        let signature = FilterSignature(from: filter)
+        let weakObserver = WeakObserver(observer)
+        
+        // Add observer to the set for this filter signature
+        if observers[signature] == nil {
+            observers[signature] = []
+        }
+        observers[signature]?.insert(weakObserver)
+        
+        // Return handle that removes observer when cancelled
+        return ObservationHandle { [weak self] in
+            await self?.removeObserver(weakObserver, for: signature)
+        }
+    }
+    
+    public func processEvent(
+        _ event: NDKEvent,
+        from relay: String,
+        subscriptionId: String
+    ) async throws {
+        // Track relay source in memory
+        relaySourceTracking[event.id, default: []].insert(relay)
+        
+        // Check if event was tombstoned by a deletion event
+        if deletionTombstones[event.id] != nil {
+            // Event was deleted before it arrived, don't save it
+            if debugMode {
+                NDKLogger.log(.debug, category: .cache, "Event \(event.id) was tombstoned, not saving")
+            }
+            return
+        }
+        
+        // Process deletion events (NIP-09) before saving
+        if event.kind == EventKind.deletion {
+            await processDeletionEvent(event)
+        }
+        
+        // Check if event already exists
+        let exists = await hasEvent(id: event.id)
+        
+        // Save event to database
+        try await saveEvent(event)
+        
+        // Save relay source to database
+        try await saveRelaySource(eventId: event.id, relay: relay, subscriptionId: subscriptionId)
+        
+        // If event is new, notify observers
+        if !exists {
+            await notifyObservers(of: event)
+        }
+    }
+    
+    public func getRelaySources(eventId: String) async -> Set<String> {
+        do {
+            let relayUrls = try await dbQueue.read { db in
+                try String.fetchAll(
+                    db,
+                    sql: "SELECT relay_url FROM relay_sources WHERE event_id = ?",
+                    arguments: [eventId]
+                )
+            }
+            return Set(relayUrls)
+        } catch {
+            logError(operation: "get relay sources", parameter: eventId, error: error)
+            // Fallback to in-memory tracking
+            return relaySourceTracking[eventId] ?? []
+        }
+    }
+    
+    // MARK: - Private Helper Methods
+    
+    /// Save relay source information to database
+    private func saveRelaySource(eventId: String, relay: String, subscriptionId: String?) async throws {
+        try await dbQueue.write { db in
+            try db.execute(
+                sql: """
+                INSERT OR IGNORE INTO relay_sources (event_id, relay_url, subscription_id)
+                VALUES (?, ?, ?)
+                """,
+                arguments: [eventId, relay, subscriptionId]
+            )
+        }
+    }
+    
+    // MARK: - Private Deletion Event Processing
+    
+    /// Process a kind:5 deletion event according to NIP-09
+    private func processDeletionEvent(_ deletionEvent: NDKEvent) async {
+        // Extract event IDs to delete from "e" tags
+        let eventIdsToDelete = deletionEvent.tags
+            .filter { $0.count >= 2 && $0[0] == "e" }
+            .map { $0[1] }
+        
+        guard !eventIdsToDelete.isEmpty else { return }
+        
+        let now = Timestamp.now
+        
+        // Process each event to be deleted
+        for eventId in eventIdsToDelete {
+            // Check if the event exists in cache
+            if let existingEvent = await getEvent(id: eventId) {
+                // Verify the deletion event author matches the original event author
+                if existingEvent.pubkey == deletionEvent.pubkey {
+                    // Delete the event from cache
+                    do {
+                        try await deleteEvent(id: eventId)
+                        NDKLogger.log(.debug, category: .cache, "Deleted event \(eventId)")
+                    } catch {
+                        NDKLogger.log(.error, category: .cache, "Failed to delete event \(eventId): \(error)")
+                    }
+                }
+            } else {
+                // Event not in cache yet - add to tombstone cache
+                // This prevents the event from being added if it arrives later
+                deletionTombstones[eventId] = now
+                if debugMode {
+                    NDKLogger.log(.debug, category: .cache, "Added tombstone for event \(eventId)")
+                }
+                
+                // Also try to delete it in case some cache implementations handle this
+                do {
+                    try await deleteEvent(id: eventId)
+                } catch {
+                    // Silent fail - event might not exist
+                }
+            }
+        }
+    }
+    
+    // MARK: - Private Observer Management
+    
+    private func removeObserver(_ observer: WeakObserver, for signature: FilterSignature) {
+        observers[signature]?.remove(observer)
+        
+        // Clean up empty sets
+        if observers[signature]?.isEmpty == true {
+            observers.removeValue(forKey: signature)
+        }
+    }
+    
+    private func notifyObservers(of event: NDKEvent) async {
+        // Clean up any nil weak references
+        for (signature, observerSet) in observers {
+            observers[signature] = observerSet.filter { $0.observer != nil }
+        }
+        
+        // Find all observers whose filters match this event
+        for (signature, observerSet) in observers {
+            // Create filter from signature to check if event matches
+            var filter = NDKFilter()
+            filter.kinds = signature.kinds
+            filter.authors = signature.authors
+            
+            // Add tag filters if present
+            if let tags = signature.tags {
+                for (tagName, values) in tags {
+                    filter.addTagFilter(tagName, values: values)
+                }
+            }
+            
+            if eventMatchesFilter(event, filter: filter) {
+                // Notify all observers for this filter
+                for weakObserver in observerSet {
+                    if let observer = weakObserver.observer {
+                        await observer.handleEvent(event)
+                    }
+                }
+            }
+        }
+    }
+    
+    private func eventMatchesFilter(_ event: NDKEvent, filter: NDKFilter) -> Bool {
+        // Check kinds
+        if let kinds = filter.kinds, !kinds.contains(event.kind) {
+            return false
+        }
+        
+        // Check authors
+        if let authors = filter.authors, !authors.contains(event.pubkey) {
+            return false
+        }
+        
+        // Check tags
+        if let filterTags = filter.tags {
+            for (tagName, values) in filterTags {
+                let eventTagValues = event.tags
+                    .filter { $0.count > 0 && $0[0] == tagName }
+                    .compactMap { $0.count > 1 ? $0[1] : nil }
+                
+                // If filter specifies values for this tag, event must have at least one matching value
+                if !values.isEmpty && !values.contains(where: { eventTagValues.contains($0) }) {
+                    return false
+                }
+            }
+        }
+        
+        // Check time constraints
+        if let since = filter.since, event.createdAt < since {
+            return false
+        }
+        
+        if let until = filter.until, event.createdAt > until {
+            return false
+        }
+        
+        return true
     }
     
     // MARK: - Optimistic Publishing Support
@@ -1097,6 +1329,120 @@ public actor NDKSQLiteCache: NDKCache {
             
             return CacheStatistics(totalEvents: totalEvents, eventsByKind: eventsByKind)
         }
+    }
+    
+    // MARK: - Cleanup Methods
+    
+    /// Start periodic cleanup of nil observers and tombstones
+    private func startPeriodicCleanup() async {
+        while !Task.isCancelled {
+            // Wait for 5 minutes between cleanups
+            try? await Task.sleep(nanoseconds: 5 * 60 * 1_000_000_000)
+            
+            await cleanupObservers()
+            await cleanupTombstones()
+        }
+    }
+    
+    /// Clean up nil observers from all filter signatures
+    private func cleanupObservers() async {
+        var emptySignatures: [FilterSignature] = []
+        
+        // Clean up nil observers and track empty signatures
+        for (signature, observerSet) in observers {
+            let activeObservers = observerSet.filter { $0.observer != nil }
+            
+            if activeObservers.isEmpty {
+                emptySignatures.append(signature)
+            } else {
+                observers[signature] = activeObservers
+            }
+        }
+        
+        // Remove empty signatures
+        for signature in emptySignatures {
+            observers.removeValue(forKey: signature)
+        }
+        
+        if debugMode && !emptySignatures.isEmpty {
+            NDKLogger.log(.debug, category: .cache, "Cleaned up \(emptySignatures.count) empty observer signatures")
+        }
+    }
+    
+    /// Clean up expired tombstones
+    private func cleanupTombstones() async {
+        let now = Timestamp.now
+        let expiredKeys = deletionTombstones.compactMap { (eventId, timestamp) -> String? in
+            let age = TimeInterval(now - timestamp)
+            return age > tombstoneTTL ? eventId : nil
+        }
+        
+        for key in expiredKeys {
+            deletionTombstones.removeValue(forKey: key)
+        }
+        
+        if debugMode && !expiredKeys.isEmpty {
+            NDKLogger.log(.debug, category: .cache, "Cleaned up \(expiredKeys.count) expired tombstones")
+        }
+    }
+    
+    // MARK: - Fetch Timestamp Tracking
+    
+    /// Get the last fetch time for a filter
+    public func getLastFetchTime(for filter: NDKFilter) async -> Date? {
+        let fingerprint = filter.fingerprint
+        
+        do {
+            return try await dbQueue.read { db in
+                if let row = try Row.fetchOne(db, sql: """
+                    SELECT last_fetch FROM fetch_timestamps WHERE filter_fingerprint = ?
+                """, arguments: [fingerprint]) {
+                    let timestamp = row["last_fetch"] as Int64
+                    return Date(timeIntervalSince1970: TimeInterval(timestamp))
+                }
+                return nil
+            }
+        } catch {
+            logError(operation: "get fetch timestamp", parameter: fingerprint, error: error)
+            return nil
+        }
+    }
+    
+    /// Record the fetch time for a filter
+    public func recordFetchTime(for filter: NDKFilter, timestamp: Date) async {
+        let fingerprint = filter.fingerprint
+        let timestampInt = Int64(timestamp.timeIntervalSince1970)
+        
+        // Encode filter as JSON for debugging purposes
+        let filterJSON: String
+        do {
+            let encoder = JSONEncoder()
+            encoder.outputFormatting = .sortedKeys
+            let data = try encoder.encode(filter)
+            filterJSON = String(data: data, encoding: .utf8) ?? "{}"
+        } catch {
+            filterJSON = "{}"
+        }
+        
+        do {
+            try await dbQueue.write { db in
+                try db.execute(sql: """
+                    INSERT OR REPLACE INTO fetch_timestamps 
+                    (filter_fingerprint, last_fetch, filter_json, updated_at) 
+                    VALUES (?, ?, ?, ?)
+                """, arguments: [fingerprint, timestampInt, filterJSON, timestampInt])
+            }
+            
+            if debugMode {
+                NDKLogger.log(.debug, category: .cache, "Recorded fetch timestamp for filter \(fingerprint)")
+            }
+        } catch {
+            logError(operation: "record fetch timestamp", parameter: fingerprint, error: error)
+        }
+    }
+    
+    deinit {
+        cleanupTask?.cancel()
     }
 }
 

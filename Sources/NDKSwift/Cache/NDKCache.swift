@@ -136,6 +136,47 @@ public protocol NDKCache: Actor {
     
     /// Clear all cached data
     func clear() async throws
+    
+    // MARK: - Reactive Observation
+    
+    /// Observe events matching a filter
+    /// - Parameters:
+    ///   - filter: The filter to match events against
+    ///   - observer: The observer to notify of matching events
+    /// - Returns: An observation handle to manage the observation lifecycle
+    func observeEvents(
+        matching filter: NDKFilter,
+        observer: CacheObserver
+    ) async -> ObservationHandle
+    
+    /// Process incoming event from relay
+    /// - Parameters:
+    ///   - event: The event to process
+    ///   - relay: The relay this event came from
+    ///   - subscriptionId: The subscription that received this event
+    func processEvent(
+        _ event: NDKEvent,
+        from relay: String,
+        subscriptionId: String
+    ) async throws
+    
+    /// Get relay sources for an event
+    /// - Parameter eventId: The event ID to check
+    /// - Returns: Set of relay URLs that have provided this event
+    func getRelaySources(eventId: String) async -> Set<String>
+    
+    // MARK: - Cache Freshness Tracking
+    
+    /// Get the timestamp when events matching a filter were last fetched
+    /// - Parameter filter: The filter to check
+    /// - Returns: The date when this filter was last queried, or nil if never
+    func getLastFetchTime(for filter: NDKFilter) async -> Date?
+    
+    /// Record that a filter was just queried
+    /// - Parameters:
+    ///   - filter: The filter that was queried
+    ///   - timestamp: When the query occurred (defaults to now)
+    func recordFetchTime(for filter: NDKFilter, timestamp: Date) async
 }
 
 // MARK: - Optional Protocol Extensions
@@ -286,5 +327,45 @@ public extension NDKCache {
             result[id] = await hasEvent(id: id)
         }
         return result
+    }
+    
+    // MARK: - Default Reactive Observation Implementation
+    
+    /// Default implementation that returns a no-op handle
+    func observeEvents(
+        matching filter: NDKFilter,
+        observer: CacheObserver
+    ) async -> ObservationHandle {
+        // Default implementation - cache implementations should override
+        return ObservationHandle { /* no-op */ }
+    }
+    
+    /// Default implementation that just saves the event
+    func processEvent(
+        _ event: NDKEvent,
+        from relay: String,
+        subscriptionId: String
+    ) async throws {
+        // Default implementation - just save the event
+        try await saveEvent(event)
+    }
+    
+    /// Default implementation that returns empty set
+    func getRelaySources(eventId: String) async -> Set<String> {
+        // Default implementation - cache implementations should override
+        return []
+    }
+    
+    // MARK: - Default Cache Freshness Implementation
+    
+    /// Default implementation that returns nil (no tracking)
+    func getLastFetchTime(for filter: NDKFilter) async -> Date? {
+        // Default implementation - cache implementations should override
+        return nil
+    }
+    
+    /// Default implementation that does nothing
+    func recordFetchTime(for filter: NDKFilter, timestamp: Date = Date()) async {
+        // Default implementation - cache implementations should override
     }
 }

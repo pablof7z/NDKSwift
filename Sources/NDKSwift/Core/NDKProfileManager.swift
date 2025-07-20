@@ -97,7 +97,7 @@ public actor NDKProfileManager {
                 kinds: [EventKind.metadata]
             )
             
-            let events = try await ndk.fetchEvents([filter])
+            let events = try await fetchEventsInternal(filter: filter)
             
             // Process events
             for event in events {
@@ -160,33 +160,36 @@ public actor NDKProfileManager {
                     limit: 1
                 )
                 
-                let subscription = await ndk.subscribe(
-                    filters: [filter],
-                    closeOnEose: closeOnEose
+                let subscriptionId = UUID().uuidString
+                let subscription = await ndk.internalSubscriptionManager.createSubscription(
+                    id: subscriptionId,
+                    filters: [filter]
                 )
                 
                 // Process events from subscription
-                do {
-                    for try await event in subscription {
-                        if let profileData = event.content.data(using: .utf8),
-                           let profile = JSONCoding.safeDecode(NDKUserProfile.self, from: profileData) {
-                            // Update cache
-                            updateCache(pubkey: pubkey, profile: profile)
-                            
-                            // Notify all observers for this pubkey
-                            activeObservations[pubkey]?.forEach { wrapper in
-                                wrapper.continuation.yield(profile)
-                            }
-                            
-                            // Save to persistent cache
-                            try? await ndk.cache.saveProfile(profile, pubkey: pubkey)
+                for await (event, _) in await subscription.events {
+                    if let profileData = event.content.data(using: .utf8),
+                       let profile = JSONCoding.safeDecode(NDKUserProfile.self, from: profileData) {
+                        // Update cache
+                        updateCache(pubkey: pubkey, profile: profile)
+                        
+                        // Notify all observers for this pubkey
+                        activeObservations[pubkey]?.forEach { wrapper in
+                            wrapper.continuation.yield(profile)
                         }
+                        
+                        // Save to persistent cache
+                        try? await ndk.cache.saveProfile(profile, pubkey: pubkey)
                     }
-                } catch {
-                    // Subscription ended or errored
+                    
+                    // If closeOnEose, stop after first profile
+                    if closeOnEose {
+                        break
+                    }
                 }
                 
                 // Clean up when done
+                await ndk.internalSubscriptionManager.closeSubscription(id: subscriptionId)
                 activeObservations[pubkey]?.removeAll { $0 === wrapper }
                 if activeObservations[pubkey]?.isEmpty == true {
                     activeObservations.removeValue(forKey: pubkey)
@@ -265,12 +268,13 @@ public actor NDKProfileManager {
         )
         
         // Fetch the event
-        guard let event = try await ndk.fetchEvent(filter) else {
+        let events = try await fetchEventsInternal(filter: filter)
+        guard let event = events.first else {
             return nil
         }
         
         // Parse the profile from event content
-        guard let profileData = event.content.data(using: .utf8),
+        guard let profileData = event.content.data(using: String.Encoding.utf8),
               let profile = JSONCoding.safeDecode(NDKUserProfile.self, from: profileData) else {
             return nil
         }
@@ -282,5 +286,22 @@ public actor NDKProfileManager {
         try? await ndk.cache.saveProfile(profile, pubkey: pubkey)
         
         return profile
+    }
+    
+    /// Internal helper to fetch events using NDKDataSource
+    private func fetchEventsInternal(filter: NDKFilter) async throws -> [NDKEvent] {
+        guard let ndk = ndk else {
+            throw NDKError.notConfigured("NDK instance not available")
+        }
+        
+        // Use NDKDataSource with appropriate maxAge for profiles
+        let dataSource = NDKDataSource(
+            ndk: ndk,
+            filter: filter,
+            maxAge: 3600, // 1 hour - profiles don't change frequently
+            cachePolicy: .cacheWithNetwork
+        )
+        
+        return await dataSource.currentValue()
     }
 }

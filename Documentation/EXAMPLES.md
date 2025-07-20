@@ -89,15 +89,15 @@ class OptimisticPublishingExample {
     }
     
     func publishWithInstantFeedback() async throws {
-        // Create subscription for real-time updates
-        let subscription = ndk.subscribe(filters: [
-            NDKFilter(kinds: [1], limit: 10)
-        ])
+        // Create data source for real-time updates
+        let notes = await NDKDataSource<NDKEvent>(
+            ndk: ndk,
+            filter: NDKFilter(kinds: [1], limit: 10)
+        )
         
-        // Process events (including optimistic ones)
-        Task {
-            for await event in subscription {
-                print("📝 New note: \(event.content)")
+        // Use in SwiftUI view for automatic updates
+        // Events (including optimistic ones) automatically appear
+        // in notes.data
                 // Event appears immediately when published locally!
             }
         }

@@ -47,7 +47,7 @@ public enum Nutzap {
         for mintURL in viableMintURLs {
             // Load mint dynamically
             guard let mintUrl = URL(string: mintURL) else {
-                NDKLogger.shared.log(.error, category: .general, "Invalid mint URL: \(mintURL)")
+                NDKLogger.log(.error, category: .general, "Invalid mint URL: \(mintURL)")
                 continue
             }
             
@@ -55,7 +55,7 @@ public enum Nutzap {
             do {
                 mint = try await wallet.mints.loadMint(url: mintUrl)
             } catch {
-                NDKLogger.shared.log(.error, category: .general, "Failed to load mint \(mintURL): \(error)")
+                NDKLogger.log(.error, category: .general, "Failed to load mint \(mintURL): \(error)")
                 lastError = error
                 continue
             }
@@ -136,7 +136,7 @@ public enum Nutzap {
                 // Release proofs on failure and try next mint
                 await proofStateManager.releaseProofs(selectedProofs)
                 lastError = error
-                NDKLogger.shared.log(.warning, category: .general, "Nutzap failed with mint \(mintURL): \(error). Trying next mint...")
+                NDKLogger.log(.warning, category: .general, "Nutzap failed with mint \(mintURL): \(error). Trying next mint...")
                 continue
             }
         }
@@ -177,14 +177,14 @@ public enum Nutzap {
             .map { $0[1] }
         
         guard !mintURLs.isEmpty else {
-            NDKLogger.shared.log(.error, category: .general, "No mint URLs in nutzap")
+            NDKLogger.log(.error, category: .general, "No mint URLs in nutzap")
             return
         }
         
         // Extract proofs from proof tags
         let proofTags = event.tags.filter { $0.count >= 2 && $0[0] == "proof" }
         guard !proofTags.isEmpty else {
-            NDKLogger.shared.log(.error, category: .general, "No proofs in nutzap")
+            NDKLogger.log(.error, category: .general, "No proofs in nutzap")
             return
         }
         
@@ -192,7 +192,7 @@ public enum Nutzap {
         for proofTag in proofTags {
             guard let proofData = proofTag[1].data(using: .utf8),
                   let proof = try? JSONCoding.decode(CashuSwift.Proof.self, from: proofData) else {
-                NDKLogger.shared.log(.error, category: .general, "Failed to decode proof from tag")
+                NDKLogger.log(.error, category: .general, "Failed to decode proof from tag")
                 continue
             }
             allProofs.append(proof)
@@ -204,7 +204,7 @@ public enum Nutzap {
         // Filter proofs locked to us
         let ourProofs = CashuHelpers.filterProofsLockedTo(proofs: allProofs, pubkey: ourPubkeyHex)
         guard !ourProofs.isEmpty else {
-            NDKLogger.shared.log(.warning, category: .general, "No proofs locked to us in nutzap")
+            NDKLogger.log(.warning, category: .general, "No proofs locked to us in nutzap")
             return
         }
         
@@ -212,7 +212,7 @@ public enum Nutzap {
         for mintURL in mintURLs {
             // Load mint dynamically
             guard let mintUrl = URL(string: mintURL) else {
-                NDKLogger.shared.log(.error, category: .general, "Invalid mint URL in nutzap: \(mintURL)")
+                NDKLogger.log(.error, category: .general, "Invalid mint URL in nutzap: \(mintURL)")
                 continue
             }
             
@@ -220,7 +220,7 @@ public enum Nutzap {
             do {
                 mint = try await wallet.mints.loadMint(url: mintUrl)
             } catch {
-                NDKLogger.shared.log(.error, category: .general, "Failed to load mint \(mintURL) for nutzap: \(error)")
+                NDKLogger.log(.error, category: .general, "Failed to load mint \(mintURL) for nutzap: \(error)")
                 continue
             }
             

@@ -438,7 +438,20 @@ struct ContactsScrollView: View {
                 limit: 1
             )
             
-            if let contactListEvent = try await ndk.fetchEvent(filter) {
+            // Use declarative data source to fetch contact list
+            let contactDataSource = ndk.observe(
+                filter: filter,
+                maxAge: 3600,
+                cachePolicy: .cacheWithNetwork
+            )
+            
+            var contactListEvent: NDKEvent?
+            for await event in contactDataSource.events {
+                contactListEvent = event
+                break // Take first event
+            }
+            
+            if let contactListEvent = contactListEvent {
                 // Parse the contact list
                 var contactPubkeys: [String] = []
                 for tag in contactListEvent.tags {
@@ -519,10 +532,19 @@ struct ContactAvatarView: View {
             guard let ndk = nostrManager.ndk else { return }
             
             profileTask = Task {
-                let profileStream = await ndk.observeProfile(for: user.pubkey, closeOnEose: true)
+                // Use declarative data source for profile
+                let profileDataSource = ndk.observe(
+                    filter: NDKFilter(
+                        authors: [user.pubkey],
+                        kinds: [0]
+                    ),
+                    maxAge: 3600,
+                    cachePolicy: .cacheWithNetwork
+                )
                 
-                for await profileUpdate in profileStream {
-                    if let profile = profileUpdate {
+                for await event in profileDataSource.events {
+                    if let profileData = event.content.data(using: .utf8),
+                       let profile = try? JSONDecoder().decode(NDKUserProfile.self, from: profileData) {
                         await MainActor.run {
                             self.profile = profile
                         }

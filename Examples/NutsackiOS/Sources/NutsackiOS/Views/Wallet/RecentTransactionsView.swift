@@ -186,9 +186,23 @@ struct TransactionRow: View {
                let senderPubkey = transaction.senderPubkey,
                let ndk = nostrManager.ndk {
                 
-                for await profile in await ndk.observeProfile(for: senderPubkey) {
-                    senderProfile = profile
-                    break
+                // Use declarative data source for profile
+                let profileDataSource = NDKDataSource(
+                    ndk: ndk,
+                    filter: NDKFilter(
+                        authors: [senderPubkey],
+                        kinds: [0]
+                    ),
+                    maxAge: 3600,
+                    cachePolicy: .cacheWithNetwork
+                )
+                
+                for await event in profileDataSource.events {
+                    if let profileData = event.content.data(using: .utf8),
+                       let profile = try? JSONDecoder().decode(NDKUserProfile.self, from: profileData) {
+                        senderProfile = profile
+                        break
+                    }
                 }
             }
         }

@@ -114,13 +114,17 @@ final class NIP60WalletE2ETests: XCTestCase {
             kinds: [EventKind.cashuToken]
         )
         
-        // Create subscription to all connected relays
-        let subscription = await ndk.subscribe(filters: [filter], closeOnEose: false)
+        // Create data source to monitor for events
+        let dataSource = ndk.observe(
+            filter: filter,
+            maxAge: 0, // Real-time monitoring
+            cachePolicy: .networkOnly
+        )
         
         // Track which relays send us the event
         Task {
             do {
-                for try await event in subscription {
+                for await event in dataSource.events {
                     if event.kind == EventKind.cashuToken {
                         print("\n📨 Received 7375 event: \(event.id)")
                         received7375Event = event
@@ -195,7 +199,14 @@ final class NIP60WalletE2ETests: XCTestCase {
                 // Fetch from specific relay
                 let relaySet = Set([relay.url])
                 do {
-                    if try await ndk.fetchEvent(verifyFilter, relays: relaySet, timeoutSeconds: 5) != nil {
+                    let dataSource = ndk.observe(
+                        filter: verifyFilter,
+                        maxAge: 0, // Always fresh for tests
+                        cachePolicy: .networkOnly,
+                        relays: relaySet
+                    )
+                    let events = await dataSource.currentValue()
+                    if !events.isEmpty {
                         publishedRelays.insert(relay.url)
                         print("   ✅ Found event on \(relay.url)")
                     } else {

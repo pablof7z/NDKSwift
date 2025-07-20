@@ -60,10 +60,17 @@ public actor NDKOutboxManager {
             }
         }
         
-        // Use standard fetchEvents with selected relays
+        // Use NDKDataSource with specific relays
         let relayUrls = Set(relayObjects.map { $0.url })
-        let events = try await ndk.fetchEvents([filter], relays: relayUrls)
-        return Array(events)
+        let dataSource = NDKDataSource(
+            ndk: ndk,
+            filter: filter,
+            maxAge: 0, // Always fresh for targeted queries
+            cachePolicy: .networkOnly, // Skip cache for relay-specific queries
+            relays: relayUrls
+        )
+        
+        return await dataSource.currentValue()
     }
     
     /// Start tracking a user for outbox operations

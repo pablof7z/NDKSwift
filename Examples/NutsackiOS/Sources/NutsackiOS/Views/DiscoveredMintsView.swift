@@ -60,15 +60,15 @@ struct DiscoveredMintsView: View {
     private var mintsList: some View {
         List {
             Section {
-                ForEach(discoveredMints, id: \.url.absoluteString) { mint in
+                ForEach(discoveredMints, id: \.url) { mint in
                     DiscoveredMintRow(
                         mint: mint,
-                        isSelected: selectedMints.contains(mint.url.absoluteString),
+                        isSelected: selectedMints.contains(mint.url),
                         onToggle: {
-                            if selectedMints.contains(mint.url.absoluteString) {
-                                selectedMints.remove(mint.url.absoluteString)
+                            if selectedMints.contains(mint.url) {
+                                selectedMints.remove(mint.url)
                             } else {
-                                selectedMints.insert(mint.url.absoluteString)
+                                selectedMints.insert(mint.url)
                             }
                         }
                     )
@@ -137,7 +137,7 @@ struct DiscoveredMintRow: View {
                 
                 // Mint info
                 VStack(alignment: .leading, spacing: 4) {
-                    Text(mint.name ?? mint.url.host ?? mint.url.absoluteString)
+                    Text(mint.name)
                         .font(.headline)
                         .foregroundStyle(.primary)
                     
@@ -150,14 +150,14 @@ struct DiscoveredMintRow: View {
                     
                     HStack(spacing: 8) {
                         // URL
-                        Label(mint.url.absoluteString, systemImage: "link")
+                        Label(mint.url, systemImage: "link")
                             .font(.caption2)
                             .foregroundStyle(.tertiary)
                             .lineLimit(1)
                         
-                        // Contact if available
-                        if let contact = mint.contact {
-                            Label(contact, systemImage: "person.circle")
+                        // Pubkey if available
+                        if let pubkey = mint.pubkey {
+                            Label(String(pubkey.prefix(8)) + "...", systemImage: "person.circle")
                                 .font(.caption2)
                                 .foregroundStyle(.tertiary)
                                 .lineLimit(1)

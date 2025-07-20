@@ -23,7 +23,7 @@ public actor NDKEventManager {
         let selection = await relaySelector.selectRelaysForPublishing(event: event)
         let targetRelayUrls = Set(selection.relays)
         
-        NDKLogger.shared.log(.debug, category: .event, "Event kind: \(event.kind), Selected \(targetRelayUrls.count) relays for publishing: \(targetRelayUrls)")
+        NDKLogger.log(.debug, category: .event, "Event kind: \(event.kind), Selected \(targetRelayUrls.count) relays for publishing: \(targetRelayUrls)")
         
         // Use common publish implementation
         return try await publishToRelays(event: event, relayUrls: targetRelayUrls, logRawJSON: logRawJSON, useOptimistic: true)
@@ -50,7 +50,7 @@ public actor NDKEventManager {
         do {
             try await cache.saveEvent(event)
         } catch {
-            NDKLogger.shared.log(.warning, category: .cache, "Failed to cache event: \(error)")
+            NDKLogger.log(.warning, category: .cache, "Failed to cache event: \(error)")
         }
         
         // Always handle optimistic publishing (except for relay lists)
@@ -58,16 +58,16 @@ public actor NDKEventManager {
             do {
                 try await cache.addUnpublishedEvent(event, relays: relayUrls)
             } catch {
-                NDKLogger.shared.log(.warning, category: .cache, "Failed to add unpublished event to cache: \(error)")
+                NDKLogger.log(.warning, category: .cache, "Failed to add unpublished event to cache: \(error)")
             }
             
-            // Always dispatch optimistically via subscription coordinator
-            await ndk.subscriptionCoordinator.processEvent(event, from: OptimisticEventSource())
+            // Always dispatch optimistically via cache (which notifies observers)
+            // Cache processEvent already happened above, so observers are notified
         }
         
         if logRawJSON {
             if let jsonString = try? JSONCoding.encodeToString(event) {
-                NDKLogger.shared.log(.debug, category: .event, "Publishing event JSON: \(jsonString)")
+                NDKLogger.log(.debug, category: .event, "Publishing event JSON: \(jsonString)")
             }
         }
         
@@ -84,7 +84,7 @@ public actor NDKEventManager {
                         let result = try await relay.publish(event)
                         return (relay, result.success)
                     } catch {
-                        NDKLogger.shared.log(.error, category: .event, "Failed to publish to \(relay.url): \(error)")
+                        NDKLogger.log(.error, category: .event, "Failed to publish to \(relay.url): \(error)")
                         return (relay, false)
                     }
                 }
@@ -155,7 +155,7 @@ public actor NDKEventManager {
                 let publishedRelays = try await publish(event: event, to: targetRelayUrls)
                 results.append((event: event, relays: publishedRelays))
             } catch {
-                NDKLogger.shared.log(.error, category: .event, "Failed to retry publishing event \(event.id): \(error)")
+                NDKLogger.log(.error, category: .event, "Failed to retry publishing event \(event.id): \(error)")
             }
         }
         
@@ -174,7 +174,7 @@ public actor NDKEventManager {
                         try await cache.confirmEvent(eventId: event.id, onRelay: relay.url)
                     }
                 } catch {
-                    NDKLogger.shared.log(.error, category: .event, "Failed to publish queued event to \(relay.url): \(error)")
+                    NDKLogger.log(.error, category: .event, "Failed to publish queued event to \(relay.url): \(error)")
                 }
             }
         }

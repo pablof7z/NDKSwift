@@ -49,7 +49,7 @@ public struct NDKCashuTokenEvent {
         )
         
         let publishedRelays = try await ndk.publish(tokenEvent.event)
-        NDKLogger.shared.log(.info, category: .event, "NDKCashuTokenEvent - Published to \(publishedRelays.count) relays")
+        NDKLogger.log(.info, category: .event, "NDKCashuTokenEvent - Published to \(publishedRelays.count) relays")
         
         return tokenEvent
     }
@@ -109,7 +109,7 @@ public struct NDKCashuQuoteEvent {
         )
         
         _ = try await ndk.publish(quoteEvent.event)
-        NDKLogger.shared.log(.info, category: .event, "NDKCashuQuoteEvent - Published quote event: \(quoteEvent.event.id)")
+        NDKLogger.log(.info, category: .event, "NDKCashuQuoteEvent - Published quote event: \(quoteEvent.event.id)")
         
         return quoteEvent
     }
@@ -177,16 +177,16 @@ public struct NDKCashuWalletEvent {
             signer: signer
         )
         
-        NDKLogger.shared.log(.info, category: .event, "NDKCashuWalletEvent - Publishing wallet configuration event: \(walletEvent.event.id)")
-        NDKLogger.shared.log(.debug, category: .event, "NDKCashuWalletEvent - Event kind: \(walletEvent.event.kind)")
-        NDKLogger.shared.log(.debug, category: .event, "NDKCashuWalletEvent - Event tags: \(walletEvent.event.tags)")
-        NDKLogger.shared.log(.debug, category: .event, "NDKCashuWalletEvent - Event author: \(walletEvent.event.pubkey)")
+        NDKLogger.log(.info, category: .event, "NDKCashuWalletEvent - Publishing wallet configuration event: \(walletEvent.event.id)")
+        NDKLogger.log(.debug, category: .event, "NDKCashuWalletEvent - Event kind: \(walletEvent.event.kind)")
+        NDKLogger.log(.debug, category: .event, "NDKCashuWalletEvent - Event tags: \(walletEvent.event.tags)")
+        NDKLogger.log(.debug, category: .event, "NDKCashuWalletEvent - Event author: \(walletEvent.event.pubkey)")
         
         do {
             let publishedRelays = try await ndk.publish(walletEvent.event)
-            NDKLogger.shared.log(.info, category: .event, "NDKCashuWalletEvent - Successfully published wallet configuration to \(publishedRelays.count) relays: \(publishedRelays)")
+            NDKLogger.log(.info, category: .event, "NDKCashuWalletEvent - Successfully published wallet configuration to \(publishedRelays.count) relays: \(publishedRelays)")
         } catch {
-            NDKLogger.shared.log(.error, category: .event, "NDKCashuWalletEvent - ERROR: Failed to publish wallet event: \(error)")
+            NDKLogger.log(.error, category: .event, "NDKCashuWalletEvent - ERROR: Failed to publish wallet event: \(error)")
             throw error
         }
         
@@ -201,11 +201,11 @@ public struct NDKCashuWalletEvent {
         p2pkPrivateKey: String? = nil,
         signer: NDKSigner
     ) async throws -> NDKCashuWalletEvent {
-        NDKLogger.shared.log(.debug, category: .event, "🔐 NDKCashuWalletEvent - Creating Kind 17375 wallet configuration event")
-        NDKLogger.shared.log(.debug, category: .event, "🔐 NDKCashuWalletEvent - Input parameters:")
-        NDKLogger.shared.log(.debug, category: .event, "🔐   - mints: \(mints)")
-        NDKLogger.shared.log(.debug, category: .event, "🔐   - relays: \(relays ?? [])")
-        NDKLogger.shared.log(.debug, category: .event, "🔐   - p2pkPrivateKey: \(p2pkPrivateKey?.prefix(8) ?? "nil")...")
+        NDKLogger.log(.debug, category: .event, "🔐 NDKCashuWalletEvent - Creating Kind 17375 wallet configuration event")
+        NDKLogger.log(.debug, category: .event, "🔐 NDKCashuWalletEvent - Input parameters:")
+        NDKLogger.log(.debug, category: .event, "🔐   - mints: \(mints)")
+        NDKLogger.log(.debug, category: .event, "🔐   - relays: \(relays ?? [])")
+        NDKLogger.log(.debug, category: .event, "🔐   - p2pkPrivateKey: \(p2pkPrivateKey?.prefix(8) ?? "nil")...")
         
         var walletTags: [[String]] = []
         
@@ -213,21 +213,21 @@ public struct NDKCashuWalletEvent {
         for mint in mints {
             walletTags.append(["mint", mint])
         }
-        NDKLogger.shared.log(.debug, category: .event, "🔐 NDKCashuWalletEvent - Added mint tags: \(walletTags.filter { $0[0] == "mint" })")
+        NDKLogger.log(.debug, category: .event, "🔐 NDKCashuWalletEvent - Added mint tags: \(walletTags.filter { $0[0] == "mint" })")
         
         // Add P2PK private key if provided
         if let privkey = p2pkPrivateKey {
             walletTags.append(["privkey", privkey])
-            NDKLogger.shared.log(.debug, category: .event, "🔐 NDKCashuWalletEvent - Added P2PK private key tag")
+            NDKLogger.log(.debug, category: .event, "🔐 NDKCashuWalletEvent - Added P2PK private key tag")
         }
         
-        NDKLogger.shared.log(.debug, category: .event, "🔐 NDKCashuWalletEvent - Complete encrypted tags structure: \(walletTags)")
+        NDKLogger.log(.debug, category: .event, "🔐 NDKCashuWalletEvent - Complete encrypted tags structure: \(walletTags)")
         
         // Encrypt wallet configuration
         let plaintext = try JSONCoding.encodeToString(walletTags)
         
-        NDKLogger.shared.log(.debug, category: .event, "🔐 NDKCashuWalletEvent - Pre-encryption plaintext JSON: \(plaintext)")
-        NDKLogger.shared.log(.debug, category: .event, "🔐 NDKCashuWalletEvent - Pre-encryption plaintext size: \(plaintext.count) characters")
+        NDKLogger.log(.debug, category: .event, "🔐 NDKCashuWalletEvent - Pre-encryption plaintext JSON: \(plaintext)")
+        NDKLogger.log(.debug, category: .event, "🔐 NDKCashuWalletEvent - Pre-encryption plaintext size: \(plaintext.count) characters")
         
         let builder = ndk.event()
             .content(plaintext)
@@ -238,21 +238,21 @@ public struct NDKCashuWalletEvent {
             for relay in relays {
                 _ = builder.tag(["relay", relay])
             }
-            NDKLogger.shared.log(.debug, category: .event, "🔐 NDKCashuWalletEvent - Added unencrypted relay tags: \(relays)")
+            NDKLogger.log(.debug, category: .event, "🔐 NDKCashuWalletEvent - Added unencrypted relay tags: \(relays)")
         }
         
-        NDKLogger.shared.log(.debug, category: .event, "🔐 NDKCashuWalletEvent - About to encrypt content with NIP-44...")
+        NDKLogger.log(.debug, category: .event, "🔐 NDKCashuWalletEvent - About to encrypt content with NIP-44...")
         let walletEvent = try await builder.encrypt(signer: signer, scheme: .nip44)
         
-        NDKLogger.shared.log(.info, category: .event, "🔐 NDKCashuWalletEvent - Encryption complete!")
-        NDKLogger.shared.log(.debug, category: .event, "🔐 NDKCashuWalletEvent - Final event details:")
-        NDKLogger.shared.log(.debug, category: .event, "🔐   - Event ID: \(walletEvent.id)")
-        NDKLogger.shared.log(.debug, category: .event, "🔐   - Event Kind: \(walletEvent.kind)")
-        NDKLogger.shared.log(.debug, category: .event, "🔐   - Event Author: \(walletEvent.pubkey)")
-        NDKLogger.shared.log(.debug, category: .event, "🔐   - Encrypted content: \(walletEvent.content.prefix(100))...")
-        NDKLogger.shared.log(.debug, category: .event, "🔐   - Encrypted content size: \(walletEvent.content.count) characters")
-        NDKLogger.shared.log(.debug, category: .event, "🔐   - Unencrypted tags: \(walletEvent.tags)")
-        NDKLogger.shared.log(.debug, category: .event, "🔐   - Created at: \(walletEvent.createdAt)")
+        NDKLogger.log(.info, category: .event, "🔐 NDKCashuWalletEvent - Encryption complete!")
+        NDKLogger.log(.debug, category: .event, "🔐 NDKCashuWalletEvent - Final event details:")
+        NDKLogger.log(.debug, category: .event, "🔐   - Event ID: \(walletEvent.id)")
+        NDKLogger.log(.debug, category: .event, "🔐   - Event Kind: \(walletEvent.kind)")
+        NDKLogger.log(.debug, category: .event, "🔐   - Event Author: \(walletEvent.pubkey)")
+        NDKLogger.log(.debug, category: .event, "🔐   - Encrypted content: \(walletEvent.content.prefix(100))...")
+        NDKLogger.log(.debug, category: .event, "🔐   - Encrypted content size: \(walletEvent.content.count) characters")
+        NDKLogger.log(.debug, category: .event, "🔐   - Unencrypted tags: \(walletEvent.tags)")
+        NDKLogger.log(.debug, category: .event, "🔐   - Created at: \(walletEvent.createdAt)")
         
         return NDKCashuWalletEvent(event: walletEvent)
     }

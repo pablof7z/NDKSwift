@@ -160,7 +160,7 @@ actor NDKOutboxTracker {
         filter.authors = [pubkey]
         filter.kinds = [NDKRelayList.kind]
 
-        let events = try await ndk.fetchEvents([filter])
+        let events = try await fetchEventsInternal(filter: filter)
 
         guard let latestEvent = events.first else {
             return nil
@@ -197,7 +197,7 @@ actor NDKOutboxTracker {
         filter.authors = [pubkey]
         filter.kinds = [EventKind.contacts]
 
-        let events = try await ndk.fetchEvents([filter])
+        let events = try await fetchEventsInternal(filter: filter)
 
         guard let latestEvent = events.first else {
             return nil
@@ -241,6 +241,19 @@ actor NDKOutboxTracker {
         case .both:
             return item
         }
+    }
+    
+    /// Internal helper to fetch events using NDKDataSource
+    private func fetchEventsInternal(filter: NDKFilter) async throws -> [NDKEvent] {
+        // Use NDKDataSource with appropriate maxAge for relay lists
+        let dataSource = NDKDataSource(
+            ndk: ndk,
+            filter: filter,
+            maxAge: 86400, // 24 hours - relay lists rarely change
+            cachePolicy: .cacheWithNetwork
+        )
+        
+        return await dataSource.currentValue()
     }
 }
 

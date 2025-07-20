@@ -95,10 +95,19 @@ struct ImportAccountView: View {
                 var displayName = "Nostr User"
                 
                 if let ndk = nostrManager.ndk {
-                    let profileStream = await ndk.observeProfile(for: pubkey, closeOnEose: true)
+                    // Use declarative data source for profile
+                    let profileDataSource = ndk.observe(
+                        filter: NDKFilter(
+                            authors: [pubkey],
+                            kinds: [0]
+                        ),
+                        maxAge: 3600,
+                        cachePolicy: .cacheWithNetwork
+                    )
                     
-                    for await profile in profileStream {
-                        if let profile = profile {
+                    for await event in profileDataSource.events {
+                        if let profileData = event.content.data(using: .utf8),
+                           let profile = try? JSONDecoder().decode(NDKUserProfile.self, from: profileData) {
                             displayName = profile.displayName ?? profile.name ?? "Nostr User"
                             print("🔑 [ImportAccountView] Using display name: \(displayName)")
                             break // We only need the first profile for login
