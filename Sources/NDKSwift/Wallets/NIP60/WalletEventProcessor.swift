@@ -25,6 +25,7 @@ actor WalletEventProcessor {
             }
         } catch {
             NDKLogger.shared.log(.error, category: .wallet, "Failed to process wallet event \(event.id): \(error)")
+        }
     }
     
     // MARK: - Private Event Processing Methods
@@ -180,9 +181,6 @@ actor WalletEventProcessor {
         let deletedProofs = await context.proofStateManager.markProofsOwnedByEventAsDeleted(eventId)
         if !deletedProofs.isEmpty {
             NDKLogger.shared.log(.debug, category: .wallet, "Marked \(deletedProofs.count) proofs as deleted from event: \(eventId)")
-            
-            // Update wallet's internal proofs array
-            await context.wallet.updateProofsFromStateManager()
         }
     }
 }

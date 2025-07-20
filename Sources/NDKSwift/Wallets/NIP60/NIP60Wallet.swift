@@ -40,6 +40,11 @@ public actor NIP60Wallet: NDKPaymentProvider {
     
     public let events = NIP60WalletEventStream()
     
+    // MARK: - Blacklist Cache
+    
+    private var cachedBlacklistedMints: Set<String> = []
+    private var blacklistLastFetched: Date?
+    
     // MARK: - Initialization
     
     public init(ndk: NDK, cache: NDKCache? = nil) throws {
@@ -103,6 +108,12 @@ public actor NIP60Wallet: NDKPaymentProvider {
                     NDKFilter(
                         kinds: [EventKind.nutzap],
                         tags: ["p": Set([userPubkey])]
+                    ),
+                    // Mute list (for blacklisted mints)
+                    NDKFilter(
+                        authors: [userPubkey],
+                        kinds: [10000],  // Mute list
+                        limit: 0  // Only get updates, not historical
                     )
                 ]
                 
@@ -145,6 +156,12 @@ public actor NIP60Wallet: NDKPaymentProvider {
                 return
             }
             await eventManager.updateLastWalletConfigTimestamp(event.createdAt)
+        }
+        
+        // Handle mute list updates
+        if event.kind == 10000 {
+            await processMuteListUpdate(event)
+            return
         }
         
         // Create context for handlers
@@ -192,7 +209,24 @@ public actor NIP60Wallet: NDKPaymentProvider {
             let mintURLs = try await walletEvent.mints(signer: signer)
             print("🏪 Extracted \(mintURLs.count) mint URLs from wallet config: \(mintURLs)")
             
-            let configuredMints = Set(mintURLs)
+            // Fetch user's mute list to check for blacklisted mints
+            var blacklistedMints: Set<String> = []
+            do {
+                let userPubkey = try await signer.pubkey
+                let filter = NDKFilter(authors: [userPubkey], kinds: [10000], limit: 1)
+                if let muteListEvent = try await ndk.fetchEvent(filter) {
+                    let muteList = NDKList.from(muteListEvent, ndk: ndk)
+                    blacklistedMints = Set(muteList.blacklistedMints)
+                    if !blacklistedMints.isEmpty {
+                        print("🚫 Found \(blacklistedMints.count) blacklisted mints in user's mute list")
+                    }
+                }
+            } catch {
+                print("⚠️ Failed to fetch mute list: \(error)")
+            }
+            
+            // Filter out blacklisted mints
+            let configuredMints = Set(mintURLs).subtracting(blacklistedMints)
             
             // Remove mints that are no longer in the configuration
             let mintsToRemove = previousMints.subtracting(configuredMints)
@@ -209,6 +243,12 @@ public actor NIP60Wallet: NDKPaymentProvider {
                 guard let url = URL(string: mintURL) else { 
                     print("⚠️ Invalid mint URL: \(mintURL)")
                     continue 
+                }
+                
+                // Skip if blacklisted
+                if blacklistedMints.contains(mintURL) {
+                    print("🚫 Skipping blacklisted mint: \(mintURL)")
+                    continue
                 }
                 
                 // Skip if already exists
@@ -251,6 +291,72 @@ public actor NIP60Wallet: NDKPaymentProvider {
             print("  - Active mint URLs: \(actualCurrentMints)")
         } catch {
             print("❌ Failed to parse wallet configuration: \(error)")
+        }
+    }
+    
+    // MARK: - Blacklist Management
+    
+    /// Get the set of blacklisted mint URLs from the user's mute list
+    public func getBlacklistedMints() async -> Set<String> {
+        // Return cached value if fetched recently (within 5 minutes)
+        if let lastFetched = blacklistLastFetched, 
+           Date().timeIntervalSince(lastFetched) < 300 {
+            return cachedBlacklistedMints
+        }
+        
+        do {
+            let userPubkey = try await signer.pubkey
+            let filter = NDKFilter(authors: [userPubkey], kinds: [10000], limit: 1)
+            
+            if let muteListEvent = try await ndk.fetchEvent(filter) {
+                let muteList = NDKList.from(muteListEvent, ndk: ndk)
+                cachedBlacklistedMints = Set(muteList.blacklistedMints)
+                blacklistLastFetched = Date()
+                
+                if !cachedBlacklistedMints.isEmpty {
+                    NDKLogger.shared.log(.debug, category: .wallet, "Found \(cachedBlacklistedMints.count) blacklisted mints")
+                }
+            }
+        } catch {
+            NDKLogger.shared.log(.error, category: .wallet, "Failed to fetch blacklisted mints: \(error)")
+        }
+        
+        return cachedBlacklistedMints
+    }
+    
+    /// Process mute list update event
+    private func processMuteListUpdate(_ event: NDKEvent) async {
+        NDKLogger.shared.log(.info, category: .wallet, "Processing mute list update")
+        
+        // Update cached blacklisted mints
+        let muteList = NDKList.from(event, ndk: ndk)
+        let newBlacklistedMints = Set(muteList.blacklistedMints)
+        let oldBlacklistedMints = cachedBlacklistedMints
+        
+        cachedBlacklistedMints = newBlacklistedMints
+        blacklistLastFetched = Date()
+        
+        // Find newly blacklisted mints
+        let newlyBlacklisted = newBlacklistedMints.subtracting(oldBlacklistedMints)
+        
+        if !newlyBlacklisted.isEmpty {
+            NDKLogger.shared.log(.info, category: .wallet, "Found \(newlyBlacklisted.count) newly blacklisted mints")
+            
+            // Remove any newly blacklisted mints from wallet
+            let currentMints = await mints.getMintURLs()
+            for mintURL in newlyBlacklisted {
+                if currentMints.contains(mintURL) {
+                    NDKLogger.shared.log(.warning, category: .wallet, "Removing newly blacklisted mint from wallet: \(mintURL)")
+                    if let url = URL(string: mintURL) {
+                        _ = await mints.removeMint(url: url)
+                    }
+                }
+            }
+            
+            // Emit event about mints being removed
+            if !newlyBlacklisted.isEmpty {
+                events.yield(NIP60WalletEvent(type: .mintsRemoved(Array(newlyBlacklisted))))
+            }
         }
     }
     
@@ -587,6 +693,23 @@ public actor NIP60Wallet: NDKPaymentProvider {
             print("✅ Loaded existing wallet configuration")
         } else {
             print("ℹ️ No existing wallet configuration found for user \(userPubkey)")
+        }
+        
+        // Fetch current mute list to initialize blacklist
+        print("📡 Fetching current mute list...")
+        let muteListFilter = NDKFilter(
+            authors: [userPubkey],
+            kinds: [10000],
+            limit: 1
+        )
+        
+        if let muteListEvent = try? await ndk.fetchEvent(muteListFilter, timeoutSeconds: 5) {
+            let muteList = NDKList.from(muteListEvent, ndk: ndk)
+            cachedBlacklistedMints = Set(muteList.blacklistedMints)
+            blacklistLastFetched = Date()
+            if !cachedBlacklistedMints.isEmpty {
+                print("🚫 Loaded \(cachedBlacklistedMints.count) blacklisted mints from mute list")
+            }
         }
         
         // Fetch historical token events before starting subscription

@@ -22,16 +22,158 @@ public actor NDKPool {
     private let poolChangeStream: AsyncStream<NDKPoolChangeEvent>
     private let poolChangeContinuation: AsyncStream<NDKPoolChangeEvent>.Continuation
     
+    /// Cache for blocked relays
+    private var cachedBlockedRelays: Set<String> = []
+    private var blockedRelaysLastFetched: Date?
+    
+    /// Subscription task for blocked relay list updates
+    private var blockedRelaySubscriptionTask: Task<Void, Never>?
+    
     init(ndk: NDK) {
         self.ndk = ndk
         
         // Initialize the relay change stream
         (self.poolChangeStream, self.poolChangeContinuation) = AsyncStream<NDKPoolChangeEvent>.makeStream()
+        
+        // Start monitoring blocked relay list if we have a signer
+        Task {
+            await startBlockedRelaySubscription()
+        }
     }
     
     /// Public accessor for relay pool changes stream
     public var relayChanges: AsyncStream<NDKPoolChangeEvent> {
         poolChangeStream
+    }
+    
+    // MARK: - Blocked Relay Management
+    
+    /// Get the set of blocked relay URLs from the user's blocked relay list
+    private func getBlockedRelays() async -> Set<String> {
+        // Return cached value if fetched recently (within 5 minutes)
+        if let lastFetched = blockedRelaysLastFetched, 
+           Date().timeIntervalSince(lastFetched) < 300 {
+            return cachedBlockedRelays
+        }
+        
+        guard let ndk = ndk, let signer = ndk.signer else {
+            return cachedBlockedRelays
+        }
+        
+        do {
+            let userPubkey = try await signer.pubkey
+            let filter = NDKFilter(authors: [userPubkey], kinds: [10006], limit: 1)
+            
+            if let blockedRelayListEvent = try await ndk.fetchEvent(filter) {
+                let blockedRelayList = NDKList.from(blockedRelayListEvent, ndk: ndk)
+                cachedBlockedRelays = Set(blockedRelayList.blockedRelays.map { url in
+                    URLNormalizer.tryNormalizeRelayUrl(url) ?? url
+                })
+                blockedRelaysLastFetched = Date()
+                
+                if !cachedBlockedRelays.isEmpty {
+                    NDKLogger.shared.log(.debug, category: .general, "Found \(cachedBlockedRelays.count) blocked relays")
+                }
+            }
+        } catch {
+            NDKLogger.shared.log(.error, category: .general, "Failed to fetch blocked relays: \(error)")
+        }
+        
+        return cachedBlockedRelays
+    }
+    
+    /// Refresh the blocked relay list and remove any currently connected relays that are now blocked
+    public func refreshBlockedRelays() async {
+        // Force refresh by clearing cache
+        blockedRelaysLastFetched = nil
+        let blockedRelays = await getBlockedRelays()
+        
+        // Remove any relays that are now blocked
+        for (url, _) in relayMap {
+            if blockedRelays.contains(url) {
+                NDKLogger.shared.log(.info, category: .general, "Removing newly blocked relay from pool: \(url)")
+                await removeRelay(url)
+            }
+        }
+    }
+    
+    /// Start subscription for blocked relay list updates
+    private func startBlockedRelaySubscription() async {
+        // Cancel any existing subscription
+        blockedRelaySubscriptionTask?.cancel()
+        
+        guard let ndk = ndk, let signer = ndk.signer else {
+            return
+        }
+        
+        do {
+            let userPubkey = try await signer.pubkey
+            
+            // First fetch the current blocked relay list
+            let initialFilter = NDKFilter(
+                authors: [userPubkey],
+                kinds: [10006],
+                limit: 1
+            )
+            
+            if let blockedRelayListEvent = try? await ndk.fetchEvent(initialFilter, timeoutSeconds: 5) {
+                await processBlockedRelayListUpdate(blockedRelayListEvent)
+            }
+            
+            // Now subscribe for updates
+            blockedRelaySubscriptionTask = Task {
+                do {
+                    let filter = NDKFilter(
+                        authors: [userPubkey],
+                        kinds: [10006],
+                        limit: 0  // Only get new events
+                    )
+                    
+                    let subscription = await ndk.subscribe(filters: [filter])
+                    
+                    for try await event in subscription {
+                        await processBlockedRelayListUpdate(event)
+                    }
+                } catch {
+                    if error is CancellationError {
+                        NDKLogger.shared.log(.debug, category: .general, "Blocked relay subscription cancelled")
+                    } else {
+                        NDKLogger.shared.log(.error, category: .general, "Blocked relay subscription error: \(error)")
+                    }
+                }
+            }
+        } catch {
+            NDKLogger.shared.log(.error, category: .general, "Failed to start blocked relay subscription: \(error)")
+        }
+    }
+    
+    /// Process a blocked relay list update event
+    private func processBlockedRelayListUpdate(_ event: NDKEvent) async {
+        NDKLogger.shared.log(.info, category: .general, "Processing blocked relay list update")
+        
+        let blockedRelayList = NDKList.from(event, ndk: ndk)
+        let newBlockedRelays = Set(blockedRelayList.blockedRelays.map { url in
+            URLNormalizer.tryNormalizeRelayUrl(url) ?? url
+        })
+        let oldBlockedRelays = cachedBlockedRelays
+        
+        cachedBlockedRelays = newBlockedRelays
+        blockedRelaysLastFetched = Date()
+        
+        // Find newly blocked relays
+        let newlyBlocked = newBlockedRelays.subtracting(oldBlockedRelays)
+        
+        if !newlyBlocked.isEmpty {
+            NDKLogger.shared.log(.info, category: .general, "Found \(newlyBlocked.count) newly blocked relays")
+            
+            // Remove any newly blocked relays from pool
+            for blockedUrl in newlyBlocked {
+                if relayMap[blockedUrl] != nil {
+                    NDKLogger.shared.log(.warning, category: .general, "Removing newly blocked relay from pool: \(blockedUrl)")
+                    await removeRelay(blockedUrl)
+                }
+            }
+        }
     }
     
     // MARK: - Relay Management
@@ -44,6 +186,15 @@ public actor NDKPool {
         // Check if already exists
         if let existing = relayMap[normalizedUrl] {
             return existing
+        }
+        
+        // Check if relay is blocked
+        let blockedRelays = await getBlockedRelays()
+        if blockedRelays.contains(normalizedUrl) {
+            NDKLogger.shared.log(.warning, category: .general, "Attempted to add blocked relay: \(normalizedUrl)")
+            // Create a disconnected relay instance to return (won't be added to pool)
+            let blockedRelay = NDKRelay(url: normalizedUrl)
+            return blockedRelay
         }
         
         // Create new relay
@@ -192,6 +343,24 @@ public actor NDKPool {
     private func handleRelayConnected(_ relay: NDKRelay) async {
         guard let ndk = ndk else { return }
         await ndk.eventManager.publishQueuedEvents(for: relay)
+    }
+    
+    // MARK: - Cleanup
+    
+    /// Stop all subscriptions and clean up resources
+    public func stop() async {
+        // Cancel blocked relay subscription
+        blockedRelaySubscriptionTask?.cancel()
+        blockedRelaySubscriptionTask = nil
+        
+        // Clear cached data
+        cachedBlockedRelays = []
+        blockedRelaysLastFetched = nil
+    }
+    
+    deinit {
+        // Cancel subscription if not already done
+        blockedRelaySubscriptionTask?.cancel()
     }
 }
 

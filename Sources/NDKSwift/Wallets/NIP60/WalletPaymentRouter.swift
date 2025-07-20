@@ -55,11 +55,15 @@ actor WalletPaymentRouter {
         let acceptedMintURLs = Set(nutzapRequest.acceptedMints.map { $0.absoluteString })
         print("WalletPaymentRouter.executeNutzapPayment - acceptedMints: \(acceptedMintURLs)")
         
+        // Get blacklisted mints from wallet
+        let blacklistedMints = await wallet.getBlacklistedMints()
+        
         let paymentRoute = await CrossMintTransfer.findBestPaymentRoute(
             amount: nutzapRequest.amountSats,
             acceptedMints: acceptedMintURLs,
             mints: mints,
-            proofStateManager: proofStateManager
+            proofStateManager: proofStateManager,
+            blacklistedMints: blacklistedMints
         )
         
         // Determine which mint to use and perform any necessary transfers

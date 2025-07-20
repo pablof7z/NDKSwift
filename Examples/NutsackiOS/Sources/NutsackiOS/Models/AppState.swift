@@ -1,5 +1,6 @@
 import Foundation
 import SwiftUI
+import NDKSwift
 
 enum ThemeMode: String, CaseIterable {
     case system = "system"

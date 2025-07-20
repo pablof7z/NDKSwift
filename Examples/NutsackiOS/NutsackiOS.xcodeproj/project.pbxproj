@@ -44,7 +44,6 @@
 		CF64D284C545411381F0E305 /* NutzapView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 055295357886CE289C42C9DD /* NutzapView.swift */; };
 		D044EAC14B431980BDE9CA63 /* MintsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4CB9DD7CBBD58218E4C4FC34 /* MintsView.swift */; };
 		D546387471DFA74D85055166 /* RecentTransactionsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E0B1C99B01866B00245F62DE /* RecentTransactionsView.swift */; };
-		D559465A2E1F88DEA91E4B35 /* NostrIdentifier.swift in Sources */ = {isa = PBXBuildFile; fileRef = A5874C254A49593AD7894C05 /* NostrIdentifier.swift */; };
 		D68171CBFD774613B6FC79BD /* WalletSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 06737C2A632A68CE0C55183C /* WalletSettingsView.swift */; };
 		DC55894F1FA07AC597FE8FB2 /* ImportAccountView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FD1FAFE4A7259CADFAF7276C /* ImportAccountView.swift */; };
 		DE2555469F21E1A95181AE75 /* ContactsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7260E070B2366527CE8E93CF /* ContactsView.swift */; };
@@ -88,7 +87,6 @@
 		98B33CB2CD71269193050EE8 /* CreateAccountView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CreateAccountView.swift; sourceTree = "<group>"; };
 		9A0E485A77CC33154C81E180 /* LaunchScreen.storyboard */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; path = LaunchScreen.storyboard; sourceTree = "<group>"; };
 		9D5B9AA3E71133AA8A3EA248 /* WalletEventInfo.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WalletEventInfo.swift; sourceTree = "<group>"; };
-		A5874C254A49593AD7894C05 /* NostrIdentifier.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NostrIdentifier.swift; sourceTree = "<group>"; };
 		A9C1DE3157B002CB979102D6 /* NutsackiOS.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = NutsackiOS.xcconfig; sourceTree = "<group>"; };
 		B43D3EE06E7A1612A33CC851 /* AsyncContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AsyncContentView.swift; sourceTree = "<group>"; };
 		BFD3618F6ACCDFC05E146B73 /* MintView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MintView.swift; sourceTree = "<group>"; };
@@ -213,7 +211,6 @@
 		8DA64FA8832FB83F5A983501 /* Utils */ = {
 			isa = PBXGroup;
 			children = (
-				A5874C254A49593AD7894C05 /* NostrIdentifier.swift */,
 				322B1C29BAF815D820653E1A /* PlatformHelpers.swift */,
 				67721329672986338EBD9E47 /* QRCodeGenerator.swift */,
 				962F8D0E61C0A3CED699E5E5 /* QRScannerView.swift */,
@@ -366,7 +363,6 @@
 				3AE0DBFC1CA063A6AC21FD56 /* MintDiscoveryManager.swift in Sources */,
 				E250B976A938B3889A783E00 /* MintView.swift in Sources */,
 				D044EAC14B431980BDE9CA63 /* MintsView.swift in Sources */,
-				D559465A2E1F88DEA91E4B35 /* NostrIdentifier.swift in Sources */,
 				6C3619BBC1925CD2012C3030 /* NostrManager.swift in Sources */,
 				2B958B8F7F7AF6395F8D66BC /* NutsackApp.swift in Sources */,
 				0A9832B818F26BDED621CDD3 /* NutzapSettingsView.swift in Sources */,

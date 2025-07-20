@@ -5,7 +5,7 @@ All notable changes to NDKSwift will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.5.0] - 2025-07-20
 
 ### Added
 - **NIP-22 Comments Support** - Generic replies to any event type
@@ -18,6 +18,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `EventKind.genericReply` constant for kind 1111
   - Comprehensive test suite for all NIP-22 scenarios
 - Comprehensive test suites for NDKErrorFactories and JSONCoding utilities
+- **NIP-51 Blacklist Support** - Respect user's mute and blocked relay lists
+  - Added real-time subscription to mute list (kind 10000) in NIP60Wallet
+  - Blacklisted mints are automatically removed from wallet when mute list is updated
+  - CrossMintTransfer now filters out blacklisted mints in all payment routes
+  - NDKPool subscribes to blocked relay list (kind 10006) for real-time updates
+  - Blocked relays are automatically disconnected when blocklist is updated
+  - Added helper methods to NDKList for checking blacklisted mints and blocked relays
+  - Wallet configuration processing now excludes blacklisted mints
+  - Added caching for blacklist data to improve performance
 
 ### Changed
 - Added centralized error factory methods in NDKErrorFactories to reduce duplication (DRY principle)
