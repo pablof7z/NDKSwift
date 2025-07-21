@@ -1,0 +1,199 @@
+# NIP-92 Media Attachments
+
+NDKSwift provides comprehensive support for NIP-92 media attachments through the `imeta` tag system. This allows you to attach metadata to media URLs in your Nostr events.
+
+## Overview
+
+NIP-92 defines the `imeta` tag for adding metadata to media files referenced in event content. NDKSwift makes this easy with:
+
+- **Automatic URL extraction** - Media URLs in content automatically get `imeta` tags
+- **Manual control** - Add custom metadata when needed
+- **Blossom integration** - First-class support for Blossom file uploads
+- **Type-safe API** - No manual tag array construction
+
+## Basic Usage
+
+### Automatic Media URL Extraction (Default)
+
+By default, NDKSwift automatically extracts media URLs from your content and creates `imeta` tags:
+
+```swift
+let event = try await ndk.event()
+    .content("Check out this photo: https://example.com/sunset.jpg")
+    .build()
+
+// Automatically creates: ["imeta", "url https://example.com/sunset.jpg"]
+```
+
+Supported media extensions:
+- Images: `jpg`, `jpeg`, `png`, `gif`, `webp`, `bmp`, `svg`
+- Videos: `mp4`, `webm`, `mov`, `avi`, `mkv`, `flv`, `wmv`, `m4v`
+- Audio: `mp3`, `m4a`, `ogg`, `wav`, `flac`, `aac`, `opus`
+- Documents: `pdf`
+
+### Disable Automatic Extraction
+
+When you need full control over `imeta` tags:
+
+```swift
+let event = try await ndk.event()
+    .content("URL that won't get imeta: https://github.com/image.png", extractImeta: false)
+    .build()
+```
+
+## Adding Custom Metadata
+
+### Basic Custom Metadata
+
+Enhance automatically extracted URLs with additional metadata:
+
+```swift
+let event = try await ndk.event()
+    .content("My vacation photo: https://example.com/beach.jpg")
+    .imetaTag(url: "https://example.com/beach.jpg") { imeta in
+        imeta.alt = "Sunset at the beach in Costa Rica"
+        imeta.dim = "3024x4032"
+        imeta.m = "image/jpeg"
+        imeta.blurhash = "eVF$^OI:${M{o#*0-nNFxakD"
+    }
+    .build()
+```
+
+### Pre-configured Imeta Tag
+
+Create and reuse imeta configurations:
+
+```swift
+var imeta = NDKImetaTag()
+imeta.url = "https://example.com/photo.jpg"
+imeta.alt = "Product photo"
+imeta.dim = "800x600"
+imeta.fallback = ["https://backup1.com/photo.jpg", "https://backup2.com/photo.jpg"]
+
+let event = try await ndk.event()
+    .content("New product: https://example.com/photo.jpg")
+    .imetaTag(imeta)
+    .build()
+```
+
+## Blossom Integration
+
+NDKSwift provides seamless integration with Blossom file uploads:
+
+```swift
+// Upload file to Blossom
+let imageData = Data(...) // Your image data
+let upload = try await ndk.uploadToBlossom(data: imageData, mimeType: "image/jpeg")
+
+// Create event with Blossom metadata
+let event = try await ndk.event()
+    .content("Just uploaded: \(upload.first!.url)")
+    .imetaTag(from: upload.first!)
+    .build()
+```
+
+The Blossom integration automatically includes:
+- URL from the upload
+- SHA256 hash (`x` field)
+- File size
+- MIME type (if provided)
+
+## Available Imeta Fields
+
+The `NDKImetaTag` struct supports all NIP-92 fields:
+
+- `url` (required): The media URL
+- `m`: MIME type (e.g., "image/jpeg")
+- `alt`: Alternative text description
+- `dim`: Dimensions as "widthxheight" (e.g., "1920x1080")
+- `blurhash`: Blur hash for placeholder images
+- `x`: SHA256 hash of the file
+- `size`: File size in bytes
+- `fallback`: Array of fallback URLs
+- `additionalFields`: Dictionary for any custom fields
+
+## Advanced Examples
+
+### Mix Automatic and Manual
+
+Start with automatic extraction, then enhance specific URLs:
+
+```swift
+let event = try await ndk.event()
+    .content("Photos: https://example.com/1.jpg and https://example.com/2.jpg")
+    .imetaTag(url: "https://example.com/1.jpg") { imeta in
+        imeta.alt = "Main photo with description"
+        imeta.dim = "1920x1080"
+    }
+    // Second URL gets basic automatic imeta tag
+    .build()
+```
+
+### Multiple Media Types
+
+```swift
+let event = try await ndk.event()
+    .content("""
+        Check out my content:
+        Video: https://example.com/tutorial.mp4
+        Audio: https://example.com/podcast.mp3
+        Document: https://example.com/guide.pdf
+        """)
+    .imetaTag(url: "https://example.com/tutorial.mp4") { imeta in
+        imeta.m = "video/mp4"
+        imeta.dim = "1280x720"
+        imeta.alt = "Tutorial on Nostr development"
+    }
+    .build()
+```
+
+### With Fallback URLs
+
+```swift
+let event = try await ndk.event()
+    .content("Important image: https://primary.com/critical.jpg")
+    .imetaTag(url: "https://primary.com/critical.jpg") { imeta in
+        imeta.fallback = [
+            "https://backup1.com/critical.jpg",
+            "https://backup2.com/critical.jpg",
+            "https://ipfs.io/ipfs/QmXxx..."
+        ]
+        imeta.alt = "Critical diagram - multiple backups available"
+    }
+    .build()
+```
+
+## Best Practices
+
+1. **Let automatic extraction handle common cases** - The default behavior covers most use cases
+2. **Add alt text for accessibility** - Always include alternative text for images
+3. **Include dimensions for images** - Helps clients reserve space while loading
+4. **Use Blossom for decentralized storage** - Integrates seamlessly with `imetaTag(from:)`
+5. **Provide fallback URLs for critical content** - Ensures availability across different hosting providers
+
+## Working with NDKImage
+
+The `NDKImage` class provides convenient access to imeta tags:
+
+```swift
+// Parse an existing image event
+let imageEvent = NDKImage(event: event)
+
+// Access imeta tags
+let imetaTags = imageEvent.imetas
+
+// Get primary image URL
+let primaryURL = imageEvent.primaryImageURL
+
+// Get all image URLs
+let allURLs = imageEvent.imageURLs
+
+// Get dimensions
+if let dimensions = imageEvent.primaryImageDimensions {
+    print("Width: \(dimensions.width), Height: \(dimensions.height)")
+}
+```
+
+## Migration Guide
+
+If you're already creating events with media URLs, no changes are needed! NDKSwift now automatically adds basic `imeta` tags. To enhance your media with additional metadata, simply add `.imetaTag()` calls to your event builder chain.

@@ -18,9 +18,10 @@ NDKSwift provides a comprehensive toolkit for building Nostr applications with:
 - **Modern Swift**: Async/await, AsyncSequence, and actors for concurrent operations
 - **Caching**: SQLite-based event storage with full-text search
 - **Wallets**: Lightning (NWC) and Cashu integration with zap support
+- **Robust Mint Handling**: Automatic retry with linear backoff for Cashu operations
 - **File Storage**: Blossom protocol implementation
 - **Type Safety**: Strongly typed APIs with compile-time validation
-- **Comprehensive NIP Support**: NIPs 1, 2, 4, 9, 10, 18, 19, 22, 25, 44, 46, 47, 57, 60, 61, 65, 77, 89
+- **Comprehensive NIP Support**: NIPs 1, 2, 4, 9, 10, 18, 19, 22, 25, 44, 46, 47, 57, 60, 61, 65, 77, 89, 92
 
 ## Installation
 
@@ -174,16 +175,16 @@ let profiles = ndk.observe(
 )
 let currentProfiles = await profiles.currentValue()
 
-// Convenience fetch method
+// Convenience method using currentValue
 let events = await ndk.observe(
     filter: NDKFilter(kinds: [1], limit: 50)
-).fetch()
+).currentValue()
 
 // Cache-only access (no network calls)
 let cachedEvents = await ndk.observe(
     filter: NDKFilter(kinds: [1]),
     cachePolicy: .cacheOnly
-).fetch()
+).currentValue()
 
 // SwiftUI Integration
 struct NotesView: View {
@@ -420,6 +421,7 @@ let handler = try await ndk.event()
 - **NIP-65** (Relay List Metadata - Outbox Model)
 - **NIP-77** (Negentropy - Set Reconciliation)
 - **NIP-89** (Recommended Application Handlers)
+- **NIP-92** (Media Attachments - imeta tags)
 - **Blossom** (Decentralized file storage protocol)
 
 ## Documentation
@@ -433,6 +435,7 @@ Comprehensive documentation is available in the [Documentation](Documentation/) 
 - [Architecture Overview](Documentation/ARCHITECTURE.md) - System design and patterns
 - [Optimistic Publishing](Documentation/OPTIMISTIC_PUBLISHING.md) - Deep dive into offline features
 - [NIP-77 Implementation](Documentation/NIP77Implementation.md) - Negentropy sync protocol details
+- [Cashu Retry Mechanism](Documentation/CASHU_RETRY_MECHANISM.md) - Robust mint failure handling
 
 ## Examples
 

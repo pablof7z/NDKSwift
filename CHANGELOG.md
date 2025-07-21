@@ -7,11 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- Added comprehensive NIP-92 (Media Attachments) support with automatic imeta tag generation
+  - Automatic extraction of media URLs from event content (images, videos, audio, PDFs)
+  - Manual imeta tag builder methods for custom metadata
+  - Seamless Blossom integration with `imetaTag(from:)` method
+  - Support for all NIP-92 fields: url, alt, dim, m, blurhash, x, size, fallback
+  - Example demonstrating various NIP-92 usage patterns
+  - Comprehensive unit tests for NIP-92 functionality
+
 ### Fixed
 - Fixed fatal error "Duplicate elements of type 'WeakObserver' were found in a Set" by using ObjectIdentifier instead of UUID for WeakObserver identity. This ensures the same observer can be registered multiple times without causing crashes.
 - Removed duplicate WeakObserver definition from MemoryCache, now using the shared definition from CacheObservation.swift
 - Fixed SQLite migration error "table relay_sources already exists" by adding existence checks in Migration_v6_RelaySources. The migration now safely skips table creation if it already exists and uses IF NOT EXISTS for indexes and triggers.
 - Fixed Swift continuation leak in `publishEvent` by ensuring all pending event continuations are properly resumed when the connection is closed or encounters an error. This prevents "SWIFT TASK CONTINUATION MISUSE" warnings.
+- Fixed SQLite error "table relay_sources has no column named subscription_id" by adding Migration_v8_AddSubscriptionId to handle existing databases that were created with an older schema. This migration adds the missing subscription_id column to the relay_sources table.
 
 ## [0.4.0] - 2025-07-21
 
