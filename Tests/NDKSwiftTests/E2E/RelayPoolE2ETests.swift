@@ -58,9 +58,9 @@ final class RelayPoolE2ETests: XCTestCase {
             print("[\(timestamp())] \(relay.url): \(state)")
             
             switch state {
-            case .connected:
+            case NDKRelayConnectionState.connected:
                 connectedRelays += 1
-            case .failed:
+            case NDKRelayConnectionState.failed:
                 failedRelays += 1
             default:
                 break
@@ -71,7 +71,15 @@ final class RelayPoolE2ETests: XCTestCase {
         XCTAssertGreaterThan(connectedRelays, 0, "Should have at least one connected relay")
         
         // Test 4: Disconnect and reconnect specific relay
-        if let firstConnectedRelay = await ndk.relays.first(where: { await $0.connectionState == .connected }) {
+        var firstConnectedRelay: NDKRelay?
+        for relay in await ndk.relays {
+            if await relay.connectionState == NDKRelayConnectionState.connected {
+                firstConnectedRelay = relay
+                break
+            }
+        }
+        
+        if let firstConnectedRelay = firstConnectedRelay {
             print("\n[\(timestamp())] Test 4: Disconnect/reconnect relay \(firstConnectedRelay.url)")
             
             await firstConnectedRelay.disconnect()
@@ -81,7 +89,7 @@ final class RelayPoolE2ETests: XCTestCase {
             print("[\(timestamp())] State after disconnect: \(stateAfterDisconnect)")
             XCTAssertNotEqual(stateAfterDisconnect, .connected)
             
-            await firstConnectedRelay.connect()
+            try await firstConnectedRelay.connect()
             try await Task.sleep(nanoseconds: 2_000_000_000) // 2s
             
             let stateAfterReconnect = await firstConnectedRelay.connectionState
@@ -118,7 +126,7 @@ final class RelayPoolE2ETests: XCTestCase {
         var disconnectedCount = 0
         for relay in await ndk.relays {
             let state = await relay.connectionState
-            if state != .connected {
+            if state != NDKRelayConnectionState.connected {
                 disconnectedCount += 1
             }
         }
@@ -158,7 +166,7 @@ final class RelayPoolE2ETests: XCTestCase {
             let publishedRelays = try await ndk.publish(event)
             
             for relay in publishedRelays {
-                let relayURL = (relay as? NDKRelay)?.url ?? "unknown"
+                let relayURL = relay.url
                 relayDistribution[relayURL, default: 0] += 1
             }
             
@@ -208,7 +216,7 @@ final class RelayPoolE2ETests: XCTestCase {
         
         let disconnectedState = await relay.connectionState
         print("[\(timestamp())] State after disconnect: \(disconnectedState)")
-        XCTAssertNotEqual(disconnectedState, .connected)
+        XCTAssertNotEqual(disconnectedState, NDKRelayConnectionState.connected)
         
         // The relay pool should attempt reconnection
         print("\n[\(timestamp())] Waiting for automatic reconnection...")
@@ -218,7 +226,7 @@ final class RelayPoolE2ETests: XCTestCase {
         
         while Date() < reconnectTimeout && !reconnected {
             let state = await relay.connectionState
-            if state == .connected {
+            if state == NDKRelayConnectionState.connected {
                 reconnected = true
                 print("[\(timestamp())] Relay reconnected automatically!")
                 break
@@ -229,7 +237,7 @@ final class RelayPoolE2ETests: XCTestCase {
         // If not auto-reconnected, try manual reconnect
         if !reconnected {
             print("[\(timestamp())] No auto-reconnect, attempting manual reconnection...")
-            await relay.connect()
+            try await relay.connect()
             try await Task.sleep(nanoseconds: 3_000_000_000) // 3s
             
             let finalState = await relay.connectionState

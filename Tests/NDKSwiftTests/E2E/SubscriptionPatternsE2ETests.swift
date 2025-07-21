@@ -85,8 +85,8 @@ final class SubscriptionPatternsE2ETests: XCTestCase {
         let cacheFetchFilter = NDKFilter(
             authors: [pubkey],
             kinds: [EventKind.textNote],
-            tags: ["test": ["realtime"]],
-            limit: 10
+            limit: 10,
+            tags: ["test": ["realtime"]]
         )
         
         let cacheDataSource = ndk.observe(
@@ -196,8 +196,8 @@ final class SubscriptionPatternsE2ETests: XCTestCase {
         let tagFilter = NDKFilter(
             authors: [pubkey],
             kinds: [EventKind.textNote],
-            tags: ["t": [testTag]],
-            limit: 10
+            limit: 10,
+            tags: ["t": [testTag]]
         )
         
         let tagDataSource = ndk.observe(filter: tagFilter, maxAge: 3600)
@@ -284,7 +284,7 @@ final class SubscriptionPatternsE2ETests: XCTestCase {
         let profileDataSource = ndk.observe(
             filter: profileFilter,
             maxAge: 3600,
-            transform: { event in
+            transform: { (event: NDKEvent) -> ProfileSummary? in
                 guard event.kind == EventKind.metadata,
                       let profileData = try? JSONCoding.decode(NDKUserProfile.self, from: event.content) else {
                     return nil

@@ -272,11 +272,11 @@ public enum CrossMintTransfer {
         var total: Int64 = 0
         for (mint, proofs) in proofsByMint {
             let balance = proofs.reduce(0) { $0 + Int64($1.amount) }
-            print("CrossMintTransfer.getTotalBalance - mint: \(mint), balance: \(balance)")
+            NDKLogger.log(.debug, category: .wallet, "CrossMintTransfer.getTotalBalance - mint: \(mint), balance: \(balance)")
             total += balance
         }
         
-        print("CrossMintTransfer.getTotalBalance - total balance: \(total)")
+        NDKLogger.log(.debug, category: .wallet, "CrossMintTransfer.getTotalBalance - total balance: \(total)")
         return total
     }
 }
