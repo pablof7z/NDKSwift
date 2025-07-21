@@ -5,6 +5,24 @@ All notable changes to NDKSwift will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.1] - 2025-07-21
+
+### Added
+- **End-to-End Test Suite** - Comprehensive E2E tests for core functionality
+  - Basic event publishing and retrieval test
+  - Relay connection and subscription management test
+  - DataSource observe() API test
+  - Real relay interaction validation
+  - Performance timing measurements
+
+### Removed
+- **Dead Code Cleanup** - Removed unused code
+  - AtomicValue utility class (replaced by actors)
+  - Unused DataSourceOptions, UpdatePolicy, DeduplicationStrategy types
+
+### Fixed
+- Debug logging now respects `ndk.debugMode` flag in NDKDataSource
+
 ## [0.6.0] - 2025-07-20
 
 ### Added
