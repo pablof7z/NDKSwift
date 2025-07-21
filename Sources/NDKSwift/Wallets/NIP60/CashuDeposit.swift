@@ -60,7 +60,7 @@ public enum CashuDeposit {
         eventManager: WalletEventManager,
         persistQuote: Bool = false,
         signer: NDKSigner? = nil
-    ) async throws -> CashuMintQuote {
+    ) async throws -> (quote: CashuMintQuote, eventId: String?) {
         // Get mint quote from mint manager
         let quoteResponse = try await mints.requestMintQuote(amount: amount, mintURL: mintURL)
         
@@ -75,16 +75,18 @@ public enum CashuDeposit {
         )
         
         // If persistQuote is true and signer is provided, save it as a NIP-60 quote event
+        var eventId: String? = nil
         if persistQuote, let signer = signer {
-            try await eventManager.saveQuoteEvent(quote: quote, signer: signer)
+            eventId = try await eventManager.saveQuoteEvent(quote: quote, signer: signer)
         }
         
-        return quote
+        return (quote: quote, eventId: eventId)
     }
     
     /// Monitor deposit status for a mint quote
     public static func monitorDeposit(
         quote: CashuMintQuote,
+        quoteEventId: String? = nil,
         mints: MintManager,
         eventManager: WalletEventManager,
         signer: NDKSigner,
@@ -106,9 +108,17 @@ public enum CashuDeposit {
                             )
                             
                             if !proofs.isEmpty {
-                                // Quote successfully used - we could delete the quote event here
-                                // but we'd need the actual Nostr event ID, not the quote ID
-                                // For now, we'll just let old quote events remain
+                                // Quote successfully used - delete the quote event if we have its ID
+                                if let quoteEventId = quoteEventId {
+                                    Task {
+                                        do {
+                                            try await eventManager.deleteQuoteEvent(eventId: quoteEventId, signer: signer)
+                                            NDKLogger.log(.info, category: .wallet, "✅ Cleaned up quote event \(quoteEventId) after successful mint")
+                                        } catch {
+                                            NDKLogger.log(.warning, category: .wallet, "⚠️ Failed to delete quote event \(quoteEventId): \(error)")
+                                        }
+                                    }
+                                }
                                 
                                 // Let the wallet handle proof state updates
                                 let createdEventIds = try await onProofsReceived(proofs)
@@ -162,7 +172,10 @@ public enum CashuDeposit {
                     }
                     
                     // Timeout reached - persist quote and mark as expired
-                    try await eventManager.saveQuoteEvent(quote: quote, signer: signer)
+                    // Only save if we don't already have an event ID (to avoid duplicates)
+                    if quoteEventId == nil {
+                        _ = try await eventManager.saveQuoteEvent(quote: quote, signer: signer)
+                    }
                     continuation.yield(.expired)
                     continuation.finish()
                     

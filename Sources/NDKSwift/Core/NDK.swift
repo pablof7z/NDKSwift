@@ -78,6 +78,7 @@ public final class NDK {
     internal var _relaySelector: NDKRelaySelector?
     internal var _publishingStrategy: NDKPublishingStrategy?
     internal var _fetchingStrategy: NDKFetchingStrategy?
+    internal var _nip05Manager: NIP05Manager?
     
     // MARK: - Computed Properties
     
@@ -97,6 +98,16 @@ public final class NDK {
         let strategy = NDKFetchingStrategy(ndk: self, selector: self.relaySelector)
         _fetchingStrategy = strategy
         return strategy
+    }
+    
+    /// NIP-05 manager for efficient resolution and caching
+    public var nip05Manager: NIP05Manager {
+        if let existing = _nip05Manager {
+            return existing
+        }
+        let manager = NIP05Manager(ndk: self)
+        _nip05Manager = manager
+        return manager
     }
     
     // MARK: - Initialization
@@ -737,6 +748,33 @@ public final class NDK {
         }
     }
     
+    
+    // MARK: - NIP-05 Search
+    
+    /// Search for NIP-05 identifiers by prefix (for autocomplete)
+    /// - Parameters:
+    ///   - query: The search prefix
+    ///   - limit: Maximum number of results (default: 10)
+    /// - Returns: Array of tuples containing user, NIP-05 identifier, and verification status
+    public func searchNIP05(_ query: String, limit: Int = 10) async -> [(user: NDKUser, nip05: String, status: NIP05VerificationStatus)] {
+        let entries = await nip05Manager.search(query, limit: limit)
+        
+        return entries.map { entry in
+            let user = NDKUser(pubkey: entry.pubkey)
+            user.ndk = self
+            return (user: user, nip05: entry.identifier, status: entry.status)
+        }
+    }
+    
+    /// Verify a NIP-05 identifier for a user
+    /// - Parameters:
+    ///   - user: The user whose NIP-05 to verify
+    ///   - maxAge: Maximum age before re-verification is needed (default: 24 hours)
+    /// - Returns: True if the NIP-05 is verified and belongs to this user
+    public func verifyNIP05(for user: NDKUser, maxAge: TimeInterval = 86400) async throws -> Bool {
+        guard let nip05 = await user.nip05 else { return false }
+        return try await nip05Manager.verify(identifier: nip05, expectedPubkey: user.pubkey, maxAge: maxAge)
+    }
     
     // MARK: - Internal Fetch Utilities
     

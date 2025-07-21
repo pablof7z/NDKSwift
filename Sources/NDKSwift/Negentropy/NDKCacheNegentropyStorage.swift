@@ -54,8 +54,8 @@ public actor NDKCacheNegentropyStorage: NegentropyStorage {
     }
     
     public func addItems(_ items: [NegentropyItem]) async throws {
-        // This would be called after sync to add new events
-        // For now, we'll skip this as events are added through normal NDK flow
+        // Events are added through normal NDK flow, not directly through this method
+        // This maintains consistency with NDK's event handling pipeline
     }
     
     public func removeItems(_ ids: [Data]) async throws {

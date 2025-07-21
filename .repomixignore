@@ -1,4 +1,23 @@
-Libraries
-.tenex
-Tests
-Examples
+# Ignore build directories
+.build/
+build/
+DerivedData/
+
+# Ignore large test files
+*.test
+**/test_vectors/
+**/Test Vectors/
+
+# Ignore documentation that's not essential
+docs/
+Documentation/
+
+# Ignore example apps (except the one we're working on)
+Examples/Apps/
+Examples/Features/
+Examples/GettingStarted/
+Examples/Test*.swift
+Examples/Debug*.swift
+
+# Keep only the NIP60Wallet example
+!Examples/NIP60Wallet.swift

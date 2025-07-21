@@ -24,8 +24,8 @@ public extension NDKPool {
 
     /// Get permanent and connected relays
     func permanentAndConnectedRelays() async -> [NDKRelay] {
-        // For now, return all connected relays
-        // In the future, could distinguish between permanent and temporary relays
+        // Return all connected relays
+        // Future enhancement: distinguish between permanent and temporary relays
         return await connectedRelays()
     }
 }

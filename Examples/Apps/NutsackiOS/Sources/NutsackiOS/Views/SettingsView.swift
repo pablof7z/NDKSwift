@@ -8,11 +8,9 @@ struct SettingsView: View {
     @Environment(NostrManager.self) private var nostrManager
     @Environment(WalletManager.self) private var walletManager
     
-    @State private var userProfile: NDKUserProfile?
-    @State private var currentUser: NDKUser?
     @State private var showPaymentAnimation = false
     @State private var debugAnimationAmount: Int64 = 21000
-    @State private var profileTask: Task<Void, Never>?
+    @State private var currentUser: NDKUser?
     
     var body: some View {
         NavigationStack {
@@ -20,20 +18,20 @@ struct SettingsView: View {
                 // Account section
                 Section {
                     if let currentUser = currentUser {
-                        NavigationLink(destination: AccountDetailView(user: currentUser, profile: userProfile)) {
+                        NavigationLink(destination: AccountDetailView(user: currentUser, profile: nostrManager.currentUserProfile)) {
                             HStack {
                                 // Profile picture placeholder
                                 Circle()
                                     .fill(Color.secondary.opacity(0.3))
                                     .overlay(
-                                        Text((userProfile?.displayName ?? userProfile?.name ?? "User").prefix(1).uppercased())
+                                        Text((nostrManager.currentUserProfile?.displayName ?? nostrManager.currentUserProfile?.name ?? "User").prefix(1).uppercased())
                                             .font(.headline)
                                             .foregroundColor(.white)
                                     )
                                     .frame(width: 50, height: 50)
                                 
                                 VStack(alignment: .leading, spacing: 4) {
-                                    Text(userProfile?.displayName ?? userProfile?.name ?? "Nostr User")
+                                    Text(nostrManager.currentUserProfile?.displayName ?? nostrManager.currentUserProfile?.name ?? "Nostr User")
                                         .font(.headline)
                                     
                                     Text(String(currentUser.npub.prefix(16)) + "...")
@@ -157,57 +155,12 @@ struct SettingsView: View {
             #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
             #endif
-            .onAppear {
-                loadUserProfile()
+            .task {
+                currentUser = await nostrManager.currentUser
             }
             .fullScreenCover(isPresented: $showPaymentAnimation) {
                 PaymentReceivedAnimation(amount: debugAnimationAmount) {
                     showPaymentAnimation = false
-                }
-            }
-            .onDisappear {
-                profileTask?.cancel()
-            }
-        }
-    }
-    
-    private func loadUserProfile() {
-        Task {
-            guard let user = await nostrManager.currentUser,
-                  let ndk = nostrManager.ndk else {
-                await MainActor.run {
-                    currentUser = nil
-                    userProfile = nil
-                }
-                return
-            }
-            
-            await MainActor.run {
-                currentUser = user
-            }
-            
-            // Cancel previous profile observation
-            profileTask?.cancel()
-            
-            // Observe profile updates using declarative data source
-            profileTask = Task {
-                let profileDataSource = ndk.observe(
-                    filter: NDKFilter(
-                        authors: [user.pubkey],
-                        kinds: [0]
-                    ),
-                    maxAge: 3600,
-                    cachePolicy: .cacheWithNetwork
-                )
-                
-                for await event in profileDataSource.events {
-                    if let profileData = event.content.data(using: .utf8),
-                       let profile = try? JSONDecoder().decode(NDKUserProfile.self, from: profileData) {
-                        await MainActor.run {
-                            self.userProfile = profile
-                        }
-                        break
-                    }
                 }
             }
         }
@@ -220,9 +173,6 @@ struct SettingsView: View {
         // Clear authentication data
         nostrManager.logout()
         
-        // Clear local state
-        currentUser = nil
-        userProfile = nil
     }
 }
 

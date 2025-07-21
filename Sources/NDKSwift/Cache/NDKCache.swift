@@ -1,6 +1,66 @@
 import Foundation
 import CashuSwift
 
+// MARK: - NIP-05 Cache Types
+
+/// Verification status for NIP-05 identifiers
+public enum NIP05VerificationStatus: String, Codable, Sendable {
+    /// Claimed in kind:0 but not yet verified
+    case unverified
+    /// Verified and matches the claiming pubkey
+    case verified
+    /// Verified but belongs to a different pubkey
+    case invalid
+    /// Was verified but needs re-verification
+    case expired
+    /// Verification attempt failed (network/DNS error)
+    case failed
+}
+
+/// Cache entry for NIP-05 identifiers
+public struct NIP05CacheEntry: Codable, Sendable, Equatable {
+    /// The full NIP-05 identifier (e.g., "satoshi@bitcoin.org")
+    public let identifier: String
+    /// The public key associated with this identifier
+    public let pubkey: String
+    /// Current verification status
+    public var status: NIP05VerificationStatus
+    /// Optional NIP-46 relay URLs from verification
+    public var nip46Relays: [String]?
+    /// When this identifier was first seen
+    public let claimedAt: Date
+    /// When last successfully verified
+    public var verifiedAt: Date?
+    /// When last verification was attempted
+    public var lastCheckAt: Date?
+    /// Error message if verification failed
+    public var errorMessage: String?
+    /// HTTP status code from last verification attempt
+    public var httpStatusCode: Int?
+    
+    public init(
+        identifier: String,
+        pubkey: String,
+        status: NIP05VerificationStatus,
+        nip46Relays: [String]? = nil,
+        claimedAt: Date = Date(),
+        verifiedAt: Date? = nil,
+        lastCheckAt: Date? = nil,
+        errorMessage: String? = nil,
+        httpStatusCode: Int? = nil
+    ) {
+        self.identifier = identifier
+        self.pubkey = pubkey
+        self.status = status
+        self.nip46Relays = nip46Relays
+        self.claimedAt = claimedAt
+        self.verifiedAt = verifiedAt
+        self.lastCheckAt = lastCheckAt
+        self.errorMessage = errorMessage
+        self.httpStatusCode = httpStatusCode
+    }
+}
+
 /// The primary cache protocol for NDKSwift
 /// 
 /// This protocol defines the caching interface that implementations must conform to.
@@ -177,6 +237,89 @@ public protocol NDKCache: Actor {
     ///   - filter: The filter that was queried
     ///   - timestamp: When the query occurred (defaults to now)
     func recordFetchTime(for filter: NDKFilter, timestamp: Date) async
+    
+    // MARK: - NIP-05 Caching Operations
+    
+    /// Save an unverified NIP-05 claim found in a kind:0 event
+    /// - Parameters:
+    ///   - identifier: The NIP-05 identifier (e.g., "satoshi@bitcoin.org")
+    ///   - pubkey: The public key claiming this identifier
+    ///   - retrievedAt: When this claim was observed
+    func saveNIP05Claim(_ identifier: String, pubkey: String, retrievedAt: Date) async throws
+    
+    /// Get a NIP-05 cache entry by identifier
+    /// - Parameter identifier: The NIP-05 identifier to lookup
+    /// - Returns: The cache entry if found, nil otherwise
+    func getNIP05Entry(_ identifier: String) async -> NIP05CacheEntry?
+    
+    /// Get all NIP-05 entries for a given pubkey
+    /// - Parameter pubkey: The public key to search for
+    /// - Returns: Array of NIP-05 entries claimed by this pubkey
+    func getNIP05Entries(pubkey: String) async -> [NIP05CacheEntry]
+    
+    /// Search for NIP-05 identifiers matching a prefix (for autocomplete)
+    /// - Parameters:
+    ///   - prefix: The search prefix
+    ///   - limit: Maximum number of results
+    /// - Returns: Array of matching NIP-05 entries
+    func searchNIP05(_ prefix: String, limit: Int) async -> [NIP05CacheEntry]
+    
+    /// Save a verified NIP-05 resolution result
+    /// - Parameter entry: The complete NIP-05 cache entry with verification status
+    func saveNIP05Resolution(_ entry: NIP05CacheEntry) async throws
+    
+    /// Mark a NIP-05 entry as invalid
+    /// - Parameters:
+    ///   - identifier: The NIP-05 identifier
+    ///   - actualPubkey: The actual pubkey that owns this identifier (if known)
+    func invalidateNIP05(_ identifier: String, actualPubkey: String?) async throws
+    
+    /// Check if a NIP-05 entry needs verification
+    /// - Parameters:
+    ///   - identifier: The NIP-05 identifier
+    ///   - maxAge: Maximum age before re-verification is needed
+    /// - Returns: True if verification is needed
+    func needsNIP05Verification(_ identifier: String, maxAge: TimeInterval) async -> Bool
+    
+    /// Get unverified NIP-05 entries for background verification
+    /// - Parameter limit: Maximum number of entries to return
+    /// - Returns: Array of unverified NIP-05 entries
+    func getUnverifiedNIP05s(limit: Int) async -> [NIP05CacheEntry]
+    
+    /// Check if we can verify a domain (rate limiting)
+    /// - Parameter domain: The domain to check
+    /// - Returns: True if verification is allowed
+    func canVerifyDomain(_ domain: String) async -> Bool
+    
+    /// Record a domain verification attempt (for rate limiting)
+    /// - Parameter domain: The domain that was attempted
+    func recordDomainVerificationAttempt(_ domain: String) async
+    
+    // MARK: - Relay Preferences Cache
+    
+    /// Save relay preferences with EOSE tracking
+    /// - Parameters:
+    ///   - pubkey: The public key
+    ///   - writeRelays: Write relay URLs (nil if no relay list)
+    ///   - readRelays: Read relay URLs (nil if no relay list)
+    ///   - fetchedAt: When this was fetched
+    ///   - expiresAt: When this cache entry expires
+    ///   - checkedRelays: Which relays sent EOSE (for negative entries)
+    func saveRelayPreferences(
+        pubkey: String,
+        writeRelays: [String]?,
+        readRelays: [String]?,
+        fetchedAt: Date,
+        expiresAt: Date,
+        checkedRelays: Set<String>?
+    ) async throws
+    
+    /// Get cached relay preferences
+    /// - Parameter pubkey: The public key to look up
+    /// - Returns: Tuple with relay preferences and metadata, or nil if not found/expired
+    func getRelayPreferences(
+        pubkey: String
+    ) async -> (writeRelays: [String]?, readRelays: [String]?, fetchedAt: Date, expiresAt: Date, checkedRelays: Set<String>?)?
 }
 
 // MARK: - Optional Protocol Extensions
@@ -367,5 +510,85 @@ public extension NDKCache {
     /// Default implementation that does nothing
     func recordFetchTime(for filter: NDKFilter, timestamp: Date = Date()) async {
         // Default implementation - cache implementations should override
+    }
+    
+    // MARK: - Default NIP-05 Implementation
+    
+    /// Default implementation that does nothing
+    func saveNIP05Claim(_ identifier: String, pubkey: String, retrievedAt: Date = Date()) async throws {
+        // Default implementation - cache implementations should override
+    }
+    
+    /// Default implementation that returns nil
+    func getNIP05Entry(_ identifier: String) async -> NIP05CacheEntry? {
+        // Default implementation - cache implementations should override
+        return nil
+    }
+    
+    /// Default implementation that returns empty array
+    func getNIP05Entries(pubkey: String) async -> [NIP05CacheEntry] {
+        // Default implementation - cache implementations should override
+        return []
+    }
+    
+    /// Default implementation that returns empty array
+    func searchNIP05(_ prefix: String, limit: Int) async -> [NIP05CacheEntry] {
+        // Default implementation - cache implementations should override
+        return []
+    }
+    
+    /// Default implementation that does nothing
+    func saveNIP05Resolution(_ entry: NIP05CacheEntry) async throws {
+        // Default implementation - cache implementations should override
+    }
+    
+    /// Default implementation that does nothing
+    func invalidateNIP05(_ identifier: String, actualPubkey: String?) async throws {
+        // Default implementation - cache implementations should override
+    }
+    
+    /// Default implementation that always returns true (needs verification)
+    func needsNIP05Verification(_ identifier: String, maxAge: TimeInterval) async -> Bool {
+        // Default implementation - cache implementations should override
+        return true
+    }
+    
+    /// Default implementation that returns empty array
+    func getUnverifiedNIP05s(limit: Int) async -> [NIP05CacheEntry] {
+        // Default implementation - cache implementations should override
+        return []
+    }
+    
+    /// Default implementation that always returns true (allow verification)
+    func canVerifyDomain(_ domain: String) async -> Bool {
+        // Default implementation - cache implementations should override
+        return true
+    }
+    
+    /// Default implementation that does nothing
+    func recordDomainVerificationAttempt(_ domain: String) async {
+        // Default implementation - cache implementations should override
+    }
+    
+    // MARK: - Default Relay Preferences Implementation
+    
+    /// Default implementation that does nothing
+    func saveRelayPreferences(
+        pubkey: String,
+        writeRelays: [String]?,
+        readRelays: [String]?,
+        fetchedAt: Date,
+        expiresAt: Date,
+        checkedRelays: Set<String>?
+    ) async throws {
+        // Default implementation - cache implementations should override
+    }
+    
+    /// Default implementation that returns nil
+    func getRelayPreferences(
+        pubkey: String
+    ) async -> (writeRelays: [String]?, readRelays: [String]?, fetchedAt: Date, expiresAt: Date, checkedRelays: Set<String>?)? {
+        // Default implementation - cache implementations should override
+        return nil
     }
 }

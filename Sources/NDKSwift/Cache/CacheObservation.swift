@@ -4,6 +4,16 @@ import Foundation
 public protocol CacheObserver: AnyObject {
     /// Called when a new event matching the observer's filter is added to cache
     func handleEvent(_ event: NDKEvent) async
+    
+    /// Called when a relay update is received (optional)
+    func handleRelayUpdate(_ update: RelayUpdate) async
+}
+
+// Default implementation for backward compatibility
+public extension CacheObserver {
+    func handleRelayUpdate(_ update: RelayUpdate) async {
+        // Default implementation does nothing
+    }
 }
 
 /// Handle for managing observation lifecycle

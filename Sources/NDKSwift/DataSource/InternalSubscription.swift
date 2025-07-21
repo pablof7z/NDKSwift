@@ -88,7 +88,7 @@ actor InternalSubscription {
     private weak var ndk: NDK?
     
     private var eventHandlers: [(NDKEvent) async -> Void] = []
-    private var eoseHandlers: [() async -> Void] = []
+    private var eoseHandlers: [(String) async -> Void] = []  // Changed to include relay URL
     private var isActive = false
     
     // AsyncSequence support
@@ -198,8 +198,8 @@ actor InternalSubscription {
         eoseHandlers.removeAll()
     }
     
-    /// Register a handler for EOSE (End of Stored Events)
-    func onEOSE(_ handler: @escaping () async -> Void) {
+    /// Register a handler for EOSE (End of Stored Events) with relay information
+    func onEOSE(_ handler: @escaping (String) async -> Void) {
         eoseHandlers.append(handler)
     }
     
@@ -228,11 +228,11 @@ actor InternalSubscription {
     func handleEOSE(from relay: RelayProtocol) async {
         NDKLogger.log(.debug, category: .subscription, "🏁 Handling EOSE from \(relay.url) for subscription: \(id)")
         
-        // Notify all handlers
+        // Notify all handlers with relay URL
         if !eoseHandlers.isEmpty {
             NDKLogger.log(.trace, category: .subscription, "📢 Notifying \(eoseHandlers.count) EOSE handlers")
             for handler in eoseHandlers {
-                await handler()
+                await handler(relay.url)
             }
         } else {
             NDKLogger.log(.trace, category: .subscription, "📦 No EOSE handlers registered")

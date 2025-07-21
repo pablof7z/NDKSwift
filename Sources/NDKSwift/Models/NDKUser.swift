@@ -77,45 +77,20 @@ public final class NDKUser: Equatable, Hashable, Sendable {
     }
 
     /// Create user from NIP-05 identifier
-    public static func fromNip05(_ nip05: String, ndk: NDK) async throws -> NDKUser {
-        // Parse NIP-05 identifier (user@domain)
-        let parts = nip05.split(separator: "@")
-        guard parts.count == 2 else {
-            throw NDKError.invalidInput(message: "Invalid NIP-05 format")
+    public static func fromNip05(_ nip05: String, ndk: NDK, forceVerify: Bool = false) async throws -> NDKUser {
+        guard let user = try await ndk.nip05Manager.resolveUser(
+            identifier: nip05,
+            forceVerify: forceVerify
+        ) else {
+            throw NDKError.invalidInput(message: "NIP-05 verification failed for \(nip05)")
         }
-
-        let name = String(parts[0])
-        let domain = String(parts[1])
-
-        // Build the well-known URL
-        let urlString = "https://\(domain)/.well-known/nostr.json?name=\(name)"
-        let url = try URLUtils.validateURL(urlString)
-
-        // Fetch the data
-        let (data, _): (Data, URLResponse)
-        do {
-            (data, _) = try await URLSession.shared.data(from: url)
-        } catch {
-            throw NDKError.connectionFailed(relay: domain, message: "Failed to fetch NIP-05 data from \(urlString)", underlying: error)
+        
+        // Restore NIP-46 URLs if available
+        if let cached = await ndk.cache.getNIP05Entry(nip05.lowercased()),
+           let nip46Relays = cached.nip46Relays {
+            await user.stateActor.setNip46Urls(nip46Relays)
         }
-
-        // Parse JSON response
-        guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-              let names = json["names"] as? [String: String],
-              let pubkey = names[name]
-        else {
-            throw NDKError.invalidInput(message: "NIP-05 verification failed for \(name)@\(domain)")
-        }
-
-        let user = NDKUser(pubkey: pubkey)
-        user.ndk = ndk
-
-        // Check for NIP-46 relays
-        if let nip46 = json["nip46"] as? [String: Any],
-           let relays = nip46[pubkey] as? [String] {
-            await user.stateActor.setNip46Urls(relays)
-        }
-
+        
         return user
     }
 
@@ -137,6 +112,9 @@ public final class NDKUser: Equatable, Hashable, Sendable {
                 // Save to cache if available
                 if let ndk = ndk {
                     try? await ndk.cache.saveProfile(profile, pubkey: pubkey)
+                    
+                    // Proactively cache NIP-05 identifier if present
+                    await ndk.nip05Manager.processMetadataEvent(event, profile: profile)
                 }
             }
         }
@@ -266,6 +244,19 @@ public final class NDKUser: Equatable, Hashable, Sendable {
         hasher.combine(pubkey)
     }
 
+    // MARK: - NIP-05 Verification
+    
+    /// Verify this user's NIP-05 identifier
+    /// - Parameter maxAge: Maximum age before re-verification is needed (default: 24 hours)
+    /// - Returns: True if the NIP-05 is verified and belongs to this user
+    public func verifyNIP05(maxAge: TimeInterval = 86400) async throws -> Bool {
+        guard let ndk = ndk else {
+            throw NDKError.notConfigured("NDK instance not set")
+        }
+        
+        return try await ndk.verifyNIP05(for: self, maxAge: maxAge)
+    }
+    
     // MARK: - Payments
 
     /// Pay this user using the configured wallet
@@ -434,5 +425,10 @@ public struct NDKUserProfile: Codable, Sendable {
     /// Set additional field value
     public mutating func setAdditionalField(_ key: String, value: String?) {
         additionalFields[key] = value
+    }
+    
+    /// Get all additional fields
+    public var allAdditionalFields: [String: String] {
+        return additionalFields
     }
 }

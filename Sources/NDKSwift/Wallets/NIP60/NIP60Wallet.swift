@@ -658,7 +658,7 @@ public actor NIP60Wallet: NDKPaymentProvider {
         mintURL: String,
         persistQuote: Bool = false
     ) async throws -> CashuMintQuote {
-        return try await CashuDeposit.requestMintQuote(
+        let (quote, _) = try await CashuDeposit.requestMintQuote(
             amount: amount,
             mintURL: mintURL,
             mints: mints,
@@ -666,6 +666,7 @@ public actor NIP60Wallet: NDKPaymentProvider {
             persistQuote: persistQuote,
             signer: signer
         )
+        return quote
     }
     
     /// Monitor deposit status for a mint quote (checking if Lightning invoice was paid)
@@ -678,6 +679,7 @@ public actor NIP60Wallet: NDKPaymentProvider {
                 do {
                     let stream = CashuDeposit.monitorDeposit(
                         quote: quote,
+                        quoteEventId: nil, // New quote, no event ID yet
                         mints: self.mints,
                         eventManager: self.eventManager,
                         signer: signer,
@@ -839,6 +841,7 @@ public actor NIP60Wallet: NDKPaymentProvider {
             do {
                 for try await status in await CashuDeposit.monitorDeposit(
                     quote: quote,
+                    quoteEventId: event.id,
                     mints: self.mints,
                     eventManager: self.eventManager,
                     signer: self.signer,

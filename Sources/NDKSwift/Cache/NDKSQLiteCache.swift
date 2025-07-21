@@ -77,6 +77,9 @@ public actor NDKSQLiteCache: NDKCache {
         Self.registerV6RelaySourcesMigration(&migrator)
         Self.registerV7FetchTimestampsMigration(&migrator)
         Self.registerV8AddSubscriptionIdMigration(&migrator)
+        Self.registerV9NIP05CacheMigration(&migrator)
+        Self.registerV10RelayPreferencesMigration(&migrator)
+        Self.registerV11ProfileAdditionalFieldsMigration(&migrator)
         
         try migrator.migrate(dbQueue)
     }
@@ -286,18 +289,32 @@ public actor NDKSQLiteCache: NDKCache {
     // MARK: - Profile Operations
     
     public func saveProfile(_ profile: NDKUserProfile, pubkey: String) async throws {
+        // Still store JSON for backward compatibility during transition
         let jsonString = try JSONCoding.encodeToString(profile)
+        
+        // Encode additional fields as property list for efficient storage
+        let additionalFieldsData: Data?
+        if !profile.allAdditionalFields.isEmpty {
+            additionalFieldsData = try PropertyListSerialization.data(
+                fromPropertyList: profile.allAdditionalFields,
+                format: .binary,
+                options: 0
+            )
+        } else {
+            additionalFieldsData = nil
+        }
         
         try await dbQueue.write { db in
             try db.execute(
                 sql: """
                 INSERT OR REPLACE INTO profiles 
-                (pubkey, name, about, picture, nip05, lud06, lud16, banner, website, updated_at, json)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                (pubkey, name, display_name, about, picture, nip05, lud06, lud16, banner, website, updated_at, json, additional_fields)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 arguments: [
                     pubkey,
                     profile.name,
+                    profile.displayName,
                     profile.about,
                     profile.picture,
                     profile.nip05,
@@ -306,7 +323,8 @@ public actor NDKSQLiteCache: NDKCache {
                     profile.banner,
                     profile.website,
                     Timestamp.now,
-                    jsonString
+                    jsonString,
+                    additionalFieldsData
                 ]
             )
         }
@@ -315,11 +333,43 @@ public actor NDKSQLiteCache: NDKCache {
     public func getProfile(pubkey: String) async -> NDKUserProfile? {
         do {
             return try await dbQueue.read { db in
-                if let row = try Row.fetchOne(db, sql: "SELECT json FROM profiles WHERE pubkey = ?", arguments: [pubkey]),
-                   let jsonString = row["json"] as? String,
+                guard let row = try Row.fetchOne(db, 
+                    sql: "SELECT name, display_name, about, picture, banner, nip05, lud16, lud06, website, additional_fields, json FROM profiles WHERE pubkey = ?", 
+                    arguments: [pubkey]) else {
+                    return nil
+                }
+                
+                // First try to reconstruct from individual fields (semantic caching)
+                if row["name"] != nil || row["display_name"] != nil {
+                    var profile = NDKUserProfile(
+                        name: row["name"] as? String,
+                        displayName: row["display_name"] as? String,
+                        about: row["about"] as? String,
+                        picture: row["picture"] as? String,
+                        banner: row["banner"] as? String,
+                        nip05: row["nip05"] as? String,
+                        lud16: row["lud16"] as? String,
+                        lud06: row["lud06"] as? String,
+                        website: row["website"] as? String
+                    )
+                    
+                    // Decode additional fields from property list
+                    if let additionalFieldsData = row["additional_fields"] as? Data,
+                       let additionalFields = try? PropertyListSerialization.propertyList(from: additionalFieldsData, options: [], format: nil) as? [String: String] {
+                        for (key, value) in additionalFields {
+                            profile.setAdditionalField(key, value: value)
+                        }
+                    }
+                    
+                    return profile
+                }
+                
+                // Fallback to JSON parsing for old data (before migration)
+                if let jsonString = row["json"] as? String,
                    let jsonData = jsonString.data(using: .utf8) {
                     return try JSONCoding.decode(NDKUserProfile.self, from: jsonData)
                 }
+                
                 return nil
             }
         } catch {
@@ -767,6 +817,37 @@ public actor NDKSQLiteCache: NDKCache {
         }
     }
     
+    // MARK: - Testing Support (only for unit tests)
+    
+    #if DEBUG
+    /// Insert raw profile data for testing migration scenarios
+    /// - Warning: This method is only available in DEBUG builds for testing
+    public func insertRawProfileForTesting(pubkey: String, json: String) async throws {
+        try await dbQueue.write { db in
+            try db.execute(
+                sql: "INSERT INTO profiles (pubkey, json, updated_at) VALUES (?, ?, ?)",
+                arguments: [pubkey, json, Timestamp.now]
+            )
+        }
+    }
+    
+    /// Get raw profile row for testing
+    /// - Warning: This method is only available in DEBUG builds for testing
+    public func getRawProfileForTesting(pubkey: String) async throws -> [String: Any]? {
+        return try await dbQueue.read { db in
+            guard let row = try Row.fetchOne(db, sql: "SELECT * FROM profiles WHERE pubkey = ?", arguments: [pubkey]) else {
+                return nil
+            }
+            
+            var result: [String: Any] = [:]
+            for (column, value) in row {
+                result[column] = value
+            }
+            return result
+        }
+    }
+    #endif
+    
     // MARK: - Reactive Observation
     
     public func observeEvents(
@@ -911,7 +992,7 @@ public actor NDKSQLiteCache: NDKCache {
             for eventId in eventIdsToDelete {
                 if await getEvent(id: eventId) == nil {
                     deletionTombstones[eventId] = now
-                    if debugMode {
+                    if self.debugMode {
                         NDKLogger.log(.debug, category: .cache, "Added tombstone for event \(eventId)")
                     }
                 }
@@ -1471,6 +1552,426 @@ public actor NDKSQLiteCache: NDKCache {
             }
         } catch {
             logError(operation: "record fetch timestamp", parameter: fingerprint, error: error)
+        }
+    }
+    
+    // MARK: - NIP-05 Cache Operations
+    
+    public func saveNIP05Claim(_ identifier: String, pubkey: String, retrievedAt: Date = Date()) async throws {
+        let claimedAt = Int64(retrievedAt.timeIntervalSince1970)
+        
+        do {
+            try await dbQueue.write { db in
+                // Check if entry already exists
+                let existing = try Row.fetchOne(db, sql: """
+                    SELECT status FROM nip05_cache 
+                    WHERE identifier = ? AND pubkey = ?
+                """, arguments: [identifier, pubkey])
+                
+                // Only insert if it doesn't exist or is in invalid state
+                if existing == nil || existing?["status"] as? String == NIP05VerificationStatus.invalid.rawValue {
+                    try db.execute(sql: """
+                        INSERT OR REPLACE INTO nip05_cache 
+                        (identifier, pubkey, status, claimed_at) 
+                        VALUES (?, ?, ?, ?)
+                    """, arguments: [identifier, pubkey, NIP05VerificationStatus.unverified.rawValue, claimedAt])
+                    
+                    if self.debugMode {
+                        NDKLogger.log(.debug, category: .cache, "Saved NIP-05 claim: \(identifier) for \(pubkey)")
+                    }
+                }
+            }
+        } catch {
+            logError(operation: "save NIP-05 claim", parameter: identifier, error: error)
+            throw error
+        }
+    }
+    
+    public func getNIP05Entry(_ identifier: String) async -> NIP05CacheEntry? {
+        do {
+            return try await dbQueue.read { db in
+                if let row = try Row.fetchOne(db, sql: """
+                    SELECT * FROM nip05_cache 
+                    WHERE identifier = ? 
+                    ORDER BY verified_at DESC, claimed_at DESC
+                    LIMIT 1
+                """, arguments: [identifier]) {
+                    return self.nip05EntryFromRow(row)
+                }
+                return nil
+            }
+        } catch {
+            logError(operation: "get NIP-05 entry", parameter: identifier, error: error)
+            return nil
+        }
+    }
+    
+    public func getNIP05Entries(pubkey: String) async -> [NIP05CacheEntry] {
+        do {
+            return try await dbQueue.read { db in
+                let rows = try Row.fetchAll(db, sql: """
+                    SELECT * FROM nip05_cache 
+                    WHERE pubkey = ?
+                    ORDER BY status = 'verified' DESC, verified_at DESC, claimed_at DESC
+                """, arguments: [pubkey])
+                return rows.compactMap { row in
+                    self.nip05EntryFromRow(row)
+                }
+            }
+        } catch {
+            logError(operation: "get NIP-05 entries for pubkey", parameter: pubkey, error: error)
+            return []
+        }
+    }
+    
+    public func searchNIP05(_ prefix: String, limit: Int) async -> [NIP05CacheEntry] {
+        do {
+            return try await dbQueue.read { db in
+                let rows = try Row.fetchAll(db, sql: """
+                    SELECT * FROM nip05_cache 
+                    WHERE identifier LIKE ? 
+                    ORDER BY 
+                        status = 'verified' DESC,
+                        LENGTH(identifier) ASC,
+                        verified_at DESC,
+                        claimed_at DESC
+                    LIMIT ?
+                """, arguments: ["\(prefix)%", limit])
+                
+                return rows.compactMap { row in
+                    self.nip05EntryFromRow(row)
+                }
+            }
+        } catch {
+            logError(operation: "search NIP-05", parameter: prefix, error: error)
+            return []
+        }
+    }
+    
+    public func saveNIP05Resolution(_ entry: NIP05CacheEntry) async throws {
+        let claimedAt = Int64(entry.claimedAt.timeIntervalSince1970)
+        let verifiedAt = entry.verifiedAt.map { Int64($0.timeIntervalSince1970) }
+        let lastCheckAt = entry.lastCheckAt.map { Int64($0.timeIntervalSince1970) }
+        let nip46RelaysJSON = entry.nip46Relays.flatMap { try? JSONCoding.encodeToString($0) }
+        
+        do {
+            try await dbQueue.write { db in
+                try db.execute(sql: """
+                    INSERT OR REPLACE INTO nip05_cache 
+                    (identifier, pubkey, status, nip46_relays, claimed_at, 
+                     verified_at, last_check_at, error_message, http_status_code) 
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """, arguments: [
+                    entry.identifier,
+                    entry.pubkey,
+                    entry.status.rawValue,
+                    nip46RelaysJSON,
+                    claimedAt,
+                    verifiedAt,
+                    lastCheckAt,
+                    entry.errorMessage,
+                    entry.httpStatusCode
+                ])
+                
+                if self.debugMode {
+                    NDKLogger.log(.debug, category: .cache, 
+                        "Saved NIP-05 resolution: \(entry.identifier) -> \(entry.pubkey) (\(entry.status))")
+                }
+            }
+        } catch {
+            logError(operation: "save NIP-05 resolution", parameter: entry.identifier, error: error)
+            throw error
+        }
+    }
+    
+    public func invalidateNIP05(_ identifier: String, actualPubkey: String?) async throws {
+        do {
+            try await dbQueue.write { db in
+                // Mark all entries for this identifier as invalid
+                try db.execute(sql: """
+                    UPDATE nip05_cache 
+                    SET status = ?, last_check_at = ?, error_message = ?
+                    WHERE identifier = ?
+                """, arguments: [
+                    NIP05VerificationStatus.invalid.rawValue,
+                    Int64(Date().timeIntervalSince1970),
+                    "Belongs to different pubkey",
+                    identifier
+                ])
+                
+                // If we know the actual owner, save that as verified
+                if let actualPubkey = actualPubkey {
+                    try db.execute(sql: """
+                        INSERT OR REPLACE INTO nip05_cache 
+                        (identifier, pubkey, status, claimed_at, verified_at, last_check_at) 
+                        VALUES (?, ?, ?, ?, ?, ?)
+                    """, arguments: [
+                        identifier,
+                        actualPubkey,
+                        NIP05VerificationStatus.verified.rawValue,
+                        Int64(Date().timeIntervalSince1970),
+                        Int64(Date().timeIntervalSince1970),
+                        Int64(Date().timeIntervalSince1970)
+                    ])
+                }
+                
+                if self.debugMode {
+                    NDKLogger.log(.debug, category: .cache, 
+                        "Invalidated NIP-05: \(identifier), actual owner: \(actualPubkey ?? "unknown")")
+                }
+            }
+        } catch {
+            logError(operation: "invalidate NIP-05", parameter: identifier, error: error)
+            throw error
+        }
+    }
+    
+    public func needsNIP05Verification(_ identifier: String, maxAge: TimeInterval) async -> Bool {
+        do {
+            return try await dbQueue.read { db in
+                let row = try Row.fetchOne(db, sql: """
+                    SELECT status, verified_at, last_check_at FROM nip05_cache 
+                    WHERE identifier = ? 
+                    ORDER BY verified_at DESC
+                    LIMIT 1
+                """, arguments: [identifier])
+                
+                guard let row = row,
+                      let status = row["status"] as? String else {
+                    return true // No entry, needs verification
+                }
+                
+                // Unverified always needs verification
+                if status == NIP05VerificationStatus.unverified.rawValue {
+                    return true
+                }
+                
+                // Check age of last verification
+                let lastCheck = row["last_check_at"] as? Int64 ?? row["verified_at"] as? Int64
+                if let lastCheck = lastCheck {
+                    let lastCheckDate = Date(timeIntervalSince1970: TimeInterval(lastCheck))
+                    return Date().timeIntervalSince(lastCheckDate) > maxAge
+                }
+                
+                return true
+            }
+        } catch {
+            logError(operation: "check NIP-05 needs verification", parameter: identifier, error: error)
+            return true
+        }
+    }
+    
+    public func getUnverifiedNIP05s(limit: Int) async -> [NIP05CacheEntry] {
+        do {
+            return try await dbQueue.read { db in
+                let rows = try Row.fetchAll(db, sql: """
+                    SELECT * FROM nip05_cache 
+                    WHERE status = ?
+                    ORDER BY claimed_at DESC
+                    LIMIT ?
+                """, arguments: [NIP05VerificationStatus.unverified.rawValue, limit])
+                
+                return rows.compactMap { row in
+                    self.nip05EntryFromRow(row)
+                }
+            }
+        } catch {
+            logError(operation: "get unverified NIP-05s", parameter: "limit: \(limit)", error: error)
+            return []
+        }
+    }
+    
+    public func canVerifyDomain(_ domain: String) async -> Bool {
+        let rateLimitWindow: TimeInterval = 3600 // 1 hour
+        let maxAttemptsPerWindow = 10
+        let now = Int64(Date().timeIntervalSince1970)
+        
+        do {
+            return try await dbQueue.read { db in
+                let row = try Row.fetchOne(db, sql: """
+                    SELECT attempt_count, window_start FROM nip05_rate_limit
+                    WHERE domain = ?
+                """, arguments: [domain])
+                
+                guard let row = row,
+                      let attemptCount = row["attempt_count"] as? Int,
+                      let windowStart = row["window_start"] as? Int64 else {
+                    return true // No rate limit entry, allow
+                }
+                
+                // Check if window has expired
+                if TimeInterval(now - windowStart) > rateLimitWindow {
+                    return true // Window expired, allow
+                }
+                
+                return attemptCount < maxAttemptsPerWindow
+            }
+        } catch {
+            logError(operation: "check domain rate limit", parameter: domain, error: error)
+            return true // Allow on error
+        }
+    }
+    
+    public func recordDomainVerificationAttempt(_ domain: String) async {
+        let rateLimitWindow: TimeInterval = 3600 // 1 hour
+        let now = Int64(Date().timeIntervalSince1970)
+        
+        do {
+            try await dbQueue.write { db in
+                // Check existing entry
+                let existing = try Row.fetchOne(db, sql: """
+                    SELECT attempt_count, window_start FROM nip05_rate_limit
+                    WHERE domain = ?
+                """, arguments: [domain])
+                
+                if let existing = existing,
+                   let windowStart = existing["window_start"] as? Int64,
+                   TimeInterval(now - windowStart) <= rateLimitWindow {
+                    // Increment counter within window
+                    try db.execute(sql: """
+                        UPDATE nip05_rate_limit 
+                        SET attempt_count = attempt_count + 1
+                        WHERE domain = ?
+                    """, arguments: [domain])
+                } else {
+                    // Start new window
+                    try db.execute(sql: """
+                        INSERT OR REPLACE INTO nip05_rate_limit 
+                        (domain, attempt_count, window_start) 
+                        VALUES (?, 1, ?)
+                    """, arguments: [domain, now])
+                }
+            }
+        } catch {
+            logError(operation: "record domain verification attempt", parameter: domain, error: error)
+        }
+    }
+    
+    // Helper function to convert database row to NIP05CacheEntry
+    private nonisolated func nip05EntryFromRow(_ row: Row) -> NIP05CacheEntry? {
+        guard let identifier = row["identifier"] as? String,
+              let pubkey = row["pubkey"] as? String,
+              let statusString = row["status"] as? String,
+              let status = NIP05VerificationStatus(rawValue: statusString),
+              let claimedAtInt = row["claimed_at"] as? Int64 else {
+            return nil
+        }
+        
+        let nip46Relays: [String]?
+        if let relaysJSON = row["nip46_relays"] as? String {
+            nip46Relays = JSONCoding.safeDecode([String].self, from: relaysJSON)
+        } else {
+            nip46Relays = nil
+        }
+        
+        return NIP05CacheEntry(
+            identifier: identifier,
+            pubkey: pubkey,
+            status: status,
+            nip46Relays: nip46Relays,
+            claimedAt: Date(timeIntervalSince1970: TimeInterval(claimedAtInt)),
+            verifiedAt: (row["verified_at"] as? Int64).map { Date(timeIntervalSince1970: TimeInterval($0)) },
+            lastCheckAt: (row["last_check_at"] as? Int64).map { Date(timeIntervalSince1970: TimeInterval($0)) },
+            errorMessage: row["error_message"] as? String,
+            httpStatusCode: row["http_status_code"] as? Int
+        )
+    }
+    
+    // MARK: - Relay Preferences Cache
+    
+    public func saveRelayPreferences(
+        pubkey: String,
+        writeRelays: [String]?,
+        readRelays: [String]?,
+        fetchedAt: Date,
+        expiresAt: Date,
+        checkedRelays: Set<String>?
+    ) async throws {
+        let fetchedAtInt = Int64(fetchedAt.timeIntervalSince1970)
+        let expiresAtInt = Int64(expiresAt.timeIntervalSince1970)
+        
+        // Encode relay arrays as JSON
+        let writeRelaysJSON = writeRelays != nil ? try? JSONCoding.encodeToString(writeRelays!) : nil
+        let readRelaysJSON = readRelays != nil ? try? JSONCoding.encodeToString(readRelays!) : nil
+        let checkedRelaysJSON = checkedRelays != nil ? try? JSONCoding.encodeToString(Array(checkedRelays!)) : nil
+        
+        do {
+            try await dbQueue.write { db in
+                try db.execute(sql: """
+                    INSERT OR REPLACE INTO relay_preferences 
+                    (pubkey, write_relays, read_relays, fetched_at, expires_at, checked_relays)
+                    VALUES (?, ?, ?, ?, ?, ?)
+                """, arguments: [
+                    pubkey,
+                    writeRelaysJSON,
+                    readRelaysJSON,
+                    fetchedAtInt,
+                    expiresAtInt,
+                    checkedRelaysJSON
+                ])
+                
+                if self.debugMode {
+                    NDKLogger.log(.debug, category: .cache, "Saved relay preferences for \(pubkey)")
+                }
+            }
+        } catch {
+            logError(operation: "save relay preferences", parameter: pubkey, error: error)
+            throw error
+        }
+    }
+    
+    public func getRelayPreferences(
+        pubkey: String
+    ) async -> (writeRelays: [String]?, readRelays: [String]?, fetchedAt: Date, expiresAt: Date, checkedRelays: Set<String>?)? {
+        do {
+            return try await dbQueue.read { db in
+                guard let row = try Row.fetchOne(db, sql: """
+                    SELECT write_relays, read_relays, fetched_at, expires_at, checked_relays
+                    FROM relay_preferences
+                    WHERE pubkey = ?
+                """, arguments: [pubkey]) else {
+                    return nil
+                }
+                
+                guard let fetchedAtInt = row["fetched_at"] as? Int64,
+                      let expiresAtInt = row["expires_at"] as? Int64 else {
+                    return nil
+                }
+                
+                // Decode relay arrays
+                let writeRelays: [String]?
+                if let json = row["write_relays"] as? String {
+                    writeRelays = JSONCoding.safeDecode([String].self, from: json)
+                } else {
+                    writeRelays = nil
+                }
+                
+                let readRelays: [String]?
+                if let json = row["read_relays"] as? String {
+                    readRelays = JSONCoding.safeDecode([String].self, from: json)
+                } else {
+                    readRelays = nil
+                }
+                
+                let checkedRelays: Set<String>?
+                if let json = row["checked_relays"] as? String,
+                   let array = JSONCoding.safeDecode([String].self, from: json) {
+                    checkedRelays = Set(array)
+                } else {
+                    checkedRelays = nil
+                }
+                
+                return (
+                    writeRelays: writeRelays,
+                    readRelays: readRelays,
+                    fetchedAt: Date(timeIntervalSince1970: TimeInterval(fetchedAtInt)),
+                    expiresAt: Date(timeIntervalSince1970: TimeInterval(expiresAtInt)),
+                    checkedRelays: checkedRelays
+                )
+            }
+        } catch {
+            logError(operation: "get relay preferences", parameter: pubkey, error: error)
+            return nil
         }
     }
     

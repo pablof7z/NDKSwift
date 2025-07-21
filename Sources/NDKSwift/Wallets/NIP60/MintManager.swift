@@ -134,9 +134,15 @@ public actor MintManager {
     
     /// Request a mint quote for Lightning deposits
     public func requestMintQuote(amount: Int64, mintURL: String) async throws -> CashuSwift.Bolt11.MintQuote {
-        // Ensure mint is loaded
-        if !hasMint(url: mintURL), let url = URL(string: mintURL) {
-            // Load the mint data when needed
+        // Always ensure mint is properly loaded with keysets
+        guard let url = URL(string: mintURL) else {
+            throw NDKError.invalidURL("Invalid mint URL: \(mintURL)")
+        }
+        
+        // Check if we have a mint with actual keysets
+        let existingMint = getMint(url: mintURL)
+        if existingMint == nil || existingMint!.keysets.isEmpty {
+            // Load or reload the mint data
             let mint = try await loadMint(url: url)
             mints[url.absoluteString] = mint
             

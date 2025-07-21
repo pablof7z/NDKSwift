@@ -159,6 +159,7 @@ public enum NDKError: LocalizedError {
     case unauthorized(relay: String, message: String)
     case relayError(relay: String, message: String)
     case publishFailed(relay: String, message: String)
+    case rateLimited(message: String)
     
     // Storage errors
     case cacheFailed(operation: String, underlying: Error? = nil)
@@ -291,6 +292,8 @@ public enum NDKError: LocalizedError {
             return "Internal error: \(message)"
         case .publishFailed(let relay, let message):
             return "Failed to publish to \(relay): \(message)"
+        case .rateLimited(let message):
+            return message
             
         // Wallet
         case .walletRateLimited(let retryAfter):

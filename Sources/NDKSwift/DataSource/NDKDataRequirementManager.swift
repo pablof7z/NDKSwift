@@ -409,6 +409,7 @@ class DataRequirement {
     private weak var ndk: NDK?
     private let closeOnEose: Bool
     private var observerHandles: [RequirementID: ObservationHandle] = [:]
+    private var observers: [RequirementID: CacheObserver] = [:]  // Track observers for relay updates
     
     var observerCount: Int { observerHandles.count }
     
@@ -424,6 +425,9 @@ class DataRequirement {
     func addObserver(_ observer: CacheObserver, id: RequirementID, individualFilter: NDKFilter) async {
         let correlationId = id.uuidString.prefix(8)
         NDKLogger.log(.debug, category: .subscription, "👁️ Adding observer to DataRequirement - filter: \(individualFilter.fingerprint)", correlationId: String(correlationId))
+        
+        // Store observer reference for relay updates
+        observers[id] = observer
         
         // Register observer with cache - cache is the single source of truth
         if let cache = cache {
@@ -442,6 +446,7 @@ class DataRequirement {
         if let handle = observerHandles.removeValue(forKey: id) {
             await handle.cancel()
         }
+        observers.removeValue(forKey: id)
     }
     
     func includesFilter(_ filter: NDKFilter) -> Bool {
@@ -515,12 +520,19 @@ class DataRequirement {
         
         NDKLogger.log(.info, category: .subscription, "🏁 Starting event processing - subscriptionId: \(subscriptionId), closeOnEose: \(closeOnEose)")
         
-        // Set up EOSE handler for closeOnEose subscriptions
-        if closeOnEose {
-            await internalSubscription.onEOSE { [weak self] in
-                guard let self = self else { return }
-                NDKLogger.log(.info, category: .subscription, "🏁 EOSE received - closing subscription: \(self.subscriptionId)")
-                // Close subscription after EOSE
+        // Set up EOSE handler
+        await internalSubscription.onEOSE { [weak self] relay in
+            guard let self = self else { return }
+            NDKLogger.log(.info, category: .subscription, "🏁 EOSE received from \(relay) - subscriptionId: \(self.subscriptionId)")
+            
+            // Forward EOSE to all observers as relay updates
+            for (_, observer) in self.observers {
+                await observer.handleRelayUpdate(.eose(relay: relay))
+            }
+            
+            // Close subscription if closeOnEose is set
+            if self.closeOnEose {
+                NDKLogger.log(.info, category: .subscription, "🏁 Closing subscription after EOSE: \(self.subscriptionId)")
                 Task {
                     await self.internalSubscription.close()
                 }
@@ -536,8 +548,7 @@ class DataRequirement {
                 eventCount += 1
                 NDKLogger.log(.trace, category: .subscription, "📨 Event #\(eventCount) received - id: \(event.id), kind: \(event.kind), from: \(relay)")
                 
-                // ONLY send to cache - cache is the single source of truth
-                // Cache will notify ALL observers including our data sources
+                // Send event to cache
                 do {
                     try await cache.processEvent(
                         event,
@@ -547,6 +558,11 @@ class DataRequirement {
                     NDKLogger.log(.trace, category: .subscription, "✅ Event processed by cache")
                 } catch {
                     NDKLogger.log(.error, category: .subscription, "❌ Failed to process event: \(error)")
+                }
+                
+                // Also forward as relay update to data sources
+                for (_, observer) in observers {
+                    await observer.handleRelayUpdate(.event(event, relay: relay))
                 }
             }
             

@@ -512,11 +512,29 @@ public actor NDKZapManager {
         // Try to get provider pubkey from recipient's profile
         var providerPubkey: String?
         for await profile in await ndk.profileManager.observe(for: recipientPubkey, maxAge: 3600) {
-            if let profile = profile,
-               profile.lud16 != nil || profile.lud06 != nil {
-                // In a real implementation, we'd resolve the LNURL to get the provider pubkey
-                // For now, we'll use the receipt's pubkey as a placeholder
-                providerPubkey = receipt.event.pubkey
+            if let profile = profile {
+                // Try to resolve LNURL to get provider pubkey
+                if let lnurlAddress = profile.lud16 ?? profile.lud06 {
+                    do {
+                        let resolution = try await ndk.lnurlResolver.resolve(lnurlAddress)
+                        providerPubkey = resolution.providerPubkey
+                        
+                        // If no provider pubkey from LNURL, check if service allows Nostr
+                        if providerPubkey == nil && resolution.payResponse.allowsNostr == true {
+                            // Some services that allow Nostr might use the recipient's pubkey
+                            // as the zap receipt signer
+                            providerPubkey = receipt.event.pubkey
+                        }
+                    } catch {
+                        NDKLogger.log(.warning, category: .general, 
+                                    "Failed to resolve LNURL for \(lnurlAddress): \(error)")
+                        // Fall back to using receipt pubkey
+                        providerPubkey = receipt.event.pubkey
+                    }
+                } else {
+                    // No LNURL configured, use receipt pubkey
+                    providerPubkey = receipt.event.pubkey
+                }
             }
             break // Only need first value
         }
@@ -630,12 +648,5 @@ extension NDKEvent {
         return try await ndk.zapManager.fetchZaps(
             for: self
         )
-    }
-    
-    /// Update publish status for this event
-    public func updatePublishStatus(relay: String, status: RelayPublishStatus) {
-        // This method needs to be implemented in NDKEventTracker
-        // For now, this is a no-op since NDKEvent is immutable
-        // The publish status tracking should be handled by NDKEventTracker
     }
 }
