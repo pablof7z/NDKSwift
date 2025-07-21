@@ -1,6 +1,5 @@
 import XCTest
 @testable import NDKSwift
-import CashuSwift
 
 final class EventDeletionE2ETests: XCTestCase {
     

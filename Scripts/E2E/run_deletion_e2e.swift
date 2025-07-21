@@ -8,7 +8,7 @@ import XCTest
 @main
 struct DeletionE2ERunner {
     static func main() async throws {
-        print("Starting Event Deletion E2E Tests at \(Date())")
+        NDKLogger.log(.info, category: .general, "Starting Event Deletion E2E Tests")
         
         let tests = EventDeletionE2ETests()
         
@@ -17,30 +17,30 @@ struct DeletionE2ERunner {
             try await tests.setUp()
             
             // Run each test
-            print("\n=== Running testBasicEventDeletionE2E ===")
+            NDKLogger.log(.info, category: .general, "\n=== Running testBasicEventDeletionE2E ===")
             try await tests.testBasicEventDeletionE2E()
-            print("✅ testBasicEventDeletionE2E passed")
+            NDKLogger.log(.info, category: .general, "✅ testBasicEventDeletionE2E passed")
             
-            print("\n=== Running testDeletionAuthorValidationE2E ===")
+            NDKLogger.log(.info, category: .general, "\n=== Running testDeletionAuthorValidationE2E ===")
             try await tests.testDeletionAuthorValidationE2E()
-            print("✅ testDeletionAuthorValidationE2E passed")
+            NDKLogger.log(.info, category: .general, "✅ testDeletionAuthorValidationE2E passed")
             
-            print("\n=== Running testMultipleEventDeletionE2E ===")
+            NDKLogger.log(.info, category: .general, "\n=== Running testMultipleEventDeletionE2E ===")
             try await tests.testMultipleEventDeletionE2E()
-            print("✅ testMultipleEventDeletionE2E passed")
+            NDKLogger.log(.info, category: .general, "✅ testMultipleEventDeletionE2E passed")
             
-            print("\n=== Running testCrossInstanceDeletionSyncE2E ===")
+            NDKLogger.log(.info, category: .general, "\n=== Running testCrossInstanceDeletionSyncE2E ===")
             try await tests.testCrossInstanceDeletionSyncE2E()
-            print("✅ testCrossInstanceDeletionSyncE2E passed")
+            NDKLogger.log(.info, category: .general, "✅ testCrossInstanceDeletionSyncE2E passed")
             
-            print("\n=== Running testDeletionTombstoneE2E ===")
+            NDKLogger.log(.info, category: .general, "\n=== Running testDeletionTombstoneE2E ===")
             try await tests.testDeletionTombstoneE2E()
-            print("✅ testDeletionTombstoneE2E passed")
+            NDKLogger.log(.info, category: .general, "✅ testDeletionTombstoneE2E passed")
             
-            print("\n✅ All deletion E2E tests passed!")
+            NDKLogger.log(.info, category: .general, "\n✅ All deletion E2E tests passed!")
             
         } catch {
-            print("❌ Test failed with error: \(error)")
+            NDKLogger.log(.error, category: .general, "❌ Test failed with error: \(error)")
             exit(1)
         }
     }
@@ -544,34 +544,34 @@ final class EventDeletionE2ETests: XCTestCase {
 // Lightweight XCTest assertion functions for standalone script
 func XCTAssertEqual<T: Equatable>(_ expression1: T, _ expression2: T, _ message: String = "", file: StaticString = #file, line: UInt = #line) {
     if expression1 != expression2 {
-        print("❌ XCTAssertEqual failed: \(expression1) != \(expression2) - \(message)")
+        NDKLogger.log(.error, category: .general, "❌ XCTAssertEqual failed: \(expression1) != \(expression2) - \(message)")
         fatalError("Test assertion failed at \(file):\(line)")
     }
 }
 
 func XCTAssertNotNil(_ expression: Any?, _ message: String = "", file: StaticString = #file, line: UInt = #line) {
     if expression == nil {
-        print("❌ XCTAssertNotNil failed: value is nil - \(message)")
+        NDKLogger.log(.error, category: .general, "❌ XCTAssertNotNil failed: value is nil - \(message)")
         fatalError("Test assertion failed at \(file):\(line)")
     }
 }
 
 func XCTAssertTrue(_ expression: Bool, _ message: String = "", file: StaticString = #file, line: UInt = #line) {
     if !expression {
-        print("❌ XCTAssertTrue failed: expression is false - \(message)")
+        NDKLogger.log(.error, category: .general, "❌ XCTAssertTrue failed: expression is false - \(message)")
         fatalError("Test assertion failed at \(file):\(line)")
     }
 }
 
 func XCTAssertGreaterThan<T: Comparable>(_ expression1: T, _ expression2: T, _ message: String = "", file: StaticString = #file, line: UInt = #line) {
     if !(expression1 > expression2) {
-        print("❌ XCTAssertGreaterThan failed: \(expression1) <= \(expression2) - \(message)")
+        NDKLogger.log(.error, category: .general, "❌ XCTAssertGreaterThan failed: \(expression1) <= \(expression2) - \(message)")
         fatalError("Test assertion failed at \(file):\(line)")
     }
 }
 
 func XCTFail(_ message: String = "", file: StaticString = #file, line: UInt = #line) {
-    print("❌ XCTFail: \(message)")
+    NDKLogger.log(.error, category: .general, "❌ XCTFail: \(message)")
     fatalError("Test failed at \(file):\(line)")
 }
 
