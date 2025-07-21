@@ -1,33 +1,31 @@
 # NDKSwift
 
-Swift implementation of the Nostr Development Kit for Apple platforms (iOS, macOS, tvOS, watchOS).
+The most feature-complete Swift implementation of the Nostr Development Kit. Build privacy-first, decentralized apps that work offline and sync seamlessly.
 
-## Overview
+## ✨ Why NDKSwift?
 
-NDKSwift provides a comprehensive toolkit for building Nostr applications with:
-- Local-first architecture with offline support
-- Modern Swift concurrency (async/await, AsyncSequence)
-- Automatic retry and delivery tracking
-- Built-in SQLite caching with full-text search
-- Lightning and Cashu wallet integration
-- Blossom file storage support
+**🚀 Local-First Architecture** - Your app works offline. Events publish optimistically and sync when reconnected.
 
-## Features
+**⚡ Modern Swift** - Built with async/await, AsyncSequence, and actors. No callback hell.
 
-- **Offline Support**: Optimistic publishing with automatic retry when reconnected
-- **Modern Swift**: Async/await, AsyncSequence, and actors for concurrent operations
-- **Caching**: SQLite-based event storage with full-text search
-- **Wallets**: Lightning (NWC) and Cashu integration with zap support
-- **Robust Mint Handling**: Automatic retry with linear backoff for Cashu operations
-- **File Storage**: Blossom protocol implementation
-- **Type Safety**: Strongly typed APIs with compile-time validation
-- **Comprehensive NIP Support**: NIPs 1, 2, 4, 9, 10, 18, 19, 22, 25, 44, 46, 47, 57, 60, 61, 65, 77, 89, 92
+**💾 Smart Caching** - SQLite-powered with full-text search. Apps feel instant.
 
-## Installation
+**💸 Built-in Wallets** - Lightning and Cashu wallets with zaps out of the box.
 
-### Swift Package Manager
+**📦 Complete Toolkit** - 20+ NIPs implemented. From basic notes to encrypted DMs to file storage.
 
-Add NDKSwift to your `Package.swift` file:
+
+
+## 🎯 Features at a Glance
+
+- **Offline-First** - Optimistic publishing with automatic retry
+- **Real-time Subscriptions** - Stream events with AsyncSequence
+- **Smart Relay Management** - Automatic reconnection and message routing
+- **Integrated Payments** - Lightning & Cashu wallets with nutzaps
+- **File Storage** - Blossom protocol for decentralized media
+- **Cross-Platform** - iOS, macOS, tvOS, watchOS support
+
+## 📦 Installation
 
 ```swift
 dependencies: [
@@ -35,447 +33,127 @@ dependencies: [
 ]
 ```
 
-Or add it through Xcode:
-1. File → Add Package Dependencies
-2. Enter: `https://github.com/nostr-dev-kit/ndk-swift`
-3. Select version 0.6.2 or later
-
-## Quick Start
+## 🚀 Quick Start
 
 ```swift
 import NDKSwift
 
-// Initialize with cache for offline support
-let cache = NDKSQLiteCache()
+// Initialize with SQLite cache for offline support
 let ndk = NDK(
-    relayUrls: [
-        "wss://relay.damus.io",
-        "wss://relay.primal.net", 
-        "wss://relay.nostr.band"
-    ],
-    cache: cache
+    relayUrls: ["wss://relay.damus.io", "wss://relay.primal.net"],
+    cache: NDKSQLiteCache()
 )
 
-// Set up signer
+// Generate keys and connect
 let signer = try NDKPrivateKeySigner.generate()
 ndk.signer = signer
-
-// Configure client tagging (NIP-89)
-ndk.clientTagConfig = NDKClientTagConfig(
-    name: "MyApp",
-    address: "31990:mypubkey:myapp-ios",
-    autoTag: true
-)
-
-// Subscribe to text notes using declarative API
-let dataSource = ndk.observe(
-    filter: NDKFilter(kinds: [1], limit: 50),
-    maxAge: 0,  // Real-time updates (0 = always fresh)
-    cachePolicy: .cacheWithNetwork  // Use cache, then fetch new
-)
-
-// Stream events as they arrive
-for await event in dataSource.events {
-    print("\(event.pubkey): \(event.content)")
-}
-
-// Or get current snapshot
-let currentEvents = await dataSource.currentValue()
-
-// Publish event (works offline, syncs when connected)
-let event = try await ndk.event()
-    .content("Hello, Nostr!")
-    .build()
-try await ndk.publish(event)
-
-// Connect to relays
 await ndk.connect()
-```
 
+// Stream real-time notes
+let notes = ndk.observe(filter: NDKFilter(kinds: [1], limit: 50))
+for await note in notes.events {
+    print("\(note.content)")
+}
 
-## Core Concepts
-
-### Events
-
-Events are the fundamental data unit in Nostr:
-
-```swift
+// Publish (works offline!)
 let event = try await ndk.event()
-    .content("Building with NDKSwift!")
-    .tags([["t", "nostr"], ["t", "swift"]])
+    .content("Hello, Nostr! 🎉")
     .build()
-
-// Publish (automatically handled offline with optimistic publishing)
 try await ndk.publish(event)
-
-// Retry unpublished events
-try await ndk.retryUnpublishedEvents()
 ```
 
-### Comments (NIP-22)
 
-Reply to any event type with threaded comments:
+## 💡 Cool Things You Can Build
 
+### 🔄 Offline-First Notes
 ```swift
-// Get blog posts using declarative API
-let blogPostsSource = ndk.observe(
-    filter: NDKFilter(kinds: [EventKind.longFormContent], limit: 1)
-)
-let blogPosts = await blogPostsSource.currentValue()
-
-// Create comment when post is available
-if let blogPost = blogPosts.first {
-    let comment = try await ndk.reply(to: blogPost)
-        .content("Great article!")
-        .build()
-    
-    try await ndk.publish(comment)
-    
-    // Thread replies automatically
-    let reply = try await ndk.reply(to: comment)
-        .content("I agree!")
-        .build()
-}
-
-// Subscribe to comments on content
-let commentsSource = ndk.observe(
-    filter: NDKFilter(
-        kinds: [EventKind.genericReply],
-        tags: ["A": blogPosts.first.map { [$0.tagAddress] } ?? []]
-    )
-)
-
-// Stream comments as they arrive
-for await comment in commentsSource.events {
-    print("New comment: \(comment.content)")
-}
-```
-
-### Declarative Data Access
-
-NDKSwift provides a modern declarative API for accessing Nostr data with automatic caching and real-time updates:
-
-```swift
-// Real-time subscription (maxAge: 0 means always fresh)
-let dataSource = ndk.observe(
-    filter: NDKFilter(authors: [bobPubkey], kinds: [1]),
-    maxAge: 0,  // Always fetch latest
-    cachePolicy: .cacheWithNetwork  // Show cached, then update
-)
-
-// Stream events as they arrive
-for await event in dataSource.events {
-    print("New note: \(event.content)")
-}
-
-// One-shot fetch with 5-minute cache tolerance
-let profiles = ndk.observe(
-    filter: NDKFilter(kinds: [0], limit: 100),
-    maxAge: 300  // Accept cached data if < 5 minutes old
-)
-let currentProfiles = await profiles.currentValue()
-
-// Convenience method using currentValue
-let events = await ndk.observe(
-    filter: NDKFilter(kinds: [1], limit: 50)
-).currentValue()
-
-// Cache-only access (no network calls)
-let cachedEvents = await ndk.observe(
-    filter: NDKFilter(kinds: [1]),
-    cachePolicy: .cacheOnly
-).currentValue()
-
-// SwiftUI Integration
-struct NotesView: View {
-    let dataSource: NDKDataSource<NDKEvent>
-    @State private var notes: [NDKEvent] = []
-    
-    var body: some View {
-        List(notes, id: \.id) { event in
-            Text(event.content)
-        }
-        .task {
-            // Update UI on main thread
-            for await event in dataSource.events {
-                await MainActor.run {
-                    notes.append(event)
-                }
-            }
-        }
-    }
-}
-
-// Transform events to custom types  
-let userProfiles = ndk.observe(
-    filter: NDKFilter(kinds: [0], authors: [pubkey]),
-    transform: { event -> NDKUserProfile? in
-        try? event.decodeMetadata()
-    }
-)
-
-// Multiple data sources automatically share subscriptions
-// Requests within 100ms are batched for efficiency
-let aliceNotes = ndk.observe(
-    filter: NDKFilter(authors: [alicePubkey], kinds: [1])
-)
-
-let bobProfile = ndk.observe(
-    filter: NDKFilter(authors: [bobPubkey], kinds: [0])
-)
-```
-
-#### Cache Policies
-
-- **`.cacheWithNetwork`** (default): Returns cached data immediately, then fetches fresh data
-- **`.cacheOnly`**: Only returns cached data, never hits the network
-- **`.networkOnly`**: Always fetches fresh data, ignores cache
-
-#### maxAge Parameter
-
-- **`maxAge: 0`**: Always fetch fresh data (real-time subscription)
-- **`maxAge: 300`**: Accept cached data if less than 5 minutes old
-- **`maxAge: 3600`**: Accept cached data if less than 1 hour old
-
-### Signers
-
-NDKSwift supports multiple signing methods:
-
-```swift
-// Local private key
-let signer = try NDKPrivateKeySigner(privateKey: "your-hex-private-key")
-
-// Generate new key
-let newSigner = try NDKPrivateKeySigner.generate()
-
-// Remote signing (NIP-46)
-let bunkerSigner = NDKBunkerSigner(remotePubkey: "bunker-pubkey", relayUrls: ["wss://relay.example.com"])
-```
-
-### Caching
-
-Enable caching for better performance and offline support:
-
-```swift
-let cache = NDKSQLiteCache()
-let ndk = NDK(relayUrls: relayUrls, cache: cache)
-
-// Events are automatically cached
-// Control cache behavior with maxAge and cachePolicy
-let dataSource = ndk.observe(
-    filter: filter,
-    maxAge: 300,  // 5 minute cache tolerance
-    cachePolicy: .cacheWithNetwork
-)
-
-// Check event confirmation state
-let confirmationState = await cache.getEventConfirmationState(eventId: event.id)
-switch confirmationState {
-case .optimistic:
-    // Event pending send
-case .partial(let confirmed, let pending):
-    // Partially delivered
-case .confirmed:
-    // Fully delivered
-case nil:
-    // Not tracked
-}
-
-// Monitor unpublished events
-let unpublished = try await cache.getUnpublishedEvents(limit: 100)
-print("\(unpublished.count) events pending")
-```
-
-### Wallets & Payments
-
-NDKSwift provides comprehensive wallet support:
-
-#### Cashu Ecash Wallet (NIP-60)
-```swift
-// Create a Cashu wallet
-let wallet = ndk.createCashuWallet()
-
-// Load wallet state from Nostr events
-try await wallet.load()
-
-// Mint tokens from Lightning invoice
-try await wallet.mintTokens(amount: 1000, mintURL: "https://mint.example.com")
-
-// Check balance
-let balance = try await wallet.getBalance()
-print("Balance: \(balance) sats")
-
-// Send a payment
-let paymentRequest = NDKPaymentRequest(
-    recipient: recipientUser,
-    amount: 100,
-    comment: "Thanks!"
-)
-let confirmation = try await wallet.pay(paymentRequest)
-
-// Check relay health (NIP-60)
-let health = await wallet.getRelayHealth()
-for relay in health {
-    if !relay.isHealthy {
-        try await wallet.repairRelay(relay.relay, missingEventIds: relay.missingEvents)
-    }
-}
-```
-
-#### NWC (Nostr Wallet Connect)
-```swift
-// Connect to a Lightning wallet via NWC
-let nwcWallet = try NDKNWCWallet(
-    uri: "nostr+walletconnect://...",
-    ndk: ndk
-)
-
-// Pay an invoice
-let invoice = "lnbc1000n1..."
-let payment = try await nwcWallet.payInvoice(invoice)
-```
-
-#### Zaps (NIP-57 & NIP-61)
-```swift
-// Configure zap manager with wallets
-ndk.zapManager.configureDefaults(
-    wallet: cashuWallet,  // For nutzaps
-    nwcWallet: nwcWallet  // For Lightning zaps
-)
-
-// Zap a user
-let zapResult = try await user.zap(
-    amountSats: 1000,
-    comment: "Great post!",
-    preferredType: .nutzap  // or .lightning
-)
-
-// Zap an event
-let eventZap = try await event.zap(
-    amountSats: 500,
-    comment: "⚡"
-)
-
-// Subscribe to zaps on an event
-let zapsSource = ndk.observe(
-    filter: NDKFilter(
-        kinds: [EventKind.zap],
-        tags: ["e": [event.id]]
-    ),
-    maxAge: 0  // Real-time zap notifications
-)
-
-// Stream zaps as they arrive
-for await zap in zapsSource.events {
-    print("New zap: \(zap.amountSats ?? 0) sats")
-}
-```
-
-#### Client Identification (NIP-89)
-```swift
-// Configure client tagging
-ndk.clientTagConfig = NDKClientTagConfig(
-    name: "MyApp",
-    address: "31990:mypubkey:myapp-ios",
-    autoTag: true,
-    excludedKinds: [4] // Exclude DMs
-)
-
-// Events include client tags automatically
+// Your app works without internet!
 let event = try await ndk.event()
-    .content("Hello from MyApp!")
+    .content("Posted from airplane mode ✈️")
     .build()
+try await ndk.publish(event)  // Queued locally, syncs when connected
+```
 
-// Extract client info
-if let clientTag = event.clientTag {
-    print("Client: \(clientTag.name)")
+### 🎭 Real-time Social Feed
+```swift
+// Stream notes with instant updates
+let feed = ndk.observe(filter: NDKFilter(kinds: [1]))
+for await note in feed.events {
+    // New notes appear instantly - no pull-to-refresh needed!
 }
+```
 
-// Create handler info
-let handler = try await ndk.event()
-    .nip89HandlerInfo(
-        identifier: "myapp-ios",
-        supportedKinds: [1, 6, 7],
-        handlerURLs: ["ios": "myapp://event/<bech32>"]
-    )
+### ⚡ One-Line Zaps
+```swift
+// Send Bitcoin instantly over Nostr
+try await event.zap(amountSats: 1000, comment: "Great post! ⚡")
+```
+
+### 🔐 End-to-End Encrypted DMs
+```swift
+// Send encrypted messages (NIP-44)
+let dm = try await ndk.event()
+    .encryptedDirectMessage(to: recipientPubkey, content: "Secret message 🤫")
     .build()
 ```
 
-## Supported NIPs
-
-- **NIP-01** (Basic protocol flow description)
-- **NIP-02** (Contact List and Petnames)
-- **NIP-04** (Encrypted Direct Messages - deprecated)
-- **NIP-09** (Event Deletion)
-- **NIP-10** (Conventions for clients' use of e and p tags in text events)
-- **NIP-18** (Reposts)
-- **NIP-19** (bech32-encoded entities)
-- **NIP-22** (Event kind 1111 - Comments)
-- **NIP-25** (Reactions)
-- **NIP-44** (Versioned Encryption)
-- **NIP-46** (Nostr Connect - Remote Signing)
-- **NIP-47** (Wallet Connect)
-- **NIP-57** (Lightning Zaps)
-- **NIP-60** (Cashu Wallet)
-- **NIP-61** (Nutzaps)
-- **NIP-65** (Relay List Metadata - Outbox Model)
-- **NIP-77** (Negentropy - Set Reconciliation)
-- **NIP-89** (Recommended Application Handlers)
-- **NIP-92** (Media Attachments - imeta tags)
-- **Blossom** (Decentralized file storage protocol)
-
-## Documentation
-
-Comprehensive documentation is available in the [Documentation](Documentation/) directory:
-
-- [Getting Started Guide](Documentation/GETTING_STARTED.md) - Step-by-step introduction
-- [Local-First Philosophy](Documentation/LOCAL_FIRST.md) - Why local-first matters for Nostr
-- [API Reference](Documentation/API_REFERENCE.md) - Complete API documentation
-- [Examples](Documentation/EXAMPLES.md) - Practical code examples
-- [Architecture Overview](Documentation/ARCHITECTURE.md) - System design and patterns
-- [Optimistic Publishing](Documentation/OPTIMISTIC_PUBLISHING.md) - Deep dive into offline features
-- [NIP-77 Implementation](Documentation/NIP77Implementation.md) - Negentropy sync protocol details
-- [Cashu Retry Mechanism](Documentation/CASHU_RETRY_MECHANISM.md) - Robust mint failure handling
-
-## Examples
-
-The [Examples](Examples/) directory contains runnable demos:
-
-- `SimpleDemo.swift` - Basic usage example
-- `StandaloneDemo.swift` - Self-contained demo (no compilation needed)
-- `OptimisticPublishingDemo.swift` - Offline publishing and retry demonstration
-- `NWCDemo.swift` - Wallet integration example
-- `BlossomDemo.swift` - File storage example
-- `OutboxDemo.swift` - Outbox model demonstration
-- `CashuDemo.swift` - Cashu wallet example
-- `ZapDemo.swift` - Lightning and Nutzap examples
-
-Run examples directly:
-```bash
-swift Examples/StandaloneDemo.swift
+### 📸 Decentralized File Storage
+```swift
+// Upload to Blossom servers
+let imageURL = try await ndk.blossom.upload(imageData)
+let event = try await ndk.event()
+    .content("Check out this photo!")
+    .imageAttachment(url: imageURL, blurhash: blurhash)
+    .build()
 ```
 
-Or compile and run:
-```bash
-swift run --package-path Examples SimpleDemo
-```
+## 📋 Supported NIPs
 
-## Requirements
+| NIP | Description | Status |
+|-----|-------------|---------|
+| [01](https://github.com/nostr-protocol/nips/blob/master/01.md) | Basic protocol flow | ✅ |
+| [02](https://github.com/nostr-protocol/nips/blob/master/02.md) | Contact List | ✅ |
+| [04](https://github.com/nostr-protocol/nips/blob/master/04.md) | Encrypted Direct Messages | ✅ |
+| [09](https://github.com/nostr-protocol/nips/blob/master/09.md) | Event Deletion | ✅ |
+| [10](https://github.com/nostr-protocol/nips/blob/master/10.md) | Reply Threading | ✅ |
+| [18](https://github.com/nostr-protocol/nips/blob/master/18.md) | Reposts | ✅ |
+| [19](https://github.com/nostr-protocol/nips/blob/master/19.md) | bech32-encoded entities | ✅ |
+| [22](https://github.com/nostr-protocol/nips/blob/master/22.md) | Comments | ✅ |
+| [25](https://github.com/nostr-protocol/nips/blob/master/25.md) | Reactions | ✅ |
+| [44](https://github.com/nostr-protocol/nips/blob/master/44.md) | Versioned Encryption | ✅ |
+| [46](https://github.com/nostr-protocol/nips/blob/master/46.md) | Nostr Connect | ✅ |
+| [47](https://github.com/nostr-protocol/nips/blob/master/47.md) | Wallet Connect | ✅ |
+| [57](https://github.com/nostr-protocol/nips/blob/master/57.md) | Lightning Zaps | ✅ |
+| [60](https://github.com/nostr-protocol/nips/blob/master/60.md) | Cashu Wallet | ✅ |
+| [61](https://github.com/nostr-protocol/nips/blob/master/61.md) | Nutzaps | ✅ |
+| [65](https://github.com/nostr-protocol/nips/blob/master/65.md) | Relay List (Outbox) | ✅ |
+| [77](https://github.com/nostr-protocol/nips/blob/master/77.md) | Negentropy Sync | ✅ |
+| [89](https://github.com/nostr-protocol/nips/blob/master/89.md) | App Handlers | ✅ |
+| [92](https://github.com/nostr-protocol/nips/blob/master/92.md) | Media Attachments | ✅ |
+| [Blossom](https://github.com/hzrd149/blossom) | File Storage | ✅ |
+
+## 📚 Learn More
+
+**Documentation**: [Full docs](Documentation/) including [Getting Started](Documentation/GETTING_STARTED.md), [API Reference](Documentation/API_REFERENCE.md), and [Architecture](Documentation/ARCHITECTURE.md)
+
+**Examples**: Check out the [Examples](Examples/) directory for runnable demos
+
+## 🛠 Requirements
 
 - iOS 13.0+ / macOS 10.15+ / tvOS 13.0+ / watchOS 6.0+
 - Swift 5.5+
 - Xcode 13.0+
 
-## Contributing
+## 🤝 Contributing
 
-Contributions are welcome! Please read our [Contributing Guidelines](CONTRIBUTING.md) and check the [Architecture Overview](Documentation/ARCHITECTURE.md) before submitting PRs.
+We welcome contributions! Check out our [Contributing Guidelines](CONTRIBUTING.md) and [Architecture Overview](Documentation/ARCHITECTURE.md).
 
-## License
+## 📄 License
 
-NDKSwift is released under the MIT License. See [LICENSE](LICENSE) for details.
+MIT License - see [LICENSE](LICENSE) for details.
 
-## Links
+## 🔗 Links
 
-- [Nostr Protocol](https://github.com/nostr-protocol/nostr) - The protocol NDKSwift implements
-- [NDK (TypeScript)](https://github.com/nostr-dev-kit/ndk) - The original NDK implementation
-- [Awesome Nostr](https://github.com/aljazceru/awesome-nostr) - Curated list of Nostr resources
+- [Nostr Protocol](https://github.com/nostr-protocol/nostr)
+- [NDK TypeScript](https://github.com/nostr-dev-kit/ndk)
+- [Awesome Nostr](https://github.com/aljazceru/awesome-nostr)

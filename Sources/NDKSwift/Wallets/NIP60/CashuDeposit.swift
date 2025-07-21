@@ -1,6 +1,35 @@
 import Foundation
 import CashuSwift
 
+/// Represents the result of a deposit monitoring operation
+public enum DepositMonitoringResult {
+    case minted(proofs: [CashuSwift.Proof])
+    case expired
+    case cancelled
+}
+
+/// Errors specific to deposit mint failures
+public enum DepositMintError: LocalizedError {
+    case requiresUserIntervention(
+        pendingOperation: PendingMintOperation,
+        invoice: String
+    )
+    
+    public var errorDescription: String? {
+        switch self {
+        case .requiresUserIntervention(let op, _):
+            return "Failed to mint tokens at \(op.mintURL) after Lightning deposit was confirmed. Quote ID: \(op.quoteId)"
+        }
+    }
+    
+    public var recoverySuggestion: String? {
+        switch self {
+        case .requiresUserIntervention:
+            return "The mint confirmed receiving your Lightning payment but failed to issue tokens. You can retry minting or contact the mint operator."
+        }
+    }
+}
+
 /// Split an amount into powers of 2 for optimal denomination distribution
 private func splitIntoBase2(_ amount: Int) -> [Int] {
     var result = [Int]()
@@ -169,7 +198,7 @@ public enum CashuDeposit {
         }
         
         // Generate outputs for minting
-        let distribution = splitIntoBase2(Int(quote.amount))
+        _ = splitIntoBase2(Int(quote.amount))
         
         // Create mint quote with request details for issue function
         var mintQuote = statusResponse
@@ -178,17 +207,35 @@ public enum CashuDeposit {
             amount: Int(quote.amount)
         )
         
-        // Issue tokens using the quote
-        let (proofs, validDLEQ) = try await CashuSwift.issue(
-            for: mintQuote,
-            with: mint,
-            seed: nil,
-            preferredDistribution: distribution
+        // Use retry handler for minting with linear backoff
+        let retryHandler = MintRetryHandler()
+        let (proofs, wasUserNotified) = try await retryHandler.retryMintWithBackoff(
+            mintQuote: mintQuote,
+            mint: mint,
+            amount: quote.amount,
+            paymentProof: nil, // No payment proof for deposits
+            onRetryAttempt: { attemptNumber, delay in
+                NDKLogger.log(.info, category: .wallet, "⏳ Deposit mint retry attempt \(attemptNumber) in \(Int(delay))s...")
+            }
         )
         
-        // Check DLEQ verification
-        guard validDLEQ else {
-            throw NDKError.invalidProof("DLEQ verification failed")
+        // Check if user notification is required
+        if wasUserNotified && proofs.isEmpty {
+            _ = PendingMintOperation(
+                quoteId: quote.quoteId,
+                mintURL: quote.mintURL,
+                amount: quote.amount,
+                invoice: quote.invoice,
+                paymentProof: nil,
+                createdAt: Date(),
+                lastAttemptAt: Date()
+            )
+            
+            throw NDKError.paymentFailed(reason: "Mint operation requires user intervention after reaching retry limit")
+        }
+        
+        guard !proofs.isEmpty else {
+            throw NDKError.paymentFailed(reason: "Failed to mint tokens after deposit was confirmed")
         }
         
         return proofs

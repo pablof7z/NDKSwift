@@ -18,14 +18,14 @@ actor NDKFetchingStrategy {
         self.ranker = NDKRelayRanker(ndk: ndk, tracker: selector.tracker)
     }
 
-    /// Fetch events using outbox model
-    func fetchEvents(
+    /// Create a data source for observing events using outbox model
+    func observe(
         filter: NDKFilter,
+        maxAge: TimeInterval = 0,
+        cachePolicy: CachePolicy = .networkOnly,
         config: OutboxFetchConfig = .default,
         customStrategy: RelaySelectionStrategy? = nil
-    ) async throws -> [NDKEvent] {
-        let fetchId = await sharedIDGenerator.nextRequestId()
-
+    ) async -> NDKDataSource<NDKEvent> {
         // Select source relays
         let selection: RelaySelectionResult
         if let customStrategy = customStrategy {
@@ -43,20 +43,14 @@ actor NDKFetchingStrategy {
             )
         }
 
-        // Create fetch operation
-        let operation = FetchOperation(
-            id: fetchId,
+        // Create and return data source with selected relays
+        return NDKDataSource(
+            ndk: ndk,
             filter: filter,
-            targetRelays: selection.relays,
-            config: config,
-            selectionMethod: selection.selectionMethod
+            maxAge: maxAge,
+            cachePolicy: cachePolicy,
+            relays: selection.relays
         )
-
-        activeFetches[fetchId] = operation
-        defer { activeFetches.removeValue(forKey: fetchId) }
-
-        // Execute fetch
-        return try await executeFetch(operation: operation)
     }
 
     /// Subscribe to events using outbox model
@@ -199,14 +193,24 @@ actor NDKFetchingStrategy {
         config: OutboxFetchConfig
     ) async -> FetchResult {
         do {
-            // Get or connect to relay
-            guard let relay = await getOrConnectRelay(url: relayURL) else {
+            // Get or connect to relay  
+            guard await getOrConnectRelay(url: relayURL) != nil else {
                 return .failure(FetchError.relayError(relayURL, "Connection failed"))
             }
 
-            // Create subscription with timeout
+            // Create data source for this specific relay with timeout
+            let relaySet = Set([relayURL])
+            let dataSource = NDKDataSource(
+                ndk: ndk,
+                filter: filter,
+                maxAge: 0, // Always fresh for outbox fetching
+                cachePolicy: .networkOnly, // Skip cache for relay-specific queries
+                relays: relaySet
+            )
+            
+            // Fetch events with timeout
             let events = try await withTimeout(seconds: config.timeoutInterval) {
-                try await relay.fetchEvents(filter: filter)
+                await dataSource.currentValue()
             }
 
             return .success(events: events, relayURL: relayURL)

@@ -31,12 +31,19 @@ public actor NDKOutboxManager {
         return result.successfulRelayUrls
     }
     
-    /// Fetch events using the outbox model
+    /// Observe events using the outbox model
     /// - Parameters:
-    ///   - filter: The filter to use for fetching events
+    ///   - filter: The filter to use for observing events
+    ///   - maxAge: Maximum age of events in seconds (0 = no cache)
+    ///   - cachePolicy: Cache policy to use
     ///   - strategy: Optional custom relay selection strategy
-    /// - Returns: Array of events matching the filter
-    public func fetchEvents(filter: NDKFilter, strategy: RelaySelectionStrategy? = nil) async throws -> [NDKEvent] {
+    /// - Returns: NDKDataSource for observing events
+    public func observe(
+        filter: NDKFilter,
+        maxAge: TimeInterval = 0,
+        cachePolicy: CachePolicy = .networkOnly,
+        strategy: RelaySelectionStrategy? = nil
+    ) async -> NDKDataSource<NDKEvent> {
         // Get optimal relays for this filter
         let relays: Set<String>
         if let strategy = strategy {
@@ -49,28 +56,17 @@ public actor NDKOutboxManager {
             relays = selection.relays
         }
         
-        // Convert URLs to NDKRelay objects
-        var relayObjects: [NDKRelay] = []
-        for url in relays {
-            if let relay = await ndk.pool.getRelay(for: url) {
-                relayObjects.append(relay)
-            } else {
-                let newRelay = await ndk.pool.addRelay(url)
-                relayObjects.append(newRelay)
-            }
-        }
+        // Convert URLs to relay URLs (already normalized)
+        let relayUrls = Set(relays)
         
-        // Use NDKDataSource with specific relays
-        let relayUrls = Set(relayObjects.map { $0.url })
-        let dataSource = NDKDataSource(
+        // Create and return data source
+        return NDKDataSource(
             ndk: ndk,
             filter: filter,
-            maxAge: 0, // Always fresh for targeted queries
-            cachePolicy: .networkOnly, // Skip cache for relay-specific queries
+            maxAge: maxAge,
+            cachePolicy: cachePolicy,
             relays: relayUrls
         )
-        
-        return await dataSource.currentValue()
     }
     
     /// Start tracking a user for outbox operations
@@ -118,16 +114,57 @@ public actor NDKOutboxManager {
     ///   - filters: The filters to analyze for relay selection
     /// - Returns: Set of relay URLs recommended for this subscription
     public func getRecommendedRelaysForSubscription(filters: [NDKFilter]) async -> Set<String> {
+        print("🔍 [OutboxManager] getRecommendedRelaysForSubscription called with \(filters.count) filters")
         var allRelays = Set<String>()
+        var missingPubkeys = Set<String>()
         
-        for filter in filters {
+        for (index, filter) in filters.enumerated() {
+            print("🔍 [OutboxManager] Processing filter \(index + 1)/\(filters.count)")
+            if let authors = filter.authors {
+                print("🔍 [OutboxManager] Filter has authors: \(authors.joined(separator: ", "))")
+            } else {
+                print("🔍 [OutboxManager] Filter has no authors. Filter details: \(filter)")
+            }
             let result = await selector.selectRelaysForFetching(
                 filter: filter,
                 config: FetchingConfig(maxRelayCount: 10)
             )
+            print("🔍 [OutboxManager] Filter \(index + 1) returned \(result.relays.count) relays")
             allRelays.formUnion(result.relays)
+            missingPubkeys.formUnion(result.missingRelayInfoPubkeys)
         }
         
+        print("🔍 [OutboxManager] After initial selection: \(allRelays.count) relays, \(missingPubkeys.count) missing pubkeys")
+        
+        // If we have missing pubkeys, fetch their relay lists first
+        if !missingPubkeys.isEmpty {
+            NDKLogger.log(.debug, category: .outbox, "📋 Missing relay info for \(missingPubkeys.count) pubkeys, fetching...")
+            print("🔍 [OutboxManager] Missing pubkeys: \(missingPubkeys.joined(separator: ", "))")
+            
+            // Fetch relay lists for missing pubkeys
+            for (index, pubkey) in missingPubkeys.enumerated() {
+                print("🔍 [OutboxManager] Fetching relay list for pubkey \(index + 1)/\(missingPubkeys.count): \(pubkey)")
+                _ = try? await tracker.getRelaysFor(pubkey: pubkey)
+                print("🔍 [OutboxManager] Completed fetch for pubkey \(index + 1)/\(missingPubkeys.count)")
+            }
+            
+            print("🔍 [OutboxManager] All relay lists fetched, re-running selection...")
+            
+            // Re-run the selection now that we have the relay lists
+            allRelays.removeAll()
+            for (index, filter) in filters.enumerated() {
+                print("🔍 [OutboxManager] Re-processing filter \(index + 1)/\(filters.count)")
+                let result = await selector.selectRelaysForFetching(
+                    filter: filter,
+                    config: FetchingConfig(maxRelayCount: 10)
+                )
+                print("🔍 [OutboxManager] Re-run filter \(index + 1) returned \(result.relays.count) relays")
+                allRelays.formUnion(result.relays)
+            }
+        }
+        
+        print("🔍 [OutboxManager] Final result: returning \(allRelays.count) relays")
+        print("🔍 [OutboxManager] Relays: \(allRelays.joined(separator: ", "))")
         return allRelays
     }
 }

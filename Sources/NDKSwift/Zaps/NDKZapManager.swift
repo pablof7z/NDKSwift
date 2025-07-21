@@ -511,11 +511,14 @@ public actor NDKZapManager {
         
         // Try to get provider pubkey from recipient's profile
         var providerPubkey: String?
-        if let profile = try? await ndk.profileManager.fetchProfile(for: recipientPubkey),
-           profile.lud16 != nil || profile.lud06 != nil {
-            // In a real implementation, we'd resolve the LNURL to get the provider pubkey
-            // For now, we'll use the receipt's pubkey as a placeholder
-            providerPubkey = receipt.event.pubkey
+        for await profile in await ndk.profileManager.observe(for: recipientPubkey, maxAge: 3600) {
+            if let profile = profile,
+               profile.lud16 != nil || profile.lud06 != nil {
+                // In a real implementation, we'd resolve the LNURL to get the provider pubkey
+                // For now, we'll use the receipt's pubkey as a placeholder
+                providerPubkey = receipt.event.pubkey
+            }
+            break // Only need first value
         }
         
         guard let providerPubkey = providerPubkey,

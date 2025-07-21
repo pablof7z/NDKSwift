@@ -3,63 +3,76 @@ import Foundation
 /// High-level reconciler for Negentropy set synchronization.
 ///
 /// `NegentropyReconciler` provides a simplified, stateful interface for performing
-/// set reconciliation using the Negentropy protocol. It manages the underlying
-/// protocol state and provides convenient methods for common reconciliation patterns.
+/// set reconciliation using the Negentropy protocol. Each instance represents a single
+/// reconciliation session and maintains protocol state throughout the exchange.
 ///
 /// ## Usage
 ///
 /// ```swift
-/// // Setup reconciler with your storage
+/// // Create a new reconciler for each reconciliation session
 /// let reconciler = NegentropyReconciler(
 ///     storage: NDKCacheNegentropyStorage(cache: cache),
 ///     frameSizeLimit: 60_000
 /// )
 ///
-/// // Start reconciliation
+/// // As initiator:
 /// let initData = try await reconciler.initiate()
 /// // Send to peer...
 ///
-/// // Process responses
+/// // Or as responder, directly process first message:
 /// let response = try await reconciler.processMessage(peerData)
-/// switch response {
-/// case .continuing(let data, let haveIds, let needIds):
-///     // Handle intermediate state
-/// case .terminated(let haveIds, let needIds, let isDone):
-///     // Reconciliation complete
+///
+/// // Continue processing messages until terminated
+/// while case .continuing(let data, _, _) = response {
+///     // Send data to peer and get their response
+///     let peerResponse = await sendToPeer(data)
+///     response = try await reconciler.processMessage(peerResponse)
 /// }
 /// ```
+///
+/// ## Important
+///
+/// - Each `NegentropyReconciler` instance is for a **single reconciliation session**
+/// - Create a new instance for each new reconciliation
+/// - The instance maintains state throughout the message exchange
+/// - Can be used as either initiator or responder
 ///
 /// ## Compared to Raw Negentropy
 ///
 /// - **Simplified API**: Higher-level methods with cleaner error handling
 /// - **State Management**: Automatically manages protocol state between calls
 /// - **Type Safety**: Strongly-typed responses instead of tuples
-/// - **Error Recovery**: Better error handling and recovery options
+/// - **Role Flexibility**: Can act as initiator or responder
 ///
 /// ## Thread Safety
 ///
 /// This is an `actor` that provides thread-safe access to reconciliation state.
-/// Each reconciler instance should be used for a single reconciliation session.
 public actor NegentropyReconciler {
-    private let storage: NegentropyStorage
-    private let frameSizeLimit: Int
+    private let negentropy: Negentropy
+    private var isInitiated = false
     
-    /// Creates a new reconciler instance.
+    /// Creates a new reconciler instance for a single reconciliation session.
     ///
     /// - Parameters:
     ///   - storage: Storage implementation providing access to your data set
     ///   - frameSizeLimit: Maximum message size in bytes (default: 60KB)
+    ///
+    /// - Important: Create a new instance for each reconciliation session
     public init(storage: NegentropyStorage, frameSizeLimit: Int = 60_000) {
-        self.storage = storage
-        self.frameSizeLimit = frameSizeLimit
+        self.negentropy = Negentropy(storage: storage, frameSizeLimit: frameSizeLimit)
     }
     
     /// Initiates reconciliation as the initiator.
     ///
     /// - Returns: Initial message data to send to the peer
-    /// - Throws: Protocol errors if reconciliation cannot be started
+    /// - Throws: `NegentropyError.protocolError` if already initiated or used as responder
+    ///
+    /// - Important: Can only be called once per instance. Creates a new reconciler for each session.
     public func initiate() async throws -> Data {
-        let negentropy = Negentropy(storage: storage, frameSizeLimit: frameSizeLimit)
+        guard !isInitiated else {
+            throw NegentropyError.protocolError("Reconciler already initiated. Create a new instance for each reconciliation session.")
+        }
+        isInitiated = true
         return try await negentropy.initiate()
     }
     
@@ -73,8 +86,23 @@ public actor NegentropyReconciler {
     ///
     /// - `.continuing`: Reconciliation is ongoing, contains next message to send
     /// - `.terminated`: Reconciliation is complete, contains final results
+    ///
+    /// ## Usage Patterns
+    ///
+    /// As initiator:
+    /// 1. Call `initiate()` first
+    /// 2. Send the result to peer
+    /// 3. Process peer's response with this method
+    ///
+    /// As responder:
+    /// 1. Directly call this method with peer's initial message
+    /// 2. Continue the exchange until terminated
     public func processMessage(_ data: Data) async throws -> NegentropyResponse {
-        let negentropy = Negentropy(storage: storage, frameSizeLimit: frameSizeLimit)
+        // Mark as initiated if this is the first call (responder role)
+        if !isInitiated {
+            isInitiated = true
+        }
+        
         let (responseData, haveIds, needIds) = try await negentropy.reconcile(data)
         
         if let data = responseData {

@@ -471,4 +471,4 @@ let result = try await ndk.syncEvents(filter: NDKFilter(kinds: [1]))
 
 Negentropy provides significant efficiency improvements for Nostr event synchronization, especially for large datasets and bandwidth-constrained environments. By following these guidelines and best practices, you can implement robust, efficient synchronization in your Nostr applications.
 
-For implementation details, see the source code in `Sources/NDKSwift/Negentropy/` and examples in `Sources/NegentropyDemo/`.
+For implementation details, see the source code in `Sources/NDKSwift/Negentropy/`.

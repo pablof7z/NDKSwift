@@ -34,9 +34,12 @@ public class NDKLightningZapProtocol: NDKZapProtocol {
     
     public func canZap(user: NDKUser) async throws -> Bool {
         // Check if user has Lightning address configured
-        guard let profile = try? await ndk.profileManager.fetchProfile(for: user.pubkey),
-              profile.lud06 != nil || profile.lud16 != nil else {
-            return false
+        for await profile in await ndk.profileManager.observe(for: user.pubkey, maxAge: 3600) {
+            guard let profile = profile,
+                  profile.lud06 != nil || profile.lud16 != nil else {
+                return false
+            }
+            break // Only need first value
         }
         
         // Try to resolve LNURL and check for zap support
@@ -205,7 +208,14 @@ public class NDKLightningZapProtocol: NDKZapProtocol {
     }
     
     private func resolveLNURL(for user: NDKUser) async throws -> LNURLPayEndpoint {
-        guard let profile = try? await ndk.profileManager.fetchProfile(for: user.pubkey) else {
+        var userProfile: NDKUserProfile?
+        
+        for await profile in await ndk.profileManager.observe(for: user.pubkey, maxAge: 3600) {
+            userProfile = profile
+            break // Only need first value
+        }
+        
+        guard let profile = userProfile else {
             throw ZapError.noLNURL
         }
         

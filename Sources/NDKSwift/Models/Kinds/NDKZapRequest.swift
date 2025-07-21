@@ -29,10 +29,13 @@ public struct NDKZapRequest {
         tags.append(["amount", String(amountMillisats)])
         
         // Optional: lnurl tag
-        if let profile = try? await ndk.profileManager.fetchProfile(for: recipient.pubkey),
-           let lnurl = profile.lud06 ?? profile.lud16 {
-            let encoded = try encodeLNURL(lnurl)
-            tags.append(["lnurl", encoded])
+        for await profile in await ndk.profileManager.observe(for: recipient.pubkey, maxAge: 3600) {
+            if let profile = profile,
+               let lnurl = profile.lud06 ?? profile.lud16 {
+                let encoded = try encodeLNURL(lnurl)
+                tags.append(["lnurl", encoded])
+            }
+            break // Only need first value
         }
         
         // Optional: zapped event

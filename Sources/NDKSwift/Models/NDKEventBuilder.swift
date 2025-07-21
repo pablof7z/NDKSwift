@@ -854,7 +854,7 @@ public final class NDKEventBuilder {
     }
     
     /// Add an imeta tag from a Blossom upload result
-    /// - Parameter upload: The Blossom upload result containing URL, hash, and size
+    /// - Parameter upload: The Blossom upload result containing URL, hash, size, and extracted metadata
     @discardableResult
     public func imetaTag(from upload: BlossomBlob) -> NDKEventBuilder {
         var imeta = NDKImetaTag(
@@ -866,6 +866,16 @@ public final class NDKEventBuilder {
         // Add mime type if available
         if let mimeType = upload.type {
             imeta.m = mimeType
+        }
+        
+        // Add blurhash if available (automatically extracted during upload)
+        if let blurhash = upload.blurhash {
+            imeta.blurhash = blurhash
+        }
+        
+        // Add dimensions if available (automatically extracted during upload)
+        if let dim = upload.dimensionsString {
+            imeta.dim = dim
         }
         
         self.tags.append(ImetaUtils.imetaTagToTag(imeta))

@@ -76,6 +76,7 @@ public actor NDKSQLiteCache: NDKCache {
         Self.registerV5DecryptedContentMigration(&migrator)
         Self.registerV6RelaySourcesMigration(&migrator)
         Self.registerV7FetchTimestampsMigration(&migrator)
+        Self.registerV8AddSubscriptionIdMigration(&migrator)
         
         try migrator.migrate(dbQueue)
     }
@@ -773,13 +774,24 @@ public actor NDKSQLiteCache: NDKCache {
         observer: CacheObserver
     ) async -> ObservationHandle {
         let signature = FilterSignature(from: filter)
-        let weakObserver = WeakObserver(observer)
+        let weakObserver = WeakObserver(observer: observer)
         
         // Add observer to the set for this filter signature
         if observers[signature] == nil {
             observers[signature] = []
         }
         observers[signature]?.insert(weakObserver)
+        
+        // Deliver existing cached events that match the filter
+        let existingEvents = try? await queryEvents(filter)
+        if let events = existingEvents, !events.isEmpty {
+            if debugMode {
+                NDKLogger.log(.debug, category: .cache, "Delivering \(events.count) existing cached events to observer")
+            }
+            for event in events {
+                await observer.handleEvent(event)
+            }
+        }
         
         // Return handle that removes observer when cancelled
         return ObservationHandle { [weak self] in
@@ -868,36 +880,44 @@ public actor NDKSQLiteCache: NDKCache {
         guard !eventIdsToDelete.isEmpty else { return }
         
         let now = Timestamp.now
+        let deletionAuthor = deletionEvent.pubkey
         
-        // Process each event to be deleted
-        for eventId in eventIdsToDelete {
-            // Check if the event exists in cache
-            if let existingEvent = await getEvent(id: eventId) {
-                // Verify the deletion event author matches the original event author
-                if existingEvent.pubkey == deletionEvent.pubkey {
-                    // Delete the event from cache
-                    do {
-                        try await deleteEvent(id: eventId)
-                        NDKLogger.log(.debug, category: .cache, "Deleted event \(eventId)")
-                    } catch {
-                        NDKLogger.log(.error, category: .cache, "Failed to delete event \(eventId): \(error)")
+        // Process all deletions in a single transaction for atomicity and efficiency
+        do {
+            try await dbQueue.write { db in
+                for eventId in eventIdsToDelete {
+                    // Check if the event exists and verify author in one query
+                    if let existingPubkey = try String.fetchOne(
+                        db,
+                        sql: "SELECT pubkey FROM events WHERE id = ?",
+                        arguments: [eventId]
+                    ) {
+                        // Verify the deletion event author matches the original event author
+                        if existingPubkey == deletionAuthor {
+                            // Delete the event and its tags
+                            try db.execute(sql: "DELETE FROM events WHERE id = ?", arguments: [eventId])
+                            try db.execute(sql: "DELETE FROM tags WHERE event_id = ?", arguments: [eventId])
+                            NDKLogger.log(.debug, category: .cache, "Deleted event \(eventId)")
+                        }
+                    } else {
+                        // Event not in cache yet - we'll add to tombstone after transaction
+                        // (tombstones are in-memory only, not in database)
                     }
                 }
-            } else {
-                // Event not in cache yet - add to tombstone cache
-                // This prevents the event from being added if it arrives later
-                deletionTombstones[eventId] = now
-                if debugMode {
-                    NDKLogger.log(.debug, category: .cache, "Added tombstone for event \(eventId)")
-                }
-                
-                // Also try to delete it in case some cache implementations handle this
-                do {
-                    try await deleteEvent(id: eventId)
-                } catch {
-                    // Silent fail - event might not exist
+            }
+            
+            // Add tombstones for non-existent events outside the transaction
+            // This is safe because tombstones are only in-memory
+            for eventId in eventIdsToDelete {
+                if await getEvent(id: eventId) == nil {
+                    deletionTombstones[eventId] = now
+                    if debugMode {
+                        NDKLogger.log(.debug, category: .cache, "Added tombstone for event \(eventId)")
+                    }
                 }
             }
+        } catch {
+            NDKLogger.log(.error, category: .cache, "Failed to process deletion event: \(error)")
         }
     }
     
@@ -932,7 +952,7 @@ public actor NDKSQLiteCache: NDKCache {
                 }
             }
             
-            if eventMatchesFilter(event, filter: filter) {
+            if await eventMatchesFilter(event, filter: filter) {
                 // Notify all observers for this filter
                 for weakObserver in observerSet {
                     if let observer = weakObserver.observer {
@@ -943,41 +963,54 @@ public actor NDKSQLiteCache: NDKCache {
         }
     }
     
-    private func eventMatchesFilter(_ event: NDKEvent, filter: NDKFilter) -> Bool {
-        // Check kinds
-        if let kinds = filter.kinds, !kinds.contains(event.kind) {
+    /// Check if an event matches a filter using an optimized hybrid approach
+    /// This ensures consistency with queryEvents SQL logic while optimizing performance
+    private func eventMatchesFilter(_ event: NDKEvent, filter: NDKFilter) async -> Bool {
+        // 1. Perform fast, in-memory checks for non-tag properties.
+        // If any of these fail, we can return false immediately without a DB query.
+        if let kinds = filter.kinds, !kinds.isEmpty, !kinds.contains(event.kind) {
             return false
         }
-        
-        // Check authors
-        if let authors = filter.authors, !authors.contains(event.pubkey) {
+        if let authors = filter.authors, !authors.isEmpty, !authors.contains(event.pubkey) {
             return false
         }
-        
-        // Check tags
-        if let filterTags = filter.tags {
-            for (tagName, values) in filterTags {
-                let eventTagValues = event.tags
-                    .filter { $0.count > 0 && $0[0] == tagName }
-                    .compactMap { $0.count > 1 ? $0[1] : nil }
-                
-                // If filter specifies values for this tag, event must have at least one matching value
-                if !values.isEmpty && !values.contains(where: { eventTagValues.contains($0) }) {
-                    return false
-                }
-            }
-        }
-        
-        // Check time constraints
         if let since = filter.since, event.createdAt < since {
             return false
         }
-        
         if let until = filter.until, event.createdAt > until {
             return false
         }
         
-        return true
+        // 2. Determine if a database query is necessary for tag-based filters.
+        // These are the filters that require complex JOINs in SQL.
+        let needsDBQueryForTags = (filter.tags != nil && !filter.tags!.isEmpty)
+                               || (filter.events != nil && !filter.events!.isEmpty)
+                               || (filter.pubkeys != nil && !filter.pubkeys!.isEmpty)
+        
+        if !needsDBQueryForTags {
+            // If we passed all in-memory checks and there are no tag filters,
+            // the event is a match. No DB query needed.
+            return true
+        }
+        
+        // 3. Fallback to the database query for complex tag-based filters.
+        // This preserves our Single Source of Truth for the most complex logic.
+        do {
+            // Create a filter that targets only this specific event
+            var singleEventFilter = filter
+            singleEventFilter.ids = [event.id]
+            
+            // Query the database to see if this event matches all filter criteria
+            let matchingEvents = try await queryEvents(singleEventFilter)
+            
+            // If the query returns the event, it matches the filter
+            return !matchingEvents.isEmpty
+        } catch {
+            // On error, for tag filters we err on the side of including the event
+            // to avoid missing notifications
+            NDKLogger.log(.warning, category: .cache, "Failed to check event match via database for tag filters, using fallback: \(error)")
+            return true
+        }
     }
     
     // MARK: - Optimistic Publishing Support

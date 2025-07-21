@@ -80,28 +80,51 @@ struct NIP92MediaDemo {
         }
         print()
         
-        // Example 5: Simulate Blossom integration
-        print("5. Blossom upload integration (simulated):")
+        // Example 5: Blossom integration with automatic metadata extraction
+        print("5. Blossom upload with automatic blurhash (simulated):")
         
-        // Simulate a Blossom upload result
+        // Simulate a Blossom upload result with automatically extracted metadata
         let blossomUpload = BlossomBlob(
             sha256: "a665a45920422f9d417e4867efdc4fb8a04a1f3fff1fa07e998e86f7f7a27ae3",
             url: "https://blossom.example.com/a665a45920422f9d417e4867efdc4fb8a04a1f3fff1fa07e998e86f7f7a27ae3.jpg",
             size: 1024 * 500, // 500KB
-            type: "image/jpeg"
+            type: "image/jpeg",
+            uploaded: Date(),
+            blurhash: "LGF5]+Yk^6#M@-5c,1J5@[or[Q6.", // Automatically calculated during upload
+            dimensions: (width: 3024, height: 4032) // Automatically extracted during upload
         )
         
         let event5 = try await ndk.event()
             .content("Just uploaded this photo: \(blossomUpload.url)")
-            .imetaTag(from: blossomUpload)
+            .imetaTag(from: blossomUpload) // Includes all metadata automatically
             .kind(EventKind.textNote)
             .build()
         
         print("Event content: \(event5.content)")
-        print("Generated imeta tags:")
+        print("Generated imeta tags (includes auto-extracted blurhash and dimensions):")
         for tag in event5.tags where tag.first == "imeta" {
             print("  \(tag)")
         }
+        print()
+        
+        // Example 5b: Real Blossom upload (commented out as it requires actual image data)
+        print("5b. Real Blossom upload example (code only):")
+        print("""
+        // In a real app:
+        let imageData = UIImage(named: "photo")!.jpegData(compressionQuality: 0.8)!
+        let upload = try await ndk.uploadToBlossom(data: imageData, mimeType: "image/jpeg")
+        
+        // The upload result now automatically includes:
+        // - blurhash (calculated from the image)
+        // - dimensions (extracted from the image)
+        // - SHA256 hash
+        // - file size
+        
+        let event = try await ndk.event()
+            .content("Check out my photo: \\(upload.first!.url)")
+            .imetaTag(from: upload.first!)
+            .build()
+        """)
         print()
         
         // Example 6: Multiple media types

@@ -32,19 +32,68 @@ public struct BlossomBlob: Codable, Sendable {
     public let size: Int64
     public let type: String?
     public let uploaded: Date
+    
+    // Media metadata (calculated client-side for images)
+    public let blurhash: String?
+    public let dimensions: (width: Int, height: Int)?
 
     public init(
         sha256: String,
         url: String,
         size: Int64,
         type: String? = nil,
-        uploaded: Date = Date()
+        uploaded: Date = Date(),
+        blurhash: String? = nil,
+        dimensions: (width: Int, height: Int)? = nil
     ) {
         self.sha256 = sha256
         self.url = url
         self.size = size
         self.type = type
         self.uploaded = uploaded
+        self.blurhash = blurhash
+        self.dimensions = dimensions
+    }
+    
+    /// Get dimensions as NIP-92 format string (e.g., "1920x1080")
+    public var dimensionsString: String? {
+        guard let dimensions = dimensions else { return nil }
+        return "\(dimensions.width)x\(dimensions.height)"
+    }
+    
+    // Custom coding to handle tuple
+    enum CodingKeys: String, CodingKey {
+        case sha256, url, size, type, uploaded, blurhash
+        case dimensionWidth, dimensionHeight
+    }
+    
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        sha256 = try container.decode(String.self, forKey: .sha256)
+        url = try container.decode(String.self, forKey: .url)
+        size = try container.decode(Int64.self, forKey: .size)
+        type = try container.decodeIfPresent(String.self, forKey: .type)
+        uploaded = try container.decode(Date.self, forKey: .uploaded)
+        blurhash = try container.decodeIfPresent(String.self, forKey: .blurhash)
+        
+        if let width = try container.decodeIfPresent(Int.self, forKey: .dimensionWidth),
+           let height = try container.decodeIfPresent(Int.self, forKey: .dimensionHeight) {
+            dimensions = (width: width, height: height)
+        } else {
+            dimensions = nil
+        }
+    }
+    
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(sha256, forKey: .sha256)
+        try container.encode(url, forKey: .url)
+        try container.encode(size, forKey: .size)
+        try container.encodeIfPresent(type, forKey: .type)
+        try container.encode(uploaded, forKey: .uploaded)
+        try container.encodeIfPresent(blurhash, forKey: .blurhash)
+        try container.encodeIfPresent(dimensions?.width, forKey: .dimensionWidth)
+        try container.encodeIfPresent(dimensions?.height, forKey: .dimensionHeight)
     }
 }
 

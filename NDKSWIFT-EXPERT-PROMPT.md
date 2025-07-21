@@ -187,20 +187,6 @@ NDKSwift provides a modern declarative API for accessing Nostr data with automat
 *   **`3600`** (1 hour): Suitable for user profiles
 *   **`86400`** (1 day): Good for relay lists or rarely changing data
 
-**Legacy API (Deprecated):**
-
-The old `fetchEvents` and `subscribe` methods are deprecated. Use `observe()` for all new code:
-
-```swift
-// Old (deprecated)
-let events = try await ndk.fetchEvents(filter)
-let subscription = ndk.subscribe(filters: [filter])
-
-// New (recommended)
-let dataSource = ndk.observe(filter: filter)
-let events = await dataSource.currentValue()  // One-shot
-for await event in dataSource.events { }      // Streaming
-```
 
 ---
 

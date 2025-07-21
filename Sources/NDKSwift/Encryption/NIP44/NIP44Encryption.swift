@@ -155,12 +155,21 @@ public enum NIP44 {
             throw Crypto.CryptoError.invalidKeyLength
         }
         
-        // Prepare public key bytes with 02 prefix for secp256k1
-        let publicKeyBytes = [UInt8]([0x02]) + [UInt8](pubKeyData)
-        
-        // Parse public key using low-level secp256k1
+        // Try both possible y-coordinate parities (even=0x02, odd=0x03)
+        // Nostr uses x-only keys, so we need to try both possibilities
         var pubkey = secp256k1_pubkey()
-        guard secp256k1_ec_pubkey_parse(secp256k1.Context.rawRepresentation, &pubkey, publicKeyBytes, publicKeyBytes.count) == 1 else {
+        
+        // First try with even y-coordinate (0x02 prefix)
+        var publicKeyBytes = [UInt8]([0x02]) + [UInt8](pubKeyData)
+        var parseResult = secp256k1_ec_pubkey_parse(secp256k1.Context.rawRepresentation, &pubkey, publicKeyBytes, publicKeyBytes.count)
+        
+        // If that fails, try with odd y-coordinate (0x03 prefix)
+        if parseResult != 1 {
+            publicKeyBytes[0] = 0x03
+            parseResult = secp256k1_ec_pubkey_parse(secp256k1.Context.rawRepresentation, &pubkey, publicKeyBytes, publicKeyBytes.count)
+        }
+        
+        guard parseResult == 1 else {
             throw Crypto.CryptoError.invalidPoint
         }
         

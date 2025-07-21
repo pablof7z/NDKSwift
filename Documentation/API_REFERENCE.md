@@ -92,7 +92,8 @@ public func observe(
     filter: NDKFilter,
     maxAge: TimeInterval = 0,
     cachePolicy: CachePolicy = .cacheWithNetwork,
-    relays: Set<RelayURL>? = nil
+    relays: Set<RelayURL>? = nil,
+    subscriptionId: String? = nil
 ) -> NDKDataSource<NDKEvent>
 
 // Create a data source with transformation
@@ -101,6 +102,7 @@ public func observe<T>(
     maxAge: TimeInterval = 0,
     cachePolicy: CachePolicy = .cacheWithNetwork,
     relays: Set<RelayURL>? = nil,
+    subscriptionId: String? = nil,
     transform: @escaping (NDKEvent) -> T?
 ) -> NDKDataSource<T>
 ```
@@ -115,32 +117,31 @@ public func subscribe(
     options: NDKSubscriptionOptions = .init()
 ) -> NDKSubscription
 
-// One-shot fetch with multiple filters
-@available(*, deprecated, message: "Use observe() with currentValue() for new code")
+// One-shot fetch with multiple filters (batch operation)
 public func fetchEvents(
     filters: [NDKFilter],
-    relays: Set<NDKRelay>? = nil,
+    relays: Set<RelayURL>? = nil,
     useCache: Bool = true
 ) async throws -> Set<NDKEvent>
 
 // One-shot fetch with single filter
 public func fetchEvents(
     _ filter: NDKFilter,
-    relays: Set<NDKRelay>? = nil,
+    relays: Set<RelayURL>? = nil,
     useCache: Bool = true
 ) async throws -> Set<NDKEvent>
 
 // Fetch single event by ID or bech32
 public func fetchEvent(
     _ idOrBech32: String,
-    relays: Set<NDKRelay>? = nil,
+    relays: Set<RelayURL>? = nil,
     useCache: Bool = true
 ) async throws -> NDKEvent?
 
 // Fetch first matching event
 public func fetchEvent(
     _ filter: NDKFilter,
-    relays: Set<NDKRelay>? = nil,
+    relays: Set<RelayURL>? = nil,
     useCache: Bool = true
 ) async throws -> NDKEvent?
 
@@ -223,6 +224,12 @@ let dataSource = ndk.observe(
     filter: NDKFilter(kinds: [1], limit: 50),
     maxAge: 300,  // 5 minutes
     cachePolicy: .cacheWithNetwork
+)
+
+// With custom subscription ID for debugging
+let walletSource = ndk.observe(
+    filter: NDKFilter(kinds: [7375]),
+    subscriptionId: "nip60-wallet-events"  // Shows in relay logs
 )
 
 // With transformation

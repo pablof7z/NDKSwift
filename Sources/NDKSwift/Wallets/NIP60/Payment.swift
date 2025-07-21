@@ -1,6 +1,31 @@
 import Foundation
 import CashuSwift
 
+/// Errors specific to mint failures during payment operations
+public enum MintFailureError: LocalizedError {
+    case requiresUserIntervention(
+        pendingOperation: PendingMintOperation,
+        sourceMint: String,
+        destinationMint: String,
+        amount: Int64,
+        paymentProof: String
+    )
+    
+    public var errorDescription: String? {
+        switch self {
+        case .requiresUserIntervention(let op, let source, let dest, let amount, _):
+            return "Failed to mint \(amount) sats at \(dest) after payment from \(source). Quote ID: \(op.quoteId)"
+        }
+    }
+    
+    public var recoverySuggestion: String? {
+        switch self {
+        case .requiresUserIntervention:
+            return "The mint has received payment but failed to issue tokens. You can retry minting or blacklist this mint."
+        }
+    }
+}
+
 /// Functions for handling payment operations (Lightning, cross-mint transfers, and direct token transfers)
 public enum Payment {
     
@@ -210,16 +235,42 @@ public enum Payment {
             signer: signer
         )
         
-        // Step 3: Mint new tokens at destination
-        let (newProofs, validDLEQ) = try await CashuSwift.issue(
-            for: mintQuote,
-            with: destinationMint,
-            seed: nil
+        // Step 3: Mint new tokens at destination with retry logic
+        let retryHandler = MintRetryHandler()
+        let (newProofs, wasUserNotified) = try await retryHandler.retryMintWithBackoff(
+            mintQuote: mintQuote,
+            mint: destinationMint,
+            amount: amount,
+            paymentProof: preimage,
+            onRetryAttempt: { attemptNumber, delay in
+                NDKLogger.log(.info, category: .wallet, "⏳ Cross-mint transfer: Retry attempt \(attemptNumber) in \(Int(delay))s...")
+            }
         )
         
-        // Verify DLEQ if available
-        if !validDLEQ {
-            throw NDKError.invalidProof("DLEQ verification failed")
+        // Check if user notification is required
+        if wasUserNotified && newProofs.isEmpty {
+            // Create a pending mint operation for user notification
+            let pendingOp = PendingMintOperation(
+                quoteId: mintQuote.quote,
+                mintURL: destinationMintURL.absoluteString,
+                amount: amount,
+                invoice: invoice,
+                paymentProof: preimage,
+                createdAt: Date(),
+                lastAttemptAt: Date()
+            )
+            
+            throw MintFailureError.requiresUserIntervention(
+                pendingOperation: pendingOp,
+                sourceMint: sourceMintURL.absoluteString,
+                destinationMint: destinationMintURL.absoluteString,
+                amount: amount,
+                paymentProof: preimage
+            )
+        }
+        
+        guard !newProofs.isEmpty else {
+            throw NDKError.paymentFailed(reason: "Failed to mint tokens at destination after multiple retries")
         }
         
         // Step 4: Update wallet state with new proofs

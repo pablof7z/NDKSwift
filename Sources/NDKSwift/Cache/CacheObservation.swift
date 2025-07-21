@@ -23,18 +23,19 @@ public struct ObservationHandle {
 /// Weak wrapper for cache observers to prevent retain cycles
 struct WeakObserver: Hashable {
     weak var observer: CacheObserver?
-    private let id = UUID()
+    private let objectIdentifier: ObjectIdentifier
     
-    init(_ observer: CacheObserver) {
+    init(observer: CacheObserver) {
         self.observer = observer
+        self.objectIdentifier = ObjectIdentifier(observer)
     }
     
     static func == (lhs: WeakObserver, rhs: WeakObserver) -> Bool {
-        lhs.id == rhs.id
+        lhs.objectIdentifier == rhs.objectIdentifier
     }
     
     func hash(into hasher: inout Hasher) {
-        hasher.combine(id)
+        hasher.combine(objectIdentifier)
     }
 }
 
@@ -42,11 +43,13 @@ struct WeakObserver: Hashable {
 struct FilterSignature: Hashable {
     let kinds: [Int]?
     let authors: [String]?
+    let ids: [String]?
     let tags: [String: [String]]?
     
     init(from filter: NDKFilter) {
         self.kinds = filter.kinds?.sorted()
         self.authors = filter.authors?.sorted()
+        self.ids = filter.ids?.sorted()
         self.tags = filter.tags?.mapValues { $0.sorted() }
     }
 }
