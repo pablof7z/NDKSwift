@@ -59,7 +59,6 @@ public enum EventKind {
     public static let deletion = 5
     public static let repost = 6
     public static let reaction = 7
-    public static let badgeAward = 8
     public static let genericRepost = 16
     public static let genericReply = 1111  // NIP-22 comment
     public static let image = 20
@@ -83,10 +82,6 @@ public enum EventKind {
     public static let nostrConnect = 24133
     public static let blossomAuth = 24242
     public static let httpAuth = 27235
-    public static let categorizedPeople = 30000
-    public static let categorizedBookmarks = 30001
-    public static let profileBadges = 30008
-    public static let badgeDefinition = 30009
     public static let longFormContent = 30023
     public static let applicationSpecificData = 30078
     public static let mintAnnouncement = 38000  // NIP-87 mint discovery
