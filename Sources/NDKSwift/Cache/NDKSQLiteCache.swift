@@ -1046,7 +1046,7 @@ public actor NDKSQLiteCache: NDKCache {
     
     /// Check if an event matches a filter using an optimized hybrid approach
     /// This ensures consistency with queryEvents SQL logic while optimizing performance
-    private func eventMatchesFilter(_ event: NDKEvent, filter: NDKFilter) async -> Bool {
+    internal func eventMatchesFilter(_ event: NDKEvent, filter: NDKFilter) async -> Bool {
         // 1. Perform fast, in-memory checks for non-tag properties.
         // If any of these fail, we can return false immediately without a DB query.
         if let kinds = filter.kinds, !kinds.isEmpty, !kinds.contains(event.kind) {

@@ -234,7 +234,7 @@ struct NIP60WalletREPL {
                     print("✅ Mint loaded successfully")
                     print("📋 Available keysets: \(mint.keysets.count)")
                     for keyset in mint.keysets {
-                        print("   - Keyset ID: \(keyset.keysetID), Unit: \(keyset.unit ?? "unknown")")
+                        print("   - Keyset ID: \(keyset.keysetID), Unit: \(keyset.unit)")
                     }
                 }
             } else {
@@ -260,7 +260,30 @@ struct NIP60WalletREPL {
             
             // Start monitoring the quote
             print("\n🔄 Monitoring payment status...")
-            print("The wallet will automatically detect the payment and mint tokens.")
+            print("Press Ctrl+C to stop monitoring and return to wallet prompt")
+            
+            // Monitor the deposit
+            do {
+                for try await status in await wallet.monitorDeposit(quote: quote, timeout: 300) {
+                    switch status {
+                    case .pending:
+                        print("⏳ Waiting for payment...")
+                    case .minted(let proofs):
+                        print("✅ Payment received! Minted \(proofs.count) proofs")
+                        let newBalance = try await wallet.getBalance() ?? 0
+                        print("💰 New balance: \(newBalance) sats")
+                        return
+                    case .expired:
+                        print("❌ Quote expired")
+                        return
+                    case .cancelled:
+                        print("❌ Quote cancelled") 
+                        return
+                    }
+                }
+            } catch {
+                print("❌ Error monitoring deposit: \(error)")
+            }
         } catch {
             print("❌ Error creating deposit: \(error)")
         }

@@ -313,6 +313,145 @@ public struct NDKCashuWalletEvent {
     }
 }
 
+// MARK: - NIP-60 Wallet Backup Event (Kind 375)
+
+/// A backup event for NIP-60 wallets (kind 375)
+/// Similar to kind 17375 but includes a public key tag for easy retrieval during restoration
+public struct NDKCashuWalletBackupEvent {
+    public let event: NDKEvent
+    
+    public init(event: NDKEvent) {
+        self.event = event
+    }
+    
+    /// Create and publish a wallet backup event
+    @discardableResult
+    public static func createAndPublish(
+        ndk: NDK,
+        mints: [String],
+        relays: [String]? = nil,
+        p2pkPrivateKey: String? = nil,
+        signer: NDKSigner
+    ) async throws -> NDKCashuWalletBackupEvent {
+        NDKLogger.log(.info, category: .event, "📦 Creating Kind 375 wallet backup event")
+        
+        let backupEvent = try await create(
+            ndk: ndk,
+            mints: mints,
+            relays: relays,
+            p2pkPrivateKey: p2pkPrivateKey,
+            signer: signer
+        )
+        
+        NDKLogger.log(.info, category: .event, "NDKCashuWalletBackupEvent - Publishing backup event: \(backupEvent.event.id)")
+        
+        do {
+            let publishedRelays = try await ndk.publish(backupEvent.event)
+            NDKLogger.log(.info, category: .event, "NDKCashuWalletBackupEvent - Successfully published backup to \(publishedRelays.count) relays: \(publishedRelays)")
+        } catch {
+            NDKLogger.log(.error, category: .event, "NDKCashuWalletBackupEvent - ERROR: Failed to publish backup event: \(error)")
+            throw error
+        }
+        
+        return backupEvent
+    }
+    
+    /// Create without publishing
+    public static func create(
+        ndk: NDK,
+        mints: [String],
+        relays: [String]? = nil,
+        p2pkPrivateKey: String? = nil,
+        signer: NDKSigner
+    ) async throws -> NDKCashuWalletBackupEvent {
+        NDKLogger.log(.debug, category: .event, "🔐 NDKCashuWalletBackupEvent - Creating Kind 375 wallet backup event")
+        
+        var walletTags: [[String]] = []
+        
+        // Add mint tags
+        for mint in mints {
+            walletTags.append(["mint", mint])
+        }
+        
+        // Add P2PK private key if provided
+        if let privkey = p2pkPrivateKey {
+            walletTags.append(["privkey", privkey])
+        }
+        
+        // Encrypt wallet configuration
+        let plaintext = try JSONCoding.encodeToString(walletTags)
+        
+        let userPubkey = try await signer.pubkey
+        
+        let builder = ndk.event()
+            .content(plaintext)
+            .kind(EventKind.cashuWalletBackup)
+            .tag(["p", userPubkey])  // Add public key tag for easy retrieval
+        
+        // Add relay tags (unencrypted according to NIP-60)
+        if let relays = relays {
+            for relay in relays {
+                _ = builder.tag(["relay", relay])
+            }
+        }
+        
+        let backupEvent = try await builder.encrypt(signer: signer, scheme: .nip44)
+        
+        NDKLogger.log(.debug, category: .event, "🔐 NDKCashuWalletBackupEvent - Final backup event details:")
+        NDKLogger.log(.debug, category: .event, "🔐   - Event ID: \(backupEvent.id)")
+        NDKLogger.log(.debug, category: .event, "🔐   - Event Kind: \(backupEvent.kind)")
+        NDKLogger.log(.debug, category: .event, "🔐   - Event Author: \(backupEvent.pubkey)")
+        NDKLogger.log(.debug, category: .event, "🔐   - Tags: \(backupEvent.tags)")
+        
+        return NDKCashuWalletBackupEvent(event: backupEvent)
+    }
+    
+    /// The mints configured in this backup event
+    public func mints(signer: NDKSigner) async throws -> [String] {
+        return try await decryptedWalletTags(signer: signer).compactMap { tag in
+            tag.count >= 2 && tag[0] == "mint" ? tag[1] : nil
+        }
+    }
+    
+    /// The P2PK private key in this backup event
+    public func p2pkPrivateKey(signer: NDKSigner) async throws -> String? {
+        let tags = try await decryptedWalletTags(signer: signer)
+        return tags.first(where: { $0.count >= 2 && $0[0] == "privkey" })?[1]
+    }
+    
+    /// The relays configured in this backup event
+    public var relays: [String] {
+        event.tags.compactMap { tag in
+            tag.count >= 2 && tag[0] == "relay" ? tag[1] : nil
+        }
+    }
+    
+    // Private helper using the same cache as wallet config
+    private func decryptedWalletTags(signer: NDKSigner) async throws -> [[String]] {
+        // Check cache first
+        if let cachedTags = await decryptedWalletCache.get(event.id) {
+            return cachedTags
+        }
+        
+        let sender = NDKUser(pubkey: event.pubkey)
+        let decryptedContent = try await signer.decrypt(
+            sender: sender,
+            value: event.content,
+            scheme: .nip44
+        )
+        
+        guard let tagsData = decryptedContent.data(using: .utf8),
+              let walletTags = JSONCoding.safeDecode([[String]].self, from: tagsData) else {
+            throw NDKError.invalidContent("Failed to parse wallet backup")
+        }
+        
+        // Cache the decrypted tags
+        await decryptedWalletCache.set(walletTags, for: event.id)
+        
+        return walletTags
+    }
+}
+
 // MARK: - NDKCashuSpendingHistory
 
 /// NIP-60 Cashu Spending History Event (kind: 7376)

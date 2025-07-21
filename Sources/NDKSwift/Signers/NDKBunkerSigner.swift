@@ -371,7 +371,12 @@ public actor NDKBunkerSigner: NDKSigner, Sendable {
 
         NDKLogger.log(.info, category: .auth, "[BunkerSigner] Connecting to bunker with pubkey: \(bunkerPubkey)")
 
-        let params = [userPubkey ?? "", secret ?? ""].filter { !$0.isEmpty }
+        // According to NIP-46, connect params are: [<remote-signer-pubkey>, <optional_secret>, <optional_requested_permissions>]
+        var params: [String] = [bunkerPubkey]
+        if let secret = secret, !secret.isEmpty {
+            params.append(secret)
+        }
+        
         let maskedParams = params.enumerated().map { index, param in
             index == 1 && !param.isEmpty ? "***" : param
         }

@@ -1,5 +1,6 @@
 import XCTest
 @testable import NDKSwift
+import CashuSwift
 
 final class NIP05Tests: XCTestCase {
     var ndk: NDK!
@@ -257,5 +258,129 @@ actor TestableCache: NDKCache {
     
     func recordNIP05DomainCheck(_ domain: String) async throws {
         domainChecks[domain] = Date()
+    }
+    
+    // MARK: - Missing NDKCache Protocol Requirements
+    
+    func addUnpublishedEvent(_ event: NDKEvent, relays: Set<String>) async throws {
+        // No-op for testing
+    }
+    
+    func getEventConfirmationState(eventId: String) async -> EventConfirmationState? {
+        return nil
+    }
+    
+    func getUnpublishedEvents(maxAge: TimeInterval, limit: Int?) async -> [(event: NDKEvent, targetRelays: Set<String>)] {
+        return []
+    }
+    
+    func getDecryptedContent(for eventId: String, viewerPubkey: String) async -> String? {
+        return nil
+    }
+    
+    func storeDecryptedContent(_ content: String, for eventId: String, viewerPubkey: String) async {
+        // No-op for testing
+    }
+    
+    func clearDecryptedContent() async {
+        // No-op for testing
+    }
+    
+    func clearDecryptedContent(for viewerPubkey: String) async {
+        // No-op for testing
+    }
+    
+    func saveMintInfo(_ info: NDKMintInfo, url: String) async throws {
+        // No-op for testing
+    }
+    
+    func getMintInfo(url: String) async -> NDKMintInfo? {
+        return nil
+    }
+    
+    func isMintInfoStale(url: String, maxAge: TimeInterval) async -> Bool {
+        return true
+    }
+    
+    func invalidateMintCache(url: String) async throws {
+        // No-op for testing
+    }
+    
+    func saveKeyset(_ keyset: CashuSwift.Keyset, mintUrl: String) async throws {
+        // No-op for testing
+    }
+    
+    func saveKeysets(_ keysets: [CashuSwift.Keyset], mintUrl: String) async throws {
+        // No-op for testing
+    }
+    
+    func getKeyset(id: String) async -> CashuSwift.Keyset? {
+        return nil
+    }
+    
+    func getKeysets(mintUrl: String) async -> [CashuSwift.Keyset] {
+        return []
+    }
+    
+    func getActiveKeysets(mintUrl: String, unit: String) async -> [CashuSwift.Keyset] {
+        return []
+    }
+    
+    func areKeysetsStale(mintUrl: String, maxAge: TimeInterval) async -> Bool {
+        return true
+    }
+    
+    func getEventsByTimeRange(from: Timestamp, to: Timestamp, filter: NDKFilter?) async throws -> [NDKEvent] {
+        return []
+    }
+    
+    func getEventIdsWithTimestamps(from: Timestamp, to: Timestamp, filter: NDKFilter?) async throws -> [(id: String, timestamp: Timestamp)] {
+        return []
+    }
+    
+    func hasEvents(ids: [String]) async -> [String: Bool] {
+        return ids.reduce(into: [:]) { result, id in
+            result[id] = events[id] != nil
+        }
+    }
+    
+    func observeEvents(matching filter: NDKFilter, observer: CacheObserver) async -> ObservationHandle {
+        // Return a dummy handle for testing
+        return ObservationHandle { }
+    }
+    
+    func getRelaySources(eventId: String) async -> Set<String> {
+        return []
+    }
+    
+    func getLastFetchTime(for filter: NDKFilter) async -> Date? {
+        return nil
+    }
+    
+    func recordFetchTime(for filter: NDKFilter, timestamp: Date) async {
+        // No-op for testing
+    }
+    
+    func saveNIP05Claim(identifier: String, pubkey: String, claimedAt: Date) async throws {
+        let entry = NIP05CacheEntry(
+            identifier: identifier,
+            pubkey: pubkey,
+            status: .unverified,
+            nip46Relays: nil,
+            claimedAt: claimedAt
+        )
+        try await saveNIP05Entry(entry)
+    }
+    
+    func saveNIP05Resolution(_ entry: NIP05CacheEntry) async throws {
+        try await saveNIP05Entry(entry)
+    }
+    
+    func getNIP05Entries(pubkey: String) async -> [NIP05CacheEntry] {
+        return nip05Entries.values.filter { $0.pubkey == pubkey }
+    }
+    
+    func getUnverifiedNIP05s(limit: Int) async -> [NIP05CacheEntry] {
+        return Array(nip05Entries.values.filter { $0.status == .unverified }.prefix(limit))
     }
 }

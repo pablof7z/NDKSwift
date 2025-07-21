@@ -1,10 +1,5 @@
-#!/usr/bin/env swift
-
 import Foundation
 import NDKSwift
-
-// Test bunker URL
-let bunkerURL = "bunker://79be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798?relay=wss%3A%2F%2Frelay.primal.net&secret=MswbYwmcYptZ"
 
 @main
 struct TestNIP46Publishing {
@@ -12,6 +7,15 @@ struct TestNIP46Publishing {
         print("🔐 Testing NIP-46 Publishing with NDKSwift")
         print("==========================================\n")
         
+        // Get bunker URL from command line arguments
+        let args = CommandLine.arguments
+        guard args.count > 1 else {
+            print("❌ Usage: TestNIP46Publishing <bunker://...>")
+            print("Example: TestNIP46Publishing \"bunker://pubkey?relay=wss://relay.url&secret=xxx\"")
+            return
+        }
+        
+        let bunkerURL = args[1]
         print("Using bunker URL: \(bunkerURL)")
         
         // Create NDK instance
@@ -49,10 +53,7 @@ struct TestNIP46Publishing {
                 print("✅ Connected to remote signer!")
                 print("👤 Your pubkey: \(user.pubkey)")
                 
-                // Fetch and display user profile if available
-                if let profile = try? await user.fetchProfile(ndk) {
-                    print("📝 Your name: \(profile.name ?? "N/A")")
-                }
+                // Note: profile fetching can be added here if needed
                 
                 // Publish a simple event
                 print("\n📝 Publishing a 'Hello World' event...")

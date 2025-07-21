@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- NIP60Wallet REPL: Added `validate` command to verify and reconcile proof states
+  - Supports dry run mode with `-d` flag to check proofs without modifying wallet state
+  - Can validate all mints or a specific mint by URL
+  - Shows detailed proof states (valid/spent/pending) with visual indicators
+  - Automatically removes spent proofs in non-dry-run mode
+  - Provides comprehensive validation summaries per mint and overall
+
 ### Fixed
 - Fixed CashuDeposit to properly track and clean up quote events after successful deposits
   - `requestMintQuote` now returns both the quote and its event ID when persisting

@@ -22,7 +22,8 @@ let package = Package(
         .executable(name: "NIP60Wallet", targets: ["NIP60Wallet"]),
         .executable(name: "DebugOutbox", targets: ["DebugOutbox"]),
         .executable(name: "NIP92MediaDemo", targets: ["NIP92MediaDemo"]),
-        .executable(name: "ProfileCachingDemo", targets: ["ProfileCachingDemo"])
+        .executable(name: "ProfileCachingDemo", targets: ["ProfileCachingDemo"]),
+        .executable(name: "TestNIP46Publishing", targets: ["TestNIP46Publishing"])
     ],
     dependencies: [
         .package(path: "..")
@@ -119,6 +120,14 @@ let package = Package(
             ],
             path: ".",
             sources: ["ProfileCachingDemo.swift"]
+        ),
+        .executableTarget(
+            name: "TestNIP46Publishing",
+            dependencies: [
+                .product(name: "NDKSwift", package: "NDKSwift")
+            ],
+            path: ".",
+            sources: ["TestNIP46Publishing.swift"]
         )
     ]
 )
