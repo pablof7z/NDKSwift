@@ -225,6 +225,7 @@ public actor WalletEventManager {
     public func clearTrackedEvents() {
         currentTokenEventIds.removeAll()
         deletedTokenEventIds.removeAll()
+        clearNutzapTracking()
     }
     
     /// Get current token event IDs
