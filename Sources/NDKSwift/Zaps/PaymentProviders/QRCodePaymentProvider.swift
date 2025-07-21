@@ -39,9 +39,9 @@ public class QRCodePaymentProvider: NDKPaymentProvider {
             try await display(lightningRequest.invoice)
         } else {
             // Default: just print to console
-            print("⚡ Pay this Lightning invoice:")
-            print(lightningRequest.invoice)
-            print("\nAmount: \(lightningRequest.amountSats) sats")
+            NDKLogger.log(.info, category: .wallet, "⚡ Pay this Lightning invoice:")
+            NDKLogger.log(.info, category: .wallet, lightningRequest.invoice)
+            NDKLogger.log(.info, category: .wallet, "Amount: \(lightningRequest.amountSats) sats")
         }
         
         // Wait for confirmation
@@ -50,7 +50,7 @@ public class QRCodePaymentProvider: NDKPaymentProvider {
             preimage = try await wait()
         } else {
             // Default: wait for user input
-            print("\nEnter payment preimage when paid (or 'cancel' to abort):")
+            NDKLogger.log(.info, category: .wallet, "Enter payment preimage when paid (or 'cancel' to abort):")
             
             // In a real app, this would be a proper UI interaction
             // For now, we'll simulate with a placeholder
