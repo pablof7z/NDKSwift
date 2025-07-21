@@ -130,7 +130,9 @@ public final class NDKDataSource<T>: ObservableObject, CacheObserver {
             )
         } else {
             // No data requirement manager available
-            print("[NDKDataSource] Warning: No data requirement manager available")
+            if ndk.debugMode {
+                print("[NDKDataSource] Warning: No data requirement manager available")
+            }
         }
         
         isLoading = false
@@ -196,31 +198,4 @@ public final class NDKDataSource<T>: ObservableObject, CacheObserver {
         // Return current accumulated data
         return data
     }
-}
-
-/// Options for configuring data source behavior
-public struct DataSourceOptions {
-    public let updatePolicy: UpdatePolicy
-    public let deduplication: DeduplicationStrategy
-    
-    public init(
-        updatePolicy: UpdatePolicy = .continuous,
-        deduplication: DeduplicationStrategy = .byEventId
-    ) {
-        self.updatePolicy = updatePolicy
-        self.deduplication = deduplication
-    }
-    
-    public static let `default` = DataSourceOptions()
-}
-
-public enum UpdatePolicy {
-    case continuous  // Keep subscription open
-    case oneShot    // Close after EOSE
-}
-
-public enum DeduplicationStrategy {
-    case byEventId
-    case none
-    case custom((NDKEvent, NDKEvent) -> Bool)
 }

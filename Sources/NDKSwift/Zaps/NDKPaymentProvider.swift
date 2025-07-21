@@ -11,7 +11,7 @@ public enum NDKPaymentMethod: String {
     case nutzap = "nip61"
 }
 
-/// Legacy type for Cashu-specific proof requests (to be refactored)
+/// Cashu-specific proof request implementation
 public struct CashuProofRequest: PaymentRequest {
     public let amountSats: Int64
     public let mintURL: URL
@@ -26,7 +26,7 @@ public struct CashuProofRequest: PaymentRequest {
     }
 }
 
-/// Legacy Cashu payment confirmation with proof details (to be refactored)
+/// Cashu payment confirmation with proof details
 public struct CashuPaymentConfirmation: PaymentConfirmation {
     public let amountSats: Int64
     public let timestamp: Date

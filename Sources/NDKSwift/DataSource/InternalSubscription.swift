@@ -1,17 +1,7 @@
 import Foundation
 
-/// INTERNAL IMPLEMENTATION DETAIL - DO NOT USE DIRECTLY
-/// 
-/// This is an internal subscription mechanism used exclusively by NDKDataRequirementManager
-/// to manage relay subscriptions. All other components should use the public NDKDataSource API.
-///
-/// Components that need to observe Nostr data should:
-/// 1. Use `ndk.observe(filter:)` to create an NDKDataSource
-/// 2. Iterate over `dataSource.events` for continuous updates
-/// 3. Use `dataSource.currentValue()` for one-time fetches
-///
-/// This internal subscription system handles the low-level relay communication details
-/// and should never be accessed directly by application code or other NDK components.
+/// Internal subscription manager for NDKDataRequirementManager only.
+/// Use `ndk.observe()` for the public API.
 actor InternalSubscriptionManager {
     private let ndk: NDK
     private var activeSubscriptions: [String: InternalSubscription] = [:]
@@ -68,14 +58,8 @@ actor InternalSubscriptionManager {
     }
 }
 
-/// INTERNAL IMPLEMENTATION DETAIL - DO NOT USE DIRECTLY
-/// 
-/// Internal subscription used exclusively by DataRequirementManager for managing
-/// individual relay subscriptions. This is a low-level component that handles
-/// the actual REQ/CLOSE message protocol with relays.
-///
-/// Application code and other NDK components should NEVER create or use
-/// InternalSubscription directly. Use NDKDataSource through `ndk.observe()` instead.
+/// Internal subscription handler for relay communication.
+/// Part of the internal implementation of NDKDataRequirementManager.
 actor InternalSubscription {
     let id: String
     let filters: [NDKFilter]
