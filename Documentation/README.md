@@ -35,7 +35,7 @@ Located in the [Development](Development/) subdirectory:
 
 ## 📝 Version
 
-This documentation is for NDKSwift v0.6.1 and later.
+This documentation is for NDKSwift v0.6.2 and later.
 
 ## 🔧 Running Examples
 
