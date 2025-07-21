@@ -160,7 +160,7 @@ actor NDKOutboxTracker {
         filter.authors = [pubkey]
         filter.kinds = [NDKRelayList.kind]
 
-        let events = await ndk.observe(filter: filter, maxAge: 86400).currentValue()
+        let events = try await ndk.internalFetchEvents(filter: filter)
 
         guard let latestEvent = events.first else {
             return nil
@@ -197,7 +197,7 @@ actor NDKOutboxTracker {
         filter.authors = [pubkey]
         filter.kinds = [EventKind.contacts]
 
-        let events = await ndk.observe(filter: filter, maxAge: 86400).currentValue()
+        let events = try await ndk.internalFetchEvents(filter: filter)
 
         guard let latestEvent = events.first else {
             return nil

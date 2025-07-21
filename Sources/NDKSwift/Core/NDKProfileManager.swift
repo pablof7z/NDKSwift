@@ -97,8 +97,8 @@ public actor NDKProfileManager {
                 kinds: [EventKind.metadata]
             )
             
-            // Use observe API to fetch profiles
-            let events = await ndk.observe(filter: filter, maxAge: 3600).currentValue()
+            // Use the reliable internal fetch
+            let events = try await ndk.internalFetchEvents(filter: filter)
             
             // Process events
             for event in events {
@@ -257,21 +257,21 @@ public actor NDKProfileManager {
             throw NDKError.notConfigured("NDK instance not available")
         }
         
-        // Create filter for kind 0 events (user metadata)
         let filter = NDKFilter(
             authors: [pubkey],
             kinds: [EventKind.metadata],
             limit: 1
         )
         
-        // Fetch the event using observe API
-        let events = await ndk.observe(filter: filter, maxAge: 3600).currentValue()
-        guard let event = events.first else {
+        // Use the new, reliable internal fetch instead of NDKDataSource
+        let events = try await ndk.internalFetchEvents(filter: filter)
+        
+        // Sort by created_at to get the latest profile, as relays may return older events.
+        guard let latestEvent = events.sorted(by: { $0.createdAt > $1.createdAt }).first else {
             return nil
         }
-        
-        // Parse the profile from event content
-        guard let profileData = event.content.data(using: String.Encoding.utf8),
+
+        guard let profileData = latestEvent.content.data(using: .utf8),
               let profile = JSONCoding.safeDecode(NDKUserProfile.self, from: profileData) else {
             return nil
         }

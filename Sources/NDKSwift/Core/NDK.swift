@@ -714,4 +714,100 @@ public final class NDK {
             print("❌ Failed to handle NIP-77 message: \(error)")
         }
     }
+    
+    // MARK: - Internal Fetch Utilities
+    
+    /// A robust internal utility for one-shot event fetching.
+    /// This bypasses NDKDataSource and uses a temporary internal subscription
+    /// that correctly waits for EOSE from relays.
+    ///
+    /// - Parameters:
+    ///   - filter: The NDKFilter for the request.
+    ///   - timeout: Request timeout in seconds.
+    /// - Returns: An array of events matching the filter.
+    internal func internalFetchEvents(
+        filter: NDKFilter,
+        timeout: TimeInterval = 10.0
+    ) async throws -> [NDKEvent] {
+        let subscriptionId = "internal-fetch-\(UUID().uuidString)"
+        NDKLogger.log(.debug, category: .subscription, "[internalFetchEvents] Starting fetch with ID: \(subscriptionId), filter: \(filter.fingerprint)")
+        
+        // Create a temporary subscription that will close on EOSE
+        let sub = await self.internalSubscriptionManager.createSubscription(
+            id: subscriptionId,
+            filters: [filter],
+            relays: nil // Let the outbox model decide
+        )
+        
+        var collectedEvents: [NDKEvent] = []
+        var receivedEose = false
+        
+        // Register EOSE handler to close the subscription
+        await sub.onEOSE { [weak sub] in
+            NDKLogger.log(.debug, category: .subscription, "[internalFetchEvents] Received EOSE for \(subscriptionId)")
+            receivedEose = true
+            await sub?.close()
+        }
+        
+        // Race the event collection against a timeout
+        let result = await withTaskGroup(of: CollectionResult.self) { group in
+            // Task to collect events
+            group.addTask {
+                // The stream will finish when the subscription is closed on EOSE
+                for await (event, _) in await sub.events {
+                    NDKLogger.log(.debug, category: .subscription, "[internalFetchEvents] Collected event: \(event.id)")
+                    collectedEvents.append(event)
+                }
+                NDKLogger.log(.debug, category: .subscription, "[internalFetchEvents] Event stream ended for \(subscriptionId)")
+                return CollectionResult.completed(collectedEvents)
+            }
+            
+            // Task for timeout
+            group.addTask {
+                do {
+                    try await Task.sleep(nanoseconds: UInt64(timeout * 1_000_000_000))
+                    // If we get here, timeout occurred
+                    NDKLogger.log(.warning, category: .subscription, "[internalFetchEvents] Timeout reached for \(subscriptionId) after \(timeout)s")
+                    return CollectionResult.timedOut
+                } catch {
+                    // Task was cancelled
+                    return CollectionResult.cancelled
+                }
+            }
+            
+            // Wait for the first task to finish
+            guard let firstResult = await group.next() else {
+                return CollectionResult.cancelled
+            }
+            
+            // Cancel the other task
+            group.cancelAll()
+            
+            return firstResult
+        }
+        
+        // Ensure cleanup
+        if !receivedEose {
+            await sub.close()
+        }
+        
+        NDKLogger.log(.debug, category: .subscription, "[internalFetchEvents] Completed with \(collectedEvents.count) events, EOSE: \(receivedEose)")
+        
+        switch result {
+        case .completed(let events):
+            return events
+        case .timedOut:
+            // Return what we collected before timeout
+            return collectedEvents
+        case .cancelled:
+            return collectedEvents
+        }
+    }
+}
+
+// Helper enum for task group results
+private enum CollectionResult {
+    case completed([NDKEvent])
+    case timedOut
+    case cancelled
 }

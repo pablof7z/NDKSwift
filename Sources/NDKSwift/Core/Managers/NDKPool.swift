@@ -360,16 +360,9 @@ public actor NDKPool {
             throw NDKError.notConfigured("NDK instance not available")
         }
         
-        // Use NDKDataSource with no cache tolerance
-        let dataSource = NDKDataSource(
-            ndk: ndk,
-            filter: filter,
-            maxAge: 0, // Always fresh
-            cachePolicy: .cacheWithNetwork
-        )
-        
-        let events = await dataSource.currentValue()
-        return events.first
+        let events = try await ndk.internalFetchEvents(filter: filter)
+        // Return the most recent event if multiple are found
+        return events.sorted { $0.createdAt > $1.createdAt }.first
     }
 }
 
