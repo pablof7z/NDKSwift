@@ -13,6 +13,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Manual imeta tag builder methods for custom metadata
   - Seamless Blossom integration with `imetaTag(from:)` method
   - Support for all NIP-92 fields: url, alt, dim, m, blurhash, x, size, fallback
+  - **Automatic blurhash calculation and dimension extraction during Blossom uploads**
+  - Blurhash dependency added for client-side image processing
   - Example demonstrating various NIP-92 usage patterns
   - Comprehensive unit tests for NIP-92 functionality
 

@@ -306,7 +306,7 @@ public actor BlossomClient {
 
     // MARK: - Convenience Methods
 
-    /// Upload with automatic auth creation
+    /// Upload with automatic auth creation and metadata extraction
     public func uploadWithAuth(
         data: Data,
         mimeType: String? = nil,
@@ -316,21 +316,47 @@ public actor BlossomClient {
     ) async throws -> BlossomBlob {
         // Calculate SHA256
         let sha256Hex = Crypto.sha256(data).hexString
+        
+        // Determine MIME type if not provided
+        let finalMimeType = mimeType ?? BlossomMediaProcessor.inferMimeType(from: data)
+        
+        // Extract media metadata if it's an image
+        var blurhash: String?
+        var dimensions: (width: Int, height: Int)?
+        
+        if BlossomMediaProcessor.isProcessableImageType(finalMimeType) {
+            if let metadata = BlossomMediaProcessor.processImage(data) {
+                blurhash = metadata.blurhash
+                dimensions = metadata.dimensions
+            }
+        }
 
         // Create auth
         let auth = try await BlossomAuth.createUploadAuth(
             sha256: sha256Hex,
             size: Int64(data.count),
-            mimeType: mimeType,
+            mimeType: finalMimeType,
             signer: signer,
             expiration: expiration
         )
-
-        return try await upload(
+        
+        // Upload the file
+        let blob = try await upload(
             data: data,
-            mimeType: mimeType,
+            mimeType: finalMimeType,
             to: serverURL,
             auth: auth
+        )
+        
+        // Return blob with extracted metadata
+        return BlossomBlob(
+            sha256: blob.sha256,
+            url: blob.url,
+            size: blob.size,
+            type: blob.type,
+            uploaded: blob.uploaded,
+            blurhash: blurhash,
+            dimensions: dimensions
         )
     }
 

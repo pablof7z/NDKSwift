@@ -253,9 +253,9 @@ public class NDKAuthManager {
             try await saveSessionMetadata(updatedSession)
             
             NDKLogger.log(.info, category: .auth, "Session restored for user: \(updatedSession.pubkey)")
-        } catch {
-            // If we fail to restore a session due to corrupted data, clean it up
-            NDKLogger.log(.error, category: .auth, "Failed to restore session \(session.id): \(error)")
+        } catch let decodingError as DecodingError {
+            // Handle corrupted session data specifically
+            NDKLogger.log(.error, category: .auth, "Corrupted session data detected for \(session.id): \(decodingError)")
             
             // Remove from available sessions
             availableSessions.removeAll { $0.id == session.id }
@@ -267,6 +267,24 @@ public class NDKAuthManager {
                 NDKLogger.log(.info, category: .auth, "Cleaned up corrupted session data for \(session.id)")
             } catch {
                 NDKLogger.log(.warning, category: .auth, "Failed to clean up corrupted session: \(error)")
+            }
+            
+            // Throw specific corrupted session error
+            throw NDKAuthError.corruptedSessionData(sessionId: session.id)
+        } catch {
+            // If we fail to restore a session due to other errors
+            NDKLogger.log(.error, category: .auth, "Failed to restore session \(session.id): \(error)")
+            
+            // Remove from available sessions
+            availableSessions.removeAll { $0.id == session.id }
+            
+            // Try to clean up keychain data
+            do {
+                try await keychainManager.deleteSignerData(identifier: session.id)
+                try await keychainManager.deleteSessionMetadata(identifier: session.id)
+                NDKLogger.log(.info, category: .auth, "Cleaned up failed session data for \(session.id)")
+            } catch {
+                NDKLogger.log(.warning, category: .auth, "Failed to clean up failed session: \(error)")
             }
             
             // Re-throw the original error
@@ -449,6 +467,7 @@ public enum NDKAuthError: LocalizedError {
     case keychainError(Error)
     case invalidSession
     case sessionExpired
+    case corruptedSessionData(sessionId: String)
     
     public var errorDescription: String? {
         switch self {
@@ -466,6 +485,8 @@ public enum NDKAuthError: LocalizedError {
             return "Invalid session data"
         case .sessionExpired:
             return "Session has expired"
+        case .corruptedSessionData(let sessionId):
+            return "Session data is corrupted for session: \(sessionId)"
         }
     }
 }
@@ -484,6 +505,8 @@ extension NDKAuthError: Equatable {
         case (.signerCreationFailed(let lhsError), .signerCreationFailed(let rhsError)),
              (.keychainError(let lhsError), .keychainError(let rhsError)):
             return lhsError.localizedDescription == rhsError.localizedDescription
+        case (.corruptedSessionData(let lhsId), .corruptedSessionData(let rhsId)):
+            return lhsId == rhsId
         default:
             return false
         }

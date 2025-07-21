@@ -30,6 +30,26 @@ private struct ProfileCacheEntry {
 }
 
 /// Manager for efficient profile fetching with caching
+/// 
+/// The ProfileManager provides intelligent caching for user profiles with configurable freshness.
+/// Use maxAge parameter to control cache behavior:
+/// - maxAge: nil - Use default staleAfter from config (typically 1 hour)
+/// - maxAge: 0 - Always fetch fresh data, bypass cache
+/// - maxAge: 300 - Use cached data if less than 5 minutes old
+/// 
+/// Example usage:
+/// ```swift
+/// // Feed view - many profiles, older data acceptable
+/// for await profile in profileManager.observe(for: pubkey, maxAge: 3600) {
+///     // Use profile (may be nil if not found)
+///     break // If you only need one value
+/// }
+/// 
+/// // Profile page - want fresh data and continuous updates
+/// for await profile in profileManager.observe(for: pubkey, maxAge: 0) {
+///     // Handle profile updates
+/// }
+/// ```
 public actor NDKProfileManager {
     private weak var ndk: NDK?
     private let config: NDKProfileConfig
@@ -53,88 +73,15 @@ public actor NDKProfileManager {
         self.config = config
     }
     
-    /// Fetch a single profile with caching and optional force refresh
-    /// The subscription manager automatically batches multiple profile requests
-    public func fetchProfile(for pubkey: PublicKey, forceRefresh: Bool = false) async throws -> NDKUserProfile? {
-        // Check cache first
-        if !forceRefresh {
-            if let cached = checkCache(for: pubkey) {
-                return cached
-            }
-        }
-        
-        // Fetch profile - subscription manager handles batching automatically
-        return try await fetchSingleProfile(pubkey)
-    }
-    
-    /// Fetch multiple profiles efficiently
-    /// The subscription manager will automatically batch these into a single request
-    public func fetchProfiles(for pubkeys: [PublicKey], forceRefresh: Bool = false) async throws -> [PublicKey: NDKUserProfile] {
-        var results: [PublicKey: NDKUserProfile] = [:]
-        var toFetch: [PublicKey] = []
-        
-        // Check cache for each pubkey
-        if !forceRefresh {
-            for pubkey in pubkeys {
-                if let cached = checkCache(for: pubkey) {
-                    results[pubkey] = cached
-                } else {
-                    toFetch.append(pubkey)
-                }
-            }
-        } else {
-            toFetch = pubkeys
-        }
-        
-        // Fetch remaining profiles - subscription manager will batch them automatically
-        if !toFetch.isEmpty {
-            guard let ndk = ndk else {
-                throw NDKError.notConfigured("NDK instance not available")
-            }
-            
-            let filter = NDKFilter(
-                authors: toFetch,
-                kinds: [EventKind.metadata]
-            )
-            
-            // Use the reliable internal fetch
-            let events = try await ndk.internalFetchEvents(filter: filter)
-            
-            // Process events
-            for event in events {
-                guard let profileData = event.content.data(using: String.Encoding.utf8),
-                      let profile = JSONCoding.safeDecode(NDKUserProfile.self, from: profileData) else {
-                    continue
-                }
-                
-                let eventPubkey = event.pubkey
-                results[eventPubkey] = profile
-                updateCache(pubkey: eventPubkey, profile: profile)
-                
-                // Notify any active observations
-                if let wrappers = activeObservations[eventPubkey] {
-                    for wrapper in wrappers {
-                        wrapper.continuation.yield(profile)
-                    }
-                }
-                
-                // Save to cache
-                Task {
-                    try? await ndk.cache.saveProfile(profile, pubkey: eventPubkey)
-                }
-            }
-        }
-        
-        return results
-    }
     
     /// Observe profile updates for a given pubkey
     /// Returns an AsyncSequence that yields the profile immediately if cached,
     /// then yields updates as they arrive from relays
+    /// 
     /// - Parameters:
     ///   - pubkey: The public key to observe
-    ///   - closeOnEose: If true, closes the subscription after receiving initial data (EOSE)
-    public func observeProfile(for pubkey: PublicKey, closeOnEose: Bool = false) -> AsyncStream<NDKUserProfile?> {
+    ///   - maxAge: Maximum age of cached data in seconds (0 = always get fresh updates, nil = use default)
+    public func observe(for pubkey: PublicKey, maxAge: TimeInterval? = nil) -> AsyncStream<NDKUserProfile?> {
         AsyncStream { continuation in
             Task {
                 // Add continuation to active observations
@@ -144,8 +91,10 @@ public actor NDKProfileManager {
                 }
                 activeObservations[pubkey]?.append(wrapper)
                 
-                // Yield cached profile immediately if available
-                if let cached = checkCache(for: pubkey) {
+                let effectiveMaxAge = maxAge ?? config.staleAfter
+                
+                // Yield cached profile immediately if available and fresh enough
+                if effectiveMaxAge > 0, let cached = checkCache(for: pubkey, maxAge: effectiveMaxAge) {
                     continuation.yield(cached)
                 }
                 
@@ -162,7 +111,9 @@ public actor NDKProfileManager {
                 )
                 
                 // Use NDKDataSource for profile updates
-                let dataSource = ndk.observe(filter: filter, maxAge: closeOnEose ? 3600 : 0)
+                // Always use maxAge: 0 for the data source to ensure live updates
+                // The initial cache check already respects the maxAge parameter
+                let dataSource = ndk.observe(filter: filter, maxAge: 0)
                 
                 // Process events from data source
                 for await event in dataSource.events {
@@ -178,11 +129,6 @@ public actor NDKProfileManager {
                         
                         // Save to persistent cache
                         try? await ndk.cache.saveProfile(profile, pubkey: pubkey)
-                    }
-                    
-                    // If closeOnEose, stop after first profile
-                    if closeOnEose {
-                        break
                     }
                 }
                 
@@ -210,11 +156,11 @@ public actor NDKProfileManager {
     
     // MARK: - Private Methods
     
-    private func checkCache(for pubkey: PublicKey) -> NDKUserProfile? {
+    private func checkCache(for pubkey: PublicKey, maxAge: TimeInterval) -> NDKUserProfile? {
         guard let entry = profileCache[pubkey] else { return nil }
         
-        // Check if stale
-        if entry.isStale(after: config.staleAfter) {
+        // Check if stale based on maxAge
+        if entry.isStale(after: maxAge) {
             // Remove stale entry
             profileCache.removeValue(forKey: pubkey)
             cacheOrder.removeAll { $0 == pubkey }
@@ -252,36 +198,4 @@ public actor NDKProfileManager {
         cacheOrder.append(pubkey)
     }
     
-    private func fetchSingleProfile(_ pubkey: PublicKey) async throws -> NDKUserProfile? {
-        guard let ndk = ndk else {
-            throw NDKError.notConfigured("NDK instance not available")
-        }
-        
-        let filter = NDKFilter(
-            authors: [pubkey],
-            kinds: [EventKind.metadata],
-            limit: 1
-        )
-        
-        // Use the new, reliable internal fetch instead of NDKDataSource
-        let events = try await ndk.internalFetchEvents(filter: filter)
-        
-        // Sort by created_at to get the latest profile, as relays may return older events.
-        guard let latestEvent = events.sorted(by: { $0.createdAt > $1.createdAt }).first else {
-            return nil
-        }
-
-        guard let profileData = latestEvent.content.data(using: .utf8),
-              let profile = JSONCoding.safeDecode(NDKUserProfile.self, from: profileData) else {
-            return nil
-        }
-        
-        // Update cache
-        updateCache(pubkey: pubkey, profile: profile)
-        
-        // Also save to persistent cache
-        try? await ndk.cache.saveProfile(profile, pubkey: pubkey)
-        
-        return profile
-    }
 }

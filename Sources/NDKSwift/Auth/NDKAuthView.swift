@@ -161,9 +161,13 @@ public struct NDKAuthView<AuthenticatedContent: View, AuthenticationContent: Vie
             AccountPickerView(authManager: authManager)
         }
         .alert("Biometric Authentication Failed", isPresented: .constant(biometricError != nil)) {
-            Button("Retry") {
-                biometricError = nil
-                retryBiometricAuth()
+            let errorInfo = biometricError.map { NDKAuthErrorHandler.analyze($0) }
+            
+            if errorInfo?.isRecoverable == true {
+                Button("Retry") {
+                    biometricError = nil
+                    retryBiometricAuth()
+                }
             }
             Button("Cancel") {
                 biometricError = nil
@@ -171,29 +175,28 @@ public struct NDKAuthView<AuthenticatedContent: View, AuthenticationContent: Vie
             }
         } message: {
             if let error = biometricError {
-                Text(error.localizedDescription)
+                let errorInfo = NDKAuthErrorHandler.analyze(error)
+                Text(errorInfo.message)
             }
         }
-        .alert("Failed to Switch Account", isPresented: .constant(sessionSwitchError != nil)) {
-            Button("OK") {
-                sessionSwitchError = nil
-            }
-            if sessionSwitchError?.localizedDescription.contains("couldn't be read") == true ||
-               sessionSwitchError?.localizedDescription.contains("missing") == true {
-                Button("Remove Account") {
+        .alert(isPresented: .constant(sessionSwitchError != nil)) {
+            let errorInfo = sessionSwitchError.map { NDKAuthErrorHandler.analyze($0) }
+            
+            return Alert(
+                title: Text(errorInfo?.title ?? "Error"),
+                message: Text(errorInfo?.message ?? "An unexpected error occurred."),
+                primaryButton: .default(Text("OK")) {
                     sessionSwitchError = nil
-                    // Account has already been cleaned up in handleSessionSwitch
-                }
-            }
-        } message: {
-            if let error = sessionSwitchError {
-                if error.localizedDescription.contains("couldn't be read") || 
-                   error.localizedDescription.contains("missing") {
-                    Text("This account's data appears to be corrupted and has been removed. Please add the account again.")
-                } else {
-                    Text(error.localizedDescription)
-                }
-            }
+                },
+                secondaryButton: errorInfo?.suggestedAction == .removeAccount
+                    ? .destructive(Text("Remove Account")) {
+                        sessionSwitchError = nil
+                        // Account has already been cleaned up in handleSessionSwitch
+                    }
+                    : .cancel(Text("Cancel")) {
+                        sessionSwitchError = nil
+                    }
+            )
         }
     }
     
@@ -309,20 +312,12 @@ public struct NDKAuthView<AuthenticatedContent: View, AuthenticationContent: Vie
                 try await authManager.switchToSession(session)
                 switchingSession = nil
             } catch {
-                // If we get a decoding error, it likely means corrupted session data
-                if error.localizedDescription.contains("couldn't be read") || 
-                   error.localizedDescription.contains("missing") ||
-                   (error as? DecodingError) != nil {
-                    print("Corrupted session data detected for \(session.id), cleaning up...")
-                    
-                    // Try to delete the corrupted session
-                    do {
-                        try await authManager.deleteSession(session)
-                        // After cleanup, logout to allow fresh login
-                        authManager.logout()
-                    } catch {
-                        print("Failed to clean up corrupted session: \(error)")
-                    }
+                let errorInfo = NDKAuthErrorHandler.analyze(error)
+                
+                // If it's a corrupted session error, the auth manager has already cleaned up
+                if errorInfo.suggestedAction == .removeAccount {
+                    // Just logout to allow fresh login
+                    authManager.logout()
                 }
                 
                 sessionSwitchError = error
@@ -332,26 +327,35 @@ public struct NDKAuthView<AuthenticatedContent: View, AuthenticationContent: Vie
     }
     
     private func errorView(_ error: Error) -> some View {
-        VStack(spacing: 20) {
+        let errorInfo = NDKAuthErrorHandler.analyze(error)
+        
+        return VStack(spacing: 20) {
             Image(systemName: "exclamationmark.triangle")
                 .font(.system(size: 50))
                 .foregroundStyle(.orange)
             
             VStack(spacing: 8) {
-                Text("Authentication Failed")
+                Text(errorInfo.title)
                     .font(.title2)
                     .fontWeight(.semibold)
                 
-                Text(error.localizedDescription)
+                Text(errorInfo.message)
                     .font(.body)
                     .foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)
             }
             
-            Button("Try Again") {
-                authManager.restoreSession()
+            if errorInfo.isRecoverable {
+                Button("Try Again") {
+                    authManager.restoreSession()
+                }
+                .buttonStyle(.borderedProminent)
+            } else {
+                Button("Sign In") {
+                    authManager.logout()
+                }
+                .buttonStyle(.borderedProminent)
             }
-            .buttonStyle(.borderedProminent)
         }
         .padding(40)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -591,21 +595,13 @@ private struct AccountPickerView: View {
                 try await authManager.switchToSession(session)
                 dismiss()
             } catch {
-                // If we get a decoding error, it likely means corrupted session data
-                if error.localizedDescription.contains("couldn't be read") || 
-                   error.localizedDescription.contains("missing") ||
-                   (error as? DecodingError) != nil {
-                    print("Corrupted session data detected for \(session.id), cleaning up...")
-                    
-                    // Try to delete the corrupted session
-                    do {
-                        try await authManager.deleteSession(session)
-                        // After cleanup, dismiss and logout to allow fresh login
-                        dismiss()
-                        authManager.logout()
-                    } catch {
-                        print("Failed to clean up corrupted session: \(error)")
-                    }
+                let errorInfo = NDKAuthErrorHandler.analyze(error)
+                
+                // If it's a corrupted session error, the auth manager has already cleaned up
+                if errorInfo.suggestedAction == .removeAccount {
+                    // Just dismiss and logout to allow fresh login
+                    dismiss()
+                    authManager.logout()
                 } else {
                     // Error will be shown by parent view
                     switchingSession = nil

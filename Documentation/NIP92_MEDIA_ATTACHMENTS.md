@@ -78,25 +78,48 @@ let event = try await ndk.event()
 
 ## Blossom Integration
 
-NDKSwift provides seamless integration with Blossom file uploads:
+NDKSwift provides seamless integration with Blossom file uploads, **automatically extracting blurhash and dimensions** during upload:
 
 ```swift
 // Upload file to Blossom
-let imageData = Data(...) // Your image data
+let imageData = UIImage(named: "photo")!.jpegData(compressionQuality: 0.8)!
 let upload = try await ndk.uploadToBlossom(data: imageData, mimeType: "image/jpeg")
 
 // Create event with Blossom metadata
 let event = try await ndk.event()
     .content("Just uploaded: \(upload.first!.url)")
-    .imetaTag(from: upload.first!)
+    .imetaTag(from: upload.first!)  // Includes all metadata automatically!
     .build()
 ```
 
-The Blossom integration automatically includes:
+The Blossom integration **automatically** includes:
 - URL from the upload
 - SHA256 hash (`x` field)
 - File size
-- MIME type (if provided)
+- MIME type (auto-detected if not provided)
+- **Blurhash** (calculated during upload for images)
+- **Dimensions** (extracted during upload for images)
+
+### Automatic Metadata Extraction
+
+When you upload an image to Blossom, NDKSwift automatically:
+
+1. **Detects MIME type** from file signature if not provided
+2. **Calculates blurhash** for supported image formats (JPEG, PNG, WebP, HEIC)
+3. **Extracts dimensions** from the image data
+4. **Includes all metadata** in the returned `BlossomBlob`
+
+This means your `imeta` tags are complete without any extra work:
+
+```swift
+// The upload result contains:
+upload.first!.url         // "https://blossom.example.com/abc123..."
+upload.first!.sha256      // "abc123def456..."
+upload.first!.size        // 512000
+upload.first!.type        // "image/jpeg"
+upload.first!.blurhash    // "LGF5]+Yk^6#M@-5c,1J5@[or[Q6."
+upload.first!.dimensions  // (width: 3024, height: 4032)
+```
 
 ## Available Imeta Fields
 

@@ -134,7 +134,8 @@ public actor WalletEventManager {
             ndk: ndk,
             filter: filter,
             maxAge: 0, // Always fresh for deletion
-            cachePolicy: .networkOnly // Need to confirm it exists
+            cachePolicy: .networkOnly, // Need to confirm it exists
+            subscriptionId: "nip60-delete-event"
         )
         
         let events = await dataSource.currentValue()
@@ -168,7 +169,8 @@ public actor WalletEventManager {
             ndk: ndk,
             filter: filter,
             maxAge: 0, // Always fresh for deletion
-            cachePolicy: .networkOnly // Need to confirm it exists
+            cachePolicy: .networkOnly, // Need to confirm it exists
+            subscriptionId: "nip60-delete-event"
         )
         
         let events = await dataSource.currentValue()

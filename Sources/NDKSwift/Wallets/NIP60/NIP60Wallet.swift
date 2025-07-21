@@ -63,11 +63,94 @@ public actor NIP60Wallet: NDKPaymentProvider {
         )
     }
     
-    // MARK: - Unified Wallet State Subscription
+    // MARK: - Configuration Subscription
     
-    /// Start the unified wallet subscription that monitors all wallet-related events
-    public func startWalletSubscription() async {
+    /// Start the configuration subscription that monitors wallet config and blocked mints
+    private func startConfigurationSubscription() async {
         // Cancel any existing subscription
+        configSubscriptionTask?.cancel()
+        
+        NDKLogger.log(.warning, category: .wallet, "📡 STARTING CONFIGURATION SUBSCRIPTION")
+        NDKLogger.log(.warning, category: .wallet, "📡 Stack trace:")
+        Thread.callStackSymbols.prefix(10).enumerated().forEach { index, symbol in
+            NDKLogger.log(.warning, category: .wallet, "📡   [\(index)] \(symbol)")
+        }
+        
+        configSubscriptionTask = Task {
+            do {
+                let userPubkey = try await signer.pubkey
+                
+                // Create filter for configuration events (17375 and 10020)
+                let configFilter = NDKFilter(
+                    authors: [userPubkey],
+                    kinds: [EventKind.cashuWalletConfig, 10020]
+                )
+                
+                NDKLogger.log(.info, category: .wallet, "Starting wallet configuration subscription for kinds [17375, 10020]")
+                
+                // Create NDKDataSource for configuration events
+                let dataSource = NDKDataSource(
+                    ndk: self.ndk,
+                    filter: configFilter,
+                    maxAge: 0, // Always fresh for config
+                    cachePolicy: .cacheWithNetwork,
+                    subscriptionId: "nip60-wallet-config"
+                )
+                
+                // Process configuration events
+                for await event in dataSource.events {
+                    await self.processConfigurationEvent(event)
+                }
+            } catch {
+                if error is CancellationError {
+                    print("🛑 Configuration subscription cancelled")
+                } else {
+                    print("❌ Configuration subscription error: \(error)")
+                }
+            }
+        }
+    }
+    
+    /// Process configuration events (17375 and 10020)
+    private func processConfigurationEvent(_ event: NDKEvent) async {
+        switch event.kind {
+        case EventKind.cashuWalletConfig:  // 17375
+            NDKLogger.log(.warning, category: .wallet, "📥 RECEIVED KIND 17375 EVENT")
+            NDKLogger.log(.warning, category: .wallet, "📥 Event ID: \(event.id)")
+            NDKLogger.log(.warning, category: .wallet, "📥 Event created at: \(Date(timeIntervalSince1970: TimeInterval(event.createdAt)))")
+            
+            // Check timestamp to avoid processing old configs
+            let lastTimestamp = await eventManager.getLastWalletConfigTimestamp()
+            NDKLogger.log(.warning, category: .wallet, "📥 Last config timestamp: \(Date(timeIntervalSince1970: TimeInterval(lastTimestamp)))")
+            
+            if event.createdAt <= lastTimestamp {
+                NDKLogger.log(.warning, category: .wallet, "📥 SKIPPING - Event is older than or equal to last processed config")
+                print("⏭️ Skipping older wallet configuration")
+                return
+            }
+            
+            NDKLogger.log(.warning, category: .wallet, "📥 PROCESSING - Event is newer than last config")
+            await eventManager.updateLastWalletConfigTimestamp(event.createdAt)
+            
+            // Process wallet configuration
+            await processWalletConfiguration(event: event)
+            
+            // Restart wallet event subscriptions with new config
+            await startWalletEventSubscription()
+            
+        case 10020:  // Blocked mints
+            await processBlockedMintsUpdate(event)
+            
+        default:
+            break
+        }
+    }
+    
+    // MARK: - Wallet Event Subscription
+    
+    /// Start the wallet event subscription after receiving configuration
+    private func startWalletEventSubscription() async {
+        // Cancel any existing wallet subscription
         walletSubscriptionTask?.cancel()
         
         walletSubscriptionTask = Task {
@@ -75,67 +158,61 @@ public actor NIP60Wallet: NDKPaymentProvider {
                 let userPubkey = try await signer.pubkey
                 let twentyFourHoursAgo = Int64(Date(timeIntervalSinceNow: -60 * 60 * 24).timeIntervalSince1970)
                 
-                // Create filters for all wallet-related events
+                // Create filters for wallet events
                 let filters = [
-                    // Our own wallet events (tokens and quotes)
+                    // Recent quotes (kind 7374)
                     NDKFilter(
                         authors: [userPubkey],
-                        kinds: [
-                            EventKind.cashuToken,
-                        ]
+                        kinds: [EventKind.cashuQuote],
+                        since: twentyFourHoursAgo
                     ),
+                    // All tokens (kind 7375)
                     NDKFilter(
                         authors: [userPubkey],
-                        kinds: [
-                            EventKind.cashuQuote
-                        ],
-                        since: twentyFourHoursAgo,
-                        limit: 20
+                        kinds: [EventKind.cashuToken]
                     ),
-                    // Wallet config with limit: 0 to only get future updates
+                    // Delete events
                     NDKFilter(
                         authors: [userPubkey],
-                        kinds: [EventKind.cashuWalletConfig],
-                        limit: 0  // Only get new events, not historical ones
-                    ),
-                    // Delete events for our wallet
-                    NDKFilter(
-                        authors: [userPubkey],
-                        kinds: [EventKind.deletion],  // Delete events
+                        kinds: [EventKind.deletion],
                         tags: ["k": Set([String(EventKind.cashuToken), String(EventKind.cashuQuote)])]
                     ),
                     // Incoming nutzaps
                     NDKFilter(
                         kinds: [EventKind.nutzap],
                         tags: ["p": Set([userPubkey])]
-                    ),
-                    // Mute list (for blacklisted mints)
-                    NDKFilter(
-                        authors: [userPubkey],
-                        kinds: [10000],  // Mute list
-                        limit: 0  // Only get updates, not historical
                     )
                 ]
                 
-                // Subscribe with wallet-specific relays if configured
-                let relayUrls = walletRelays.isEmpty ? nil : Set(walletRelays.map { $0.url })
+                // Use wallet-specific relays if configured from 17375 event
+                let relayUrls: Set<String>? = walletConfigRelays.isEmpty ? nil : Set(walletConfigRelays)
                 
-                print("📡 Starting unified wallet subscription with \(walletRelays.count) relays")
+                print("📡 Starting wallet event subscription with \(walletConfigRelays.isEmpty ? "default" : "\(walletConfigRelays.count) configured") relays")
                 
-                // Create NDKDataSource for each filter with wallet-specific relays
+                // Create NDKDataSource for each filter
                 var dataSources: [NDKDataSource<NDKEvent>] = []
-                for filter in filters {
+                for (index, filter) in filters.enumerated() {
+                    let subscriptionId: String
+                    switch index {
+                    case 0: subscriptionId = "nip60-quotes"
+                    case 1: subscriptionId = "nip60-tokens"
+                    case 2: subscriptionId = "nip60-deletes"
+                    case 3: subscriptionId = "nip60-nutzaps"
+                    default: subscriptionId = "nip60-wallet-\(index)"
+                    }
+                    
                     let dataSource = NDKDataSource(
                         ndk: self.ndk,
                         filter: filter,
-                        maxAge: 0, // Always fresh for wallet events
+                        maxAge: 0,
                         cachePolicy: .cacheWithNetwork,
-                        relays: relayUrls
+                        relays: relayUrls,
+                        subscriptionId: subscriptionId
                     )
                     dataSources.append(dataSource)
                 }
                 
-                // Process events from all data sources
+                // Process wallet events
                 await withTaskGroup(of: Void.self) { group in
                     for dataSource in dataSources {
                         group.addTask {
@@ -147,32 +224,16 @@ public actor NIP60Wallet: NDKPaymentProvider {
                 }
             } catch {
                 if error is CancellationError {
-                    print("🛑 Wallet subscription cancelled")
+                    print("🛑 Wallet event subscription cancelled")
                 } else {
-                    print("❌ Wallet subscription error: \(error)")
+                    print("❌ Wallet event subscription error: \(error)")
                 }
             }
         }
     }
     
-    /// Process a wallet-related event from the unified subscription
+    /// Process a wallet event (tokens, quotes, nutzaps, etc)
     private func processWalletEvent(_ event: NDKEvent) async {
-        // Special handling for wallet config timestamp check
-        if event.kind == EventKind.cashuWalletConfig {
-            let lastTimestamp = await eventManager.getLastWalletConfigTimestamp()
-            if event.createdAt <= lastTimestamp {
-                print("⏭️ Skipping older wallet configuration")
-                return
-            }
-            await eventManager.updateLastWalletConfigTimestamp(event.createdAt)
-        }
-        
-        // Handle mute list updates
-        if event.kind == 10000 {
-            await processMuteListUpdate(event)
-            return
-        }
-        
         // Create context for handlers
         let context = WalletEventContext(
             wallet: self,
@@ -191,6 +252,15 @@ public actor NIP60Wallet: NDKPaymentProvider {
     /// This method extracts mints, relays, and P2PK keys from a wallet configuration event.
     /// Note: Mints that fail to load (e.g., due to network errors) will be skipped and not added to the wallet.
     internal func processWalletConfiguration(event: NDKEvent) async {
+        NDKLogger.log(.warning, category: .wallet, "⚙️ PROCESSING WALLET CONFIGURATION EVENT")
+        NDKLogger.log(.warning, category: .wallet, "⚙️ Event ID: \(event.id)")
+        NDKLogger.log(.warning, category: .wallet, "⚙️ Event Kind: \(event.kind)")
+        NDKLogger.log(.warning, category: .wallet, "⚙️ Event created at: \(Date(timeIntervalSince1970: TimeInterval(event.createdAt)))")
+        NDKLogger.log(.warning, category: .wallet, "⚙️ Stack trace:")
+        Thread.callStackSymbols.prefix(10).enumerated().forEach { index, symbol in
+            NDKLogger.log(.warning, category: .wallet, "⚙️   [\(index)] \(symbol)")
+        }
+        
         print("⚙️ Processing wallet configuration")
         print("⚙️ Event ID: \(event.id)")
         print("⚙️ Event Kind: \(event.kind)")
@@ -218,28 +288,10 @@ public actor NIP60Wallet: NDKPaymentProvider {
             let mintURLs = try await walletEvent.mints(signer: signer)
             print("🏪 Extracted \(mintURLs.count) mint URLs from wallet config: \(mintURLs)")
             
-            // Fetch user's mute list to check for blacklisted mints
-            var blacklistedMints: Set<String> = []
-            do {
-                let userPubkey = try await signer.pubkey
-                let filter = NDKFilter(authors: [userPubkey], kinds: [10000], limit: 1)
-                
-                let dataSource = NDKDataSource(
-                    ndk: ndk,
-                    filter: filter,
-                    maxAge: 300 // 5 minutes - mute lists can change
-                )
-                
-                let events = await dataSource.currentValue()
-                if let muteListEvent = events.first {
-                    let muteList = NDKList.from(muteListEvent, ndk: ndk)
-                    blacklistedMints = Set(muteList.blacklistedMints)
-                    if !blacklistedMints.isEmpty {
-                        print("🚫 Found \(blacklistedMints.count) blacklisted mints in user's mute list")
-                    }
-                }
-            } catch {
-                print("⚠️ Failed to fetch mute list: \(error)")
+            // Get current blacklisted mints
+            let blacklistedMints = await getBlacklistedMints()
+            if !blacklistedMints.isEmpty {
+                NDKLogger.log(.info, category: .wallet, "Found \(blacklistedMints.count) blacklisted mints")
             }
             
             // Filter out blacklisted mints
@@ -313,48 +365,19 @@ public actor NIP60Wallet: NDKPaymentProvider {
     
     // MARK: - Blacklist Management
     
-    /// Get the set of blacklisted mint URLs from the user's mute list
+    /// Get the set of blacklisted mint URLs from the cached blocked mints list
+    /// This returns the cached value that is kept up-to-date by the configuration subscription
     public func getBlacklistedMints() async -> Set<String> {
-        // Return cached value if fetched recently (within 5 minutes)
-        if let lastFetched = blacklistLastFetched, 
-           Date().timeIntervalSince(lastFetched) < 300 {
-            return cachedBlacklistedMints
-        }
-        
-        do {
-            let userPubkey = try await signer.pubkey
-            let filter = NDKFilter(authors: [userPubkey], kinds: [10000], limit: 1)
-            
-            let dataSource = NDKDataSource(
-                ndk: ndk,
-                filter: filter,
-                maxAge: 300 // 5 minutes - mute lists can change
-            )
-            
-            let events = await dataSource.currentValue()
-            if let muteListEvent = events.first {
-                let muteList = NDKList.from(muteListEvent, ndk: ndk)
-                cachedBlacklistedMints = Set(muteList.blacklistedMints)
-                blacklistLastFetched = Date()
-                
-                if !cachedBlacklistedMints.isEmpty {
-                    NDKLogger.log(.debug, category: .wallet, "Found \(cachedBlacklistedMints.count) blacklisted mints")
-                }
-            }
-        } catch {
-            NDKLogger.log(.error, category: .wallet, "Failed to fetch blacklisted mints: \(error)")
-        }
-        
         return cachedBlacklistedMints
     }
     
-    /// Process mute list update event
-    private func processMuteListUpdate(_ event: NDKEvent) async {
-        NDKLogger.log(.info, category: .wallet, "Processing mute list update")
+    /// Process blocked mints update event (kind 10020)
+    private func processBlockedMintsUpdate(_ event: NDKEvent) async {
+        NDKLogger.log(.info, category: .wallet, "Processing blocked mints update")
         
         // Update cached blacklisted mints
-        let muteList = NDKList.from(event, ndk: ndk)
-        let newBlacklistedMints = Set(muteList.blacklistedMints)
+        let blockedMintsEvent = NDKBlockedMintsEvent(event: event)
+        let newBlacklistedMints = Set(blockedMintsEvent.blockedMints)
         let oldBlacklistedMints = cachedBlacklistedMints
         
         cachedBlacklistedMints = newBlacklistedMints
@@ -701,89 +724,87 @@ public actor NIP60Wallet: NDKPaymentProvider {
         
         let userPubkey = try await signer.pubkey
         
-        // Use fetchEvent for a one-shot, reliable fetch of the latest config
+        // Fetch initial configuration and blocked mints
+        print("📡 Fetching initial wallet configuration and blocked mints...")
+        
+        // Fetch wallet config (17375) and blocked mints (10020) together
         let configFilter = NDKFilter(
             authors: [userPubkey],
-            kinds: [EventKind.cashuWalletConfig],
-            limit: 1
+            kinds: [EventKind.cashuWalletConfig, 10020],
+            limit: 10  // Allow for both event types
         )
         
-        print("📡 Fetching initial wallet configuration...")
-        
-        // Try to fetch existing configuration with a timeout
         let configDataSource = NDKDataSource(
             ndk: ndk,
             filter: configFilter,
-            maxAge: 0, // Always fresh for wallet config
-            cachePolicy: .networkOnly // Want latest config
+            maxAge: 0,
+            cachePolicy: .networkOnly,
+            subscriptionId: "nip60-load-config"
         )
         
         let configEvents = await configDataSource.currentValue()
-        if let configEvent = configEvents.first {
-            // Process the latest configuration event found
-            await self.processWalletEvent(configEvent)
+        
+        // Process blocked mints first (so they're cached when processing wallet config)
+        for event in configEvents where event.kind == 10020 {
+            await processBlockedMintsUpdate(event)
+        }
+        
+        // Then process wallet configuration
+        if let configEvent = configEvents.first(where: { $0.kind == EventKind.cashuWalletConfig }) {
+            await processWalletConfiguration(event: configEvent)
+            await eventManager.updateLastWalletConfigTimestamp(configEvent.createdAt)
             print("✅ Loaded existing wallet configuration")
         } else {
             print("ℹ️ No existing wallet configuration found for user \(userPubkey)")
         }
         
-        // Fetch current mute list to initialize blacklist
-        print("📡 Fetching current mute list...")
-        let muteListFilter = NDKFilter(
-            authors: [userPubkey],
-            kinds: [10000],
-            limit: 1
-        )
         
-        let muteDataSource = NDKDataSource(
-            ndk: ndk,
-            filter: muteListFilter,
-            maxAge: 300 // 5 minutes for mute lists
-        )
-        
-        let muteEvents = await muteDataSource.currentValue()
-        if let muteListEvent = muteEvents.first {
-            let muteList = NDKList.from(muteListEvent, ndk: ndk)
-            cachedBlacklistedMints = Set(muteList.blacklistedMints)
-            blacklistLastFetched = Date()
-            if !cachedBlacklistedMints.isEmpty {
-                print("🚫 Loaded \(cachedBlacklistedMints.count) blacklisted mints from mute list")
+        // Only fetch historical data if we have a configuration
+        if !walletConfigRelays.isEmpty || configEvents.first != nil {
+            // Fetch historical token events
+            print("📡 Fetching historical token events...")
+            
+            // Use configured relays if available
+            let relayUrls: Set<String>? = walletConfigRelays.isEmpty ? nil : Set(walletConfigRelays)
+            
+            let tokenFilter = NDKFilter(
+                authors: [userPubkey],
+                kinds: [EventKind.cashuToken]
+            )
+            
+            let tokenDataSource = NDKDataSource(
+                ndk: ndk,
+                filter: tokenFilter,
+                maxAge: 0,
+                cachePolicy: .networkOnly,
+                relays: relayUrls,
+                subscriptionId: "nip60-load-tokens"
+            )
+            
+            let tokenEvents = await tokenDataSource.currentValue()
+            print("📦 Found \(tokenEvents.count) token events")
+            
+            // Process each token event to load proofs
+            for event in tokenEvents {
+                await processWalletEvent(event)
             }
         }
         
-        // Fetch historical token events before starting subscription
-        print("📡 Fetching historical token events...")
-        let tokenFilter = NDKFilter(
-            authors: [userPubkey],
-            kinds: [EventKind.cashuToken]
-        )
-        
-        // Fetch all token events that represent wallet state
-        // Use NDKDataSource with networkOnly for initial wallet load
-        let dataSource = NDKDataSource(
-            ndk: ndk,
-            filter: tokenFilter,
-            maxAge: 0, // Always fresh for wallet data
-            cachePolicy: .networkOnly // Want latest wallet state
-        )
-        
-        let tokenEvents = await dataSource.currentValue()
-        print("📦 Found \(tokenEvents.count) token events")
-        
-        // Process each token event to load proofs
-        for event in tokenEvents {
-            await self.processWalletEvent(event)
-        }
-        
-        // Log the initial balance after loading historical events
+        // Log the initial balance
         let initialBalance = await proofStateManager.getTotalBalance()
-        print("💰 Initial wallet balance after loading: \(initialBalance) sats")
+        print("💰 Initial wallet balance: \(initialBalance) sats")
         
-        // Emit balance change event if we have a non-zero balance after loading
+        // Emit balance change event if we have a non-zero balance
         await notifyBalanceChangeIfNeeded()
         
-        // Now start the long-lived subscription for any future updates
-        await self.startWalletSubscription()
+        // Start configuration subscription (17375 and 10020)
+        await startConfigurationSubscription()
+        
+        // If we already have a configuration, start wallet event subscription
+        if !walletConfigRelays.isEmpty || configEvents.first != nil {
+            await startWalletEventSubscription()
+        }
+        
         print("✅ Wallet loading complete. Monitoring for updates.")
     }
     
@@ -909,6 +930,16 @@ public actor NIP60Wallet: NDKPaymentProvider {
     ///   - relays: Array of relay URLs to publish wallet events to
     ///   - publishMintList: Whether to publish a public mint list event (kind 10019)
     public func setup(mints: [String], relays: [String], publishMintList: Bool = true) async throws {
+        NDKLogger.log(.warning, category: .wallet, "🔧 NIP60Wallet.setup() CALLED - Stack trace:")
+        Thread.callStackSymbols.prefix(10).enumerated().forEach { index, symbol in
+            NDKLogger.log(.warning, category: .wallet, "🔧   [\(index)] \(symbol)")
+        }
+        
+        NDKLogger.log(.info, category: .wallet, "🔧 Setup parameters:")
+        NDKLogger.log(.info, category: .wallet, "🔧   - Mints: \(mints)")
+        NDKLogger.log(.info, category: .wallet, "🔧   - Relays: \(relays)")
+        NDKLogger.log(.info, category: .wallet, "🔧   - PublishMintList: \(publishMintList)")
+        
         print("NIP60Wallet - setup() called with \(mints.count) mints, \(relays.count) relays")
         
         // Update wallet configuration relays immediately
@@ -1182,7 +1213,8 @@ public actor NIP60Wallet: NDKPaymentProvider {
         let configDataSource = NDKDataSource(
             ndk: ndk,
             filter: configFilter,
-            maxAge: 300 // 5 minutes for config freshness
+            maxAge: 300, // 5 minutes for config freshness
+            subscriptionId: "nip60-find-configs"
         )
         
         let configEvents = await configDataSource.currentValue()

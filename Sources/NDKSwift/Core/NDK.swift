@@ -1,4 +1,5 @@
 import Foundation
+import CryptoSwift
 
 /// Main entry point for NDKSwift
 public final class NDK {
@@ -52,7 +53,7 @@ public final class NDK {
     internal var pool: NDKPool!
     
     /// User and profile management
-    internal var profileManager: NDKProfileManager!
+    public private(set) var profileManager: NDKProfileManager!
     
     /// Event tracker for managing event metadata
     public let eventTracker: NDKEventTracker = NDKEventTracker()
@@ -401,20 +402,26 @@ public final class NDK {
     ///             >0 = use cache if fresh enough, otherwise fetch and close after EOSE
     ///   - cachePolicy: Defines how the cache should be used for this request
     ///   - relays: Optional set of specific relay URLs to query
+    ///   - subscriptionId: Optional custom subscription ID for debugging/tracing.
+    ///                     This ID will be used in REQ messages sent to relays.
     ///   - transform: Optional transform function to convert NDKEvent to custom type
     /// - Returns: A data source that can be observed for changes
     public func observe(
         filter: NDKFilter,
         maxAge: TimeInterval = 0,
         cachePolicy: CachePolicy = .cacheWithNetwork,
-        relays: Set<RelayURL>? = nil
+        relays: Set<RelayURL>? = nil,
+        subscriptionId: String? = nil
     ) -> NDKDataSource<NDKEvent> {
-        NDKDataSource(
+        NDKLogger.log(.info, category: .general, "🔍 observe() called - filter: \(filter.fingerprint), maxAge: \(maxAge), cachePolicy: \(cachePolicy), relays: \(relays?.map { $0 } ?? ["auto"]), subscriptionId: \(subscriptionId ?? "auto")")
+        
+        return NDKDataSource(
             ndk: self,
             filter: filter,
             maxAge: maxAge,
             cachePolicy: cachePolicy,
-            relays: relays
+            relays: relays,
+            subscriptionId: subscriptionId
         )
     }
     
@@ -423,14 +430,18 @@ public final class NDK {
         maxAge: TimeInterval = 0,
         cachePolicy: CachePolicy = .cacheWithNetwork,
         relays: Set<RelayURL>? = nil,
+        subscriptionId: String? = nil,
         transform: @escaping (NDKEvent) -> T?
     ) -> NDKDataSource<T> {
-        NDKDataSource(
+        NDKLogger.log(.info, category: .general, "🔍 observe<T>() called - filter: \(filter.fingerprint), maxAge: \(maxAge), cachePolicy: \(cachePolicy), relays: \(relays?.map { $0 } ?? ["auto"]), subscriptionId: \(subscriptionId ?? "auto")")
+        
+        return NDKDataSource(
             ndk: self,
             filter: filter,
             maxAge: maxAge,
             cachePolicy: cachePolicy,
             relays: relays,
+            subscriptionId: subscriptionId,
             transform: transform
         )
     }
@@ -587,17 +598,28 @@ public final class NDK {
     // MARK: - Internal Methods (for relay communication)
     
     func processEvent(_ event: NDKEvent, subscriptionId: String, from relay: RelayProtocol) async {
+        NDKLogger.log(.trace, category: .event, "🎯 Processing event - id: \(event.id), kind: \(event.kind), subId: \(subscriptionId), relay: \(relay.url)")
+        
         // Process event through cache for observation
-        try? await cache.processEvent(event, from: relay.url, subscriptionId: subscriptionId)
+        do {
+            try await cache.processEvent(event, from: relay.url, subscriptionId: subscriptionId)
+            NDKLogger.log(.trace, category: .event, "✅ Event processed by cache")
+        } catch {
+            NDKLogger.log(.error, category: .event, "❌ Cache processing failed: \(error)")
+        }
         
         // Also process through internal subscription manager
         if let ndkRelay = relay as? NDKRelay {
+            NDKLogger.log(.trace, category: .event, "🔄 Routing to internal subscription manager")
             // Process through internal subscription manager with correct subscription ID
             await internalSubscriptionManager.processEvent(event, subscriptionId: subscriptionId, from: ndkRelay)
+        } else {
+            NDKLogger.log(.warning, category: .event, "⚠️ Relay is not NDKRelay type - cannot route to subscription manager")
         }
     }
     
     func processEOSE(subscriptionId: String, from relay: RelayProtocol) {
+        NDKLogger.log(.debug, category: .subscription, "🏁 Processing EOSE - subId: \(subscriptionId), relay: \(relay.url)")
         Task {
             await internalSubscriptionManager.processEOSE(subscriptionId: subscriptionId, from: relay)
         }
@@ -715,99 +737,7 @@ public final class NDK {
         }
     }
     
+    
     // MARK: - Internal Fetch Utilities
     
-    /// A robust internal utility for one-shot event fetching.
-    /// This bypasses NDKDataSource and uses a temporary internal subscription
-    /// that correctly waits for EOSE from relays.
-    ///
-    /// - Parameters:
-    ///   - filter: The NDKFilter for the request.
-    ///   - timeout: Request timeout in seconds.
-    /// - Returns: An array of events matching the filter.
-    internal func internalFetchEvents(
-        filter: NDKFilter,
-        timeout: TimeInterval = 10.0
-    ) async throws -> [NDKEvent] {
-        let subscriptionId = "internal-fetch-\(UUID().uuidString)"
-        NDKLogger.log(.debug, category: .subscription, "[internalFetchEvents] Starting fetch with ID: \(subscriptionId), filter: \(filter.fingerprint)")
-        
-        // Create a temporary subscription that will close on EOSE
-        let sub = await self.internalSubscriptionManager.createSubscription(
-            id: subscriptionId,
-            filters: [filter],
-            relays: nil // Let the outbox model decide
-        )
-        
-        var collectedEvents: [NDKEvent] = []
-        var receivedEose = false
-        
-        // Register EOSE handler to close the subscription
-        await sub.onEOSE { [weak sub] in
-            NDKLogger.log(.debug, category: .subscription, "[internalFetchEvents] Received EOSE for \(subscriptionId)")
-            receivedEose = true
-            await sub?.close()
-        }
-        
-        // Race the event collection against a timeout
-        let result = await withTaskGroup(of: CollectionResult.self) { group in
-            // Task to collect events
-            group.addTask {
-                // The stream will finish when the subscription is closed on EOSE
-                for await (event, _) in await sub.events {
-                    NDKLogger.log(.debug, category: .subscription, "[internalFetchEvents] Collected event: \(event.id)")
-                    collectedEvents.append(event)
-                }
-                NDKLogger.log(.debug, category: .subscription, "[internalFetchEvents] Event stream ended for \(subscriptionId)")
-                return CollectionResult.completed(collectedEvents)
-            }
-            
-            // Task for timeout
-            group.addTask {
-                do {
-                    try await Task.sleep(nanoseconds: UInt64(timeout * 1_000_000_000))
-                    // If we get here, timeout occurred
-                    NDKLogger.log(.warning, category: .subscription, "[internalFetchEvents] Timeout reached for \(subscriptionId) after \(timeout)s")
-                    return CollectionResult.timedOut
-                } catch {
-                    // Task was cancelled
-                    return CollectionResult.cancelled
-                }
-            }
-            
-            // Wait for the first task to finish
-            guard let firstResult = await group.next() else {
-                return CollectionResult.cancelled
-            }
-            
-            // Cancel the other task
-            group.cancelAll()
-            
-            return firstResult
-        }
-        
-        // Ensure cleanup
-        if !receivedEose {
-            await sub.close()
-        }
-        
-        NDKLogger.log(.debug, category: .subscription, "[internalFetchEvents] Completed with \(collectedEvents.count) events, EOSE: \(receivedEose)")
-        
-        switch result {
-        case .completed(let events):
-            return events
-        case .timedOut:
-            // Return what we collected before timeout
-            return collectedEvents
-        case .cancelled:
-            return collectedEvents
-        }
-    }
-}
-
-// Helper enum for task group results
-private enum CollectionResult {
-    case completed([NDKEvent])
-    case timedOut
-    case cancelled
 }

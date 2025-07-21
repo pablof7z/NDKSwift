@@ -17,6 +17,9 @@ public actor MemoryCache: NDKCache {
     private var deletionTombstones: [String: Date] = [:]
     private let tombstoneTTL: TimeInterval = 600 // 10 minutes
     
+    // Observer tracking
+    private var observers: [FilterSignature: Set<WeakObserver>] = [:]
+    
     public init() {
         // Initialize LRU cache with 1000 item limit for decrypted content
         self.decryptedContent = LRUCache(capacity: 1000)
@@ -26,8 +29,15 @@ public actor MemoryCache: NDKCache {
     
     public func saveEvent(_ event: NDKEvent) async throws {
         let eventId = event.id
+        let isNew = events[eventId] == nil
         events[eventId] = event
-        NDKLogger.log(.trace, category: .cache, "Saved event \(eventId)")
+        NDKLogger.log(.trace, category: .cache, "Saved event \(eventId) - isNew: \(isNew), kind: \(event.kind), author: \(event.pubkey)")
+        
+        // Notify observers if this is a new event
+        if isNew {
+            NDKLogger.log(.debug, category: .cache, "Event is new, notifying \(observers.count) observer groups")
+            await notifyObservers(of: event)
+        }
     }
     
     public func getEvent(id: String) async -> NDKEvent? {
@@ -382,6 +392,8 @@ public actor MemoryCache: NDKCache {
         
         // Save the event
         try await saveEvent(event)
+        
+        // No need to notify here since saveEvent already does it
     }
     
     /// Process a kind:5 deletion event according to NIP-09
@@ -414,6 +426,79 @@ public actor MemoryCache: NDKCache {
                 // This prevents the event from being added if it arrives later
                 deletionTombstones[eventId] = now
                 NDKLogger.log(.debug, category: .cache, "Added tombstone for event \(eventId)")
+            }
+        }
+    }
+    
+    // MARK: - Reactive Observation
+    
+    public func observeEvents(
+        matching filter: NDKFilter,
+        observer: CacheObserver
+    ) async -> ObservationHandle {
+        let signature = FilterSignature(from: filter)
+        let weakObserver = WeakObserver(observer: observer)
+        
+        // Add observer to the set for this filter signature
+        if observers[signature] == nil {
+            observers[signature] = []
+        }
+        observers[signature]?.insert(weakObserver)
+        
+        NDKLogger.log(.info, category: .cache, "Added observer for filter: \(signature) - total observer groups: \(observers.count)")
+        
+        // Deliver existing cached events that match the filter
+        let existingEvents = try? await queryEvents(filter)
+        if let events = existingEvents, !events.isEmpty {
+            NDKLogger.log(.debug, category: .cache, "Delivering \(events.count) existing cached events to observer")
+            for event in events {
+                await observer.handleEvent(event)
+            }
+        }
+        
+        // Return handle that removes observer when cancelled
+        return ObservationHandle { [weak self] in
+            await self?.removeObserver(weakObserver, for: signature)
+        }
+    }
+    
+    private func removeObserver(_ observer: WeakObserver, for signature: FilterSignature) async {
+        observers[signature]?.remove(observer)
+        if observers[signature]?.isEmpty == true {
+            observers.removeValue(forKey: signature)
+        }
+        NDKLogger.log(.trace, category: .cache, "Removed observer for filter: \(signature)")
+    }
+    
+    private func notifyObservers(of event: NDKEvent) async {
+        // Clean up any nil weak references
+        for (signature, observerSet) in observers {
+            observers[signature] = observerSet.filter { $0.observer != nil }
+        }
+        
+        // Find all observers whose filters match this event
+        for (signature, observerSet) in observers {
+            // Create filter from signature to check if event matches
+            var filter = NDKFilter(
+                ids: signature.ids,
+                authors: signature.authors,
+                kinds: signature.kinds,
+                tags: signature.tags?.mapValues { Set($0) }
+            )
+            
+            // Check if event matches this filter
+            let matches = filter.matches(event: event)
+            NDKLogger.log(.debug, category: .cache, "Checking filter match - signature: \(signature), matches: \(matches)")
+            
+            if matches {
+                // Notify all observers for this filter
+                NDKLogger.log(.debug, category: .cache, "Filter matches! Notifying \(observerSet.count) observers")
+                for weakObserver in observerSet {
+                    if let observer = weakObserver.observer {
+                        NDKLogger.log(.trace, category: .cache, "Notifying observer about event \(event.id)")
+                        await observer.handleEvent(event)
+                    }
+                }
             }
         }
     }

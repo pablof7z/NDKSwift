@@ -42,6 +42,10 @@ extension NDK {
 public struct NDKOutboxConfig {
     /// Relays to blacklist from outbox selection
     public let blacklistedRelays: Set<String>
+    
+    /// Dedicated relays for fetching relay lists (kind:10002)
+    /// These relays should be optimized for metadata queries
+    public let outboxRelays: Set<String>
 
     /// Default publish configuration
     public let defaultPublishConfig: OutboxPublishConfig
@@ -60,6 +64,7 @@ public struct NDKOutboxConfig {
 
     public init(
         blacklistedRelays: Set<String> = [],
+        outboxRelays: Set<String> = ["wss://purplepag.es"],
         defaultPublishConfig: OutboxPublishConfig = .default,
         defaultFetchConfig: OutboxFetchConfig = .default,
         defaultSubscriptionConfig: OutboxSubscriptionConfig = .default,
@@ -67,6 +72,7 @@ public struct NDKOutboxConfig {
         retryInterval: TimeInterval = 300
     ) {
         self.blacklistedRelays = blacklistedRelays
+        self.outboxRelays = outboxRelays
         self.defaultPublishConfig = defaultPublishConfig
         self.defaultFetchConfig = defaultFetchConfig
         self.defaultSubscriptionConfig = defaultSubscriptionConfig

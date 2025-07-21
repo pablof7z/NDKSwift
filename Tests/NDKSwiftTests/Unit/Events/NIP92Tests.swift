@@ -63,12 +63,15 @@ final class NIP92Tests: XCTestCase {
     }
     
     func testBlossomIntegration() async throws {
-        // Test Blossom upload integration
+        // Test Blossom upload integration with automatic metadata
         let blossomBlob = BlossomBlob(
             sha256: "abc123def456",
             url: "https://blossom.example.com/abc123def456.jpg",
             size: 1024 * 250, // 250KB
-            type: "image/jpeg"
+            type: "image/jpeg",
+            uploaded: Date(),
+            blurhash: "LGF5]+Yk^6#M@-5c,1J5@[or[Q6.", // Automatically calculated
+            dimensions: (width: 1920, height: 1080) // Automatically extracted
         )
         
         let event = try await ndk.event()
@@ -84,6 +87,8 @@ final class NIP92Tests: XCTestCase {
         XCTAssertTrue(imetaTag.contains("x abc123def456"))
         XCTAssertTrue(imetaTag.contains("size 256000"))
         XCTAssertTrue(imetaTag.contains("m image/jpeg"))
+        XCTAssertTrue(imetaTag.contains("blurhash LGF5]+Yk^6#M@-5c,1J5@[or[Q6."))
+        XCTAssertTrue(imetaTag.contains("dim 1920x1080"))
     }
     
     func testNoDuplicateImetaTags() async throws {

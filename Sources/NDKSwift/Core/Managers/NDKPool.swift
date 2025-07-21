@@ -50,35 +50,8 @@ public actor NDKPool {
     
     /// Get the set of blocked relay URLs from the user's blocked relay list
     private func getBlockedRelays() async -> Set<String> {
-        // Return cached value if fetched recently (within 5 minutes)
-        if let lastFetched = blockedRelaysLastFetched, 
-           Date().timeIntervalSince(lastFetched) < 300 {
-            return cachedBlockedRelays
-        }
-        
-        guard let ndk = ndk, let signer = ndk.signer else {
-            return cachedBlockedRelays
-        }
-        
-        do {
-            let userPubkey = try await signer.pubkey
-            let filter = NDKFilter(authors: [userPubkey], kinds: [10006], limit: 1)
-            
-            if let blockedRelayListEvent = try await fetchEventInternal(filter: filter) {
-                let blockedRelayList = NDKList.from(blockedRelayListEvent, ndk: ndk)
-                cachedBlockedRelays = Set(blockedRelayList.blockedRelays.map { url in
-                    URLNormalizer.tryNormalizeRelayUrl(url) ?? url
-                })
-                blockedRelaysLastFetched = Date()
-                
-                if !cachedBlockedRelays.isEmpty {
-                    NDKLogger.log(.debug, category: .general, "Found \(cachedBlockedRelays.count) blocked relays")
-                }
-            }
-        } catch {
-            NDKLogger.log(.error, category: .general, "Failed to fetch blocked relays: \(error)")
-        }
-        
+        // Always return cached value immediately for non-blocking operation
+        // The background subscription will keep it updated
         return cachedBlockedRelays
     }
     
@@ -109,30 +82,28 @@ public actor NDKPool {
         do {
             let userPubkey = try await signer.pubkey
             
-            // First fetch the current blocked relay list
-            let initialFilter = NDKFilter(
-                authors: [userPubkey],
-                kinds: [10006],
-                limit: 1
-            )
-            
-            if let blockedRelayListEvent = try? await fetchEventInternal(filter: initialFilter) {
-                await processBlockedRelayListUpdate(blockedRelayListEvent)
-            }
-            
-            // Now subscribe for updates using NDKDataSource
+            // Subscribe for blocked relay list using NDKDataSource
             blockedRelaySubscriptionTask = Task {
                 let filter = NDKFilter(
                     authors: [userPubkey],
-                    kinds: [10006],
-                    limit: 0  // Only get new events
+                    kinds: [10006]
                 )
                 
-                // Use NDKDataSource for blocked relay list monitoring
-                let dataSource = ndk.observe(filter: filter, maxAge: 0)
+                // Use NDKDataSource with 24 hour maxAge for blocked relay lists
+                // This will return cached data immediately if available, then fetch updates
+                let dataSource = ndk.observe(
+                    filter: filter, 
+                    maxAge: 86400 // 24 hours
+                )
+                
+                var latestEvent: NDKEvent?
                 
                 for await event in dataSource.events {
-                    await processBlockedRelayListUpdate(event)
+                    // Always process the latest event
+                    if latestEvent == nil || event.createdAt > latestEvent!.createdAt {
+                        latestEvent = event
+                        await processBlockedRelayListUpdate(event)
+                    }
                 }
             }
         } catch {
@@ -175,9 +146,11 @@ public actor NDKPool {
     @discardableResult
     public func addRelay(_ url: RelayURL) async -> NDKRelay {
         let normalizedUrl = URLNormalizer.tryNormalizeRelayUrl(url) ?? url
+        NDKLogger.log(.debug, category: .relay, "➕ Adding relay to pool - original: \(url), normalized: \(normalizedUrl)")
         
         // Check if already exists
         if let existing = relayMap[normalizedUrl] {
+            NDKLogger.log(.trace, category: .relay, "♻️ Relay already exists in pool: \(normalizedUrl)")
             return existing
         }
         
@@ -196,22 +169,31 @@ public actor NDKPool {
             relay.setNDK(ndk)
         }
         relayMap[normalizedUrl] = relay
+        NDKLogger.log(.info, category: .relay, "✅ Added new relay to pool: \(normalizedUrl), total relays: \(relayMap.count)")
         
         // Set up connection state observer to publish queued events and emit pool events
         await relay.observeConnectionState { [weak self, weak relay] state in
             guard let self = self, let relay = relay else { return }
+            NDKLogger.log(.debug, category: .relay, "🔄 Relay state changed - url: \(relay.url), state: \(state)")
             switch state {
             case .connected:
                 // Emit pool connection event
                 self.poolChangeContinuation.yield(.relayConnected(relay))
+                NDKLogger.log(.info, category: .relay, "🟢 Relay connected: \(relay.url)")
                 Task {
                     await self.handleRelayConnected(relay)
                 }
-            case .disconnected, .failed(_):
+            case .disconnected:
                 // Emit pool disconnection event
                 self.poolChangeContinuation.yield(.relayDisconnected(relay))
+                NDKLogger.log(.info, category: .relay, "🔴 Relay disconnected: \(relay.url)")
+            case .failed(let error):
+                // Emit pool disconnection event
+                self.poolChangeContinuation.yield(.relayDisconnected(relay))
+                NDKLogger.log(.warning, category: .relay, "🔴 Relay failed: \(relay.url), error: \(error)")
             case .connecting, .disconnecting:
                 // Don't emit events for transitional states
+                NDKLogger.log(.trace, category: .relay, "🔄 Relay transitional state: \(state) for \(relay.url)")
                 break
             }
         }
@@ -225,11 +207,16 @@ public actor NDKPool {
     /// Remove a relay from the pool
     public func removeRelay(_ url: RelayURL) async {
         let normalizedUrl = URLNormalizer.tryNormalizeRelayUrl(url) ?? url
+        NDKLogger.log(.debug, category: .relay, "➖ Removing relay from pool: \(normalizedUrl)")
+        
         if let relay = relayMap.removeValue(forKey: normalizedUrl) {
             await relay.disconnect()
             
             // Emit relay removed event
             poolChangeContinuation.yield(.relayRemoved(normalizedUrl))
+            NDKLogger.log(.info, category: .relay, "✅ Removed relay from pool: \(normalizedUrl), remaining relays: \(relayMap.count)")
+        } else {
+            NDKLogger.log(.warning, category: .relay, "⚠️ Attempted to remove non-existent relay: \(normalizedUrl)")
         }
     }
     
@@ -270,17 +257,24 @@ public actor NDKPool {
     
     /// Connect to all relays
     public func connectAll() async {
+        let relayCount = relays.count
+        NDKLogger.log(.info, category: .relay, "🔌 Connecting to all relays (\(relayCount) total)")
+        
         await withTaskGroup(of: Void.self) { group in
             for relay in relays {
                 group.addTask {
                     do {
+                        NDKLogger.log(.trace, category: .relay, "🔌 Attempting connection to \(relay.url)")
                         try await relay.connect()
                     } catch {
-                        NDKLogger.log(.error, category: .relay, "Failed to connect to \(relay.url): \(error)")
+                        NDKLogger.log(.error, category: .relay, "❌ Failed to connect to \(relay.url): \(error)")
                     }
                 }
             }
         }
+        
+        let connectedCount = await connectedRelays().count
+        NDKLogger.log(.info, category: .relay, "✅ Connection attempt complete - connected: \(connectedCount)/\(relayCount)")
     }
     
     /// Disconnect from all relays
@@ -300,6 +294,7 @@ public actor NDKPool {
     ///   - autoConnect: Whether to automatically connect to disconnected relays
     /// - Returns: Array of prepared relay instances
     public func prepareRelays(_ urls: [String], autoConnect: Bool = false) async -> [NDKRelay] {
+        NDKLogger.log(.debug, category: .relay, "🔧 Preparing \(urls.count) relays, autoConnect: \(autoConnect)")
         var preparedRelays: [NDKRelay] = []
         
         // First, ensure all relays exist in the pool
@@ -332,7 +327,11 @@ public actor NDKPool {
     // MARK: - Private Helpers
     
     private func handleRelayConnected(_ relay: NDKRelay) async {
-        guard let ndk = ndk else { return }
+        guard let ndk = ndk else {
+            NDKLogger.log(.warning, category: .relay, "⚠️ No NDK instance to handle relay connection")
+            return
+        }
+        NDKLogger.log(.debug, category: .relay, "📤 Publishing queued events for newly connected relay: \(relay.url)")
         await ndk.eventManager.publishQueuedEvents(for: relay)
     }
     
@@ -354,15 +353,5 @@ public actor NDKPool {
         blockedRelaySubscriptionTask?.cancel()
     }
     
-    /// Internal helper to fetch events using NDKDataSource
-    private func fetchEventInternal(filter: NDKFilter) async throws -> NDKEvent? {
-        guard let ndk = ndk else {
-            throw NDKError.notConfigured("NDK instance not available")
-        }
-        
-        let events = try await ndk.internalFetchEvents(filter: filter)
-        // Return the most recent event if multiple are found
-        return events.sorted { $0.createdAt > $1.createdAt }.first
-    }
 }
 

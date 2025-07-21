@@ -30,6 +30,8 @@ public final class NDKDataSource<T>: ObservableObject, CacheObserver {
     private let relays: Set<RelayURL>?
     private var requirementHandle: DataRequirementHandle?
     private var task: Task<Void, Never>?
+    private let correlationId: String
+    private let subscriptionId: String?
     
     // Actor for thread-safe state management
     private actor StateManager {
@@ -56,7 +58,8 @@ public final class NDKDataSource<T>: ObservableObject, CacheObserver {
         filter: NDKFilter,
         maxAge: TimeInterval = 0,
         cachePolicy: CachePolicy = .cacheWithNetwork,
-        relays: Set<RelayURL>? = nil
+        relays: Set<RelayURL>? = nil,
+        subscriptionId: String? = nil
     ) where T == NDKEvent {
         self.init(
             ndk: ndk,
@@ -64,6 +67,7 @@ public final class NDKDataSource<T>: ObservableObject, CacheObserver {
             maxAge: maxAge,
             cachePolicy: cachePolicy,
             relays: relays,
+            subscriptionId: subscriptionId,
             transform: { $0 }
         )
     }
@@ -77,6 +81,7 @@ public final class NDKDataSource<T>: ObservableObject, CacheObserver {
     ///             >0 = use cache if fresh enough, otherwise fetch and close after EOSE
     ///   - cachePolicy: Defines how the cache should be used for this request
     ///   - relays: Optional set of specific relay URLs to query
+    ///   - subscriptionId: Optional custom subscription ID to use (for debugging/tracing)
     ///   - transform: Optional transform to convert NDKEvent to custom type
     public init(
         ndk: NDK,
@@ -84,6 +89,7 @@ public final class NDKDataSource<T>: ObservableObject, CacheObserver {
         maxAge: TimeInterval = 0,
         cachePolicy: CachePolicy = .cacheWithNetwork,
         relays: Set<RelayURL>? = nil,
+        subscriptionId: String? = nil,
         transform: @escaping (NDKEvent) -> T?
     ) {
         self.ndk = ndk
@@ -92,6 +98,8 @@ public final class NDKDataSource<T>: ObservableObject, CacheObserver {
         self.maxAge = maxAge
         self.cachePolicy = cachePolicy
         self.relays = relays
+        self.correlationId = IDGenerator.randomId(length: 8)
+        self.subscriptionId = subscriptionId
         
         // Set up the AsyncStream
         var continuation: AsyncStream<T>.Continuation!
@@ -102,11 +110,13 @@ public final class NDKDataSource<T>: ObservableObject, CacheObserver {
         
         // Start observing immediately
         task = Task { [weak self] in
-            await self?.startObserving()
+            guard let self = self else { return }
+            await self.startObserving()
         }
     }
     
     deinit {
+        NDKLogger.log(.debug, category: .subscription, "🔚 NDKDataSource deinit - Cleaning up resources", correlationId: correlationId)
         task?.cancel()
         eventsContinuation.finish()
         let handle = requirementHandle
@@ -126,10 +136,12 @@ public final class NDKDataSource<T>: ObservableObject, CacheObserver {
                 observer: self,
                 maxAge: maxAge,
                 cachePolicy: cachePolicy,
-                relays: relays
+                relays: relays,
+                subscriptionId: subscriptionId
             )
         } else {
             // No data requirement manager available
+            NDKLogger.log(.error, category: .subscription, "❌ No data requirement manager available! Data source will not receive events", correlationId: correlationId)
             if ndk.debugMode {
                 print("[NDKDataSource] Warning: No data requirement manager available")
             }
@@ -141,61 +153,52 @@ public final class NDKDataSource<T>: ObservableObject, CacheObserver {
     // MARK: - CacheObserver
     
     public func handleEvent(_ event: NDKEvent) async {
+        NDKLogger.log(.trace, category: .subscription, "📥 Received event - id: \(event.id), kind: \(event.kind), author: \(String(event.pubkey.prefix(8)))...", correlationId: correlationId)
+        
         // Check if we've already processed this event
-        guard await !stateManager.isProcessed(event.id) else { return }
+        guard await !stateManager.isProcessed(event.id) else {
+            NDKLogger.log(.trace, category: .subscription, "⏭️ Skipping duplicate event - id: \(event.id)", correlationId: correlationId)
+            return
+        }
         await stateManager.markProcessed(event.id)
         
+        NDKLogger.log(.debug, category: .subscription, "🔄 Processing new event - id: \(event.id)", correlationId: correlationId)
+        
         if let transformed = transform(event) {
+            NDKLogger.log(.trace, category: .subscription, "✅ Transform successful - yielding to stream and updating data", correlationId: correlationId)
+            
             // Yield to AsyncStream
             eventsContinuation.yield(transformed)
             
             // Update @Published property on MainActor
             await MainActor.run {
                 data.append(transformed)
+                NDKLogger.log(.trace, category: .subscription, "📈 Data array updated - count: \(self.data.count)", correlationId: self.correlationId)
             }
+        } else {
+            NDKLogger.log(.trace, category: .subscription, "❌ Transform failed - event not added to data", correlationId: correlationId)
         }
     }
     
     /// Manually refresh the data
     public func refresh() async {
+        NDKLogger.log(.info, category: .subscription, "🔄 Refreshing data source", correlationId: correlationId)
         data.removeAll()
         await stateManager.clearProcessed()
-        await requirementHandle?.release()
+        
+        if let handle = requirementHandle {
+            NDKLogger.log(.debug, category: .subscription, "Releasing existing requirement handle", correlationId: correlationId)
+            await handle.release()
+        }
         requirementHandle = nil
+        
+        NDKLogger.log(.debug, category: .subscription, "Restarting observation", correlationId: correlationId)
         await startObserving()
     }
     
     /// Get the current data snapshot
     /// Useful for internal components that need one-shot access
     public func currentValue() async -> [T] {
-        return data
-    }
-    
-    /// Fetch data once and return the results
-    /// This is a convenience method for one-shot data fetching
-    /// - Returns: Array of transformed events from cache and/or network
-    /// - Note: For maxAge > 0, this will return cached data if fresh enough
-    public func fetch() async -> [T] {
-        // For cache-only, just return current cached data
-        if cachePolicy == .cacheOnly {
-            // Query cache directly
-            if let cachedEvents = try? await ndk.cache.queryEvents(filter) {
-                return cachedEvents.compactMap(transform)
-            }
-            return []
-        }
-        
-        // For network-only, clear current data and wait for fresh results
-        if cachePolicy == .networkOnly {
-            data.removeAll()
-            await stateManager.clearProcessed()
-        }
-        
-        // Wait a bit for data to arrive from the existing observation
-        // This leverages the existing subscription mechanism
-        try? await Task.sleep(nanoseconds: 500_000_000) // 0.5 seconds
-        
-        // Return current accumulated data
         return data
     }
 }

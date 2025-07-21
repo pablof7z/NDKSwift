@@ -369,7 +369,9 @@ public actor NDKRelayConnection {
                 }
             }
             
+            print("🔍 [NDKRelayConnection] Notifying delegate about message: \(message)")
             await notifyDelegate { delegate in
+                print("🔍 [NDKRelayConnection] Calling delegate.relayConnection(didReceiveMessage)")
                 delegate.relayConnection(self, didReceiveMessage: message)
             }
         } catch {

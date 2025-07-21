@@ -17,6 +17,7 @@ actor NDKDataRequirementManager {
     
     init(ndk: NDK) {
         self.ndk = ndk
+        NDKLogger.log(.debug, category: .subscription, "🏗️ NDKDataRequirementManager initialized")
     }
     
     /// Register a new data requirement
@@ -25,46 +26,25 @@ actor NDKDataRequirementManager {
     ///   - observer: The observer to notify when data arrives
     ///   - maxAge: Maximum age of cached data to consider fresh (0 = live subscription)
     ///   - cachePolicy: How to handle cache vs network
+    ///   - relays: Optional set of specific relay URLs to query
+    ///   - subscriptionId: Optional custom subscription ID (for debugging/tracing)
     /// - Returns: Handle for managing the requirement lifecycle
     func registerRequirement(
         filter: NDKFilter,
         observer: CacheObserver,
         maxAge: TimeInterval = 0,
         cachePolicy: CachePolicy = .cacheWithNetwork,
-        relays: Set<RelayURL>? = nil
+        relays: Set<RelayURL>? = nil,
+        subscriptionId: String? = nil
     ) async -> DataRequirementHandle {
         let requirementId = RequirementID()
-        
+        let correlationId = requirementId.uuidString.prefix(8)
         // Handle cache-only policy
         if cachePolicy == .cacheOnly {
-            // Only return cached data, never hit network
-            let cachedEvents = try? await ndk.cache.queryEvents(filter)
-            if let events = cachedEvents {
-                for event in events {
-                    await observer.handleEvent(event)
-                }
-            }
-            // Return dummy handle that does nothing
+            NDKLogger.log(.debug, category: .subscription, "📦 Cache-only policy - no network subscription", correlationId: String(correlationId))
+            // The cache observer will deliver existing events
+            // Just return a dummy handle since no subscription is needed
             return DataRequirementHandle(id: requirementId, manager: nil)
-        }
-        
-        // Check cache freshness for cacheWithNetwork policy
-        if cachePolicy == .cacheWithNetwork && maxAge > 0 {
-            // Check if we have fresh cached data
-            if let lastFetch = await ndk.cache.getLastFetchTime(for: filter) {
-                let age = Date().timeIntervalSince(lastFetch)
-                if age <= maxAge {
-                    // Cache is fresh enough - return cached data
-                    let cachedEvents = try? await ndk.cache.queryEvents(filter)
-                    if let events = cachedEvents, !events.isEmpty {
-                        for event in events {
-                            await observer.handleEvent(event)
-                        }
-                        // For maxAge > 0, we don't keep subscription open
-                        return DataRequirementHandle(id: requirementId, manager: nil)
-                    }
-                }
-            }
         }
         
         // For networkOnly or when cache is stale/empty, proceed with network request
@@ -72,6 +52,7 @@ actor NDKDataRequirementManager {
         
         // Check if we can reuse an existing requirement (only for live subscriptions)
         if maxAge == 0, let existing = findMatchingRequirement(for: filter) {
+            NDKLogger.log(.info, category: .subscription, "♻️ Reusing existing requirement for filter", correlationId: String(correlationId))
             await existing.addObserver(observer, id: requirementId, individualFilter: filter)
             return DataRequirementHandle(
                 id: requirementId,
@@ -87,18 +68,24 @@ actor NDKDataRequirementManager {
             registeredAt: Date(),
             maxAge: maxAge,
             cachePolicy: cachePolicy,
-            relays: relays
+            relays: relays,
+            subscriptionId: subscriptionId
         )
         
         // Add to pending queue
         pendingRequirements[signature, default: []].append(pending)
+        let pendingCount = pendingRequirements[signature]?.count ?? 0
+        NDKLogger.log(.debug, category: .subscription, "⏳ Added to pending queue - signature: \(signature), pending count: \(pendingCount)", correlationId: String(correlationId))
         
         // Start or extend grouping timer
         if flushTasks[signature] == nil {
+            NDKLogger.log(.debug, category: .subscription, "⏲️ Starting grouping timer (\(groupingWindow * 1000)ms)", correlationId: String(correlationId))
             flushTasks[signature] = Task {
                 try? await Task.sleep(nanoseconds: UInt64(groupingWindow * 1_000_000_000))
                 await flushPendingRequirements(for: signature)
             }
+        } else {
+            NDKLogger.log(.trace, category: .subscription, "⏲️ Grouping timer already running", correlationId: String(correlationId))
         }
         
         return DataRequirementHandle(
@@ -109,14 +96,23 @@ actor NDKDataRequirementManager {
     
     /// Release a data requirement
     func releaseRequirement(id: RequirementID) async {
-        guard let requirement = activeRequirements[id] else { return }
+        let correlationId = id.uuidString.prefix(8)
+        NDKLogger.log(.debug, category: .subscription, "🔓 Releasing requirement", correlationId: String(correlationId))
+        
+        guard let requirement = activeRequirements[id] else {
+            NDKLogger.log(.trace, category: .subscription, "⚠️ Requirement not found in active list", correlationId: String(correlationId))
+            return
+        }
         
         await requirement.removeObserver(id: id)
         
         // If no more observers, close the subscription
         if requirement.observerCount == 0 {
+            NDKLogger.log(.info, category: .subscription, "🛑 No more observers - closing subscription: \(requirement.subscriptionId)", correlationId: String(correlationId))
             await requirement.internalSubscription.close()
             activeRequirements.removeValue(forKey: id)
+        } else {
+            NDKLogger.log(.debug, category: .subscription, "👥 Still \(requirement.observerCount) observers remaining", correlationId: String(correlationId))
         }
     }
     
@@ -133,10 +129,16 @@ actor NDKDataRequirementManager {
     }
     
     private func flushPendingRequirements(for signature: FilterSignature) async {
+        NDKLogger.log(.debug, category: .subscription, "🚀 Flushing pending requirements for signature: \(signature)")
         flushTasks.removeValue(forKey: signature)
         
         guard let pending = pendingRequirements.removeValue(forKey: signature),
-              !pending.isEmpty else { return }
+              !pending.isEmpty else {
+            NDKLogger.log(.trace, category: .subscription, "No pending requirements to flush")
+            return
+        }
+        
+        NDKLogger.log(.info, category: .subscription, "📦 Processing \(pending.count) pending requirements")
         
         // Group by maxAge and cachePolicy to handle lifecycle correctly
         let groupedByLifecycle = Dictionary(grouping: pending) { p in
@@ -157,12 +159,31 @@ actor NDKDataRequirementManager {
                 // Use specified relays if provided, otherwise use outbox if enabled
                 var relays: Set<RelayURL>? = lifecycleGroup.first?.relays
                 if relays == nil && ndk.outboxEnabled {
+                    print("🔍 [DataRequirementManager] No relays specified and outbox enabled, fetching recommended relays...")
                     relays = await ndk.outbox.getRecommendedRelaysForSubscription(filters: [aggregatedFilter])
+                    print("🔍 [DataRequirementManager] Got \(relays?.count ?? 0) recommended relays")
+                    
+                    // Add and connect to any new relays
+                    if let recommendedRelays = relays, !recommendedRelays.isEmpty {
+                        print("🔍 [DataRequirementManager] Ensuring recommended relays are connected...")
+                        for relayUrl in recommendedRelays {
+                            // This will add the relay if not already in the pool
+                            await ndk.addRelayAndConnect(relayUrl)
+                        }
+                        print("🔍 [DataRequirementManager] All recommended relays added to pool")
+                    }
+                    
+                    // If outbox returned empty set, fall back to all connected relays
+                    if relays?.isEmpty ?? true {
+                        print("🔍 [DataRequirementManager] Outbox returned empty relay set, falling back to all connected relays")
+                        relays = nil // This will cause the subscription to use all connected relays
+                    }
                 }
                 
                 // Create subscription using internal manager
-                // Use a deterministic subscription ID based on the filter
-                let subscriptionId = "ds_\(UUID().uuidString)"
+                // Use custom subscription ID if provided, otherwise generate one
+                let subscriptionId = lifecycleGroup.compactMap { $0.subscriptionId }.first ?? "ds_\(IDGenerator.randomId(length: 8))"
+                NDKLogger.log(.info, category: .subscription, "🎯 Creating subscription - id: \(subscriptionId), filter: \(aggregatedFilter.fingerprint), relays: \(relays?.map { $0 } ?? ["all"])")
                 let internalSubscription = await ndk.internalSubscriptionManager.createSubscription(
                     id: subscriptionId,
                     filters: [aggregatedFilter],
@@ -180,23 +201,34 @@ actor NDKDataRequirementManager {
                 )
                 
                 // Add relevant observers to this requirement
+                var addedObservers = 0
+                NDKLogger.log(.debug, category: .subscription, "🔍 Checking \(lifecycleGroup.count) pending requirements for coverage")
                 for p in lifecycleGroup {
                     // Only add observer if this aggregated filter covers their individual filter
-                    if requirement.includesFilter(p.filter) {
+                    let covers = requirement.includesFilter(p.filter)
+                    NDKLogger.log(.debug, category: .subscription, "🔍 Filter coverage check - aggregated: \(aggregatedFilter.fingerprint), individual: \(p.filter.fingerprint), covers: \(covers)")
+                    
+                    if covers {
                         await requirement.addObserver(p.observer, id: p.id, individualFilter: p.filter)
+                        addedObservers += 1
                         if !closeOnEose {
                             // Only track in activeRequirements if it's a live subscription
                             activeRequirements[p.id] = requirement
                         }
+                    } else {
+                        NDKLogger.log(.warning, category: .subscription, "⚠️ Aggregated filter doesn't cover individual filter - this shouldn't happen!")
                     }
                 }
+                NDKLogger.log(.debug, category: .subscription, "👥 Added \(addedObservers) observers to requirement")
                 
                 // Start processing events
                 Task {
+                    NDKLogger.log(.debug, category: .subscription, "▶️ Starting event processing for subscription: \(subscriptionId)")
                     await requirement.startProcessing()
                     
                     // Record fetch time after processing starts
                     await ndk.cache.recordFetchTime(for: aggregatedFilter, timestamp: Date())
+                    NDKLogger.log(.trace, category: .subscription, "🕰️ Recorded fetch time for filter")
                 }
             }
         }
@@ -204,13 +236,22 @@ actor NDKDataRequirementManager {
     
     /// Smart filter aggregation that returns multiple filters when needed
     private func aggregateFilters(_ filters: [NDKFilter]) -> [NDKFilter] {
+        NDKLogger.log(.debug, category: .subscription, "🧮 Aggregating \(filters.count) filters")
+        
         // Group filters by compatibility
         let filterGroups = groupCompatibleFilters(filters)
+        NDKLogger.log(.debug, category: .subscription, "📦 Grouped into \(filterGroups.count) compatible groups")
         
         // Aggregate each group separately
-        return filterGroups.map { group in
+        let aggregated = filterGroups.map { group in
             aggregateSingleGroup(group)
         }
+        
+        for (index, filter) in aggregated.enumerated() {
+            NDKLogger.log(.trace, category: .subscription, "Group \(index + 1): \(filter.fingerprint)")
+        }
+        
+        return aggregated
     }
     
     /// Group filters that can be efficiently combined
@@ -356,6 +397,7 @@ struct PendingRequirement {
     let maxAge: TimeInterval
     let cachePolicy: CachePolicy
     let relays: Set<RelayURL>?
+    let subscriptionId: String?
 }
 
 /// Manages a single data requirement - events flow ONLY through cache
@@ -380,6 +422,9 @@ class DataRequirement {
     }
     
     func addObserver(_ observer: CacheObserver, id: RequirementID, individualFilter: NDKFilter) async {
+        let correlationId = id.uuidString.prefix(8)
+        NDKLogger.log(.debug, category: .subscription, "👁️ Adding observer to DataRequirement - filter: \(individualFilter.fingerprint)", correlationId: String(correlationId))
+        
         // Register observer with cache - cache is the single source of truth
         if let cache = cache {
             let handle = await cache.observeEvents(
@@ -387,6 +432,9 @@ class DataRequirement {
                 observer: observer
             )
             observerHandles[id] = handle
+            NDKLogger.log(.trace, category: .subscription, "✅ Observer registered with cache", correlationId: String(correlationId))
+        } else {
+            NDKLogger.log(.error, category: .subscription, "❌ No cache available - observer not registered!", correlationId: String(correlationId))
         }
     }
     
@@ -460,12 +508,18 @@ class DataRequirement {
     }
     
     func startProcessing() async {
-        guard let cache = cache else { return }
+        guard let cache = cache else {
+            NDKLogger.log(.error, category: .subscription, "❌ Cannot start processing - no cache available!")
+            return
+        }
+        
+        NDKLogger.log(.info, category: .subscription, "🏁 Starting event processing - subscriptionId: \(subscriptionId), closeOnEose: \(closeOnEose)")
         
         // Set up EOSE handler for closeOnEose subscriptions
         if closeOnEose {
             await internalSubscription.onEOSE { [weak self] in
                 guard let self = self else { return }
+                NDKLogger.log(.info, category: .subscription, "🏁 EOSE received - closing subscription: \(self.subscriptionId)")
                 // Close subscription after EOSE
                 Task {
                     await self.internalSubscription.close()
@@ -475,15 +529,28 @@ class DataRequirement {
         
         // Process events from subscription
         Task {
+            var eventCount = 0
+            NDKLogger.log(.debug, category: .subscription, "👂 Listening for events on subscription: \(subscriptionId)")
+            
             for await (event, relay) in await internalSubscription.events {
+                eventCount += 1
+                NDKLogger.log(.trace, category: .subscription, "📨 Event #\(eventCount) received - id: \(event.id), kind: \(event.kind), from: \(relay)")
+                
                 // ONLY send to cache - cache is the single source of truth
                 // Cache will notify ALL observers including our data sources
-                try? await cache.processEvent(
-                    event,
-                    from: relay,
-                    subscriptionId: subscriptionId
-                )
+                do {
+                    try await cache.processEvent(
+                        event,
+                        from: relay,
+                        subscriptionId: subscriptionId
+                    )
+                    NDKLogger.log(.trace, category: .subscription, "✅ Event processed by cache")
+                } catch {
+                    NDKLogger.log(.error, category: .subscription, "❌ Failed to process event: \(error)")
+                }
             }
+            
+            NDKLogger.log(.info, category: .subscription, "🔚 Event stream ended - processed \(eventCount) events for subscription: \(subscriptionId)")
         }
     }
 }

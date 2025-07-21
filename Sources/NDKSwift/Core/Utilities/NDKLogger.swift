@@ -55,18 +55,14 @@ public enum NDKLogger {
     /// Categories to log
     public static var enabledCategories: Set<NDKLogCategory> = Set(NDKLogCategory.allCases)
     
-    /// Production safety - sanitize sensitive data
-    public static var sanitizeSensitiveData: Bool = true
-    
     /// Log a message at the specified level
     public static func log(_ level: NDKLogLevel, category: NDKLogCategory, _ message: String) {
         guard level <= logLevel else { return }
         guard enabledCategories.contains(category) else { return }
         
-        let sanitizedMessage = sanitizeSensitiveData ? sanitizeMessage(message) : message
         let timestamp = ISO8601DateFormatter().string(from: Date())
         let emoji = emojiForCategory(category)
-        print("[\(timestamp)] [\(category.rawValue)] [\(level)] \(emoji) \(sanitizedMessage)")
+        print("[\(timestamp)] [\(category.rawValue)] [\(level)] \(emoji) \(message)")
     }
     
     /// Log a message with correlation ID for tracking across components
@@ -118,35 +114,6 @@ public enum NDKLogger {
     }
     
     // MARK: - Private Helpers
-    
-    private static func sanitizeMessage(_ message: String) -> String {
-        var sanitized = message
-        
-        // Sanitize potential private keys (64 char hex)
-        sanitized = sanitized.replacingOccurrences(
-            of: "\\b[a-fA-F0-9]{64}\\b",
-            with: "<PRIVATE_KEY>",
-            options: .regularExpression
-        )
-        
-        // Sanitize potential secrets and tokens
-        let secretPatterns = [
-            ("secret=\\w+", "secret=***"),
-            ("token=\\w+", "token=***"),
-            ("key=\\w+", "key=***"),
-            ("password=\\w+", "password=***")
-        ]
-        
-        for (pattern, replacement) in secretPatterns {
-            sanitized = sanitized.replacingOccurrences(
-                of: pattern,
-                with: replacement,
-                options: [.regularExpression, .caseInsensitive]
-            )
-        }
-        
-        return sanitized
-    }
     
     private static func emojiForCategory(_ category: NDKLogCategory) -> String {
         switch category {

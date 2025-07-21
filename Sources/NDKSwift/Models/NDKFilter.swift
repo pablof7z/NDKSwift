@@ -4,8 +4,8 @@ import CryptoKit
 /// Filter for subscribing to events
 /// 
 /// PERFORMANCE NOTE: Always batch multiple criteria in a single filter!
-/// BAD:  fetchEvent(filter1) then fetchEvent(filter2) - makes 2 network requests
-/// GOOD: fetchEvents(NDKFilter(kinds: [kind1, kind2])) - makes 1 network request
+/// BAD:  observe(filter1) then observe(filter2) - creates 2 separate subscriptions
+/// GOOD: observe(NDKFilter(kinds: [kind1, kind2])) - creates 1 subscription
 /// The arrays in this struct exist specifically to enable efficient batching!
 public struct NDKFilter: Codable, Equatable, Sendable {
     /// Event IDs to filter
@@ -460,5 +460,52 @@ public struct NDKFilter: Codable, Equatable, Sendable {
         let hash = SHA256.hash(data: data)
         let hashHex = Data(hash).hexString
         return String(hashHex.prefix(15))
+    }
+}
+
+// MARK: - CustomStringConvertible
+
+extension NDKFilter: CustomStringConvertible {
+    public var description: String {
+        var parts: [String] = []
+        
+        if let kinds = kinds {
+            parts.append("kinds:\(kinds.map { String($0) }.joined(separator: ","))")
+        }
+        
+        if let authors = authors {
+            let authorPrefixes = authors.prefix(3).map { String($0.prefix(8)) }.joined(separator: ",")
+            let suffix = authors.count > 3 ? "..." : ""
+            parts.append("authors:\(authorPrefixes)\(suffix)")
+        }
+        
+        if let ids = ids {
+            let idPrefixes = ids.prefix(3).map { String($0.prefix(8)) }.joined(separator: ",")
+            let suffix = ids.count > 3 ? "..." : ""
+            parts.append("ids:\(idPrefixes)\(suffix)")
+        }
+        
+        if let since = since {
+            parts.append("since:\(since)")
+        }
+        
+        if let until = until {
+            parts.append("until:\(until)")
+        }
+        
+        if let limit = limit {
+            parts.append("limit:\(limit)")
+        }
+        
+        if !tagFilters.isEmpty {
+            let tagParts = tagFilters.map { key, values in
+                let valuePrefixes = values.prefix(2).map { String($0.prefix(8)) }.joined(separator: ",")
+                let suffix = values.count > 2 ? "..." : ""
+                return "\(key):\(valuePrefixes)\(suffix)"
+            }
+            parts.append(contentsOf: tagParts)
+        }
+        
+        return "NDKFilter(\(parts.joined(separator: ", ")))"
     }
 }

@@ -33,15 +33,5 @@ public protocol RelayProtocol: AnyObject, Sendable {
     /// - Returns: A tuple containing success status and optional message from the relay
     /// - Throws: If the relay is not connected or other network errors occur
     func publish(_ event: NDKEvent) async throws -> (success: Bool, message: String?)
-    
-    /// Fetch events from the relay matching the given filter
-    /// 
-    /// ⚠️ **WARNING**: This blocks until EOSE. See NDK.fetchEvents for guidance on when to use this.
-    /// Consider using subscriptions for most use cases instead.
-    /// 
-    /// - Parameter filter: The filter to match events against
-    /// - Returns: Array of events matching the filter
-    /// - Throws: If the relay is not connected or other network errors occur
-    func fetchEvents(filter: NDKFilter) async throws -> [NDKEvent]
 }
 

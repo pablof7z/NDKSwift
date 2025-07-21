@@ -18,7 +18,6 @@ public enum StringConstants {
     
     /// Operation names for logging and debugging
     public enum Operations {
-        public static let fetchEvents = "Fetch events"
         public static let publishEvent = "Publish event"
         public static let connect = "Connect"
         public static let disconnect = "Disconnect"
