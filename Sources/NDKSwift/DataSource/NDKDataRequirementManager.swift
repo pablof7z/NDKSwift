@@ -486,9 +486,6 @@ class DataRequirement {
             }
         }
     }
-    
-    // REMOVED: Event filtering is now ONLY done by the cache
-    // The cache is the single source of truth for all event distribution
 }
 
 /// Handle for managing a data requirement
@@ -501,6 +498,3 @@ public struct DataRequirementHandle {
         await manager?.releaseRequirement(id: id)
     }
 }
-
-// REMOVED: DataSourceObserver protocol - we now use CacheObserver from the cache module
-// The cache is the single source of truth for all event distribution

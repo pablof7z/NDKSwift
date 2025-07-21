@@ -91,8 +91,6 @@ actor RelayStateActor {
     var stats = NDKRelayStats()
     var info: NDKRelayInformation?
     
-    // Active subscription IDs
-    var subscriptionIds: Set<String> = []
     
     // Observers
     var stateObservers: [@Sendable (NDKRelayConnectionState) -> Void] = []
@@ -223,23 +221,6 @@ actor RelayStateActor {
         return info
     }
     
-    // MARK: - Subscriptions
-    
-    func addSubscriptionId(_ subscriptionId: String) {
-        subscriptionIds.insert(subscriptionId)
-    }
-    
-    func removeSubscription(_ subscriptionId: String) {
-        subscriptionIds.remove(subscriptionId)
-    }
-    
-    func hasSubscription(_ subscriptionId: String) -> Bool {
-        return subscriptionIds.contains(subscriptionId)
-    }
-    
-    func getAllSubscriptionIds() -> [String] {
-        return Array(subscriptionIds)
-    }
     
     // MARK: - Observers
     
@@ -401,12 +382,6 @@ public final class NDKRelay: RelayProtocol, Hashable, Equatable, @unchecked Send
         }
     }
 
-    /// Get all active subscription IDs
-    public var activeSubscriptionIds: [String] {
-        get async {
-            await stateActor.getAllSubscriptionIds()
-        }
-    }
 
     // MARK: - Connection Management
 
@@ -531,18 +506,6 @@ public final class NDKRelay: RelayProtocol, Hashable, Equatable, @unchecked Send
         }
     }
 
-    // MARK: - Subscription Management
-
-    /// Add a subscription ID to this relay (internal use only)
-    public func addSubscriptionId(_ subscriptionId: String) async {
-        await stateActor.addSubscriptionId(subscriptionId)
-    }
-
-    
-    /// Remove a subscription by ID from this relay (safer for async contexts)
-    public func removeSubscription(byId subscriptionId: String) async {
-        await stateActor.removeSubscription(subscriptionId)
-    }
 
     // MARK: - Message Handling
 

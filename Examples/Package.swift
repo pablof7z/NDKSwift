@@ -14,7 +14,9 @@ let package = Package(
         .executable(name: "TestNegentropyProtocol", targets: ["TestNegentropyProtocol"]),
         .executable(name: "RealDeclarativeDemo", targets: ["RealDeclarativeDemo"]),
         .executable(name: "TestRealRelay", targets: ["TestRealRelay"]),
-        .executable(name: "TestOutboxModel", targets: ["TestOutboxModel"])
+        .executable(name: "TestOutboxModel", targets: ["TestOutboxModel"]),
+        .executable(name: "E2ETestBasicEventFlow", targets: ["E2ETestBasicEventFlow"]),
+        .executable(name: "E2ETestSimple", targets: ["E2ETestSimple"])
     ],
     dependencies: [
         .package(path: "..")
@@ -70,6 +72,20 @@ let package = Package(
             ],
             path: ".",
             sources: ["TestOutboxModel.swift"]
+        ),
+        .executableTarget(
+            name: "E2ETestBasicEventFlow",
+            dependencies: [
+                .product(name: "NDKSwift", package: "NDKSwift")
+            ],
+            path: "Sources/E2ETestBasicEventFlow"
+        ),
+        .executableTarget(
+            name: "E2ETestSimple",
+            dependencies: [
+                .product(name: "NDKSwift", package: "NDKSwift")
+            ],
+            path: "Sources/E2ETestSimple"
         )
     ]
 )
