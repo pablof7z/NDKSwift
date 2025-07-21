@@ -1,3 +1,5 @@
+import Foundation
+
 /// HTTP constants for consistent usage across the codebase
 public enum HTTPConstants {
     // HTTP Methods
