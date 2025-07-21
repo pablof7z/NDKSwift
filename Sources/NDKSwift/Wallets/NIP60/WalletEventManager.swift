@@ -19,6 +19,10 @@ public actor WalletEventManager {
     // Wallet event tracking
     private var lastWalletConfigTimestamp: Timestamp = 0
     
+    // Nutzap tracking
+    private var nutzapEvents: [String: NutzapInfo] = [:] // eventId -> NutzapInfo
+    private var redeemedNutzaps: Set<String> = [] // Set of redeemed nutzap event IDs
+    
     // MARK: - Initialization
     
     public init(ndk: NDK) {
@@ -246,5 +250,93 @@ public actor WalletEventManager {
     /// Update the last wallet configuration timestamp
     public func updateLastWalletConfigTimestamp(_ timestamp: Timestamp) {
         lastWalletConfigTimestamp = timestamp
+    }
+    
+    // MARK: - Nutzap Tracking
+    
+    /// Track a nutzap event
+    public func trackNutzap(_ event: NDKEvent) {
+        // Extract amount from proof tags
+        var totalAmount: Int64 = 0
+        for tag in event.tags {
+            if tag.count >= 2 && tag[0] == "proof" {
+                if let proofData = tag[1].data(using: .utf8),
+                   let proof = try? JSONCoding.decode(CashuSwift.Proof.self, from: proofData) {
+                    totalAmount += Int64(proof.amount)
+                }
+            }
+        }
+        
+        nutzapEvents[event.id] = NutzapInfo(
+            eventId: event.id,
+            sender: event.pubkey,
+            amount: totalAmount,
+            comment: event.content.isEmpty ? nil : event.content,
+            createdAt: event.createdAt,
+            isRedeemed: redeemedNutzaps.contains(event.id)
+        )
+    }
+    
+    /// Mark a nutzap as redeemed
+    public func markNutzapRedeemed(_ eventId: String) {
+        redeemedNutzaps.insert(eventId)
+        if var info = nutzapEvents[eventId] {
+            info.isRedeemed = true
+            info.redeemedAt = Timestamp.now
+            nutzapEvents[eventId] = info
+        }
+    }
+    
+    /// Get all nutzap events
+    public func getNutzaps() -> [NutzapInfo] {
+        return Array(nutzapEvents.values).sorted { $0.createdAt > $1.createdAt }
+    }
+    
+    /// Get pending (unredeemed) nutzaps
+    public func getPendingNutzaps() -> [NutzapInfo] {
+        return nutzapEvents.values
+            .filter { !$0.isRedeemed }
+            .sorted { $0.createdAt > $1.createdAt }
+    }
+    
+    /// Get redeemed nutzaps
+    public func getRedeemedNutzaps() -> [NutzapInfo] {
+        return nutzapEvents.values
+            .filter { $0.isRedeemed }
+            .sorted { $0.createdAt > $1.createdAt }
+    }
+    
+    /// Check if a nutzap is redeemed
+    public func isNutzapRedeemed(_ eventId: String) -> Bool {
+        return redeemedNutzaps.contains(eventId)
+    }
+    
+    /// Clear nutzap tracking (for wallet reload)
+    public func clearNutzapTracking() {
+        nutzapEvents.removeAll()
+        redeemedNutzaps.removeAll()
+    }
+}
+
+// MARK: - NutzapInfo
+
+/// Information about a nutzap event
+public struct NutzapInfo: Sendable {
+    public let eventId: String
+    public let sender: String
+    public let amount: Int64
+    public let comment: String?
+    public let createdAt: Timestamp
+    public var isRedeemed: Bool
+    public var redeemedAt: Timestamp?
+    
+    public init(eventId: String, sender: String, amount: Int64, comment: String?, createdAt: Timestamp, isRedeemed: Bool, redeemedAt: Timestamp? = nil) {
+        self.eventId = eventId
+        self.sender = sender
+        self.amount = amount
+        self.comment = comment
+        self.createdAt = createdAt
+        self.isRedeemed = isRedeemed
+        self.redeemedAt = redeemedAt
     }
 }

@@ -156,11 +156,27 @@ actor NDKDataRequirementManager {
             
             // Create a subscription for each aggregated filter
             for aggregatedFilter in aggregatedFilters {
+                // Optimize filter for cache - remove event IDs we already have
+                guard let optimizedFilter = await optimizeFilterForCache(aggregatedFilter) else {
+                    NDKLogger.log(.info, category: .subscription, "✅ All events in filter already cached - skipping subscription")
+                    
+                    // Still need to notify observers about cached events
+                    for p in lifecycleGroup {
+                        if aggregatedFilter.fingerprint == p.filter.fingerprint || 
+                           (aggregatedFilter.ids != nil && p.filter.ids != nil && 
+                            Set(aggregatedFilter.ids ?? []).isSuperset(of: Set(p.filter.ids ?? []))) {
+                            // The cache observer will deliver the cached events
+                            NDKLogger.log(.debug, category: .subscription, "📦 Observer will receive cached events for filter: \(p.filter.fingerprint)")
+                        }
+                    }
+                    continue // Skip creating subscription
+                }
+                
                 // Use specified relays if provided, otherwise use outbox if enabled
                 var relays: Set<RelayURL>? = lifecycleGroup.first?.relays
                 if relays == nil && ndk.outboxEnabled {
                     print("🔍 [DataRequirementManager] No relays specified and outbox enabled, fetching recommended relays...")
-                    relays = await ndk.outbox.getRecommendedRelaysForSubscription(filters: [aggregatedFilter])
+                    relays = await ndk.outbox.getRecommendedRelaysForSubscription(filters: [optimizedFilter])
                     print("🔍 [DataRequirementManager] Got \(relays?.count ?? 0) recommended relays")
                     
                     // Add and connect to any new relays
@@ -183,14 +199,14 @@ actor NDKDataRequirementManager {
                 // Create subscription using internal manager
                 // Use custom subscription ID if provided, otherwise generate one
                 let subscriptionId = lifecycleGroup.compactMap { $0.subscriptionId }.first ?? "ds_\(IDGenerator.randomId(length: 8))"
-                NDKLogger.log(.info, category: .subscription, "🎯 Creating subscription - id: \(subscriptionId), filter: \(aggregatedFilter.fingerprint), relays: \(relays?.map { $0 } ?? ["all"])")
+                NDKLogger.log(.info, category: .subscription, "🎯 Creating subscription - id: \(subscriptionId), filter: \(optimizedFilter.fingerprint), relays: \(relays?.map { $0 } ?? ["all"])")
                 let internalSubscription = await ndk.internalSubscriptionManager.createSubscription(
                     id: subscriptionId,
-                    filters: [aggregatedFilter],
+                    filters: [optimizedFilter],
                     relays: relays
                 )
                 
-                // Create data requirement
+                // Create data requirement (use original aggregated filter for coverage checks)
                 let requirement = DataRequirement(
                     filter: aggregatedFilter,
                     subscriptionId: internalSubscription.id,
@@ -252,6 +268,40 @@ actor NDKDataRequirementManager {
         }
         
         return aggregated
+    }
+    
+    /// Optimize filter by removing event IDs that are already in cache
+    /// Returns nil if all requested IDs are in cache (no subscription needed)
+    private func optimizeFilterForCache(_ filter: NDKFilter) async -> NDKFilter? {
+        // Only optimize if filter has specific event IDs
+        guard let requestedIds = filter.ids, !requestedIds.isEmpty else {
+            return filter
+        }
+        
+        NDKLogger.log(.debug, category: .subscription, "🔍 Checking cache for \(requestedIds.count) event IDs")
+        
+        // Check which IDs we already have
+        let cacheStatus = await ndk.cache.hasEvents(ids: requestedIds)
+        let missingIds = requestedIds.filter { cacheStatus[$0] != true }
+        
+        NDKLogger.log(.info, category: .subscription, "📊 Cache check - requested: \(requestedIds.count), missing: \(missingIds.count)")
+        
+        // If we have all IDs, no need for subscription
+        if missingIds.isEmpty {
+            NDKLogger.log(.info, category: .subscription, "✅ All \(requestedIds.count) event IDs found in cache - no subscription needed")
+            return nil
+        }
+        
+        // If we have some IDs, create optimized filter with only missing ones
+        if missingIds.count < requestedIds.count {
+            var optimizedFilter = filter
+            optimizedFilter.ids = missingIds
+            NDKLogger.log(.info, category: .subscription, "🎯 Optimized filter - removed \(requestedIds.count - missingIds.count) cached IDs")
+            return optimizedFilter
+        }
+        
+        // All IDs are missing, use original filter
+        return filter
     }
     
     /// Group filters that can be efficiently combined
@@ -520,6 +570,10 @@ class DataRequirement {
         
         NDKLogger.log(.info, category: .subscription, "🏁 Starting event processing - subscriptionId: \(subscriptionId), closeOnEose: \(closeOnEose)")
         
+        // Track received event IDs if this filter is for specific IDs
+        let requestedIds = filter.ids
+        var receivedIds: Set<String>? = requestedIds != nil ? Set() : nil
+        
         // Set up EOSE handler
         await internalSubscription.onEOSE { [weak self] relay in
             guard let self = self else { return }
@@ -530,8 +584,11 @@ class DataRequirement {
                 await observer.handleRelayUpdate(.eose(relay: relay))
             }
             
-            // Close subscription if closeOnEose is set
-            if self.closeOnEose {
+            // Close subscription if closeOnEose is set OR if we have all requested event IDs
+            let shouldClose = self.closeOnEose || 
+                (requestedIds != nil && receivedIds != nil && Set(requestedIds!) == receivedIds!)
+            
+            if shouldClose {
                 NDKLogger.log(.info, category: .subscription, "🏁 Closing subscription after EOSE: \(self.subscriptionId)")
                 Task {
                     await self.internalSubscription.close()
@@ -547,6 +604,19 @@ class DataRequirement {
             for await (event, relay) in await internalSubscription.events {
                 eventCount += 1
                 NDKLogger.log(.trace, category: .subscription, "📨 Event #\(eventCount) received - id: \(event.id), kind: \(event.kind), from: \(relay)")
+                
+                // Track received event IDs
+                if receivedIds != nil {
+                    receivedIds!.insert(event.id)
+                    
+                    // Check if we've received all requested IDs
+                    if let requested = requestedIds, Set(requested) == receivedIds! {
+                        NDKLogger.log(.info, category: .subscription, "✅ Received all \(requested.count) requested event IDs - closing subscription immediately")
+                        Task {
+                            await self.internalSubscription.close()
+                        }
+                    }
+                }
                 
                 // Send event to cache
                 do {

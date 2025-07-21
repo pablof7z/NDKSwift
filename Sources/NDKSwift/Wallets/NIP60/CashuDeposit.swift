@@ -92,7 +92,8 @@ public enum CashuDeposit {
         signer: NDKSigner,
         timeout: TimeInterval = 600.0,
         quoteAge: TimeInterval = 0,
-        onProofsReceived: @escaping ([CashuSwift.Proof]) async throws -> [String]
+        onProofsReceived: @escaping ([CashuSwift.Proof]) async throws -> [String],
+        manualCheckTrigger: AsyncStream<Void>? = nil
     ) -> AsyncThrowingStream<DepositStatus, Error> {
         return AsyncThrowingStream { continuation in
             let task = Task {
@@ -167,8 +168,31 @@ public enum CashuDeposit {
                         
                         print("📜 Quote \(quote.quoteId) still pending - next check in \(Int(interval)) seconds")
                         
-                        // Wait before next check
-                        try await Task.sleep(nanoseconds: UInt64(interval * Double(TimeConstants.nanosecondsPerSecond)))
+                        // Wait before next check, but allow manual trigger
+                        if let manualCheckTrigger = manualCheckTrigger {
+                            // Create a task that races between sleep and manual trigger
+                            await withTaskGroup(of: Void.self) { group in
+                                // Sleep task
+                                group.addTask {
+                                    try? await Task.sleep(nanoseconds: UInt64(interval * Double(TimeConstants.nanosecondsPerSecond)))
+                                }
+                                
+                                // Manual trigger task
+                                group.addTask {
+                                    for await _ in manualCheckTrigger {
+                                        print("🔄 Manual check triggered...")
+                                        break
+                                    }
+                                }
+                                
+                                // Wait for first to complete and cancel the other
+                                await group.next()
+                                group.cancelAll()
+                            }
+                        } else {
+                            // No manual trigger - use regular sleep
+                            try await Task.sleep(nanoseconds: UInt64(interval * Double(TimeConstants.nanosecondsPerSecond)))
+                        }
                     }
                     
                     // Timeout reached - persist quote and mark as expired

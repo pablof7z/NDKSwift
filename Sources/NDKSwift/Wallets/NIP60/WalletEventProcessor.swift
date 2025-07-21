@@ -8,10 +8,19 @@ actor WalletEventProcessor {
     /// Process a wallet event based on its kind
     func processEvent(_ event: NDKEvent, context: WalletEventContext) async {
         NDKLogger.log(.debug, category: .wallet, "Wallet event received: kind=\(event.kind)")
+        
+        // Special logging for nutzaps
+        if event.kind == EventKind.nutzap {
+            NDKLogger.log(.warning, category: .wallet, "🎯🎯🎯 NUTZAP EVENT DETECTED IN PROCESSOR!")
+        }
+        
         do {
             switch event.kind {
             case EventKind.cashuWalletConfig:
                 await context.wallet.processWalletConfiguration(event: event)
+            case EventKind.cashuWalletBackup:
+                // Backup events are handled separately during restore operations
+                NDKLogger.log(.info, category: .wallet, "Backup event detected: \(event.id) - skipping regular processing")
             case EventKind.cashuToken:
                 try await processTokenEvent(event, context: context)
             case EventKind.cashuQuote:
@@ -163,7 +172,12 @@ actor WalletEventProcessor {
     
     /// Process incoming nutzap events
     private func processNutzapEvent(_ event: NDKEvent, context: WalletEventContext) async throws {
-        NDKLogger.log(.debug, category: .wallet, "Processing incoming nutzap event")
+        NDKLogger.log(.warning, category: .wallet, "🎯 NUTZAP EVENT RECEIVED!")
+        NDKLogger.log(.warning, category: .wallet, "🎯 Event ID: \(event.id)")
+        NDKLogger.log(.warning, category: .wallet, "🎯 Event Author: \(event.pubkey)")
+        NDKLogger.log(.warning, category: .wallet, "🎯 Event Content: \(event.content)")
+        NDKLogger.log(.warning, category: .wallet, "🎯 Event Tags: \(event.tags)")
+        
         try await context.wallet.processIncomingNutzap(event)
     }
     

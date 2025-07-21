@@ -429,7 +429,7 @@ public struct NDKCashuWalletBackupEvent {
     // Private helper using the same cache as wallet config
     private func decryptedWalletTags(signer: NDKSigner) async throws -> [[String]] {
         // Check cache first
-        if let cachedTags = await decryptedWalletCache.get(event.id) {
+        if let cachedTags = await decryptedWalletCache.get(for: event.id) {
             return cachedTags
         }
         
@@ -563,13 +563,15 @@ public struct NDKCashuMintList {
         ndk: NDK,
         mints: [String],
         signer: NDKSigner,
-        p2pkPubkey: String? = nil
+        p2pkPubkey: String? = nil,
+        relays: [String]? = nil
     ) async throws -> NDKCashuMintList {
         let mintList = try await create(
             ndk: ndk,
             mints: mints,
             signer: signer,
-            p2pkPubkey: p2pkPubkey
+            p2pkPubkey: p2pkPubkey,
+            relays: relays
         )
         
         _ = try await ndk.publish(mintList.event)
@@ -582,7 +584,8 @@ public struct NDKCashuMintList {
         ndk: NDK,
         mints: [String],
         signer: NDKSigner,
-        p2pkPubkey: String? = nil
+        p2pkPubkey: String? = nil,
+        relays: [String]? = nil
     ) async throws -> NDKCashuMintList {
         let builder = ndk.event()
             .kind(10019)  // NIP-60 mint list kind
@@ -594,7 +597,14 @@ public struct NDKCashuMintList {
         
         // Add P2PK pubkey tag if provided (required for nutzaps per NIP-61)
         if let p2pkPubkey = p2pkPubkey {
-            _ = builder.tag(["p2pk", p2pkPubkey])
+            _ = builder.tag(["pubkey", p2pkPubkey])
+        }
+        
+        // Add relay tags if provided (recommended for nutzaps per NIP-61)
+        if let relays = relays {
+            for relay in relays {
+                _ = builder.tag(["relay", relay])
+            }
         }
         
         let mintListEvent = try await builder.build(signer: signer)

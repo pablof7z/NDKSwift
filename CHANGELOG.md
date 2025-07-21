@@ -7,7 +7,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.1] - 2025-07-21
+
+### Fixed
+- Fixed nutzap processing by correcting the kind:10019 mint list event format
+  - Changed P2PK pubkey tag from "p2pk" to "pubkey" as specified in NIP-61
+  - Added relay tags to kind:10019 events for proper nutzap routing
+  - Added comprehensive logging throughout the nutzap receive flow
+  - Nutzaps should now be properly received and redeemed by the wallet
+
 ### Added
+- Event ID filter optimization for improved subscription efficiency
+  - Filters requesting specific event IDs now check cache first
+  - Cached event IDs are automatically excluded from relay requests
+  - Subscriptions close immediately after receiving all requested IDs
+  - No network request is made if all IDs are already cached
+  - Reduces network traffic and relay load for immutable event data
+- NIP-92 Media Attachments support with automatic URL extraction
+  - Automatic imeta tag creation for media URLs in content
+  - Manual imeta tag builder methods  
+  - Seamless Blossom integration with automatic blurhash and dimension extraction
+  - NDKEvent extensions for extracting and working with imeta tags
+  - Support for all NIP-92 fields including fallback URLs
 - NIP60Wallet REPL: Added `validate` command to verify and reconcile proof states
   - Supports dry run mode with `-d` flag to check proofs without modifying wallet state
   - Can validate all mints or a specific mint by URL
@@ -100,11 +121,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 To migrate from the old fetch methods to the new observe pattern:
 
 ```swift
-// Old way:
-let event = try await ndk.fetchEvent("event_id")
-let events = try await ndk.fetchEvents(filter)
-
-// New way:
 let dataSource = ndk.observe(filter: NDKFilter(ids: ["event_id"]), maxAge: 3600)
 let event = await dataSource.currentValue().first
 

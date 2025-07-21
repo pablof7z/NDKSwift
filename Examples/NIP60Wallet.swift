@@ -7,6 +7,7 @@ enum Command {
     case deposit(amount: Int64, mintUrl: String?)
     case check(mintUrl: String?)
     case validate(dryRun: Bool, mintUrl: String?)
+    case mints
     case quit
     case help
     case unknown(String)
@@ -44,6 +45,8 @@ enum Command {
             }
             
             return .validate(dryRun: dryRun, mintUrl: mintUrl)
+        case "mints", "m":
+            return .mints
         case "quit", "q", "exit":
             return .quit
         case "help", "h":
@@ -178,6 +181,9 @@ struct NIP60WalletREPL {
             case .validate(let dryRun, let mintUrl):
                 await validateProofs(wallet: wallet, dryRun: dryRun, mintUrl: mintUrl)
                 
+            case .mints:
+                await showMints(wallet: wallet)
+                
             case .help:
                 showHelp()
                 
@@ -260,11 +266,25 @@ struct NIP60WalletREPL {
             
             // Start monitoring the quote
             print("\n🔄 Monitoring payment status...")
-            print("Press Ctrl+C to stop monitoring and return to wallet prompt")
+            print("Press Enter to check manually, or Ctrl+C to stop monitoring")
+            
+            // Create manual check trigger
+            let (triggerStream, triggerContinuation) = AsyncStream<Void>.makeStream()
+            
+            // Start keyboard monitor task
+            let keyboardTask = Task {
+                while !Task.isCancelled {
+                    if readLine() != nil {
+                        // User pressed Enter
+                        triggerContinuation.yield()
+                    }
+                }
+                triggerContinuation.finish()
+            }
             
             // Monitor the deposit
             do {
-                for try await status in await wallet.monitorDeposit(quote: quote, timeout: 300) {
+                for try await status in await wallet.monitorDeposit(quote: quote, timeout: 300, manualCheckTrigger: triggerStream) {
                     switch status {
                     case .pending:
                         print("⏳ Waiting for payment...")
@@ -272,18 +292,24 @@ struct NIP60WalletREPL {
                         print("✅ Payment received! Minted \(proofs.count) proofs")
                         let newBalance = try await wallet.getBalance() ?? 0
                         print("💰 New balance: \(newBalance) sats")
+                        keyboardTask.cancel()
                         return
                     case .expired:
                         print("❌ Quote expired")
+                        keyboardTask.cancel()
                         return
                     case .cancelled:
                         print("❌ Quote cancelled") 
+                        keyboardTask.cancel()
                         return
                     }
                 }
             } catch {
                 print("❌ Error monitoring deposit: \(error)")
             }
+            
+            // Clean up keyboard task
+            keyboardTask.cancel()
         } catch {
             print("❌ Error creating deposit: \(error)")
         }
@@ -576,6 +602,27 @@ struct NIP60WalletREPL {
         }
     }
     
+    static func showMints(wallet: NIP60Wallet) async {
+        print("🏦 Configured Mints")
+        print("==================")
+        
+        let mintUrls = await wallet.mints.getMintURLs()
+        
+        if mintUrls.isEmpty {
+            print("No mints configured")
+        } else {
+            for (index, mintUrl) in mintUrls.enumerated() {
+                // Get balance for this mint
+                if let url = URL(string: mintUrl) {
+                    let balance = await wallet.getBalance(mint: url)
+                    print("\(index + 1). \(mintUrl)")
+                    print("   Balance: \(balance) sats")
+                }
+            }
+            print("\nTotal mints: \(mintUrls.count)")
+        }
+    }
+    
     static func showHelp() {
         print("""
         
@@ -585,12 +632,14 @@ struct NIP60WalletREPL {
         check, c [mint_url]           - Check proof states (all mints if no URL provided)
         validate, v [-d] [mint_url]   - Validate proofs and remove spent ones (-d for dry run)
         deposit <amount> [mint_url]   - Create a deposit quote for specified amount (in sats)
+        mints, m                      - Show configured mints and their balances
         help, h                       - Show this help message
         quit, q, exit                 - Exit the REPL
         
         Examples:
         =========
         wallet> balance
+        wallet> mints                                 # Show all configured mints
         wallet> check
         wallet> check https://nofees.testnut.cashu.space
         wallet> validate                              # Validate all proofs and remove spent ones

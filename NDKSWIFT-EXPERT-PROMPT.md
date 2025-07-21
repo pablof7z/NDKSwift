@@ -865,7 +865,6 @@ NDKSwift includes a comprehensive implementation of Negentropy, a set reconcilia
 
 *   **Small Event Sets (< 100 events)**: Traditional sync is simpler and faster
 *   **Real-time Subscriptions**: Use regular `NDKSubscription` for live feeds
-*   **One-off Queries**: Use `ndk.fetchEvents()` for simple, specific queries
 *   **Unsupported Relays**: Always check relay NIP-77 support first
 
 **Core Implementation Pattern:**
