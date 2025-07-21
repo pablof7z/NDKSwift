@@ -627,9 +627,15 @@ public actor NIP60Wallet: NDKPaymentProvider {
     
     /// Check proof states for a specific mint
     public func checkProofStates(mintURL: URL) async throws -> [String: CashuSwift.Proof.ProofState] {
-        let mints = await mints.getAllMints()
-        guard let mint = mints[mintURL.absoluteString] else {
-            throw NDKError.noMintAvailable("Mint not found: \(mintURL)")
+        let allMints = await mints.getAllMints()
+        let mint: CashuSwift.Mint
+        
+        if let existingMint = allMints[mintURL.absoluteString] {
+            mint = existingMint
+        } else {
+            // Mint not configured - load it on demand
+            NDKLogger.log(.info, category: .wallet, "Loading unconfigured mint on-demand: \(mintURL)")
+            mint = try await mints.loadMint(url: mintURL)
         }
         
         // Get all proofs for this mint
@@ -672,7 +678,8 @@ public actor NIP60Wallet: NDKPaymentProvider {
     /// Monitor deposit status for a mint quote (checking if Lightning invoice was paid)
     public func monitorDeposit(
         quote: CashuMintQuote,
-        timeout: TimeInterval = 600.0
+        timeout: TimeInterval = 600.0,
+        manualCheckTrigger: AsyncStream<Void>? = nil
     ) -> AsyncThrowingStream<DepositStatus, Error> {
         return AsyncThrowingStream { continuation in
             Task {
@@ -694,7 +701,8 @@ public actor NIP60Wallet: NDKPaymentProvider {
                                 memo: "Deposit"
                             )
                             return try await self.update(stateChange: stateChange)
-                        }
+                        },
+                        manualCheckTrigger: manualCheckTrigger
                     )
                     
                     for try await status in stream {
@@ -973,7 +981,8 @@ public actor NIP60Wallet: NDKPaymentProvider {
                 ndk: ndk,
                 mints: mints,
                 signer: signer,
-                p2pkPubkey: p2pkPubkey
+                p2pkPubkey: p2pkPubkey,
+                relays: relays
             )
             print("NIP60Wallet - Mint list published successfully with p2pk tag")
         }
@@ -1261,7 +1270,7 @@ public actor NIP60Wallet: NDKPaymentProvider {
         NDKLogger.log(.info, category: .wallet, "📦 Creating wallet backup (kind 375)")
         
         // Get current wallet configuration
-        let currentMints = await mints.getAllMints().map { $0.url }
+        let currentMints = await mints.getMintURLs()
         let currentRelays = walletConfigRelays
         let (p2pkPrivateKey, _) = try await p2pkManager.getOrCreateKeypair()
         
@@ -1286,18 +1295,31 @@ public actor NIP60Wallet: NDKPaymentProvider {
     public func restoreFromBackup(userPubkey: String? = nil) async throws -> Bool {
         NDKLogger.log(.info, category: .wallet, "🔄 Attempting to restore wallet from backup")
         
-        let pubkey = try userPubkey ?? (try await signer.pubkey)
+        let pubkey: String
+        if let userPubkey = userPubkey {
+            pubkey = userPubkey
+        } else {
+            pubkey = try await signer.pubkey
+        }
         
         // Create filter for backup events
         let backupFilter = NDKFilter(
             authors: [pubkey],
             kinds: [EventKind.cashuWalletBackup],
-            tags: ["p": Set([pubkey])],
-            limit: 1  // Get most recent backup
+            limit: 1,  // Get most recent backup
+            tags: ["p": Set([pubkey])]
         )
         
-        // Fetch backup events
-        let backupEvents = try await ndk.fetchEvents(filter: backupFilter)
+        // Fetch backup events using NDKDataSource
+        let dataSource = NDKDataSource(
+            ndk: ndk,
+            filter: backupFilter,
+            maxAge: 0,
+            cachePolicy: .networkOnly,
+            subscriptionId: "nip60-restore-backup"
+        )
+        
+        let backupEvents = await dataSource.currentValue()
         
         guard let latestBackup = backupEvents.first else {
             NDKLogger.log(.warning, category: .wallet, "❌ No backup events found for user")
@@ -1320,19 +1342,21 @@ public actor NIP60Wallet: NDKPaymentProvider {
         NDKLogger.log(.info, category: .wallet, "  - Has P2PK key: \(backupP2pkPrivateKey != nil)")
         
         // Update wallet configuration
-        for mintUrl in backupMints {
-            _ = try await mints.addMint(url: mintUrl)
+        for mintUrlString in backupMints {
+            if let mintUrl = URL(string: mintUrlString) {
+                await mints.addMintURL(url: mintUrl)
+            }
         }
         
         self.walletConfigRelays = backupRelays
         
         // Restore P2PK keypair if present
         if let p2pkPrivateKey = backupP2pkPrivateKey {
-            await p2pkManager.setKeypair(privateKey: p2pkPrivateKey)
+            try? await p2pkManager.restoreFromPrivateKey(p2pkPrivateKey)
         }
         
         // Publish restored configuration as new wallet config event
-        try await configureWithNewMints(backupMints, relays: backupRelays.isEmpty ? nil : backupRelays)
+        try await setup(mints: backupMints, relays: backupRelays, publishMintList: false)
         
         NDKLogger.log(.info, category: .wallet, "✅ Wallet restored successfully from backup")
         
@@ -1346,11 +1370,19 @@ public actor NIP60Wallet: NDKPaymentProvider {
         let backupFilter = NDKFilter(
             authors: [pubkey],
             kinds: [EventKind.cashuWalletBackup],
-            tags: ["p": Set([pubkey])],
-            limit: 1
+            limit: 1,
+            tags: ["p": Set([pubkey])]
         )
         
-        let backupEvents = try await ndk.fetchEvents(filter: backupFilter)
+        let dataSource = NDKDataSource(
+            ndk: ndk,
+            filter: backupFilter,
+            maxAge: 0,
+            cachePolicy: .networkOnly,
+            subscriptionId: "nip60-check-backup"
+        )
+        
+        let backupEvents = await dataSource.currentValue()
         return !backupEvents.isEmpty
     }
 }

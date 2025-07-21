@@ -194,27 +194,52 @@ let event = try await ndk.event()
 4. **Use Blossom for decentralized storage** - Integrates seamlessly with `imetaTag(from:)`
 5. **Provide fallback URLs for critical content** - Ensures availability across different hosting providers
 
-## Working with NDKImage
+## Extracting Imeta Tags from Events
 
-The `NDKImage` class provides convenient access to imeta tags:
+NDKSwift provides convenient extensions to extract and work with imeta tags from existing events:
 
 ```swift
-// Parse an existing image event
-let imageEvent = NDKImage(event: event)
+// Get all imeta tags from an event
+let imetaTags = event.imetas
 
-// Access imeta tags
-let imetaTags = imageEvent.imetas
+// Check if event has any imeta tags
+if event.hasImeta {
+    print("Event contains \(event.imetas.count) media attachments")
+}
 
-// Get primary image URL
-let primaryURL = imageEvent.primaryImageURL
+// Get imeta tags for a specific URL
+let specificTags = event.imetas(for: "https://example.com/photo.jpg")
+
+// Get the first imeta tag
+if let firstImeta = event.firstImeta {
+    print("First media URL: \(firstImeta.url ?? "")")
+}
+
+// Get all media URLs
+let allURLs = event.imetaURLs
+
+// Get imeta tags by MIME type
+let imetasByType = event.imetasByMimeType
+let imageImetas = imetasByType["image/jpeg"] ?? []
+
+// Convenience properties for specific media types
+let images = event.imageImetas
+let videos = event.videoImetas  
+let audio = event.audioImetas
+
+// Get primary image metadata
+if let dimensions = event.primaryImageDimensions {
+    print("Primary image: \(dimensions.width)x\(dimensions.height)")
+}
+if let blurhash = event.primaryImageBlurhash {
+    print("Blurhash: \(blurhash)")
+}
+if let primaryURL = event.primaryImageURL {
+    print("Primary image URL: \(primaryURL)")
+}
 
 // Get all image URLs
-let allURLs = imageEvent.imageURLs
-
-// Get dimensions
-if let dimensions = imageEvent.primaryImageDimensions {
-    print("Width: \(dimensions.width), Height: \(dimensions.height)")
-}
+let allImageURLs = event.imageURLs
 ```
 
 ## Migration Guide

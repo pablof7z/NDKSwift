@@ -153,12 +153,6 @@ The subscription system uses modern Swift patterns for cleaner, more intuitive c
    }
    ```
 
-2. **Async Functions for One-Shot Queries**:
-   ```swift
-   // Clear intent - fetch once and return
-   let events = try await ndk.fetchEvents(filter)
-   ```
-
 3. **No Callback Hell**: The API avoids nested callbacks in favor of linear async/await code
 
 4. **Automatic Resource Management**: Subscriptions clean up when their AsyncSequence completes

@@ -163,38 +163,47 @@ public enum Nutzap {
         let privateKey = try await p2pkManager.getOrCreatePrivateKey()
         let ourPubkeyHex = try await p2pkManager.getCashuPublicKey()
         
+        NDKLogger.log(.warning, category: .wallet, "🎯 Processing nutzap with our P2PK pubkey: \(ourPubkeyHex)")
+        
         // Verify p tag points to our Nostr pubkey
         let pTags = event.tags.filter { $0.first == "p" }
         guard let recipientTag = pTags.first,
               recipientTag.count > 1 else {
-            // No recipient tag
+            NDKLogger.log(.warning, category: .wallet, "🎯 No recipient tag in nutzap - ignoring")
             return
         }
+        
+        NDKLogger.log(.warning, category: .wallet, "🎯 Nutzap recipient tag: \(recipientTag[1])")
         
         // Get mint URLs from u tags
         let mintURLs = event.tags
             .filter { $0.count >= 2 && $0[0] == "u" }
             .map { $0[1] }
         
+        NDKLogger.log(.warning, category: .wallet, "🎯 Mint URLs in nutzap: \(mintURLs)")
+        
         guard !mintURLs.isEmpty else {
-            NDKLogger.log(.error, category: .general, "No mint URLs in nutzap")
+            NDKLogger.log(.error, category: .wallet, "🎯 No mint URLs in nutzap")
             return
         }
         
         // Extract proofs from proof tags
         let proofTags = event.tags.filter { $0.count >= 2 && $0[0] == "proof" }
         guard !proofTags.isEmpty else {
-            NDKLogger.log(.error, category: .general, "No proofs in nutzap")
+            NDKLogger.log(.error, category: .wallet, "🎯 No proofs in nutzap")
             return
         }
+        
+        NDKLogger.log(.warning, category: .wallet, "🎯 Found \(proofTags.count) proof tags in nutzap")
         
         var allProofs: [CashuSwift.Proof] = []
         for proofTag in proofTags {
             guard let proofData = proofTag[1].data(using: .utf8),
                   let proof = try? JSONCoding.decode(CashuSwift.Proof.self, from: proofData) else {
-                NDKLogger.log(.error, category: .general, "Failed to decode proof from tag")
+                NDKLogger.log(.error, category: .wallet, "🎯 Failed to decode proof from tag: \(proofTag[1])")
                 continue
             }
+            NDKLogger.log(.warning, category: .wallet, "🎯 Decoded proof: amount=\(proof.amount), C=\(proof.C)")
             allProofs.append(proof)
         }
         
@@ -203,8 +212,11 @@ public enum Nutzap {
         
         // Filter proofs locked to us
         let ourProofs = CashuHelpers.filterProofsLockedTo(proofs: allProofs, pubkey: ourPubkeyHex)
+        
+        NDKLogger.log(.warning, category: .wallet, "🎯 Total proofs: \(allProofs.count), Proofs locked to us: \(ourProofs.count)")
+        
         guard !ourProofs.isEmpty else {
-            NDKLogger.log(.warning, category: .general, "No proofs locked to us in nutzap")
+            NDKLogger.log(.warning, category: .wallet, "🎯 No proofs locked to our P2PK pubkey (\(ourPubkeyHex)) in nutzap")
             return
         }
         
