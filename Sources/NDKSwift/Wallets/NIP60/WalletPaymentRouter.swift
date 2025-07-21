@@ -48,12 +48,12 @@ actor WalletPaymentRouter {
         ndk: NDK,
         signer: NDKSigner
     ) async throws -> PaymentConfirmation {
-        print("WalletPaymentRouter.executeNutzapPayment - amount: \(nutzapRequest.amountSats)")
-        print("WalletPaymentRouter.executeNutzapPayment - proofStateManager: \(ObjectIdentifier(proofStateManager))")
+        NDKLogger.log(.debug, category: .wallet, "WalletPaymentRouter.executeNutzapPayment - amount: \(nutzapRequest.amountSats)")
+        NDKLogger.log(.debug, category: .wallet, "WalletPaymentRouter.executeNutzapPayment - proofStateManager: \(ObjectIdentifier(proofStateManager))")
         
         // Find the best payment route
         let acceptedMintURLs = Set(nutzapRequest.acceptedMints.map { $0.absoluteString })
-        print("WalletPaymentRouter.executeNutzapPayment - acceptedMints: \(acceptedMintURLs)")
+        NDKLogger.log(.debug, category: .wallet, "WalletPaymentRouter.executeNutzapPayment - acceptedMints: \(acceptedMintURLs)")
         
         // Get blacklisted mints from wallet
         let blacklistedMints = await wallet.getBlacklistedMints()
@@ -69,13 +69,13 @@ actor WalletPaymentRouter {
         // Determine which mint to use and perform any necessary transfers
         switch paymentRoute {
         case .direct(let mint):
-            print("💸 Direct payment using mint: \(mint)")
+            NDKLogger.log(.info, category: .wallet, "💸 Direct payment using mint: \(mint)")
             // No transfer needed, mint already has sufficient balance
             
         case .crossMint(let sourceMint, let targetMint, let estimatedFee):
-            print("💱 Cross-mint transfer required from \(sourceMint) to \(targetMint)")
+            NDKLogger.log(.info, category: .wallet, "💱 Cross-mint transfer required from \(sourceMint) to \(targetMint)")
             if let fee = estimatedFee {
-                print("   Estimated fee: \(fee) sats")
+                NDKLogger.log(.info, category: .wallet, "   Estimated fee: \(fee) sats")
             }
             
             // Perform the transfer
@@ -98,7 +98,7 @@ actor WalletPaymentRouter {
             // Funds are now in the target mint
             
         case .impossible(let reason):
-            print("❌ Payment impossible: \(reason)")
+            NDKLogger.log(.error, category: .wallet, "❌ Payment impossible: \(reason)")
             throw NDKError.insufficientBalance(amount: nutzapRequest.amountSats)
         }
         
@@ -144,8 +144,8 @@ actor WalletPaymentRouter {
         mints: MintManager,
         proofStateManager: ProofStateManager
     ) async throws -> PaymentConfirmation {
-        print("WalletPaymentRouter.executeLightningPayment - amount: \(lightningRequest.amountSats)")
-        print("WalletPaymentRouter.executeLightningPayment - invoice: \(lightningRequest.invoice)")
+        NDKLogger.log(.debug, category: .wallet, "WalletPaymentRouter.executeLightningPayment - amount: \(lightningRequest.amountSats)")
+        NDKLogger.log(.debug, category: .wallet, "WalletPaymentRouter.executeLightningPayment - invoice: \(lightningRequest.invoice)")
         
         // Pay Lightning invoice through the mint
         let (preimage, feePaid) = try await wallet.payLightning(

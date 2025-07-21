@@ -94,9 +94,9 @@ public enum CashuDeposit {
                                             createdEventIds: createdEventIds,
                                             signer: signer
                                         )
-                                        print("✅ Created NIP-60 history event for lightning deposit of \(quote.amount) sats")
+                                        NDKLogger.log(.info, category: .wallet, "✅ Created NIP-60 history event for lightning deposit of \(quote.amount) sats")
                                     } catch {
-                                        print("⚠️ Failed to create history event for deposit: \(error)")
+                                        NDKLogger.log(.warning, category: .wallet, "⚠️ Failed to create history event for deposit: \(error)")
                                     }
                                 }
                                 
