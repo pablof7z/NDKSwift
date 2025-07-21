@@ -78,10 +78,23 @@ public final class NDKEventBuilder {
     
     // MARK: - Builder Methods
     
-    /// Set the event content
+    /// Set the event content with optional automatic imeta tag extraction
+    /// - Parameters:
+    ///   - content: The event content
+    ///   - extractImeta: Whether to automatically extract media URLs and create imeta tags (default: true)
     @discardableResult
-    public func content(_ content: String) -> NDKEventBuilder {
+    public func content(_ content: String, extractImeta: Bool = true) -> NDKEventBuilder {
         self.content = content
+        
+        if extractImeta {
+            // Extract media URLs and create basic imeta tags
+            let urls = extractMediaURLs(from: content)
+            for url in urls where !hasImetaTag(for: url) {
+                let imeta = NDKImetaTag(url: url)
+                self.tags.append(ImetaUtils.imetaTagToTag(imeta))
+            }
+        }
+        
         return self
     }
     
@@ -826,4 +839,71 @@ public final class NDKEventBuilder {
         return try await signer.sign(tempEvent)
     }
     
+    // MARK: - NIP-92 Media Attachments Support
+    
+    /// Add an imeta tag for a media URL
+    /// - Parameters:
+    ///   - url: The media URL
+    ///   - configure: Optional closure to configure additional imeta fields
+    @discardableResult
+    public func imetaTag(url: String, configure: (inout NDKImetaTag) -> Void = { _ in }) -> NDKEventBuilder {
+        var imeta = NDKImetaTag(url: url)
+        configure(&imeta)
+        self.tags.append(ImetaUtils.imetaTagToTag(imeta))
+        return self
+    }
+    
+    /// Add an imeta tag from a Blossom upload result
+    /// - Parameter upload: The Blossom upload result containing URL, hash, and size
+    @discardableResult
+    public func imetaTag(from upload: BlossomBlob) -> NDKEventBuilder {
+        var imeta = NDKImetaTag(
+            url: upload.url,
+            x: upload.sha256,
+            size: String(upload.size)
+        )
+        
+        // Add mime type if available
+        if let mimeType = upload.type {
+            imeta.m = mimeType
+        }
+        
+        self.tags.append(ImetaUtils.imetaTagToTag(imeta))
+        return self
+    }
+    
+    /// Add a pre-configured imeta tag
+    @discardableResult
+    public func imetaTag(_ imeta: NDKImetaTag) -> NDKEventBuilder {
+        self.tags.append(ImetaUtils.imetaTagToTag(imeta))
+        return self
+    }
+    
+    // MARK: - Private Helpers
+    
+    /// Extract media URLs from content based on file extensions
+    private func extractMediaURLs(from content: String) -> [String] {
+        // Pattern to match URLs with common media file extensions
+        let pattern = #"https?://[^\s]+\.(?:jpg|jpeg|png|gif|webp|bmp|svg|mp4|mp3|webm|mov|avi|mkv|flv|wmv|m4v|m4a|ogg|wav|flac|aac|opus|pdf)(?:\?[^\s]*)?"#
+        
+        let regex = try? NSRegularExpression(pattern: pattern, options: [.caseInsensitive])
+        let matches = regex?.matches(in: content, options: [], range: NSRange(location: 0, length: content.utf16.count)) ?? []
+        
+        return matches.compactMap { match in
+            guard let range = Range(match.range, in: content) else { return nil }
+            return String(content[range])
+        }
+    }
+    
+    /// Check if an imeta tag already exists for a given URL
+    private func hasImetaTag(for url: String) -> Bool {
+        return tags.contains { tag in
+            guard tag.first == "imeta" else { return false }
+            
+            // Check if any imeta tag contains this URL
+            return tag.contains { component in
+                component.hasPrefix("url ") && component.dropFirst(4) == url
+            }
+        }
+    }
 }
