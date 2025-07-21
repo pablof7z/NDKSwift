@@ -5,6 +5,17 @@ All notable changes to NDKSwift will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.2] - 2025-07-21
+
+### Fixed
+- **E2E Test Improvements** - Replaced Task.sleep hack with proper async relay monitoring
+  - NIP60WalletE2ETests now uses `waitForRelayConnections` method
+  - Removed hardcoded nanosecond delays for relay connection waiting
+  - Fixed unused variable warnings in tests
+- **Mint Info Fetching** - Implemented proper mint info retrieval in NutsackiOS
+  - WalletSettingsView now uses wallet's MintManager.getMintInfo() method
+  - Removed TODO comment about CashuSwift API availability
+
 ## [0.6.1] - 2025-07-21
 
 ### Added
