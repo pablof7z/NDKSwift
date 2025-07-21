@@ -41,7 +41,6 @@ public enum Payment {
         eventManager: WalletEventManager,
         signer: NDKSigner
     ) async throws -> (preimage: String, feePaid: Int64?) {
-        // For now, use the provided amount
         let invoiceAmount = amount
         
         // Get mints with sufficient balance

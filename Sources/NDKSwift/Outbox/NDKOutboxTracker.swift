@@ -2,46 +2,73 @@ import Foundation
 
 /// Tracks relay information for users to implement the outbox model
 actor NDKOutboxTracker {
-    /// Default TTL for cached relay information (2 minutes)
-    static let defaultTTL: TimeInterval = 120
+    /// Default TTL for positive cache entries (24 hours)
+    static let positiveEntryTTL: TimeInterval = 86400
+    
+    /// Default TTL for negative cache entries (1 hour)
+    static let negativeEntryTTL: TimeInterval = 3600
 
-    /// Default cache capacity
-    static let defaultCapacity = 1000
+    /// Default in-memory cache capacity
+    static let defaultCapacity = 500
 
     private let ndk: NDK
-    private let cache: LRUCache<String, NDKOutboxItem>
+    private let memoryCache: LRUCache<String, CachedRelayPreference>
     private let blacklistedRelays: Set<String>
 
     /// Track pending fetches to avoid duplicate requests
     private var pendingFetches: [String: Task<NDKOutboxItem?, Error>] = [:]
+    
+    /// Cached relay preference with metadata
+    private struct CachedRelayPreference {
+        let item: NDKOutboxItem?  // nil = negative cache
+        let fetchedAt: Date
+        let expiresAt: Date
+        let checkedRelays: Set<String>?  // For negative entries only
+    }
 
     init(
         ndk: NDK,
         capacity: Int = defaultCapacity,
-        ttl: TimeInterval = defaultTTL,
         blacklistedRelays: Set<String> = []
     ) {
         self.ndk = ndk
-        self.cache = LRUCache(capacity: capacity, defaultTTL: ttl)
+        self.memoryCache = LRUCache(capacity: capacity, defaultTTL: Self.positiveEntryTTL)
         self.blacklistedRelays = blacklistedRelays
     }
 
     /// Get relay information for a user
     func getRelaysFor(
         pubkey: String,
+        maxAge: TimeInterval = 3600,
         type: RelayListType = .both
     ) async throws -> NDKOutboxItem? {
-        print("🔍 [OutboxTracker] getRelaysFor called for pubkey: \(pubkey)")
+        print("🔍 [OutboxTracker] getRelaysFor called for pubkey: \(pubkey), maxAge: \(maxAge)")
         
-        // Check cache first
-        if let cached = await cache.get(pubkey) {
-            print("🔍 [OutboxTracker] Found cached relay info for pubkey: \(pubkey)")
-            return filterByType(cached, type: type)
+        // 1. Check memory cache first
+        if let cached = await checkMemoryCache(pubkey: pubkey, maxAge: maxAge) {
+            print("🔍 [OutboxTracker] Memory cache hit for pubkey: \(pubkey)")
+            if let item = cached.item {
+                return filterByType(item, type: type)
+            } else {
+                // Negative cache hit
+                return nil
+            }
+        }
+        
+        // 2. Check database cache
+        if let cached = await checkDatabaseCache(pubkey: pubkey, maxAge: maxAge) {
+            print("🔍 [OutboxTracker] Database cache hit for pubkey: \(pubkey)")
+            if let item = cached.item {
+                return filterByType(item, type: type)
+            } else {
+                // Negative cache hit
+                return nil
+            }
         }
 
         print("🔍 [OutboxTracker] No cache found, checking pending fetches...")
         
-        // Check if there's already a pending fetch
+        // 3. Check if there's already a pending fetch
         if let pendingTask = pendingFetches[pubkey] {
             print("🔍 [OutboxTracker] Found pending fetch for pubkey: \(pubkey), waiting...")
             let result = try await pendingTask.value
@@ -51,22 +78,19 @@ actor NDKOutboxTracker {
 
         print("🔍 [OutboxTracker] Creating new fetch task for pubkey: \(pubkey)")
         
-        // Create new fetch task
+        // 4. Create new fetch task
         let fetchTask = Task<NDKOutboxItem?, Error> {
             defer {
                 print("🔍 [OutboxTracker] Removing pending fetch for pubkey: \(pubkey)")
                 pendingFetches.removeValue(forKey: pubkey)
             }
 
-            print("🔍 [OutboxTracker] Starting fetchRelayList for pubkey: \(pubkey)")
-            let item = try await fetchRelayList(for: pubkey)
+            print("🔍 [OutboxTracker] Starting fetchRelayListFromNetwork for pubkey: \(pubkey)")
+            let (item, eoseRelays) = try await fetchRelayListFromNetwork(for: pubkey)
             
-            if let item = item {
-                print("🔍 [OutboxTracker] fetchRelayList succeeded, caching result for pubkey: \(pubkey)")
-                await cache.set(pubkey, value: item)
-            } else {
-                print("🔍 [OutboxTracker] fetchRelayList returned nil for pubkey: \(pubkey)")
-            }
+            // Cache the result
+            await cacheResult(pubkey: pubkey, item: item, eoseRelays: eoseRelays)
+            
             return item
         }
 
@@ -82,8 +106,9 @@ actor NDKOutboxTracker {
         pubkey: String,
         type: RelayListType = .both
     ) async -> NDKOutboxItem? {
-        guard let cached = await cache.get(pubkey) else { return nil }
-        return filterByType(cached, type: type)
+        guard let cached = await memoryCache.get(pubkey),
+              let item = cached.item else { return nil }
+        return filterByType(item, type: type)
     }
 
     /// Track a user's relay information
@@ -108,7 +133,12 @@ actor NDKOutboxTracker {
             source: source
         )
 
-        await cache.set(pubkey, value: item)
+        await memoryCache.set(pubkey, value: CachedRelayPreference(
+            item: item,
+            fetchedAt: Date(),
+            expiresAt: Date().addingTimeInterval(Self.positiveEntryTTL),
+            checkedRelays: nil
+        ))
     }
 
     /// Update relay metadata (e.g., health scores)
@@ -117,9 +147,11 @@ actor NDKOutboxTracker {
         metadata: RelayMetadata
     ) async {
         // Get all items that contain this relay
-        let allItems = await cache.allItems()
+        let allItems = await memoryCache.allItems()
 
-        for (pubkey, item) in allItems {
+        for (pubkey, cached) in allItems {
+            guard let item = cached.item else { continue }
+            
             var updated = false
 
             let updatedReadRelays = item.readRelays.map { relay -> RelayInfo in
@@ -146,24 +178,219 @@ actor NDKOutboxTracker {
                     fetchedAt: item.fetchedAt,
                     source: item.source
                 )
-                await cache.set(pubkey, value: updatedItem)
+                await memoryCache.set(pubkey, value: CachedRelayPreference(
+                    item: updatedItem,
+                    fetchedAt: cached.fetchedAt,
+                    expiresAt: cached.expiresAt,
+                    checkedRelays: cached.checkedRelays
+                ))
             }
         }
     }
 
     /// Clear the cache
     func clear() async {
-        await cache.clear()
+        await memoryCache.clear()
         pendingFetches.removeAll()
     }
 
     /// Clean up expired entries
     func cleanupExpired() async {
-        await cache.cleanupExpired()
+        await memoryCache.cleanupExpired()
     }
 
     // MARK: - Private Methods
+    
+    private func checkMemoryCache(pubkey: String, maxAge: TimeInterval) async -> CachedRelayPreference? {
+        guard let cached = await memoryCache.get(pubkey) else { return nil }
+        
+        // Check maxAge
+        let age = Date().timeIntervalSince(cached.fetchedAt)
+        if age > maxAge {
+            return nil
+        }
+        
+        // Check expiration
+        if Date() > cached.expiresAt {
+            return nil
+        }
+        
+        // For negative cache, check if we'd query the same relays
+        if cached.item == nil, let checkedRelays = cached.checkedRelays {
+            let currentOutboxRelays = ndk.outboxConfig.outboxRelays
+            if !currentOutboxRelays.isSubset(of: checkedRelays) {
+                // Some new outbox relays to check
+                return nil
+            }
+        }
+        
+        return cached
+    }
+    
+    private func checkDatabaseCache(pubkey: String, maxAge: TimeInterval) async -> CachedRelayPreference? {
+        guard let dbResult = await ndk.cache.getRelayPreferences(pubkey: pubkey) else {
+            return nil
+        }
+        
+        // Check maxAge
+        let age = Date().timeIntervalSince(dbResult.fetchedAt)
+        if age > maxAge {
+            return nil
+        }
+        
+        // Check expiration
+        if Date() > dbResult.expiresAt {
+            return nil
+        }
+        
+        // For negative cache, check if we'd query the same relays
+        let hasRelayList = dbResult.writeRelays != nil || dbResult.readRelays != nil
+        if !hasRelayList, let checkedRelays = dbResult.checkedRelays {
+            let currentOutboxRelays = ndk.outboxConfig.outboxRelays
+            if !currentOutboxRelays.isSubset(of: checkedRelays) {
+                // Some new outbox relays to check
+                return nil
+            }
+        }
+        
+        // Convert to NDKOutboxItem
+        let item: NDKOutboxItem?
+        if let writeRelays = dbResult.writeRelays, let readRelays = dbResult.readRelays {
+            let writeRelayInfos = writeRelays
+                .filter { !blacklistedRelays.contains($0) }
+                .map { RelayInfo(url: $0) }
+            let readRelayInfos = readRelays
+                .filter { !blacklistedRelays.contains($0) }
+                .map { RelayInfo(url: $0) }
+            
+            item = NDKOutboxItem(
+                pubkey: pubkey,
+                readRelays: Set(readRelayInfos),
+                writeRelays: Set(writeRelayInfos),
+                fetchedAt: dbResult.fetchedAt,
+                source: .nip65
+            )
+        } else {
+            item = nil
+        }
+        
+        let cached = CachedRelayPreference(
+            item: item,
+            fetchedAt: dbResult.fetchedAt,
+            expiresAt: dbResult.expiresAt,
+            checkedRelays: dbResult.checkedRelays
+        )
+        
+        // Update memory cache
+        await memoryCache.set(pubkey, value: cached)
+        
+        return cached
+    }
+    
+    private func cacheResult(pubkey: String, item: NDKOutboxItem?, eoseRelays: Set<String>) async {
+        let now = Date()
+        let ttl = item != nil ? Self.positiveEntryTTL : Self.negativeEntryTTL
+        let expiresAt = now.addingTimeInterval(ttl)
+        
+        let cached = CachedRelayPreference(
+            item: item,
+            fetchedAt: now,
+            expiresAt: expiresAt,
+            checkedRelays: item == nil ? eoseRelays : nil
+        )
+        
+        // Update memory cache
+        await memoryCache.set(pubkey, value: cached)
+        
+        // Save to database
+        let writeRelays = item?.writeRelays.map { $0.url }
+        let readRelays = item?.readRelays.map { $0.url }
+        
+        try? await ndk.cache.saveRelayPreferences(
+            pubkey: pubkey,
+            writeRelays: writeRelays,
+            readRelays: readRelays,
+            fetchedAt: now,
+            expiresAt: expiresAt,
+            checkedRelays: item == nil ? eoseRelays : nil
+        )
+    }
 
+    private func fetchRelayListFromNetwork(for pubkey: String) async throws -> (item: NDKOutboxItem?, eoseRelays: Set<String>) {
+        var eoseRelays = Set<String>()
+        var relayListEvent: NDKEvent?
+        
+        let filter = NDKFilter(
+            authors: [pubkey],
+            kinds: [10002],
+            limit: 1
+        )
+        
+        // Use configured outbox relays
+        let dataSource = ndk.observe(
+            filter: filter,
+            maxAge: 0,
+            cachePolicy: .networkOnly,
+            relays: ndk.outboxConfig.outboxRelays
+        )
+        
+        // Process both events and relay updates with timeout
+        await withTaskGroup(of: Void.self) { group in
+            // Task 1: Collect events
+            group.addTask {
+                for await event in dataSource.events {
+                    if relayListEvent == nil || event.createdAt > relayListEvent!.createdAt {
+                        relayListEvent = event
+                    }
+                }
+            }
+            
+            // Task 2: Track EOSE
+            group.addTask {
+                for await update in dataSource.relayUpdates {
+                    if case .eose(let relay) = update {
+                        eoseRelays.insert(relay)
+                    }
+                }
+            }
+            
+            // Task 3: Timeout after 2 seconds
+            group.addTask {
+                try? await Task.sleep(nanoseconds: 2_000_000_000)
+            }
+            
+            // Wait for the first task to complete (timeout or data)
+            await group.next()
+            
+            // Cancel remaining tasks
+            group.cancelAll()
+        }
+        
+        // Parse relay list if found
+        guard let event = relayListEvent else {
+            return (nil, eoseRelays)
+        }
+        
+        let relayList = NDKRelayList.fromEvent(event)
+        
+        let readRelayUrls = Set(relayList.readRelays.map { $0.url })
+            .subtracting(blacklistedRelays)
+        let writeRelayUrls = Set(relayList.writeRelays.map { $0.url })
+            .subtracting(blacklistedRelays)
+        
+        let readRelayInfos = readRelayUrls.map { RelayInfo(url: $0) }
+        let writeRelayInfos = writeRelayUrls.map { RelayInfo(url: $0) }
+        
+        let item = NDKOutboxItem(
+            pubkey: pubkey,
+            readRelays: Set(readRelayInfos),
+            writeRelays: Set(writeRelayInfos),
+            source: .nip65
+        )
+        
+        return (item, eoseRelays)
+    }
+    
     private func fetchRelayList(for pubkey: String) async throws -> NDKOutboxItem? {
         print("🔍 [OutboxTracker] fetchRelayList: Trying NIP-65 (kind 10002) for pubkey: \(pubkey)")
         
@@ -210,7 +437,7 @@ actor NDKOutboxTracker {
         
         // Set up EOSE handler
         print("🔍 [OutboxTracker] fetchNIP65RelayList: Setting up EOSE handler")
-        await subscription.onEOSE {
+        await subscription.onEOSE { _ in
             print("🔍 [OutboxTracker] fetchNIP65RelayList: EOSE received")
             didReceiveEvent = true
         }
@@ -302,7 +529,7 @@ actor NDKOutboxTracker {
         var didReceiveEvent = false
         
         // Set up EOSE handler
-        await subscription.onEOSE {
+        await subscription.onEOSE { _ in
             didReceiveEvent = true
         }
         

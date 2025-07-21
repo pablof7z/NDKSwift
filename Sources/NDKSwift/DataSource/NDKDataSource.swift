@@ -11,6 +11,16 @@ public enum CachePolicy {
     case networkOnly
 }
 
+/// Relay-level update information
+public enum RelayUpdate {
+    /// Event received from a specific relay
+    case event(NDKEvent, relay: String)
+    /// End of stored events from a specific relay
+    case eose(relay: String)
+    /// Subscription closed on a specific relay
+    case closed(relay: String)
+}
+
 /// Primary API for declarative data access in NDKSwift
 /// Automatically manages subscriptions, caching, and lifecycle
 public final class NDKDataSource<T>: ObservableObject, CacheObserver {
@@ -21,6 +31,10 @@ public final class NDKDataSource<T>: ObservableObject, CacheObserver {
     /// AsyncStream for consuming events as they arrive
     public let events: AsyncStream<T>
     private let eventsContinuation: AsyncStream<T>.Continuation
+    
+    /// Relay-level updates (events, EOSE, closed)
+    public let relayUpdates: AsyncStream<RelayUpdate>
+    private let relayUpdatesContinuation: AsyncStream<RelayUpdate>.Continuation
     
     private let filter: NDKFilter
     private let ndk: NDK
@@ -101,12 +115,19 @@ public final class NDKDataSource<T>: ObservableObject, CacheObserver {
         self.correlationId = IDGenerator.randomId(length: 8)
         self.subscriptionId = subscriptionId
         
-        // Set up the AsyncStream
+        // Set up the AsyncStream for events
         var continuation: AsyncStream<T>.Continuation!
         self.events = AsyncStream { cont in
             continuation = cont
         }
         self.eventsContinuation = continuation
+        
+        // Set up the AsyncStream for relay updates
+        var relayUpdatesCont: AsyncStream<RelayUpdate>.Continuation!
+        self.relayUpdates = AsyncStream { cont in
+            relayUpdatesCont = cont
+        }
+        self.relayUpdatesContinuation = relayUpdatesCont
         
         // Start observing immediately
         task = Task { [weak self] in
@@ -119,6 +140,7 @@ public final class NDKDataSource<T>: ObservableObject, CacheObserver {
         NDKLogger.log(.debug, category: .subscription, "🔚 NDKDataSource deinit - Cleaning up resources", correlationId: correlationId)
         task?.cancel()
         eventsContinuation.finish()
+        relayUpdatesContinuation.finish()
         let handle = requirementHandle
         Task {
             await handle?.release()
@@ -178,6 +200,12 @@ public final class NDKDataSource<T>: ObservableObject, CacheObserver {
         } else {
             NDKLogger.log(.trace, category: .subscription, "❌ Transform failed - event not added to data", correlationId: correlationId)
         }
+    }
+    
+    /// Handle relay-level updates (EOSE, subscription status, etc)
+    /// This needs to be called by the internal subscription system
+    public func handleRelayUpdate(_ update: RelayUpdate) async {
+        relayUpdatesContinuation.yield(update)
     }
     
     /// Manually refresh the data

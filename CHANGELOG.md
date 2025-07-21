@@ -7,7 +7,53 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- Fixed CashuDeposit to properly track and clean up quote events after successful deposits
+  - `requestMintQuote` now returns both the quote and its event ID when persisting
+  - `monitorDeposit` accepts an optional quote event ID for cleanup
+  - Successfully used quotes are automatically deleted from Nostr storage
+  - Prevents accumulation of obsolete quote events
+
 ### Added
+- Added `check` command to NIP60Wallet example REPL for validating proof states
+  - Check proofs against specific mint or all configured mints
+  - Shows proof states: unspent, spent, or pending
+  - Provides summary statistics for proof validation
+  - Automatically reconciles proof states after checking
+- Added modular LNURL resolution system for proper zap receipt validation
+  - `LNURLResolver` protocol for easy replacement with library implementations
+  - Support for LUD16 (Lightning Address) resolution
+  - Automatic extraction of provider pubkey from LNURL metadata
+  - Fallback handling for services that use recipient's pubkey
+  - Comprehensive error handling and logging
+  - Unit tests for LNURL resolution scenarios
+- Added comprehensive NIP-05 caching system with proactive caching and lazy verification
+- Added profile semantic caching for optimized performance
+  - Profiles now stored with individual fields in database columns
+  - No JSON parsing required on retrieval (average <0.1ms per profile)
+  - Additional/custom profile fields stored as efficient binary plist
+  - Backward compatible with JSON-only profiles from before migration
+  - Migration v11 automatically converts existing profiles to semantic format
+  - Performance improvement: ~10x faster profile retrieval compared to JSON parsing
+  - Automatic extraction of NIP-05 identifiers from kind:0 events
+  - Verification states: unverified, verified, invalid, expired, failed
+  - Smart caching with configurable TTL (24 hours default)
+  - Rate limiting per domain to prevent abuse
+  - NIP-05 search with prefix matching for autocomplete
+  - Self-healing cache that corrects wrong associations
+  - SQLite storage with optimized search indexes
+  - **Performance Improvements**:
+    - Dedicated `NIP05Manager` actor for better modularity and encapsulation
+    - In-memory LRU cache layer for frequently accessed entries
+    - In-flight request deduplication prevents duplicate network calls
+    - Batch verification support for stale entries
+  - **API Improvements**:
+    - `ndk.nip05Manager` provides centralized NIP-05 operations
+    - Cache statistics and health monitoring
+    - Flexible cache clearing options
+  - `NDKUser.fromNip05()` now uses cache with optional force verification
+  - `ndk.searchNIP05()` for instant prefix search without network requests
+  - `ndk.verifyNIP05()` and `user.verifyNIP05()` for lazy verification
 - Added comprehensive NIP-92 (Media Attachments) support with automatic imeta tag generation
   - Automatic extraction of media URLs from event content (images, videos, audio, PDFs)
   - Manual imeta tag builder methods for custom metadata

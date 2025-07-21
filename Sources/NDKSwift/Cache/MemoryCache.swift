@@ -207,7 +207,7 @@ public actor MemoryCache: NDKCache {
         // Get all keys that end with the viewer pubkey
         let allItems = await decryptedContent.allItems()
         for (key, _) in allItems where key.hasSuffix(":\(viewerPubkey)") {
-            await decryptedContent.remove(key)
+            await decryptedContent.delete(key)
         }
         NDKLogger.log(.debug, category: .cache, "Cleared decrypted content for viewer \(viewerPubkey)")
     }
@@ -479,7 +479,7 @@ public actor MemoryCache: NDKCache {
         // Find all observers whose filters match this event
         for (signature, observerSet) in observers {
             // Create filter from signature to check if event matches
-            var filter = NDKFilter(
+            let filter = NDKFilter(
                 ids: signature.ids,
                 authors: signature.authors,
                 kinds: signature.kinds,

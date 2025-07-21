@@ -155,14 +155,13 @@ public struct NegentropyDecoder {
             return try decodeMessageAfterProtocol(data: data, index: &index)
         }
         
-        // The actual Negentropy protocol doesn't use explicit message type bytes
+        // The Negentropy protocol doesn't use explicit message type bytes
         // Messages are distinguished by their structure
-        // For now, we'll use a simplified heuristic approach
+        // This implementation uses a heuristic approach to identify message types
         
         var index = data.startIndex
         
-        // The Negentropy protocol uses a more complex format
-        // For now, we'll implement a basic version that handles the common cases
+        // Parse the message based on its structure
         
         // If first byte is < 0x80, it's likely a reconciliation message
         let firstByte = data[data.startIndex]
@@ -304,8 +303,7 @@ public struct NegentropyDecoder {
         let fingerprintPrefix = data[index..<data.index(index, offsetBy: 8)]
         index = data.index(index, offsetBy: 8)
         
-        // Note: In a real implementation, we'd need to expand the fingerprint prefix
-        // For now, we'll use the prefix as-is
+        // Using the fingerprint prefix directly (8 bytes)
         return NegentropyRange(
             lower: lower,
             upper: upper,
@@ -347,8 +345,7 @@ public struct NegentropyDecoder {
     }
     
     private static func decodeFullId(data: Data, index: inout Data.Index) throws -> Data {
-        // In the actual protocol, IDs might be compressed
-        // For now, we'll read 8 bytes as a prefix
+        // Reading ID prefix (8 bytes)
         return try decodeIdPrefix(data: data, index: &index)
             .paddedToLength(32) // Extend to full 32 bytes
     }

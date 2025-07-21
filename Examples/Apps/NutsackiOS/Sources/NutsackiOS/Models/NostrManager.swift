@@ -19,6 +19,10 @@ class NostrManager {
     private(set) var userProfileDataSource: UserProfileDataSource?
     private(set) var contactsMetadataDataSource: MultipleProfilesDataSource?
     
+    // Current user's profile
+    private(set) var currentUserProfile: NDKUserProfile?
+    private var profileObservationTask: Task<Void, Never>?
+    
     // Default relays for the app
     let defaultRelays = [ "wss://relay.primal.net" ]
     
@@ -171,6 +175,11 @@ class NostrManager {
     }
     
     func logout() {
+        // Cancel profile observation
+        profileObservationTask?.cancel()
+        profileObservationTask = nil
+        currentUserProfile = nil
+        
         // Clean up data sources
         contactListDataSource = nil
         userProfileDataSource = nil
@@ -255,7 +264,18 @@ class NostrManager {
         
         print("NostrManager - Initializing declarative data sources for user: \(pubkey.prefix(8))...")
         
-        // Initialize user profile data source
+        // Cancel any existing profile observation
+        profileObservationTask?.cancel()
+        
+        // Start observing user profile using NDKProfileManager
+        profileObservationTask = Task { @MainActor in
+            // Use maxAge of 3600 (1 hour) for the profile in settings
+            for await profile in ndk.profileManager.observe(for: pubkey, maxAge: 3600) {
+                self.currentUserProfile = profile
+            }
+        }
+        
+        // Initialize user profile data source (kept for compatibility)
         userProfileDataSource = UserProfileDataSource(ndk: ndk, pubkey: pubkey)
         
         // Initialize contact list data source

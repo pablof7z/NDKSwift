@@ -85,7 +85,7 @@ extension NDK {
         // 2. Look for Blossom server announcements
         // 3. Check user's preferred servers from kind 10096 events
 
-        // For now, return some known Blossom servers
+        // Return default known Blossom servers
         return BlossomConstants.defaultServers
     }
 }

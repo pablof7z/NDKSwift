@@ -639,7 +639,7 @@ public final class NDKRelay: RelayProtocol, Hashable, Equatable, @unchecked Send
         
         // Route to subscription manager via NDK only
         if let ndk = ndk, let subId = subscriptionId {
-            print("🔍 [NDKRelay] Routing event to NDK for processing - ndk exists: \(ndk != nil)")
+            print("🔍 [NDKRelay] Routing event to NDK for processing - ndk exists: true")
             NDKLogger.log(.trace, category: .relay, "🔀 Routing event to NDK for processing")
             Task {
                 await ndk.processEvent(event, subscriptionId: subId, from: self)

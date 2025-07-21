@@ -7,8 +7,7 @@ final class NIP92Tests: XCTestCase {
     override func setUp() async throws {
         try await super.setUp()
         ndk = NDK()
-        let privateKey = NDKPrivateKey.generate()
-        ndk.signer = NDKPrivateKeySigner(privateKey: privateKey)
+        ndk.signer = try NDKPrivateKeySigner.generate()
     }
     
     func testAutomaticImetaExtraction() async throws {
@@ -122,8 +121,9 @@ final class NIP92Tests: XCTestCase {
         XCTAssertEqual(imetaTags.count, 9)
         
         // Verify case-insensitive matching
-        let urls = imetaTags.compactMap { tag in
-            tag.first { $0.hasPrefix("url ") }?.dropFirst(4).map(String.init)
+        let urls = imetaTags.compactMap { tag -> String? in
+            guard let urlElement = tag.first(where: { $0.hasPrefix("url ") }) else { return nil }
+            return String(urlElement.dropFirst(4))
         }
         XCTAssertTrue(urls.contains("https://example.com/photo.JPEG"))
         XCTAssertTrue(urls.contains("https://example.com/image.jpg?size=large&quality=100"))
@@ -210,5 +210,87 @@ final class NIP92Tests: XCTestCase {
         XCTAssertTrue(tag.contains("m image/jpeg"))
         XCTAssertTrue(tag.contains("fallback https://backup1.com/test.jpg"))
         XCTAssertTrue(tag.contains("fallback https://backup2.com/test.jpg"))
+    }
+    
+    func testBlossomIntegrationWithoutMetadata() async throws {
+        // Test Blossom upload without blurhash/dimensions (e.g., non-image file)
+        let blossomBlob = BlossomBlob(
+            sha256: "pdf123",
+            url: "https://blossom.example.com/pdf123.pdf",
+            size: 1024 * 500,
+            type: "application/pdf"
+            // No blurhash or dimensions for PDFs
+        )
+        
+        let event = try await ndk.event()
+            .content("Document: \(blossomBlob.url)")
+            .imetaTag(from: blossomBlob)
+            .build()
+        
+        let imetaTags = event.tags.filter { $0.first == "imeta" }
+        XCTAssertEqual(imetaTags.count, 1)
+        
+        let imetaTag = imetaTags[0]
+        XCTAssertTrue(imetaTag.contains("url https://blossom.example.com/pdf123.pdf"))
+        XCTAssertTrue(imetaTag.contains("x pdf123"))
+        XCTAssertTrue(imetaTag.contains("size 512000"))
+        XCTAssertTrue(imetaTag.contains("m application/pdf"))
+        
+        // Should not contain blurhash or dimensions
+        XCTAssertFalse(imetaTag.contains(where: { $0.hasPrefix("blurhash ") }))
+        XCTAssertFalse(imetaTag.contains(where: { $0.hasPrefix("dim ") }))
+    }
+    
+    func testMediaURLExtractionWithQueryParameters() async throws {
+        // Test that URLs with query parameters are properly extracted
+        let event = try await ndk.event()
+            .content("Images: https://example.com/photo.jpg?size=large&quality=100 and https://cdn.example.com/image.png?cache=bust")
+            .build()
+        
+        let imetaTags = event.tags.filter { $0.first == "imeta" }
+        XCTAssertEqual(imetaTags.count, 2)
+        
+        // Check that full URLs with query parameters are preserved
+        let urls = imetaTags.compactMap { tag -> String? in
+            guard let urlElement = tag.first(where: { $0.hasPrefix("url ") }) else { return nil }
+            return String(urlElement.dropFirst(4))
+        }
+        XCTAssertTrue(urls.contains("https://example.com/photo.jpg?size=large&quality=100"))
+        XCTAssertTrue(urls.contains("https://cdn.example.com/image.png?cache=bust"))
+    }
+    
+    func testMediaURLExtractionCaseInsensitive() async throws {
+        // Test that file extensions are matched case-insensitively
+        let event = try await ndk.event()
+            .content("Mixed case: https://example.com/photo.JPG and https://example.com/image.PNG and https://example.com/video.MP4")
+            .build()
+        
+        let imetaTags = event.tags.filter { $0.first == "imeta" }
+        XCTAssertEqual(imetaTags.count, 3)
+    }
+    
+    func testBlossomUploadWithPartialMetadata() async throws {
+        // Test when only some metadata is available (e.g., blurhash but no dimensions)
+        let blossomBlob = BlossomBlob(
+            sha256: "partial123",
+            url: "https://blossom.example.com/partial123.jpg",
+            size: 1024 * 100,
+            type: "image/jpeg",
+            uploaded: Date(),
+            blurhash: "L6R:YnM{9Zt7~qj[j[ay9}of-;WB"
+            // No dimensions
+        )
+        
+        let event = try await ndk.event()
+            .content("Photo: \(blossomBlob.url)")
+            .imetaTag(from: blossomBlob)
+            .build()
+        
+        let imetaTags = event.tags.filter { $0.first == "imeta" }
+        XCTAssertEqual(imetaTags.count, 1)
+        
+        let imetaTag = imetaTags[0]
+        XCTAssertTrue(imetaTag.contains("blurhash L6R:YnM{9Zt7~qj[j[ay9}of-;WB"))
+        XCTAssertFalse(imetaTag.contains(where: { $0.hasPrefix("dim ") }))
     }
 }

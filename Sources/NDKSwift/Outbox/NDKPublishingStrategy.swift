@@ -49,7 +49,8 @@ actor NDKPublishingStrategy {
             event: event,
             targetRelays: selection.relays,
             config: config,
-            selectionMethod: selection.selectionMethod
+            selectionMethod: selection.selectionMethod,
+            eventTracker: ndk.eventTracker
         )
 
         // Store in outbox
@@ -344,17 +345,20 @@ actor OutboxItem {
     public var successCount: Int = 0
     public var failureCount: Int = 0
     public var lastUpdated: Date = .init()
+    private let eventTracker: NDKEventTracker
 
     init(
         event: NDKEvent,
         targetRelays: Set<String>,
         config: OutboxPublishConfig,
-        selectionMethod: SelectionMethod
+        selectionMethod: SelectionMethod,
+        eventTracker: NDKEventTracker
     ) {
         self.event = event
         self.targetRelays = targetRelays
         self.config = config
         self.selectionMethod = selectionMethod
+        self.eventTracker = eventTracker
 
         // Initialize all relays as pending
         for relay in targetRelays {
@@ -366,8 +370,8 @@ actor OutboxItem {
         relayStatuses[relay] = status
         lastUpdated = Date()
 
-        // Also update the event's relay status
-        event.updatePublishStatus(relay: relay, status: status)
+        // Also update the event's relay status via the event tracker
+        await eventTracker.updatePublishStatus(eventId: event.id, relay: relay, status: status)
     }
     
     func setOverallStatus(_ status: PublishStatus) {

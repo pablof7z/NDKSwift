@@ -21,7 +21,8 @@ let package = Package(
         .executable(name: "DebugSubscription", targets: ["DebugSubscription"]),
         .executable(name: "NIP60Wallet", targets: ["NIP60Wallet"]),
         .executable(name: "DebugOutbox", targets: ["DebugOutbox"]),
-        .executable(name: "NIP92MediaDemo", targets: ["NIP92MediaDemo"])
+        .executable(name: "NIP92MediaDemo", targets: ["NIP92MediaDemo"]),
+        .executable(name: "ProfileCachingDemo", targets: ["ProfileCachingDemo"])
     ],
     dependencies: [
         .package(path: "..")
@@ -33,7 +34,7 @@ let package = Package(
                 .product(name: "NDKSwift", package: "NDKSwift")
             ],
             path: "GettingStarted",
-            sources: ["main.swift", "Example01_ConnectToRelay.swift", "Example02_PublishEvent.swift", "Example03_Subscribe.swift", "Example03_1_SimpleObserver.swift", "Example03_2_GroupedSubscriptions.swift", "Example04_UserProfile.swift", "Example05_EncryptedMessages.swift", "Example06_OutboxModel.swift", "Example07_MultipleObservers.swift"],
+            sources: ["main.swift", "Example01_ConnectToRelay.swift", "Example02_PublishEvent.swift", "Example03_Subscribe.swift", "Example03_1_SimpleObserver.swift", "Example03_2_GroupedSubscriptions.swift", "Example04_UserProfile.swift", "Example05_EncryptedMessages.swift", "Example06_OutboxModel.swift", "Example07_MultipleObservers.swift", "Example08_PublishWithNIP46.swift"],
             swiftSettings: [
                 .unsafeFlags(["-parse-as-library"])
             ]
@@ -110,6 +111,14 @@ let package = Package(
                 .product(name: "NDKSwift", package: "NDKSwift")
             ],
             path: "Features/NIP92MediaDemo"
+        ),
+        .executableTarget(
+            name: "ProfileCachingDemo",
+            dependencies: [
+                .product(name: "NDKSwift", package: "NDKSwift")
+            ],
+            path: ".",
+            sources: ["ProfileCachingDemo.swift"]
         )
     ]
 )

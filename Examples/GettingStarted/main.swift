@@ -31,6 +31,8 @@ struct GettingStarted {
             try await runOutboxExample()
         case "7", "07", "multiple":
             try await Example07_MultipleObservers.run()
+        case "8", "08", "nip46", "bunker":
+            try await Example08_PublishWithNIP46.run()
         default:
             print("❌ Unknown example: \(example)")
             printUsage()
@@ -54,6 +56,7 @@ struct GettingStarted {
           5 or encrypted  - Send encrypted messages
           6 or outbox     - Demonstrate NIP-65 outbox model
           7 or multiple   - Test multiple observers on same filter
+          8 or nip46      - Publish with NIP-46 remote signer (bunker/nostrconnect)
         
         Example: swift run GettingStarted 1
         """)
