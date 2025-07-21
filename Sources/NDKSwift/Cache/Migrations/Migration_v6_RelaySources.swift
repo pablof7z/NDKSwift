@@ -4,6 +4,13 @@ import GRDB
 extension NDKSQLiteCache {
     static func registerV6RelaySourcesMigration(_ migrator: inout DatabaseMigrator) {
         migrator.registerMigration("v6-relay-sources") { db in
+            // Check if table already exists
+            let tableExists = try db.tableExists("relay_sources")
+            if tableExists {
+                // Table already exists, skip creation
+                return
+            }
+            
             // Create relay_sources table to track which relays provided each event
             try db.create(table: "relay_sources") { t in
                 t.column("event_id", .text).notNull()
@@ -16,13 +23,13 @@ extension NDKSQLiteCache {
             }
             
             // Create indexes for efficient queries
-            try db.create(index: "idx_relay_sources_event", on: "relay_sources", columns: ["event_id"])
-            try db.create(index: "idx_relay_sources_relay", on: "relay_sources", columns: ["relay_url"])
-            try db.create(index: "idx_relay_sources_time", on: "relay_sources", columns: ["first_seen"])
+            try db.create(index: "idx_relay_sources_event", on: "relay_sources", columns: ["event_id"], ifNotExists: true)
+            try db.create(index: "idx_relay_sources_relay", on: "relay_sources", columns: ["relay_url"], ifNotExists: true)
+            try db.create(index: "idx_relay_sources_time", on: "relay_sources", columns: ["first_seen"], ifNotExists: true)
             
             // Foreign key to events table (cascade delete when event is deleted)
             try db.execute(sql: """
-                CREATE TRIGGER cleanup_relay_sources_on_event_delete
+                CREATE TRIGGER IF NOT EXISTS cleanup_relay_sources_on_event_delete
                 AFTER DELETE ON events
                 FOR EACH ROW
                 BEGIN
