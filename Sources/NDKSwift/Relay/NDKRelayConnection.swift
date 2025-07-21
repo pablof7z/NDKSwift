@@ -69,10 +69,7 @@ public actor NDKRelayConnection {
     
     /// Connect to the relay (async version that properly waits)
     public func connect() async throws {
-        NDKLogger.log(.debug, category: .relay, "connect() async called for \(url)")
-        
         guard !isConnected else {
-            NDKLogger.log(.debug, category: .relay, "Already connected to \(url)")
             return
         }
         
@@ -93,7 +90,6 @@ public actor NDKRelayConnection {
                     await self._connect()
                 }
             }
-            NDKLogger.log(.debug, category: .relay, "connect() async completed for \(url)")
         } catch {
             // For initial connection failures, don't auto-retry (as per Gemini's suggestion)
             if isInitialConnection {
@@ -137,11 +133,10 @@ public actor NDKRelayConnection {
             webSocketTask = Self.sharedURLSession.webSocketTask(with: request)
             webSocketTask?.resume()
             
-            NDKLogger.log(.debug, category: .relay, "WebSocket task created and resumed")
             
-            // Start receiving messages
-            Task {
-                await receiveMessages()
+            // Start receiving messages in a detached task so it doesn't block
+            Task.detached { [weak self] in
+                await self?.receiveMessages()
             }
             
             // Send a ping to verify connection is established
@@ -276,7 +271,9 @@ public actor NDKRelayConnection {
     
     #if os(iOS) || os(macOS) || os(watchOS) || os(tvOS)
     private func receiveMessages() async {
-        guard let task = webSocketTask else { return }
+        guard let task = webSocketTask else { 
+            return 
+        }
         
         do {
             while true {
@@ -343,6 +340,7 @@ public actor NDKRelayConnection {
     #if os(iOS) || os(macOS) || os(watchOS) || os(tvOS)
     private func sendPing() async {
         guard let task = webSocketTask else {
+            NDKLogger.log(.error, category: .relay, "No WebSocket task for \(url)")
             // Resume all waiting continuations with error
             for continuation in connectionContinuations {
                 continuation.resume(throwing: NDKError.connectionFailed(relay: url.absoluteString, message: "No WebSocket task"))
@@ -351,25 +349,47 @@ public actor NDKRelayConnection {
             return
         }
         
-        await withCheckedContinuation { continuation in
+        // Use a single task with timeout built-in
+        let pingCompleted = await withCheckedContinuation { continuation in
+            var pingHandled = false
+            
+            // Set up timeout
+            let timeoutTask = Task {
+                try? await Task.sleep(nanoseconds: 3_000_000_000)
+                if !pingHandled {
+                    pingHandled = true
+                    NDKLogger.log(.error, category: .relay, "[sendPing] Ping timeout for \(url)")
+                    continuation.resume(returning: false)
+                }
+            }
+            
             task.sendPing { [weak self] error in
+                guard !pingHandled else { return } // Ignore if timeout already fired
+                pingHandled = true
+                timeoutTask.cancel()
+                
                 Task { [weak self] in
-                    guard let self = self else { 
-                        continuation.resume()
-                        return 
+                    guard let self = self else {
+                        continuation.resume(returning: false)
+                        return
                     }
                     
                     if let error = error {
-                        NDKLogger.log(.error, category: .relay, "Ping failed for \(self.url): \(error)")
                         await self.resumeContinuationWithError(error)
                         await self.handleConnectionError(error)
+                        continuation.resume(returning: false)
                     } else {
-                        NDKLogger.log(.debug, category: .relay, "Ping successful for \(self.url)")
                         await self.markAsConnected()
+                        continuation.resume(returning: true)
                     }
-                    continuation.resume()
                 }
             }
+        }
+        
+        if !pingCompleted {
+            let timeoutError = NDKError.timeout(operation: "ping", seconds: 3)
+            await resumeContinuationWithError(timeoutError)
+            await handleConnectionError(timeoutError)
         }
     }
     
@@ -388,7 +408,7 @@ public actor NDKRelayConnection {
         connectedAt = Date()
         retryPolicy.reset()
         
-        NDKLogger.log(.info, category: .relay, "Marked as connected: \(url)")
+        NDKLogger.log(.info, category: .relay, "Connected to \(url)")
         
         // Resume all waiting continuations
         for continuation in connectionContinuations {

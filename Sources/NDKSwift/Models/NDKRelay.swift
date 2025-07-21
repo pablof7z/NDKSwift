@@ -91,8 +91,8 @@ actor RelayStateActor {
     var stats = NDKRelayStats()
     var info: NDKRelayInformation?
     
-    // Subscriptions
-    var subscriptions: [String: NDKSubscription] = [:]
+    // Active subscription IDs
+    var subscriptionIds: Set<String> = []
     
     // Observers
     var stateObservers: [@Sendable (NDKRelayConnectionState) -> Void] = []
@@ -225,20 +225,20 @@ actor RelayStateActor {
     
     // MARK: - Subscriptions
     
-    func addSubscription(_ subscription: NDKSubscription) {
-        subscriptions[subscription.id] = subscription
+    func addSubscriptionId(_ subscriptionId: String) {
+        subscriptionIds.insert(subscriptionId)
     }
     
     func removeSubscription(_ subscriptionId: String) {
-        subscriptions.removeValue(forKey: subscriptionId)
+        subscriptionIds.remove(subscriptionId)
     }
     
-    func getSubscription(_ subscriptionId: String) -> NDKSubscription? {
-        return subscriptions[subscriptionId]
+    func hasSubscription(_ subscriptionId: String) -> Bool {
+        return subscriptionIds.contains(subscriptionId)
     }
     
-    func getAllSubscriptions() -> [NDKSubscription] {
-        return Array(subscriptions.values)
+    func getAllSubscriptionIds() -> [String] {
+        return Array(subscriptionIds)
     }
     
     // MARK: - Observers
@@ -314,10 +314,6 @@ public final class NDKRelay: RelayProtocol, Hashable, Equatable, @unchecked Send
         set { _ndk = newValue }
     }
 
-    /// Subscription manager for this relay (lazy initialization)
-    internal lazy var subscriptionManager: NDKRelaySubscriptionManager = {
-        NDKRelaySubscriptionManager(relay: self)
-    }()
 
     /// Internal state actor that manages all mutable state
     private let stateActor = RelayStateActor()
@@ -405,10 +401,10 @@ public final class NDKRelay: RelayProtocol, Hashable, Equatable, @unchecked Send
         }
     }
 
-    /// Get all active subscriptions
-    public var activeSubscriptions: [NDKSubscription] {
+    /// Get all active subscription IDs
+    public var activeSubscriptionIds: [String] {
         get async {
-            await stateActor.getAllSubscriptions()
+            await stateActor.getAllSubscriptionIds()
         }
     }
 
@@ -434,7 +430,6 @@ public final class NDKRelay: RelayProtocol, Hashable, Equatable, @unchecked Send
         }
 
         await stateActor.updateConnectionState(.connecting)
-        NDKLogger.log(.debug, category: .relay, "State updated to connecting for \(url)")
         
         // Reset manual disconnection flag when explicitly connecting
         await stateActor.setManuallyDisconnected(false)
@@ -442,23 +437,18 @@ public final class NDKRelay: RelayProtocol, Hashable, Equatable, @unchecked Send
         await stateActor.updateStats {
             $0.connectionAttempts += 1
         }
-        NDKLogger.log(.debug, category: .relay, "Stats updated for \(url)")
 
         let url = try URLUtils.validateURL(normalizedURL)
 
-        NDKLogger.log(.debug, category: .relay, "Creating connection for \(url)")
         let newConnection = NDKRelayConnection(url: url)
         await stateActor.setConnection(newConnection)
         await newConnection.setDelegate(self)
         
-        NDKLogger.log(.debug, category: .relay, "Calling connection.connect() for \(url)")
         if let conn = await stateActor.getConnection() {
             try await conn.connect()
         } else {
-            NDKLogger.log(.error, category: .relay, "ERROR: connection is nil for \(url)")
             throw NDKError.connectionFailed(relay: url.absoluteString, message: "Connection is nil")
         }
-        NDKLogger.log(.debug, category: .relay, "connection.connect() completed for \(url)")
     }
 
     /// Disconnect from the relay
@@ -543,15 +533,11 @@ public final class NDKRelay: RelayProtocol, Hashable, Equatable, @unchecked Send
 
     // MARK: - Subscription Management
 
-    /// Add a subscription to this relay
-    public func addSubscription(_ subscription: NDKSubscription) async {
-        await stateActor.addSubscription(subscription)
+    /// Add a subscription ID to this relay (internal use only)
+    public func addSubscriptionId(_ subscriptionId: String) async {
+        await stateActor.addSubscriptionId(subscriptionId)
     }
 
-    /// Remove a subscription from this relay
-    public func removeSubscription(_ subscription: NDKSubscription) async {
-        await stateActor.removeSubscription(subscription.id)
-    }
     
     /// Remove a subscription by ID from this relay (safer for async contexts)
     public func removeSubscription(byId subscriptionId: String) async {
@@ -646,9 +632,9 @@ public final class NDKRelay: RelayProtocol, Hashable, Equatable, @unchecked Send
     /// Handle EVENT message
     private func handleEventMessage(_ event: NDKEvent, subscriptionId: String?) async {
         // Route to subscription manager via NDK only
-        if let ndk = ndk {
+        if let ndk = ndk, let subId = subscriptionId {
             Task {
-                await ndk.processEvent(event, from: self)
+                await ndk.processEvent(event, subscriptionId: subId, from: self)
             }
         }
     }
@@ -756,10 +742,9 @@ extension NDKRelay: NDKRelayConnectionDelegate {
             await stateActor.resetReconnectDelay()
             await stateActor.updateConnectionState(.connected)
 
-            // Fetch relay information and replay subscriptions
+            // Fetch relay information
             await fetchRelayInformation()
-            // Replay any waiting subscriptions
-            await subscriptionManager.executePendingSubscriptions()
+            // Note: Subscription replay is handled by InternalSubscriptionManager
         }
     }
 
@@ -782,39 +767,8 @@ extension NDKRelay: NDKRelayConnectionDelegate {
     private func handleNostrMessage(_ message: NostrMessage) async {
         await stateActor.updateStats { $0.messagesReceived += 1 }
 
-        switch message {
-        case let .event(subscriptionId, event):
-            // Route through subscription manager only
-            await subscriptionManager.handleEvent(event, relaySubscriptionId: subscriptionId)
-
-        case let .eose(subscriptionId):
-            // Route through subscription manager only
-            await subscriptionManager.handleEOSE(relaySubscriptionId: subscriptionId)
-
-        case let .ok(eventId, accepted, errorMessage):
-            // Handle event publishing confirmation
-            await handleOKMessage(eventId: eventId, accepted: accepted, message: errorMessage)
-
-        case let .notice(noticeMessage):
-            NDKLogger.log(.info, category: .relay, "Notice from \(url): \(noticeMessage)")
-
-        case let .auth(challenge):
-            // Handle authentication challenge
-            await handleAuthChallenge(challenge)
-            
-        case .negOpen, .negMsg, .negClose, .negErr:
-            // Route NIP-77 messages
-            await routeMessage(message)
-
-        default:
-            // Handle other message types as needed
-            break
-        }
-    }
-
-    private func handleAuthChallenge(_ challenge: String) async {
-        // Notify NDK about auth challenge - implementation requires signer
-        await ndk?.handleAuthChallenge(challenge: challenge, from: self)
+        // Use the same routing as routeMessage to avoid duplication
+        await routeMessage(message)
     }
 }
 

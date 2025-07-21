@@ -67,14 +67,19 @@ ndk.clientTagConfig = NDKClientTagConfig(
 )
 
 // Subscribe to text notes using declarative API
-let textNotes = await ndk.observe(
-    filter: NDKFilter(kinds: [1], limit: 50)
+let dataSource = ndk.observe(
+    filter: NDKFilter(kinds: [1], limit: 50),
+    maxAge: 0,  // Real-time updates (0 = always fresh)
+    cachePolicy: .cacheWithNetwork  // Use cache, then fetch new
 )
 
-// Data automatically updates in SwiftUI views
-ForEach(textNotes.data, id: \.id) { event in
-    Text("\(event.pubkey): \(event.content)")
+// Stream events as they arrive
+for await event in dataSource.events {
+    print("\(event.pubkey): \(event.content)")
 }
+
+// Or get current snapshot
+let currentEvents = await dataSource.currentValue()
 
 // Publish event (works offline, syncs when connected)
 let event = try await ndk.event()
@@ -112,12 +117,13 @@ Reply to any event type with threaded comments:
 
 ```swift
 // Get blog posts using declarative API
-let blogPosts = await ndk.observe(
+let blogPostsSource = ndk.observe(
     filter: NDKFilter(kinds: [EventKind.longFormContent], limit: 1)
 )
+let blogPosts = await blogPostsSource.currentValue()
 
 // Create comment when post is available
-if let blogPost = blogPosts.data.first {
+if let blogPost = blogPosts.first {
     let comment = try await ndk.reply(to: blogPost)
         .content("Great article!")
         .build()
@@ -131,54 +137,104 @@ if let blogPost = blogPosts.data.first {
 }
 
 // Subscribe to comments on content
-let comments = await ndk.observe(
+let commentsSource = ndk.observe(
     filter: NDKFilter(
         kinds: [EventKind.genericReply],
-        tags: ["A": blogPosts.data.first.map { [$0.tagAddress] } ?? []]
+        tags: ["A": blogPosts.first.map { [$0.tagAddress] } ?? []]
     )
 )
+
+// Stream comments as they arrive
+for await comment in commentsSource.events {
+    print("New comment: \(comment.content)")
+}
 ```
 
 ### Declarative Data Access
 
-Access Nostr data declaratively with automatic lifecycle management:
+NDKSwift provides a modern declarative API for accessing Nostr data with automatic caching and real-time updates:
 
 ```swift
-// Real-time data subscription
-let bobNotes = await ndk.observe(
-    filter: NDKFilter(authors: [bobPubkey], kinds: [1])
+// Real-time subscription (maxAge: 0 means always fresh)
+let dataSource = ndk.observe(
+    filter: NDKFilter(authors: [bobPubkey], kinds: [1]),
+    maxAge: 0,  // Always fetch latest
+    cachePolicy: .cacheWithNetwork  // Show cached, then update
 )
 
-// Use in SwiftUI views - automatically updates
-struct BobNotesView: View {
-    @StateObject var notes = bobNotes
+// Stream events as they arrive
+for await event in dataSource.events {
+    print("New note: \(event.content)")
+}
+
+// One-shot fetch with 5-minute cache tolerance
+let profiles = ndk.observe(
+    filter: NDKFilter(kinds: [0], limit: 100),
+    maxAge: 300  // Accept cached data if < 5 minutes old
+)
+let currentProfiles = await profiles.currentValue()
+
+// Convenience fetch method
+let events = await ndk.observe(
+    filter: NDKFilter(kinds: [1], limit: 50)
+).fetch()
+
+// Cache-only access (no network calls)
+let cachedEvents = await ndk.observe(
+    filter: NDKFilter(kinds: [1]),
+    cachePolicy: .cacheOnly
+).fetch()
+
+// SwiftUI Integration
+struct NotesView: View {
+    let dataSource: NDKDataSource<NDKEvent>
+    @State private var notes: [NDKEvent] = []
     
     var body: some View {
-        List(notes.data, id: \.id) { event in
+        List(notes, id: \.id) { event in
             Text(event.content)
+        }
+        .task {
+            // Update UI on main thread
+            for await event in dataSource.events {
+                await MainActor.run {
+                    notes.append(event)
+                }
+            }
         }
     }
 }
 
-// Transform events to custom types
-let profiles = await ndk.observe(
-    filter: NDKFilter(kinds: [0], authors: [alicePubkey])
-) { event in
-    // Transform NDKEvent to NDKUserProfile
-    try? JSONDecoder().decode(NDKUserProfile.self, from: event.content.data(using: .utf8)!)
-}
+// Transform events to custom types  
+let userProfiles = ndk.observe(
+    filter: NDKFilter(kinds: [0], authors: [pubkey]),
+    transform: { event -> NDKUserProfile? in
+        try? event.decodeMetadata()
+    }
+)
 
 // Multiple data sources automatically share subscriptions
-let aliceNotes = await ndk.observe(
+// Requests within 100ms are batched for efficiency
+let aliceNotes = ndk.observe(
     filter: NDKFilter(authors: [alicePubkey], kinds: [1])
 )
 
-let bobProfile = await ndk.observe(
+let bobProfile = ndk.observe(
     filter: NDKFilter(authors: [bobPubkey], kinds: [0])
 )
-
-// System automatically groups similar requests within 100ms window
 ```
+
+#### Cache Policies
+
+- **`.cacheWithNetwork`** (default): Returns cached data immediately, then fetches fresh data
+- **`.cacheOnly`**: Only returns cached data, never hits the network
+- **`.networkOnly`**: Always fetches fresh data, ignores cache
+
+#### maxAge Parameter
+
+- **`maxAge: 0`**: Always fetch fresh data (real-time subscription)
+- **`maxAge: 300`**: Accept cached data if less than 5 minutes old
+- **`maxAge: 3600`**: Accept cached data if less than 1 hour old
 
 ### Signers
 
@@ -203,8 +259,13 @@ Enable caching for better performance and offline support:
 let cache = NDKSQLiteCache()
 let ndk = NDK(relayUrls: relayUrls, cache: cache)
 
-// Events are automatically cached and available through data sources
-let dataSource = await ndk.observe(filter: filter)
+// Events are automatically cached
+// Control cache behavior with maxAge and cachePolicy
+let dataSource = ndk.observe(
+    filter: filter,
+    maxAge: 300,  // 5 minute cache tolerance
+    cachePolicy: .cacheWithNetwork
+)
 
 // Check event confirmation state
 let confirmationState = await cache.getEventConfirmationState(eventId: event.id)
@@ -295,12 +356,18 @@ let eventZap = try await event.zap(
 )
 
 // Subscribe to zaps on an event
-let zaps = await ndk.observe(
+let zapsSource = ndk.observe(
     filter: NDKFilter(
         kinds: [EventKind.zap],
         tags: ["e": [event.id]]
-    )
+    ),
+    maxAge: 0  // Real-time zap notifications
 )
+
+// Stream zaps as they arrive
+for await zap in zapsSource.events {
+    print("New zap: \(zap.amountSats ?? 0) sats")
+}
 ```
 
 #### Client Identification (NIP-89)

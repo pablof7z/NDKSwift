@@ -46,7 +46,7 @@ final class NIP60SimpleWalletE2ETest: XCTestCase {
         let filter = NDKFilter(authors: [pubkey], kinds: [EventKind.cashuToken])
         let dataSource = ndk.observe(
             filter: filter,
-            maxAge: 0 // Real-time monitoring
+            maxAge: 0, // Real-time monitoring
             cachePolicy: .networkOnly
         )
         

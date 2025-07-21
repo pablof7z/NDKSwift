@@ -40,10 +40,6 @@ public struct NWCResponseHandler {
         print("[NWC Response] Using \(connectedRelays.count) connected relays")
         
         // 2. Create subscription for the response BEFORE publishing
-        var options = NDKSubscriptionOptions()
-        options.relays = Set(connectedRelays)
-        options.closeOnEose = false // Keep subscription open to catch the response
-        
         let relayUrls = Set(connectedRelays.map { $0.url })
         
         // Use NDKDataSource for NWC response monitoring
@@ -59,7 +55,7 @@ public struct NWCResponseHandler {
         let responseTask = Task { () -> T in
             print("[NWC Response] Waiting for response event...")
             
-            for await responseEvent in await dataSource.events {
+            for await responseEvent in dataSource.events {
                 print("[NWC Response] Got response event:")
                 print("[NWC Response]   ID: \(responseEvent.id)")
                 print("[NWC Response]   Pubkey: \(responseEvent.pubkey)")
@@ -178,7 +174,7 @@ public struct NWCResponseHandler {
         var responses: [String: Result<T, NDKError>] = [:]
         
         let responseTask = Task<[String: Result<T, NDKError>], Error> {
-            for await event in await dataSource.events {
+            for await event in dataSource.events {
                 // Get the d-tag for this response
                 let eventTags = event.tags
                 guard let dTag = eventTags.first(where: { $0.count >= 2 && $0[0] == "d" }),
@@ -275,7 +271,7 @@ public struct NWCResponseHandler {
                 )
                 
                 let task = Task {
-                for await event in await dataSource.events {
+                for await event in dataSource.events {
                     // Check if this is an NWC notification (no e-tag)
                     let eventTags = event.tags
                     guard !eventTags.contains(where: { $0.count >= 1 && $0[0] == "e" }) else {

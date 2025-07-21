@@ -10,8 +10,8 @@ public protocol RelayProtocol: AnyObject, Sendable {
     /// Reference to NDK instance
     var ndk: NDK? { get set }
     
-    /// Active subscriptions on this relay
-    var activeSubscriptions: [NDKSubscription] { get async }
+    /// Active subscription IDs on this relay
+    var activeSubscriptionIds: [String] { get async }
     
     // Subscription manager removed from protocol - implementation specific
     
@@ -24,8 +24,8 @@ public protocol RelayProtocol: AnyObject, Sendable {
     /// Send a message to the relay
     func send(_ message: String) async throws
     
-    /// Add a subscription
-    func addSubscription(_ subscription: NDKSubscription) async
+    /// Add a subscription (internal use only)
+    func addSubscriptionId(_ subscriptionId: String) async
     
     /// Remove a subscription by ID
     func removeSubscription(byId id: String) async

@@ -101,9 +101,10 @@ actor NDKFetchingStrategy {
     func closeSubscription(_ subscriptionId: String) async {
         guard let subscription = activeSubscriptions[subscriptionId] else { return }
 
-        // Close all relay subscriptions
-        for (_, relaySubscription) in subscription.relaySubscriptions {
-            await relaySubscription.close()
+        // Close all relay data sources
+        for _ in subscription.relayDataSources.values {
+            // DataSource cleanup happens automatically in deinit
+            // Just remove references
         }
 
         subscription.status = .closed
@@ -231,7 +232,7 @@ actor NDKFetchingStrategy {
         }
 
         // Update status based on successful connections
-        let connectedCount = subscription.relaySubscriptions.count
+        let connectedCount = subscription.relayDataSources.count
         if connectedCount > 0 {
             subscription.status = .active(connectedRelays: connectedCount)
         } else {
@@ -244,16 +245,13 @@ actor NDKFetchingStrategy {
         relayURL: String
     ) async {
         // Get or connect to relay
-        guard let relay = await getOrConnectRelay(url: relayURL) else {
+        guard await getOrConnectRelay(url: relayURL) != nil else {
             subscription.updateRelayStatus(relayURL, status: .failed)
             return
         }
 
-        // Create relay subscription through NDK
-        var options = NDKSubscriptionOptions()
-        options.relays = Set([relay])
-
-        let relayUrls = options.relays?.map { $0.url }
+        // Create data source for this specific relay
+        let relaySet = Set([relayURL])
         
         // Create data sources for each filter
         var dataSources: [NDKDataSource<NDKEvent>] = []
@@ -263,7 +261,7 @@ actor NDKFetchingStrategy {
                 filter: filter,
                 maxAge: 0, // Always fresh for outbox fetching
                 cachePolicy: .cacheWithNetwork, // Use cache but also fetch from network
-                relays: relayUrls.map { Set($0) }
+                relays: relaySet
             )
             dataSources.append(dataSource)
         }
@@ -276,7 +274,7 @@ actor NDKFetchingStrategy {
             await withTaskGroup(of: Void.self) { group in
                 for dataSource in dataSources {
                     group.addTask {
-                        for await event in await dataSource.events {
+                        for await event in dataSource.events {
                             // Deduplicate events
                             let eventId = event.id
                             if !subscription.seenEventIds.contains(eventId) {
@@ -292,7 +290,8 @@ actor NDKFetchingStrategy {
             }
         }
 
-        // Note: We no longer store subscription references as they're managed internally
+        // Store data sources for cleanup later
+        subscription.relayDataSources[relayURL] = dataSources.first
         subscription.updateRelayStatus(relayURL, status: .active)
     }
 
@@ -416,7 +415,7 @@ class OutboxSubscription {
 
     public var status: SubscriptionStatus = .pending
     public var relayStatuses: [String: SubscriptionRelayStatus] = [:]
-    public var relaySubscriptions: [String: NDKSubscription] = [:]
+    public var relayDataSources: [String: NDKDataSource<NDKEvent>] = [:]
     public var seenEventIds: Set<String> = []
     public var eventCount: Int = 0
 

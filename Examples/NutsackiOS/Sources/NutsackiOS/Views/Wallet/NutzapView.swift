@@ -330,8 +330,7 @@ struct NutzapView: View {
             }
             
             // Use declarative data source for profile
-            let profileDataSource = NDKDataSource(
-                ndk: ndk,
+            let profileDataSource = ndk.observe(
                 filter: NDKFilter(
                     authors: [pubkey],
                     kinds: [0]
@@ -426,72 +425,58 @@ struct NutzapView: View {
     private func loadAcceptedMints(for pubkey: String) async {
         guard let ndk = nostrManager.ndk else { return }
         
-        do {
-            // Fetch nutzap preferences event (kind 10019) - NIP-61
-            let filter = NDKFilter(
-                authors: [pubkey],
-                kinds: [EventKind.nutzapPreferences],
-                limit: 1
-            )
-            
-            // Use declarative data source to fetch preferences
-            let preferencesDataSource = NDKDataSource(
-                ndk: ndk,
-                filter: filter,
-                maxAge: 3600,
-                cachePolicy: .cacheWithNetwork
-            )
-            
-            var events: [NDKEvent] = []
-            let fetchTask = Task {
-                for await event in preferencesDataSource.events {
-                    events.append(event)
-                    if events.count >= 1 {
-                        break // Only need first event
-                    }
+        // Fetch nutzap preferences event (kind 10019) - NIP-61
+        let filter = NDKFilter(
+            authors: [pubkey],
+            kinds: [EventKind.nutzapPreferences],
+            limit: 1
+        )
+        
+        // Use declarative data source to fetch preferences
+        let preferencesDataSource = ndk.observe(
+            filter: filter,
+            maxAge: 3600,
+            cachePolicy: .cacheWithNetwork
+        )
+        
+        var events: [NDKEvent] = []
+        let fetchTask = Task {
+            for await event in preferencesDataSource.events {
+                events.append(event)
+                if events.count >= 1 {
+                    break // Only need first event
                 }
             }
-            
-            // Wait a bit for the event
-            try? await Task.sleep(nanoseconds: 2_000_000_000) // 2 seconds
-            fetchTask.cancel()
-            guard let preferencesEvent = events.first else {
-                // If recipient has no nutzap preferences, they can't receive nutzaps
-                await MainActor.run {
-                    acceptedMints = []
-                }
-                return
-            }
-            
-            // Parse mints from event tags
-            var mints: [String] = []
-            for tag in preferencesEvent.tags where tag.count >= 2 && tag[0] == "mint" {
-                mints.append(tag[1])
-            }
-            
-            // Don't add fallback mints - recipient must have configured mints
-            
-            await MainActor.run {
-                acceptedMints = mints
-                // Determine payment method: prefer nutzap if mints available, otherwise lightning
-                if !mints.isEmpty {
-                    paymentMethod = .nutzap
-                } else if supportsLightning {
-                    paymentMethod = .lightning
-                } else {
-                    paymentMethod = .nutzap // Will show error when trying to send
-                }
-            }
-        } catch {
-            print("Failed to load accepted mints: \(error)")
+        }
+        
+        // Wait a bit for the event
+        try? await Task.sleep(nanoseconds: 2_000_000_000) // 2 seconds
+        fetchTask.cancel()
+        guard let preferencesEvent = events.first else {
+            // If recipient has no nutzap preferences, they can't receive nutzaps
             await MainActor.run {
                 acceptedMints = []
-                // If no mints and lightning is available, use lightning
-                if supportsLightning {
-                    paymentMethod = .lightning
-                } else {
-                    paymentMethod = .nutzap
-                }
+            }
+            return
+        }
+        
+        // Parse mints from event tags
+        var mints: [String] = []
+        for tag in preferencesEvent.tags where tag.count >= 2 && tag[0] == "mint" {
+            mints.append(tag[1])
+        }
+        
+        // Don't add fallback mints - recipient must have configured mints
+        
+        await MainActor.run {
+            acceptedMints = mints
+            // Determine payment method: prefer nutzap if mints available, otherwise lightning
+            if !mints.isEmpty {
+                paymentMethod = .nutzap
+            } else if supportsLightning {
+                paymentMethod = .lightning
+            } else {
+                paymentMethod = .nutzap // Will show error when trying to send
             }
         }
     }
@@ -512,33 +497,25 @@ struct NutzapView: View {
     private func checkLightningSupport(for pubkey: String) async {
         guard let ndk = nostrManager.ndk else { return }
         
-        do {
-            // Use declarative data source to fetch profile
-            let profileDataSource = NDKDataSource(
-                ndk: ndk,
-                filter: NDKFilter(
-                    authors: [pubkey],
-                    kinds: [0]
-                ),
-                maxAge: 3600,
-                cachePolicy: .cacheWithNetwork
-            )
-            
-            var profile: NDKUserProfile?
-            for await event in profileDataSource.events {
-                if let profileData = event.content.data(using: .utf8) {
-                    profile = try? JSONDecoder().decode(NDKUserProfile.self, from: profileData)
-                    break
-                }
+        // Use declarative data source to fetch profile
+        let profileDataSource = ndk.observe(
+            filter: NDKFilter(
+                authors: [pubkey],
+                kinds: [0]
+            ),
+            maxAge: 3600,
+            cachePolicy: .cacheWithNetwork
+        )
+        
+        var profile: NDKUserProfile?
+        for await event in profileDataSource.events {
+            if let profileData = event.content.data(using: .utf8) {
+                profile = try? JSONDecoder().decode(NDKUserProfile.self, from: profileData)
+                break
             }
-            await MainActor.run {
-                supportsLightning = profile?.lud16 != nil || profile?.lud06 != nil
-            }
-        } catch {
-            print("Failed to check Lightning support: \(error)")
-            await MainActor.run {
-                supportsLightning = false
-            }
+        }
+        await MainActor.run {
+            supportsLightning = profile?.lud16 != nil || profile?.lud06 != nil
         }
     }
 }

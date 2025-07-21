@@ -331,7 +331,7 @@ class WalletManager {
                 if let eventId = redeemedEventId, let ndk = nostrManager.ndk {
                     Task {
                         let filter = NDKFilter(ids: [eventId])
-                        let dataSource = NDKDataSource(ndk: ndk, filter: filter, maxAge: 3600)
+                        let dataSource = ndk.observe(filter: filter, maxAge: 3600)
                         // Wait for first event
                         for await event in dataSource.events {
                             let nutzapEvent = event
@@ -913,8 +913,8 @@ class WalletManager {
         )
         
         // Fetch events from cache or relays using data sources
-        let tokenDataSource = NDKDataSource(ndk: ndk, filter: tokenFilter, maxAge: 3600)
-        let deletionDataSource = NDKDataSource(ndk: ndk, filter: deletionFilter, maxAge: 3600)
+        let tokenDataSource = ndk.observe(filter: tokenFilter, maxAge: 3600)
+        let deletionDataSource = ndk.observe(filter: deletionFilter, maxAge: 3600)
         
         // Collect events
         var tokenEvents: [NDKEvent] = []
@@ -939,7 +939,7 @@ class WalletManager {
             }
         }
         
-        try await fetchTask.value
+        await fetchTask.value
         
         // Build a set of deleted event IDs from deletion events
         var deletedEventIds = Set<String>()

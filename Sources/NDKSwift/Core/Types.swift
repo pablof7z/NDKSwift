@@ -352,7 +352,7 @@ public enum NDKError: LocalizedError {
 
 // MARK: - Subscription State
 
-public enum NDKSubscriptionState: Equatable, Sendable {
+internal enum NDKSubscriptionState: Equatable, Sendable {
     case pending
     case active
     case inactive

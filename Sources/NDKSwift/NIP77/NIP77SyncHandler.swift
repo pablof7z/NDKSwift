@@ -239,35 +239,30 @@ public actor NIP77SyncHandler {
         var totalBytes = reqMessage.count
         
         // Fetch events using regular REQ/EVENT protocol
-        do {
-            // Use NDKDataSource for fetching missing events
-            let dataSource = NDKDataSource(
-                ndk: ndk,
-                filter: filter,
-                maxAge: 0, // Always fetch fresh for sync
-                cachePolicy: .networkOnly // Skip cache for sync operations
-            )
-            
-            let events = await dataSource.currentValue()
-            
-            // Store events in cache and estimate bandwidth
-            for event in events {
-                // Use processEvent to ensure observers are notified
-                try? await cache.processEvent(event, from: relayURL, subscriptionId: "nip77-sync-\(relayURL)")
-                // Estimate EVENT message size
-                let eventJson = try? event.toJSON()
-                totalBytes += (eventJson?.count ?? 500) + 20 // +20 for ["EVENT","sub", wrapper]
-            }
-            
-            // Add EOSE message
-            totalBytes += 15 // ["EOSE","sub"]
-            
-            NDKLogger.log(.info, category: .network, "[NIP77] Successfully fetched and cached \(events.count) events (bandwidth: \(totalBytes) bytes)")
-            return (Array(events), totalBytes)
-        } catch {
-            NDKLogger.log(.error, category: .network, "[NIP77] Error fetching events: \(error)")
-            return ([], totalBytes)
+        // Use NDKDataSource for fetching missing events
+        let dataSource = NDKDataSource(
+            ndk: ndk,
+            filter: filter,
+            maxAge: 0, // Always fetch fresh for sync
+            cachePolicy: .networkOnly // Skip cache for sync operations
+        )
+        
+        let events = await dataSource.currentValue()
+        
+        // Store events in cache and estimate bandwidth
+        for event in events {
+            // Use processEvent to ensure observers are notified
+            try? await cache.processEvent(event, from: relayURL, subscriptionId: "nip77-sync-\(relayURL)")
+            // Estimate EVENT message size
+            let eventJson = try? event.toJSON()
+            totalBytes += (eventJson?.count ?? 500) + 20 // +20 for ["EVENT","sub", wrapper]
         }
+        
+        // Add EOSE message
+        totalBytes += 15 // ["EOSE","sub"]
+        
+        NDKLogger.log(.info, category: .network, "[NIP77] Successfully fetched and cached \(events.count) events (bandwidth: \(totalBytes) bytes)")
+        return (Array(events), totalBytes)
     }
     
     private func sendEvents(ids: [String], relayURL: String) async -> (events: [NDKEvent], bytesUsed: Int) {

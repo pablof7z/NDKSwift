@@ -45,8 +45,7 @@ class MintDiscoveryManager {
                 
                 // Process announcements as they stream in
                 Task {
-                    do {
-                        for await announcementEvent in announcementDataSource.events {
+                    for await announcementEvent in announcementDataSource.events {
                             let announcement = NDKCashuMintAnnouncement(event: announcementEvent)
                         
                         if let mintURL = announcement.mintURL,
@@ -80,16 +79,11 @@ class MintDiscoveryManager {
                             continuation.yield(discoveredMints)
                         }
                     }
-                    } catch {
-                        // Log error but don't stop the stream
-                        print("Error processing announcement stream: \(error)")
-                    }
                 }
                 
                 // Process recommendations as they stream in
                 Task {
-                    do {
-                        for await recommendationEvent in recommendationDataSource.events {
+                    for await recommendationEvent in recommendationDataSource.events {
                         let recommendation = NDKMintRecommendation(event: recommendationEvent)
                         
                         if let mintURL = recommendation.mintURL,
@@ -130,10 +124,6 @@ class MintDiscoveryManager {
                             
                             continuation.yield(discoveredMints)
                         }
-                    }
-                    } catch {
-                        // Log error but don't stop the stream
-                        print("Error processing recommendation stream: \(error)")
                     }
                 }
                 

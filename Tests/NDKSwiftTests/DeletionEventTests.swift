@@ -6,12 +6,12 @@ final class MockRelay: RelayProtocol, @unchecked Sendable {
     let url: String = "wss://test.relay"
     var connectionState: NDKRelayConnectionState { .connected }
     var ndk: NDK?
-    var activeSubscriptions: [NDKSubscription] { [] }
+    var activeSubscriptionIds: [String] { [] }
     
     func connect() async {}
     func disconnect() async {}
     func send(_ message: String) async throws {}
-    func addSubscription(_ subscription: NDKSubscription) async {}
+    func addSubscriptionId(_ subscriptionId: String) async {}
     func removeSubscription(byId id: String) async {}
     func getSignatureStats() async -> NDKRelaySignatureStats { NDKRelaySignatureStats() }
     func updateSignatureStats(_ updater: @Sendable (inout NDKRelaySignatureStats) -> Void) async {}

@@ -12,10 +12,9 @@ let package = Package(
         .executable(name: "DebugKind0Fetcher", targets: ["DebugKind0Fetcher"]),
         .executable(name: "NIP77Demo", targets: ["NIP77Demo"]),
         .executable(name: "TestNegentropyProtocol", targets: ["TestNegentropyProtocol"]),
-        .executable(name: "DeclarativeDemo", targets: ["DeclarativeDemo"]),
-        .executable(name: "ComprehensiveDeclarativeDemo", targets: ["ComprehensiveDeclarativeDemo"]),
-        .executable(name: "BasicDataSourceDemo", targets: ["BasicDataSourceDemo"]),
-        .executable(name: "MinimalDeclarativeDemo", targets: ["MinimalDeclarativeDemo"])
+        .executable(name: "RealDeclarativeDemo", targets: ["RealDeclarativeDemo"]),
+        .executable(name: "TestRealRelay", targets: ["TestRealRelay"]),
+        .executable(name: "TestOutboxModel", targets: ["TestOutboxModel"])
     ],
     dependencies: [
         .package(path: "..")
@@ -50,36 +49,27 @@ let package = Package(
             path: "Sources/TestNegentropyProtocol"
         ),
         .executableTarget(
-            name: "DeclarativeDemo",
+            name: "RealDeclarativeDemo",
             dependencies: [
                 .product(name: "NDKSwift", package: "NDKSwift")
             ],
-            path: ".",
-            sources: ["DeclarativeDemo.swift"]
+            path: "Sources/RealDeclarativeDemo"
         ),
         .executableTarget(
-            name: "ComprehensiveDeclarativeDemo",
+            name: "TestRealRelay",
             dependencies: [
                 .product(name: "NDKSwift", package: "NDKSwift")
             ],
             path: ".",
-            sources: ["ComprehensiveDeclarativeDemo.swift"]
+            sources: ["TestRealRelay.swift"]
         ),
         .executableTarget(
-            name: "BasicDataSourceDemo",
+            name: "TestOutboxModel",
             dependencies: [
                 .product(name: "NDKSwift", package: "NDKSwift")
             ],
             path: ".",
-            sources: ["FeatureShowcase.swift"]
-        ),
-        .executableTarget(
-            name: "MinimalDeclarativeDemo",
-            dependencies: [
-                .product(name: "NDKSwift", package: "NDKSwift")
-            ],
-            path: ".",
-            sources: ["MinimalDeclarativeDemo.swift"]
+            sources: ["TestOutboxModel.swift"]
         )
     ]
 )

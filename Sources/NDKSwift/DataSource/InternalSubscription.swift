@@ -1,7 +1,17 @@
 import Foundation
 
-/// Internal subscription mechanism for DataRequirementManager
-/// This replaces the old subscription system for internal use only
+/// INTERNAL IMPLEMENTATION DETAIL - DO NOT USE DIRECTLY
+/// 
+/// This is an internal subscription mechanism used exclusively by NDKDataRequirementManager
+/// to manage relay subscriptions. All other components should use the public NDKDataSource API.
+///
+/// Components that need to observe Nostr data should:
+/// 1. Use `ndk.observe(filter:)` to create an NDKDataSource
+/// 2. Iterate over `dataSource.events` for continuous updates
+/// 3. Use `dataSource.currentValue()` for one-time fetches
+///
+/// This internal subscription system handles the low-level relay communication details
+/// and should never be accessed directly by application code or other NDK components.
 actor InternalSubscriptionManager {
     private let ndk: NDK
     private var activeSubscriptions: [String: InternalSubscription] = [:]
@@ -45,7 +55,9 @@ actor InternalSubscriptionManager {
     
     /// Process incoming event from relay
     func processEvent(_ event: NDKEvent, subscriptionId: String, from relay: RelayProtocol) async {
-        guard let subscription = activeSubscriptions[subscriptionId] else { return }
+        guard let subscription = activeSubscriptions[subscriptionId] else {
+            return
+        }
         await subscription.handleEvent(event, from: relay)
     }
     
@@ -56,7 +68,14 @@ actor InternalSubscriptionManager {
     }
 }
 
-/// Internal subscription for use by DataRequirementManager only
+/// INTERNAL IMPLEMENTATION DETAIL - DO NOT USE DIRECTLY
+/// 
+/// Internal subscription used exclusively by DataRequirementManager for managing
+/// individual relay subscriptions. This is a low-level component that handles
+/// the actual REQ/CLOSE message protocol with relays.
+///
+/// Application code and other NDK components should NEVER create or use
+/// InternalSubscription directly. Use NDKDataSource through `ndk.observe()` instead.
 actor InternalSubscription {
     let id: String
     let filters: [NDKFilter]
@@ -110,7 +129,7 @@ actor InternalSubscription {
                 let message = createREQMessage()
                 try await relay.send(message)
             } catch {
-                print("[InternalSubscription] Failed to send REQ to \(relay.url): \(error)")
+                NDKLogger.log(.warning, category: .subscription, "Failed to send REQ to \(relay.url): \(error)")
             }
         }
     }
@@ -155,7 +174,7 @@ actor InternalSubscription {
     /// Handle incoming event
     func handleEvent(_ event: NDKEvent, from relay: RelayProtocol) async {
         // Feed event to stream with relay information
-        await eventContinuation?.yield((event: event, relay: relay.url))
+        eventContinuation?.yield((event: event, relay: relay.url))
         
         // Notify all handlers
         for handler in eventHandlers {
@@ -192,7 +211,7 @@ actor InternalSubscription {
             
             if let tags = filter.tags {
                 for (key, values) in tags {
-                    filterDict["#\(key)"] = values
+                    filterDict["#\(key)"] = Array(values)
                 }
             }
             

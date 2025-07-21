@@ -63,11 +63,12 @@ public final class NDK {
     /// Signature verification sampler
     private let signatureVerificationSampler: NDKSignatureVerificationSampler
     
-    /// Subscription tracker for monitoring and debugging
-    internal let subscriptionTracker: NDKSubscriptionTracker
     
     /// Data requirement manager for declarative data access
     internal var dataRequirementManager: NDKDataRequirementManager?
+    
+    /// Initial relay URLs to add after construction
+    private var initialRelayUrls: [RelayURL] = []
     
     // MARK: - Lazy Internal Components
     
@@ -103,17 +104,12 @@ public final class NDK {
         relayUrls: [RelayURL] = [],
         signer: NDKSigner? = nil,
         cache: NDKCache? = nil,
-        signatureVerificationConfig: NDKSignatureVerificationConfig = .default,
-        subscriptionTrackingConfig: SubscriptionTrackingConfig = .default
+        signatureVerificationConfig: NDKSignatureVerificationConfig = .default
     ) {
         self.signer = signer
         self.cache = cache ?? MemoryCache()
         self.signatureVerificationConfig = signatureVerificationConfig
         self.signatureVerificationSampler = NDKSignatureVerificationSampler(config: signatureVerificationConfig)
-        self.subscriptionTracker = NDKSubscriptionTracker(
-            trackClosedSubscriptions: subscriptionTrackingConfig.trackClosedSubscriptions,
-            maxClosedSubscriptions: subscriptionTrackingConfig.maxClosedSubscriptions
-        )
         
         // Initialize internal subscription manager
         self.internalSubscriptionManager = InternalSubscriptionManager(ndk: self)
@@ -140,30 +136,10 @@ public final class NDK {
         // Set shared NDK instance for NDKEventBuilder
         NDKEventBuilder.setSharedNDK(self)
         
-        // Add initial relays
-        Task {
-            for url in relayUrls {
-                await addRelay(url)
-            }
-        }
+        // Store relay URLs for later initialization
+        self.initialRelayUrls = relayUrls
     }
     
-    // MARK: - Public Configuration
-    
-    public struct SubscriptionTrackingConfig {
-        public var trackClosedSubscriptions: Bool
-        public var maxClosedSubscriptions: Int
-        
-        public init(
-            trackClosedSubscriptions: Bool = false,
-            maxClosedSubscriptions: Int = 100
-        ) {
-            self.trackClosedSubscriptions = trackClosedSubscriptions
-            self.maxClosedSubscriptions = maxClosedSubscriptions
-        }
-        
-        public static let `default` = SubscriptionTrackingConfig()
-    }
     
     // MARK: - Relay Management (Delegated to Pool)
     
@@ -174,54 +150,76 @@ public final class NDK {
     /// - Returns: Number of connected relays
     @discardableResult
     public func waitForRelayConnections(minimumRelays: Int = 1, timeout: TimeInterval = 5.0) async -> Int {
+        print("[waitForRelayConnections] Starting wait for \(minimumRelays) relays with timeout \(timeout)s")
+        
         // Create a task that will timeout
         let timeoutTask = Task {
+            print("[waitForRelayConnections] Timeout task started")
             try? await Task.sleep(nanoseconds: UInt64(timeout * 1_000_000_000))
+            print("[waitForRelayConnections] Timeout reached!")
             return -1 // Sentinel value for timeout
         }
         
         // Create a task that monitors relay connections
         let connectionTask = Task { () -> Int in
+            print("[waitForRelayConnections] Connection monitoring task started")
             var connectedCount = 0
             
             // Check initial state
+            print("[waitForRelayConnections] Checking initial relay state...")
             connectedCount = await pool.connectedRelays().count
+            print("[waitForRelayConnections] Initial connected relays: \(connectedCount)")
             if connectedCount >= minimumRelays {
+                print("[waitForRelayConnections] Already have enough relays connected!")
                 return connectedCount
             }
             
             // Monitor pool changes
+            print("[waitForRelayConnections] Starting to monitor pool changes...")
             for await change in await pool.relayChanges {
+                print("[waitForRelayConnections] Received pool change: \(change)")
                 switch change {
                 case .relayConnected:
                     connectedCount = await pool.connectedRelays().count
+                    print("[waitForRelayConnections] Relay connected! Total: \(connectedCount)")
                     if connectedCount >= minimumRelays {
+                        print("[waitForRelayConnections] Minimum relay count reached!")
                         return connectedCount
                     }
                 case .relayDisconnected:
                     connectedCount = await pool.connectedRelays().count
+                    print("[waitForRelayConnections] Relay disconnected! Total: \(connectedCount)")
                 default:
+                    print("[waitForRelayConnections] Other change: \(change)")
                     break
                 }
             }
             
+            print("[waitForRelayConnections] Pool changes stream ended")
             return connectedCount
         }
         
         // Race between timeout and connection
+        print("[waitForRelayConnections] Starting race between timeout and connection tasks")
         let result = await withTaskGroup(of: Int.self) { group in
             group.addTask { await timeoutTask.value }
             group.addTask { await connectionTask.value }
             
+            print("[waitForRelayConnections] Waiting for first task to complete...")
             if let firstResult = await group.next() {
+                print("[waitForRelayConnections] First result received: \(firstResult)")
                 // Cancel the other task
                 group.cancelAll()
-                return firstResult == -1 ? await pool.connectedRelays().count : firstResult
+                let finalCount = firstResult == -1 ? await pool.connectedRelays().count : firstResult
+                print("[waitForRelayConnections] Final count: \(finalCount)")
+                return finalCount
             }
             
+            print("[waitForRelayConnections] No task completed?")
             return 0
         }
         
+        print("[waitForRelayConnections] Returning result: \(result)")
         return result
     }
     
@@ -270,9 +268,22 @@ public final class NDK {
     
     /// Connect to all configured relays
     /// 
+    /// Initialize relays that were passed to the constructor
+    /// This should be called before connect() to ensure relays are added
+    public func initializeRelays() async {
+        for url in initialRelayUrls {
+            await addRelay(url)
+        }
+        initialRelayUrls.removeAll() // Clear after adding
+    }
+    
     /// Initiates WebSocket connections to all relays in the pool.
     /// Connections are managed automatically with reconnection logic.
     public func connect() async {
+        // Ensure initial relays are added first
+        if !initialRelayUrls.isEmpty {
+            await initializeRelays()
+        }
         await pool.connectAll()
     }
     
@@ -392,7 +403,6 @@ public final class NDK {
     ///   - relays: Optional set of specific relay URLs to query
     ///   - transform: Optional transform function to convert NDKEvent to custom type
     /// - Returns: A data source that can be observed for changes
-    @MainActor
     public func observe(
         filter: NDKFilter,
         maxAge: TimeInterval = 0,
@@ -408,7 +418,6 @@ public final class NDK {
         )
     }
     
-    @MainActor
     public func observe<T>(
         filter: NDKFilter,
         maxAge: TimeInterval = 0,
@@ -577,16 +586,14 @@ public final class NDK {
     
     // MARK: - Internal Methods (for relay communication)
     
-    func processEvent(_ event: NDKEvent, from relay: RelayProtocol) async {
+    func processEvent(_ event: NDKEvent, subscriptionId: String, from relay: RelayProtocol) async {
         // Process event through cache for observation
-        try? await cache.processEvent(event, from: relay.url, subscriptionId: "")
+        try? await cache.processEvent(event, from: relay.url, subscriptionId: subscriptionId)
         
         // Also process through internal subscription manager
-        // The relay should include subscription ID in the event
-        // For now, we'll need to extract it from the relay's internal state
         if let ndkRelay = relay as? NDKRelay {
-            // Process through internal subscription manager
-            await internalSubscriptionManager.processEvent(event, subscriptionId: "", from: ndkRelay)
+            // Process through internal subscription manager with correct subscription ID
+            await internalSubscriptionManager.processEvent(event, subscriptionId: subscriptionId, from: ndkRelay)
         }
     }
     

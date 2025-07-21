@@ -5,7 +5,35 @@ All notable changes to NDKSwift will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.5.0] - 2025-07-20
+## [0.6.0] - 2025-07-20
+
+### Added
+- **Declarative Data Access API** - Modern pattern for accessing Nostr data
+  - `ndk.observe()` - Create data sources with automatic caching and updates
+  - `NDKDataSource` - Observable data source with AsyncStream support
+  - `maxAge` parameter for cache freshness control
+  - `CachePolicy` enum (.cacheWithNetwork, .cacheOnly, .networkOnly)
+  - Automatic subscription grouping and deduplication
+  - Thread-safe state management with actors
+  - `fetch()` convenience method for one-shot data fetching
+  - Transform support for converting events to custom types
+- **SQLite Cache Timestamp Tracking** - Track when filters were last fetched
+  - Migration v7 adds fetch_timestamps table
+  - Enables maxAge parameter to work with persistent cache
+  - Automatic cache freshness validation
+- **NIP-77 Observer Integration** - Sync events now notify observers
+  - Changed from saveEvent to processEvent for proper observer notifications
+  - Ensures data sources are updated when events arrive via sync
+
+### Changed
+- **BREAKING**: Removed internal subscription methods
+  - All data access now flows through NDKDataSource
+  - Legacy fetchEvents/fetchEvent methods deprecated with migration warnings
+  - Tests migrated to use new declarative patterns
+- Improved thread safety with actor-based state management
+- Enhanced documentation with declarative patterns and MainActor.run examples
+
+## [0.5.0] - 2025-01-19
 
 ### Added
 - **NIP-22 Comments Support** - Generic replies to any event type

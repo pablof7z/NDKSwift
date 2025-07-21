@@ -6,6 +6,7 @@ Complete API documentation for NDKSwift v0.3.0+
 
 - [Core Classes](#core-classes)
   - [NDK](#ndk)
+  - [NDKDataSource](#ndkdatasource)
   - [NDKEvent](#ndkevent)
   - [NDKFilter](#ndkfilter)
   - [NDKSubscription](#ndksubscription)
@@ -16,6 +17,8 @@ Complete API documentation for NDKSwift v0.3.0+
   - [NDKCache](#ndkcache)
   - [NDKWallet](#ndkwallet)
 - [Types and Enums](#types-and-enums)
+  - [CachePolicy](#cachepolicy)
+  - [EventConfirmationState](#eventconfirmationstate)
 - [Utilities](#utilities)
 
 ## Core Classes
@@ -81,16 +84,39 @@ public func publish(event: NDKEvent, to relayUrls: Set<String>) async throws -> 
 public func retryUnpublishedEvents(maxAge: TimeInterval, limit: Int?) async throws -> [(event: NDKEvent, relays: Set<NDKRelay>)]
 ```
 
-#### Subscriptions
+#### Data Access (Declarative API)
+
+```swift
+// Create a data source with automatic caching and updates
+public func observe(
+    filter: NDKFilter,
+    maxAge: TimeInterval = 0,
+    cachePolicy: CachePolicy = .cacheWithNetwork,
+    relays: Set<RelayURL>? = nil
+) -> NDKDataSource<NDKEvent>
+
+// Create a data source with transformation
+public func observe<T>(
+    filter: NDKFilter,
+    maxAge: TimeInterval = 0,
+    cachePolicy: CachePolicy = .cacheWithNetwork,
+    relays: Set<RelayURL>? = nil,
+    transform: @escaping (NDKEvent) -> T?
+) -> NDKDataSource<T>
+```
+
+#### Legacy Subscriptions (Deprecated)
 
 ```swift
 // Create a subscription (AsyncSequence)
+@available(*, deprecated, message: "Use observe() for new code")
 public func subscribe(
     filters: [NDKFilter],
     options: NDKSubscriptionOptions = .init()
 ) -> NDKSubscription
 
 // One-shot fetch with multiple filters
+@available(*, deprecated, message: "Use observe() with currentValue() for new code")
 public func fetchEvents(
     filters: [NDKFilter],
     relays: Set<NDKRelay>? = nil,
@@ -172,6 +198,137 @@ public func getSignatureVerificationStats() async -> (
     failedVerifications: Int,
     blacklistedRelays: Int
 )
+```
+
+### NDKDataSource
+
+A modern declarative API for accessing Nostr data with automatic caching and real-time updates.
+
+#### Properties
+
+```swift
+public let filter: NDKFilter                     // Filter defining what events to observe
+public let maxAge: TimeInterval                  // Maximum age of cached data to consider fresh
+public let cachePolicy: CachePolicy              // How to handle cache vs network
+public let relays: Set<RelayURL>?               // Specific relays to use (optional)
+```
+
+#### Initialization
+
+NDKDataSource is created through `ndk.observe()` methods:
+
+```swift
+// Basic observation
+let dataSource = ndk.observe(
+    filter: NDKFilter(kinds: [1], limit: 50),
+    maxAge: 300,  // 5 minutes
+    cachePolicy: .cacheWithNetwork
+)
+
+// With transformation
+let profiles = ndk.observe(
+    filter: NDKFilter(kinds: [0]),
+    transform: { event -> NDKUserProfile? in
+        try? event.decodeMetadata()
+    }
+)
+```
+
+#### Accessing Data
+
+```swift
+// Stream events as they arrive (AsyncSequence)
+var events: AsyncStream<T> { get }
+
+// Get current snapshot of all events
+func currentValue() async -> [T]
+
+// Fetch data once (convenience method)
+func fetch() async -> [T]
+
+// Example: Real-time streaming
+for await event in dataSource.events {
+    print("New event: \(event)")
+}
+
+// Example: One-shot fetch
+let currentEvents = await dataSource.currentValue()
+
+// Example: Convenience fetch
+let events = await dataSource.fetch()
+```
+
+#### Cache Policies
+
+```swift
+public enum CachePolicy {
+    case cacheWithNetwork    // Return cache first, then fetch updates
+    case cacheOnly          // Only return cached data
+    case networkOnly        // Always fetch fresh, ignore cache
+}
+```
+
+#### Usage Patterns
+
+```swift
+// Real-time subscription (maxAge: 0)
+let liveNotes = ndk.observe(
+    filter: NDKFilter(kinds: [1]),
+    maxAge: 0  // Always fresh
+)
+
+// Periodic updates with cache
+let profiles = ndk.observe(
+    filter: NDKFilter(kinds: [0], authors: following),
+    maxAge: 3600  // 1 hour cache
+)
+
+// Offline-first with cache only
+let cachedEvents = ndk.observe(
+    filter: NDKFilter(kinds: [1]),
+    cachePolicy: .cacheOnly
+)
+
+// SwiftUI Integration
+struct NotesView: View {
+    let dataSource: NDKDataSource<NDKEvent>
+    @State private var notes: [NDKEvent] = []
+    
+    var body: some View {
+        List(notes, id: \.id) { note in
+            Text(note.content)
+        }
+        .task {
+            for await event in dataSource.events {
+                await MainActor.run {
+                    notes.append(event)
+                }
+            }
+        }
+    }
+}
+
+// One-shot fetch examples
+// Fetch from cache if fresh, otherwise network
+let dataSource = ndk.observe(
+    filter: NDKFilter(kinds: [0], authors: [pubkey]),
+    maxAge: 300  // 5 minutes
+)
+let profiles = await dataSource.fetch()
+
+// Always fetch from network
+let freshDataSource = ndk.observe(
+    filter: NDKFilter(kinds: [1], limit: 10),
+    cachePolicy: .networkOnly
+)
+let latestNotes = await freshDataSource.fetch()
+
+// Only use cached data
+let offlineDataSource = ndk.observe(
+    filter: NDKFilter(kinds: [1]),
+    cachePolicy: .cacheOnly
+)
+let cachedNotes = await offlineDataSource.fetch()
 ```
 
 ### NDKEvent
@@ -783,7 +940,46 @@ public typealias RelayURL = String               // Relay websocket URL
 
 ### EventKind
 
-Common event kinds.
+Common event kinds defined in various NIPs.
+
+### CachePolicy
+
+Controls how NDKDataSource balances cache vs network access:
+
+```swift
+public enum CachePolicy {
+    case cacheWithNetwork    // Return cached data first, then fetch fresh
+    case cacheOnly          // Only return cached data, no network calls
+    case networkOnly        // Always fetch from network, ignore cache
+}
+```
+
+### EventConfirmationState
+
+Tracks the publication state of events in the cache:
+
+```swift
+public enum EventConfirmationState {
+    case optimistic                           // Event created locally, not yet sent
+    case partial(confirmed: Set<String>, pending: Set<String>)  // Partially delivered
+    case confirmed                           // Fully delivered to all target relays
+}
+```
+
+Usage:
+```swift
+// Check event publication status
+if let state = await ndk.cache?.getEventConfirmationState(eventId: event.id) {
+    switch state {
+    case .optimistic:
+        print("Event is being sent...")
+    case .partial(let confirmed, let pending):
+        print("Sent to \(confirmed.count) relays, \(pending.count) pending")
+    case .confirmed:
+        print("Event confirmed on all relays")
+    }
+}
+```
 
 ### NDKError
 
