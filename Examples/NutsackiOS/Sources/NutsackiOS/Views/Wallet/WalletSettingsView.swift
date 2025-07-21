@@ -211,9 +211,23 @@ struct WalletSettingsView: View {
     
     
     private func fetchMintInfo(url: URL) async throws -> MintInfo {
-        // For now, just return a basic MintInfo
-        // TODO: Properly fetch mint info when CashuSwift API is available
-        return MintInfo(url: url, name: url.host ?? "Unknown Mint")
+        // Use wallet's mint manager to fetch proper mint info
+        if let wallet = walletManager.activeWallet {
+            do {
+                let ndkMintInfo = try await wallet.mints.getMintInfo(url: url)
+                // Convert NDKMintInfo to local MintInfo
+                return MintInfo(
+                    url: url,
+                    name: ndkMintInfo.name ?? url.host ?? "Unknown Mint"
+                )
+            } catch {
+                // Fallback to basic info if fetch fails
+                return MintInfo(url: url, name: url.host ?? "Unknown Mint")
+            }
+        } else {
+            // No active wallet, use basic info
+            return MintInfo(url: url, name: url.host ?? "Unknown Mint")
+        }
     }
     
     private func saveSettings() async {

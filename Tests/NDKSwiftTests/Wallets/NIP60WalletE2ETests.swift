@@ -14,32 +14,22 @@ final class NIP60WalletE2ETests: XCTestCase {
         ndk = NDK(cache: cache)
         
         // Add test relays
-        let relay1 = await ndk.pool.addRelay("wss://relay.damus.io")
-        let relay2 = await ndk.pool.addRelay("wss://relay.primal.net")
-        let relay3 = await ndk.pool.addRelay("wss://relay.nostr.band")
+        _ = await ndk.pool.addRelay("wss://relay.damus.io")
+        _ = await ndk.pool.addRelay("wss://relay.primal.net")
+        _ = await ndk.pool.addRelay("wss://relay.nostr.band")
         
-        // Connect to relays explicitly
+        // Connect to relays using proper async monitoring
         print("🔌 Connecting to relays...")
-        let relays = [relay1, relay2, relay3]
-        for relay in relays {
-            do {
-                try await relay.connect()
-                print("   ✅ Connected to \(relay.url)")
-            } catch {
-                print("   ❌ Failed to connect to \(relay.url): \(error)")
-            }
-        }
+        await ndk.connect()
         
-        // Wait for connections to establish
-        try await Task.sleep(nanoseconds: 2_000_000_000) // 2 seconds
+        // Wait for at least 2 relays to connect with 5 second timeout
+        let connectedCount = await ndk.waitForRelayConnections(minimumRelays: 2, timeout: 5.0)
         
         // Check connection status
         print("\n📡 Final relay connection status:")
         let allRelays = await ndk.pool.relays
-        var connectedCount = 0
         for relay in allRelays {
             if await relay.isConnected {
-                connectedCount += 1
                 print("   ✅ Connected: \(relay.url)")
             } else {
                 print("   ❌ Not connected: \(relay.url)")
@@ -198,22 +188,18 @@ final class NIP60WalletE2ETests: XCTestCase {
                 }
                 // Fetch from specific relay
                 let relaySet = Set([relay.url])
-                do {
-                    let dataSource = ndk.observe(
-                        filter: verifyFilter,
-                        maxAge: 0, // Always fresh for tests
-                        cachePolicy: .networkOnly,
-                        relays: relaySet
-                    )
-                    let events = await dataSource.currentValue()
-                    if !events.isEmpty {
-                        publishedRelays.insert(relay.url)
-                        print("   ✅ Found event on \(relay.url)")
-                    } else {
-                        print("   ❌ NOT found on \(relay.url)")
-                    }
-                } catch {
-                    print("   ❌ Error fetching from \(relay.url): \(error)")
+                let dataSource = ndk.observe(
+                    filter: verifyFilter,
+                    maxAge: 0, // Always fresh for tests
+                    cachePolicy: .networkOnly,
+                    relays: relaySet
+                )
+                let events = await dataSource.currentValue()
+                if !events.isEmpty {
+                    publishedRelays.insert(relay.url)
+                    print("   ✅ Found event on \(relay.url)")
+                } else {
+                    print("   ❌ NOT found on \(relay.url)")
                 }
             }
             
