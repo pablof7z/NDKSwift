@@ -1251,4 +1251,106 @@ public actor NIP60Wallet: NDKPaymentProvider {
             signer: signer
         )
     }
+    
+    // MARK: - Backup and Restore
+    
+    /// Create a backup of the wallet configuration (kind 375)
+    /// - Returns: The published backup event
+    @discardableResult
+    public func createBackup() async throws -> NDKCashuWalletBackupEvent {
+        NDKLogger.log(.info, category: .wallet, "📦 Creating wallet backup (kind 375)")
+        
+        // Get current wallet configuration
+        let currentMints = await mints.getAllMints().map { $0.url }
+        let currentRelays = walletConfigRelays
+        let (p2pkPrivateKey, _) = try await p2pkManager.getOrCreateKeypair()
+        
+        // Create and publish backup event
+        let backupEvent = try await NDKCashuWalletBackupEvent.createAndPublish(
+            ndk: ndk,
+            mints: currentMints,
+            relays: currentRelays.isEmpty ? nil : currentRelays,
+            p2pkPrivateKey: p2pkPrivateKey,
+            signer: signer
+        )
+        
+        NDKLogger.log(.info, category: .wallet, "✅ Wallet backup created successfully: \(backupEvent.event.id)")
+        
+        return backupEvent
+    }
+    
+    /// Restore wallet from a backup event (kind 375)
+    /// - Parameter userPubkey: The public key to search backup events for
+    /// - Returns: True if restoration was successful, false if no backup found
+    @discardableResult
+    public func restoreFromBackup(userPubkey: String? = nil) async throws -> Bool {
+        NDKLogger.log(.info, category: .wallet, "🔄 Attempting to restore wallet from backup")
+        
+        let pubkey = try userPubkey ?? (try await signer.pubkey)
+        
+        // Create filter for backup events
+        let backupFilter = NDKFilter(
+            authors: [pubkey],
+            kinds: [EventKind.cashuWalletBackup],
+            tags: ["p": Set([pubkey])],
+            limit: 1  // Get most recent backup
+        )
+        
+        // Fetch backup events
+        let backupEvents = try await ndk.fetchEvents(filter: backupFilter)
+        
+        guard let latestBackup = backupEvents.first else {
+            NDKLogger.log(.warning, category: .wallet, "❌ No backup events found for user")
+            return false
+        }
+        
+        NDKLogger.log(.info, category: .wallet, "📦 Found backup event: \(latestBackup.id)")
+        
+        // Parse backup event
+        let backupEvent = NDKCashuWalletBackupEvent(event: latestBackup)
+        
+        // Extract configuration from backup
+        let backupMints = try await backupEvent.mints(signer: signer)
+        let backupRelays = backupEvent.relays
+        let backupP2pkPrivateKey = try await backupEvent.p2pkPrivateKey(signer: signer)
+        
+        NDKLogger.log(.info, category: .wallet, "📋 Restored configuration:")
+        NDKLogger.log(.info, category: .wallet, "  - Mints: \(backupMints)")
+        NDKLogger.log(.info, category: .wallet, "  - Relays: \(backupRelays)")
+        NDKLogger.log(.info, category: .wallet, "  - Has P2PK key: \(backupP2pkPrivateKey != nil)")
+        
+        // Update wallet configuration
+        for mintUrl in backupMints {
+            _ = try await mints.addMint(url: mintUrl)
+        }
+        
+        self.walletConfigRelays = backupRelays
+        
+        // Restore P2PK keypair if present
+        if let p2pkPrivateKey = backupP2pkPrivateKey {
+            await p2pkManager.setKeypair(privateKey: p2pkPrivateKey)
+        }
+        
+        // Publish restored configuration as new wallet config event
+        try await configureWithNewMints(backupMints, relays: backupRelays.isEmpty ? nil : backupRelays)
+        
+        NDKLogger.log(.info, category: .wallet, "✅ Wallet restored successfully from backup")
+        
+        return true
+    }
+    
+    /// Check if a backup exists for the current user
+    public func hasBackup() async throws -> Bool {
+        let pubkey = try await signer.pubkey
+        
+        let backupFilter = NDKFilter(
+            authors: [pubkey],
+            kinds: [EventKind.cashuWalletBackup],
+            tags: ["p": Set([pubkey])],
+            limit: 1
+        )
+        
+        let backupEvents = try await ndk.fetchEvents(filter: backupFilter)
+        return !backupEvents.isEmpty
+    }
 }

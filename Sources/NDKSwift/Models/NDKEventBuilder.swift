@@ -847,6 +847,14 @@ public final class NDKEventBuilder {
     ///   - configure: Optional closure to configure additional imeta fields
     @discardableResult
     public func imetaTag(url: String, configure: (inout NDKImetaTag) -> Void = { _ in }) -> NDKEventBuilder {
+        // Remove any existing imeta tag for this URL first
+        self.tags.removeAll { tag in
+            guard tag.first == "imeta" else { return false }
+            return tag.contains { component in
+                component.hasPrefix("url ") && component.dropFirst(4) == url
+            }
+        }
+        
         var imeta = NDKImetaTag(url: url)
         configure(&imeta)
         self.tags.append(ImetaUtils.imetaTagToTag(imeta))
@@ -857,6 +865,14 @@ public final class NDKEventBuilder {
     /// - Parameter upload: The Blossom upload result containing URL, hash, size, and extracted metadata
     @discardableResult
     public func imetaTag(from upload: BlossomBlob) -> NDKEventBuilder {
+        // Remove any existing imeta tag for this URL first
+        self.tags.removeAll { tag in
+            guard tag.first == "imeta" else { return false }
+            return tag.contains { component in
+                component.hasPrefix("url ") && component.dropFirst(4) == upload.url
+            }
+        }
+        
         var imeta = NDKImetaTag(
             url: upload.url,
             x: upload.sha256,
@@ -885,6 +901,16 @@ public final class NDKEventBuilder {
     /// Add a pre-configured imeta tag
     @discardableResult
     public func imetaTag(_ imeta: NDKImetaTag) -> NDKEventBuilder {
+        // Remove any existing imeta tag for this URL first
+        if let url = imeta.url {
+            self.tags.removeAll { tag in
+                guard tag.first == "imeta" else { return false }
+                return tag.contains { component in
+                    component.hasPrefix("url ") && component.dropFirst(4) == url
+                }
+            }
+        }
+        
         self.tags.append(ImetaUtils.imetaTagToTag(imeta))
         return self
     }

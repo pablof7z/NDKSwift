@@ -134,12 +134,12 @@ final class NIP60NutzapE2ETests: XCTestCase {
         
         print("✅ Created nutsack wallets for both pubkeys")
         
-        // Start wallet subscriptions to process incoming events
-        print("\n📡 Starting wallet subscriptions...")
-        await wallet1.startWalletSubscription()
-        print("✅ Wallet1 subscription started")
-        await wallet2.startWalletSubscription()
-        print("✅ Wallet2 subscription started")
+        // Load wallets to start subscriptions
+        print("\n📡 Loading wallets to start subscriptions...")
+        try await wallet1.load()
+        print("✅ Wallet1 loaded and subscriptions started")
+        try await wallet2.load()
+        print("✅ Wallet2 loaded and subscriptions started")
         
         // Wait for wallet setup to propagate
         print("\n⏳ Waiting for wallet setup to propagate (3 seconds)...")

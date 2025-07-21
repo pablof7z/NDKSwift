@@ -23,6 +23,7 @@ The most feature-complete Swift implementation of the Nostr Development Kit. Bui
 - **Smart Relay Management** - Automatic reconnection and message routing
 - **Integrated Payments** - Lightning & Cashu wallets with nutzaps
 - **File Storage** - Blossom protocol for decentralized media
+- **Profile Semantic Caching** - 10x faster profile loading with direct column storage
 - **Cross-Platform** - iOS, macOS, tvOS, watchOS support
 
 ## 📦 Installation
