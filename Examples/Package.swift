@@ -18,7 +18,8 @@ let package = Package(
         .executable(name: "E2ETestBasicEventFlow", targets: ["E2ETestBasicEventFlow"]),
         .executable(name: "E2ETestSimple", targets: ["E2ETestSimple"]),
         .executable(name: "E2ETestRelaySubscription", targets: ["E2ETestRelaySubscription"]),
-        .executable(name: "E2ETestObserveAPI", targets: ["E2ETestObserveAPI"])
+        .executable(name: "E2ETestObserveAPI", targets: ["E2ETestObserveAPI"]),
+        .executable(name: "E2ERelayPool", targets: ["E2ERelayPool"])
     ],
     dependencies: [
         .package(path: "..")
@@ -102,6 +103,13 @@ let package = Package(
                 .product(name: "NDKSwift", package: "NDKSwift")
             ],
             path: "Sources/E2ETestObserveAPI"
+        ),
+        .executableTarget(
+            name: "E2ERelayPool",
+            dependencies: [
+                .product(name: "NDKSwift", package: "NDKSwift")
+            ],
+            path: "Sources/E2ERelayPool"
         )
     ]
 )
