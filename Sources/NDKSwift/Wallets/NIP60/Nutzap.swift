@@ -302,6 +302,9 @@ public enum Nutzap {
             signer: signer
         )
         
+        // Mark the nutzap as redeemed
+        await eventManager.markNutzapRedeemed(event.id)
+        
         // Emit nutzap received notification
         await emitNutzapReceived(event: event, amount: totalReceived)
     }
