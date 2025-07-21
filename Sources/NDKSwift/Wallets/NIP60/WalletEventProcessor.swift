@@ -178,6 +178,9 @@ actor WalletEventProcessor {
         NDKLogger.log(.warning, category: .wallet, "🎯 Event Content: \(event.content)")
         NDKLogger.log(.warning, category: .wallet, "🎯 Event Tags: \(event.tags)")
         
+        // Track the nutzap in the event manager
+        await context.eventManager.trackNutzap(event)
+        
         try await context.wallet.processIncomingNutzap(event)
     }
     
