@@ -28,7 +28,7 @@ actor NDKDataRequirementManager {
     /// - Returns: Handle for managing the requirement lifecycle
     func registerRequirement(
         filter: NDKFilter,
-        observer: DataSourceObserver,
+        observer: CacheObserver,
         maxAge: TimeInterval = 0,
         cachePolicy: CachePolicy = .cacheWithNetwork,
         relays: Set<RelayURL>? = nil
@@ -72,7 +72,7 @@ actor NDKDataRequirementManager {
         
         // Check if we can reuse an existing requirement (only for live subscriptions)
         if maxAge == 0, let existing = findMatchingRequirement(for: filter) {
-            existing.addObserver(observer, id: requirementId, individualFilter: filter)
+            await existing.addObserver(observer, id: requirementId, individualFilter: filter)
             return DataRequirementHandle(
                 id: requirementId,
                 manager: self
@@ -111,7 +111,7 @@ actor NDKDataRequirementManager {
     func releaseRequirement(id: RequirementID) async {
         guard let requirement = activeRequirements[id] else { return }
         
-        requirement.removeObserver(id: id)
+        await requirement.removeObserver(id: id)
         
         // If no more observers, close the subscription
         if requirement.observerCount == 0 {
@@ -161,7 +161,8 @@ actor NDKDataRequirementManager {
                 }
                 
                 // Create subscription using internal manager
-                let subscriptionId = UUID().uuidString
+                // Use a deterministic subscription ID based on the filter
+                let subscriptionId = "ds_\(UUID().uuidString)"
                 let internalSubscription = await ndk.internalSubscriptionManager.createSubscription(
                     id: subscriptionId,
                     filters: [aggregatedFilter],
@@ -182,7 +183,7 @@ actor NDKDataRequirementManager {
                 for p in lifecycleGroup {
                     // Only add observer if this aggregated filter covers their individual filter
                     if requirement.includesFilter(p.filter) {
-                        requirement.addObserver(p.observer, id: p.id, individualFilter: p.filter)
+                        await requirement.addObserver(p.observer, id: p.id, individualFilter: p.filter)
                         if !closeOnEose {
                             // Only track in activeRequirements if it's a live subscription
                             activeRequirements[p.id] = requirement
@@ -350,14 +351,14 @@ typealias RequirementID = UUID
 struct PendingRequirement {
     let id: RequirementID
     let filter: NDKFilter
-    let observer: DataSourceObserver
+    let observer: CacheObserver
     let registeredAt: Date
     let maxAge: TimeInterval
     let cachePolicy: CachePolicy
     let relays: Set<RelayURL>?
 }
 
-/// Manages a single data requirement with potentially multiple observers
+/// Manages a single data requirement - events flow ONLY through cache
 class DataRequirement {
     let filter: NDKFilter
     let subscriptionId: String
@@ -365,9 +366,9 @@ class DataRequirement {
     private let cache: NDKCache?
     private weak var ndk: NDK?
     private let closeOnEose: Bool
-    private var observers: [RequirementID: (observer: DataSourceObserver, filter: NDKFilter)] = [:]
+    private var observerHandles: [RequirementID: ObservationHandle] = [:]
     
-    var observerCount: Int { observers.count }
+    var observerCount: Int { observerHandles.count }
     
     init(filter: NDKFilter, subscriptionId: String, internalSubscription: InternalSubscription, cache: NDKCache?, ndk: NDK, closeOnEose: Bool = false) {
         self.filter = filter
@@ -378,12 +379,21 @@ class DataRequirement {
         self.closeOnEose = closeOnEose
     }
     
-    func addObserver(_ observer: DataSourceObserver, id: RequirementID, individualFilter: NDKFilter) {
-        observers[id] = (observer, individualFilter)
+    func addObserver(_ observer: CacheObserver, id: RequirementID, individualFilter: NDKFilter) async {
+        // Register observer with cache - cache is the single source of truth
+        if let cache = cache {
+            let handle = await cache.observeEvents(
+                matching: individualFilter,
+                observer: observer
+            )
+            observerHandles[id] = handle
+        }
     }
     
-    func removeObserver(id: RequirementID) {
-        observers.removeValue(forKey: id)
+    func removeObserver(id: RequirementID) async {
+        if let handle = observerHandles.removeValue(forKey: id) {
+            await handle.cancel()
+        }
     }
     
     func includesFilter(_ filter: NDKFilter) -> Bool {
@@ -466,65 +476,19 @@ class DataRequirement {
         // Process events from subscription
         Task {
             for await (event, relay) in await internalSubscription.events {
-                // Let cache process and notify its observers
+                // ONLY send to cache - cache is the single source of truth
+                // Cache will notify ALL observers including our data sources
                 try? await cache.processEvent(
                     event,
                     from: relay,
                     subscriptionId: subscriptionId
                 )
-                
-                // Also notify our direct observers if event matches their individual filter
-                for (_, (observer, individualFilter)) in observers {
-                    if eventMatchesFilter(event, filter: individualFilter) {
-                        await observer.handleEvent(event)
-                    }
-                }
             }
         }
     }
     
-    private func eventMatchesFilter(_ event: NDKEvent, filter: NDKFilter) -> Bool {
-        // This duplicates logic from SQLite cache - should be extracted to shared location
-        if let kinds = filter.kinds, !kinds.contains(event.kind) {
-            return false
-        }
-        
-        if let authors = filter.authors, !authors.contains(event.pubkey) {
-            return false
-        }
-        
-        if let ids = filter.ids, !ids.contains(event.id) {
-            return false
-        }
-        
-        if let since = filter.since, event.createdAt < since {
-            return false
-        }
-        
-        if let until = filter.until, event.createdAt > until {
-            return false
-        }
-        
-        // Check tag filters
-        if let tags = filter.tags {
-            for (tagKey, tagValues) in tags {
-                // Remove # prefix if present
-                let tagName = tagKey.hasPrefix("#") ? String(tagKey.dropFirst()) : tagKey
-                
-                // Check if event has any of the required values for this tag
-                let hasTag = event.tags.contains { tag in
-                    guard tag.count >= 2 && tag[0] == tagName else { return false }
-                    return tagValues.contains(tag[1])
-                }
-                
-                if !hasTag {
-                    return false
-                }
-            }
-        }
-        
-        return true
-    }
+    // REMOVED: Event filtering is now ONLY done by the cache
+    // The cache is the single source of truth for all event distribution
 }
 
 /// Handle for managing a data requirement
@@ -538,8 +502,5 @@ public struct DataRequirementHandle {
     }
 }
 
-/// Protocol for objects that observe data requirements
-protocol DataSourceObserver: AnyObject {
-    func handleEvent(_ event: NDKEvent) async
-    func handleError(_ error: Error) async
-}
+// REMOVED: DataSourceObserver protocol - we now use CacheObserver from the cache module
+// The cache is the single source of truth for all event distribution

@@ -41,7 +41,8 @@ class NostrClient {
     
     func connect() async {
         await ndk.connect()
-        print("Connected to \(ndk.pool.connectedRelays().count) relays")
+        let connectedRelays = await ndk.pool.connectedRelays()
+        print("Connected to \(connectedRelays.count) relays")
     }
 }
 ```
@@ -60,12 +61,13 @@ func createNewIdentity() throws -> NDKPrivateKeySigner {
 }
 
 // Login with existing key
-func login(with nsec: String) throws {
+func login(with nsec: String) async throws {
     let signer = try NDKPrivateKeySigner(nsec: nsec)
     ndk.signer = signer
     
     // Get user info
-    let user = try await signer.user()
+    let pubkey = try await signer.pubkey
+    let user = ndk.getUser(pubkey: pubkey)
     print("Logged in as: \(user.npub)")
 }
 ```
@@ -90,22 +92,38 @@ class OptimisticPublishingExample {
     
     func publishWithInstantFeedback() async throws {
         // Create data source for real-time updates
-        let notes = await NDKDataSource<NDKEvent>(
-            ndk: ndk,
-            filter: NDKFilter(kinds: [1], limit: 10)
+        let notesSource = ndk.observe(
+            filter: NDKFilter(kinds: [1], limit: 10),
+            maxAge: 0  // Real-time updates
         )
         
-        // Use in SwiftUI view for automatic updates
-        // Events (including optimistic ones) automatically appear
-        // in notes.data
-                // Event appears immediately when published locally!
+        // Stream updates including optimistic events
+        Task {
+            for await event in notesSource.events {
+                print("Event: \(event.content)")
+                // Check if it's optimistic (not yet confirmed)
+                if let state = await ndk.cache?.getEventConfirmationState(eventId: event.id) {
+                    switch state {
+                    case .optimistic:
+                        print("  Status: Sending...")
+                    case .partial(let confirmed, let pending):
+                        print("  Status: Sent to \(confirmed.count)/\(confirmed.count + pending.count) relays")
+                    case .confirmed:
+                        print("  Status: Confirmed ✓")
+                    }
+                }
             }
         }
         
+        // Connect to relays
         await ndk.connect()
         
         // Publish an event - appears instantly in subscription above
-        let event = NDKEvent(content: "Hello with instant feedback!", kind: 1)
+        let event = try await ndk.event()
+            .content("Hello with instant feedback!")
+            .kind(1)
+            .build()
+            
         try await ndk.publish(event)
         
         print("✅ Event published and visible immediately!")
@@ -121,7 +139,10 @@ class NoteComposer: ObservableObject {
     let ndk: NDK
     
     func publishNote(content: String) async throws {
-        let event = NDKEvent(content: content, kind: 1)
+        let event = try await ndk.event()
+            .content(content)
+            .kind(1)
+            .build()
         
         // Create view model with initial "sending" state
         let noteVM = NoteViewModel(
@@ -152,11 +173,19 @@ class NoteComposer: ObservableObject {
                 case .optimistic:
                     // Still pending
                     try? await Task.sleep(nanoseconds: 500_000_000)
-                case .confirmed(let relay):
-                    // Update UI to show confirmed
+                case .partial(let confirmed, _):
+                    // Update UI to show partial confirmation
                     await MainActor.run {
                         if let index = notes.firstIndex(where: { $0.id == eventId }) {
-                            notes[index].state = .sent(relay: relay)
+                            notes[index].state = .sent(relays: confirmed)
+                        }
+                    }
+                    try? await Task.sleep(nanoseconds: 500_000_000)
+                case .confirmed:
+                    // Update UI to show full confirmation
+                    await MainActor.run {
+                        if let index = notes.firstIndex(where: { $0.id == eventId }) {
+                            notes[index].state = .confirmed
                         }
                     }
                     isConfirmed = true
@@ -175,7 +204,8 @@ struct NoteViewModel {
     
     enum NoteState {
         case sending
-        case sent(relay: String)
+        case sent(relays: Set<String>)
+        case confirmed
         case failed(error: String)
     }
 }
@@ -238,8 +268,10 @@ class UnpublishedEventManager {
             switch state {
             case .optimistic:
                 print("   Status: Still sending...")
-            case .confirmed(let relay):
-                print("   Status: Confirmed by \(relay)")
+            case .partial(let confirmed, let pending):
+                print("   Status: Partial (\(confirmed.count) confirmed, \(pending.count) pending)")
+            case .confirmed:
+                print("   Status: Fully confirmed")
             case nil:
                 print("   Status: Unknown")
             }
@@ -311,7 +343,10 @@ class EventStatusMonitor: ObservableObject {
     }
     
     func publishWithMonitoring(content: String) async throws {
-        let event = NDKEvent(content: content, kind: 1)
+        let event = try await ndk.event()
+            .content(content)
+            .kind(1)
+            .build()
         
         // Set initial status
         await MainActor.run {
@@ -342,9 +377,12 @@ class EventStatusMonitor: ObservableObject {
                 case .optimistic:
                     // Still sending, continue polling
                     try? await Task.sleep(nanoseconds: 1_000_000_000) // 1 second
-                case .confirmed(let relay):
+                case .partial(let confirmed, _):
+                    // Still partial, continue polling
+                    try? await Task.sleep(nanoseconds: 1_000_000_000) // 1 second
+                case .confirmed:
                     await MainActor.run {
-                        eventStatuses[eventId] = .confirmed(relay: relay)
+                        eventStatuses[eventId] = .confirmed(relay: "all")
                     }
                     return
                 }
@@ -370,10 +408,13 @@ class EventStatusMonitor: ObservableObject {
 
 ```swift
 // Note: Optimistic publishing is now always enabled
-// If you need relay-only events, use subscription options:
-var options = NDKSubscriptionOptions()
-options.skipOptimisticEvents = true
-let relayOnlySubscription = ndk.subscribe(filters: [filter], options: options)
+// If you need to skip optimistic events in your data source,
+// use the networkOnly cache policy:
+let relayOnlySource = ndk.observe(
+    filter: filter,
+    maxAge: 0,
+    cachePolicy: .networkOnly  // Skip cache and optimistic events
+)
 ```
 
 ## Social Features
@@ -382,20 +423,30 @@ let relayOnlySubscription = ndk.subscribe(filters: [filter], options: options)
 
 ```swift
 func followUser(_ userPubkey: String) async throws {
-    // Get current follow list
-    guard let currentUser = ndk.activeUser else { return }
-    let following = try await currentUser.follows()
+    // Get current signer
+    guard let signer = ndk.signer else { return }
+    let myPubkey = try await signer.pubkey
     
-    // Add new user
-    var tags: [Tag] = following.map { ["p", $0.pubkey] }
-    tags.append(["p", userPubkey])
+    // Get current contact list
+    let contactsSource = ndk.observe(
+        filter: NDKFilter(kinds: [3], authors: [myPubkey]),
+        maxAge: 0  // Always fresh
+    )
+    
+    let currentContacts = await contactsSource.currentValue().first
+    var tags = currentContacts?.tags ?? []
+    
+    // Add new user if not already following
+    if !tags.contains(where: { $0.count > 1 && $0[0] == "p" && $0[1] == userPubkey }) {
+        tags.append(["p", userPubkey])
+    }
     
     // Publish updated contact list
-    let contactList = NDKEvent(
-        kind: EventKind.contactList,
-        tags: tags,
-        content: ""
-    )
+    let contactList = try await ndk.event()
+        .kind(EventKind.contactList)
+        .tags(tags)
+        .content("")
+        .build()
     
     try await ndk.publish(contactList)
 }
@@ -405,23 +456,30 @@ func followUser(_ userPubkey: String) async throws {
 
 ```swift
 func createTimelineFeed() async throws {
-    guard let currentUser = ndk.activeUser else { return }
+    guard let signer = ndk.signer else { return }
+    let myPubkey = try await signer.pubkey
     
-    // Get users we follow
-    let following = try await currentUser.follows()
-    let pubkeys = following.map { $0.pubkey }
+    // Get users we follow from contact list
+    let contactsSource = ndk.observe(
+        filter: NDKFilter(kinds: [3], authors: [myPubkey]),
+        maxAge: 300  // 5 minute cache is fine for follows
+    )
+    
+    guard let contactList = await contactsSource.currentValue().first else { return }
+    let following = contactList.referencedPubkeys()
     
     // Subscribe to their posts
-    let subscription = ndk.subscribe(filters: [
-        NDKFilter(
-            authors: pubkeys,
+    let feedSource = ndk.observe(
+        filter: NDKFilter(
+            authors: Array(following),
             kinds: [1, 6], // Text notes and reposts
             limit: 50
-        )
-    ])
+        ),
+        maxAge: 0  // Real-time feed
+    )
     
     // Display feed
-    for await event in subscription {
+    for await event in feedSource.events {
         if event.kind == 1 {
             displayPost(event)
         } else if event.kind == 6 {
@@ -443,12 +501,21 @@ struct UserProfileView {
     let ndk: NDK
     
     func loadProfile(for pubkey: String) async throws -> UserProfile {
-        let user = ndk.getUser(pubkey)
-        let profile = try await user.fetchProfile()
+        let user = ndk.getUser(pubkey: pubkey)
+        
+        // Get profile metadata
+        let profileSource = ndk.observe(
+            filter: NDKFilter(kinds: [0], authors: [pubkey]),
+            maxAge: 3600  // 1 hour cache
+        )
+        
+        let profile = await profileSource.currentValue()
+            .compactMap { try? $0.decodeMetadata() }
+            .first
         
         // Get additional stats
         let followers = try await getFollowerCount(pubkey)
-        let following = try await user.follows().count
+        let following = try await getFollowingCount(pubkey)
         
         return UserProfile(
             user: user,
@@ -459,13 +526,28 @@ struct UserProfileView {
     }
     
     func getFollowerCount(_ pubkey: String) async throws -> Int {
-        let events = try await ndk.fetchEvents(
-            NDKFilter(
+        let followersSource = ndk.observe(
+            filter: NDKFilter(
                 kinds: [3],
                 tags: ["p": Set([pubkey])]
-            )
+            ),
+            maxAge: 300  // 5 minute cache
         )
-        return events.count
+        
+        let followers = await followersSource.currentValue()
+        return followers.count
+    }
+    
+    func getFollowingCount(_ pubkey: String) async throws -> Int {
+        let contactsSource = ndk.observe(
+            filter: NDKFilter(kinds: [3], authors: [pubkey]),
+            maxAge: 300
+        )
+        
+        if let contacts = await contactsSource.currentValue().first {
+            return contacts.referencedPubkeys().count
+        }
+        return 0
     }
 }
 ```

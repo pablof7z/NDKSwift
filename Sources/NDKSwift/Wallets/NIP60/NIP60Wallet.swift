@@ -139,7 +139,7 @@ public actor NIP60Wallet: NDKPaymentProvider {
                 await withTaskGroup(of: Void.self) { group in
                     for dataSource in dataSources {
                         group.addTask {
-                            for await event in await dataSource.events {
+                            for await event in dataSource.events {
                                 await self.processWalletEvent(event)
                             }
                         }

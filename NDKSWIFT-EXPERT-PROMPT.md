@@ -94,52 +94,113 @@ NDKSwift provides a powerful, self-contained authentication system via `NDKAuthM
 
 ---
 
-### 3. Subscriptions: Fetching Data from Nostr
+### 3. Data Access: Declarative API with NDKDataSource
 
-Fetching data is done via subscriptions. NDKSwift optimizes this by grouping and merging subscriptions automatically.
+NDKSwift provides a modern declarative API for accessing Nostr data with automatic caching, real-time updates, and intelligent subscription management.
 
 **Key Concepts:**
 
-*   **`NDKSubscription`**: An `AsyncSequence` that yields `NDKEvent`s. You consume events using a `for try await` loop.
-*   **`NDKSubscriptionBuilder`**: A fluent API for constructing subscriptions.
-*   **`ndk.fetchEvents(...)`**: A convenience method for one-shot queries. It creates a subscription that automatically closes on EOSE.
-*   **`ndk.subscribe(...)`**: For long-lived subscriptions that you manage manually. **Crucially, you MUST call `await subscription.close()` when you are done to free up resources on relays.**
+*   **`NDKDataSource`**: A declarative data source that provides both streaming (`events`) and snapshot (`currentValue()`) access
+*   **`maxAge`**: Controls cache freshness - how old cached data can be before fetching fresh
+*   **`CachePolicy`**: Determines how to balance cache vs network (`.cacheWithNetwork`, `.cacheOnly`, `.networkOnly`)
+*   **Automatic Lifecycle**: Data sources manage their subscriptions automatically - no manual closing needed
+*   **Temporal Grouping**: Similar requests within 100ms are automatically batched for efficiency
 
 **Best Practices:**
 
-1.  **Use `fetchEvents` for one-time data needs:**
+1.  **Real-time subscriptions (maxAge: 0):**
 
     ```swift
-    // Fetch a user's profile
-    let filter = NDKFilter(authors: [pubkey], kinds: [EventKind.metadata], limit: 1)
-    let events = try await ndk.fetchEvents(filter)
-    if let profileEvent = events.first {
+    // Stream text notes in real-time
+    let notesSource = ndk.observe(
+        filter: NDKFilter(kinds: [EventKind.textNote], limit: 100),
+        maxAge: 0,  // Always fresh
+        cachePolicy: .cacheWithNetwork
+    )
+    
+    // Stream events as they arrive
+    for await event in notesSource.events {
+        // Update your UI with the new event
+    }
+    ```
+
+2.  **One-shot queries with cache tolerance:**
+
+    ```swift
+    // Fetch user profile with 1-hour cache
+    let profileSource = ndk.observe(
+        filter: NDKFilter(authors: [pubkey], kinds: [EventKind.metadata], limit: 1),
+        maxAge: 3600  // 1 hour cache tolerance
+    )
+    
+    let profiles = await profileSource.currentValue()
+    if let profile = profiles.first {
         // Process profile
     }
     ```
 
-2.  **Use `subscribe` for real-time feeds (e.g., a social media feed):**
+3.  **Cache-only access for offline support:**
 
     ```swift
-    let filter = NDKFilter(kinds: [EventKind.textNote], limit: 100)
-    let subscription = ndk.subscribe(filters: [filter])
-
-    // In a Task or view task modifier
-    Task {
-        do {
-            for try await event in subscription {
-                // Update your UI with the new event
-            }
-        } catch {
-            // Handle errors, e.g., cancellation
-        }
-    }
-
-    // When the view disappears or is no longer needed:
-    // await subscription.close()
+    // Only use cached data, no network calls
+    let cachedNotes = ndk.observe(
+        filter: NDKFilter(kinds: [1]),
+        cachePolicy: .cacheOnly
+    )
+    
+    let offlineNotes = await cachedNotes.currentValue()
     ```
 
-3.  **Use `withSubscriptionGroup` for managing multiple subscriptions in a view:** This pattern ensures all subscriptions are automatically closed when a view's task completes.
+4.  **SwiftUI Integration Pattern:**
+
+    ```swift
+    struct NotesView: View {
+        let dataSource: NDKDataSource<NDKEvent>
+        @State private var notes: [NDKEvent] = []
+        
+        var body: some View {
+            List(notes, id: \.id) { note in
+                NoteRow(event: note)
+            }
+            .task {
+                // Update UI on main thread
+                for await event in dataSource.events {
+                    await MainActor.run {
+                        notes.append(event)
+                    }
+                }
+            }
+        }
+    }
+    ```
+
+**Cache Policy Guide:**
+
+*   **`.cacheWithNetwork`** (default): Returns cached data immediately, then fetches fresh data. Perfect for most UI scenarios.
+*   **`.cacheOnly`**: Never hits the network. Use for offline mode or when you know data is cached.
+*   **`.networkOnly`**: Always fetches fresh, ignores cache. Use for critical real-time data.
+
+**maxAge Guidelines:**
+
+*   **`0`**: Real-time data, always fetch fresh
+*   **`300`** (5 min): Good for social feeds that update frequently
+*   **`3600`** (1 hour): Suitable for user profiles
+*   **`86400`** (1 day): Good for relay lists or rarely changing data
+
+**Legacy API (Deprecated):**
+
+The old `fetchEvents` and `subscribe` methods are deprecated. Use `observe()` for all new code:
+
+```swift
+// Old (deprecated)
+let events = try await ndk.fetchEvents(filter)
+let subscription = ndk.subscribe(filters: [filter])
+
+// New (recommended)
+let dataSource = ndk.observe(filter: filter)
+let events = await dataSource.currentValue()  // One-shot
+for await event in dataSource.events { }      // Streaming
+```
 
 ---
 
@@ -148,21 +209,38 @@ Fetching data is done via subscriptions. NDKSwift optimizes this by grouping and
 **The Flow:** Use `NDKEventBuilder` to construct an event, then call `build(signer:)` to create a signed, immutable `NDKEvent`. Finally, publish it.
 
 ```swift
+// Using the NDK's event builder (recommended)
+let event = try await ndk.event()
+    .content("Hello from NDKSwift!")
+    .kind(EventKind.textNote)
+    .tag(["t", "swift"])
+    .build()  // Uses ndk.signer automatically
+
+let publishedRelays = try await ndk.publish(event)
+
+// Or with explicit signer
 let signer = authManager.activeSigner!
 let event = try await NDKEventBuilder()
     .content("Hello from NDKSwift!")
     .kind(EventKind.textNote)
     .tag(["t", "swift"])
     .build(signer: signer)
-
-let publishedRelays = try await ndk.publish(event)
 ```
 
 **Optimistic Publishing:** This is a key feature for a responsive UI. When enabled (default), `ndk.publish(event)` does the following:
-1.  Immediately dispatches the event to active subscriptions.
+1.  Immediately dispatches the event to active subscriptions (including NDKDataSource observers).
 2.  Your UI can update instantly, showing the event in a "sending..." state.
 3.  The event is sent to relays in the background.
-4.  When `OK` messages arrive from relays, the event's status is confirmed.
+4.  When `OK` messages arrive from relays, the event's status transitions through confirmation states.
+
+**Confirmation States:**
+```swift
+public enum EventConfirmationState {
+    case optimistic                          // Local, not yet sent
+    case partial(confirmed: Set<String>, pending: Set<String>)  // Partially sent
+    case confirmed                          // Fully confirmed
+}
+```
 
 Always design your UI to handle this optimistic state. You can check an event's confirmation status via the cache's `getEventConfirmationState(eventId:)` method. See section 5 for detailed implementation guidance.
 
@@ -434,10 +512,12 @@ ndk.optimisticPublishingConfig.dispatchToSubscriptions = true
 // Disable optimistic publishing for traditional behavior
 ndk.optimisticPublishingConfig = .disabled
 
-// Per-subscription control
-var options = NDKSubscriptionOptions()
-options.skipOptimisticEvents = true  // Only receive confirmed events
-let subscription = ndk.subscribe(filters: [filter], options: options)
+// Per-data source control
+let confirmedOnlySource = ndk.observe(
+    filter: filter,
+    maxAge: 0,
+    cachePolicy: .networkOnly  // Skip cache and optimistic events
+)
 ```
 
 **UI Implementation Patterns:**
@@ -465,9 +545,15 @@ let subscription = ndk.subscribe(filters: [filter], options: options)
                 case .optimistic:
                     // Still sending...
                     try? await Task.sleep(nanoseconds: 500_000_000)
-                case .confirmed(let relay):
+                case .partial(let confirmed, let pending):
+                    // Still partial, update UI
                     await MainActor.run {
-                        publishingStates[event.id] = .sent(relay: relay)
+                        publishingStates[event.id] = .sending // or show partial state
+                    }
+                    try? await Task.sleep(nanoseconds: 500_000_000)
+                case .confirmed:
+                    await MainActor.run {
+                        publishingStates[event.id] = .sent(relay: "all")
                     }
                     break
                 }
@@ -517,10 +603,17 @@ let subscription = ndk.subscribe(filters: [filter], options: options)
                     switch state {
                     case .optimistic:
                         try? await Task.sleep(nanoseconds: 500_000_000)
-                    case .confirmed(let relay):
+                    case .partial(let confirmed, _):
                         await MainActor.run {
                             if let index = notes.firstIndex(where: { $0.id == eventId }) {
-                                notes[index].state = .sent(relay: relay)
+                                notes[index].state = .sent(relays: confirmed)
+                            }
+                        }
+                        try? await Task.sleep(nanoseconds: 500_000_000)
+                    case .confirmed:
+                        await MainActor.run {
+                            if let index = notes.firstIndex(where: { $0.id == eventId }) {
+                                notes[index].state = .confirmed
                             }
                         }
                         return
@@ -540,7 +633,8 @@ let subscription = ndk.subscribe(filters: [filter], options: options)
         
         enum NoteState {
             case sending
-            case sent(relay: String)
+            case sent(relays: Set<String>)
+            case confirmed
             case failed(error: String)
         }
     }
@@ -571,11 +665,19 @@ let subscription = ndk.subscribe(filters: [filter], options: options)
                                 .font(.caption)
                                 .foregroundColor(.secondary)
                         }
-                    case .sent(let relay):
+                    case .sent(let relays):
+                        HStack {
+                            Image(systemName: "arrow.up.circle")
+                                .foregroundColor(.orange)
+                            Text("Sent to \(relays.count) relay(s)")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
+                    case .confirmed:
                         HStack {
                             Image(systemName: "checkmark.circle.fill")
                                 .foregroundColor(.green)
-                            Text("Sent via \(relay)")
+                            Text("Delivered")
                                 .font(.caption)
                                 .foregroundColor(.secondary)
                         }
@@ -599,10 +701,13 @@ let subscription = ndk.subscribe(filters: [filter], options: options)
 
 Both `MemoryCache` and `NDKSQLiteCache` fully support optimistic publishing:
 
-*   **`addUnpublishedEvent(_:relays:)`**: Cache events with optimistic state
-*   **`confirmEvent(eventId:onRelay:)`**: Mark events as confirmed
+*   **`saveEvent(_:)`**: Save events to cache
+*   **`processEvent(_:from:subscriptionId:)`**: Process incoming events and notify observers
 *   **`getEventConfirmationState(eventId:)`**: Query current confirmation status
+*   **`confirmEvent(eventId:onRelay:)`**: Mark events as confirmed
 *   **`getUnpublishedEvents(maxAge:limit:)`**: Query for unpublished events that can be retried
+*   **`getLastFetchTime(for:)`**: Check when a filter was last fetched (for maxAge)
+*   **`recordFetchTime(for:timestamp:)`**: Record fetch timestamp for cache freshness
 
 **Retry Functionality:**
 
@@ -723,7 +828,42 @@ ForEach(Array(seenRelays), id: \.self) { relay in
 
 ---
 
-### 8. Negentropy Set Reconciliation: Efficient Synchronization
+### 8. Cache Observation and NIP-77 Integration
+
+NDKSwift's cache system integrates seamlessly with both NDKDataSource observers and NIP-77 sync operations, ensuring all data updates are propagated correctly.
+
+**Cache Observer Pattern:**
+
+When events arrive through any channel (relay subscription, NIP-77 sync, optimistic publishing), they flow through the cache's `processEvent` method which:
+
+1. Saves the event to storage
+2. Notifies all matching NDKDataSource observers
+3. Updates relay tracking information
+4. Handles deletion tombstones (NIP-09)
+
+**NIP-77 Integration:**
+
+```swift
+// When NIP-77 syncs events, observers are automatically notified
+let profileSource = ndk.observe(
+    filter: NDKFilter(kinds: [0], authors: [pubkey]),
+    maxAge: 300  // 5 minute cache
+)
+
+// This will receive updates from:
+// - Regular relay subscriptions
+// - NIP-77 sync operations
+// - Optimistic publishing
+// - Any other event source
+
+for await profile in profileSource.events {
+    print("Profile updated (from any source): \(profile)")
+}
+```
+
+**Important:** Always use `cache.processEvent()` instead of `cache.saveEvent()` when you want observers to be notified. The NIP-77 implementation has been updated to use `processEvent` to ensure proper observer notification.
+
+### 9. Negentropy Set Reconciliation: Efficient Synchronization
 
 NDKSwift includes a comprehensive implementation of Negentropy, a set reconciliation protocol that dramatically improves sync efficiency for large datasets. This is particularly valuable for bandwidth-constrained environments and large-scale synchronization operations.
 
@@ -918,13 +1058,13 @@ By integrating Negentropy thoughtfully, you can provide users with dramatically 
 
 ---
 
-### 9. Performance & Advanced Topics
+### 10. Performance & Advanced Topics
 
 *   **Signature Verification Sampling:** NDKSwift does not verify every single signature by default to save CPU. It uses a sampling strategy defined by `NDKSignatureVerificationConfig`. For most apps, the default is fine. You can configure it to be more or less strict. It also automatically detects and can blacklist "evil relays" that serve events with invalid signatures.
 *   **Caching:** Use `NDKSQLiteCache` to persist events, profiles, and other Nostr data. This dramatically improves launch times and provides a basic offline experience. The `NDKProfileManager` also uses this cache to avoid re-fetching profile metadata.
 *   **Relay Health:** `NDKCashuWallet` includes a relay health system to ensure that a user's wallet state is consistent across their defined relays. It can detect and repair missing or stale events.
 
-#### 9.1. Relay Selection Strategy and Network Courtesy
+#### 10.1. Relay Selection Strategy and Network Courtesy
 
 NDKSwift implements sophisticated relay selection algorithms that balance performance, deliverability, and network courtesy. Understanding these strategies helps you build apps that are both effective and respectful to the Nostr ecosystem.
 

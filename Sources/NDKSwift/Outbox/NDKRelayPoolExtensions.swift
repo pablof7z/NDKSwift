@@ -32,31 +32,4 @@ public extension NDKPool {
 
 /// Extensions to NDKRelay for outbox model support
 public extension NDKRelay {
-    /// Subscribe to events on this relay
-    func subscribe(
-        filters: [NDKFilter],
-        eventHandler: @escaping (NDKEvent) -> Void
-    ) -> Task<Void, Error> {
-        // Create subscription with this specific relay
-        var options = NDKSubscriptionOptions()
-        options.relays = Set([self])
-
-        let subscription = NDKSubscription(
-            filters: filters,
-            options: options,
-            ndk: nil
-        )
-
-        // Start task to handle events
-        return Task {
-            do {
-                for try await event in subscription {
-                    eventHandler(event)
-                }
-            } catch {
-                // Subscription completed or failed
-                throw error
-            }
-        }
-    }
 }

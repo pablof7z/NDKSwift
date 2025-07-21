@@ -120,30 +120,19 @@ public actor NDKPool {
                 await processBlockedRelayListUpdate(blockedRelayListEvent)
             }
             
-            // Now subscribe for updates
+            // Now subscribe for updates using NDKDataSource
             blockedRelaySubscriptionTask = Task {
-                do {
-                    let filter = NDKFilter(
-                        authors: [userPubkey],
-                        kinds: [10006],
-                        limit: 0  // Only get new events
-                    )
-                    
-                    let subscriptionId = UUID().uuidString
-                    let subscription = await ndk.internalSubscriptionManager.createSubscription(
-                        id: subscriptionId,
-                        filters: [filter]
-                    )
-                    
-                    for await (event, _) in await subscription.events {
-                        await processBlockedRelayListUpdate(event)
-                    }
-                } catch {
-                    if error is CancellationError {
-                        NDKLogger.log(.debug, category: .general, "Blocked relay subscription cancelled")
-                    } else {
-                        NDKLogger.log(.error, category: .general, "Blocked relay subscription error: \(error)")
-                    }
+                let filter = NDKFilter(
+                    authors: [userPubkey],
+                    kinds: [10006],
+                    limit: 0  // Only get new events
+                )
+                
+                // Use NDKDataSource for blocked relay list monitoring
+                let dataSource = ndk.observe(filter: filter, maxAge: 0)
+                
+                for await event in dataSource.events {
+                    await processBlockedRelayListUpdate(event)
                 }
             }
         } catch {
@@ -281,19 +270,17 @@ public actor NDKPool {
     
     /// Connect to all relays
     public func connectAll() async {
-        print("[NDKPool] Connecting to all relays...")
         await withTaskGroup(of: Void.self) { group in
             for relay in relays {
                 group.addTask {
                     do {
                         try await relay.connect()
                     } catch {
-                        print("[NDKPool] Failed to connect to \(relay.url): \(error)")
+                        NDKLogger.log(.error, category: .relay, "Failed to connect to \(relay.url): \(error)")
                     }
                 }
             }
         }
-        print("[NDKPool] connectAll() completed")
     }
     
     /// Disconnect from all relays

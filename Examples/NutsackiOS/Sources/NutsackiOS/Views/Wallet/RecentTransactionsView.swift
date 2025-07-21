@@ -187,8 +187,7 @@ struct TransactionRow: View {
                let ndk = nostrManager.ndk {
                 
                 // Use declarative data source for profile
-                let profileDataSource = NDKDataSource(
-                    ndk: ndk,
+                let profileDataSource = ndk.observe(
                     filter: NDKFilter(
                         authors: [senderPubkey],
                         kinds: [0]

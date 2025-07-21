@@ -341,7 +341,7 @@ public actor NDKBunkerSigner: NDKSigner, Sendable {
         subscriptionTask = Task { [weak self] in
             NDKLogger.log(.info, category: .auth, "[BunkerSigner] Subscription started")
             
-            for await event in await dataSource.events {
+            for await event in dataSource.events {
                 let eventKind = event.kind
                 let eventPubkey = event.pubkey
                 NDKLogger.log(.debug, category: .auth, "[BunkerSigner] Received event: kind=\(eventKind), from=\(eventPubkey)")

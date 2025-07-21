@@ -13,7 +13,7 @@ public enum CachePolicy {
 
 /// Primary API for declarative data access in NDKSwift
 /// Automatically manages subscriptions, caching, and lifecycle
-public final class NDKDataSource<T>: ObservableObject, DataSourceObserver {
+public final class NDKDataSource<T>: ObservableObject, CacheObserver {
     @Published public private(set) var data: [T] = []
     @Published public private(set) var isLoading: Bool = false
     @Published public private(set) var error: Error?
@@ -109,8 +109,9 @@ public final class NDKDataSource<T>: ObservableObject, DataSourceObserver {
     deinit {
         task?.cancel()
         eventsContinuation.finish()
+        let handle = requirementHandle
         Task {
-            await requirementHandle?.release()
+            await handle?.release()
         }
     }
     
@@ -119,7 +120,7 @@ public final class NDKDataSource<T>: ObservableObject, DataSourceObserver {
         error = nil
         
         // Use the new data requirement manager if available
-        if let requirementManager = await ndk.dataRequirementManager {
+        if let requirementManager = ndk.dataRequirementManager {
             requirementHandle = await requirementManager.registerRequirement(
                 filter: filter,
                 observer: self,
@@ -135,9 +136,9 @@ public final class NDKDataSource<T>: ObservableObject, DataSourceObserver {
         isLoading = false
     }
     
-    // MARK: - DataSourceObserver
+    // MARK: - CacheObserver
     
-    nonisolated func handleEvent(_ event: NDKEvent) async {
+    public func handleEvent(_ event: NDKEvent) async {
         // Check if we've already processed this event
         guard await !stateManager.isProcessed(event.id) else { return }
         await stateManager.markProcessed(event.id)
@@ -153,13 +154,6 @@ public final class NDKDataSource<T>: ObservableObject, DataSourceObserver {
         }
     }
     
-    nonisolated func handleError(_ error: Error) async {
-        await MainActor.run {
-            self.error = error
-            self.isLoading = false
-        }
-    }
-    
     /// Manually refresh the data
     public func refresh() async {
         data.removeAll()
@@ -172,6 +166,34 @@ public final class NDKDataSource<T>: ObservableObject, DataSourceObserver {
     /// Get the current data snapshot
     /// Useful for internal components that need one-shot access
     public func currentValue() async -> [T] {
+        return data
+    }
+    
+    /// Fetch data once and return the results
+    /// This is a convenience method for one-shot data fetching
+    /// - Returns: Array of transformed events from cache and/or network
+    /// - Note: For maxAge > 0, this will return cached data if fresh enough
+    public func fetch() async -> [T] {
+        // For cache-only, just return current cached data
+        if cachePolicy == .cacheOnly {
+            // Query cache directly
+            if let cachedEvents = try? await ndk.cache.queryEvents(filter) {
+                return cachedEvents.compactMap(transform)
+            }
+            return []
+        }
+        
+        // For network-only, clear current data and wait for fresh results
+        if cachePolicy == .networkOnly {
+            data.removeAll()
+            await stateManager.clearProcessed()
+        }
+        
+        // Wait a bit for data to arrive from the existing observation
+        // This leverages the existing subscription mechanism
+        try? await Task.sleep(nanoseconds: 500_000_000) // 0.5 seconds
+        
+        // Return current accumulated data
         return data
     }
 }

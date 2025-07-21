@@ -349,34 +349,30 @@ public actor NDKZapManager {
                         cachePolicy: .cacheWithNetwork
                     )
                     
-                    do {
-                        for await event in await dataSource.events {
-                            let eventKind = event.kind
-                            if eventKind == EventKind.zapReceipt {
-                                let receipt = NDKZapReceipt(event: event)
-                                if let zapInfo = try? await self.validateAndParseZapReceipt(receipt) {
-                                    continuation.yield(zapInfo)
-                                }
-                            } else if eventKind == EventKind.nutzap {
-                                let nutzap = NDKNutzap(event: event)
-                                let totalAmount = nutzap.totalAmount
-                                
-                                let zapInfo = ZapInfo(
-                                    type: .nutzap,
-                                    amountSats: Int64(totalAmount),
-                                    sender: event.pubkey,
-                                    recipient: nutzap.recipientPubkey ?? "",
-                                    comment: nutzap.comment,
-                                    timestamp: Date(timeIntervalSince1970: TimeInterval(event.createdAt)),
-                                    event: event
-                                )
+                    for await event in dataSource.events {
+                        let eventKind = event.kind
+                        if eventKind == EventKind.zapReceipt {
+                            let receipt = NDKZapReceipt(event: event)
+                            if let zapInfo = try? await self.validateAndParseZapReceipt(receipt) {
                                 continuation.yield(zapInfo)
                             }
+                        } else if eventKind == EventKind.nutzap {
+                            let nutzap = NDKNutzap(event: event)
+                            let totalAmount = nutzap.totalAmount
+                            
+                            let zapInfo = ZapInfo(
+                                type: .nutzap,
+                                amountSats: Int64(totalAmount),
+                                sender: event.pubkey,
+                                recipient: nutzap.recipientPubkey ?? "",
+                                comment: nutzap.comment,
+                                timestamp: Date(timeIntervalSince1970: TimeInterval(event.createdAt)),
+                                event: event
+                            )
+                            continuation.yield(zapInfo)
                         }
-                        continuation.finish()
-                    } catch {
-                        continuation.finish(throwing: error)
                     }
+                    continuation.finish()
                 }
             }
         }

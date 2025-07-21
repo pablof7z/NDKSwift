@@ -97,7 +97,8 @@ public actor NDKProfileManager {
                 kinds: [EventKind.metadata]
             )
             
-            let events = try await fetchEventsInternal(filter: filter)
+            // Use observe API to fetch profiles
+            let events = await ndk.observe(filter: filter, maxAge: 3600).currentValue()
             
             // Process events
             for event in events {
@@ -160,14 +161,11 @@ public actor NDKProfileManager {
                     limit: 1
                 )
                 
-                let subscriptionId = UUID().uuidString
-                let subscription = await ndk.internalSubscriptionManager.createSubscription(
-                    id: subscriptionId,
-                    filters: [filter]
-                )
+                // Use NDKDataSource for profile updates
+                let dataSource = ndk.observe(filter: filter, maxAge: closeOnEose ? 3600 : 0)
                 
-                // Process events from subscription
-                for await (event, _) in await subscription.events {
+                // Process events from data source
+                for await event in dataSource.events {
                     if let profileData = event.content.data(using: .utf8),
                        let profile = JSONCoding.safeDecode(NDKUserProfile.self, from: profileData) {
                         // Update cache
@@ -189,7 +187,6 @@ public actor NDKProfileManager {
                 }
                 
                 // Clean up when done
-                await ndk.internalSubscriptionManager.closeSubscription(id: subscriptionId)
                 activeObservations[pubkey]?.removeAll { $0 === wrapper }
                 if activeObservations[pubkey]?.isEmpty == true {
                     activeObservations.removeValue(forKey: pubkey)
@@ -267,8 +264,8 @@ public actor NDKProfileManager {
             limit: 1
         )
         
-        // Fetch the event
-        let events = try await fetchEventsInternal(filter: filter)
+        // Fetch the event using observe API
+        let events = await ndk.observe(filter: filter, maxAge: 3600).currentValue()
         guard let event = events.first else {
             return nil
         }
@@ -286,22 +283,5 @@ public actor NDKProfileManager {
         try? await ndk.cache.saveProfile(profile, pubkey: pubkey)
         
         return profile
-    }
-    
-    /// Internal helper to fetch events using NDKDataSource
-    private func fetchEventsInternal(filter: NDKFilter) async throws -> [NDKEvent] {
-        guard let ndk = ndk else {
-            throw NDKError.notConfigured("NDK instance not available")
-        }
-        
-        // Use NDKDataSource with appropriate maxAge for profiles
-        let dataSource = NDKDataSource(
-            ndk: ndk,
-            filter: filter,
-            maxAge: 3600, // 1 hour - profiles don't change frequently
-            cachePolicy: .cacheWithNetwork
-        )
-        
-        return await dataSource.currentValue()
     }
 }
