@@ -15,7 +15,6 @@ class NostrManager {
     var cache: NDKSQLiteCache?
     
     // Declarative data sources
-    private(set) var contactListDataSource: ContactListDataSource?
     private(set) var userProfileDataSource: UserProfileDataSource?
     private(set) var contactsMetadataDataSource: MultipleProfilesDataSource?
     
@@ -181,7 +180,6 @@ class NostrManager {
         currentUserProfile = nil
         
         // Clean up data sources
-        contactListDataSource = nil
         userProfileDataSource = nil
         contactsMetadataDataSource = nil
         
@@ -278,22 +276,48 @@ class NostrManager {
         // Initialize user profile data source (kept for compatibility)
         userProfileDataSource = UserProfileDataSource(ndk: ndk, pubkey: pubkey)
         
-        // Initialize contact list data source
-        contactListDataSource = ContactListDataSource(ndk: ndk, pubkey: pubkey)
-        
-        // Observe contact list changes to update contacts metadata
+        // Load contacts and initialize metadata data source
         Task {
-            guard let contactListDataSource = contactListDataSource else { return }
-            
-            for await contactPubkeys in contactListDataSource.$contactPubkeys.values {
-                if !contactPubkeys.isEmpty {
-                    print("NostrManager - Contact list updated with \(contactPubkeys.count) contacts")
-                    // Update contacts metadata data source
-                    self.contactsMetadataDataSource = MultipleProfilesDataSource(
-                        ndk: ndk,
-                        pubkeys: contactPubkeys
-                    )
+            await loadContactsMetadata(for: pubkey, ndk: ndk)
+        }
+    }
+    
+    private func loadContactsMetadata(for pubkey: String, ndk: NDK) async {
+        let filter = NDKFilter(
+            authors: [pubkey],
+            kinds: [3],
+            limit: 1
+        )
+        
+        // Use declarative data source to fetch contact list
+        let contactDataSource = ndk.observe(
+            filter: filter,
+            maxAge: 3600,
+            cachePolicy: .cacheWithNetwork
+        )
+        
+        var contactListEvent: NDKEvent?
+        for await event in contactDataSource.events {
+            contactListEvent = event
+            break // Take first event
+        }
+        
+        if let contactListEvent = contactListEvent {
+            // Parse the contact list
+            var contactPubkeys: Set<String> = []
+            for tag in contactListEvent.tags {
+                if tag.count >= 2 && tag[0] == "p" {
+                    contactPubkeys.insert(tag[1])
                 }
+            }
+            
+            if !contactPubkeys.isEmpty {
+                print("NostrManager - Contact list loaded with \(contactPubkeys.count) contacts")
+                // Update contacts metadata data source
+                self.contactsMetadataDataSource = MultipleProfilesDataSource(
+                    ndk: ndk,
+                    pubkeys: contactPubkeys
+                )
             }
         }
     }

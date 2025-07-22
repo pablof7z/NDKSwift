@@ -10,18 +10,8 @@ struct ContactsView: View {
     @State private var resolvedUser: NDKUser?
     @State private var isResolving = false
     @State private var showQRScanner = false
+    @State private var contacts: [String] = []
     
-    // Get contacts from NostrManager's data source
-    private var contacts: [String] {
-        guard let contactListDataSource = nostrManager.contactListDataSource else {
-            return []
-        }
-        return Array(contactListDataSource.contactPubkeys)
-    }
-    
-    private var isLoading: Bool {
-        nostrManager.contactListDataSource?.isLoading ?? true
-    }
     
     var filteredContacts: [String] {
         if searchText.isEmpty {
@@ -30,7 +20,7 @@ struct ContactsView: View {
         
         return contacts.filter { pubkey in
             // Filter by pubkey/npub
-            let npub = NDKUser(pubkey: pubkey).npub ?? pubkey
+            let npub = NDKUser(pubkey: pubkey).npub
             if npub.localizedCaseInsensitiveContains(searchText) {
                 return true
             }
@@ -54,8 +44,7 @@ struct ContactsView: View {
     }
     
     var body: some View {
-        NavigationStack {
-            VStack(spacing: 0) {
+        VStack(spacing: 0) {
                 // Search input section
                 VStack(spacing: 12) {
                     HStack {
@@ -89,9 +78,7 @@ struct ContactsView: View {
                         }
                         .padding(.horizontal)
                     } else if let user = resolvedUser {
-                        Button(action: {
-                            navigationDestination = .nutzap(pubkey: user.pubkey)
-                        }) {
+                        NavigationLink(value: user.pubkey) {
                             HStack {
                                 // Profile picture
                                 UserProfilePicture(user: user)
@@ -122,15 +109,7 @@ struct ContactsView: View {
                 
                 // Contacts list
                 List {
-                    if isLoading {
-                        HStack {
-                            Spacer()
-                            ProgressView()
-                                .padding()
-                            Spacer()
-                        }
-                        .listRowBackground(Color.clear)
-                    } else if contacts.isEmpty {
+                    if contacts.isEmpty {
                         VStack(spacing: 16) {
                             Image(systemName: "person.2.slash")
                                 .font(.largeTitle)
@@ -150,7 +129,7 @@ struct ContactsView: View {
                         .listRowBackground(Color.clear)
                     } else {
                         ForEach(filteredContacts, id: \.self) { pubkey in
-                            ContactRow(pubkey: pubkey, navigationDestination: $navigationDestination)
+                            ContactRow(pubkey: pubkey)
                         }
                     }
                 }
@@ -184,6 +163,13 @@ struct ContactsView: View {
                 }
             }
             #endif
+        .navigationDestination(for: String.self) { pubkey in
+            NutzapView(recipientPubkey: pubkey)
+                .environment(nostrManager)
+                .environment(walletManager)
+        }
+        .task {
+            await loadContacts()
         }
     }
     
@@ -247,45 +233,72 @@ struct ContactsView: View {
             }
         }
     }
+    
+    private func loadContacts() async {
+        guard let ndk = nostrManager.ndk else { return }
+        
+        do {
+            // Get user's contact list
+            guard let signer = ndk.signer else { return }
+            let pubkey = try await signer.pubkey
+            
+            let filter = NDKFilter(
+                authors: [pubkey],
+                kinds: [3],
+                limit: 1
+            )
+            
+            // Use declarative data source to fetch contact list
+            let contactDataSource = ndk.observe(
+                filter: filter,
+                maxAge: 3600,
+                cachePolicy: .cacheWithNetwork
+            )
+            
+            var contactListEvent: NDKEvent?
+            for await event in contactDataSource.events {
+                contactListEvent = event
+                break // Take first event
+            }
+            
+            if let contactListEvent = contactListEvent {
+                // Parse the contact list
+                var contactPubkeys: [String] = []
+                for tag in contactListEvent.tags {
+                    if tag.count >= 2 && tag[0] == "p" {
+                        contactPubkeys.append(tag[1])
+                    }
+                }
+                
+                // Update contacts
+                contacts = contactPubkeys
+            }
+        } catch {
+            print("Failed to load contacts: \(error)")
+        }
+    }
 }
 
 struct ContactRow: View {
     let pubkey: String
-    @Binding var navigationDestination: WalletView.WalletDestination?
     @Environment(NostrManager.self) private var nostrManager
-    @Environment(\.dismiss) private var dismiss
     
     private var user: NDKUser {
         NDKUser(pubkey: pubkey)
     }
     
-    private var profile: NDKUserProfile? {
-        nostrManager.contactsMetadataDataSource?.profile(for: pubkey)
-    }
-    
-    private var displayName: String {
-        profile?.displayName ?? profile?.name ?? "Nostr User"
-    }
-    
-    private var npub: String {
-        user.npub ?? pubkey
-    }
-    
     var body: some View {
-        Button(action: {
-            navigationDestination = .nutzap(pubkey: pubkey)
-            dismiss()
-        }) {
+        NavigationLink(value: pubkey) {
             HStack {
                 // Profile picture
                 UserProfilePicture(pubkey: pubkey, size: 50)
                 
                 VStack(alignment: .leading, spacing: 4) {
-                    Text(displayName)
+                    UserDisplayName(pubkey: pubkey)
                         .font(.headline)
                         .lineLimit(1)
                     
-                    Text(npub.prefix(16) + "...")
+                    UserNIP05(pubkey: pubkey)
                         .font(.caption)
                         .foregroundStyle(.secondary)
                         .lineLimit(1)

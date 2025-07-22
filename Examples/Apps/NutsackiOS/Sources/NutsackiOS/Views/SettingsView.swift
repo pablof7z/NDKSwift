@@ -121,7 +121,7 @@ struct SettingsView: View {
                 // Nutzap Settings
                 Section {
                     NavigationLink(destination: NutzapSettingsView()) {
-                        Label("Nutzap Settings", systemImage: "bolt.heart")
+                        Label("Zap Settings", systemImage: "bolt.heart")
                     }
                     
                     NavigationLink(destination: WalletEventsView()) {
@@ -137,12 +137,12 @@ struct SettingsView: View {
                     }
                     
                     NavigationLink(destination: ReceivedNutzapsView(walletManager: walletManager)) {
-                        Label("Received Nutzaps", systemImage: "bolt.fill")
+                        Label("Received Zaps", systemImage: "bolt.fill")
                     }
                 } header: {
                     Text("Wallet")
                 } footer: {
-                    Text("Configure how others can send nutzaps to your wallet")
+                    Text("Configure how others can send zaps to your wallet")
                 }
                 
                 

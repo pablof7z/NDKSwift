@@ -92,7 +92,7 @@ extension Transaction.TransactionType {
         case .melt, .withdraw: return "Lightning Payment"
         case .send: return "Sent Ecash"
         case .receive: return "Received Ecash"
-        case .nutzap: return "Nutzap"
+        case .nutzap: return "Zap"
         case .swap: return "Mint Transfer"
         }
     }

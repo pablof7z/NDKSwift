@@ -19,6 +19,7 @@ struct BalanceCard: View {
     @State private var mintBalances: [BalanceCardMint] = []
     @State private var isLoadingMints = false
     @State private var isExpanded = false
+    @State private var pulseAnimation = false
     
     private let mintColors: [Color] = [
         Color(red: 0.98, green: 0.54, blue: 0.13), // Orange
@@ -28,12 +29,12 @@ struct BalanceCard: View {
     ]
     
     private let compactChartSize: CGFloat = 20
-    private let expandedChartSize: CGFloat = 180
+    private let expandedChartSize: CGFloat = 160
     
     var body: some View {
-        VStack(spacing: 20) {
+        VStack(spacing: 12) {
             // Balance display - centered
-            VStack(spacing: 8) {
+            VStack(spacing: 4) {
                 HStack(alignment: .firstTextBaseline, spacing: 8) {
                     Text(formatBalance(Int(walletManager.currentBalance)))
                         .font(.system(size: isExpanded ? 48 : 56, weight: .semibold, design: .rounded))
@@ -53,36 +54,51 @@ struct BalanceCard: View {
                         .opacity(0.8)
                 }
                 
-                // Fiat conversion with mini pie chart
-                if appState.preferredConversionUnit != .sat && !convertedBalance.isEmpty && convertedBalance != "..." {
-                    HStack(spacing: 12) {
-                        // Compact pie chart on the left
-                        if !mintBalances.isEmpty && mintBalances.count > 1 && !isExpanded {
+                // Fiat conversion and/or mini pie chart
+                HStack(spacing: 12) {
+                    // Compact pie chart on the left - show if there are any mints at all
+                    if !mintBalances.isEmpty && !isExpanded {
+                        ZStack {
                             ExpandablePieChart(
                                 mintBalances: mintBalances,
                                 mintColors: mintColors,
                                 size: compactChartSize,
                                 useGrayscale: true
                             )
-                            .onTapGesture {
-                                withAnimation(.spring(response: 0.5, dampingFraction: 0.8)) {
-                                    isExpanded.toggle()
-                                }
+                            
+                            // Subtle pulsing ring hint
+                            Circle()
+                                .stroke(Color.orange.opacity(0.3), lineWidth: 1)
+                                .frame(width: compactChartSize + 8, height: compactChartSize + 8)
+                                .scaleEffect(pulseAnimation ? 1.3 : 1.0)
+                                .opacity(pulseAnimation ? 0.2 : 0.6)
+                                .animation(
+                                    Animation.easeInOut(duration: 2)
+                                        .repeatForever(autoreverses: true),
+                                    value: pulseAnimation
+                                )
+                        }
+                        .onTapGesture {
+                            withAnimation(.spring(response: 0.5, dampingFraction: 0.8)) {
+                                isExpanded.toggle()
                             }
                         }
-                        
+                    }
+                    
+                    // Show fiat conversion if available
+                    if appState.preferredConversionUnit != .sat && !convertedBalance.isEmpty && convertedBalance != "..." {
                         Text(convertedBalance)
                             .font(.system(size: 18, weight: .regular, design: .rounded))
                             .foregroundStyle(.secondary)
                             .opacity(isExpanded ? 0.5 : 0.8)
                     }
-                    .animation(.default, value: convertedBalance)
                 }
+                .animation(.default, value: convertedBalance)
             }
             
             // Expanded pie chart with legend
-            if !mintBalances.isEmpty && mintBalances.count > 1 && isExpanded {
-                VStack(spacing: 20) {
+            if !mintBalances.isEmpty && isExpanded {
+                VStack(spacing: 16) {
                     // Large pie chart
                     ExpandablePieChart(
                         mintBalances: mintBalances,
@@ -97,20 +113,20 @@ struct BalanceCard: View {
                     }
                     
                     // Legend
-                    VStack(alignment: .leading, spacing: 12) {
+                    VStack(alignment: .leading, spacing: 8) {
                         ForEach(Array(mintBalances.enumerated()), id: \.element.id) { index, item in
-                            HStack(spacing: 12) {
+                            HStack(spacing: 10) {
                                 Circle()
                                     .fill(mintColors[index % mintColors.count])
                                     .frame(width: 14, height: 14)
                                 
-                                VStack(alignment: .leading, spacing: 2) {
+                                VStack(alignment: .leading, spacing: 1) {
                                     Text(formatMintURL(item.mint))
-                                        .font(.system(size: 15, weight: .medium))
+                                        .font(.system(size: 14, weight: .medium))
                                         .foregroundStyle(.primary)
                                     
                                     Text("\(formatBalance(Int(item.balance))) sats (\(String(format: "%.1f", item.percentage))%)")
-                                        .font(.system(size: 13))
+                                        .font(.system(size: 12))
                                         .foregroundStyle(.secondary)
                                 }
                                 
@@ -122,18 +138,20 @@ struct BalanceCard: View {
                     
                     // Reconcile button
                     NavigationLink(destination: SwapView()) {
-                        HStack {
+                        HStack(spacing: 6) {
                             Image(systemName: "arrow.triangle.swap")
+                                .font(.system(size: 14))
                             Text("Reconcile")
                         }
-                        .font(.system(size: 16, weight: .medium))
+                        .font(.system(size: 15, weight: .medium))
                         .foregroundColor(.white)
                         .frame(maxWidth: .infinity)
-                        .padding(.vertical, 12)
+                        .padding(.vertical, 10)
                         .background(Color.orange)
-                        .cornerRadius(12)
+                        .cornerRadius(10)
                     }
                     .padding(.horizontal)
+                    .padding(.top, 4)
                 }
                 .transition(.asymmetric(
                     insertion: .scale.combined(with: .opacity),
@@ -142,13 +160,16 @@ struct BalanceCard: View {
             }
         }
         .frame(maxWidth: .infinity)
-        .padding(.vertical, 24)
+        .padding(.vertical, 16)
         .task(id: walletManager.currentBalance) {
             await convert()
             await loadMintBalances()
         }
         .task {
             await loadMintBalances()
+        }
+        .onAppear {
+            pulseAnimation = true
         }
         .onChange(of: appState.preferredConversionUnit) { _, _ in
             Task {
@@ -192,7 +213,10 @@ struct BalanceCard: View {
         convertedBalance = "..."
         
         guard let prices = appState.exchangeRates else {
+            print("⚠️ BalanceCard: No exchange rates available")
             convertedBalance = ""
+            // Try to reload exchange rates
+            appState.loadExchangeRates()
             return
         }
         
@@ -205,6 +229,7 @@ struct BalanceCard: View {
             convertedBalance = String(format: "%.8f BTC", btcAmount)
             return
         case .sat:
+            print("⚠️ BalanceCard: Conversion unit is SAT, not showing fiat balance")
             convertedBalance = ""
             return
         }
@@ -217,6 +242,7 @@ struct BalanceCard: View {
         formatter.currencyCode = appState.preferredConversionUnit.rawValue.uppercased()
         
         convertedBalance = formatter.string(from: NSNumber(value: fiatValue)) ?? ""
+        print("✅ BalanceCard: Converted \(walletManager.currentBalance) sats to \(convertedBalance) (\(appState.preferredConversionUnit.rawValue))")
     }
     
     private func loadMintBalances() async {

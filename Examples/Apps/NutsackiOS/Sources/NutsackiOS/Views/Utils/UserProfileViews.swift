@@ -7,6 +7,7 @@ struct UserDisplayName: View {
     let pubkey: String
     @Environment(NostrManager.self) private var nostrManager
     @State private var profile: NDKUserProfile?
+    @State private var observationTask: Task<Void, Never>?
     
     init(user: NDKUser) {
         self.pubkey = user.pubkey
@@ -21,17 +22,29 @@ struct UserDisplayName: View {
             .task(id: pubkey) {
                 await loadProfile()
             }
+            .onAppear {
+                startObservingContactsMetadata()
+            }
+            .onDisappear {
+                observationTask?.cancel()
+            }
     }
     
     private var displayName: String {
         // First check if profile is in contacts metadata
         if let profileDataSource = nostrManager.contactsMetadataDataSource,
            let cachedProfile = profileDataSource.profile(for: pubkey) {
-            return cachedProfile.displayName ?? cachedProfile.name ?? "Nostr User"
+            return cachedProfile.displayName ?? cachedProfile.name ?? fallbackName
         }
         
         // Otherwise use loaded profile
-        return profile?.displayName ?? profile?.name ?? "Nostr User"
+        return profile?.displayName ?? profile?.name ?? fallbackName
+    }
+    
+    private var fallbackName: String {
+        // Show shortened npub as fallback instead of generic "Nostr User"
+        let npub = NDKUser(pubkey: pubkey).npub
+        return String(npub.prefix(16)) + "..."
     }
     
     private func loadProfile() async {
@@ -39,7 +52,10 @@ struct UserDisplayName: View {
         
         // Check if already in contacts metadata
         if let profileDataSource = nostrManager.contactsMetadataDataSource,
-           profileDataSource.profile(for: pubkey) != nil {
+           let cachedProfile = profileDataSource.profile(for: pubkey) {
+            await MainActor.run {
+                self.profile = cachedProfile
+            }
             return
         }
         
@@ -62,6 +78,19 @@ struct UserDisplayName: View {
             }
         }
     }
+    
+    private func startObservingContactsMetadata() {
+        observationTask?.cancel()
+        observationTask = Task { @MainActor in
+            guard let contactsMetadata = nostrManager.contactsMetadataDataSource else { return }
+            
+            for await profiles in contactsMetadata.$profiles.values {
+                if let updatedProfile = profiles[pubkey] {
+                    self.profile = updatedProfile
+                }
+            }
+        }
+    }
 }
 
 struct UserProfilePicture: View {
@@ -69,6 +98,7 @@ struct UserProfilePicture: View {
     let size: CGFloat
     @Environment(NostrManager.self) private var nostrManager
     @State private var profile: NDKUserProfile?
+    @State private var observationTask: Task<Void, Never>?
     
     init(user: NDKUser, size: CGFloat = 40) {
         self.pubkey = user.pubkey
@@ -100,6 +130,12 @@ struct UserProfilePicture: View {
         .task(id: pubkey) {
             await loadProfile()
         }
+        .onAppear {
+            startObservingContactsMetadata()
+        }
+        .onDisappear {
+            observationTask?.cancel()
+        }
     }
     
     private var placeholderCircle: some View {
@@ -124,7 +160,10 @@ struct UserProfilePicture: View {
         
         // Check if already in contacts metadata
         if let profileDataSource = nostrManager.contactsMetadataDataSource,
-           profileDataSource.profile(for: pubkey) != nil {
+           let cachedProfile = profileDataSource.profile(for: pubkey) {
+            await MainActor.run {
+                self.profile = cachedProfile
+            }
             return
         }
         
@@ -147,6 +186,19 @@ struct UserProfilePicture: View {
             }
         }
     }
+    
+    private func startObservingContactsMetadata() {
+        observationTask?.cancel()
+        observationTask = Task { @MainActor in
+            guard let contactsMetadata = nostrManager.contactsMetadataDataSource else { return }
+            
+            for await profiles in contactsMetadata.$profiles.values {
+                if let updatedProfile = profiles[pubkey] {
+                    self.profile = updatedProfile
+                }
+            }
+        }
+    }
 }
 
 struct UserNIP05: View {
@@ -154,6 +206,7 @@ struct UserNIP05: View {
     let npub: String?
     @Environment(NostrManager.self) private var nostrManager
     @State private var profile: NDKUserProfile?
+    @State private var observationTask: Task<Void, Never>?
     
     init(user: NDKUser) {
         self.pubkey = user.pubkey
@@ -170,15 +223,20 @@ struct UserNIP05: View {
             .task(id: pubkey) {
                 await loadProfile()
             }
+            .onAppear {
+                startObservingContactsMetadata()
+            }
+            .onDisappear {
+                observationTask?.cancel()
+            }
     }
     
     private var displayText: String {
         // First check if profile is in contacts metadata
         if let profileDataSource = nostrManager.contactsMetadataDataSource,
-           let cachedProfile = profileDataSource.profile(for: pubkey) {
-            if let nip05 = cachedProfile.nip05 {
-                return nip05
-            }
+           let cachedProfile = profileDataSource.profile(for: pubkey),
+           let nip05 = cachedProfile.nip05 {
+            return nip05
         }
         
         // Otherwise use loaded profile
@@ -195,7 +253,10 @@ struct UserNIP05: View {
         
         // Check if already in contacts metadata
         if let profileDataSource = nostrManager.contactsMetadataDataSource,
-           profileDataSource.profile(for: pubkey) != nil {
+           let cachedProfile = profileDataSource.profile(for: pubkey) {
+            await MainActor.run {
+                self.profile = cachedProfile
+            }
             return
         }
         
@@ -215,6 +276,19 @@ struct UserNIP05: View {
                     self.profile = fetchedProfile
                 }
                 break
+            }
+        }
+    }
+    
+    private func startObservingContactsMetadata() {
+        observationTask?.cancel()
+        observationTask = Task { @MainActor in
+            guard let contactsMetadata = nostrManager.contactsMetadataDataSource else { return }
+            
+            for await profiles in contactsMetadata.$profiles.values {
+                if let updatedProfile = profiles[pubkey] {
+                    self.profile = updatedProfile
+                }
             }
         }
     }

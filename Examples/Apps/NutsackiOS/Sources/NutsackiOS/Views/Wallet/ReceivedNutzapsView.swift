@@ -25,7 +25,7 @@ struct ReceivedNutzapsView: View {
                 Text("Failed").tag(NutzapStatusFilter.failed)
             }
             .pickerStyle(SegmentedPickerStyle())
-            .padding(.vertical)
+            .padding(.vertical, 8)
             .listRowBackground(Color.clear)
             
             // Nutzap list
@@ -38,7 +38,7 @@ struct ReceivedNutzapsView: View {
             }
         }
         .listStyle(PlainListStyle())
-        .navigationTitle("Received Nutzaps")
+        .navigationTitle("Received Zaps")
         .toolbar {
             ToolbarItem(placement: .navigationBarTrailing) {
                 if hasRetryableFailures {
@@ -197,8 +197,8 @@ struct NutzapSummarySection: View {
     }
     
     var body: some View {
-        VStack(spacing: 16) {
-            HStack(spacing: 16) {
+        VStack(spacing: 12) {
+            HStack(spacing: 12) {
                 // Pending card
                 SummaryCard(
                     title: "Pending",
@@ -226,7 +226,8 @@ struct NutzapSummarySection: View {
                 }
             }
         }
-        .padding()
+        .padding(.horizontal)
+        .padding(.vertical, 12)
     }
 }
 
@@ -237,7 +238,7 @@ struct SummaryCard: View {
     let icon: String
     
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: 4) {
             HStack {
                 Image(systemName: icon)
                     .foregroundColor(color)
@@ -250,7 +251,8 @@ struct SummaryCard: View {
                 .foregroundColor(.primary)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .padding()
+        .padding(.horizontal, 12)
+        .padding(.vertical, 10)
         .background(
             RoundedRectangle(cornerRadius: 12)
                 .fill(color.opacity(0.1))
@@ -271,7 +273,7 @@ struct NutzapRow: View {
             NutzapStatusIndicator(status: nutzap.status)
                 .frame(width: 32)
             
-            VStack(alignment: .leading, spacing: 4) {
+            VStack(alignment: .leading, spacing: 2) {
                 // Amount and sender
                 HStack {
                     Text("\(nutzap.amount) sats")
@@ -328,7 +330,7 @@ struct NutzapRow: View {
                 .disabled(isRedeeming)
             }
         }
-        .padding(.vertical, 4)
+        .padding(.vertical, 2)
     }
     
     private func relativeTime(from date: Date) -> String {

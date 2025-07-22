@@ -1,6 +1,9 @@
 import SwiftUI
 import NDKSwift
 import CashuSwift
+#if os(iOS)
+import UIKit
+#endif
 
 struct TransactionDetailDrawer: View {
     let transaction: Transaction
@@ -12,7 +15,9 @@ struct TransactionDetailDrawer: View {
     @State private var showTokenDetail = false
     @State private var showShareSheet = false
     @State private var copiedToClipboard = false
+    @State private var copiedBech32 = false
     @State private var mintInfo: NDKMintInfo?
+    @State private var loadedNostrEvent: NDKEvent?
     
     private var formattedDate: String {
         let formatter = DateFormatter()
@@ -46,11 +51,64 @@ struct TransactionDetailDrawer: View {
     }
     
     private var headerView: some View {
-        VStack(spacing: 12) {
-            // Transaction Type Icon
-            Image(systemName: directionIcon)
-                .font(.system(size: 50))
-                .foregroundStyle(directionColor)
+        VStack(spacing: 16) {
+            // For Nutzaps, show the user avatar prominently
+            if transaction.type == .nutzap {
+                let profile = transaction.direction == .incoming ? senderProfile : recipientProfile
+                let pubkey = transaction.direction == .incoming ? transaction.senderPubkey : transaction.recipientPubkey
+                
+                if let pubkey = pubkey {
+                    VStack(spacing: 12) {
+                        // User avatar
+                        AsyncImage(url: URL(string: profile?.picture ?? "")) { image in
+                            image
+                                .resizable()
+                                .aspectRatio(contentMode: .fill)
+                        } placeholder: {
+                            Circle()
+                                .fill(Color.secondary.opacity(0.3))
+                                .overlay(
+                                    Image(systemName: "person.fill")
+                                        .font(.largeTitle)
+                                        .foregroundColor(.secondary)
+                                )
+                        }
+                        .frame(width: 80, height: 80)
+                        .clipShape(Circle())
+                        .overlay(
+                            // Direction indicator
+                            Image(systemName: transaction.direction == .incoming ? "arrow.down.circle.fill" : "arrow.up.circle.fill")
+                                .font(.title2)
+                                .foregroundStyle(directionColor)
+                                .background(Circle().fill(.white).frame(width: 30, height: 30))
+                                .offset(x: 25, y: 25)
+                        )
+                        
+                        // User name
+                        VStack(spacing: 4) {
+                            Text(transaction.direction == .incoming ? "From" : "To")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                            
+                            if let profile = profile {
+                                Text(profile.name ?? profile.displayName ?? "Anonymous")
+                                    .font(.title3)
+                                    .fontWeight(.semibold)
+                            } else {
+                                Text(pubkey.prefix(16) + "...")
+                                    .font(.title3)
+                                    .fontWeight(.semibold)
+                                    .font(.system(.body, design: .monospaced))
+                            }
+                        }
+                    }
+                }
+            } else {
+                // Regular transaction icon
+                Image(systemName: directionIcon)
+                    .font(.system(size: 50))
+                    .foregroundStyle(directionColor)
+            }
             
             // Amount
             Text("\(transaction.direction == .outgoing ? "-" : "+")\(transaction.amount) sats")
@@ -164,40 +222,62 @@ struct TransactionDetailDrawer: View {
                             }
                         }
                         
-                        // Nostr Event ID
+                        // Nostr Event
                         if let eventID = transaction.nostrEventID {
-                            TransactionInfoRow(
-                                label: "Nostr Event",
-                                value: String(eventID.prefix(16)) + "...",
-                                icon: "link",
-                                action: {
-                                    #if os(iOS)
-                                    UIPasteboard.general.string = eventID
-                                    #endif
-                                }
-                            )
-                        }
-                        
-                        // Nutzap Specific Details
-                        if transaction.type == .nutzap {
-                            // Sender
-                            if let senderPubkey = transaction.senderPubkey {
-                                ProfileDetailRow(
-                                    label: "From",
-                                    pubkey: senderPubkey,
-                                    profile: senderProfile
+                            HStack {
+                                TransactionInfoRow(
+                                    label: "Nostr Event",
+                                    value: "View event details",
+                                    icon: "link"
                                 )
+                                
+                                Spacer()
+                                
+                                HStack(spacing: 12) {
+                                    // Copy button
+                                    if let event = loadedNostrEvent,
+                                       let bech32 = try? event.encode(includeRelays: true) {
+                                        Button(action: {
+                                            #if os(iOS)
+                                            UIPasteboard.general.string = bech32
+                                            #endif
+                                            withAnimation {
+                                                copiedBech32 = true
+                                            }
+                                            DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
+                                                copiedBech32 = false
+                                            }
+                                        }) {
+                                            Image(systemName: copiedBech32 ? "checkmark.circle.fill" : "doc.on.doc")
+                                                .foregroundColor(copiedBech32 ? .green : .accentColor)
+                                        }
+                                        .buttonStyle(.plain)
+                                        
+                                        // Open in njump.me button
+                                        Button(action: {
+                                            if let url = URL(string: "https://njump.me/\(bech32)") {
+                                                #if os(iOS)
+                                                UIApplication.shared.open(url)
+                                                #endif
+                                            }
+                                        }) {
+                                            Image(systemName: "arrow.up.forward.square")
+                                                .foregroundColor(.accentColor)
+                                        }
+                                        .buttonStyle(.plain)
+                                    }
+                                }
                             }
                             
-                            // Recipient
-                            if let recipientPubkey = transaction.recipientPubkey {
-                                ProfileDetailRow(
-                                    label: "To",
-                                    pubkey: recipientPubkey,
-                                    profile: recipientProfile
-                                )
+                            if copiedBech32 {
+                                Text("Copied to clipboard!")
+                                    .font(.caption)
+                                    .foregroundStyle(.green)
+                                    .transition(.opacity)
+                                    .padding(.horizontal)
                             }
                         }
+                        
                     }
                     .padding()
                     .background(Color(.secondarySystemGroupedBackground))
@@ -272,6 +352,22 @@ struct TransactionDetailDrawer: View {
     private func loadProfiles() async {
         guard let ndk = nostrManager.ndk else { return }
         
+        // Load Nostr event if we have an event ID
+        if let eventID = transaction.nostrEventID {
+            let eventDataSource = ndk.observe(
+                filter: NDKFilter(
+                    ids: [eventID]
+                ),
+                maxAge: 3600,
+                cachePolicy: .cacheWithNetwork
+            )
+            
+            for await event in eventDataSource.events {
+                loadedNostrEvent = event
+                break
+            }
+        }
+        
         // Load sender profile
         if let senderPubkey = transaction.senderPubkey {
             let profileDataSource = ndk.observe(
@@ -340,6 +436,12 @@ struct TransactionDetailDrawer: View {
         
         if let eventID = transaction.nostrEventID {
             text += "\nNostr Event ID: \(eventID)\n"
+            
+            if let event = loadedNostrEvent,
+               let bech32 = try? event.encode(includeRelays: true) {
+                text += "Bech32 Event: \(bech32)\n"
+                text += "View on njump.me: https://njump.me/\(bech32)\n"
+            }
         }
         
         return text

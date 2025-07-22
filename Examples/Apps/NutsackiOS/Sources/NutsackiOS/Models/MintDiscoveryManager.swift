@@ -10,6 +10,41 @@ class MintDiscoveryManager {
         self.ndk = ndk
     }
     
+    /// Validates a mint URL to ensure it's a proper HTTP/HTTPS URL
+    private func isValidMintURL(_ urlString: String) -> Bool {
+        // Trim whitespace
+        let trimmed = urlString.trimmingCharacters(in: .whitespacesAndNewlines)
+        
+        // Check if it's a valid URL
+        guard let url = URL(string: trimmed) else { return false }
+        
+        // Must have a scheme
+        guard let scheme = url.scheme?.lowercased() else { return false }
+        
+        // Only allow http or https
+        guard scheme == "http" || scheme == "https" else { return false }
+        
+        // Must have a host
+        guard let host = url.host, !host.isEmpty else { return false }
+        
+        // Check for common invalid patterns
+        // No spaces in the URL
+        if trimmed.contains(" ") { return false }
+        
+        // Host should be a valid domain
+        let hostPattern = #"^[a-zA-Z0-9]([a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?)*$"#
+        let hostRegex = try? NSRegularExpression(pattern: hostPattern, options: .caseInsensitive)
+        let hostRange = NSRange(location: 0, length: host.utf16.count)
+        
+        if let regex = hostRegex {
+            if regex.firstMatch(in: host, options: [], range: hostRange) == nil {
+                return false
+            }
+        }
+        
+        return true
+    }
+    
     /// Discover mints through NIP-87 announcements and recommendations with streaming updates
     func discoverMintsStream() -> AsyncStream<[DiscoveredMint]> {
         AsyncStream { continuation in
@@ -49,7 +84,8 @@ class MintDiscoveryManager {
                             let announcement = NDKCashuMintAnnouncement(event: announcementEvent)
                         
                         if let mintURL = announcement.mintURL,
-                           let url = URL(string: mintURL) {
+                           isValidMintURL(mintURL),
+                           let url = URL(string: mintURL.trimmingCharacters(in: .whitespacesAndNewlines)) {
                             
                             let discoveredMint = DiscoveredMint(
                                 url: url.absoluteString,
@@ -87,7 +123,8 @@ class MintDiscoveryManager {
                         let recommendation = NDKMintRecommendation(event: recommendationEvent)
                         
                         if let mintURL = recommendation.mintURL,
-                           let url = URL(string: mintURL) {
+                           isValidMintURL(mintURL),
+                           let url = URL(string: mintURL.trimmingCharacters(in: .whitespacesAndNewlines)) {
                             
                             if var existingMint = mintsByURL[url] {
                                 // Update existing mint with recommendation

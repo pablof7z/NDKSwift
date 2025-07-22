@@ -42,7 +42,7 @@ struct WalletSettingsView: View {
                             }
                             .buttonStyle(.borderedProminent)
                         }
-                        .padding(.vertical, 8)
+                        .padding(.vertical, 4)
                     }
                 }
                 
@@ -66,32 +66,36 @@ struct WalletSettingsView: View {
                     }
                     
                     // Add mint buttons
-                    HStack(spacing: 16) {
+                    HStack(spacing: 12) {
                         Button(action: { showAddMintSheet = true }) {
                             Label("Add Mint", systemImage: "plus.circle")
+                                .font(.footnote)
                         }
                         .buttonStyle(.bordered)
-                        
-                        Spacer()
+                        .controlSize(.small)
                         
                         Button(action: discoverMints) {
                             if isDiscovering {
                                 HStack(spacing: 4) {
                                     ProgressView()
-                                        .scaleEffect(0.8)
+                                        .scaleEffect(0.7)
                                     Text("Discovering...")
+                                        .font(.footnote)
                                 }
                             } else {
                                 Label("Discover", systemImage: "magnifyingglass")
+                                    .font(.footnote)
                             }
                         }
                         .buttonStyle(.bordered)
+                        .controlSize(.small)
                         .disabled(isDiscovering)
                     }
+                    .padding(.top, 4)
                 } header: {
-                    Text("Mints")
-                } footer: {
-                    Text("Mints are Cashu servers that issue and redeem ecash tokens")
+                    Text("MINTS")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
                 }
                 
                 // Relays Section
@@ -110,16 +114,25 @@ struct WalletSettingsView: View {
                         }
                     }
                     
-                    Button(action: { showAddRelaySheet = true }) {
-                        Label("Add Relay", systemImage: "plus.circle")
-                    }
                 } header: {
-                    Text("Wallet Relays")
+                    HStack {
+                        Text("WALLET RELAYS")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                        Spacer()
+                        Button(action: { showAddRelaySheet = true }) {
+                            Image(systemName: "plus.circle")
+                                .font(.footnote)
+                        }
+                    }
                 } footer: {
                     Text("These relays will be used to sync your wallet events and mint lists")
+                        .font(.caption2)
+                        .foregroundColor(.secondary.opacity(0.8))
                 }
                 
             }
+            .formStyle(.grouped)
             .navigationTitle("Wallet Settings")
             .platformNavigationBarTitleDisplayMode(inline: true)
             .toolbar {
@@ -131,6 +144,7 @@ struct WalletSettingsView: View {
                     Button("Save") {
                         Task { await saveSettings() }
                     }
+                    .fontWeight(.semibold)
                     .disabled(isSaving)
                 }
             }
@@ -178,7 +192,12 @@ struct WalletSettingsView: View {
                         }
                         
                         if !mints.contains(where: { $0.url.absoluteString == mint.url }) {
-                            if let url = URL(string: mint.url) {
+                            // Note: mint.url should already be validated by MintDiscoveryManager
+                            // but we double-check here for safety
+                            let trimmedURL = mint.url.trimmingCharacters(in: .whitespacesAndNewlines)
+                            if let url = URL(string: trimmedURL),
+                               url.scheme != nil,
+                               url.host != nil {
                                 do {
                                     let mintInfo = try await fetchMintInfo(url: url)
                                     mints.append(mintInfo)
@@ -372,52 +391,56 @@ struct MintSettingsRow: View {
     @Environment(WalletManager.self) private var walletManager
     
     var body: some View {
-        HStack(spacing: 12) {
+        HStack(spacing: 8) {
             // Favicon
             Group {
                 if let favicon = favicon {
                     favicon
                         .resizable()
                         .aspectRatio(contentMode: .fit)
-                        .frame(width: 40, height: 40)
-                        .clipShape(RoundedRectangle(cornerRadius: 8))
+                        .frame(width: 32, height: 32)
+                        .clipShape(RoundedRectangle(cornerRadius: 6))
                 } else {
                     Image(systemName: "building.columns.fill")
-                        .font(.title2)
+                        .font(.body)
                         .foregroundColor(.orange)
-                        .frame(width: 40, height: 40)
+                        .frame(width: 32, height: 32)
                         .background(Color.orange.opacity(0.1))
-                        .clipShape(RoundedRectangle(cornerRadius: 8))
+                        .clipShape(RoundedRectangle(cornerRadius: 6))
                 }
             }
             
-            VStack(alignment: .leading, spacing: 4) {
+            VStack(alignment: .leading, spacing: 2) {
                 Text(mintInfo.name ?? mintInfo.url.host ?? "Unknown Mint")
-                    .font(.headline)
-                Text(mintInfo.url.absoluteString)
+                    .font(.subheadline)
+                    .fontWeight(.medium)
+                Text(mintInfo.url.host ?? mintInfo.url.absoluteString)
                     .font(.caption)
                     .foregroundColor(.secondary)
                     .lineLimit(1)
+                    .truncationMode(.tail)
             }
             
             Spacer()
             
-            VStack(alignment: .trailing, spacing: 4) {
+            VStack(alignment: .trailing, spacing: 1) {
                 Text("\(balance)")
-                    .font(.headline)
+                    .font(.subheadline)
+                    .fontWeight(.semibold)
                     .foregroundColor(.orange)
                 Text("sats")
-                    .font(.caption)
+                    .font(.caption2)
                     .foregroundColor(.secondary)
             }
             
             Button(action: onDelete) {
                 Image(systemName: "xmark.circle.fill")
+                    .font(.callout)
                     .foregroundColor(.secondary)
             }
             .buttonStyle(.plain)
         }
-        .padding(.vertical, 4)
+        .padding(.vertical, 2)
         .task {
             await updateBalance()
             await loadFavicon()
@@ -457,20 +480,22 @@ struct RelaySettingsRow: View {
     @Environment(NostrManager.self) private var nostrManager
     
     var body: some View {
-        HStack(spacing: 12) {
+        HStack(spacing: 8) {
             // Relay Icon
-            RelayIconView(icon: relayIcon)
+            RelayIconView(icon: relayIcon, size: 32)
             
-            VStack(alignment: .leading, spacing: 4) {
+            VStack(alignment: .leading, spacing: 2) {
                 // Use NIP-11 name if available, otherwise use hostname
                 Text(relayState?.info?.name ?? getRelayHost(relayURL) ?? "Unknown Relay")
-                    .font(.headline)
+                    .font(.subheadline)
+                    .fontWeight(.medium)
                     
-                HStack(spacing: 8) {
-                    Text(relayURL)
+                HStack(spacing: 6) {
+                    Text(getRelayHost(relayURL) ?? relayURL)
                         .font(.caption)
                         .foregroundColor(.secondary)
                         .lineLimit(1)
+                        .truncationMode(.middle)
                     
                     // Connection status indicator
                     if let state = relayState {
@@ -488,11 +513,12 @@ struct RelaySettingsRow: View {
             
             Button(action: onDelete) {
                 Image(systemName: "xmark.circle.fill")
+                    .font(.callout)
                     .foregroundColor(.secondary)
             }
             .buttonStyle(.plain)
         }
-        .padding(.vertical, 4)
+        .padding(.vertical, 2)
         .task {
             await loadRelayInfo()
         }
@@ -564,13 +590,34 @@ struct AddMintSheet: View {
     let onAdd: (URL) async -> Void
     
     var isValidURL: Bool {
-        guard !mintURL.isEmpty,
-              let url = URL(string: mintURL),
-              let scheme = url.scheme,
+        // Trim whitespace
+        let trimmed = mintURL.trimmingCharacters(in: .whitespacesAndNewlines)
+        
+        guard !trimmed.isEmpty,
+              let url = URL(string: trimmed),
+              let scheme = url.scheme?.lowercased(),
               (scheme == "https" || scheme == "http"),
-              url.host != nil else {
+              let host = url.host,
+              !host.isEmpty else {
             return false
         }
+        
+        // No spaces in the URL
+        if trimmed.contains(" ") {
+            return false
+        }
+        
+        // Host should be a valid domain
+        let hostPattern = #"^[a-zA-Z0-9]([a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?)*$"#
+        let hostRegex = try? NSRegularExpression(pattern: hostPattern, options: .caseInsensitive)
+        let hostRange = NSRange(location: 0, length: host.utf16.count)
+        
+        if let regex = hostRegex {
+            if regex.firstMatch(in: host, options: [], range: hostRange) == nil {
+                return false
+            }
+        }
+        
         return true
     }
     
@@ -609,8 +656,9 @@ struct AddMintSheet: View {
                 
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Add") {
+                        let trimmedURL = mintURL.trimmingCharacters(in: .whitespacesAndNewlines)
                         guard isValidURL,
-                              let url = URL(string: mintURL) else {
+                              let url = URL(string: trimmedURL) else {
                             validationError = "Please enter a valid URL"
                             return
                         }

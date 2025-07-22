@@ -175,12 +175,12 @@ struct NutzapView: View {
                 if paymentMethod == .nutzap {
                     Image(systemName: "bitcoinsign.square.fill")
                         .foregroundColor(.orange)
-                    Text("Nutzap")
+                    Text("Zap")
                         .font(.headline)
                 } else {
                     Image(systemName: "bolt.fill")
                         .foregroundColor(.yellow)
-                    Text("Lightning Zap")
+                    Text("Lightning")
                         .font(.headline)
                 }
                 Spacer()
@@ -220,10 +220,10 @@ struct NutzapView: View {
                     HStack {
                         if paymentMethod == .nutzap {
                             Image(systemName: "bitcoinsign.square.fill")
-                            Text("Send Nutzap")
+                            Text("Zap")
                         } else {
                             Image(systemName: "bolt.fill")
-                            Text("Send Lightning Zap")
+                            Text("Send Lightning")
                         }
                     }
                     .frame(maxWidth: .infinity)
@@ -260,14 +260,14 @@ struct NutzapView: View {
             
             sendButton
         }
-        .navigationTitle(paymentMethod == .nutzap ? "Nutzap" : "Lightning Zap")
+        .navigationTitle("Zap")
         .platformNavigationBarTitleDisplayMode(inline: true)
         #if os(iOS)
         .ignoresSafeArea(.keyboard, edges: [])
         #endif
         .toolbar {
             ToolbarItem(placement: .confirmationAction) {
-                Button(paymentMethod == .nutzap ? "Send Nutzap" : "Send Zap") { 
+                Button("Zap") { 
                     sendPayment()
                 }
                 .foregroundColor(.orange)
@@ -561,7 +561,7 @@ struct NutzapSuccessView: View {
             }
             
             VStack(spacing: 8) {
-                Text("Nutzapped!")
+                Text("Zapped!")
                     .font(.largeTitle)
                     .fontWeight(.bold)
                 
