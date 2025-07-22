@@ -98,7 +98,7 @@ struct Example08_PublishWithNIP46 {
             let profileEvents = await profileDataSource.collect(timeout: 3.0)
             if let profileEvent = profileEvents.sorted(by: { $0.createdAt > $1.createdAt }).first,
                let profileData = profileEvent.content.data(using: .utf8),
-               let profile = try? JSONDecoder().decode(NDKUserProfile.self, from: profileData) {
+               let profile = JSONCoding.safeDecode(NDKUserProfile.self, from: profileData) {
                 print("📝 Your name: \(profile.name ?? "N/A")")
             }
         } catch {

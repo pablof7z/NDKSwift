@@ -109,7 +109,7 @@ public class UserProfileDataSource: ObservableObject {
                 events.sorted { $0.createdAt > $1.createdAt }.first
             }
             .map { event in
-                try? JSONDecoder().decode(NDKUserProfile.self, from: event.content.data(using: .utf8) ?? Data())
+                JSONCoding.safeDecode(NDKUserProfile.self, from: event.content.data(using: .utf8) ?? Data())
             }
             .assign(to: &$profile)
         
@@ -157,7 +157,7 @@ public class MultipleProfilesDataSource: ObservableObject {
                 // Get the latest profile for each author
                 for (pubkey, authorEvents) in eventsByAuthor {
                     if let latestEvent = authorEvents.sorted(by: { $0.createdAt > $1.createdAt }).first,
-                       let profile = try? JSONDecoder().decode(NDKUserProfile.self, from: latestEvent.content.data(using: .utf8) ?? Data()) {
+                       let profile = JSONCoding.safeDecode(NDKUserProfile.self, from: latestEvent.content.data(using: .utf8) ?? Data()) {
                         profileDict[pubkey] = profile
                     }
                 }
