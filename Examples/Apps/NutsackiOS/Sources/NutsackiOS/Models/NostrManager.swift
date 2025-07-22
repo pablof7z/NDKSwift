@@ -24,7 +24,7 @@ class NostrManager {
     private var profileObservationTask: Task<Void, Never>?
     
     // Default relays for the app
-    let defaultRelays = [ "wss://relay.primal.net" ]
+    let defaultRelays = [ RelayConstants.primal ]
     
     // Key for storing user-added relays
     private static let userRelaysKey = "UserAddedRelays"
@@ -61,7 +61,7 @@ class NostrManager {
             // Configure NIP-89 client tags for Nutsack
             ndk.clientTagConfig = NDKClientTagConfig(
                 name: "Nutsack",
-                relay: "wss://relay.primal.net",
+                relay: RelayConstants.primal,
                 autoTag: true,
                 excludedKinds: [
                     // Exclude sensitive event kinds from client tagging

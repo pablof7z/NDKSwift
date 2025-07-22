@@ -21,11 +21,7 @@ struct BasicE2ERunner {
         NDKLogger.log(.info, category: .signer, "Generated keypair, pubkey: \(pubkey)")
         
         // Add relays
-        let relayURLs = [
-            "wss://relay.damus.io",
-            "wss://relay.nostr.band",
-            "wss://nos.lol"
-        ]
+        let relayURLs = RelayConstants.testRelays
         
         for relay in relayURLs {
             await publisherNDK.addRelay(relay)

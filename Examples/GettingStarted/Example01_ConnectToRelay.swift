@@ -8,9 +8,9 @@ struct Example01_ConnectToRelay {
         
         // Step 1: Create an NDK instance with relay URLs
         let relayUrls = [
-            "wss://relay.damus.io",
-            "wss://relay.primal.net",
-            "wss://nos.lol"
+            RelayConstants.damus,
+            RelayConstants.primal,
+            RelayConstants.nosLol
         ]
         
         let ndk = NDK(relayUrls: relayUrls)
