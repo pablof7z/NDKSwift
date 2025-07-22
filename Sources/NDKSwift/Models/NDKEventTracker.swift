@@ -12,10 +12,10 @@ import Foundation
 /// let tracker = NDKEventTracker()
 /// 
 /// // Track that an event was seen on a relay
-/// await tracker.markSeen(eventId: event.id, relay: "wss://relay.damus.io")
+/// await tracker.markSeen(eventId: event.id, relay: RelayConstants.damus)
 /// 
 /// // Update publish status
-/// await tracker.updatePublishStatus(eventId: event.id, relay: "wss://relay.damus.io", status: .succeeded)
+/// await tracker.updatePublishStatus(eventId: event.id, relay: RelayConstants.damus, status: .succeeded)
 /// 
 /// // Get relay information
 /// let relays = await tracker.getSeenOnRelays(eventId: event.id)

@@ -329,7 +329,7 @@ public final class NDKEventBuilder {
     /// ```swift
     /// let event = try await ndk.event()
     ///     .content("Hello from my client!")
-    ///     .clientTag(name: "Nutsack", address: "31990:abc123:nutsack-ios", relay: "wss://relay.example.com")
+    ///     .clientTag(name: "Nutsack", address: "31990:abc123:nutsack-ios", relay: RelayConstants.example)
     ///     .build()
     /// ```
     @discardableResult
