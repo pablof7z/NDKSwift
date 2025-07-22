@@ -215,72 +215,65 @@ public struct NDKAuthErrorHandler {
     
     #if !os(watchOS)
     private static func handleBiometricError(_ error: LAError) -> ErrorInfo {
-        switch error.code {
-        case .authenticationFailed:
-            return ErrorInfo(
-                title: "Authentication Failed",
-                message: "Face ID or Touch ID authentication failed. Please try again.",
-                isRecoverable: true,
-                suggestedAction: .retry
+        let errorMappings: [LAError.Code: (title: String, message: String, isRecoverable: Bool, suggestedAction: ErrorInfo.SuggestedAction?)] = [
+            .authenticationFailed: (
+                "Authentication Failed",
+                "Face ID or Touch ID authentication failed. Please try again.",
+                true,
+                .retry
+            ),
+            .userCancel: (
+                "Authentication Cancelled",
+                "You cancelled the authentication.",
+                true,
+                nil
+            ),
+            .userFallback: (
+                "Use Passcode",
+                "Please enter your device passcode to continue.",
+                true,
+                nil
+            ),
+            .systemCancel: (
+                "Authentication Interrupted",
+                "Authentication was cancelled by the system. Please try again.",
+                true,
+                .retry
+            ),
+            .passcodeNotSet: (
+                "Passcode Not Set",
+                "Please set up a device passcode in Settings to use this feature.",
+                false,
+                nil
+            ),
+            .biometryNotAvailable: (
+                "Biometrics Unavailable",
+                "Face ID or Touch ID is not available on this device.",
+                false,
+                nil
+            ),
+            .biometryNotEnrolled: (
+                "Biometrics Not Set Up",
+                "Please set up Face ID or Touch ID in Settings to use biometric authentication.",
+                false,
+                nil
+            ),
+            .biometryLockout: (
+                "Biometrics Locked",
+                "Too many failed attempts. Please use your device passcode.",
+                true,
+                nil
             )
-            
-        case .userCancel:
+        ]
+        
+        if let mapping = errorMappings[error.code] {
             return ErrorInfo(
-                title: "Authentication Cancelled",
-                message: "You cancelled the authentication.",
-                isRecoverable: true,
-                suggestedAction: nil
+                title: mapping.title,
+                message: mapping.message,
+                isRecoverable: mapping.isRecoverable,
+                suggestedAction: mapping.suggestedAction
             )
-            
-        case .userFallback:
-            return ErrorInfo(
-                title: "Use Passcode",
-                message: "Please enter your device passcode to continue.",
-                isRecoverable: true,
-                suggestedAction: nil
-            )
-            
-        case .systemCancel:
-            return ErrorInfo(
-                title: "Authentication Interrupted",
-                message: "Authentication was cancelled by the system. Please try again.",
-                isRecoverable: true,
-                suggestedAction: .retry
-            )
-            
-        case .passcodeNotSet:
-            return ErrorInfo(
-                title: "Passcode Not Set",
-                message: "Please set up a device passcode in Settings to use this feature.",
-                isRecoverable: false,
-                suggestedAction: nil
-            )
-            
-        case .biometryNotAvailable:
-            return ErrorInfo(
-                title: "Biometrics Unavailable",
-                message: "Face ID or Touch ID is not available on this device.",
-                isRecoverable: false,
-                suggestedAction: nil
-            )
-            
-        case .biometryNotEnrolled:
-            return ErrorInfo(
-                title: "Biometrics Not Set Up",
-                message: "Please set up Face ID or Touch ID in Settings to use biometric authentication.",
-                isRecoverable: false,
-                suggestedAction: nil
-            )
-            
-        case .biometryLockout:
-            return ErrorInfo(
-                title: "Biometrics Locked",
-                message: "Too many failed attempts. Please use your device passcode.",
-                isRecoverable: true,
-                suggestedAction: nil
-            )
-            
-        default:
+        } else {
             return ErrorInfo(
                 title: "Authentication Error",
                 message: error.localizedDescription,

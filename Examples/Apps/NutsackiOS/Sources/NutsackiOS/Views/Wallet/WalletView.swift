@@ -29,6 +29,7 @@ struct WalletView: View {
         case contacts
         case walletEvents
         case proofManagement
+        case receivedNutzaps
         
         var id: String {
             switch self {
@@ -41,6 +42,7 @@ struct WalletView: View {
             case .contacts: return "contacts"
             case .walletEvents: return "walletEvents"
             case .proofManagement: return "proofManagement"
+            case .receivedNutzaps: return "receivedNutzaps"
             }
         }
     }
@@ -117,6 +119,10 @@ struct WalletView: View {
                             NavigationLink(value: WalletDestination.proofManagement) {
                                 Label("Manage Proofs", systemImage: "key")
                             }
+                            
+                            NavigationLink(value: WalletDestination.receivedNutzaps) {
+                                Label("Received Nutzaps", systemImage: "bolt.fill")
+                            }
                         } label: {
                             Image(systemName: "ellipsis.circle")
                         }
@@ -158,6 +164,8 @@ struct WalletView: View {
                     WalletEventsView()
                 case .proofManagement:
                     ProofManagementView()
+                case .receivedNutzaps:
+                    ReceivedNutzapsView(walletManager: walletManager)
                 }
             }
             .onAppear {
@@ -594,8 +602,7 @@ struct ContactAvatarView: View {
                 )
                 
                 for await event in profileDataSource.events {
-                    if let profileData = event.content.data(using: .utf8),
-                       let profile = try? JSONDecoder().decode(NDKUserProfile.self, from: profileData) {
+                    if let profile = JSONCoding.safeDecode(NDKUserProfile.self, from: event.content) {
                         await MainActor.run {
                             self.profile = profile
                         }
