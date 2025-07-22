@@ -258,7 +258,7 @@ public enum Nutzap {
             if let firstProof = allProofs.first,
                let secretData = firstProof.secret.data(using: .utf8),
                let secret = try? JSONSerialization.jsonObject(with: secretData, options: []) as? [[String: Any]],
-               let p2pkCondition = secret.first(where: { $0["kind"] as? String == "P2PK" }),
+               let p2pkCondition = secret.first(where: { $0[NostrJSONConstants.kind] as? String == "P2PK" }),
                let data = p2pkCondition["data"] as? String {
                 expectedPubkey = data
             }
