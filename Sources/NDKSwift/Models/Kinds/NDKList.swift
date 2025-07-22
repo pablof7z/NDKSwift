@@ -187,8 +187,7 @@ public class NDKList {
 
             // Try to parse content as JSON array of tags
             do {
-                let data = content.data(using: .utf8) ?? Data()
-                let tagArrays = try JSONSerialization.jsonObject(with: data) as? [[String]]
+                let tagArrays = try JSONCoding.parseArray(from: content) as? [[String]]
                 return tagArrays ?? []
             } catch {
                 return []
@@ -199,8 +198,7 @@ public class NDKList {
             let tagArrays = newValue
 
             do {
-                let data = try JSONSerialization.data(withJSONObject: tagArrays)
-                content = String(data: data, encoding: .utf8) ?? ""
+                content = try JSONCoding.serializeToString(tagArrays)
             } catch {
                 content = ""
             }
@@ -436,8 +434,7 @@ public class NDKList {
         }
 
         // Create JSON representation of encrypted items
-        let jsonData = try JSONSerialization.data(withJSONObject: encryptedItems)
-        let jsonString = String(data: jsonData, encoding: .utf8) ?? ""
+        let jsonString = try JSONCoding.serializeToString(encryptedItems)
 
         // For now, store as plain JSON - encryption would require NIP-04/44 implementation
         content = jsonString

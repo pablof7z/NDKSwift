@@ -345,7 +345,7 @@ public actor NIP05Manager {
         }
         
         // Parse JSON response
-        guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+        guard let json = try? JSONCoding.parseDictionary(from: data),
               let names = json["names"] as? [String: String],
               let pubkey = names[name] else {
             // Cache invalid format
