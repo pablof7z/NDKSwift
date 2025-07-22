@@ -1,74 +1,127 @@
-# Low-Risk Improvements Round 2
+# Low-Risk Improvements Round 2 - NDKSwift
 
-This document summarizes the low-risk improvements made to the NDKSwift codebase focusing on DRY/KISS principles.
+## 1. Extract JSON Constants (Highest Impact)
 
-## Improvements Made
+### Problem
+Multiple JSON-related strings are hardcoded throughout the codebase, especially for Cashu/NIP-60 operations:
+- "proof", "mint", "unit", "amount", "secret", "C" appear in many files
+- These are part of the Cashu protocol and should be constants
 
-### 1. Error Message Constants (`ErrorMessageConstants.swift`)
-- Consolidated common error messages like "Failed to parse", "Invalid format", "Missing required"
-- Provides helper functions for consistent error message formatting
-- Reduces duplication across error handling code
+### Files affected:
+- Sources/NDKSwift/Wallets/NIP60/Nutzap.swift:402
+- Sources/NDKSwift/Models/Kinds/NDKCashuEvents.swift (multiple occurrences)
+- Sources/NDKSwift/Wallets/NIP60/WalletTransaction.swift:149
+- Sources/NDKSwift/Models/Kinds/NDKZapRequest.swift:29,65
+- Sources/NDKSwift/Models/Kinds/NDKNutzap.swift:36,39,146,183,190
+- Sources/NDKSwift/Models/Kinds/NDKMintAnnouncement.swift:105
 
-### 2. Validation Helpers (`ValidationHelpers.swift`)
-- Common string validation patterns (isEmpty, normalize, hasLength)
-- URL validation helpers
-- Collection validation helpers
-- Numeric validation helpers
-- Reduces duplicate validation logic
+### Solution
+Create a new file `Sources/NDKSwift/Utils/NostrJSONConstants.swift`:
+```swift
+public enum NostrJSONConstants {
+    public enum Cashu {
+        public static let proof = "proof"
+        public static let mint = "mint"
+        public static let unit = "unit"
+        public static let amount = "amount"
+        public static let secret = "secret"
+        public static let C = "C"
+    }
+}
+```
 
-### 3. Collection Extensions (`CollectionExtensions.swift`)
-- Added properties: `hasElements`, `hasOneElement`, `hasMultipleElements`
-- String extensions: `hasContent`, `trimmed`, `normalized`
-- Optional collection helpers: `isNilOrEmpty`, `hasElements`
-- Array extension: `removeAll(where:)` that returns removed elements
+## 2. Extract Hex Validation Constants
 
-### 4. String Format Helpers (`StringFormatHelpers.swift`)
-- Error message formatting
-- Relay URL display formatting
-- Hex string formatting and truncation
-- JSON pretty printing
-- Timestamp formatting helpers
+### Problem
+Magic numbers 32 and 64 appear frequently for hex string validation:
+- 64 characters = 32 bytes hex-encoded (for event IDs, pubkeys)
+- 32 bytes = raw data size
+- These validations are repeated in many places
 
-### 5. Type Aliases (`TypeAliases.swift`)
-- Consolidated common type aliases: `Timestamp`, `RelayURL`, `PublicKey`, etc.
-- Common callback types: `ResultCallback`, `EventCallback`
-- Common closure types: `AsyncThrowingOperation`, `FilterPredicate`
+### Files affected:
+- Sources/NDKSwift/Utils/Bech32.swift:183,191
+- Sources/NDKSwift/Models/NDKEventBuilder.swift:417,467,475,531
+- Sources/NDKSwift/Utils/ContentTagger.swift:20,266,273,281,290,302
+- Sources/NDKSwift/Negentropy/NegentropyItem.swift:42
+- Sources/NDKSwift/Encryption/NIP04/NIP04Encryption.swift:126,141
 
-### 6. JSON Constants Consolidation
-- Updated `NostrJSONConstants` to reference `NostrTagConstants.ProfileField`
-- Eliminates duplication between the two constant files
+### Solution
+Add to `Sources/NDKSwift/Utils/Crypto.swift`:
+```swift
+public enum CryptoConstants {
+    // Existing:
+    public static let privateKeySize = 32
+    
+    // Add:
+    public static let publicKeySize = 32
+    public static let eventIdSize = 32
+    public static let hexEncodedKeyLength = 64
+    public static let hexEncodedEventIdLength = 64
+}
+```
 
-### 7. Code Updates
-- Updated `NDKErrorFactories` to use `ErrorMessageConstants`
-- Updated `Nutzap.swift` to use `NostrJSONConstants.kind`
+## 3. Consolidate Error Message Patterns
 
-## Benefits
+### Problem
+"Failed to" error messages are inconsistent and duplicated:
+- "Failed to encrypt", "Failed to decrypt", "Failed to parse", etc.
+- Some use sentence case, others don't
 
-1. **Reduced Code Duplication**: Common patterns are now centralized
-2. **Improved Maintainability**: Changes to error messages or validation logic only need to be made in one place
-3. **Better Consistency**: Error messages and formatting are now consistent across the codebase
-4. **Type Safety**: Type aliases improve code readability and reduce errors
-5. **Cleaner Code**: Helper methods make code more readable and concise
+### Files affected:
+- Sources/NDKSwift/Signers/NDKBunkerSigner.swift:527,555,560
+- Sources/NDKSwift/RPC/NDKNostrRPC.swift:67,142
+- Sources/NDKSwift/Wallets/NIP60/WalletEventProcessor.swift:66,67,114
+- Sources/NDKSwift/Wallets/NIP60/Payment.swift:17,24,70,272
 
-## Files Added
+### Solution
+Add error message factory methods to NDKError:
+```swift
+extension NDKError {
+    static func failedToParseContent(_ type: String) -> NDKError {
+        return .invalidContent("Failed to parse \(type)")
+    }
+    
+    static func failedToPerformOperation(_ operation: String, reason: String? = nil) -> NDKError {
+        let message = reason != nil ? "Failed to \(operation): \(reason!)" : "Failed to \(operation)"
+        return .failedTo(operation, message: reason)
+    }
+}
+```
 
-- `/Sources/NDKSwift/Utils/ErrorMessageConstants.swift`
-- `/Sources/NDKSwift/Utils/ValidationHelpers.swift`
-- `/Sources/NDKSwift/Utils/StringFormatHelpers.swift`
-- `/Sources/NDKSwift/Utils/TypeAliases.swift`
+## 4. Extract Common JSON Parsing Pattern
 
-## Files Modified
+### Problem
+The pattern `content.data(using: .utf8)` followed by `JSONDecoder().decode` appears frequently:
 
-- `/Sources/NDKSwift/Extensions/CollectionExtensions.swift` - Added new extension methods
-- `/Sources/NDKSwift/Utils/NostrJSONConstants.swift` - Referenced ProfileField constants
-- `/Sources/NDKSwift/Errors/NDKErrorFactories.swift` - Used ErrorMessageConstants
-- `/Sources/NDKSwift/Wallets/NIP60/Nutzap.swift` - Used NostrJSONConstants
-- `CHANGELOG.md` - Documented all changes
+### Files affected (17 occurrences):
+- Sources/NDKSwift/RPC/NDKNostrRPC.swift:64
+- Sources/NDKSwift/Wallets/NIP60/WalletEventProcessor.swift:64,112
+- Sources/NDKSwift/Wallets/NIP60/P2PKManager.swift:57
+- Sources/NDKSwift/Core/NDKProfileManager.swift:120
+- Sources/NDKSwift/Wallets/NWC/NWCResponseHandler.swift:298,334
+- Sources/NDKSwift/Wallets/NIP60/Nutzap.swift:237,259
 
-## Next Steps
+### Solution
+Add extension to String:
+```swift
+extension String {
+    func decodeJSON<T: Decodable>(_ type: T.Type) throws -> T {
+        guard let data = self.data(using: .utf8) else {
+            throw NDKError.invalidDataFormat("JSON", details: "Failed to convert string to UTF-8 data")
+        }
+        return try JSONDecoder().decode(type, from: data)
+    }
+}
+```
 
-These improvements provide a foundation for further refactoring. Future work could:
-1. Update more files to use the new constants and helpers
-2. Add more validation patterns as they're discovered
-3. Extend the formatting helpers for other common patterns
-4. Create additional type aliases as patterns emerge
+## Implementation Priority
+
+1. **NostrJSONConstants** - Highest impact, affects Cashu/wallet functionality
+2. **Hex validation constants** - Medium-high impact, improves validation clarity
+3. **JSON parsing extension** - Medium impact, reduces boilerplate
+4. **Error message consolidation** - Lower impact but improves consistency
+
+## Estimated Effort
+- Total time: ~2 hours
+- Each improvement is isolated and can be done incrementally
+- No breaking changes, all are internal refactors

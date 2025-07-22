@@ -14,6 +14,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Provides constants for popular relays like Damus, Nostr Band, nos.lol, Primal, etc.
   - Includes pre-defined relay sets for different use cases (default, extended, test, wallet)
   - Eliminates hardcoded relay URLs throughout the codebase
+- `ErrorMessageConstants` enum to consolidate common error messages
+  - Reduces duplication of error strings like "Failed to parse", "Invalid format", etc.
+  - Provides helper functions for consistent error message formatting
+- `ValidationHelpers` enum to consolidate common validation patterns
+  - String validation (isEmpty, normalize, hasLength)
+  - URL validation helpers
+  - Collection validation helpers
+  - Numeric validation helpers
+- `CollectionExtensions` with common collection operations
+  - `hasElements`, `hasOneElement`, `hasMultipleElements` properties
+  - String extensions for `hasContent`, `trimmed`, `normalized`
+  - Optional collection helpers like `isNilOrEmpty`
+- `StringFormatHelpers` for common string formatting patterns
+  - Error message formatting
+  - Relay URL display formatting
+  - Hex string formatting and truncation
+  - JSON pretty printing
+  - Timestamp formatting
+- `TypeAliases` file to consolidate common type aliases
+  - `Timestamp`, `RelayURL`, `PublicKey`, `EventID`, etc.
+  - Common callback and closure type aliases
 
 ### Fixed
 - Relay health monitoring now correctly uses wallet-configured relays from kind 17375 events
@@ -27,6 +48,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Cleaned up Package.swift by removing commented-out dependencies (YAGNI principle)
 - Removed unnecessary Foundation imports from utility files that don't need them
 - Updated examples, tests, and source code to use `RelayConstants` instead of hardcoded relay URLs
+- Updated `NDKErrorFactories` to use `ErrorMessageConstants` for consistent error messages
+- Updated `NostrJSONConstants` to reference `NostrTagConstants.ProfileField` to avoid duplication
+- Updated `Nutzap.swift` to use `NostrJSONConstants.kind` instead of hardcoded string
 
 ## [0.4.2] - 2025-07-21
 

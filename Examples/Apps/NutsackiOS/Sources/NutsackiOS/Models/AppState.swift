@@ -30,6 +30,7 @@ class AppState: ObservableObject {
     private static let themeKey = "PreferredTheme"
     private static let lastRNackHashKey = "LastReleaseNotesAcknoledgedHash"
     private static let firstLaunchFlag = "HasLaunchedBefore"
+    private static let blacklistedMintsKey = "BlacklistedMints"
     
     struct ExchangeRateResponse: Decodable {
         let bitcoin: ExchangeRate
@@ -49,6 +50,12 @@ class AppState: ObservableObject {
     @Published var themeMode: ThemeMode {
         didSet {
             UserDefaults.standard.setValue(themeMode.rawValue, forKey: AppState.themeKey)
+        }
+    }
+    
+    @Published var blacklistedMints: Set<String> {
+        didSet {
+            UserDefaults.standard.set(Array(blacklistedMints), forKey: AppState.blacklistedMintsKey)
         }
     }
     
@@ -73,6 +80,12 @@ class AppState: ObservableObject {
             themeMode = theme
         } else {
             themeMode = .system
+        }
+        
+        if let savedMints = UserDefaults.standard.array(forKey: AppState.blacklistedMintsKey) as? [String] {
+            blacklistedMints = Set(savedMints)
+        } else {
+            blacklistedMints = []
         }
         
         loadExchangeRates()
@@ -101,6 +114,20 @@ class AppState: ObservableObject {
                 self.exchangeRates = prices
             }
         }
+    }
+    
+    // MARK: - Blacklist Management
+    
+    func blacklistMint(_ mintURL: String) {
+        blacklistedMints.insert(mintURL)
+    }
+    
+    func unblacklistMint(_ mintURL: String) {
+        blacklistedMints.remove(mintURL)
+    }
+    
+    func isMintBlacklisted(_ mintURL: String) -> Bool {
+        blacklistedMints.contains(mintURL)
     }
 }
 
