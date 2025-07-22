@@ -225,7 +225,7 @@ public enum CashuDeposit {
                     // Timeout reached - persist quote and mark as expired
                     // Only save if we don't already have an event ID (to avoid duplicates)
                     if quoteEventId == nil {
-                        _ = try await eventManager.saveQuoteEvent(quote: quote, signer: signer)
+                        try await eventManager.saveQuoteEvent(quote: quote, signer: signer)
                     }
                     continuation.yield(.expired)
                     continuation.finish()
@@ -261,8 +261,6 @@ public enum CashuDeposit {
             throw NDKError.depositNotReady("Deposit not yet received by mint")
         }
         
-        // Generate outputs for minting
-        _ = splitIntoBase2(Int(quote.amount))
         
         // Create mint quote with request details for issue function
         var mintQuote = statusResponse
@@ -285,16 +283,6 @@ public enum CashuDeposit {
         
         // Check if user notification is required
         if wasUserNotified && proofs.isEmpty {
-            _ = PendingMintOperation(
-                quoteId: quote.quoteId,
-                mintURL: quote.mintURL,
-                amount: quote.amount,
-                invoice: quote.invoice,
-                paymentProof: nil,
-                createdAt: Date(),
-                lastAttemptAt: Date()
-            )
-            
             throw NDKError.paymentFailed(reason: "Mint operation requires user intervention after reaching retry limit")
         }
         

@@ -84,7 +84,7 @@ actor WalletPaymentRouter {
                 throw NDKError.invalidRequest("Invalid mint URLs for transfer")
             }
             
-            _ = try await CrossMintTransfer.transferBetweenMints(
+            try await CrossMintTransfer.transferBetweenMints(
                 amount: nutzapRequest.amountSats,
                 from: sourceURL,
                 to: targetURL,

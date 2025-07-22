@@ -60,7 +60,7 @@ public actor WalletEventManager {
                 ] + tokenChange.deletedTokenIds.map { ["e", $0] })
                 .build(signer: signer)
             
-            _ = try await ndk.publish(deleteEvent)
+            try await ndk.publish(deleteEvent)
             
             // Create individual Kind 5 events for each deleted token
             for tokenId in tokenChange.deletedTokenIds {

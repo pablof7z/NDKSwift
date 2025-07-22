@@ -283,7 +283,7 @@ public enum Payment {
             mint: destinationMintURL.absoluteString,
             memo: "Cross-mint transfer"
         )
-        _ = try await wallet.update(stateChange: stateChange)
+        try await wallet.update(stateChange: stateChange)
         
         return PaymentTransferResult(
             proofs: newProofs,
@@ -357,7 +357,7 @@ public enum Payment {
                 mint: mintURL.absoluteString,
                 memo: "Send tokens"
             )
-            _ = try await wallet.update(stateChange: stateChange)
+            try await wallet.update(stateChange: stateChange)
             
             return (proofs: lockedProofs, change: changeProofs)
             
