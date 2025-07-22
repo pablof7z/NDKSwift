@@ -1,4 +1,3 @@
-import Foundation
 import CashuSwift
 
 /// Calculates the token changes needed based on a wallet state change

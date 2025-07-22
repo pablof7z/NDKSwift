@@ -1,4 +1,3 @@
-import Foundation
 
 /// Nostr message types
 public enum NostrMessageType: String {

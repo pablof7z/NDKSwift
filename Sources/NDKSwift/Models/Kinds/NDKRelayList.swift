@@ -1,4 +1,3 @@
-import Foundation
 
 /// Relay access modes for relay list entries
 public enum NDKRelayAccess: String, CaseIterable {

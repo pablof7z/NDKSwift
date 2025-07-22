@@ -1,4 +1,3 @@
-import Foundation
 
 /// Protocol for objects that can be stored in an NDKList
 public protocol NDKListItem {
