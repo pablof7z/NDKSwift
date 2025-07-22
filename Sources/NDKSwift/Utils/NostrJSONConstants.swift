@@ -23,16 +23,16 @@ public struct NostrJSONConstants {
     // Subscription fields
     public static let subscription = "subscription"
     
-    // Profile fields (kind 0)
-    public static let name = "name"
-    public static let about = "about"
-    public static let picture = "picture"
-    public static let nip05 = "nip05"
-    public static let banner = "banner"
-    public static let displayName = "display_name"
-    public static let website = "website"
-    public static let lud06 = "lud06"
-    public static let lud16 = "lud16"
+    // Profile fields (kind 0) - using NostrTagConstants for consistency
+    public static let name = NostrTagConstants.ProfileField.name
+    public static let about = NostrTagConstants.ProfileField.about
+    public static let picture = NostrTagConstants.ProfileField.picture
+    public static let nip05 = NostrTagConstants.ProfileField.nip05
+    public static let banner = NostrTagConstants.ProfileField.banner
+    public static let displayName = NostrTagConstants.ProfileField.displayName
+    public static let website = NostrTagConstants.ProfileField.website
+    public static let lud06 = NostrTagConstants.ProfileField.lud06
+    public static let lud16 = NostrTagConstants.ProfileField.lud16
     
     // NIP-05 fields
     public static let names = "names"
