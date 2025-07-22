@@ -477,14 +477,15 @@ public class NDKList {
 
     /// Sign this list as an event
     public func sign() async throws {
-        guard let signer = ndk?.signer else {
-            throw NDKError.notConfigured("No signer configured")
+        guard let ndk = ndk else {
+            throw NDKError.notConfigured("NDK reference lost")
         }
+        let signer = try ndk.requireSigner()
 
         let event = toNDKEvent()
 
         // Use NDKEventBuilder for signing
-        let signedEvent = try await ndk!.event()
+        let signedEvent = try await ndk.event()
             .pubkey(try await signer.pubkey)
             .createdAt(event.createdAt)
             .kind(event.kind)

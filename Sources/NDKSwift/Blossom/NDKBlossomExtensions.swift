@@ -35,9 +35,7 @@ extension NDK {
         servers: [String]? = nil,
         expiration: Date? = nil
     ) async throws -> [BlossomBlob] {
-        guard let signer = signer else {
-            throw NDKError.notConfigured("No signer configured")
-        }
+        let signer = try requireSigner()
 
         // Use provided servers or discover from relay list
         let targetServers: [String]
@@ -155,9 +153,7 @@ public extension NDKEvent {
         caption: String? = nil,
         ndk: NDK
     ) async throws -> NDKEvent {
-        guard let signer = ndk.signer else {
-            throw NDKError.notConfigured("No signer configured")
-        }
+        let signer = try ndk.requireSigner()
 
         // Upload to Blossom
         let blobs = try await ndk.uploadToBlossom(

@@ -19,9 +19,7 @@ public struct NDKNutzap {
         comment: String? = nil,
         zappedEvent: NDKEvent? = nil
     ) async throws -> NDKNutzap {
-        guard let signer = ndk.signer else {
-            throw NDKError.notConfigured("No signer configured")
-        }
+        let signer = try ndk.requireSigner()
         
         var tags: [[String]] = []
         
@@ -140,9 +138,7 @@ public struct NDKNutzap {
     
     /// Create nutzap preferences from a user's kind 10019 event
     public static func createPreferences(ndk: NDK, mints: [NDKNutzapPreferences.MintConfig]) async throws -> NDKEvent {
-        guard let signer = ndk.signer else {
-            throw NDKError.notConfigured("No signer configured")
-        }
+        let signer = try ndk.requireSigner()
         
         var tags: [[String]] = []
         

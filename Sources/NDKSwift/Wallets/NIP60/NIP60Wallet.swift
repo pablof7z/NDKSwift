@@ -49,7 +49,10 @@ public actor NIP60Wallet: NDKPaymentProvider {
     // MARK: - Initialization
     
     public init(ndk: NDK, cache: NDKCache? = nil) throws {
-        guard let signer = ndk.signer else {
+        let signer: NDKSigner
+        do {
+            signer = try ndk.requireSigner()
+        } catch {
             throw NDKError.notConfigured("NIP60Wallet requires a signer configured on NDK")
         }
         

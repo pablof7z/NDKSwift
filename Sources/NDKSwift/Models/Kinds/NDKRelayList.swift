@@ -293,9 +293,7 @@ public extension NDK {
 
     /// Publish a relay list
     func publishRelayList(_ relayList: NDKRelayList) async throws {
-        guard signer != nil else {
-            throw NDKError.notConfigured("No signer configured")
-        }
+        _ = try requireSigner()
 
         try await relayList.sign()
         let event = relayList.toNDKEvent()
