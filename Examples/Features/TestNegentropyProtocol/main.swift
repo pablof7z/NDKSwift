@@ -9,26 +9,21 @@ struct TestNegentropyProtocol {
         print("🔬 Testing Negentropy Protocol Implementation")
         print("==========================================\n")
         
-        do {
-            // Test 1: Empty set encoding
-            print("Test 1: Empty Set Encoding")
-            await testEmptySet()
-            
-            print("\n" + String(repeating: "-", count: 40) + "\n")
-            
-            // Test 2: Small set encoding (IdList mode)
-            print("Test 2: Small Set Encoding (IdList mode)")
-            await testSmallSet()
-            
-            print("\n" + String(repeating: "-", count: 40) + "\n")
-            
-            // Test 3: Protocol handshake flow
-            print("Test 3: Protocol Handshake Flow")
-            await testProtocolHandshake()
-            
-        } catch {
-            print("❌ Error: \(error)")
-        }
+        // Test 1: Empty set encoding
+        print("Test 1: Empty Set Encoding")
+        await testEmptySet()
+        
+        print("\n" + String(repeating: "-", count: 40) + "\n")
+        
+        // Test 2: Small set encoding (IdList mode)
+        print("Test 2: Small Set Encoding (IdList mode)")
+        await testSmallSet()
+        
+        print("\n" + String(repeating: "-", count: 40) + "\n")
+        
+        // Test 3: Protocol handshake flow
+        print("Test 3: Protocol Handshake Flow")
+        await testProtocolHandshake()
     }
     
     static func testEmptySet() async {

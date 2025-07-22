@@ -250,7 +250,7 @@ final class UserProfileE2ETests: XCTestCase {
             .build()
         
         print("[\(timestamp())] Publishing minimal profile...")
-        try await ndk.publish(profileEvent)
+        _ = try await ndk.publish(profileEvent)
         
         // Give relays time to propagate
         try await Task.sleep(nanoseconds: 2_000_000_000)

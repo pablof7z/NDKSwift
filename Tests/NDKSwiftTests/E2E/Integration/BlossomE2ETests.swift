@@ -177,7 +177,7 @@ final class BlossomE2ETests: XCTestCase {
         let signer = try NDKPrivateKeySigner.generate()
         ndk.signer = signer
         
-        let pubkey = try await signer.pubkey
+        _ = try await signer.pubkey
         
         // Upload a test file first
         let testData = "Delete test - \(UUID().uuidString)".data(using: .utf8)!

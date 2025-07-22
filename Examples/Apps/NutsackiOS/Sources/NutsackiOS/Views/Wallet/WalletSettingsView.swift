@@ -724,10 +724,6 @@ private struct DiscoveredMintRowItem: View {
                 .foregroundColor(.green)
         }
     }
-    
-    private func loadBlacklist() async {
-        blacklistedMints = await walletManager.getBlacklistedMints()
-    }
 }
 
 // MARK: - Blacklisted Mint Row

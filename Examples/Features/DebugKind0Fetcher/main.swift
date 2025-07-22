@@ -55,7 +55,7 @@ struct DebugKind0Fetcher {
         print("🔍 Fetching profile using NDK Data Source...")
         
         // Use NDK's declarative API to fetch the profile
-        let profileDataSource = await NDKDataSource<NDKUserProfile>(
+        let profileDataSource = NDKDataSource<NDKUserProfile>(
             ndk: ndk,
             filter: NDKFilter(
                 authors: [pubkeyHex],
@@ -73,7 +73,7 @@ struct DebugKind0Fetcher {
         // Wait for data to arrive
         try await Task.sleep(nanoseconds: 2_000_000_000) // 2 seconds
         
-        let profiles = await profileDataSource.data
+        let profiles = profileDataSource.data
         if let profile = profiles.first {
             print("✅ Found profile for pubkey")
             print("")

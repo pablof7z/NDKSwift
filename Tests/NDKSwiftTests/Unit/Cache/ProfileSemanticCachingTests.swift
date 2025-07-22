@@ -130,7 +130,7 @@ final class ProfileSemanticCachingTests: XCTestCase {
         try await cache.insertRawProfileForTesting(pubkey: pubkey, json: jsonProfile)
         
         // Retrieve the profile (should use JSON fallback)
-        var profile = await cache.getProfile(pubkey: pubkey)
+        let profile = await cache.getProfile(pubkey: pubkey)
         XCTAssertNotNil(profile)
         XCTAssertEqual(profile?.name, "Pre-Migration User")
         

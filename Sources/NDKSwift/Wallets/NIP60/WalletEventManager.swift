@@ -60,7 +60,8 @@ public actor WalletEventManager {
                 ] + tokenChange.deletedTokenIds.map { ["e", $0] })
                 .build(signer: signer)
             
-            try await ndk.publish(deleteEvent)
+            let relays = try await ndk.publish(deleteEvent)
+            NDKLogger.log(.debug, category: .wallet, "🗑️ Token deletion event published to \(relays.count) relays")
             
             // Create individual Kind 5 events for each deleted token
             for tokenId in tokenChange.deletedTokenIds {

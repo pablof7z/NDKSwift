@@ -38,7 +38,6 @@ struct Example05_EncryptedMessages {
         )
         
         let bobSubscription = bobNDK.observe(filter: bobDMFilter)
-        var receivedMessage: String?
         
         // Start Bob's listener in background
         let bobListenerTask = Task {
@@ -52,7 +51,7 @@ struct Example05_EncryptedMessages {
                     ndk: bobNDK
                 ) {
                     print("🔓 Decrypted content: \(decrypted)")
-                    receivedMessage = decrypted
+                    _ = decrypted
                 } else {
                     print("❌ Failed to decrypt message")
                 }
@@ -73,7 +72,7 @@ struct Example05_EncryptedMessages {
             useNIP44: false // Using NIP-04 for this example
         )
         
-        let publishResult = try await aliceNDK.publish(dmEvent)
+        _ = try await aliceNDK.publish(dmEvent)
         
         print("✅ Encrypted message sent!")
         print("📍 Event ID: \(dmEvent.id)")

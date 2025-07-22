@@ -17,6 +17,7 @@
 		276233E0707E1C816CA5CFC5 /* WalletEventsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 29F689EC6224FF420AB39B5C /* WalletEventsView.swift */; };
 		2B958B8F7F7AF6395F8D66BC /* NutsackApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7E5246359CDA91D9B7847663 /* NutsackApp.swift */; };
 		2BC4F751066C9A3FF8097E62 /* RelayHealthView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3AFA24434F57D28213E47F35 /* RelayHealthView.swift */; };
+		37A06CA0B6A4D33F210E8FE8 /* ReceivedNutzapsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9C0816FCB2308D992EAD2413 /* ReceivedNutzapsView.swift */; };
 		39CD315ACA254FDC07076930 /* ReceiveView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 29823E16BE363E01B66A8DE5 /* ReceiveView.swift */; };
 		3AE0DBFC1CA063A6AC21FD56 /* MintDiscoveryManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 89F70690BBEA51B2AC1E862F /* MintDiscoveryManager.swift */; };
 		3E17EB5A5226CACB8D750A19 /* WalletEventDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CD23BF78658593B392C7FF56 /* WalletEventDetailView.swift */; };
@@ -96,6 +97,7 @@
 		9659D4E97B490CDC1F10A8D4 /* OfflineTokenView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OfflineTokenView.swift; sourceTree = "<group>"; };
 		98B33CB2CD71269193050EE8 /* CreateAccountView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CreateAccountView.swift; sourceTree = "<group>"; };
 		9A0E485A77CC33154C81E180 /* LaunchScreen.storyboard */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; path = LaunchScreen.storyboard; sourceTree = "<group>"; };
+		9C0816FCB2308D992EAD2413 /* ReceivedNutzapsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReceivedNutzapsView.swift; sourceTree = "<group>"; };
 		9D5B9AA3E71133AA8A3EA248 /* WalletEventInfo.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WalletEventInfo.swift; sourceTree = "<group>"; };
 		A9C1DE3157B002CB979102D6 /* NutsackiOS.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = NutsackiOS.xcconfig; sourceTree = "<group>"; };
 		B43D3EE06E7A1612A33CC851 /* AsyncContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AsyncContentView.swift; sourceTree = "<group>"; };
@@ -172,6 +174,7 @@
 				9659D4E97B490CDC1F10A8D4 /* OfflineTokenView.swift */,
 				FA415E993BB5A7710A803BD9 /* PaymentReceivedAnimation.swift */,
 				816546EBC30AFC0F9FA87E2A /* ProofManagementView.swift */,
+				9C0816FCB2308D992EAD2413 /* ReceivedNutzapsView.swift */,
 				29823E16BE363E01B66A8DE5 /* ReceiveView.swift */,
 				E0B1C99B01866B00245F62DE /* RecentTransactionsView.swift */,
 				3AFA24434F57D28213E47F35 /* RelayHealthView.swift */,
@@ -399,6 +402,7 @@
 				FE9B372405B563AA3EC15B71 /* QRCodeGenerator.swift in Sources */,
 				707A32AD80C4C06691C236F0 /* QRScannerView.swift in Sources */,
 				39CD315ACA254FDC07076930 /* ReceiveView.swift in Sources */,
+				37A06CA0B6A4D33F210E8FE8 /* ReceivedNutzapsView.swift in Sources */,
 				D546387471DFA74D85055166 /* RecentTransactionsView.swift in Sources */,
 				046F9C1180FC8BBC8A09106F /* RelayConnectionViews.swift in Sources */,
 				2BC4F751066C9A3FF8097E62 /* RelayHealthView.swift in Sources */,
