@@ -10,7 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.4.1] - 2025-01-22
 
 ### Fixed
-- Validate P2PK pubkey format in nutzaps (must be 33 bytes starting with "02")
+- Validate P2PK pubkey format in nutzaps (must be 33 bytes starting with "02" or "03" for compressed secp256k1 keys)
 - Update transaction status to 'failed' for malformed nutzaps instead of keeping them as 'processing'
 - Add detailed error information to failed transactions for better user feedback
 - Include P2PK pubkey data in proof decoding logs for easier debugging
