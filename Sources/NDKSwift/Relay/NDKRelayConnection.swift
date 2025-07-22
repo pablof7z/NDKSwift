@@ -195,7 +195,7 @@ public actor NDKRelayConnection {
             // Clean up any pending event continuations to prevent leaks
             for (eventId, continuation) in pendingEvents {
                 NDKLogger.log(.warning, category: .relay, "⚠️ Cancelling pending event \(eventId) due to disconnect")
-                continuation.resume(throwing: NDKError.connectionFailed(relay: url.absoluteString, message: "Connection closed"))
+                continuation.resume(throwing: NDKError.connectionLost(relay: url.absoluteString, message: "Connection closed"))
             }
             pendingEvents.removeAll()
             
@@ -278,7 +278,7 @@ public actor NDKRelayConnection {
     /// Send raw JSON to relay
     public func send(_ json: String) async throws {
         guard isConnected else {
-            throw NDKError.connectionFailed(relay: url.absoluteString, message: StringConstants.ErrorMessages.notConnected)
+            throw NDKError.connectionLost(relay: url.absoluteString, message: StringConstants.ErrorMessages.notConnected)
         }
         
         // Log network traffic
@@ -287,7 +287,7 @@ public actor NDKRelayConnection {
         
         #if os(iOS) || os(macOS) || os(watchOS) || os(tvOS)
             guard let task = webSocketTask else {
-                throw NDKError.connectionFailed(relay: url.absoluteString, message: "No WebSocket task")
+                throw NDKError.connectionLost(relay: url.absoluteString, message: "No WebSocket task")
             }
             
             let message = URLSessionWebSocketTask.Message.string(json)
@@ -382,7 +382,7 @@ public actor NDKRelayConnection {
             NDKLogger.log(.error, category: .connection, "❌ No WebSocket task for \(url) - cannot send ping")
             // Resume all waiting continuations with error
             for continuation in connectionContinuations {
-                continuation.resume(throwing: NDKError.connectionFailed(relay: url.absoluteString, message: "No WebSocket task"))
+                continuation.resume(throwing: NDKError.connectionLost(relay: url.absoluteString, message: "No WebSocket task"))
             }
             connectionContinuations.removeAll()
             isConnecting = false
@@ -486,7 +486,7 @@ public actor NDKRelayConnection {
         // Clean up any pending event continuations to prevent leaks
         for (eventId, continuation) in pendingEvents {
             NDKLogger.log(.warning, category: .relay, "⚠️ Failing pending event \(eventId) due to connection error")
-            continuation.resume(throwing: NDKError.connectionFailed(relay: url.absoluteString, message: error.localizedDescription))
+            continuation.resume(throwing: NDKError.networkError(for: url.absoluteString, operation: "send event", error: error))
         }
         pendingEvents.removeAll()
         

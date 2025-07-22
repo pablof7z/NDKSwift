@@ -366,7 +366,7 @@ public actor NDKBunkerSigner: NDKSigner, Sendable {
     private func connectBunker() async throws -> NDKUser {
         guard let bunkerPubkey = bunkerPubkey else {
             NDKLogger.log(.error, category: .auth, "[BunkerSigner] ERROR: Bunker pubkey not set!")
-            throw NDKError.notConfigured("Bunker pubkey not set")
+            throw NDKError.configurationError("Bunker pubkey not set")
         }
 
         NDKLogger.log(.info, category: .auth, "[BunkerSigner] Connecting to bunker with pubkey: \(bunkerPubkey)")
@@ -524,7 +524,7 @@ public actor NDKBunkerSigner: NDKSigner, Sendable {
         guard let response = response,
               response.error == nil
         else {
-            throw NDKError.signingFailed("Failed to get public key")
+            throw NDKError.cryptoOperation("get public key", nip: "NIP-46", error: NSError(domain: "BunkerError", code: -1, userInfo: [NSLocalizedDescriptionKey: response?.error ?? "Failed to get public key"]))
         }
 
         return response.result
@@ -544,7 +544,7 @@ public actor NDKBunkerSigner: NDKSigner, Sendable {
         guard let response = response,
               response.error == nil
         else {
-            throw NDKError.signingFailed(errorMessage)
+            throw NDKError.cryptoOperation(method, nip: "NIP-46", error: NSError(domain: "BunkerError", code: -1, userInfo: [NSLocalizedDescriptionKey: response?.error ?? errorMessage]))
         }
 
         return response.result

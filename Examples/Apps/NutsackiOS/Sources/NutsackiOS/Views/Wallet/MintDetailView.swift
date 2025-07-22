@@ -343,73 +343,118 @@ struct MintInfoTab: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
                 if let info = mintInfo {
-                    // Basic Info
-                    VStack(alignment: .leading, spacing: 12) {
-                        Text("Mint Information")
-                            .font(.headline)
-                        
-                        LabeledContent("Name", value: info.name ?? "Unknown")
-                        LabeledContent("Public Key", value: String(info.pubkey?.prefix(16) ?? "Unknown") + "...")
-                            .font(.system(.body, design: .monospaced))
-                        
-                        if let description = info.description {
-                            VStack(alignment: .leading, spacing: 4) {
-                                Text("Description")
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
-                                Text(description)
-                                    .font(.body)
-                            }
-                        }
-                    }
-                    .padding()
-                    .background(Color(.secondarySystemGroupedBackground))
-                    .cornerRadius(12)
-                    
-                    // Contact Info
-                    ContactInfoSection(contacts: info.contact)
-                    
-                    // Supported Methods
-                    if let nuts = info.nuts {
-                        VStack(alignment: .leading, spacing: 12) {
-                            Text("Supported NIPs")
-                                .font(.headline)
-                            
-                            ForEach(nuts.sorted(by: { $0.key < $1.key }), id: \.key) { key, value in
-                                HStack {
-                                    Text("NUT-\(key)")
-                                        .font(.system(.body, design: .monospaced))
-                                    Spacer()
-                                    Image(systemName: "checkmark.circle.fill")
-                                        .foregroundColor(.green)
-                                }
-                            }
-                        }
-                        .padding()
-                        .background(Color(.secondarySystemGroupedBackground))
-                        .cornerRadius(12)
-                    }
+                    mintInfoContent(info: info)
                 } else {
-                    // Fallback for no mint info
-                    VStack(spacing: 16) {
-                        Image(systemName: "building.columns")
-                            .font(.system(size: 48))
-                            .foregroundColor(.gray)
-                        
-                        Text("Mint information not available")
-                            .font(.headline)
-                            .foregroundStyle(.secondary)
-                        
-                        Text(mintURL)
-                            .font(.caption)
-                            .foregroundStyle(.tertiary)
-                    }
-                    .padding(.vertical, 40)
-                    .frame(maxWidth: .infinity)
+                    noMintInfoContent
                 }
             }
             .padding()
         }
+    }
+    
+    @ViewBuilder
+    private func mintInfoContent(info: NDKMintInfo) -> some View {
+        // Basic Info
+        basicInfoSection(info: info)
+        
+        // Contact Info
+        ContactInfoSection(contacts: info.contact)
+        
+        // Supported Methods
+        supportedMethodsSection(nuts: info.nuts)
+    }
+    
+    @ViewBuilder
+    private func basicInfoSection(info: NDKMintInfo) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Mint Information")
+                .font(.headline)
+            
+            LabeledContent("Name", value: info.name ?? "Unknown")
+            LabeledContent("Public Key", value: String(info.pubkey?.prefix(16) ?? "Unknown") + "...")
+                .font(.system(.body, design: .monospaced))
+            
+            if let description = info.description {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Description")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    Text(description)
+                        .font(.body)
+                }
+            }
+        }
+        .padding()
+        .background(Color(.secondarySystemGroupedBackground))
+        .cornerRadius(12)
+    }
+    
+    @ViewBuilder
+    private func supportedMethodsSection(nuts: NDKMintInfo.Nuts?) -> some View {
+        if let nuts = nuts {
+            VStack(alignment: .leading, spacing: 12) {
+                Text("Supported NIPs")
+                    .font(.headline)
+                
+                VStack(alignment: .leading, spacing: 8) {
+                    if nuts.nut04 != nil {
+                        nutRow(number: "04", description: "Mint tokens")
+                    }
+                    if nuts.nut05 != nil {
+                        nutRow(number: "05", description: "Melt tokens")
+                    }
+                    if nuts.nut07 != nil {
+                        nutRow(number: "07", description: "Spendable check")
+                    }
+                    if nuts.nut08 != nil {
+                        nutRow(number: "08", description: "Melt with Lightning")
+                    }
+                    if nuts.nut09 != nil {
+                        nutRow(number: "09", description: "Restore")
+                    }
+                    if nuts.nut10 != nil {
+                        nutRow(number: "10", description: "Spending conditions")
+                    }
+                    if nuts.nut12 != nil {
+                        nutRow(number: "12", description: "DLEQ proofs")
+                    }
+                }
+            }
+            .padding()
+            .background(Color(.secondarySystemGroupedBackground))
+            .cornerRadius(12)
+        }
+    }
+    
+    private func nutRow(number: String, description: String) -> some View {
+        HStack {
+            Text("NUT-\(number)")
+                .font(.system(.body, design: .monospaced))
+            Text(description)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            Spacer()
+            Image(systemName: "checkmark.circle.fill")
+                .foregroundColor(.green)
+        }
+    }
+    
+    private var noMintInfoContent: some View {
+        VStack(spacing: 16) {
+            Image(systemName: "building.columns")
+                .font(.system(size: 48))
+                .foregroundColor(.gray)
+            
+            Text("Mint information not available")
+                .font(.headline)
+                .foregroundStyle(.secondary)
+            
+            Text(mintURL)
+                .font(.caption)
+                .foregroundStyle(.tertiary)
+        }
+        .padding(.vertical, 40)
+        .frame(maxWidth: .infinity)
     }
 }
 

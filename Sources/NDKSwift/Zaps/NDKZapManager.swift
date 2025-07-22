@@ -423,7 +423,7 @@ public actor NDKZapManager {
                     } else if let user = user {
                         filter.addTagFilter("p", values: [user.pubkey])
                     } else {
-                        continuation.finish(throwing: NDKError.invalidInput(message: "Must specify either event or user"))
+                        continuation.finish(throwing: NDKError.missingRequired("event or user"))
                         return
                     }
                     
@@ -486,7 +486,7 @@ public actor NDKZapManager {
         } else if let user = user {
             filter.addTagFilter("p", values: [user.pubkey])
         } else {
-            throw NDKError.invalidInput(message: "Must specify either event or user")
+            throw NDKError.missingRequired("event or user")
         }
         
         // Use NDKDataSource for fetching zaps

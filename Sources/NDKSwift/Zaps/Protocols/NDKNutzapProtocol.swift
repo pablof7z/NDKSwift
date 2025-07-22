@@ -76,13 +76,13 @@ public class NDKNutzapProtocol: NDKZapProtocol {
     ) async throws -> ZapResult {
         // Extract metadata
         guard let _ = prepared.metadata["preferences"] as? NDKNutzapPreferences else {
-            throw NDKError.invalidInput(message: "Missing nutzap preferences in metadata")
+            throw NDKError.missingRequired("nutzap preferences", in: "metadata")
         }
         
         // Handle NutzapConfirmation - the nutzap event is already created
         guard let nutzapConfirmation = confirmation as? NutzapConfirmation else {
             NDKLogger.log(.error, category: .wallet, "Invalid confirmation type: \(confirmation)")
-            throw NDKError.invalidInput(message: "Invalid payment confirmation type for nutzap")
+            throw NDKError.invalidDataFormat("payment confirmation", details: "Expected NutzapConfirmation type")
         }
         
         // The nutzap event is already created and included in the confirmation

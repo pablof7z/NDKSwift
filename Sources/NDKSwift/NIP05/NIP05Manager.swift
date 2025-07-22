@@ -286,7 +286,7 @@ public actor NIP05Manager {
         // Parse identifier
         let parts = identifier.split(separator: "@")
         guard parts.count == 2 else {
-            throw NDKError.invalidInput(message: "Invalid NIP-05 format: \(identifier)")
+            throw NDKError.invalidDataFormat("NIP-05 identifier", details: "Expected format: name@domain")
         }
         
         let name = String(parts[0])
@@ -305,7 +305,7 @@ public actor NIP05Manager {
         let normalizedName = name == "_" ? "" : name
         let urlString = "https://\(domain)/.well-known/nostr.json?name=\(normalizedName)"
         guard let url = URL(string: urlString) else {
-            throw NDKError.invalidInput(message: "Invalid NIP-05 format: \(identifier)")
+            throw NDKError.invalidDataFormat("NIP-05 identifier", details: "Expected format: name@domain")
         }
         
         NDKLogger.log(.info, category: .general, "🌐 NIP-05: Fetching \(urlString)")
@@ -417,7 +417,7 @@ extension NIP05CacheEntry {
 
 extension NDKError {
     static let invalidNIP05Format = { (identifier: String) in 
-        NDKError.invalidInput(message: "Invalid NIP-05 format: \(identifier)")
+        NDKError.invalidDataFormat("NIP-05 identifier", details: "Invalid format: \(identifier)")
     }
     static let invalidNIP05Response = NDKError.invalidResponse(from: "NIP-05")
 }
