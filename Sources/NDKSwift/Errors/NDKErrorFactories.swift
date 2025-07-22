@@ -1,5 +1,3 @@
-import Foundation
-
 extension NDKError {
     static func failedTo(_ operation: String, message: String? = nil, underlying: Error? = nil) -> NDKError {
         let fullMessage = message.map { "Failed to \(operation): \($0)" } ?? "Failed to \(operation)"
