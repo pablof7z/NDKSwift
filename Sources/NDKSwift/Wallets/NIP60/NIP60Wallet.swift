@@ -453,16 +453,17 @@ public actor NIP60Wallet: NDKPaymentProvider {
     
     /// Process an incoming nutzap event
     internal func processIncomingNutzap(_ event: NDKEvent) async throws {
-        let mints = await mints.getAllMints()
-        let keysets = mints.values.flatMap { $0.keysets }.reduce(into: [:]) { result, keyset in
-            result[keyset.keysetID] = keyset
-        }
-        
-        // Process the nutzap
-        _ = try await Nutzap.processIncoming(
-            wallet: self,
-            event: event,
-            mints: mints,
+        do {
+            let mints = await mints.getAllMints()
+            let keysets = mints.values.flatMap { $0.keysets }.reduce(into: [:]) { result, keyset in
+                result[keyset.keysetID] = keyset
+            }
+            
+            // Process the nutzap
+            _ = try await Nutzap.processIncoming(
+                wallet: self,
+                event: event,
+                mints: mints,
             keysets: keysets,
             proofStateManager: proofStateManager,
             eventManager: eventManager,
@@ -471,19 +472,23 @@ public actor NIP60Wallet: NDKPaymentProvider {
             signer: signer
         )
         
-        // Extract amount from the nutzap event
-        if let proofTag = event.tags.first(where: { $0.count >= 2 && $0[0] == "proof" }) {
-            if let proofData = proofTag[1].data(using: .utf8),
-               let proofJSON = try? JSONSerialization.jsonObject(with: proofData) as? [String: Any],
-               let proofArray = proofJSON["proofs"] as? [[String: Any]] {
-                let totalAmount = proofArray.reduce(0) { sum, proofDict in
-                    sum + (proofDict["amount"] as? Int64 ?? 0)
-                }
-                
-                // Emit event
-                let sender = event.pubkey
-                events.yield(NIP60WalletEvent(type: .nutzapReceived(amount: totalAmount, from: sender, eventId: event.id)))
-            }
+        // Success - the status is already updated by processIncoming
+        } catch {
+            // Map error and update status
+            let redemptionError = Nutzap.mapToRedemptionError(error)
+            
+            // Update status with error
+            await eventManager.updateNutzapStatus(
+                event.id,
+                status: .failed(
+                    error: redemptionError,
+                    attempts: 1,
+                    lastAttempt: .now
+                )
+            )
+            
+            // Re-throw the error for upstream handling
+            throw error
         }
     }
     
@@ -755,11 +760,11 @@ public actor NIP60Wallet: NDKPaymentProvider {
                     for await update in dataSource.relayUpdates {
                         if case .eose = update, !receivedEOSE {
                             receivedEOSE = true
-                            print("📡 Configuration EOSE received. Starting wallet event subscriptions...")
+                            NDKLogger.log(.info, category: .wallet, "📡 Configuration EOSE received. Starting wallet event subscriptions...")
                             
                             // Log the initial balance
                             let initialBalance = await self.proofStateManager.getTotalBalance()
-                            print("💰 Initial wallet balance: \(initialBalance) sats")
+                            NDKLogger.log(.info, category: .wallet, "💰 Initial wallet balance: \(initialBalance) sats")
                             
                             // Emit balance change event if we have a non-zero balance
                             await self.notifyBalanceChangeIfNeeded()
@@ -770,7 +775,7 @@ public actor NIP60Wallet: NDKPaymentProvider {
                             // Start wallet event subscription with proper relays
                             await self.startWalletEventSubscription()
                             
-                            print("✅ Wallet loading complete. Monitoring for updates.")
+                            NDKLogger.log(.info, category: .wallet, "✅ Wallet loading complete. Monitoring for updates.")
                         }
                     }
                 }
@@ -784,9 +789,9 @@ public actor NIP60Wallet: NDKPaymentProvider {
                 eoseTask?.cancel()
             } catch {
                 if error is CancellationError {
-                    print("🛑 Configuration subscription cancelled")
+                    NDKLogger.log(.info, category: .wallet, "🛑 Configuration subscription cancelled")
                 } else {
-                    print("❌ Configuration subscription error: \(error)")
+                    NDKLogger.log(.error, category: .wallet, "❌ Configuration subscription error: \(error)")
                 }
             }
         }
@@ -1273,6 +1278,166 @@ public actor NIP60Wallet: NDKPaymentProvider {
     public func getTotalRedeemedNutzapAmount() async -> Int64 {
         let redeemedNutzaps = await eventManager.getRedeemedNutzaps()
         return redeemedNutzaps.reduce(0) { $0 + $1.amount }
+    }
+    
+    /// Get nutzaps by status filter
+    /// - Parameter filter: Status filter to apply
+    /// - Returns: Array of filtered NutzapInfo sorted by creation date (newest first)
+    public func getNutzapsByStatus(_ filter: NutzapStatusFilter) async -> [NutzapInfo] {
+        return await eventManager.getNutzapsByStatus(filter)
+    }
+    
+    /// Manually redeem a nutzap
+    /// - Parameter eventId: The event ID of the nutzap to redeem
+    /// - Returns: Redemption result with success status and details
+    /// - Throws: NutzapRedemptionError if redemption fails
+    public func redeemNutzap(_ eventId: String) async throws -> NutzapRedemptionResult {
+        guard let nutzapInfo = await eventManager.getNutzapInfo(eventId) else {
+            throw NutzapRedemptionError.unknownError("Nutzap not found")
+        }
+        
+        // Don't retry if already redeemed
+        if case .redeemed = nutzapInfo.status {
+            return NutzapRedemptionResult(
+                success: true,
+                proofsRedeemed: [],
+                error: nil,
+                amount: nutzapInfo.amount
+            )
+        }
+        
+        // Update attempt timestamp
+        await eventManager.updateNutzapAttemptTimestamp(eventId)
+        
+        do {
+            // Process with internal retry for transient errors
+            let result = try await redeemWithRetry(nutzapInfo.event, maxAttempts: 3)
+            
+            // Update status to redeemed
+            await eventManager.updateNutzapStatus(
+                eventId,
+                status: .redeemed(at: .now, proofsCount: result.proofsRedeemed?.count ?? 0)
+            )
+            
+            // Update transaction history
+            await updateTransactionForNutzap(eventId, status: .completed)
+            
+            return result
+        } catch {
+            // Map error to NutzapRedemptionError
+            let redemptionError = Nutzap.mapToRedemptionError(error)
+            
+            // Get current attempts count
+            let currentAttempts = getCurrentAttempts(nutzapInfo.status) + 1
+            
+            // Update status with error
+            await eventManager.updateNutzapStatus(
+                eventId,
+                status: .failed(
+                    error: redemptionError,
+                    attempts: currentAttempts,
+                    lastAttempt: .now
+                )
+            )
+            
+            // Update transaction history
+            await updateTransactionForNutzap(eventId, status: .failed)
+            
+            throw redemptionError
+        }
+    }
+    
+    /// Retry all failed nutzaps that have retryable errors
+    /// - Returns: Array of tuples with event ID and redemption result
+    public func retryFailedNutzaps() async -> [(eventId: String, result: NutzapRedemptionResult)] {
+        let failedNutzaps = await eventManager.getFailedNutzaps()
+        var results: [(String, NutzapRedemptionResult)] = []
+        
+        for nutzap in failedNutzaps {
+            // Only retry if the error is retryable
+            if case .failed(let error, _, _) = nutzap.status, error.isRetryable {
+                do {
+                    let result = try await redeemNutzap(nutzap.eventId)
+                    results.append((nutzap.eventId, result))
+                } catch {
+                    // Continue with next nutzap
+                    let failureResult = NutzapRedemptionResult(
+                        success: false,
+                        proofsRedeemed: nil,
+                        error: Nutzap.mapToRedemptionError(error),
+                        amount: 0
+                    )
+                    results.append((nutzap.eventId, failureResult))
+                }
+            }
+        }
+        
+        return results
+    }
+    
+    // MARK: - Private Nutzap Redemption Helpers
+    
+    /// Redeem nutzap with automatic retry for transient errors
+    private func redeemWithRetry(_ event: NDKEvent, maxAttempts: Int) async throws -> NutzapRedemptionResult {
+        var lastError: Error?
+        
+        for attempt in 1...maxAttempts {
+            do {
+                // Get mints and construct keysets dictionary
+                let allMints = await mints.getAllMints()
+                let keysets = allMints.values.flatMap { $0.keysets }.reduce(into: [:]) { result, keyset in
+                    result[keyset.keysetID] = keyset
+                }
+                
+                // Call the existing processIncoming method
+                let result = try await Nutzap.processIncoming(
+                    wallet: self,
+                    event: event,
+                    mints: allMints,
+                    keysets: keysets,
+                    proofStateManager: proofStateManager,
+                    eventManager: eventManager,
+                    p2pkManager: p2pkManager,
+                    ndk: ndk,
+                    signer: signer
+                )
+                
+                return result
+            } catch {
+                lastError = error
+                let redemptionError = Nutzap.mapToRedemptionError(error)
+                
+                // Only retry transient errors
+                if redemptionError.isRetryable && attempt < maxAttempts {
+                    // Exponential backoff: 1s, 2s, 4s...
+                    let delay = UInt64(pow(2.0, Double(attempt - 1))) * 1_000_000_000
+                    try? await Task.sleep(nanoseconds: delay)
+                    continue
+                }
+                
+                throw error
+            }
+        }
+        
+        throw lastError ?? NutzapRedemptionError.unknownError("All retry attempts failed")
+    }
+    
+    /// Get current attempt count from status
+    private func getCurrentAttempts(_ status: NutzapRedemptionStatus) -> Int {
+        if case .failed(_, let attempts, _) = status {
+            return attempts
+        }
+        return 0
+    }
+    
+    /// Update transaction status for a nutzap
+    private func updateTransactionForNutzap(_ eventId: String, status: TransactionStatus) async {
+        // Find transaction with this nutzap event ID
+        if let transaction = await transactionHistory.getTransactionForEvent(eventId: eventId) {
+            // Update transaction status
+            let updated = transaction.with(status: status)
+            await transactionHistory.updateTransaction(updated)
+        }
     }
     
     // MARK: - Transaction History

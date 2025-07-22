@@ -117,7 +117,7 @@ public actor NDKOutboxManager {
         var allRelays = Set<String>()
         var missingPubkeys = Set<String>()
         
-        for (index, filter) in filters.enumerated() {
+        for (_, filter) in filters.enumerated() {
             let result = await selector.selectRelaysForFetching(
                 filter: filter,
                 config: FetchingConfig(maxRelayCount: 10)
@@ -130,13 +130,13 @@ public actor NDKOutboxManager {
         // If we have missing pubkeys, fetch their relay lists first
         if !missingPubkeys.isEmpty {
             // Fetch relay lists for missing pubkeys
-            for (index, pubkey) in missingPubkeys.enumerated() {
+            for (_, pubkey) in missingPubkeys.enumerated() {
                 _ = try? await tracker.getRelaysFor(pubkey: pubkey)
             }
             
             // Re-run the selection now that we have the relay lists
             allRelays.removeAll()
-            for (index, filter) in filters.enumerated() {
+            for (_, filter) in filters.enumerated() {
                 let result = await selector.selectRelaysForFetching(
                     filter: filter,
                     config: FetchingConfig(maxRelayCount: 10)
