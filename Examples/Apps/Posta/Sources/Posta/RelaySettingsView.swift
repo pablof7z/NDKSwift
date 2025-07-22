@@ -2,7 +2,8 @@ import SwiftUI
 import NDKSwift
 
 struct RelaySettingsView: View {
-    @ObservedObject var relayManager: RelayManager
+    @Environment(RelayManager.self) var relayManager
+    @Environment(NDKManager.self) var ndkManager
     @State private var showingAddRelay = false
     @State private var newRelayUrl = ""
     @State private var showingResetConfirmation = false
@@ -11,29 +12,12 @@ struct RelaySettingsView: View {
         List {
             // Stats Section
             Section {
-                HStack {
-                    VStack(alignment: .leading) {
-                        Text("Connected")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                        Text("\(relayManager.relays.filter { $0.isConnected }.count)")
-                            .font(.title2)
-                            .fontWeight(.semibold)
-                            .foregroundColor(.green)
-                    }
-                    
-                    Spacer()
-                    
-                    VStack(alignment: .trailing) {
-                        Text("Total")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                        Text("\(relayManager.relays.count)")
-                            .font(.title2)
-                            .fontWeight(.semibold)
-                    }
-                }
-                .padding(.vertical, 4)
+                RelayStatsView(
+                    totalRelays: relayManager.relays.count,
+                    connectedRelays: relayManager.relays.filter { $0.isConnected }.count
+                )
+                .listRowInsets(EdgeInsets())
+                .listRowBackground(Color.clear)
             }
             
             // Relay List
@@ -96,25 +80,12 @@ struct RelayRow: View {
     
     var body: some View {
         HStack {
-            // Connection Status
-            Circle()
-                .fill(relay.isConnected ? Color.green : Color.gray)
-                .frame(width: 10, height: 10)
-            
-            // Relay Info
-            VStack(alignment: .leading, spacing: 2) {
-                Text(relay.url)
-                    .font(.subheadline)
-                    .lineLimit(1)
-                
-                if let lastSeen = relay.lastSeen {
-                    Text("Last seen: \(lastSeen, style: .relative)")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                }
-            }
-            
-            Spacer()
+            // Use the new RelayRowView component for consistent display
+            RelayRowView(
+                url: relay.url,
+                state: relay.isConnected ? .connected : .disconnected,
+                lastSeen: relay.lastSeen
+            )
             
             // Toggle
             Toggle("", isOn: Binding(
@@ -132,7 +103,7 @@ struct RelayRow: View {
 }
 
 struct AddRelayView: View {
-    @ObservedObject var relayManager: RelayManager
+    @Environment(RelayManager.self) var relayManager
     @Environment(\.dismiss) var dismiss
     
     @State private var relayUrl = ""

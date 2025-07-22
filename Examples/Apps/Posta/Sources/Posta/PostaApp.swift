@@ -4,18 +4,18 @@ import NDKSwift
 @main
 struct PostaApp: App {
     @State private var authManager = NDKAuthManager.shared
-    @StateObject private var ndkManager = NDKManager.shared
-    @StateObject private var relayManager = RelayManager()
-    @StateObject private var subscriptionManager = SubscriptionManager()
+    @State private var ndkManager = NDKManager.shared
+    @State private var relayManager = RelayManager()
+    @State private var subscriptionManager = SubscriptionManager()
     @StateObject private var themeManager = ThemeManager()
     
     var body: some Scene {
         WindowGroup {
             ContentView()
                 .environment(authManager)
-                .environmentObject(ndkManager)
-                .environmentObject(relayManager)
-                .environmentObject(subscriptionManager)
+                .environment(ndkManager)
+                .environment(relayManager)
+                .environment(subscriptionManager)
                 .environmentObject(themeManager)
                 .preferredColorScheme(themeManager.currentTheme.colorScheme)
                 .onAppear {
@@ -50,7 +50,8 @@ struct PostaApp: App {
             
             // Set NDK on managers
             await MainActor.run {
-                ndkManager.setNDK(ndkInstance)
+                let userPubkey = authManager.activeSession?.pubkey
+                ndkManager.setNDK(ndkInstance, userPubkey: userPubkey)
                 authManager.setNDK(ndkInstance)
                 relayManager.setNDK(ndkInstance)
             }

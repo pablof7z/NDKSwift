@@ -1,25 +1,36 @@
 import Foundation
 import NDKSwift
+import Observation
 
 @MainActor
-class SubscriptionManager: ObservableObject {
-    @Published var notes: [NDKEvent] = []
-    @Published var latestFollowList: Set<String> = []
-    @Published var isLoadingFollows = true
-    @Published var isLoadingNotes = false
-    @Published var isSyncing = false
-    @Published var syncStatus: String = ""
+@Observable
+class SubscriptionManager {
+    // Published state
+    var notes: [NDKEvent] {
+        notesDataSource?.notes ?? []
+    }
+    var latestFollowList: Set<String> {
+        followListDataSource?.followList ?? []
+    }
+    var isLoadingFollows: Bool {
+        followListDataSource?.isLoading ?? true
+    }
+    var isLoadingNotes: Bool {
+        notesDataSource?.isLoading ?? false
+    }
+    var isSyncing = false
+    var syncStatus: String = ""
+    var error: Error? {
+        followListDataSource?.error ?? notesDataSource?.error
+    }
+    
+    // Data sources
+    private var followListDataSource: FollowListDataSource?
+    private var notesDataSource: NotesDataSource?
+    private var contactsMetadataDataSource: MultipleProfilesDataSource?
     
     private var ndk: NDK?
     private var currentUserPubkey: String?
-    
-    private var followDataSource: NDKDataSource<NDKEvent>?
-    private var notesDataSource: NDKDataSource<NDKEvent>?
-    private var followTask: Task<Void, Never>?
-    private var notesTask: Task<Void, Never>?
-    
-    private var hasEOSEd = false
-    private var mostRecentFollowEvent: NDKEvent?
     
     init() {}
     
@@ -41,224 +52,98 @@ class SubscriptionManager: ObservableObject {
             print("SubscriptionManager - After wait, connected relays: \(retriedConnected)/\(retriedTotal)")
         }
         
-        // Start the follow list subscription
-        await startFollowSubscription()
+        // Initialize follow list data source
+        followListDataSource = FollowListDataSource(ndk: ndk, pubkey: userPubkey)
+        
+        // Wait for follow list to load
+        await waitForFollowList()
     }
     
     func cleanup() async {
-        followTask?.cancel()
-        notesTask?.cancel()
-        followDataSource = nil
+        followListDataSource = nil
         notesDataSource = nil
-        hasEOSEd = false
-        mostRecentFollowEvent = nil
-        notes.removeAll()
-        latestFollowList.removeAll()
+        contactsMetadataDataSource = nil
     }
     
-    private func startFollowSubscription() async {
-        guard let ndk = ndk, let userPubkey = currentUserPubkey else { return }
+    private func waitForFollowList() async {
+        guard let followListDataSource = followListDataSource else { return }
         
-        isLoadingFollows = true
+        // Give the follow list a moment to load
+        try? await Task.sleep(nanoseconds: 1_000_000_000) // 1 second
         
-        print("SubscriptionManager - Starting follow subscription for user: \(userPubkey)")
-        
-        // Create filter for kind:3 (follow list) events from the current user
-        let followFilter = NDKFilter(
-            authors: [userPubkey],
-            kinds: [EventKind.contacts],
-            limit: 1  // We only need the latest contact list
-        )
-        
-        // Subscribe to follow list events using observe
-        // Use .networkOnly to ensure we get fresh data
-        followDataSource = ndk.observe(
-            filter: followFilter,
-            cachePolicy: .networkOnly
-        )
-        
-        // Start observing events
-        followTask = Task {
-            // Wait for the first kind:3 event
-            for await event in followDataSource!.events {
-                print("SubscriptionManager - Received kind:3 event with \(event.tags.count) tags")
-                await processFollowEvent(event)
-                
-                // After processing the first event, we have our contact list
-                await handleFollowEOSE()
-                
-                // Continue listening for updates to the contact list
-                // (The loop continues to catch any future updates)
-            }
-        }
-    }
-    
-    private func processFollowEvent(_ event: NDKEvent) async {
-        // Check if this is the most recent follow event
-        if mostRecentFollowEvent == nil || event.createdAt > mostRecentFollowEvent!.createdAt {
-            mostRecentFollowEvent = event
-            
-            // Parse the follow list from tags
-            var newFollowList = Set<String>()
-            for tag in event.tags {
-                if tag.count >= 2 && tag[0] == "p" {
-                    newFollowList.insert(tag[1])
+        // Once we have a follow list, start loading notes
+        if !followListDataSource.followList.isEmpty {
+            await startNotesSubscription()
+        } else {
+            // Keep checking for follow list updates
+            Task {
+                while followListDataSource.followList.isEmpty && !Task.isCancelled {
+                    try? await Task.sleep(nanoseconds: 500_000_000) // 0.5 seconds
+                }
+                if !Task.isCancelled {
+                    await startNotesSubscription()
                 }
             }
-            
-            print("SubscriptionManager - Parsed \(newFollowList.count) contacts from kind:3 event")
-            latestFollowList = newFollowList
-            
-            // If we've already EOSEd, restart the notes subscription
-            if hasEOSEd {
-                await restartNotesSubscription()
-            }
         }
-    }
-    
-    private func handleFollowEOSE() async {
-        hasEOSEd = true
-        isLoadingFollows = false
-        
-        print("SubscriptionManager - Follow list loaded, starting notes subscription")
-        
-        // Start the notes subscription now that we have the follow list
-        await startNotesSubscription()
-        
-        // Perform negentropy sync now that we have the follow list
-        await performNegentropySync()
     }
     
     private func startNotesSubscription() async {
-        guard let ndk = ndk, !latestFollowList.isEmpty else { 
-            print("SubscriptionManager - Cannot start notes subscription: ndk=\(ndk != nil), followList=\(latestFollowList.count)")
-            return 
-        }
+        guard let ndk = ndk, let followListDataSource = followListDataSource else { return }
         
-        print("SubscriptionManager - Starting notes subscription for \(latestFollowList.count) authors")
-        isLoadingNotes = true
-        
-        // Cancel existing notes task if any
-        notesTask?.cancel()
-        
-        // Create filter for kind:1 notes from followed users
-        let notesFilter = NDKFilter(
-            authors: Array(latestFollowList),
-            kinds: [EventKind.textNote]
-        )
-        
-        // Subscribe to notes using observe
-        notesDataSource = ndk.observe(
-            filter: notesFilter,
-            cachePolicy: .cacheWithNetwork
-        )
-        
-        // Start observing notes
-        notesTask = Task {
-            var receivedInitialEvents = false
-            for await event in notesDataSource!.events {
-                await processNoteEvent(event)
-                
-                // After receiving some events, set loading to false
-                if !receivedInitialEvents {
-                    receivedInitialEvents = true
-                    Task {
-                        try? await Task.sleep(nanoseconds: 500_000_000) // 0.5 seconds
-                        isLoadingNotes = false
-                    }
-                }
-            }
-        }
-    }
-    
-    private func restartNotesSubscription() async {
-        print("Restarting notes subscription with updated follow list")
-        await startNotesSubscription()
-    }
-    
-    private func processNoteEvent(_ event: NDKEvent) async {
-        // Check if it's a root post (not a reply)
-        let isReply = event.tags.contains { tag in
-            tag.count >= 2 && tag[0] == "e"
-        }
-        
-        if !isReply {
-            // Add to notes array if not already present
-            if !notes.contains(where: { $0.id == event.id }) {
-                notes.append(event)
-                // Sort by timestamp (newest first)
-                notes.sort { $0.createdAt > $1.createdAt }
-            }
-        }
-    }
-    
-    // MARK: - Negentropy Sync
-    
-    /// Perform NIP-77 negentropy sync for contacts' metadata and relay lists
-    func performNegentropySync() async {
-        guard let ndk = ndk, !latestFollowList.isEmpty else {
-            print("SubscriptionManager - Cannot perform sync: NDK not ready or no follow list")
+        let follows = Array(followListDataSource.followList)
+        guard !follows.isEmpty else {
+            print("SubscriptionManager - No follows to load notes for")
             return
         }
         
-        isSyncing = true
-        syncStatus = "Starting sync..."
+        print("SubscriptionManager - Starting notes subscription for \(follows.count) follows")
         
-        print("SubscriptionManager - Starting negentropy sync for \(latestFollowList.count) contacts...")
-        
-        // Create filter for contacts' metadata and relay lists
-        let contactsFilter = NDKFilter(
-            authors: Array(latestFollowList),
-            kinds: [
-                EventKind.metadata,     // Profile metadata (kind:0)
-                EventKind.relayList    // Relay list metadata (kind:10002)
-            ]
+        // Create filter for notes from follows
+        let notesFilter = NDKFilter(
+            authors: follows,
+            kinds: [EventKind.textNote],
+            limit: 100
         )
         
-        do {
-            // Sync with all connected relays
-            syncStatus = "Syncing profiles..."
-            let results = try await ndk.syncWithAllRelays(filter: contactsFilter)
-            
-            var totalDownloaded = 0
-            var totalEfficiency = 0
-            var eventsByKind: [Int: Int] = [:]
-            
-            for (relay, result) in results {
-                totalDownloaded += result.downloadedEvents.count
-                totalEfficiency += result.efficiencyRatio
-                
-                // Count events by kind for detailed logging
-                for event in result.downloadedEvents {
-                    eventsByKind[event.kind, default: 0] += 1
-                }
-                
-                print("SubscriptionManager - Sync on \(relay): \(result.downloadedEvents.count) new events, \(result.efficiencyRatio)% efficient")
-            }
-            
-            let avgEfficiency = results.isEmpty ? 0 : totalEfficiency / results.count
-            let metadataCount = eventsByKind[0] ?? 0
-            let relayListCount = eventsByKind[EventKind.relayList] ?? 0
-            
-            syncStatus = "Sync complete: \(metadataCount) profiles, \(relayListCount) relay lists"
-            print("SubscriptionManager - Sync completed: \(totalDownloaded) total events (\(metadataCount) metadata, \(relayListCount) relay lists), \(avgEfficiency)% avg efficiency")
-            
-            // Clear sync status after a delay
-            Task {
-                try? await Task.sleep(nanoseconds: 3_000_000_000) // 3 seconds
+        // Initialize notes data source
+        notesDataSource = NotesDataSource(ndk: ndk, filter: notesFilter)
+        
+        // Initialize metadata data source for profiles
+        contactsMetadataDataSource = MultipleProfilesDataSource(
+            ndk: ndk,
+            pubkeys: Set(follows)
+        )
+    }
+    
+    func triggerSync() async {
+        guard !isSyncing else { return }
+        
+        isSyncing = true
+        syncStatus = "Syncing..."
+        
+        // Force refresh by recreating data sources
+        if let ndk = ndk, let userPubkey = currentUserPubkey {
+            await cleanup()
+            await initialize(ndk: ndk, userPubkey: userPubkey)
+        }
+        
+        // Wait a moment for sync to complete
+        try? await Task.sleep(nanoseconds: 2_000_000_000) // 2 seconds
+        
+        syncStatus = "Sync complete"
+        isSyncing = false
+        
+        // Clear status after a moment
+        Task {
+            try? await Task.sleep(nanoseconds: 2_000_000_000) // 2 seconds
+            if !isSyncing {
                 syncStatus = ""
-                isSyncing = false
             }
-            
-        } catch {
-            print("SubscriptionManager - Error during negentropy sync: \(error)")
-            syncStatus = "Sync failed"
-            isSyncing = false
         }
     }
     
-    /// Manually trigger a sync (can be called from UI)
-    func triggerSync() async {
-        await performNegentropySync()
+    // Profile lookup helper
+    func profile(for pubkey: String) -> NDKUserProfile? {
+        contactsMetadataDataSource?.profile(for: pubkey)
     }
 }
