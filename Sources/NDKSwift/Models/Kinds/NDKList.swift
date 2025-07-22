@@ -430,7 +430,7 @@ public class NDKList {
     
     /// Create filters for 'a' tags grouped by kind
     private func createFiltersForATags(_ items: [[String]]) -> [NDKFilter] {
-        let aTags = items.extractTags(named: NostrTag.a)
+        let aTags = items.extractTags(named: NostrTagConstants.TagName.address)
         let parsedATags = aTags.compactMap { tag -> (kind: Int, pubkey: String, dTag: String?)? in
             guard let value = tag[safe: 1] else { return nil }
             return parseATag(value)

@@ -405,18 +405,18 @@ public struct NDKCashuWalletBackupEvent {
     /// The mints configured in this backup event
     public func mints(signer: NDKSigner) async throws -> [String] {
         let tags = try await decryptedWalletTags(signer: signer)
-        return tags.tagValues(named: NostrTag.mint)
+        return tags.tagValues(named: NostrTagConstants.TagName.mint)
     }
     
     /// The P2PK private key in this backup event
     public func p2pkPrivateKey(signer: NDKSigner) async throws -> String? {
         let tags = try await decryptedWalletTags(signer: signer)
-        return tags.firstTagValue(named: NostrTag.privkey)
+        return tags.firstTagValue(named: "privkey")
     }
     
     /// The relays configured in this backup event
     public var relays: [String] {
-        event.tags.tagValues(named: NostrTag.relay)
+        event.tags.tagValues(named: NostrTagConstants.TagName.relay)
     }
     
     // Private helper using the same cache as wallet config
@@ -697,22 +697,22 @@ public struct NDKCashuMintAnnouncement {
     
     /// Extract mint URL from the announcement
     public var mintURL: String? {
-        event.tags.firstTagValue(named: NostrTag.url)
+        event.tags.firstTagValue(named: NostrTagConstants.TagName.url)
     }
     
     /// Extract supported nuts from the announcement
     public var supportedNuts: [String] {
-        event.tags.tagValues(named: NostrTag.nuts)
+        event.tags.tagValues(named: "nuts")
     }
     
     /// Extract network from the announcement
     public var network: String? {
-        event.tags.firstTagValue(named: NostrTag.network)
+        event.tags.firstTagValue(named: "n")
     }
     
     /// Extract contact from the announcement
     public var contact: String? {
-        event.tags.firstTagValue(named: NostrTag.contact)
+        event.tags.firstTagValue(named: "contact")
     }
     
     /// Extract description from content
@@ -839,7 +839,7 @@ public struct NDKNutzapEvent {
     /// Extract the token from the nutzap event
     public var token: CashuSwift.Token? {
         // Get all proof tags
-        let proofTags = event.tags.extractTags(named: NostrTag.proof)
+        let proofTags = event.tags.extractTags(named: NostrTagConstants.TagName.proof)
         guard !proofTags.isEmpty else { return nil }
         
         // Parse all proofs
@@ -863,12 +863,12 @@ public struct NDKNutzapEvent {
     
     /// Extract the mint URL from the nutzap event
     public var mintURL: String? {
-        event.tags.firstTagValue(named: NostrTag.url)
+        event.tags.firstTagValue(named: NostrTagConstants.TagName.url)
     }
     
     /// Extract the total amount from the amount tag
     public var amount: Int64? {
-        guard let amountString = event.tags.firstTagValue(named: NostrTag.amount) else {
+        guard let amountString = event.tags.firstTagValue(named: NostrTagConstants.TagName.amount) else {
             return nil
         }
         return Int64(amountString)
@@ -876,17 +876,17 @@ public struct NDKNutzapEvent {
     
     /// Extract the unit from the nutzap event 
     public var unit: String? {
-        return event.tags.firstTagValue(named: NostrTag.unit) ?? "sat"
+        return event.tags.firstTagValue(named: NostrTagConstants.TagName.unit) ?? "sat"
     }
     
     /// Extract the recipient from the p tag
     public var recipient: String? {
-        event.tags.firstTagValue(named: NostrTag.pubkey)
+        event.tags.firstTagValue(named: NostrTagConstants.TagName.pubkey)
     }
     
     /// Extract the nutzapped event ID from the e tag
     public var nutzappedEventId: String? {
-        event.tags.firstTagValue(named: NostrTag.event)
+        event.tags.firstTagValue(named: NostrTagConstants.TagName.event)
     }
     
     /// Get the comment from the event content
@@ -938,7 +938,7 @@ public struct NDKMintRecommendation {
         tags.append(["k", "38172"])
         
         // Add d tag (event identifier from the announcement)
-        if let dTagValue = mintAnnouncementEvent.event.tags.firstTagValue(named: NostrTag.description) {
+        if let dTagValue = mintAnnouncementEvent.event.tags.firstTagValue(named: NostrTagConstants.TagName.identifier) {
             tags.append(["d", dTagValue])
         }
         
@@ -965,12 +965,12 @@ public struct NDKMintRecommendation {
     
     /// Extract recommended mint URL
     public var mintURL: String? {
-        event.tags.firstTagValue(named: NostrTag.url)
+        event.tags.firstTagValue(named: NostrTagConstants.TagName.url)
     }
     
     /// Extract the announcement event reference
     public var announcementReference: String? {
-        event.tags.firstTagValue(named: NostrTag.a)
+        event.tags.firstTagValue(named: NostrTagConstants.TagName.address)
     }
     
     /// Extract recommendation reason
