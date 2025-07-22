@@ -194,7 +194,7 @@ public enum Nutzap {
         p2pkManager: P2PKManager,
         ndk: NDK,
         signer: NDKSigner
-    ) async throws {
+    ) async throws -> NutzapRedemptionResult {
         // Check if this nutzap is for us
         let privateKey = try await p2pkManager.getOrCreatePrivateKey()
         let ourPubkeyHex = try await p2pkManager.getCashuPublicKey()
@@ -206,7 +206,7 @@ public enum Nutzap {
         guard let recipientTag = pTags.first,
               recipientTag.count > 1 else {
             NDKLogger.log(.warning, category: .wallet, "🎯 No recipient tag in nutzap - ignoring")
-            return
+            throw NutzapRedemptionError.invalidProofs(reason: "No recipient tag in nutzap event")
         }
         
         NDKLogger.log(.warning, category: .wallet, "🎯 Nutzap recipient tag: \(recipientTag[1])")
@@ -220,14 +220,14 @@ public enum Nutzap {
         
         guard !mintURLs.isEmpty else {
             NDKLogger.log(.error, category: .wallet, "🎯 No mint URLs in nutzap")
-            return
+            throw NutzapRedemptionError.invalidProofs(reason: "No mint URLs in nutzap event")
         }
         
         // Extract proofs from proof tags
         let proofTags = event.tags.filter { $0.count >= 2 && $0[0] == "proof" }
         guard !proofTags.isEmpty else {
             NDKLogger.log(.error, category: .wallet, "🎯 No proofs in nutzap")
-            return
+            throw NutzapRedemptionError.invalidProofs(reason: "No proofs in nutzap event")
         }
         
         NDKLogger.log(.warning, category: .wallet, "🎯 Found \(proofTags.count) proof tags in nutzap")
@@ -253,7 +253,16 @@ public enum Nutzap {
         
         guard !ourProofs.isEmpty else {
             NDKLogger.log(.warning, category: .wallet, "🎯 No proofs locked to our P2PK pubkey (\(ourPubkeyHex)) in nutzap")
-            return
+            // Extract expected pubkey from the first proof's secret
+            var expectedPubkey = "unknown"
+            if let firstProof = allProofs.first,
+               let secretData = firstProof.secret.data(using: .utf8),
+               let secret = try? JSONSerialization.jsonObject(with: secretData, options: []) as? [[String: Any]],
+               let p2pkCondition = secret.first(where: { $0["kind"] as? String == "P2PK" }),
+               let data = p2pkCondition["data"] as? String {
+                expectedPubkey = data
+            }
+            throw NutzapRedemptionError.p2pkLockedToUnknownKey(expectedPubkey: expectedPubkey, actualPubkey: ourPubkeyHex)
         }
         
         // Process proofs by mint
@@ -300,7 +309,9 @@ public enum Nutzap {
             redeemedProofs.append(contentsOf: unlockedProofs)
         }
         
-        guard totalReceived > 0 else { return }
+        guard totalReceived > 0 else { 
+            throw NutzapRedemptionError.insufficientAmount(expected: 1, actual: 0)
+        }
         
         // Update wallet state
         // Group by mint since we may have redeemed from multiple mints
@@ -339,10 +350,17 @@ public enum Nutzap {
         )
         
         // Mark the nutzap as redeemed
-        await eventManager.markNutzapRedeemed(event.id)
+        await eventManager.markNutzapRedeemed(event.id, proofsCount: redeemedProofs.count)
         
         // Emit nutzap received notification
         await emitNutzapReceived(event: event, amount: totalReceived)
+        
+        return NutzapRedemptionResult(
+            success: true,
+            proofsRedeemed: redeemedProofs,
+            error: nil,
+            amount: totalReceived
+        )
     }
     
     // MARK: - Private Helper Functions
@@ -384,6 +402,108 @@ public enum Nutzap {
                     "amount": amount
                 ]
             )
+        }
+    }
+}
+
+// MARK: - Error Mapping
+
+extension Nutzap {
+    /// Map CashuSwift and other errors to NutzapRedemptionError
+    public static func mapToRedemptionError(_ error: Error) -> NutzapRedemptionError {
+        switch error {
+        case let cashuError as CashuError:
+            switch cashuError {
+            case .networkError:
+                return .networkError("Network error occurred")
+            case .cryptoError:
+                return .dleqVerificationFailed
+            case .quoteNotPaid:
+                return .invalidProofs(reason: "Quote not paid")
+            case .blindedMessageAlreadySigned:
+                return .alreadySpent(proofIds: [])
+            case .alreadySpent:
+                return .alreadySpent(proofIds: [])
+            case .transactionUnbalanced:
+                return .invalidProofs(reason: "Transaction unbalanced")
+            case .invalidToken:
+                return .invalidProofs(reason: "Invalid token format")
+            case .tokenEncoding(let message):
+                return .invalidProofs(reason: "Token encoding error: \(message)")
+            case .tokenDecoding(let message):
+                return .invalidProofs(reason: "Token decoding error: \(message)")
+            case .unsupportedToken(let message):
+                return .invalidProofs(reason: "Unsupported token: \(message)")
+            case .inputError(let message):
+                return .invalidProofs(reason: "Input error: \(message)")
+            case .insufficientInputs(let message):
+                return .invalidProofs(reason: "Insufficient inputs: \(message)")
+            case .unitIsNotSupported(let message):
+                return .invalidProofs(reason: "Unit not supported: \(message)")
+            case .keysetInactive:
+                return .invalidProofs(reason: "Keyset inactive")
+            case .amountOutsideOfLimitRange:
+                return .invalidProofs(reason: "Amount outside of limit range")
+            case .proofsAlreadyIssuedForQuote:
+                return .alreadySpent(proofIds: [])
+            case .mintingDisabled:
+                return .temporaryMintError("Minting disabled")
+            case .typeMismatch(let message):
+                return .invalidProofs(reason: "Type mismatch: \(message)")
+            case .preferredDistributionMismatch(let message):
+                return .invalidProofs(reason: "Distribution mismatch: \(message)")
+            case .noActiveKeysetForUnit(let message):
+                return .invalidProofs(reason: "No active keyset for unit: \(message)")
+            case .unitError(let message):
+                return .invalidProofs(reason: "Unit error: \(message)")
+            case .invalidAmount:
+                return .invalidProofs(reason: "Invalid amount")
+            case .missingRequestDetail(let message):
+                return .invalidProofs(reason: "Missing request detail: \(message)")
+            case .restoreError(let message):
+                return .invalidProofs(reason: "Restore error: \(message)")
+            case .feeCalculationError(let message):
+                return .invalidProofs(reason: "Fee calculation error: \(message)")
+            case .partiallySpentToken:
+                return .alreadySpent(proofIds: [])
+            case .bolt11InvalidInvoiceError(let message):
+                return .invalidProofs(reason: "Invalid invoice: \(message)")
+            case .quoteIsPending:
+                return .temporaryMintError("Quote is pending")
+            case .invoiceAlreadyPaid:
+                return .alreadySpent(proofIds: [])
+            case .quoteIsExpired:
+                return .temporaryMintError("Quote expired")
+            case .unknownError(let message):
+                return .unknownError(message)
+            case .spendingConditionError(let message):
+                return .invalidProofs(reason: "Spending condition error: \(message)")
+            case .invalidKey(let message):
+                return .invalidProofs(reason: "Invalid key: \(message)")
+            case .p2pkSigningError(let message):
+                return .invalidProofs(reason: "P2PK signing error: \(message)")
+            case .invalidSplit(let message):
+                return .invalidProofs(reason: "Invalid split: \(message)")
+            }
+        case let ndkError as NDKError:
+            switch ndkError {
+            case .connectionFailed(let relay, let message, _):
+                return .networkError("Connection to \(relay) failed: \(message)")
+            case .insufficientBalance(let amount):
+                return .insufficientAmount(expected: amount ?? 0, actual: 0)
+            case .walletError(let message):
+                // Check if it's an invalid proof error
+                if message.contains("Invalid proof:") {
+                    return .invalidProofs(reason: message)
+                }
+                return .unknownError(message)
+            default:
+                return .unknownError(ndkError.localizedDescription)
+            }
+        case let urlError as URLError:
+            return .networkError("Network error: \(urlError.localizedDescription)")
+        default:
+            return .unknownError(error.localizedDescription)
         }
     }
 }

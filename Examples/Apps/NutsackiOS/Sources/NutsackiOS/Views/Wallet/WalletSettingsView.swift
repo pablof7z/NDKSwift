@@ -19,6 +19,8 @@ struct WalletSettingsView: View {
     @State private var showDiscoveredMints = false
     @State private var discoveredMints: [DiscoveredMint] = []
     @State private var isDiscovering = false
+    @State private var blacklistedMints: [String] = []
+    @State private var showBlacklistSheet = false
     
     var body: some View {
         NavigationStack {
@@ -117,6 +119,34 @@ struct WalletSettingsView: View {
                 } footer: {
                     Text("These relays will be used to sync your wallet events and mint lists")
                 }
+                
+                // Blacklisted Mints Section
+                Section {
+                    if blacklistedMints.isEmpty {
+                        ContentUnavailableView(
+                            "No Blacklisted Mints",
+                            systemImage: "xmark.shield",
+                            description: Text("Blacklisted mints will not be used or shown")
+                        )
+                    } else {
+                        ForEach(blacklistedMints, id: \.self) { mintURL in
+                            BlacklistedMintRow(mintURL: mintURL) {
+                                Task {
+                                    try? await walletManager.unblacklistMint(mintURL)
+                                    await loadBlacklist()
+                                }
+                            }
+                        }
+                    }
+                    
+                    Button(action: { showBlacklistSheet = true }) {
+                        Label("Manage Blacklist", systemImage: "xmark.shield")
+                    }
+                } header: {
+                    Text("Blacklisted Mints")
+                } footer: {
+                    Text("Blacklisted mints are blocked from being used in your wallet")
+                }
             }
             .navigationTitle("Wallet Settings")
             .platformNavigationBarTitleDisplayMode(inline: true)
@@ -158,6 +188,23 @@ struct WalletSettingsView: View {
                     }
                 }
             }
+            .sheet(isPresented: $showBlacklistSheet) {
+                BlacklistManagementSheet(
+                    currentMints: mints.map { $0.url.absoluteString },
+                    blacklistedMints: blacklistedMints
+                ) { mintURL, action in
+                    Task {
+                        switch action {
+                        case .block:
+                            try? await walletManager.blacklistMint(mintURL)
+                            mints.removeAll { $0.url.absoluteString == mintURL }
+                        case .unblock:
+                            try? await walletManager.unblacklistMint(mintURL)
+                        }
+                        await loadBlacklist()
+                    }
+                }
+            }
             .alert("Error", isPresented: $showError) {
                 Button("OK") { }
             } message: {
@@ -165,6 +212,7 @@ struct WalletSettingsView: View {
             }
             .task {
                 await loadCurrentSettings()
+                await loadBlacklist()
             }
         }
     }
@@ -297,6 +345,10 @@ struct WalletSettingsView: View {
                 isDiscovering = false
             }
         }
+    }
+    
+    private func loadBlacklist() async {
+        blacklistedMints = await walletManager.getBlacklistedMints()
     }
 }
 
@@ -670,6 +722,131 @@ private struct DiscoveredMintRowItem: View {
         if isSelected {
             Image(systemName: "checkmark.circle.fill")
                 .foregroundColor(.green)
+        }
+    }
+    
+    private func loadBlacklist() async {
+        blacklistedMints = await walletManager.getBlacklistedMints()
+    }
+}
+
+// MARK: - Blacklisted Mint Row
+struct BlacklistedMintRow: View {
+    let mintURL: String
+    let onUnblock: () -> Void
+    
+    var body: some View {
+        HStack {
+            Image(systemName: "xmark.shield.fill")
+                .foregroundColor(.red)
+                .frame(width: 40, height: 40)
+            
+            VStack(alignment: .leading, spacing: 4) {
+                Text(URL(string: mintURL)?.host ?? "Unknown Mint")
+                    .font(.headline)
+                Text(mintURL)
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+                    .lineLimit(1)
+            }
+            
+            Spacer()
+            
+            Button("Unblock") {
+                onUnblock()
+            }
+            .buttonStyle(.bordered)
+            .controlSize(.small)
+        }
+        .padding(.vertical, 4)
+    }
+}
+
+// MARK: - Blacklist Management Sheet
+struct BlacklistManagementSheet: View {
+    @Environment(\.dismiss) private var dismiss
+    let currentMints: [String]
+    let blacklistedMints: [String]
+    let onAction: (String, BlacklistAction) async -> Void
+    
+    enum BlacklistAction {
+        case block
+        case unblock
+    }
+    
+    var body: some View {
+        NavigationStack {
+            List {
+                if !currentMints.isEmpty {
+                    Section("Active Mints") {
+                        ForEach(currentMints, id: \.self) { mintURL in
+                            HStack {
+                                VStack(alignment: .leading, spacing: 4) {
+                                    Text(URL(string: mintURL)?.host ?? "Unknown Mint")
+                                        .font(.headline)
+                                    Text(mintURL)
+                                        .font(.caption)
+                                        .foregroundColor(.secondary)
+                                        .lineLimit(1)
+                                }
+                                
+                                Spacer()
+                                
+                                Button("Block") {
+                                    Task {
+                                        await onAction(mintURL, .block)
+                                        dismiss()
+                                    }
+                                }
+                                .buttonStyle(.bordered)
+                                .tint(.red)
+                                .controlSize(.small)
+                            }
+                            .padding(.vertical, 4)
+                        }
+                    }
+                }
+                
+                if !blacklistedMints.isEmpty {
+                    Section("Blacklisted Mints") {
+                        ForEach(blacklistedMints, id: \.self) { mintURL in
+                            HStack {
+                                Image(systemName: "xmark.shield.fill")
+                                    .foregroundColor(.red)
+                                
+                                VStack(alignment: .leading, spacing: 4) {
+                                    Text(URL(string: mintURL)?.host ?? "Unknown Mint")
+                                        .font(.headline)
+                                    Text(mintURL)
+                                        .font(.caption)
+                                        .foregroundColor(.secondary)
+                                        .lineLimit(1)
+                                }
+                                
+                                Spacer()
+                                
+                                Button("Unblock") {
+                                    Task {
+                                        await onAction(mintURL, .unblock)
+                                        dismiss()
+                                    }
+                                }
+                                .buttonStyle(.bordered)
+                                .tint(.green)
+                                .controlSize(.small)
+                            }
+                            .padding(.vertical, 4)
+                        }
+                    }
+                }
+            }
+            .navigationTitle("Manage Blacklist")
+            .platformNavigationBarTitleDisplayMode(inline: true)
+            .toolbar {
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Done") { dismiss() }
+                }
+            }
         }
     }
 }

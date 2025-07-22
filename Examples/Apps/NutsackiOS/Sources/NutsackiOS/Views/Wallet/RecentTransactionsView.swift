@@ -60,18 +60,20 @@ struct TransactionRow: View {
     
     var icon: String {
         switch transaction.type {
-        case .mint: return "bolt.fill"
-        case .melt: return "bolt"
+        case .mint, .deposit: return "bolt.fill"
+        case .melt, .withdraw: return "bolt"
         case .send: return "arrow.up"
         case .receive: return "arrow.down"
         case .nutzap: return "bolt.heart.fill"
+        case .swap: return "arrow.2.circlepath"
         }
     }
     
     var color: Color {
         switch transaction.type {
-        case .mint, .receive, .nutzap: return .green  // Nutzaps are received, so green
-        case .melt, .send: return .orange
+        case .mint, .deposit, .receive, .nutzap: return .green  // Nutzaps are received, so green
+        case .melt, .withdraw, .send: return .orange
+        case .swap: return .blue
         }
     }
     
@@ -223,8 +225,8 @@ struct TransactionHistoryView: View {
         func matches(_ transaction: Transaction) -> Bool {
             switch self {
             case .all: return true
-            case .sent: return [.send, .melt].contains(transaction.type)
-            case .received: return [.receive, .mint, .nutzap].contains(transaction.type)
+            case .sent: return [.send, .melt, .withdraw, .swap].contains(transaction.type)
+            case .received: return [.receive, .mint, .deposit, .nutzap].contains(transaction.type)
             }
         }
     }
@@ -308,15 +310,5 @@ struct TransactionDetailRow: View {
     }
 }
 
-extension Transaction.TransactionType {
-    var displayName: String {
-        switch self {
-        case .mint: return "Minted"
-        case .melt: return "Melted"
-        case .send: return "Sent"
-        case .receive: return "Received"
-        case .nutzap: return "Nutzapped"
-        }
-    }
-}
+// Transaction.TransactionType extension moved to DataModels.swift
 

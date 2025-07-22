@@ -50,7 +50,7 @@ struct MintsView: View {
                         .listRowInsets(EdgeInsets(top: 20, leading: 16, bottom: 5, trailing: 16))
                     
                     ForEach(availableMints, id: \.url.absoluteString) { mint in
-                        NavigationLink(destination: MintDetailView(mintInfo: mint)) {
+                        NavigationLink(destination: MintInfoDetailView(mintInfo: mint)) {
                             MintRow(mintInfo: mint)
                         }
                     }
@@ -176,7 +176,7 @@ struct MintRow: View {
     }
 }
 
-struct MintDetailView: View {
+struct MintInfoDetailView: View {
     let mintInfo: MintInfo
     @Environment(WalletManager.self) private var walletManager
     @Environment(\.dismiss) private var dismiss
@@ -187,6 +187,8 @@ struct MintDetailView: View {
     @State private var showError = false
     @State private var errorMessage = ""
     @State private var balance: Int64 = 0
+    @State private var isBlacklisted = false
+    @State private var showBlacklistAlert = false
     
     var body: some View {
         List {
@@ -228,6 +230,11 @@ struct MintDetailView: View {
                 }
                 .disabled(isSyncing)
                 
+                Button(role: .destructive, action: { showBlacklistAlert = true }) {
+                    Label("Blacklist Mint", systemImage: "xmark.shield")
+                        .foregroundColor(.red)
+                }
+                
                 Button(role: .destructive, action: { showRemoveAlert = true }) {
                     Label("Remove Mint", systemImage: "trash")
                         .foregroundColor(.red)
@@ -247,6 +254,14 @@ struct MintDetailView: View {
             }
         } message: {
             Text("This will remove the mint from your wallet. Any tokens from this mint will no longer be usable.")
+        }
+        .alert("Blacklist Mint?", isPresented: $showBlacklistAlert) {
+            Button("Cancel", role: .cancel) { }
+            Button("Blacklist", role: .destructive) {
+                performBlacklistMint()
+            }
+        } message: {
+            Text("This will block the mint from being used. The mint will be removed from your wallet and cannot be added again until unblocked.")
         }
         .alert("Error", isPresented: $showError) {
             Button("OK") { }
@@ -295,6 +310,22 @@ struct MintDetailView: View {
             await MainActor.run {
                 errorMessage = "To remove mints, please use Wallet Settings."
                 showError = true
+            }
+        }
+    }
+    
+    private func performBlacklistMint() {
+        Task {
+            do {
+                try await walletManager.blacklistMint(mintInfo.url.absoluteString)
+                await MainActor.run {
+                    dismiss()
+                }
+            } catch {
+                await MainActor.run {
+                    errorMessage = "Failed to blacklist mint: \(error.localizedDescription)"
+                    showError = true
+                }
             }
         }
     }

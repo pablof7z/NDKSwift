@@ -86,8 +86,11 @@ public actor MintFailureHandler {
             
         case .blacklistMint:
             // Add mint to blacklist
-            // TODO: await wallet.blacklistMint(operation.mintURL)
-            NDKLogger.log(.warning, category: .wallet, "⚫ Blacklisted mint: \(operation.mintURL)")
+            do {
+                try await wallet.blacklistMint(operation.mintURL)
+            } catch {
+                NDKLogger.log(.error, category: .wallet, "Failed to blacklist mint: \(error)")
+            }
             
             // Log the failed operation for potential manual recovery
             logFailedOperation(operation, paymentProof: paymentProof)
@@ -132,8 +135,11 @@ public actor MintFailureHandler {
             }
             
         case .blacklistMint:
-            // TODO: await wallet.blacklistMint(operation.mintURL)
-            NDKLogger.log(.warning, category: .wallet, "⚫ Blacklisted mint after deposit failure: \(operation.mintURL)")
+            do {
+                try await wallet.blacklistMint(operation.mintURL)
+            } catch {
+                NDKLogger.log(.error, category: .wallet, "Failed to blacklist mint after deposit failure: \(error)")
+            }
             
         case .cancel:
             NDKLogger.log(.info, category: .wallet, "User cancelled deposit recovery for: \(operation.mintURL)")

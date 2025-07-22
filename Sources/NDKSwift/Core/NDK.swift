@@ -357,7 +357,7 @@ public final class NDK {
     ///     filter: NDKFilter(authors: [pubkey], kinds: [0])
     /// ) { event in
     ///     // Transform event to profile
-    ///     try? JSONDecoder().decode(NDKUserProfile.self, from: event.content.data(using: .utf8)!)
+    ///     try? JSONCoding.decode(NDKUserProfile.self, from: event.content)
     /// }
     /// ```
     /// 
@@ -395,7 +395,7 @@ public final class NDK {
     /// let profiles = ndk.observe(
     ///     filter: NDKFilter(authors: [pubkey], kinds: [0])
     /// ) { event in
-    ///     try? JSONDecoder().decode(NDKUserProfile.self, from: event.content.data(using: .utf8)!)
+    ///     try? JSONCoding.decode(NDKUserProfile.self, from: event.content)
     /// }
     /// 
     /// // With options

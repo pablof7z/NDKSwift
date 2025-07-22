@@ -190,11 +190,11 @@ struct ProofManagementView: View {
         
         // Get all proof entries
         let entries = await wallet.proofStateManager.getAllEntries()
-            .filter { $0.state != .deleted }
+            .filter { $0.state != ProofStateManager.ProofState.deleted }
         
         // Calculate balances per mint
         var balances: [String: Int64] = [:]
-        for entry in entries where entry.state == .available {
+        for entry in entries where entry.state == ProofStateManager.ProofState.available {
             balances[entry.mint, default: 0] += Int64(entry.proof.amount)
         }
         
