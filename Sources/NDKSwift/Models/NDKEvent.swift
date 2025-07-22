@@ -382,11 +382,3 @@ public struct NDKEvent: Codable, Equatable, Hashable, Sendable {
     }
     
 }
-
-// MARK: - Character extension for hex validation
-
-private extension Character {
-    var isHexDigit: Bool {
-        return ("0" ... "9").contains(self) || ("a" ... "f").contains(self) || ("A" ... "F").contains(self)
-    }
-}
