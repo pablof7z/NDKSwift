@@ -460,7 +460,7 @@ public actor NDKBunkerSigner: NDKSigner, Sendable {
                 connectionContinuation?.resume(throwing: error)
             }
         } else {
-            let error = NDKError.networkError(for: "bunker", operation: "connect", error: NSError(domain: "BunkerError", code: -1, userInfo: [NSLocalizedDescriptionKey: response.error ?? "Connection failed"]))
+            let error = NDKError.networkError(for: "bunker", operation: "connect", error: NSError(domain: "BunkerError", code: -1, userInfo: [NSLocalizedDescriptionKey: response.error ?? StringConstants.ErrorMessages.connectionFailed]))
             connectionContinuation?.resume(throwing: error)
         }
         connectionContinuation = nil

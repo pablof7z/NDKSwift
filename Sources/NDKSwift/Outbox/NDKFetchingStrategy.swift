@@ -195,7 +195,7 @@ actor NDKFetchingStrategy {
         do {
             // Get or connect to relay  
             guard await getOrConnectRelay(url: relayURL) != nil else {
-                return .failure(FetchError.relayError(relayURL, "Connection failed"))
+                return .failure(FetchError.relayError(relayURL, StringConstants.ErrorMessages.connectionFailed))
             }
 
             // Create data source for this specific relay with timeout
