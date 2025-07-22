@@ -37,12 +37,9 @@ public enum BlossomMediaProcessor {
         let pixelWidth = cgImage.width
         let pixelHeight = cgImage.height
         
-        // Calculate blurhash with reasonable component counts
-        let componentsX = min(9, max(4, pixelWidth / 100))
-        let componentsY = min(9, max(4, pixelHeight / 100))
-        
         // For now, return a placeholder blurhash since we can't use external dependencies
-        // A real implementation would calculate the actual blurhash
+        // A real implementation would calculate the actual blurhash with component counts
+        // based on image dimensions (e.g., min(9, max(4, pixelWidth / 100)))
         let blurhash = "L00000fQfQfQfQfQfQfQfQfQfQfQ"
         
         return (blurhash: blurhash, dimensions: (width: pixelWidth, height: pixelHeight))

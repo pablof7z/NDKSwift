@@ -538,7 +538,7 @@ public actor NDKZapManager {
         recipientInfo: RecipientZapInfo,
         preferredType: ZapType?
     ) throws -> NDKZapProtocol {
-        print("selectZapProtocol \(preferredType), supported: \(recipientInfo.supportedZapTypes)")
+        print("selectZapProtocol \(String(describing: preferredType)), supported: \(recipientInfo.supportedZapTypes)")
         
         // Try preferred type first if it's supported
         if let preferredType = preferredType,
