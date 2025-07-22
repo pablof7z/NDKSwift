@@ -118,8 +118,10 @@ public enum EventKind {
     public static let muteList = 10000
     public static let pinList = 10001
     public static let relayList = 10002
+    public static let blockedRelays = 10006
     public static let cashuMintList = 10019
     public static let nutzapPreferences = 10019  // Alias for NIP-61
+    public static let blockedMints = 10020
     
     // MARK: - Authentication Events (20000-29999)
     public static let clientAuthentication = 22242
