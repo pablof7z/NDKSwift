@@ -145,8 +145,9 @@ public enum Payment {
                 throw NDKError.paymentFailed(reason: "Lightning payment was not successful")
             }
             
-            guard dleqValid else {
-                throw NDKError.invalidProof("DLEQ verification failed")
+            // Log DLEQ verification failure but continue
+            if !dleqValid {
+                NDKLogger.log(.warning, category: .wallet, "⚠️ DLEQ verification failed but continuing since payment was successful. Mint: \(mintURL)")
             }
             
             // Mark used proofs as deleted

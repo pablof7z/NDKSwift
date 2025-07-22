@@ -13,12 +13,21 @@ fileprivate let logger = Logger.init(subsystem: "CashuSwift", category: "wallet"
 
 extension CashuSwift {
     public static func loadMint<T: MintRepresenting>(url:URL, type:T.Type = Mint.self) async throws -> T {
-        let keysetList = try await Network.get(url: url.appending(path: "/v1/keysets"),
+        // Ensure URL ends with slash for proper path appending
+        let baseURL = url.absoluteString.hasSuffix("/") ? url : URL(string: url.absoluteString + "/")!
+        let keysetsURL = baseURL.appendingPathComponent("v1/keysets")
+        
+        logger.debug("Loading mint from: \(url.absoluteString)")
+        logger.debug("Fetching keysets from: \(keysetsURL.absoluteString)")
+        
+        let keysetList = try await Network.get(url: keysetsURL,
                                                expected: KeysetList.self)
         var keysetsWithKeys = [Keyset]()
         for keyset in keysetList.keysets {
             var new = keyset
-            new.keys = try await Network.get(url: url.appending(path: "/v1/keys/\(keyset.keysetID.urlSafe)"),
+            let keysURL = baseURL.appendingPathComponent("v1/keys/\(keyset.keysetID.urlSafe)")
+            logger.debug("Fetching keys from: \(keysURL.absoluteString)")
+            new.keys = try await Network.get(url: keysURL,
                                              expected: KeysetList.self).keysets[0].keys
             keysetsWithKeys.append(new)
         }

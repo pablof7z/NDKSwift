@@ -8,6 +8,7 @@ enum Command {
     case check(mintUrl: String?)
     case validate(dryRun: Bool, mintUrl: String?)
     case mints
+    case zap(recipient: String, amount: Int64, comment: String?)
     case quit
     case help
     case unknown(String)
@@ -47,6 +48,14 @@ enum Command {
             return .validate(dryRun: dryRun, mintUrl: mintUrl)
         case "mints", "m":
             return .mints
+        case "zap", "z":
+            if parts.count >= 3,
+               let amount = Int64(parts[2]) {
+                let recipient = String(parts[1])
+                let comment = parts.count > 3 ? parts.dropFirst(3).joined(separator: " ") : nil
+                return .zap(recipient: recipient, amount: amount, comment: comment)
+            }
+            return .unknown("Invalid zap command. Usage: zap <recipient> <amount> [comment]")
         case "quit", "q", "exit":
             return .quit
         case "help", "h":
@@ -135,6 +144,10 @@ struct NIP60WalletREPL {
             
             // Load wallet (starts subscriptions)
             try await wallet.load()
+            
+            // Configure wallet as payment provider for zaps
+            await ndk.zapManager.configureDefaults(cashuWallet: wallet)
+            print("⚡ Wallet configured for zaps")
         } catch {
             print("❌ Failed to initialize wallet: \(error)")
             return
@@ -145,13 +158,13 @@ struct NIP60WalletREPL {
         print("")
         
         // REPL loop
-        await runREPL(wallet: wallet)
+        await runREPL(ndk: ndk, wallet: wallet)
         
         // Disconnect
         await ndk.disconnect()
     }
     
-    static func runREPL(wallet: NIP60Wallet) async {
+    static func runREPL(ndk: NDK, wallet: NIP60Wallet) async {
         while true {
             print("wallet> ", terminator: "")
             fflush(stdout)
@@ -178,6 +191,9 @@ struct NIP60WalletREPL {
                 
             case .mints:
                 await showMints(wallet: wallet)
+                
+            case .zap(let recipient, let amount, let comment):
+                await sendZap(ndk: ndk, wallet: wallet, recipient: recipient, amount: amount, comment: comment)
                 
             case .help:
                 showHelp()
@@ -618,6 +634,87 @@ struct NIP60WalletREPL {
         }
     }
     
+    static func sendZap(ndk: NDK, wallet: NIP60Wallet, recipient: String, amount: Int64, comment: String?) async {
+        print("⚡ Sending zap of \(amount) sats...")
+        
+        do {
+            
+            // Parse recipient (could be npub, hex pubkey, or NIP-05)
+            let recipientUser: NDKUser
+            
+            if recipient.starts(with: "npub") {
+                // npub format
+                guard let user = NDKUser(npub: recipient) else {
+                    print("❌ Invalid npub: \(recipient)")
+                    return
+                }
+                user.ndk = ndk
+                recipientUser = user
+            } else if recipient.contains("@") {
+                // NIP-05 format
+                print("🔍 Resolving NIP-05: \(recipient)")
+                do {
+                    recipientUser = try await NDKUser.fromNip05(recipient, ndk: ndk)
+                    print("✅ Resolved to pubkey: \(recipientUser.pubkey)")
+                } catch {
+                    print("❌ Failed to resolve NIP-05: \(error)")
+                    return
+                }
+            } else if recipient.count == 64 && recipient.allSatisfy({ $0.isHexDigit }) {
+                // Hex pubkey
+                recipientUser = NDKUser(pubkey: recipient)
+                recipientUser.ndk = ndk
+            } else {
+                print("❌ Invalid recipient format. Use npub, hex pubkey, or NIP-05")
+                return
+            }
+            
+            // Fetch recipient profile to get their name
+            print("📋 Fetching recipient profile...")
+            var recipientName = recipientUser.npub
+            
+            // Use profile manager to get profile data
+            for await profile in await ndk.profileManager.observe(for: recipientUser.pubkey, maxAge: TimeConstants.hour) {
+                if let profile = profile {
+                    recipientName = profile.displayName ?? profile.name ?? recipientUser.npub
+                    break // Only need first value
+                }
+            }
+            print("⚡ Zapping \(recipientName)...")
+            
+            // Send the zap
+            let zapResult = try await recipientUser.zap(
+                amountSats: amount,
+                comment: comment,
+                preferredType: .nutzap // Prefer nutzap since we're using a Cashu wallet
+            )
+            
+            print("\n✅ Zap sent successfully!")
+            print("==================")
+            print("Type: \(zapResult.type)")
+            print("Amount: \(zapResult.amountSats) sats") 
+            print("Recipient: \(recipientName)")
+            if let comment = comment {
+                print("Comment: \(comment)")
+            }
+            
+            if let nutzapEvent = zapResult.nutzapEvent {
+                print("Nutzap Event ID: \(nutzapEvent.id)")
+            }
+            
+            if let receiptEvent = zapResult.receiptEvent {
+                print("Lightning Receipt ID: \(receiptEvent.id)")
+            }
+            
+            // Update balance
+            let newBalance = try await wallet.getBalance() ?? 0
+            print("\n💰 New balance: \(newBalance) sats")
+            
+        } catch {
+            print("❌ Failed to send zap: \(error)")
+        }
+    }
+    
     static func showHelp() {
         print("""
         
@@ -628,6 +725,7 @@ struct NIP60WalletREPL {
         validate, v [-d] [mint_url]   - Validate proofs and remove spent ones (-d for dry run)
         deposit <amount> [mint_url]   - Create a deposit quote for specified amount (in sats)
         mints, m                      - Show configured mints and their balances
+        zap, z <recipient> <amount> [comment] - Send a zap to a user (recipient can be npub, hex pubkey, or NIP-05)
         help, h                       - Show this help message
         quit, q, exit                 - Exit the REPL
         
@@ -643,6 +741,9 @@ struct NIP60WalletREPL {
         wallet> validate -d https://testnut.cashu.space # Dry run for specific mint
         wallet> deposit 1000
         wallet> deposit 100 https://nofees.testnut.cashu.space
+        wallet> zap npub1n0sturny6w9zn2wwexju3m6asu7zh7jnv2jt2kx6tlmfhs7thq0qnflahe 21 "Great post!"
+        wallet> zap pablo@f7z.io 100 "Thanks for NDKSwift!"
+        wallet> zap 3bf0c63fcb93463407af97a5e5ee64fa883d107ef9e558472c4eb9aaaefa459d 50
         wallet> quit
         
         """)

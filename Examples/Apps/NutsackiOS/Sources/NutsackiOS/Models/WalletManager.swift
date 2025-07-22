@@ -10,13 +10,17 @@ class WalletManager {
     var activeWallet: NIP60Wallet?
     var isLoading = false
     var error: Error?
-    private var walletTransactions: [WalletTransaction] = []
+    private var walletTransactions: [WalletTransaction] = [] {
+        didSet {
+            // Update the public transactions array whenever walletTransactions changes
+            transactions = walletTransactions.map { $0.toTransaction() }
+        }
+    }
     var currentBalance: Int64 = 0
     
     /// Transactions converted for UI compatibility
-    var transactions: [Transaction] {
-        walletTransactions.map { $0.toTransaction() }
-    }
+    /// This is automatically updated when walletTransactions changes
+    private(set) var transactions: [Transaction] = []
     
     /// Stored mint URLs for quick access
     private(set) var mintURLs: [String] = []
@@ -201,11 +205,17 @@ class WalletManager {
                     
                 case .transactionAdded(let transaction):
                     print("WalletManager - New transaction added: \(transaction.displayDescription)")
+                    print("WalletManager - Transaction type: \(transaction.type), amount: \(transaction.amount), status: \(transaction.status)")
                     await MainActor.run {
                         // Add transaction if not already present
                         if !self.walletTransactions.contains(where: { $0.id == transaction.id }) {
+                            print("WalletManager - Adding new transaction to list. Current count: \(self.walletTransactions.count)")
                             self.walletTransactions.insert(transaction, at: 0)
                             self.sortTransactions()
+                            print("WalletManager - Transaction added. New count: \(self.walletTransactions.count)")
+                            print("WalletManager - UI transactions count: \(self.transactions.count)")
+                        } else {
+                            print("WalletManager - Transaction already exists, skipping")
                         }
                     }
                     
@@ -215,6 +225,7 @@ class WalletManager {
                         // Update existing transaction
                         if let index = self.walletTransactions.firstIndex(where: { $0.id == transaction.id }) {
                             self.walletTransactions[index] = transaction
+                            // The didSet on walletTransactions will automatically update the transactions array
                         }
                     }
                 }
@@ -239,6 +250,7 @@ class WalletManager {
                 
                 await MainActor.run {
                     self.walletTransactions = initialTransactions
+                    // The didSet on walletTransactions will automatically update the transactions array
                 }
                 
                 print("📊 Loaded \(initialTransactions.count) initial transactions")
@@ -255,6 +267,7 @@ class WalletManager {
     /// Sort transactions by timestamp (newest first)
     private func sortTransactions() {
         walletTransactions.sort { $0.timestamp > $1.timestamp }
+        // The didSet on walletTransactions will automatically update the transactions array
     }
     
     /// Get relays for wallet configuration
@@ -362,13 +375,15 @@ class WalletManager {
             throw WalletError.noActiveWallet
         }
         
-        // Create pending transaction immediately
-        let transaction = Transaction(
+        // Create pending transaction immediately in wallet's transaction history
+        let pendingTx = await wallet.transactionHistory.createPendingTransaction(
             type: .send,
-            amount: Int(amount),
-            memo: memo ?? "Sent ecash"
+            amount: amount,
+            direction: .outgoing,
+            memo: memo ?? "Sent ecash",
+            mint: fromMint?.absoluteString
         )
-        transaction.status = .pending
+        print("Created pending transaction: \(pendingTx.id) for send operation")
         
         // Transaction will be added when wallet event is processed
         
@@ -429,39 +444,32 @@ class WalletManager {
             
             let tokenString = "cashuA\(base64Token)"
             
-            // Update transaction status to completed
-            await MainActor.run {
-                if let index = self.transactions.firstIndex(where: { $0.transactionID == transaction.transactionID }) {
-                    self.transactions[index].status = .completed
-                    self.transactions[index].offlineToken = tokenString
-                }
-            }
+            // Update pending transaction status to completed
+            await wallet.transactionHistory.updateTransactionStatus(id: pendingTx.id, status: .completed)
             
             // Create history event for sending ecash
-            Task {
-                do {
-                    guard let ndk = nostrManager.ndk,
-                          let signer = ndk.signer else { return }
-                    
-                    try await wallet.eventManager.createSpendingHistoryEvent(
-                        direction: .out,
-                        amount: amount,
-                        memo: memo ?? "Sent ecash",
-                        signer: signer
-                    )
-                } catch {
-                    print("Failed to create history event for send: \(error)")
+            do {
+                guard let ndk = nostrManager.ndk,
+                      let signer = ndk.signer else { 
+                    print("Failed to create history event: NDK or signer not available")
+                    return tokenString
                 }
+                
+                try await wallet.eventManager.createSpendingHistoryEvent(
+                    direction: .out,
+                    amount: amount,
+                    memo: memo ?? "Sent ecash",
+                    signer: signer
+                )
+            } catch {
+                print("Failed to create history event for send: \(error)")
+                // Don't throw here, the send operation succeeded even if history event failed
             }
             
             return tokenString
         } catch {
-            // Update transaction status to failed
-            await MainActor.run {
-                if let index = self.transactions.firstIndex(where: { $0.transactionID == transaction.transactionID }) {
-                    self.transactions[index].status = .failed
-                }
-            }
+            // Update pending transaction status to failed
+            await wallet.transactionHistory.updateTransactionStatus(id: pendingTx.id, status: .failed)
             throw error
         }
     }
@@ -501,15 +509,14 @@ class WalletManager {
             sum + proofs.reduce(0) { $0 + Int64($1.amount) }
         }
         
-        // Create pending transaction immediately
-        let transaction = Transaction(
+        // Create pending transaction immediately in wallet's transaction history
+        let pendingTx = await wallet.transactionHistory.createPendingTransaction(
             type: .receive,
-            amount: Int(totalAmount),
+            amount: totalAmount,
+            direction: .incoming,
             memo: token.memo ?? "Received ecash"
         )
-        transaction.status = .pending
-        
-        // Transaction will be added when wallet event is processed
+        print("Created pending transaction: \(pendingTx.id) for receive operation")
         
         do {
             var totalReceived: Int64 = 0
@@ -523,40 +530,34 @@ class WalletManager {
                 totalReceived += proofs.reduce(0) { $0 + Int64($1.amount) }
             }
             
-            // Update transaction status to completed
-            await MainActor.run {
-                if let index = self.transactions.firstIndex(where: { $0.transactionID == transaction.transactionID }) {
-                    self.transactions[index].status = .completed
-                }
-            }
+            // Update pending transaction status to completed
+            await wallet.transactionHistory.updateTransactionStatus(id: pendingTx.id, status: .completed)
             
             // Create history event for receiving ecash
             if totalReceived > 0 {
-                Task {
-                    do {
-                        guard let ndk = nostrManager.ndk,
-                              let signer = ndk.signer else { return }
-                        
-                        try await wallet.eventManager.createSpendingHistoryEvent(
-                            direction: .in,
-                            amount: totalReceived,
-                            memo: token.memo ?? "Received ecash",
-                            signer: signer
-                        )
-                    } catch {
-                        print("Failed to create history event for receive: \(error)")
+                do {
+                    guard let ndk = nostrManager.ndk,
+                          let signer = ndk.signer else { 
+                        print("Failed to create history event: NDK or signer not available")
+                        return totalReceived
                     }
+                    
+                    try await wallet.eventManager.createSpendingHistoryEvent(
+                        direction: .in,
+                        amount: totalReceived,
+                        memo: token.memo ?? "Received ecash",
+                        signer: signer
+                    )
+                } catch {
+                    print("Failed to create history event for receive: \(error)")
+                    // Don't throw here, the receive operation succeeded even if history event failed
                 }
             }
             
             return totalReceived
         } catch {
-            // Update transaction status to failed
-            await MainActor.run {
-                if let index = self.transactions.firstIndex(where: { $0.transactionID == transaction.transactionID }) {
-                    self.transactions[index].status = .failed
-                }
-            }
+            // Update pending transaction status to failed
+            await wallet.transactionHistory.updateTransactionStatus(id: pendingTx.id, status: .failed)
             throw error
         }
     }
@@ -569,16 +570,17 @@ class WalletManager {
             throw WalletError.noActiveWallet
         }
         
-        // Create pending transaction immediately
-        let transaction = Transaction(
+        // Create pending transaction immediately in wallet's transaction history
+        let lightningData = LightningData(invoice: invoice)
+        let pendingTx = await wallet.transactionHistory.createPendingTransaction(
             type: .melt,
-            amount: Int(amount),
-            memo: "Lightning payment"
+            amount: amount,
+            direction: .outgoing,
+            memo: "Lightning payment",
+            lookupKeys: TransactionLookupKeys(paymentHash: nil), // Could extract from invoice
+            lightningData: lightningData
         )
-        transaction.status = .pending
-        transaction.lightningInvoice = invoice
-        
-        // Transaction will be added when wallet event is processed
+        print("Created pending transaction: \(pendingTx.id) for lightning payment")
         
         do {
             let (preimage, feePaid) = try await wallet.payLightning(
@@ -588,22 +590,13 @@ class WalletManager {
             
             print("Paid Lightning invoice: \(amount) sats, fee: \(feePaid ?? 0) sats")
             
-            // Update transaction status to completed
-            await MainActor.run {
-                if let index = self.transactions.firstIndex(where: { $0.transactionID == transaction.transactionID }) {
-                    self.transactions[index].status = .completed
-                    // The history event will provide more details
-                }
-            }
+            // Update pending transaction status to completed
+            await wallet.transactionHistory.updateTransactionStatus(id: pendingTx.id, status: .completed)
             
             return preimage
         } catch {
-            // Update transaction status to failed
-            await MainActor.run {
-                if let index = self.transactions.firstIndex(where: { $0.transactionID == transaction.transactionID }) {
-                    self.transactions[index].status = .failed
-                }
-            }
+            // Update pending transaction status to failed
+            await wallet.transactionHistory.updateTransactionStatus(id: pendingTx.id, status: .failed)
             throw error
         }
     }
@@ -624,16 +617,21 @@ class WalletManager {
             throw WalletError.noActiveWallet
         }
         
-        // Create pending transaction immediately
-        let transaction = Transaction(
-            type: .send,  // Use send type for outgoing nutzaps
-            amount: Int(amount),
-            memo: comment ?? "Nutzap sent"
+        // Create pending transaction immediately in wallet's transaction history
+        let nutzapData = NutzapData(
+            recipientPubkey: recipient,
+            nutzapEventId: "pending-\(UUID().uuidString)", // Temporary ID until nutzap event is created
+            comment: comment
         )
-        transaction.status = .pending
-        // Note: For outgoing nutzaps, we don't set senderPubkey as that's for incoming
-        
-        // Transaction will be added when wallet event is processed
+        let pendingTx = await wallet.transactionHistory.createPendingTransaction(
+            type: .nutzapSent,
+            amount: amount,
+            direction: .outgoing,
+            memo: comment ?? "Nutzap sent",
+            lookupKeys: TransactionLookupKeys(recipientPubkey: recipient),
+            nutzapData: nutzapData
+        )
+        print("Created pending transaction: \(pendingTx.id) for nutzap")
         
         do {
             // Create nutzap request
@@ -652,19 +650,11 @@ class WalletManager {
             
             print("✅ Nutzap completed successfully!")
             
-            // Update transaction status to completed
-            await MainActor.run {
-                if let index = self.transactions.firstIndex(where: { $0.transactionID == transaction.transactionID }) {
-                    self.transactions[index].status = .completed
-                }
-            }
+            // Update pending transaction status to completed
+            await wallet.transactionHistory.updateTransactionStatus(id: pendingTx.id, status: .completed)
         } catch {
-            // Update transaction status to failed
-            await MainActor.run {
-                if let index = self.transactions.firstIndex(where: { $0.transactionID == transaction.transactionID }) {
-                    self.transactions[index].status = .failed
-                }
-            }
+            // Update pending transaction status to failed
+            await wallet.transactionHistory.updateTransactionStatus(id: pendingTx.id, status: .failed)
             throw error
         }
     }
@@ -931,6 +921,7 @@ class WalletManager {
         // Clear wallet state
         activeWallet = nil
         walletTransactions.removeAll()
+        // The didSet on walletTransactions will automatically clear the transactions array
         currentBalance = 0
         
         print("WalletManager - Cleared all wallet data and cancelled subscriptions")

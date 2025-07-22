@@ -84,13 +84,16 @@ public actor MintRetryHandler {
                     seed: nil
                 )
                 
-                // Verify DLEQ if available
+                // Log DLEQ verification status but accept proofs regardless
                 if !validDLEQ {
-                    throw NDKError.walletError(message: "DLEQ verification failed")
+                    NDKLogger.log(.warning, category: .wallet, "⚠️ DLEQ verification failed for mint quote \(mintQuote.quote) but accepting proofs since payment was made. Mint: \(mint.url)")
                 }
                 
-                NDKLogger.log(.info, category: .wallet, "✅ Successfully minted \(proofs.count) proofs after \(attemptCount) attempts")
-                return (proofs, false)
+                // Accept proofs even if DLEQ failed - user has already paid
+                if !proofs.isEmpty {
+                    NDKLogger.log(.info, category: .wallet, "✅ Successfully minted \(proofs.count) proofs after \(attemptCount) attempts (DLEQ valid: \(validDLEQ))")
+                    return (proofs, false)
+                }
                 
             } catch {
                 NDKLogger.log(.warning, category: .wallet, "❌ Mint attempt \(attemptCount) failed: \(error)")

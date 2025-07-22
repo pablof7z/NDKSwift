@@ -29,9 +29,9 @@ struct SendView: View {
     
     // Offline mode states
     @State private var availableAmounts: [Int64] = []
-    @State private var proofCombinations: [Int64: [ProofInfo]] = [:]
+    @State private var proofCombinations: [Int64: [CashuSwift.Proof]] = [:]
     @State private var selectedAmount: Int64?
-    @State private var availableProofs: [ProofInfo] = []
+    @State private var availableProofs: [CashuSwift.Proof] = []
     @State private var pickerAmounts: [Int64] = []
     @State private var selectedPickerIndex = 0
     @State private var isLoadingOfflineAmounts = false
@@ -355,17 +355,17 @@ struct SendView: View {
             Text(errorMessage)
         }
         .sheet(isPresented: $showTokenView) {
-            if isOfflineMode, let token = generatedToken {
-                OfflineTokenView(
-                    token: token,
-                    amount: Int(selectedAmount ?? 0),
-                    memo: memo,
-                    mintURL: selectedMintURL
-                )
-            } else {
-                // Pass the token even if it's nil - TokenView handles the loading state
-                TokenView(token: generatedToken, amount: amountInt, memo: memo)
-            }
+            TokenConfirmationView(
+                token: generatedToken,
+                amount: isOfflineMode ? Int(selectedAmount ?? 0) : amountInt,
+                memo: memo,
+                mintURL: selectedMintURL,
+                isOfflineMode: isOfflineMode,
+                onDismiss: {
+                    // Navigate back to wallet when done
+                    dismiss()
+                }
+            )
         }
         .onAppear {
             loadMints()
@@ -393,12 +393,10 @@ struct SendView: View {
             guard let selectedAmt = selectedAmount else { return }
             let amount = selectedAmt
             
-            guard let proofInfos = proofCombinations[amount],
+            guard let proofs = proofCombinations[amount],
                   let mintURL = selectedMintURL else { return }
             
-            // Extract the actual CashuSwift.Proof objects
-            let cashuProofs = proofInfos.compactMap { $0.proof }
-            guard !cashuProofs.isEmpty else { return }
+            guard !proofs.isEmpty else { return }
             
             isSending = true
             
@@ -406,7 +404,7 @@ struct SendView: View {
                 do {
                     // Generate offline token
                     let (token, transactionId) = try await walletManager.sendOffline(
-                        proofs: cashuProofs,
+                        proofs: proofs,
                         mint: mintURL,
                         memo: memo.isEmpty ? nil : memo
                     )
@@ -540,37 +538,30 @@ struct SendView: View {
             
             print("Found \(mintProofs.count) proofs for mint \(mintURL)")
             
-            // Convert to ProofInfo and sort by amount (largest first)
-            let proofInfos = mintProofs.enumerated().map { index, proof in
-                ProofInfo(
-                    id: proof.C,
-                    amount: Int64(proof.amount),
-                    keysetId: proof.keysetID,
-                    proof: proof
-                )
-            }.sorted(by: { $0.amount > $1.amount })
+            // Sort proofs by amount (largest first)
+            let sortedProofs = mintProofs.sorted(by: { $0.amount > $1.amount })
             
             // Use a smart approach that doesn't explode exponentially
             var amounts: [Int64] = []
-            var combinations: [Int64: [ProofInfo]] = [:]
+            var combinations: [Int64: [CashuSwift.Proof]] = [:]
             
             // Calculate total available
-            let totalAmount = proofInfos.reduce(0) { $0 + $1.amount }
-            print("Total available: \(totalAmount) sats from \(proofInfos.count) proofs")
+            let totalAmount = sortedProofs.reduce(0) { $0 + Int64($1.amount) }
+            print("Total available: \(totalAmount) sats from \(sortedProofs.count) proofs")
             
             // Always add the total amount option
             amounts.append(totalAmount)
-            combinations[totalAmount] = proofInfos
+            combinations[totalAmount] = sortedProofs
             
             // Add common denominations that we can definitely make
             for targetAmount in commonAmounts where targetAmount <= totalAmount {
                 // Try to construct this amount using a greedy algorithm
                 var remaining = targetAmount
-                var usedProofs: [ProofInfo] = []
-                var availableProofs = proofInfos
+                var usedProofs: [CashuSwift.Proof] = []
+                var availableProofs = sortedProofs
                 
                 // First try to find exact matches
-                if let exactMatch = availableProofs.first(where: { $0.amount == remaining }) {
+                if let exactMatch = availableProofs.first(where: { Int64($0.amount) == remaining }) {
                     usedProofs.append(exactMatch)
                     amounts.append(targetAmount)
                     combinations[targetAmount] = usedProofs
@@ -579,9 +570,9 @@ struct SendView: View {
                 
                 // Otherwise use greedy approach - start with largest proofs
                 for proof in availableProofs {
-                    if proof.amount <= remaining {
+                    if Int64(proof.amount) <= remaining {
                         usedProofs.append(proof)
-                        remaining -= proof.amount
+                        remaining -= Int64(proof.amount)
                         if remaining == 0 { break }
                     }
                 }
@@ -594,7 +585,7 @@ struct SendView: View {
             
             // Add some intermediate amounts based on proof distribution
             // Group proofs by amount
-            let proofsByAmount = Dictionary(grouping: proofInfos, by: { $0.amount })
+            let proofsByAmount = Dictionary(grouping: sortedProofs, by: { Int64($0.amount) })
             
             // For each unique proof amount, offer multiples of it (if we have multiple)
             for (amount, proofs) in proofsByAmount where proofs.count > 1 {
@@ -611,7 +602,7 @@ struct SendView: View {
             let sortedAmounts = amounts.sorted().filter { $0 > 0 }
             
             await MainActor.run {
-                availableProofs = proofInfos
+                availableProofs = sortedProofs
                 availableAmounts = amounts
                 proofCombinations = combinations
                 pickerAmounts = sortedAmounts
@@ -632,161 +623,5 @@ struct SendView: View {
         }
     }
     
-    
-}
-
-// MARK: - Token View
-struct TokenView: View {
-    let token: String?
-    let amount: Int
-    let memo: String
-    
-    @State private var copied = false
-    @Environment(\.dismiss) private var dismiss
-    
-    var isGenerating: Bool {
-        token == nil || token?.isEmpty == true
-    }
-    
-    var body: some View {
-        NavigationStack {
-            ScrollView {
-                VStack(spacing: 30) {
-                    // Status indicator
-                    if isGenerating {
-                        VStack(spacing: 16) {
-                            ProgressView()
-                                .progressViewStyle(CircularProgressViewStyle())
-                                .scaleEffect(1.5)
-                                .padding(.top, 40)
-                            
-                            Text("Generating token...")
-                                .font(.headline)
-                                .foregroundStyle(.secondary)
-                        }
-                    } else {
-                        Image(systemName: "checkmark.circle.fill")
-                            .font(.system(size: 60))
-                            .foregroundStyle(.green)
-                            .padding(.top, 40)
-                    }
-                    
-                    // Amount
-                    VStack(spacing: 8) {
-                        Text("\(amount) sats")
-                            .font(.largeTitle)
-                            .fontWeight(.bold)
-                        
-                        if !memo.isEmpty {
-                            Text(memo)
-                                .font(.subheadline)
-                                .foregroundStyle(.secondary)
-                                .multilineTextAlignment(.center)
-                                .padding(.horizontal)
-                        }
-                    }
-                    
-                    if let token = token, !token.isEmpty {
-                        // QR Code
-                        QRCodeView(content: token)
-                        
-                        // Token text
-                        VStack(spacing: 12) {
-                            Text(token)
-                                .font(.system(.caption, design: .monospaced))
-                                .lineLimit(3)
-                                .truncationMode(.middle)
-                                .padding()
-                                .background(Color.secondary.opacity(0.2))
-                                .cornerRadius(8)
-                            
-                            Button(action: copyToken) {
-                                Label(
-                                    copied ? "Copied!" : "Copy Token",
-                                    systemImage: copied ? "checkmark.circle.fill" : "doc.on.doc"
-                                )
-                                .frame(maxWidth: .infinity)
-                            }
-                            .buttonStyle(.borderedProminent)
-                            .tint(copied ? .green : .orange)
-                            
-                            Button(action: shareToken) {
-                                Label("Share Token", systemImage: "square.and.arrow.up")
-                                    .frame(maxWidth: .infinity)
-                            }
-                            .buttonStyle(.bordered)
-                        }
-                        .padding(.horizontal)
-                    } else {
-                        // Placeholder while generating
-                        VStack(spacing: 12) {
-                            RoundedRectangle(cornerRadius: 12)
-                                .fill(Color.secondary.opacity(0.2))
-                                .frame(width: 250, height: 250)
-                                .overlay(
-                                    ProgressView()
-                                        .progressViewStyle(CircularProgressViewStyle())
-                                )
-                            
-                            Text("The token will appear here once generated")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                                .padding(.horizontal)
-                        }
-                    }
-                    
-                    Spacer(minLength: 40)
-                }
-            }
-            .navigationTitle("Ecash Token")
-            .platformNavigationBarTitleDisplayMode(inline: true)
-            .toolbar {
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("Done") { dismiss() }
-                }
-            }
-        }
-    }
-    
-    private func copyToken() {
-        guard let token = token else { return }
-        
-        #if os(iOS)
-        UIPasteboard.general.string = token
-        #else
-        NSPasteboard.general.clearContents()
-        NSPasteboard.general.setString(token, forType: .string)
-        #endif
-        withAnimation {
-            copied = true
-        }
-        
-        DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
-            withAnimation {
-                copied = false
-            }
-        }
-    }
-    
-    private func shareToken() {
-        guard let token = token else { return }
-        
-        #if os(iOS)
-        let activityController = UIActivityViewController(
-            activityItems: [token],
-            applicationActivities: nil
-        )
-        
-        if let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
-           let window = windowScene.windows.first,
-           let rootViewController = window.rootViewController {
-            rootViewController.present(activityController, animated: true)
-        }
-        #else
-        // On macOS, copy to clipboard instead
-        NSPasteboard.general.clearContents()
-        NSPasteboard.general.setString(token, forType: .string)
-        #endif
-    }
     
 }

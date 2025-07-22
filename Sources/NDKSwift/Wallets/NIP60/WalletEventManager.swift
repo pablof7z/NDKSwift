@@ -16,9 +16,6 @@ public actor WalletEventManager {
     private var currentTokenEventIds: Set<String> = []
     private var deletedTokenEventIds: Set<String> = []
     
-    // Wallet event tracking
-    private var lastWalletConfigTimestamp: Timestamp = 0
-    
     // Nutzap tracking
     private var nutzapEvents: [String: NutzapInfo] = [:] // eventId -> NutzapInfo
     private var redeemedNutzaps: Set<String> = [] // Set of redeemed nutzap event IDs
@@ -198,9 +195,11 @@ public actor WalletEventManager {
         destroyedEventIds: [String]? = nil,
         createdEventIds: [String]? = nil,
         redeemedEventId: String? = nil,
+        token: String? = nil,
         signer: NDKSigner
     ) async throws {
-        try await NDKCashuSpendingHistory.createAndPublish(
+        NDKLogger.log(.info, category: .wallet, "📝 Creating spending history event: \(direction) \(amount) sats - \(memo ?? "no memo")")
+        let event = try await NDKCashuSpendingHistory.createAndPublish(
             ndk: ndk,
             direction: direction,
             amount: amount,
@@ -208,8 +207,10 @@ public actor WalletEventManager {
             destroyedEventIds: destroyedEventIds,
             createdEventIds: createdEventIds,
             redeemedEventId: redeemedEventId,
+            token: token,
             signer: signer
         )
+        NDKLogger.log(.info, category: .wallet, "✅ Spending history event created and published")
     }
     
     // MARK: - Event State Management
@@ -244,16 +245,6 @@ public actor WalletEventManager {
     /// Add a current token event ID
     public func addCurrentTokenEventId(_ eventId: String) {
         currentTokenEventIds.insert(eventId)
-    }
-    
-    /// Get the last wallet configuration timestamp
-    public func getLastWalletConfigTimestamp() -> Timestamp {
-        return lastWalletConfigTimestamp
-    }
-    
-    /// Update the last wallet configuration timestamp
-    public func updateLastWalletConfigTimestamp(_ timestamp: Timestamp) {
-        lastWalletConfigTimestamp = timestamp
     }
     
     // MARK: - Nutzap Tracking

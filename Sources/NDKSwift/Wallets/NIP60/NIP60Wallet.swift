@@ -46,6 +46,11 @@ public actor NIP60Wallet: NDKPaymentProvider {
     private var cachedBlacklistedMints: Set<String> = []
     private var blacklistLastFetched: Date?
     
+    // MARK: - Configuration State
+    
+    private var newestConfigTimestamp: Timestamp = 0
+    private var hasProcessedInitialConfig = false
+    
     // MARK: - Initialization
     
     public init(ndk: NDK, cache: NDKCache? = nil) throws {
@@ -81,21 +86,23 @@ public actor NIP60Wallet: NDKPaymentProvider {
         switch event.kind {
         case EventKind.cashuWalletConfig:  // 17375
             
-            // Check timestamp to avoid processing old configs
-            let lastTimestamp = await eventManager.getLastWalletConfigTimestamp()
-            
-            if event.createdAt <= lastTimestamp {
-                NDKLogger.log(.debug, category: .wallet, "⏭️ Skipping older wallet configuration")
+            // Only process if this is newer than what we've seen
+            if event.createdAt <= newestConfigTimestamp {
+                NDKLogger.log(.debug, category: .wallet, "⏭️ Skipping older wallet configuration (timestamp: \(event.createdAt) <= \(newestConfigTimestamp))")
                 return
             }
             
-            await eventManager.updateLastWalletConfigTimestamp(event.createdAt)
+            // Update our newest timestamp
+            newestConfigTimestamp = event.createdAt
             
             // Process wallet configuration
             await processWalletConfiguration(event: event)
             
-            // Restart wallet event subscriptions with new config
-            await startWalletEventSubscription()
+            // Only restart wallet subscriptions if we've already processed initial config
+            if hasProcessedInitialConfig {
+                // Restart wallet event subscriptions with new config
+                await startWalletEventSubscription()
+            }
             
         case 10020:  // Blocked mints
             await processBlockedMintsUpdate(event)
@@ -144,7 +151,7 @@ public actor NIP60Wallet: NDKPaymentProvider {
                     // Spending history (kind 7376)
                     NDKFilter(
                         authors: [userPubkey],
-                        kinds: []
+                        kinds: [EventKind.cashuSpendingHistory]
                     )
                 ]
                 
@@ -752,6 +759,8 @@ public actor NIP60Wallet: NDKPaymentProvider {
         await eventManager.clearTrackedEvents()
         await transactionHistory.clear()
         walletConfigRelays = []
+        newestConfigTimestamp = 0
+        hasProcessedInitialConfig = false
         
         // Cancel any existing subscriptions
         configSubscriptionTask?.cancel()
@@ -806,6 +815,9 @@ public actor NIP60Wallet: NDKPaymentProvider {
                         
                         // Start wallet event subscription with proper relays
                         await self.startWalletEventSubscription()
+                        
+                        // Mark that we've processed initial config
+                        self.hasProcessedInitialConfig = true
                         
                         NDKLogger.log(.info, category: .wallet, "✅ Wallet loading complete. Monitoring for updates.")
                     }
@@ -1082,11 +1094,12 @@ public actor NIP60Wallet: NDKPaymentProvider {
         
         _ = try await update(stateChange: stateChange)
         
-        // Create spending history event
+        // Create spending history event with the token
         try await eventManager.createSpendingHistoryEvent(
             direction: .out,
             amount: proofs.reduce(0) { $0 + Int64($1.amount) },
             memo: memo ?? "Offline token",
+            token: tokenString,
             signer: signer
         )
         
