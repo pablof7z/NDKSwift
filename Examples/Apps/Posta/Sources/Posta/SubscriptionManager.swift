@@ -183,8 +183,8 @@ class SubscriptionManager: ObservableObject {
         let contactsFilter = NDKFilter(
             authors: Array(latestFollowList),
             kinds: [
-                0,     // Profile metadata (kind:0)
-                10002  // Relay list metadata (kind:10002)
+                EventKind.metadata,     // Profile metadata (kind:0)
+                EventKind.relayList    // Relay list metadata (kind:10002)
             ]
         )
         
@@ -211,7 +211,7 @@ class SubscriptionManager: ObservableObject {
             
             let avgEfficiency = results.isEmpty ? 0 : totalEfficiency / results.count
             let metadataCount = eventsByKind[0] ?? 0
-            let relayListCount = eventsByKind[10002] ?? 0
+            let relayListCount = eventsByKind[EventKind.relayList] ?? 0
             
             syncStatus = "Sync complete: \(metadataCount) profiles, \(relayListCount) relay lists"
             print("SubscriptionManager - Sync completed: \(totalDownloaded) total events (\(metadataCount) metadata, \(relayListCount) relay lists), \(avgEfficiency)% avg efficiency")

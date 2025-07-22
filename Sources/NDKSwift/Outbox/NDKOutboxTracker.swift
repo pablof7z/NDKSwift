@@ -310,7 +310,7 @@ actor NDKOutboxTracker {
         
         let filter = NDKFilter(
             authors: [pubkey],
-            kinds: [10002],
+            kinds: [EventKind.relayList],
             limit: 1
         )
         

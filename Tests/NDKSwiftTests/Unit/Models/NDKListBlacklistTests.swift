@@ -5,7 +5,7 @@ final class NDKListBlacklistTests: XCTestCase {
     
     func testMuteListMintBlacklisting() {
         // Create a mute list (kind 10000)
-        let muteList = NDKList(kind: 10000)
+        let muteList = NDKList(kind: EventKind.muteList)
         
         // Add some mint URLs
         muteList.tags = [
@@ -32,7 +32,7 @@ final class NDKListBlacklistTests: XCTestCase {
     
     func testBlockedRelaysList() {
         // Create a blocked relays list (kind 10006)
-        let blockedRelaysList = NDKList(kind: 10006)
+        let blockedRelaysList = NDKList(kind: EventKind.blockedRelays)
         
         // Add some relay URLs
         blockedRelaysList.tags = [
@@ -59,7 +59,7 @@ final class NDKListBlacklistTests: XCTestCase {
     
     func testNonBlacklistLists() {
         // Test that non-blacklist lists return empty results
-        let contactList = NDKList(kind: 3)
+        let contactList = NDKList(kind: EventKind.contacts)
         contactList.tags = [
             ["r", "https://mint1.example.com"],
             ["r", "wss://relay1.example.com"]
@@ -73,7 +73,7 @@ final class NDKListBlacklistTests: XCTestCase {
     }
     
     func testRelayURLNormalization() {
-        let blockedRelaysList = NDKList(kind: 10006)
+        let blockedRelaysList = NDKList(kind: EventKind.blockedRelays)
         blockedRelaysList.tags = [
             ["r", "wss://relay.example.com"] // Without trailing slash
         ]

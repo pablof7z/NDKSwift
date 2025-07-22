@@ -19,7 +19,7 @@ class MintDiscoveryManager {
                 
                 // Subscribe to mint announcements (kind: 38172)
                 let announcementFilter = NDKFilter(
-                    kinds: [38172],
+                    kinds: [EventKind.cashuMintAnnouncement],
                     limit: 100
                 )
                 
@@ -32,7 +32,7 @@ class MintDiscoveryManager {
                 
                 // Subscribe to recommendations (kind: 38000)
                 let recommendationFilter = NDKFilter(
-                    kinds: [38000],
+                    kinds: [EventKind.mintAnnouncement],
                     limit: 100
                 )
                 

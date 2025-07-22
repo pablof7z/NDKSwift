@@ -77,7 +77,7 @@ Task {
     print("Test 2: NIP60 wallet subscription IDs")
     let walletSource = NDKDataSource(
         ndk: ndk,
-        filter: NDKFilter(kinds: [7375]),
+        filter: NDKFilter(kinds: [EventKind.cashuToken]),
         subscriptionId: "nip60-wallet-events"
     )
     print("Created wallet data source with ID: nip60-wallet-events\n")

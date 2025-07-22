@@ -315,7 +315,7 @@ public actor NDKBunkerSigner: NDKSigner, Sendable {
         NDKLogger.log(.debug, category: .auth, "[BunkerSigner] Setting up listener for local pubkey: \(localPubkey)")
 
         let filter = NDKFilter(
-            kinds: [24133], // NostrConnect kind
+            kinds: [EventKind.nostrConnect], // NostrConnect kind
             tags: ["p": [localPubkey]]
         )
 

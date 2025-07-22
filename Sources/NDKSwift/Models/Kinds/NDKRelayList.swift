@@ -48,7 +48,7 @@ public struct NDKRelayListEntry {
 /// Provides read/write relay separation and relay set integration
 public class NDKRelayList: NDKList {
     /// The kind for relay lists (NIP-65)
-    public static let kind: Kind = 10002
+    public static let kind: Kind = EventKind.relayList
 
     /// Initialize a new relay list
     public override init(ndk: NDK? = nil) {
@@ -269,7 +269,7 @@ public class NDKRelayList: NDKList {
 public extension NDK {
     /// Fetch the relay list for a specific user
     func fetchRelayList(for user: NDKUser) async throws -> NDKRelayList? {
-        let filter = NDKFilter(authors: [user.pubkey], kinds: [10002], limit: 1)
+        let filter = NDKFilter(authors: [user.pubkey], kinds: [EventKind.relayList], limit: 1)
         
         // Use NDKDataSource with long maxAge for relay lists
         let dataSource = NDKDataSource(

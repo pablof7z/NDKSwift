@@ -19,7 +19,7 @@ public class MintDiscoveryDataSource: ObservableObject {
     public init(ndk: NDK, followedPubkeys: [String] = []) {
         // Mint announcements (kind: 38172)
         self.announcementDataSource = ndk.observe(
-            filter: NDKFilter(kinds: [38172]),
+            filter: NDKFilter(kinds: [EventKind.cashuMintAnnouncement]),
             maxAge: 0,  // Real-time updates
             cachePolicy: .cacheWithNetwork
         )
@@ -28,7 +28,7 @@ public class MintDiscoveryDataSource: ObservableObject {
         self.recommendationDataSource = ndk.observe(
             filter: NDKFilter(
                 authors: followedPubkeys.isEmpty ? nil : followedPubkeys,
-                kinds: [38000]
+                kinds: [EventKind.mintAnnouncement]
             ),
             maxAge: 0,  // Real-time updates
             cachePolicy: .cacheWithNetwork
@@ -149,7 +149,7 @@ public class WalletSettingsDataSource: ObservableObject {
         self.dataSource = ndk.observe(
             filter: NDKFilter(
                 authors: [pubkey],
-                kinds: [30078],
+                kinds: [EventKind.applicationSpecificData],
                 tags: ["d": ["nutsack"]]
             ),
             maxAge: 0,  // Real-time updates

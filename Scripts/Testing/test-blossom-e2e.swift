@@ -148,7 +148,7 @@ struct BlossomE2ERunner {
         
         let filter = NDKFilter(
             authors: [fileMetadata.pubkey],
-            kinds: [1063],
+            kinds: [EventKind.fileMetadata],
             limit: 1
         )
         

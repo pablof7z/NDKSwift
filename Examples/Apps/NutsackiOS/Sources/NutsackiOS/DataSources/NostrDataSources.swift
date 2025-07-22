@@ -190,7 +190,7 @@ public class RelayMetadataDataSource: ObservableObject {
         self.dataSource = ndk.observe(
             filter: NDKFilter(
                 authors: pubkeys,
-                kinds: [10002]
+                kinds: [EventKind.relayList]
             ),
             maxAge: 0,  // Real-time updates
             cachePolicy: .cacheWithNetwork

@@ -138,7 +138,7 @@ class WalletExample {
     func loadConfigOld() async -> WalletConfig? {
         let dataSource = NDKDataSource(
             ndk: ndk,
-            filter: NDKFilter(kinds: [37375], limit: 1),
+            filter: NDKFilter(kinds: [EventKind.cashuWalletConfig], limit: 1),
             maxAge: 300 // 5 minutes
         )
         let events = await dataSource.currentValue()
@@ -149,7 +149,7 @@ class WalletExample {
     func loadConfigNew() async -> WalletConfig? {
         let dataSource = NDKDataSource(
             ndk: ndk,
-            filter: NDKFilter(kinds: [37375]),
+            filter: NDKFilter(kinds: [EventKind.cashuWalletConfig]),
             maxAge: 300 // 5 minutes - might return from cache immediately!
         )
         // Collect all configs and use the most recent
@@ -164,7 +164,7 @@ class ZapExample {
     func getZapsOld() async -> [NDKEvent] {
         let dataSource = NDKDataSource(
             ndk: ndk,
-            filter: NDKFilter(kinds: [9735])
+            filter: NDKFilter(kinds: [EventKind.zapReceipt])
         )
         return await dataSource.currentValue()
     }
@@ -173,7 +173,7 @@ class ZapExample {
     func getZapsNew() async -> [NDKEvent] {
         let dataSource = NDKDataSource(
             ndk: ndk,
-            filter: NDKFilter(kinds: [9735])
+            filter: NDKFilter(kinds: [EventKind.zapReceipt])
         )
         // Wait for all zaps with 10 second timeout
         return await dataSource.collect(timeout: 10.0)
