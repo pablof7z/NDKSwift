@@ -129,7 +129,7 @@ actor WalletEventProcessor {
         let eventIdsToDelete = event.tags.eventIds
         
         // Find 'k' tags that specify kinds to delete
-        let kindsToDelete = event.tags.tagValues(named: NostrTag.kind).compactMap { Int32($0) }
+        let kindsToDelete = event.tags.tagValues(named: NostrTagConstants.TagName.kind).compactMap { Int32($0) }
         
         // We only care about token events and quote events
         let relevantKinds: Set<Int32> = [7375, 7374]
