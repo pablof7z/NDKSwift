@@ -52,11 +52,11 @@ public enum TimeConstants {
     /// Default TTL for unpublished events retry window (1 hour)
     public static let unpublishedEventRetryWindow: TimeInterval = hour
     
-    /// Default TTL for mint info cache (24 hours)
-    public static let mintInfoCacheTTL: TimeInterval = day
+    /// Default TTL for mint info cache (7 days)
+    public static let mintInfoCacheTTL: TimeInterval = week
     
-    /// Default TTL for keysets cache (1 hour)
-    public static let keysetsCacheTTL: TimeInterval = hour
+    /// Default TTL for keysets cache (3 days)
+    public static let keysetsCacheTTL: TimeInterval = 3 * day
 }
 
 // MARK: - Timestamp utilities

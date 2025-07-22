@@ -103,28 +103,9 @@ struct WalletView: View {
                 
                 if walletManager.activeWallet != nil {
                     ToolbarItem(placement: .topBarTrailing) {
-                        Menu {
-                            Button(action: { showWalletSettings = true }) {
-                                Label("Wallet Settings", systemImage: "gearshape")
-                            }
-                            
-                            NavigationLink(value: WalletDestination.relayHealth) {
-                                Label("Relay Health", systemImage: "antenna.radiowaves.left.and.right")
-                            }
-                            
-                            NavigationLink(value: WalletDestination.walletEvents) {
-                                Label("Token Events", systemImage: "doc.text")
-                            }
-                            
-                            NavigationLink(value: WalletDestination.proofManagement) {
-                                Label("Manage Proofs", systemImage: "key")
-                            }
-                            
-                            NavigationLink(value: WalletDestination.receivedNutzaps) {
-                                Label("Received Nutzaps", systemImage: "bolt.fill")
-                            }
-                        } label: {
-                            Image(systemName: "ellipsis.circle")
+                        Button(action: { showWalletSettings = true }) {
+                            Image(systemName: "gearshape")
+                                .font(.title3)
                         }
                     }
                 }

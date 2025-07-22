@@ -40,11 +40,21 @@ public actor ProofStateManager {
         if let existing = proofState[proof.C] {
             // Only update if the new event is newer (higher timestamp)
             if let newTimestamp = timestamp, let existingTimestamp = existing.ownerTimestamp {
-                if newTimestamp <= existingTimestamp {
-                    // Existing owner is newer or same age, don't update ownership
+                if newTimestamp < existingTimestamp {
+                    // Existing owner is newer, don't update ownership
+                    NDKLogger.log(.debug, category: .wallet, "ProofStateManager.addProof - Proof \(proof.C) already exists with newer owner (existing: \(existingTimestamp), new: \(newTimestamp))")
+                    return
+                } else if newTimestamp == existingTimestamp && existing.state == state {
+                    // Same timestamp and same state, no need to update
+                    NDKLogger.log(.debug, category: .wallet, "ProofStateManager.addProof - Proof \(proof.C) already exists with same owner and state")
                     return
                 }
             }
+            
+            // If we're here, the new event is newer or same age but different state, so update the proof
+            NDKLogger.log(.debug, category: .wallet, "ProofStateManager.addProof - Updating existing proof \(proof.C) from state \(existing.state) to \(state), owner: \(existing.ownerEventId ?? "none") -> \(eventId ?? "none")")
+        } else {
+            NDKLogger.log(.debug, category: .wallet, "ProofStateManager.addProof - Adding new proof \(proof.C) with state \(state), owner: \(eventId ?? "none")")
         }
         
         proofState[proof.C] = ProofEntry(
@@ -54,6 +64,8 @@ public actor ProofStateManager {
             ownerEventId: eventId,
             ownerTimestamp: timestamp
         )
+        
+        NDKLogger.log(.debug, category: .wallet, "ProofStateManager.addProof - Added/Updated proof C: \(proof.C), amount: \(proof.amount), state: \(state), mint: \(mint), eventId: \(eventId ?? "none")")
     }
     
     /// Update the state of a proof
@@ -112,9 +124,16 @@ public actor ProofStateManager {
     
     /// Get total balance
     func getTotalBalance() -> Int64 {
-        return proofState.values
-            .filter { $0.state == .available }
-            .reduce(0) { $0 + Int64($1.proof.amount) }
+        let availableProofs = proofState.values.filter { $0.state == .available }
+        let totalBalance = availableProofs.reduce(0) { $0 + Int64($1.proof.amount) }
+        
+        NDKLogger.log(.debug, category: .wallet, "ProofStateManager.getTotalBalance() - Total proofs: \(proofState.count), Available: \(availableProofs.count), Balance: \(totalBalance)")
+        
+        if proofState.count > 0 && availableProofs.isEmpty {
+            NDKLogger.log(.warning, category: .wallet, "⚠️ Have \(proofState.count) proofs but none are available! States: \(proofState.values.map { $0.state }.reduce(into: [:]) { counts, state in counts[String(describing: state), default: 0] += 1 })")
+        }
+        
+        return totalBalance
     }
     
     /// Get balance for a specific mint

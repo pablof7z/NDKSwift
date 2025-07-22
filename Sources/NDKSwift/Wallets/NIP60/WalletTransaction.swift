@@ -26,6 +26,9 @@ public struct WalletTransaction: Identifiable, Sendable {
     public let lightningData: LightningData?
     public let ecashTokenData: EcashTokenData?
     
+    // Error information for failed transactions
+    public let errorDetails: String?
+    
     public init(
         id: String? = nil,
         type: WalletTransactionType,
@@ -39,7 +42,8 @@ public struct WalletTransaction: Identifiable, Sendable {
         lookupKeys: TransactionLookupKeys = TransactionLookupKeys(),
         nutzapData: NutzapData? = nil,
         lightningData: LightningData? = nil,
-        ecashTokenData: EcashTokenData? = nil
+        ecashTokenData: EcashTokenData? = nil,
+        errorDetails: String? = nil
     ) {
         self.id = id ?? UUID().uuidString
         self.type = type
@@ -54,13 +58,15 @@ public struct WalletTransaction: Identifiable, Sendable {
         self.nutzapData = nutzapData
         self.lightningData = lightningData
         self.ecashTokenData = ecashTokenData
+        self.errorDetails = errorDetails
     }
     
     /// Create a copy with updated fields
     public func with(
         status: TransactionStatus? = nil,
         events: TransactionEvents? = nil,
-        memo: String?? = nil
+        memo: String?? = nil,
+        errorDetails: String? = nil
     ) -> WalletTransaction {
         return WalletTransaction(
             id: self.id,  // Keep the same ID
@@ -75,7 +81,8 @@ public struct WalletTransaction: Identifiable, Sendable {
             lookupKeys: self.lookupKeys,
             nutzapData: self.nutzapData,
             lightningData: self.lightningData,
-            ecashTokenData: self.ecashTokenData
+            ecashTokenData: self.ecashTokenData,
+            errorDetails: errorDetails ?? self.errorDetails
         )
     }
 }

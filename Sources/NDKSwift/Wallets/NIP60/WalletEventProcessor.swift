@@ -67,14 +67,11 @@ actor WalletEventProcessor {
             throw NDKError.invalidContent("Failed to parse NIP-60 token event data")
         }
         
-        // Handle del tags - these events are no longer valid
-        if let delIds = nip60Token.del {
-            for delId in delIds {
-                await deleteEventAndProofs(delId, context: context)
-            }
-        }
-        
-        // Add proofs to state
+        // Add proofs to state FIRST before processing deletions
+        // This ensures that if the same proof appears in both the deleted event and this event,
+        // it will be properly transferred to the new event
+        NDKLogger.log(.info, category: .wallet, "📊 Adding \(nip60Token.proofs.count) proofs from token event \(event.id) for mint: \(nip60Token.mint)")
+        var totalAmount: Int64 = 0
         for proof in nip60Token.proofs {
             await context.proofStateManager.addProof(
                 proof, 
@@ -82,7 +79,23 @@ actor WalletEventProcessor {
                 eventId: event.id,
                 timestamp: event.createdAt
             )
+            totalAmount += Int64(proof.amount)
+            NDKLogger.log(.debug, category: .wallet, "  - Added proof C: \(proof.C), amount: \(proof.amount)")
         }
+        NDKLogger.log(.info, category: .wallet, "📊 Total amount added from token event: \(totalAmount) sats")
+        
+        // Handle del tags AFTER adding new proofs - these events are no longer valid
+        // But only delete proofs that weren't transferred to this new event
+        if let delIds = nip60Token.del {
+            NDKLogger.log(.info, category: .wallet, "📊 Processing \(delIds.count) del tags from token event")
+            for delId in delIds {
+                await deleteEventAndProofs(delId, context: context)
+            }
+        }
+        
+        // Log current balance after processing
+        let currentBalance = await context.proofStateManager.getTotalBalance()
+        NDKLogger.log(.info, category: .wallet, "💰 Current total balance after processing token event: \(currentBalance) sats")
         
         await context.eventManager.addCurrentTokenEventId(event.id)
     }

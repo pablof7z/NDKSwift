@@ -83,6 +83,17 @@ struct TransactionDetailDrawer: View {
                             icon: statusIcon(for: transaction.status)
                         )
                         
+                        // Error details for failed transactions
+                        if transaction.status == .failed, let errorDetails = transaction.errorDetails {
+                            TransactionInfoRow(
+                                label: "Error",
+                                value: errorDetails,
+                                valueColor: .red,
+                                icon: "exclamationmark.triangle",
+                                multiline: true
+                            )
+                        }
+                        
                         // Date and Time
                         TransactionInfoRow(
                             label: "Date",

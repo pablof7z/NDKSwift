@@ -244,7 +244,7 @@ public actor WalletTransactionHistory {
         let historyEvent = NDKCashuSpendingHistory(event: event)
         let historyData = try await historyEvent.decryptedHistoryData(signer: signer)
         
-        NDKLogger.log(.info, category: .wallet, "📥 History data: \(historyData.direction) \(historyData.amount) sats - \(historyData.memo ?? "no memo")")
+        NDKLogger.log(.info, category: .wallet, "📥 History data: \(historyData.direction?.rawValue ?? "unknown") \(historyData.amount) sats - \(historyData.memo ?? "no memo")")
         
         // Check if we already have a transaction for this event
         if findTransactionForHistory(eventId: event.id) != nil {
@@ -312,15 +312,31 @@ public actor WalletTransactionHistory {
             comment: event.content.isEmpty ? nil : event.content
         )
         
-        // Check if this nutzap has been redeemed
-        let isRedeemed = await eventManager.isNutzapRedeemed(event.id)
+        // Check nutzap status
+        let nutzapInfo = await eventManager.getNutzapInfo(event.id)
+        let status: TransactionStatus
+        
+        if let info = nutzapInfo {
+            switch info.status {
+            case .redeemed:
+                status = .completed
+            case .failed:
+                status = .failed
+            case .pending:
+                status = .processing
+            }
+        } else {
+            // If no info yet, check if it's been redeemed
+            let isRedeemed = await eventManager.isNutzapRedeemed(event.id)
+            status = isRedeemed ? .completed : .processing
+        }
         
         // Create transaction
         let transaction = WalletTransaction(
             type: .nutzapReceived,
             amount: amount,
             direction: .incoming,
-            status: isRedeemed ? .completed : .processing,
+            status: status,
             memo: nutzapData.comment ?? "Nutzap received",
             mint: nil,  // Could extract from u tags if needed
             timestamp: Date(timeIntervalSince1970: TimeInterval(event.createdAt)),
@@ -458,6 +474,17 @@ public actor WalletTransactionHistory {
         
         let updated = transaction.with(status: status)
         transactions[id] = updated
+        
+        eventStream?.yield(NIP60WalletEvent(type: .transactionUpdated(updated)))
+    }
+    
+    /// Update transaction status for a nutzap event
+    public func updateNutzapTransactionStatus(nutzapEventId: String, status: TransactionStatus, errorDetails: String? = nil) {
+        guard let transactionId = nutzapEventIndex[nutzapEventId],
+              let transaction = transactions[transactionId] else { return }
+        
+        let updated = transaction.with(status: status, errorDetails: errorDetails)
+        transactions[transactionId] = updated
         
         eventStream?.yield(NIP60WalletEvent(type: .transactionUpdated(updated)))
     }
@@ -673,7 +700,7 @@ public actor WalletTransactionHistory {
         if let token = historyData.token {
             // Parse token to get actual proof count
             var proofCount = 0
-            if let cashuToken = try? CashuSwift.Token.from(tokenString: token) {
+            if let cashuToken = try? token.deserializeToken() {
                 for (_, proofs) in cashuToken.proofsByMint {
                     proofCount += proofs.count
                 }
