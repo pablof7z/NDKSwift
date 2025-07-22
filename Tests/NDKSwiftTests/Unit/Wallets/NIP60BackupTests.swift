@@ -8,14 +8,14 @@ final class NIP60BackupTests: XCTestCase {
     var wallet: NIP60Wallet!
     var signer: NDKPrivateKeySigner!
     var mockRelay: MockRelay!
-    var mockCache: NDKInMemoryCache!
+    var mockCache: MemoryCache!
     
     override func setUp() async throws {
         try await super.setUp()
         
         // Create mock components
         mockRelay = MockRelay(url: "wss://test.relay")
-        mockCache = NDKInMemoryCache()
+        mockCache = MemoryCache()
         
         // Create signer
         let privateKey = "test_private_key_for_backup_tests"

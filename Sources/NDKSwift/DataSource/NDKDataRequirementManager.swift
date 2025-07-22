@@ -4,7 +4,7 @@ import Foundation
 /// Handles temporal grouping, deduplication, and lifecycle management
 actor NDKDataRequirementManager {
     private let ndk: NDK
-    private let groupingWindow: TimeInterval = 0.1 // 100ms
+    private let groupingWindow: TimeInterval = NetworkConstants.dataGroupingWindow
     
     // Active requirements tracked by ID
     private var activeRequirements: [RequirementID: DataRequirement] = [:]

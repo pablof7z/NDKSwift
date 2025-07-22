@@ -9,7 +9,7 @@ actor NDKOutboxTracker {
     static let negativeEntryTTL: TimeInterval = TimeConstants.hour
 
     /// Default in-memory cache capacity
-    static let defaultCapacity = 500
+    static let defaultCapacity = NetworkConstants.outboxTrackerCapacity
 
     private let ndk: NDK
     private let memoryCache: LRUCache<String, CachedRelayPreference>

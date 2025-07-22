@@ -15,14 +15,14 @@ public actor MemoryCache: NDKCache {
     
     // Tombstone cache for deletion events that arrive before the original event
     private var deletionTombstones: [String: Date] = [:]
-    private let tombstoneTTL: TimeInterval = 600 // 10 minutes
+    private let tombstoneTTL: TimeInterval = NetworkConstants.tombstoneTTL
     
     // Observer tracking
     private var observers: [FilterSignature: Set<WeakObserver>] = [:]
     
     public init() {
-        // Initialize LRU cache with 1000 item limit for decrypted content
-        self.decryptedContent = LRUCache(capacity: 1000)
+        // Initialize LRU cache with configured item limit for decrypted content
+        self.decryptedContent = LRUCache(capacity: NetworkConstants.defaultCacheCapacity)
     }
     
     // MARK: - Event Operations
