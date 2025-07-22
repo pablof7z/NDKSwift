@@ -32,33 +32,26 @@ public class NDKLightningZapProtocol: NDKZapProtocol {
         self.urlSession = urlSession
     }
     
-    public func canZap(user: NDKUser) async throws -> Bool {
-        // Check if user has Lightning address configured
-        for await profile in await ndk.profileManager.observe(for: user.pubkey, maxAge: 3600) {
-            guard let profile = profile,
-                  profile.lud06 != nil || profile.lud16 != nil else {
-                return false
-            }
-            break // Only need first value
-        }
-        
-        // Try to resolve LNURL and check for zap support
-        do {
-            let endpoint = try await resolveLNURL(for: user)
-            return endpoint.supportsZaps
-        } catch {
-            return false
-        }
+    public func canZap(recipientInfo: RecipientZapInfo) -> Bool {
+        // Simply check the pre-fetched info
+        return recipientInfo.hasLightningSupport
     }
     
     public func prepareZap(
         event: NDKEvent?,
-        to user: NDKUser,
+        recipientInfo: RecipientZapInfo,
         amountSats: Int64,
         comment: String?
     ) async throws -> PreparedZap {
-        // 1. Resolve LNURL endpoint
-        let endpoint = try await resolveLNURL(for: user)
+        // Create NDKUser from recipient info
+        let user = NDKUser(pubkey: recipientInfo.pubkey)
+        
+        // 1. Resolve LNURL endpoint using pre-fetched profile
+        guard let lightningAddress = recipientInfo.lightningAddress else {
+            throw ZapError.recipientDoesNotSupportZaps
+        }
+        
+        let endpoint = try await resolveLNURL(address: lightningAddress)
         
         guard endpoint.supportsZaps else {
             throw ZapError.endpointDoesNotSupportZaps
@@ -74,8 +67,8 @@ public class NDKLightningZapProtocol: NDKZapProtocol {
             )
         }
         
-        // 3. Get recipient's relays
-        let recipientRelays = try await getRecipientRelays(user)
+        // 3. Use NDK's connected relays
+        let recipientRelays = await ndk.connectedRelays().map { $0.url }
         
         // 4. Create zap request event
         let zapRequest = try await NDKZapRequest.create(
@@ -99,7 +92,7 @@ public class NDKLightningZapProtocol: NDKZapProtocol {
         let paymentRequest = LightningInvoiceRequest(
             invoice: invoice,
             amountSats: amountSats,
-            recipient: user.pubkey
+            recipient: recipientInfo.pubkey
         )
         
         // 7. Store metadata for completion
@@ -223,6 +216,11 @@ public class NDKLightningZapProtocol: NDKZapProtocol {
         guard let lnurlString = lnurlString else {
             throw ZapError.noLNURL
         }
+        
+        return try await resolveLNURL(address: lnurlString)
+    }
+    
+    private func resolveLNURL(address lnurlString: String) async throws -> LNURLPayEndpoint {
         
         // Convert Lightning address to URL if needed
         let url: URL
@@ -360,8 +358,9 @@ public class NDKLightningZapProtocol: NDKZapProtocol {
             maxAge: 3600 // 1 hour - relay lists don't change frequently
         )
         
-        let events = await dataSource.currentValue()
-        if let relayListEvent = events.first {
+        // Collect all relay list events and use the most recent
+        let events = await dataSource.collect(timeout: 3.0)
+        if let relayListEvent = events.sorted(by: { $0.createdAt > $1.createdAt }).first {
             let eventTags = relayListEvent.tags
             let relays = eventTags
                 .filter { $0.first == "r" }

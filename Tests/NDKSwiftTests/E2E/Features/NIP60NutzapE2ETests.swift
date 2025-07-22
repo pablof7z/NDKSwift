@@ -346,8 +346,9 @@ final class NIP60NutzapE2ETests: XCTestCase {
             maxAge: 0, // Always fresh for tests
             cachePolicy: .networkOnly
         )
-        let preferencesEvents = await dataSource.currentValue()
-        guard let preferencesEvent = preferencesEvents.first else {
+        // Collect all preferences and use the most recent
+        let preferencesEvents = await dataSource.collect(timeout: 5.0)
+        guard let preferencesEvent = preferencesEvents.sorted(by: { $0.createdAt > $1.createdAt }).first else {
             XCTFail("Pubkey2 should have published nutzap preferences")
             return
         }

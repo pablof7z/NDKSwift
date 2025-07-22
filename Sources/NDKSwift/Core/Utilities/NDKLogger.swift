@@ -144,8 +144,6 @@ public enum NDKLogger {
         if prettyPrintNetworkMessages, let parsed = parsed {
             logParsedMessage(parsed)
         }
-        
-        print("   RAW: \(message)")
     }
     
     /// Log received network traffic
@@ -157,8 +155,6 @@ public enum NDKLogger {
         if prettyPrintNetworkMessages, let parsed = parsed {
             logParsedMessage(parsed)
         }
-        
-        print("   RAW: \(message)")
     }
     
     /// Log parsing errors
@@ -167,7 +163,6 @@ public enum NDKLogger {
         
         print("\n📥 RECEIVED FROM \(relay.host ?? relay.absoluteString):")
         print("   ❌ PARSE ERROR: \(error)")
-        print("   RAW: \(message)")
     }
     
     private static func logParsedMessage(_ message: NostrMessage) {

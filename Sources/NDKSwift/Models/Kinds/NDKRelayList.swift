@@ -278,8 +278,9 @@ public extension NDK {
             maxAge: 86400 // 24 hours - relay lists rarely change
         )
         
-        let events = await dataSource.currentValue()
-        guard let event = events.first else { return nil }
+        // Collect all relay list events and use the most recent
+        let events = await dataSource.collect(timeout: 3.0)
+        guard let event = events.sorted(by: { $0.createdAt > $1.createdAt }).first else { return nil }
         return NDKRelayList.fromEvent(event)
     }
 

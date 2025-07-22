@@ -247,7 +247,8 @@ public actor NIP77SyncHandler {
             cachePolicy: .networkOnly // Skip cache for sync operations
         )
         
-        let events = await dataSource.currentValue()
+        // Collect all events (sync operations need all events)
+        let events = await dataSource.collect(timeout: 30.0) // Longer timeout for sync operations
         
         // Store events in cache and estimate bandwidth
         for event in events {

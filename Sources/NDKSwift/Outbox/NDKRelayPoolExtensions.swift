@@ -9,8 +9,8 @@ public extension NDKPool {
 
     /// Add a relay and optionally connect to it
     @discardableResult
-    func addRelayAndConnect(url: String) async -> NDKRelay? {
-        let relay = await addRelay(url)
+    func addRelayAndConnect(url: String, origin: NDKRelayOrigin = .explicit) async -> NDKRelay? {
+        let relay = await addRelay(url, origin: origin)
 
         // Try to connect
         do {

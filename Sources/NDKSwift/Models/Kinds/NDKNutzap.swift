@@ -182,6 +182,11 @@ public struct NDKNutzapPreferences {
         }
     }
     
+    /// Check if any mints are configured (synchronous)
+    public var hasMints: Bool {
+        event.tags.contains { $0.first == "mint" }
+    }
+    
     /// Get configured mints
     public var mints: [MintConfig] {
         get async {

@@ -327,16 +327,12 @@ class NostrManager {
                 for await change in relayChanges {
                     switch change {
                     case .relayConnected(let relay):
-                        print("NostrManager - Relay connected: \(relay.url), proceeding with startup sync")
                         return // Exit successfully
                     case .relayDisconnected(let relay):
-                        print("NostrManager - Relay disconnected: \(relay.url)")
                         continue // Keep waiting
                     case .relayAdded(let relay):
-                        print("NostrManager - Relay added: \(relay.url)")
                         continue // Keep waiting for connection
                     case .relayRemoved(let url):
-                        print("NostrManager - Relay removed: \(url)")
                         continue // Keep waiting
                     }
                 }

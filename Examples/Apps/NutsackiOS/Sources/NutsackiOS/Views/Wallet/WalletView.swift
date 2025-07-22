@@ -27,6 +27,8 @@ struct WalletView: View {
         case swap
         case relayHealth
         case contacts
+        case walletEvents
+        case proofManagement
         
         var id: String {
             switch self {
@@ -37,6 +39,8 @@ struct WalletView: View {
             case .swap: return "swap"
             case .relayHealth: return "relayHealth"
             case .contacts: return "contacts"
+            case .walletEvents: return "walletEvents"
+            case .proofManagement: return "proofManagement"
             }
         }
     }
@@ -97,8 +101,20 @@ struct WalletView: View {
                 
                 if walletManager.activeWallet != nil {
                     ToolbarItem(placement: .topBarTrailing) {
-                        Button(action: { showWalletSettings = true }) {
-                            Image(systemName: "gearshape")
+                        Menu {
+                            Button(action: { showWalletSettings = true }) {
+                                Label("Wallet Settings", systemImage: "gearshape")
+                            }
+                            
+                            NavigationLink(value: WalletDestination.walletEvents) {
+                                Label("Token Events", systemImage: "doc.text")
+                            }
+                            
+                            NavigationLink(value: WalletDestination.proofManagement) {
+                                Label("Manage Proofs", systemImage: "key")
+                            }
+                        } label: {
+                            Image(systemName: "ellipsis.circle")
                         }
                     }
                 }
@@ -134,6 +150,10 @@ struct WalletView: View {
                     RelayHealthView()
                 case .contacts:
                     ContactsView(navigationDestination: $navigationDestination)
+                case .walletEvents:
+                    WalletEventsView()
+                case .proofManagement:
+                    ProofManagementView()
                 }
             }
             .onAppear {

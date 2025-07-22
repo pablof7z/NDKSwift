@@ -141,8 +141,9 @@ public final class NDKUser: Equatable, Hashable, Sendable {
             maxAge: 86400 // 24 hours - relay lists rarely change
         )
         
-        let events = await dataSource.currentValue()
-        if let event = events.first {
+        // Collect all relay list events and use the most recent
+        let events = await dataSource.collect(timeout: 3.0)
+        if let event = events.sorted(by: { $0.createdAt > $1.createdAt }).first {
             // Parse relay tags
             let eventTags = event.tags
             let relays = eventTags
@@ -187,8 +188,9 @@ public final class NDKUser: Equatable, Hashable, Sendable {
             maxAge: 600 // 10 minutes - contact lists don't change frequently
         )
         
-        let events = await dataSource.currentValue()
-        if let event = events.first {
+        // Collect all contact list events and use the most recent
+        let events = await dataSource.collect(timeout: 3.0)
+        if let event = events.sorted(by: { $0.createdAt > $1.createdAt }).first {
             // Parse 'p' tags from contact list
             let eventTags = event.tags
             let followedPubkeys = eventTags
@@ -298,8 +300,8 @@ public final class NDKUser: Equatable, Hashable, Sendable {
             maxAge: 300 // 5 minutes - payment methods don't change often
         )
         
-        // Get current value
-        let events = await dataSource.currentValue()
+        // Collect all profile events
+        let events = await dataSource.collect(timeout: 5.0)
         
         for event in events {
             switch event.kind {

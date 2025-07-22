@@ -15,6 +15,10 @@ public struct NIP60WalletEvent {
         case balanceChanged(Int64)
         /// Nutzap payment received
         case nutzapReceived(amount: Int64, from: String?, eventId: String)
+        /// A new transaction was added to the history
+        case transactionAdded(WalletTransaction)
+        /// An existing transaction was updated
+        case transactionUpdated(WalletTransaction)
     }
     
     /// The type of event that occurred

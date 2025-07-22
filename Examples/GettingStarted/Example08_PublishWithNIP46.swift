@@ -92,8 +92,13 @@ struct Example08_PublishWithNIP46 {
             print("✅ Connected to remote signer!")
             print("👤 Your pubkey: \(user.pubkey)")
             
-            // Fetch and display user profile if available
-            if let profile = try? await user.fetchProfile(ndk) {
+            // Fetch and display user profile if available  
+            let profileDataSource = ndk.observe(filter: NDKFilter(authors: [user.pubkey], kinds: [0]), maxAge: 3600)
+            // Collect all profile events and use the most recent
+            let profileEvents = await profileDataSource.collect(timeout: 3.0)
+            if let profileEvent = profileEvents.sorted(by: { $0.createdAt > $1.createdAt }).first,
+               let profileData = profileEvent.content.data(using: .utf8),
+               let profile = try? JSONDecoder().decode(NDKUserProfile.self, from: profileData) {
                 print("📝 Your name: \(profile.name ?? "N/A")")
             }
         } catch {

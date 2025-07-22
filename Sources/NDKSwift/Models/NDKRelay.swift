@@ -1,5 +1,15 @@
 import Foundation
 
+/// Indicates how a relay was added to the pool
+public enum NDKRelayOrigin: Codable, Equatable, Sendable {
+    /// Explicitly added by developer during NDK initialization or via addRelay()
+    case explicit
+    /// Discovered through outbox model (from another user's relay list)
+    case outbox(authorPubkey: String) // pubkey whose relay list led to discovery
+    /// Added as a fallback relay
+    case fallback
+}
+
 /// Relay information for NIP-65 (relay list metadata)
 /// 
 /// This struct represents relay preferences for read/write operations,
@@ -90,6 +100,9 @@ actor RelayStateActor {
     var connectionState: NDKRelayConnectionState = .disconnected
     var stats = NDKRelayStats()
     var info: NDKRelayInformation?
+    
+    // Relay origin tracking
+    var origin: NDKRelayOrigin = .explicit
     
     // Subscription tracking
     var activeSubscriptions: [String: NDKRelaySubscriptionInfo] = [:]
@@ -192,6 +205,16 @@ actor RelayStateActor {
     
     func isManuallyDisconnected() -> Bool {
         return manuallyDisconnected
+    }
+    
+    // MARK: - Origin
+    
+    func setOrigin(_ newOrigin: NDKRelayOrigin) {
+        origin = newOrigin
+    }
+    
+    func getOrigin() -> NDKRelayOrigin {
+        return origin
     }
     
     // MARK: - Stats
@@ -368,6 +391,22 @@ public final class NDKRelay: RelayProtocol, Hashable, Equatable, @unchecked Send
         }
     }
 
+    /// Indicates how this relay was added to the pool
+    /// 
+    /// - `.explicit`: Added by developer during initialization or via addRelay()
+    /// - `.outbox`: Discovered through another user's relay list
+    /// - `.fallback`: Added as a fallback relay
+    public var origin: NDKRelayOrigin {
+        get async {
+            await stateActor.getOrigin()
+        }
+    }
+    
+    /// Set the origin of this relay
+    internal func setOrigin(_ origin: NDKRelayOrigin) async {
+        await stateActor.setOrigin(origin)
+    }
+    
     /// Relay information fetched via NIP-11
     /// 
     /// This is automatically populated after connecting to a relay that supports NIP-11.
@@ -429,13 +468,11 @@ public final class NDKRelay: RelayProtocol, Hashable, Equatable, @unchecked Send
     /// - Throws: `NDKError.connectionFailed` if the initial connection attempt fails
     public func connect() async throws {
         let currentState = await stateActor.getConnectionState()
-        NDKLogger.log(.debug, category: .relay, "connect() called for \(url), current state: \(currentState)")
         
         switch currentState {
         case .disconnected, .failed:
             break
         default:
-            NDKLogger.log(.debug, category: .relay, "Skipping connect for \(url) - already in state: \(currentState)")
             return
         }
 
@@ -629,9 +666,6 @@ public final class NDKRelay: RelayProtocol, Hashable, Equatable, @unchecked Send
 
     /// Handle EVENT message
     private func handleEventMessage(_ event: NDKEvent, subscriptionId: String?) async {
-        print("🔍 [NDKRelay] EVENT received - id: \(event.id), kind: \(event.kind), subId: \(subscriptionId ?? "none"), from: \(url)")
-        NDKLogger.log(.trace, category: .relay, "📨 EVENT received - id: \(event.id), kind: \(event.kind), subId: \(subscriptionId ?? "none"), from: \(url)")
-        
         // Update subscription event count
         if let subId = subscriptionId {
             await incrementSubscriptionEventCount(id: subId)
@@ -639,8 +673,6 @@ public final class NDKRelay: RelayProtocol, Hashable, Equatable, @unchecked Send
         
         // Route to subscription manager via NDK only
         if let ndk = ndk, let subId = subscriptionId {
-            print("🔍 [NDKRelay] Routing event to NDK for processing - ndk exists: true")
-            NDKLogger.log(.trace, category: .relay, "🔀 Routing event to NDK for processing")
             Task {
                 await ndk.processEvent(event, subscriptionId: subId, from: self)
             }
@@ -652,12 +684,8 @@ public final class NDKRelay: RelayProtocol, Hashable, Equatable, @unchecked Send
 
     /// Handle EOSE message
     private func handleEOSEMessage(subscriptionId: String) async {
-        print("🔍 [NDKRelay] EOSE received - subId: \(subscriptionId), from: \(url)")
-        NDKLogger.log(.debug, category: .relay, "🏁 EOSE received - subId: \(subscriptionId), from: \(url)")
-        
         // Route to subscription manager via NDK only
         if let ndk = ndk {
-            print("🔍 [NDKRelay] Processing EOSE via NDK")
             ndk.processEOSE(subscriptionId: subscriptionId, from: self)
         } else {
             print("🔍 [NDKRelay] Cannot process EOSE - no NDK instance")

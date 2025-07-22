@@ -210,7 +210,7 @@ actor NDKFetchingStrategy {
             
             // Fetch events with timeout
             let events = try await withTimeout(seconds: config.timeoutInterval) {
-                await dataSource.currentValue()
+                await dataSource.collect(timeout: config.timeoutInterval)
             }
 
             return .success(events: events, relayURL: relayURL)

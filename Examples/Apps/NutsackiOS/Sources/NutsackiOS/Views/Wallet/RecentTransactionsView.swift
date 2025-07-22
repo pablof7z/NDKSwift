@@ -76,9 +76,10 @@ struct TransactionRow: View {
     }
     
     var sign: String {
-        switch transaction.type {
-        case .mint, .receive, .nutzap: return "+"  // Nutzaps are received, so positive
-        case .melt, .send: return "-"
+        switch transaction.direction {
+        case .incoming: return "+"
+        case .outgoing: return "-"
+        case .neutral: return ""
         }
     }
     

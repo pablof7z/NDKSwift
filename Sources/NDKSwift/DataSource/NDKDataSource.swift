@@ -175,16 +175,12 @@ public final class NDKDataSource<T>: ObservableObject, CacheObserver {
     // MARK: - CacheObserver
     
     public func handleEvent(_ event: NDKEvent) async {
-        NDKLogger.log(.trace, category: .subscription, "📥 Received event - id: \(event.id), kind: \(event.kind), author: \(String(event.pubkey.prefix(8)))...", correlationId: correlationId)
-        
         // Check if we've already processed this event
         guard await !stateManager.isProcessed(event.id) else {
             NDKLogger.log(.trace, category: .subscription, "⏭️ Skipping duplicate event - id: \(event.id)", correlationId: correlationId)
             return
         }
         await stateManager.markProcessed(event.id)
-        
-        NDKLogger.log(.debug, category: .subscription, "🔄 Processing new event - id: \(event.id)", correlationId: correlationId)
         
         if let transformed = transform(event) {
             NDKLogger.log(.trace, category: .subscription, "✅ Transform successful - yielding to stream and updating data", correlationId: correlationId)
@@ -225,8 +221,192 @@ public final class NDKDataSource<T>: ObservableObject, CacheObserver {
     }
     
     /// Get the current data snapshot
-    /// Useful for internal components that need one-shot access
+    /// ⚠️ WARNING: This method returns immediately and may return empty array if no events have arrived yet.
+    /// Consider using `first()`, `collect()`, or iterating the `events` AsyncStream instead.
+    @available(*, deprecated, message: "RACE CONDITION: Returns empty if called too soon. Use first() to wait for one event, collect() to wait for all events, or iterate events AsyncStream")
     public func currentValue() async -> [T] {
         return data
+    }
+    
+    // MARK: - Event-Driven Methods
+    
+    /// Wait for the first event to arrive
+    /// - Parameters:
+    ///   - timeout: Maximum time to wait (default: 10 seconds)
+    /// - Returns: The first event, or nil if timeout/EOSE with no events
+    public func first(timeout: TimeInterval = 10.0) async -> T? {
+        // If we already have data, return the first item
+        if let firstItem = data.first {
+            return firstItem
+        }
+        
+        return await withTaskGroup(of: T?.self) { group in
+            // Timeout task
+            group.addTask {
+                try? await Task.sleep(nanoseconds: UInt64(timeout * 1_000_000_000))
+                return nil
+            }
+            
+            // Event monitoring task
+            group.addTask { [weak self] in
+                guard let self = self else { return nil }
+                
+                // Create a new iterator to avoid consuming the main stream
+                var iterator = self.events.makeAsyncIterator()
+                return await iterator.next()
+            }
+            
+            // EOSE monitoring task
+            group.addTask { [weak self] in
+                guard let self = self else { return nil }
+                
+                var activeRelays = Set<String>()
+                var eoseReceived = Set<String>()
+                
+                for await update in self.relayUpdates {
+                    switch update {
+                    case .event:
+                        // An event arrived, the event monitoring task will handle it
+                        break
+                        
+                    case .eose(let relay):
+                        activeRelays.insert(relay)
+                        eoseReceived.insert(relay)
+                        
+                        // If all active relays sent EOSE and no events
+                        if !activeRelays.isEmpty && activeRelays == eoseReceived && self.data.isEmpty {
+                            return nil
+                        }
+                        
+                    case .closed:
+                        break
+                    }
+                }
+                
+                return nil
+            }
+            
+            // Return first non-nil result
+            for await result in group {
+                if result != nil {
+                    group.cancelAll()
+                    return result
+                }
+            }
+            
+            return nil
+        }
+    }
+    
+    /// Collect all events until EOSE or timeout
+    /// - Parameters:
+    ///   - timeout: Maximum time to wait (default: 10 seconds)
+    ///   - limit: Maximum number of events to collect (nil = unlimited)
+    /// - Returns: Array of collected events
+    public func collect(timeout: TimeInterval = 10.0, limit: Int? = nil) async -> [T] {
+        var collected: [T] = []
+        
+        await withTaskGroup(of: Void.self) { group in
+            // Timeout task
+            group.addTask {
+                try? await Task.sleep(nanoseconds: UInt64(timeout * 1_000_000_000))
+            }
+            
+            // Collection task
+            group.addTask { [weak self] in
+                guard let self = self else { return }
+                
+                var activeRelays = Set<String>()
+                var eoseReceived = Set<String>()
+                var eventTask: Task<Void, Never>?
+                
+                // Start event collection
+                eventTask = Task {
+                    for await event in self.events {
+                        collected.append(event)
+                        if let limit = limit, collected.count >= limit {
+                            break
+                        }
+                    }
+                }
+                
+                // Monitor relay updates
+                for await update in self.relayUpdates {
+                    switch update {
+                    case .event(_, let relay):
+                        activeRelays.insert(relay)
+                        
+                    case .eose(let relay):
+                        activeRelays.insert(relay)
+                        eoseReceived.insert(relay)
+                        
+                        // Check if all active relays have sent EOSE
+                        if !activeRelays.isEmpty && activeRelays == eoseReceived {
+                            eventTask?.cancel()
+                            return
+                        }
+                        
+                    case .closed:
+                        eventTask?.cancel()
+                        return
+                    }
+                }
+            }
+            
+            // Wait for first task to complete
+            await group.next()
+            group.cancelAll()
+        }
+        
+        return collected
+    }
+    
+    /// Create an AsyncStream that emits events and completes on EOSE
+    /// Useful for one-shot queries that need to process events as they arrive
+    public var eventsUntilEOSE: AsyncStream<T> {
+        AsyncStream { continuation in
+            Task { [weak self] in
+                guard let self = self else {
+                    continuation.finish()
+                    return
+                }
+                
+                var activeRelays = Set<String>()
+                var eoseReceived = Set<String>()
+                
+                // Start forwarding events
+                let eventTask = Task {
+                    for await event in self.events {
+                        continuation.yield(event)
+                    }
+                }
+                
+                // Monitor for EOSE
+                for await update in self.relayUpdates {
+                    switch update {
+                    case .event(_, let relay):
+                        activeRelays.insert(relay)
+                        
+                    case .eose(let relay):
+                        activeRelays.insert(relay)
+                        eoseReceived.insert(relay)
+                        
+                        // Check if all active relays have sent EOSE
+                        if !activeRelays.isEmpty && activeRelays == eoseReceived {
+                            eventTask.cancel()
+                            continuation.finish()
+                            return
+                        }
+                        
+                    case .closed:
+                        eventTask.cancel()
+                        continuation.finish()
+                        return
+                    }
+                }
+                
+                continuation.finish()
+            }
+        }
     }
 }

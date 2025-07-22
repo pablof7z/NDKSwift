@@ -107,52 +107,6 @@ public func observe<T>(
 ) -> NDKDataSource<T>
 ```
 
-#### Legacy Subscriptions (Deprecated)
-
-```swift
-// Create a subscription (AsyncSequence)
-@available(*, deprecated, message: "Use observe() for new code")
-public func subscribe(
-    filters: [NDKFilter],
-    options: NDKSubscriptionOptions = .init()
-) -> NDKSubscription
-
-// One-shot fetch with multiple filters (batch operation)
-public func fetchEvents(
-    filters: [NDKFilter],
-    relays: Set<RelayURL>? = nil,
-    useCache: Bool = true
-) async throws -> Set<NDKEvent>
-
-// One-shot fetch with single filter
-public func fetchEvents(
-    _ filter: NDKFilter,
-    relays: Set<RelayURL>? = nil,
-    useCache: Bool = true
-) async throws -> Set<NDKEvent>
-
-// Fetch single event by ID or bech32
-public func fetchEvent(
-    _ idOrBech32: String,
-    relays: Set<RelayURL>? = nil,
-    useCache: Bool = true
-) async throws -> NDKEvent?
-
-// Fetch first matching event
-public func fetchEvent(
-    _ filter: NDKFilter,
-    relays: Set<RelayURL>? = nil,
-    useCache: Bool = true
-) async throws -> NDKEvent?
-
-// Fetch user profile
-public func fetchProfile(
-    _ pubkey: String,
-    relays: Set<NDKRelay>? = nil,
-    useCache: Bool = true
-) async throws -> NDKUserProfile?
-```
-
 #### User Management
 
 ```swift

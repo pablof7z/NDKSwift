@@ -11,51 +11,59 @@ public class NDKNutzapProtocol: NDKZapProtocol {
         self.ndk = ndk
     }
     
-    public func canZap(user: NDKUser) async throws -> Bool {
-        // Check if user has nutzap preferences
-        guard let preferences = try? await fetchNutzapPreferences(for: user) else {
-            return false
-        }
-        
-        // We can zap if they have at least one mint configured
-        return !(await preferences.mints).isEmpty
+    public func canZap(recipientInfo: RecipientZapInfo) -> Bool {
+        // Simply check the pre-fetched info
+        return recipientInfo.hasNutzapSupport
     }
     
     public func prepareZap(
         event: NDKEvent?,
-        to user: NDKUser,
+        recipientInfo: RecipientZapInfo,
         amountSats: Int64,
         comment: String?
     ) async throws -> PreparedZap {
-        // 1. Fetch recipient's nutzap preferences
-        guard let preferences = try await fetchNutzapPreferences(for: user) else {
+        print("prepareZap")
+        // We already have the preferences!
+        guard let preferences = recipientInfo.nutzapPreferences else {
             throw ZapError.nutzapPreferencesNotFound
         }
         
-        // 2. Get all accepted mints
-        let acceptedMints = (await preferences.mints).map { $0.url }
+        // Get all accepted mints
+        let acceptedMints = await recipientInfo.nutzapMintURLs
         guard !acceptedMints.isEmpty else {
             throw ZapError.invalidMint
         }
         
-        // 3. Create payment request with ALL accepted mints
+        // Get P2PK pubkey
+        guard let p2pkPubkey = await recipientInfo.nutzapP2PKPubkey else {
+            throw ZapError.nutzapPreferencesNotFound
+        }
+        
+        // Create payment request with ALL accepted mints
         // Payment provider will choose the optimal one
         let paymentRequest = NutzapPaymentRequest(
             amountSats: amountSats,
-            recipientPubkey: user.pubkey,  // Nostr pubkey for p tag
-            recipientP2PK: await preferences.p2pkPubkey,  // P2PK key for locking proofs
+            recipientPubkey: recipientInfo.pubkey,  // Nostr pubkey for p tag
+            recipientP2PK: p2pkPubkey,  // P2PK key for locking proofs
             acceptedMints: acceptedMints,
             comment: comment
         )
         
-        // 4. Store metadata for completion
+        // Get all relays (including mint-specific ones)
+        let allRelays = await recipientInfo.nutzapRelays
+        
+        // Store metadata for completion
         let metadata: [String: Any] = [
-            "preferences": preferences
+            "preferences": preferences,
+            "relays": Array(allRelays)
         ]
+        
+        // Create prepared zap with NDKUser
+        let recipient = NDKUser(pubkey: recipientInfo.pubkey)
         
         return PreparedZap(
             paymentRequest: paymentRequest,
-            recipient: user,
+            recipient: recipient,
             zappedEvent: event,
             comment: comment,
             metadata: metadata
@@ -67,46 +75,42 @@ public class NDKNutzapProtocol: NDKZapProtocol {
         confirmation: PaymentConfirmation
     ) async throws -> ZapResult {
         // Extract metadata
-        guard let _ = prepared.metadata["preferences"] as? NDKNutzapPreferences,
-              let relays = prepared.metadata["relays"] as? [String] else {
-            throw NDKError.invalidInput(message: "Missing nutzap metadata")
+        guard let _ = prepared.metadata["preferences"] as? NDKNutzapPreferences else {
+            throw NDKError.invalidInput(message: "Missing nutzap preferences in metadata")
         }
         
-        // Extract Cashu proofs from confirmation
-        guard let cashuConfirmation = confirmation as? CashuPaymentConfirmation else {
+        // Handle NutzapConfirmation - the nutzap event is already created
+        guard let nutzapConfirmation = confirmation as? NutzapConfirmation else {
+            print("\(confirmation)")
             throw NDKError.invalidInput(message: "Invalid payment confirmation type for nutzap")
         }
         
-        // Create nutzap event using the mint from the confirmation
-        let nutzap = try await NDKNutzap.create(
-            ndk: ndk,
-            recipient: prepared.recipient,
-            proofs: cashuConfirmation.proofs,
-            mint: cashuConfirmation.mintURL,  // Use the mint that was actually used
-            comment: prepared.comment,
-            zappedEvent: prepared.zappedEvent
-        )
+        // The nutzap event is already created and included in the confirmation
+        let nutzapEvent = nutzapConfirmation.nutzapEvent
         
-        // Publish to recipient's preferred relays
-        _ = try await ndk.publish(nutzap.event, to: Set(relays))
+        // Publish to recipient's preferred relays if available, otherwise use default behavior
+        let relays = prepared.metadata["relays"] as? [String]
+        if let relays = relays, !relays.isEmpty {
+            _ = try await ndk.publish(nutzapEvent, to: Set(relays))
+        } else {
+            // Publish without specifying relays - use NDK's default relay selection
+            _ = try await ndk.publish(nutzapEvent)
+        }
         
         // Create result - Nutzaps are complete immediately
         return ZapResult(
             type: .nutzap,
             amountSats: prepared.paymentRequest.amountSats,
             receiptEvent: nil,
-            nutzapEvent: nutzap.event
+            nutzapEvent: nutzapEvent
         )
     }
     
     // MARK: - Mint Communication
     
     /// Get available mints for a recipient
-    public func getAcceptedMints(for user: NDKUser) async throws -> [URL] {
-        guard let preferences = try await fetchNutzapPreferences(for: user) else {
-            return []
-        }
-        return (await preferences.mints).map { $0.url }
+    public func getAcceptedMints(recipientInfo: RecipientZapInfo) async -> [URL] {
+        return await recipientInfo.nutzapMintURLs
     }
     
     /// Create a mint quote for Lightning-to-Cashu conversion
@@ -141,28 +145,6 @@ public class NDKNutzapProtocol: NDKZapProtocol {
         } catch {
             throw ZapError.mintQuoteFailed(mint: mint.host ?? mint.absoluteString, reason: error.localizedDescription)
         }
-    }
-    
-    // MARK: - Private Methods
-    
-    private func fetchNutzapPreferences(for user: NDKUser) async throws -> NDKNutzapPreferences? {
-        var filter = NDKFilter()
-        filter.authors = [user.pubkey]
-        filter.kinds = [EventKind.nutzapPreferences]
-        
-        // Use NDKDataSource for fetching preferences
-        let dataSource = NDKDataSource(
-            ndk: ndk,
-            filter: filter,
-            maxAge: 300 // 5 minutes - preferences don't change often
-        )
-        
-        let events = await dataSource.currentValue()
-        guard let event = events.first else {
-            return nil
-        }
-        
-        return NDKNutzapPreferences(event: event)
     }
 }
 

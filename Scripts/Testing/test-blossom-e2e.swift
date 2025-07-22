@@ -153,7 +153,7 @@ struct BlossomE2ERunner {
         )
         
         let dataSource = ndk.observe(filter: filter, maxAge: 3600)
-        let fetchedEvents = await dataSource.currentValue()
+        let fetchedEvents = await dataSource.collect(timeout: 5.0)
         guard fetchedEvents.count == 1 else {
             throw TestError.eventNotFound
         }

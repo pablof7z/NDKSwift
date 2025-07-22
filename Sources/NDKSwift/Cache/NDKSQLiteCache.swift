@@ -666,7 +666,7 @@ public actor NDKSQLiteCache: NDKCache {
     
     /// Prune the cache to a maximum number of mints based on LRU
     public func pruneMintCache(maxMints: Int) async throws {
-        try await dbQueue.write { db in
+        try await dbQueue.write { [debugMode] db in
             let mintCount = try Int.fetchOne(db, sql: "SELECT COUNT(*) FROM mint_info") ?? 0
             
             if mintCount > maxMints {
@@ -688,7 +688,7 @@ public actor NDKSQLiteCache: NDKCache {
                     try db.execute(sql: "DELETE FROM mint_info WHERE url = ?", arguments: [url])
                 }
                 
-                if self.debugMode {
+                if debugMode {
                     NDKLogger.log(.info, category: .cache, "Pruned \(urlsToDelete.count) mints from cache")
                 }
             }
@@ -992,7 +992,7 @@ public actor NDKSQLiteCache: NDKCache {
             for eventId in eventIdsToDelete {
                 if await getEvent(id: eventId) == nil {
                     deletionTombstones[eventId] = now
-                    if self.debugMode {
+                    if debugMode {
                         NDKLogger.log(.debug, category: .cache, "Added tombstone for event \(eventId)")
                     }
                 }
@@ -1561,7 +1561,7 @@ public actor NDKSQLiteCache: NDKCache {
         let claimedAt = Int64(retrievedAt.timeIntervalSince1970)
         
         do {
-            try await dbQueue.write { db in
+            try await dbQueue.write { [debugMode] db in
                 // Check if entry already exists
                 let existing = try Row.fetchOne(db, sql: """
                     SELECT status FROM nip05_cache 
@@ -1576,7 +1576,7 @@ public actor NDKSQLiteCache: NDKCache {
                         VALUES (?, ?, ?, ?)
                     """, arguments: [identifier, pubkey, NIP05VerificationStatus.unverified.rawValue, claimedAt])
                     
-                    if self.debugMode {
+                    if debugMode {
                         NDKLogger.log(.debug, category: .cache, "Saved NIP-05 claim: \(identifier) for \(pubkey)")
                     }
                 }
@@ -1655,7 +1655,7 @@ public actor NDKSQLiteCache: NDKCache {
         let nip46RelaysJSON = entry.nip46Relays.flatMap { try? JSONCoding.encodeToString($0) }
         
         do {
-            try await dbQueue.write { db in
+            try await dbQueue.write { [debugMode] db in
                 try db.execute(sql: """
                     INSERT OR REPLACE INTO nip05_cache 
                     (identifier, pubkey, status, nip46_relays, claimed_at, 
@@ -1673,7 +1673,7 @@ public actor NDKSQLiteCache: NDKCache {
                     entry.httpStatusCode
                 ])
                 
-                if self.debugMode {
+                if debugMode {
                     NDKLogger.log(.debug, category: .cache, 
                         "Saved NIP-05 resolution: \(entry.identifier) -> \(entry.pubkey) (\(entry.status))")
                 }
@@ -1686,7 +1686,7 @@ public actor NDKSQLiteCache: NDKCache {
     
     public func invalidateNIP05(_ identifier: String, actualPubkey: String?) async throws {
         do {
-            try await dbQueue.write { db in
+            try await dbQueue.write { [debugMode] db in
                 // Mark all entries for this identifier as invalid
                 try db.execute(sql: """
                     UPDATE nip05_cache 
@@ -1715,7 +1715,7 @@ public actor NDKSQLiteCache: NDKCache {
                     ])
                 }
                 
-                if self.debugMode {
+                if debugMode {
                     NDKLogger.log(.debug, category: .cache, 
                         "Invalidated NIP-05: \(identifier), actual owner: \(actualPubkey ?? "unknown")")
                 }
@@ -1896,7 +1896,7 @@ public actor NDKSQLiteCache: NDKCache {
         let checkedRelaysJSON = checkedRelays != nil ? try? JSONCoding.encodeToString(Array(checkedRelays!)) : nil
         
         do {
-            try await dbQueue.write { db in
+            try await dbQueue.write { [debugMode] db in
                 try db.execute(sql: """
                     INSERT OR REPLACE INTO relay_preferences 
                     (pubkey, write_relays, read_relays, fetched_at, expires_at, checked_relays)
@@ -1910,7 +1910,7 @@ public actor NDKSQLiteCache: NDKCache {
                     checkedRelaysJSON
                 ])
                 
-                if self.debugMode {
+                if debugMode {
                     NDKLogger.log(.debug, category: .cache, "Saved relay preferences for \(pubkey)")
                 }
             }

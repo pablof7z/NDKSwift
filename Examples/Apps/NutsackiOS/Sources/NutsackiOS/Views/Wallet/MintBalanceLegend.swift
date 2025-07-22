@@ -5,37 +5,45 @@ struct MintBalanceLegend: View {
     let mintBalances: [(mint: String, balance: Int64, percentage: Double)]
     let mintColors: [Color]
     let opacity: Double
+    @State private var selectedMint: String?
     
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             ForEach(Array(mintBalances.enumerated()), id: \.element.mint) { index, item in
-                HStack(spacing: 12) {
-                    // Color indicator
-                    RoundedRectangle(cornerRadius: 4)
-                        .fill(mintColors[index % mintColors.count])
-                        .frame(width: 20, height: 20)
-                    
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(formatMintName(item.mint))
-                            .font(.system(size: 14, weight: .medium))
-                            .foregroundColor(.white)
+                NavigationLink(destination: MintDetailView(mintURL: item.mint)) {
+                    HStack(spacing: 12) {
+                        // Color indicator
+                        RoundedRectangle(cornerRadius: 4)
+                            .fill(mintColors[index % mintColors.count])
+                            .frame(width: 20, height: 20)
                         
-                        HStack(spacing: 8) {
-                            Text("\(formatSats(item.balance)) sats")
-                                .font(.caption)
-                                .foregroundColor(.secondary)
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(formatMintName(item.mint))
+                                .font(.system(size: 14, weight: .medium))
+                                .foregroundColor(.white)
                             
-                            Text("·")
-                                .foregroundColor(.secondary.opacity(0.5))
-                            
-                            Text("\(Int(item.percentage))%")
-                                .font(.caption)
-                                .foregroundColor(.secondary)
+                            HStack(spacing: 8) {
+                                Text("\(formatSats(item.balance)) sats")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                                
+                                Text("·")
+                                    .foregroundColor(.secondary.opacity(0.5))
+                                
+                                Text("\(Int(item.percentage))%")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                            }
                         }
+                        
+                        Spacer()
+                        
+                        Image(systemName: "chevron.right")
+                            .font(.caption)
+                            .foregroundColor(.secondary.opacity(0.6))
                     }
-                    
-                    Spacer()
                 }
+                .buttonStyle(.plain)
             }
         }
         .padding(16)

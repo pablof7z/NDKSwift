@@ -194,8 +194,8 @@ final class NIP60WalletE2ETests: XCTestCase {
                     cachePolicy: .networkOnly,
                     relays: relaySet
                 )
-                let events = await dataSource.currentValue()
-                if !events.isEmpty {
+                // Use first() to check if any event exists on this relay
+                if let _ = await dataSource.first() {
                     publishedRelays.insert(relay.url)
                     print("   ✅ Found event on \(relay.url)")
                 } else {
