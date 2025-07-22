@@ -367,20 +367,7 @@ struct MintInfoTab: View {
                     .cornerRadius(12)
                     
                     // Contact Info
-                    if info.contact?.contains { !$0.isEmpty } == true {
-                        VStack(alignment: .leading, spacing: 12) {
-                            Text("Contact")
-                                .font(.headline)
-                            
-                            ForEach(info.contact ?? [], id: \.self) { contact in
-                                Text(contact)
-                                    .font(.body)
-                            }
-                        }
-                        .padding()
-                        .background(Color(.secondarySystemGroupedBackground))
-                        .cornerRadius(12)
-                    }
+                    ContactInfoSection(contacts: info.contact)
                     
                     // Supported Methods
                     if let nuts = info.nuts {
@@ -626,6 +613,33 @@ struct ValidationResultsView: View {
                     Button("Done") { dismiss() }
                 }
             }
+        }
+    }
+}
+
+// MARK: - Contact Info Section
+private struct ContactInfoSection: View {
+    let contacts: [NDKMintInfo.Contact]?
+    
+    var body: some View {
+        if let contacts = contacts, !contacts.isEmpty {
+            VStack(alignment: .leading, spacing: 12) {
+                Text("Contact")
+                    .font(.headline)
+                
+                ForEach(Array(contacts.enumerated()), id: \.offset) { index, contact in
+                    HStack(alignment: .top, spacing: 8) {
+                        Text("\(contact.method):")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                        Text(contact.info)
+                            .font(.body)
+                    }
+                }
+            }
+            .padding()
+            .background(Color(.secondarySystemGroupedBackground))
+            .cornerRadius(12)
         }
     }
 }

@@ -197,16 +197,12 @@ final class NIP60NutzapE2ETests: XCTestCase {
         
         Task {
             print("👂 Listening for pubkey1's 7375 events...")
-            do {
-                for await event in dataSource7375_1.events {
-                    print("📨 Pubkey1 published 7375 event: \(event.id)")
-                    if depositEvent == nil {
-                        depositEvent = event
-                        deposit7375Expectation.fulfill()
-                    }
+            for await event in dataSource7375_1.events {
+                print("📨 Pubkey1 published 7375 event: \(event.id)")
+                if depositEvent == nil {
+                    depositEvent = event
+                    deposit7375Expectation.fulfill()
                 }
-            } catch {
-                print("❌ Subscription error: \(error)")
             }
         }
         
@@ -223,16 +219,12 @@ final class NIP60NutzapE2ETests: XCTestCase {
         )
         
         Task {
-            do {
-                for await event in dataSource9321.events {
-                    print("📨 Nutzap event published: \(event.id)")
-                    if nutzapEvent == nil {
-                        nutzapEvent = event
-                        nutzap9321Expectation.fulfill()
-                    }
+            for await event in dataSource9321.events {
+                print("📨 Nutzap event published: \(event.id)")
+                if nutzapEvent == nil {
+                    nutzapEvent = event
+                    nutzap9321Expectation.fulfill()
                 }
-            } catch {
-                print("❌ Nutzap subscription error: \(error)")
             }
         }
         
@@ -249,16 +241,12 @@ final class NIP60NutzapE2ETests: XCTestCase {
         )
         
         Task {
-            do {
-                for await event in dataSource7375_2.events {
-                    print("📨 Pubkey2 published 7375 event: \(event.id)")
-                    if redeemEvent == nil {
-                        redeemEvent = event
-                        redeem7375Expectation.fulfill()
-                    }
+            for await event in dataSource7375_2.events {
+                print("📨 Pubkey2 published 7375 event: \(event.id)")
+                if redeemEvent == nil {
+                    redeemEvent = event
+                    redeem7375Expectation.fulfill()
                 }
-            } catch {
-                print("❌ Subscription error: \(error)")
             }
         }
         

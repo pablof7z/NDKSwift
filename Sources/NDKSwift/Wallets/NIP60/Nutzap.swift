@@ -130,7 +130,7 @@ public enum Nutzap {
                     mint: mintURL,
                     memo: "Send nutzap"
                 )
-                try await wallet.update(stateChange: stateChange)
+                _ = try await wallet.update(stateChange: stateChange)
                 
                 // Create spending history
                 try await eventManager.createSpendingHistoryEvent(
@@ -332,7 +332,7 @@ public enum Nutzap {
                 mint: mintURL,
                 memo: "Receive nutzap"
             )
-            try await wallet.update(stateChange: stateChange)
+            _ = try await wallet.update(stateChange: stateChange)
         }
         
         // Create spending history for received nutzap

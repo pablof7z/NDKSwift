@@ -506,7 +506,7 @@ final class NegentropyTests: XCTestCase {
         let response = try await reconciler2.processMessage(initData)
         
         switch response {
-        case .continuing(let data, let haveIds2, let needIds2):
+        case .continuing(let data, _, _):
             // At this point, reconciler2 might not have identified differences yet
             // The protocol often requires multiple rounds
             
@@ -525,7 +525,7 @@ final class NegentropyTests: XCTestCase {
                 XCTAssertTrue(haveIds1.count > 0 || needIds1.count > 0 || data2.count > 0)
             }
             
-        case .terminated(let haveIds, let needIds, let isDone):
+        case .terminated(_, _, let isDone):
             // Early termination is possible if sets are identical
             XCTAssertTrue(isDone)
         }

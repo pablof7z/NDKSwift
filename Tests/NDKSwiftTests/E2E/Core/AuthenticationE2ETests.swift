@@ -388,7 +388,7 @@ final class AuthenticationE2ETests: XCTestCase {
         
         // Create session
         let signer = try NDKPrivateKeySigner.generate()
-        let pubkey = try await signer.pubkey
+        _ = try await signer.pubkey
         
         var session = try await authManager.createSession(
             with: signer,

@@ -13,9 +13,9 @@ final class RelayConnectionRaceConditionTests: XCTestCase {
         let connection = NDKRelayConnection(url: url)
         
         // Attempt to connect multiple times concurrently
-        async let connect1 = connection.connect()
-        async let connect2 = connection.connect()
-        async let connect3 = connection.connect()
+        async let connect1: Void = connection.connect()
+        async let connect2: Void = connection.connect()
+        async let connect3: Void = connection.connect()
         
         // All should complete without error
         do {

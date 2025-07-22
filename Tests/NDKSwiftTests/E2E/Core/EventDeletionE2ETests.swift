@@ -152,7 +152,7 @@ final class EventDeletionE2ETests: XCTestCase {
         
         // Malicious actor tries to delete the event
         let maliciousTime = Date()
-        let (maliciousDeletion, _) = try await maliciousActor.publish { builder in
+        _ = try await maliciousActor.publish { builder in
             builder
                 .content("Trying to delete someone else's event")
                 .kind(EventKind.deletion)
@@ -183,7 +183,7 @@ final class EventDeletionE2ETests: XCTestCase {
         
         // Now original author deletes their own event
         let legitimateTime = Date()
-        let (legitimateDeletion, _) = try await originalAuthor.publish { builder in
+        _ = try await originalAuthor.publish { builder in
             builder
                 .content("Deleting my own event")
                 .kind(EventKind.deletion)
@@ -337,8 +337,6 @@ final class EventDeletionE2ETests: XCTestCase {
         
         // Set up real-time subscriptions on instances 2 and 3
         let filter = NDKFilter(authors: [pubkey], kinds: [EventKind.textNote])
-        var receivedOnInstance2 = false
-        var receivedOnInstance3 = false
         var deletedOnInstance2 = false
         var deletedOnInstance3 = false
         
@@ -351,7 +349,6 @@ final class EventDeletionE2ETests: XCTestCase {
             let dataSource2 = instance2.observe(filter: filter)
             for await receivedEvent in dataSource2.events {
                 if receivedEvent.id == event.id {
-                    receivedOnInstance2 = true
                     NDKLogger.log(.debug, category: .event, "📨 Instance 2 received event after \(Date().timeIntervalSince(subscription2Time))s")
                 }
             }
@@ -363,7 +360,6 @@ final class EventDeletionE2ETests: XCTestCase {
             let dataSource3 = instance3.observe(filter: filter)
             for await receivedEvent in dataSource3.events {
                 if receivedEvent.id == event.id {
-                    receivedOnInstance3 = true
                     NDKLogger.log(.debug, category: .event, "📨 Instance 3 received event after \(Date().timeIntervalSince(subscription3Time))s")
                 }
             }
@@ -374,7 +370,7 @@ final class EventDeletionE2ETests: XCTestCase {
         
         // Instance 2 deletes the event
         let deletionTime = Date()
-        let (deletionEvent, _) = try await instance2.publish { builder in
+        _ = try await instance2.publish { builder in
             builder
                 .content("Deleting event from instance 2")
                 .kind(EventKind.deletion)
@@ -460,7 +456,7 @@ final class EventDeletionE2ETests: XCTestCase {
         
         // First, publish the deletion event (before the actual event)
         let deletionTime = Date()
-        let (deletionEvent, _) = try await ndk.publish { builder in
+        _ = try await ndk.publish { builder in
             builder
                 .content("Pre-deleting event \(localEvent.id)")
                 .kind(EventKind.deletion)

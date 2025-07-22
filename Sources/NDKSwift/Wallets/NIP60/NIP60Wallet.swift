@@ -763,67 +763,59 @@ public actor NIP60Wallet: NDKPaymentProvider {
         
         // Start configuration subscription and wait for EOSE
         configSubscriptionTask = Task {
-            do {
-                // Create filter for configuration events (17375 and 10020)
-                let configFilter = NDKFilter(
-                    authors: [userPubkey],
-                    kinds: [EventKind.cashuWalletConfig, 10020]
-                )
-                
-                NDKLogger.log(.info, category: .wallet, "Starting wallet configuration subscription for kinds [17375, 10020]")
-                
-                // Create NDKDataSource for configuration events
-                let dataSource = NDKDataSource(
-                    ndk: self.ndk,
-                    filter: configFilter,
-                    maxAge: 0,
-                    cachePolicy: .cacheWithNetwork,
-                    subscriptionId: "nip60-wallet-config"
-                )
-                
-                // Track EOSE status
-                var receivedEOSE = false
-                var eoseTask: Task<Void, Never>?
-                
-                // Monitor relay updates for EOSE
-                eoseTask = Task {
-                    for await update in dataSource.relayUpdates {
-                        if case .eose = update, !receivedEOSE {
-                            receivedEOSE = true
-                            NDKLogger.log(.info, category: .wallet, "📡 Configuration EOSE received. Starting wallet event subscriptions...")
-                            
-                            // Log the initial balance
-                            let initialBalance = await self.proofStateManager.getTotalBalance()
-                            NDKLogger.log(.info, category: .wallet, "💰 Initial wallet balance: \(initialBalance) sats")
-                            
-                            // Emit balance change event if we have a non-zero balance
-                            await self.notifyBalanceChangeIfNeeded()
-                            
-                            // Start transaction history observation
-                            try? await self.transactionHistory.startObserving()
-                            
-                            // Start wallet event subscription with proper relays
-                            await self.startWalletEventSubscription()
-                            
-                            NDKLogger.log(.info, category: .wallet, "✅ Wallet loading complete. Monitoring for updates.")
-                        }
+            // Create filter for configuration events (17375 and 10020)
+            let configFilter = NDKFilter(
+                authors: [userPubkey],
+                kinds: [EventKind.cashuWalletConfig, 10020]
+            )
+            
+            NDKLogger.log(.info, category: .wallet, "Starting wallet configuration subscription for kinds [17375, 10020]")
+            
+            // Create NDKDataSource for configuration events
+            let dataSource = NDKDataSource(
+                ndk: self.ndk,
+                filter: configFilter,
+                maxAge: 0,
+                cachePolicy: .cacheWithNetwork,
+                subscriptionId: "nip60-wallet-config"
+            )
+            
+            // Track EOSE status
+            var receivedEOSE = false
+            var eoseTask: Task<Void, Never>?
+            
+            // Monitor relay updates for EOSE
+            eoseTask = Task {
+                for await update in dataSource.relayUpdates {
+                    if case .eose = update, !receivedEOSE {
+                        receivedEOSE = true
+                        NDKLogger.log(.info, category: .wallet, "📡 Configuration EOSE received. Starting wallet event subscriptions...")
+                        
+                        // Log the initial balance
+                        let initialBalance = await self.proofStateManager.getTotalBalance()
+                        NDKLogger.log(.info, category: .wallet, "💰 Initial wallet balance: \(initialBalance) sats")
+                        
+                        // Emit balance change event if we have a non-zero balance
+                        await self.notifyBalanceChangeIfNeeded()
+                        
+                        // Start transaction history observation
+                        try? await self.transactionHistory.startObserving()
+                        
+                        // Start wallet event subscription with proper relays
+                        await self.startWalletEventSubscription()
+                        
+                        NDKLogger.log(.info, category: .wallet, "✅ Wallet loading complete. Monitoring for updates.")
                     }
                 }
-                
-                // Process configuration events as they arrive
-                for await event in dataSource.events {
-                    await self.processConfigurationEvent(event)
-                }
-                
-                // Clean up EOSE monitoring task
-                eoseTask?.cancel()
-            } catch {
-                if error is CancellationError {
-                    NDKLogger.log(.info, category: .wallet, "🛑 Configuration subscription cancelled")
-                } else {
-                    NDKLogger.log(.error, category: .wallet, "❌ Configuration subscription error: \(error)")
-                }
             }
+            
+            // Process configuration events as they arrive
+            for await event in dataSource.events {
+                await self.processConfigurationEvent(event)
+            }
+            
+            // Clean up EOSE monitoring task
+            eoseTask?.cancel()
         }
     }
     

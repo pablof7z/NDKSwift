@@ -84,7 +84,7 @@ actor WalletPaymentRouter {
                 throw NDKError.invalidRequest("Invalid mint URLs for transfer")
             }
             
-            try await CrossMintTransfer.transferBetweenMints(
+            let result = try await CrossMintTransfer.transferBetweenMints(
                 amount: nutzapRequest.amountSats,
                 from: sourceURL,
                 to: targetURL,
@@ -94,6 +94,9 @@ actor WalletPaymentRouter {
                 mints: mints,
                 signer: signer
             )
+            
+            // Log the actual fee paid
+            NDKLogger.log(.info, category: .wallet, "✅ Cross-mint transfer completed. Fee paid: \(result.feePaid) sats")
             
             // Funds are now in the target mint
             
