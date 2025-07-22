@@ -14,7 +14,7 @@ fileprivate let logger = Logger.init(subsystem: "CashuSwift", category: "wallet"
 
 extension CashuSwift {
     
-    @available(*, deprecated, message: "function does not check DLEQ")
+    @available(*, deprecated, message: "Use melt() with DLEQVerificationResult or NIP60Wallet.payInvoice() for integrated DLEQ validation")
     public static func melt(mint:MintRepresenting,
                             quote:Quote,
                             proofs:[ProofRepresenting],
@@ -93,7 +93,7 @@ extension CashuSwift {
     ///Checks whether the invoice was successfully paid by the mint.
     ///If the check returns `true` and the user has provided NUT-07 blank outputs for fee return
     ///it will also unblind the mint's promises and return valid change proofs.
-    @available(*, deprecated, message: "function does not check DLEQ")
+    @available(*, deprecated, message: "Use melt() with DLEQVerificationResult or NIP60Wallet.payInvoice() for integrated DLEQ validation")
     public static func meltState(mint: MintRepresenting,
                                  quoteID: String,
                                  blankOutputs: (outputs: [Output],
@@ -145,7 +145,7 @@ extension CashuSwift {
         }
     }
     
-    @available(*, deprecated, message: "function does not check DLEQ")
+    @available(*, deprecated, message: "Use melt() with DLEQVerificationResult or NIP60Wallet.payInvoice() for integrated DLEQ validation")
     public static func melt(mint: Mint,
                             quote: Quote,
                             proofs: [Proof],
@@ -161,7 +161,7 @@ extension CashuSwift {
         return (result.paid, result.change as! [Proof]?)
     }
     
-    @available(*, deprecated, message: "function does not check DLEQ")
+    @available(*, deprecated, message: "Use melt() with DLEQVerificationResult or NIP60Wallet.payInvoice() for integrated DLEQ validation")
     public static func meltState(mint: Mint,
                                  quoteID: String,
                                  blankOutputs: (outputs: [Output],

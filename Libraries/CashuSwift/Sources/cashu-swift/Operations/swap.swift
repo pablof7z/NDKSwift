@@ -189,7 +189,7 @@ extension CashuSwift {
         return (sendProofs, keepProofs, inputDLEQ, outputDLEQ)
     }
     
-    @available(*, deprecated, message: "function does not check DLEQ, or support proofs with witness for NUT-10 spending conditions.")
+    @available(*, deprecated, message: "Use swap() with DLEQVerificationResult and P2PK support or NIP60Wallet for integrated validation")
     public static func swap(mint:MintRepresenting,
                             proofs:[ProofRepresenting],
                             amount:Int? = nil,
@@ -208,7 +208,7 @@ extension CashuSwift {
         return (result.new, result.change)
     }
 
-    @available(*, deprecated, message: "function does not check DLEQ")
+    @available(*, deprecated, message: "Use swap() with DLEQVerificationResult or NIP60Wallet.swap() for DLEQ validation")
     public static func swap(mint: Mint,
                            proofs: [Proof],
                            amount: Int? = nil,

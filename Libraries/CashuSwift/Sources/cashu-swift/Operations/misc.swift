@@ -328,7 +328,7 @@ func calculateNumberOfBlankOutputs(_ overpayed:Int) -> Int {
 extension Array where Element : MintRepresenting {
     
     // docs: deprecated and only for redeeming legace V3 multi mint token
-    @available(*, deprecated)
+    @available(*, deprecated, message: "Legacy V3 multi-mint token support. Use NIP60Wallet for modern cross-mint operations")
     public func receive(token:CashuSwift.Token,
                         seed:String? = nil) async throws -> Dictionary<String, [ProofRepresenting]> {
         

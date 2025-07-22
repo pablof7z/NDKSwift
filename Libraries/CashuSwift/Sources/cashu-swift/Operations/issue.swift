@@ -15,7 +15,7 @@ extension CashuSwift {
     /// After paying the quote amount to the mint, use this function to issue the actual ecash as a list of [`String`]s
     /// Leaving `seed` empty will give you proofs from non-deterministic outputs which cannot be recreated from a seed phrase backup
     // generic types without dleq return
-    @available(*, deprecated, message: "This method does not return the boolean flag for successful DLEQ verification which needs to be handled by a wallet application.")
+    @available(*, deprecated, message: "Use issue() with DLEQVerificationResult or NIP60Wallet for automatic DLEQ validation and error handling")
     public static func issue(for quote:Quote,
                              on mint: MintRepresenting,
                              seed:String? = nil,
@@ -75,7 +75,7 @@ extension CashuSwift {
     }
     
     // static types without dleq return
-    @available(*, deprecated, message: "This method does not return the boolean flag for successful DLEQ verification which needs to be handled by a wallet application.")
+    @available(*, deprecated, message: "Use issue() with DLEQVerificationResult or NIP60Wallet for automatic DLEQ validation and error handling")
     public static func issue(for quote: Quote,
                              on mint: Mint,
                              seed: String? = nil,
