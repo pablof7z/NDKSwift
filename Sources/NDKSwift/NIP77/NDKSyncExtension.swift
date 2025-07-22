@@ -68,7 +68,7 @@ extension NDK {
         let subscriptionId = try await syncHandler.startSync(filter: filter, relayURL: relayURL)
         
         // Wait for sync to complete (with timeout)
-        let timeout: TimeInterval = 30.0
+        let timeout: TimeInterval = NetworkConstants.timeoutStandardRequest
         let startWait = Date()
         
         while await syncHandler.isSyncActive(subscriptionId: subscriptionId) {

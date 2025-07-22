@@ -160,7 +160,7 @@ public final class NDK {
     ///   - timeout: Maximum time to wait in seconds (default: 5)
     /// - Returns: Number of connected relays
     @discardableResult
-    public func waitForRelayConnections(minimumRelays: Int = 1, timeout: TimeInterval = 5.0) async -> Int {
+    public func waitForRelayConnections(minimumRelays: Int = 1, timeout: TimeInterval = NetworkConstants.timeoutSubscription) async -> Int {
         NDKLogger.log(.debug, category: .relay, "Starting wait for \(minimumRelays) relays with timeout \(timeout)s")
         
         // Create a task that will timeout

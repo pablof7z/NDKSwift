@@ -25,7 +25,7 @@ public actor NDKNWCWallet: NDKPaymentProvider {
     private var _walletInfo: GetInfoResponse?
     private var _cachedBalance: Int64?
     private var _lastBalanceCheck: Date?
-    private let balanceCacheDuration: TimeInterval = 30 // 30 seconds
+    private let balanceCacheDuration: TimeInterval = NetworkConstants.timeoutStandardRequest // 30 seconds
     private var connectionTask: Task<Void, Error>?
     
     // MARK: - Computed Properties

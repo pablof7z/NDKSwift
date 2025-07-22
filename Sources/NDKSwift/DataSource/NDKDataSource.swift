@@ -234,7 +234,7 @@ public final class NDKDataSource<T>: ObservableObject, CacheObserver {
     /// - Parameters:
     ///   - timeout: Maximum time to wait (default: 10 seconds)
     /// - Returns: The first event, or nil if timeout/EOSE with no events
-    public func first(timeout: TimeInterval = 10.0) async -> T? {
+    public func first(timeout: TimeInterval = NetworkConstants.timeoutRelayInfo) async -> T? {
         // If we already have data, return the first item
         if let firstItem = data.first {
             return firstItem

@@ -350,7 +350,7 @@ public struct OutboxFetchConfig {
     public init(
         selectionConfig: FetchingConfig = .default,
         minSuccessfulRelays: Int = 1,
-        timeoutInterval: TimeInterval = 30.0,
+        timeoutInterval: TimeInterval = NetworkConstants.timeoutStandardRequest,
         deduplicateEvents: Bool = true
     ) {
         self.selectionConfig = selectionConfig
@@ -371,7 +371,7 @@ public struct OutboxSubscriptionConfig {
     public init(
         fetchConfig: OutboxFetchConfig = .default,
         autoReconnect: Bool = true,
-        reconnectDelay: TimeInterval = 5.0
+        reconnectDelay: TimeInterval = NetworkConstants.timeoutSubscription
     ) {
         self.fetchConfig = fetchConfig
         self.autoReconnect = autoReconnect
