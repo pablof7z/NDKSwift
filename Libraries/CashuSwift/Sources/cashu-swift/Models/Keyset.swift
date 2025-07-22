@@ -77,13 +77,16 @@ extension CashuSwift {
                 return firstKey < secondKey
             }.map { $0.value }
             
-            var concatData = [UInt8]()
+            var concatData = Data()
             for stringKey in sortedValues {
-                try! concatData.append(contentsOf: stringKey.bytes)
+                guard let keyData = stringKey.hexDecoded() else {
+                    continue
+                }
+                concatData.append(keyData)
             }
             
             let hashData = Data(SHA256.hash(data: concatData))
-            let result = String(bytes: hashData).prefix(14)
+            let result = hashData.hexString.prefix(14)
             
             return "00" + result
         }
