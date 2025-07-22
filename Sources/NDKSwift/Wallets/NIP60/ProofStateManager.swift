@@ -21,11 +21,11 @@ public actor ProofStateManager {
     }
     
     public struct ProofEntry {
-        let proof: CashuSwift.Proof
-        var state: ProofState
-        let mint: String
-        var ownerEventId: String? // Which event currently owns this proof
-        var ownerTimestamp: Timestamp? // Timestamp of the owner event
+        public let proof: CashuSwift.Proof
+        public var state: ProofState
+        public let mint: String
+        public var ownerEventId: String? // Which event currently owns this proof
+        public var ownerTimestamp: Timestamp? // Timestamp of the owner event
     }
     
     // MARK: - Properties
@@ -78,9 +78,9 @@ public actor ProofStateManager {
                 entry.ownerEventId = eventId
                 entry.ownerTimestamp = timestamp
                 proofState[proof.C] = entry
-                print("  Proof \(proof.C): Updated owner from \(previousOwner) to \(eventId)")
+                NDKLogger.log(.trace, category: .wallet, "  Proof \(proof.C): Updated owner from \(previousOwner) to \(eventId)")
             } else {
-                print("  Proof \(proof.C): WARNING - proof not found in state!")
+                NDKLogger.log(.warning, category: .wallet, "  Proof \(proof.C): WARNING - proof not found in state!")
             }
         }
     }
@@ -122,7 +122,7 @@ public actor ProofStateManager {
         let availableProofs = proofState.values
             .filter { $0.state == .available && $0.mint == mint }
         let balance = availableProofs.reduce(0) { $0 + Int64($1.proof.amount) }
-        print("ProofStateManager.getBalance(mint: \(mint)) - found \(availableProofs.count) available proofs, balance: \(balance)")
+        NDKLogger.log(.trace, category: .wallet, "ProofStateManager.getBalance(mint: \(mint)) - found \(availableProofs.count) available proofs, balance: \(balance)")
         return balance
     }
     
@@ -236,12 +236,12 @@ public actor ProofStateManager {
     }
     
     /// Get all proof entries (for reconciliation)
-    func getAllEntries() -> [ProofEntry] {
+    public func getAllEntries() -> [ProofEntry] {
         return Array(proofState.values)
     }
     
     /// Get proof entries for a specific mint
-    func getEntries(mint: String) -> [ProofEntry] {
+    public func getEntries(mint: String) -> [ProofEntry] {
         return proofState.values.filter { $0.mint == mint }
     }
     
@@ -289,7 +289,7 @@ public actor ProofStateManager {
                 entry.ownerEventId == eventId && entry.state != .deleted
             }
             .map { $0.proof }
-        print("ProofStateManager.getProofsForEvent(\(eventId)) - Found \(proofs.count) proofs")
+        NDKLogger.log(.trace, category: .wallet, "ProofStateManager.getProofsForEvent(\(eventId)) - Found \(proofs.count) proofs")
         return proofs
     }
     
@@ -300,9 +300,9 @@ public actor ProofStateManager {
                 entry.ownerEventId == eventId && entry.state == .available
             }
             .map { $0.proof }
-        print("ProofStateManager.getAvailableProofsForEvent(\(eventId)) - Found \(proofs.count) available proofs")
+        NDKLogger.log(.trace, category: .wallet, "ProofStateManager.getAvailableProofsForEvent(\(eventId)) - Found \(proofs.count) available proofs")
         for proof in proofs {
-            print("  - Proof C: \(proof.C), amount: \(proof.amount)")
+            NDKLogger.log(.trace, category: .wallet, "  - Proof C: \(proof.C), amount: \(proof.amount)")
         }
         return proofs
     }

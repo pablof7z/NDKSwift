@@ -146,18 +146,18 @@ public actor NDKZapManager {
         preferredType: ZapType? = nil,
         preferredProvider: String? = nil
     ) async throws -> ZapResult {
-        print("// 1. Fetch all recipient info ONCE")
+        NDKLogger.log(.debug, category: .wallet, "// 1. Fetch all recipient info ONCE")
         // 1. Fetch all recipient info ONCE
         let recipientInfo = await fetchRecipientZapInfo(for: recipient)
         
-        print("// 2. Select zap protocol based on available options")
+        NDKLogger.log(.debug, category: .wallet, "// 2. Select zap protocol based on available options")
         // 2. Select zap protocol based on available options
         let zapProtocol = try selectZapProtocol(
             recipientInfo: recipientInfo,
             preferredType: preferredType
         )
         
-        print("// 3. Prepare the zap with pre-fetched info")
+        NDKLogger.log(.debug, category: .wallet, "// 3. Prepare the zap with pre-fetched info")
         // 3. Prepare the zap with pre-fetched info
         let prepared = try await zapProtocol.prepareZap(
             event: event,
@@ -166,13 +166,13 @@ public actor NDKZapManager {
             comment: comment
         )
         
-        print("// 3. Try to find a provider that can directly fulfill the request")
+        NDKLogger.log(.debug, category: .wallet, "// 3. Try to find a provider that can directly fulfill the request")
         // 3. Try to find a provider that can directly fulfill the request
         if let provider = try? await selectPaymentProvider(
             for: prepared.paymentRequest,
             preferredId: preferredProvider
         ) {
-            print("// Direct fulfillment path")
+            NDKLogger.log(.debug, category: .wallet, "// Direct fulfillment path")
             // Direct fulfillment path
             let confirmation = try await provider.fulfill(prepared.paymentRequest)
             return try await zapProtocol.completeZap(
@@ -181,7 +181,7 @@ public actor NDKZapManager {
             )
         }
         
-        print("// 4. No direct provider - try protocol transformation")
+        NDKLogger.log(.debug, category: .wallet, "// 4. No direct provider - try protocol transformation")
         // 4. No direct provider - try protocol transformation
         // If this is a Nutzap, try Lightning fallback
         if zapProtocol.type == .nutzap,
@@ -538,7 +538,7 @@ public actor NDKZapManager {
         recipientInfo: RecipientZapInfo,
         preferredType: ZapType?
     ) throws -> NDKZapProtocol {
-        print("selectZapProtocol \(String(describing: preferredType)), supported: \(recipientInfo.supportedZapTypes)")
+        NDKLogger.log(.debug, category: .wallet, "selectZapProtocol \(String(describing: preferredType)), supported: \(recipientInfo.supportedZapTypes)")
         
         // Try preferred type first if it's supported
         if let preferredType = preferredType,
@@ -558,7 +558,7 @@ public actor NDKZapManager {
            let lightningProtocol = zapProtocols[.lightning] {
             return lightningProtocol
         }
-        print("recipientDoesNotSupportZaps")
+        NDKLogger.log(.debug, category: .wallet, "recipientDoesNotSupportZaps")
         
         throw ZapError.recipientDoesNotSupportZaps
     }

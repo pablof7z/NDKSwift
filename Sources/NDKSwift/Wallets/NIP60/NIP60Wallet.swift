@@ -82,7 +82,7 @@ public actor NIP60Wallet: NDKPaymentProvider {
             let lastTimestamp = await eventManager.getLastWalletConfigTimestamp()
             
             if event.createdAt <= lastTimestamp {
-                print("⏭️ Skipping older wallet configuration")
+                NDKLogger.log(.debug, category: .wallet, "⏭️ Skipping older wallet configuration")
                 return
             }
             
@@ -148,7 +148,7 @@ public actor NIP60Wallet: NDKPaymentProvider {
                 // Use wallet-specific relays if configured from 17375 event
                 let relayUrls: Set<String>? = walletConfigRelays.isEmpty ? nil : Set(walletConfigRelays)
                 
-                print("📡 Starting wallet event subscription with \(walletConfigRelays.isEmpty ? "default" : "\(walletConfigRelays.count) configured") relays")
+                NDKLogger.log(.debug, category: .wallet, "📡 Starting wallet event subscription with \(walletConfigRelays.isEmpty ? "default" : "\(walletConfigRelays.count) configured") relays")
                 
                 // Create NDKDataSource for each filter
                 var dataSources: [NDKDataSource<NDKEvent>] = []
@@ -186,9 +186,9 @@ public actor NIP60Wallet: NDKPaymentProvider {
                 }
             } catch {
                 if error is CancellationError {
-                    print("🛑 Wallet event subscription cancelled")
+                    NDKLogger.log(.debug, category: .wallet, "🛑 Wallet event subscription cancelled")
                 } else {
-                    print("❌ Wallet event subscription error: \(error)")
+                    NDKLogger.log(.debug, category: .wallet, "❌ Wallet event subscription error: \(error)")
                 }
             }
         }
@@ -215,16 +215,16 @@ public actor NIP60Wallet: NDKPaymentProvider {
     /// Note: Mints that fail to load (e.g., due to network errors) will be skipped and not added to the wallet.
     internal func processWalletConfiguration(event: NDKEvent) async {
         
-        print("⚙️ Processing wallet configuration")
-        print("⚙️ Event ID: \(event.id)")
-        print("⚙️ Event Kind: \(event.kind)")
+        NDKLogger.log(.debug, category: .wallet, "⚙️ Processing wallet configuration")
+        NDKLogger.log(.debug, category: .wallet, "⚙️ Event ID: \(event.id)")
+        NDKLogger.log(.debug, category: .wallet, "⚙️ Event Kind: \(event.kind)")
         
         let walletEvent = NDKCashuWalletEvent(event: event)
         
         // Process relay tags (unencrypted, no signer needed)
         walletConfigRelays = walletEvent.relays
         walletRelays = walletEvent.relays.compactMap { NDKRelay(url: $0) }
-        print("📡 Extracted \(walletRelays.count) wallet relays from wallet event")
+        NDKLogger.log(.debug, category: .wallet, "📡 Extracted \(walletRelays.count) wallet relays from wallet event")
         
         do {
             // Get current mints before update
@@ -232,15 +232,15 @@ public actor NIP60Wallet: NDKPaymentProvider {
             
             // Process P2PK private key
             if let privkey = try await walletEvent.privateKey(signer: signer) {
-                print("🔑 Found P2PK private key in wallet config: \(privkey.prefix(8))...")
+                NDKLogger.log(.debug, category: .wallet, "🔑 Found P2PK private key in wallet config: \(privkey.prefix(8))...")
                 try? await p2pkManager.restoreFromPrivateKey(privkey)
             } else {
-                print("🔑 No P2PK private key found in wallet config")
+                NDKLogger.log(.debug, category: .wallet, "🔑 No P2PK private key found in wallet config")
             }
             
             // Process mints
             let mintURLs = try await walletEvent.mints(signer: signer)
-            print("🏪 Extracted \(mintURLs.count) mint URLs from wallet config: \(mintURLs)")
+            NDKLogger.log(.debug, category: .wallet, "🏪 Extracted \(mintURLs.count) mint URLs from wallet config: \(mintURLs)")
             
             // Get current blacklisted mints
             let blacklistedMints = await getBlacklistedMints()
@@ -256,7 +256,7 @@ public actor NIP60Wallet: NDKPaymentProvider {
             for mintURL in mintsToRemove {
                 guard let url = URL(string: mintURL) else { continue }
                 _ = await mints.removeMint(url: url)
-                print("🗑 Removed mint no longer in config: \(mintURL)")
+                NDKLogger.log(.debug, category: .wallet, "🗑 Removed mint no longer in config: \(mintURL)")
             }
             
             // Add new mints from configuration
@@ -264,13 +264,13 @@ public actor NIP60Wallet: NDKPaymentProvider {
             
             for mintURL in mintURLs {
                 guard let url = URL(string: mintURL) else { 
-                    print("⚠️ Invalid mint URL: \(mintURL)")
+                    NDKLogger.log(.debug, category: .wallet, "⚠️ Invalid mint URL: \(mintURL)")
                     continue 
                 }
                 
                 // Skip if blacklisted
                 if blacklistedMints.contains(mintURL) {
-                    print("🚫 Skipping blacklisted mint: \(mintURL)")
+                    NDKLogger.log(.debug, category: .wallet, "🚫 Skipping blacklisted mint: \(mintURL)")
                     continue
                 }
                 
@@ -282,7 +282,7 @@ public actor NIP60Wallet: NDKPaymentProvider {
                 
                 await mints.addMintURL(url: url)
                 successfullyAddedMints.insert(mintURL)
-                print("✅ Added mint URL: \(mintURL)")
+                NDKLogger.log(.debug, category: .wallet, "✅ Added mint URL: \(mintURL)")
             }
             
             // Get the actual current mints from MintManager after updates
@@ -307,13 +307,13 @@ public actor NIP60Wallet: NDKPaymentProvider {
                 }
             }
             
-            print("✅ Wallet configuration updated:")
-            print("  - Requested mints: \(mintURLs.count)")
-            print("  - Successfully added: \(successfullyAddedMints.count)")
-            print("  - Total active mints: \(actualCurrentMints.count)")
-            print("  - Active mint URLs: \(actualCurrentMints)")
+            NDKLogger.log(.debug, category: .wallet, "✅ Wallet configuration updated:")
+            NDKLogger.log(.debug, category: .wallet, "  - Requested mints: \(mintURLs.count)")
+            NDKLogger.log(.debug, category: .wallet, "  - Successfully added: \(successfullyAddedMints.count)")
+            NDKLogger.log(.debug, category: .wallet, "  - Total active mints: \(actualCurrentMints.count)")
+            NDKLogger.log(.debug, category: .wallet, "  - Active mint URLs: \(actualCurrentMints)")
         } catch {
-            print("❌ Failed to parse wallet configuration: \(error)")
+            NDKLogger.log(.debug, category: .wallet, "❌ Failed to parse wallet configuration: \(error)")
         }
     }
     
@@ -576,7 +576,7 @@ public actor NIP60Wallet: NDKPaymentProvider {
             signer: signer
         )
         
-        print("🔍 Reconciliation complete - Checked: \(result.totalChecked), Spent: \(result.spentProofs.count), Pending: \(result.pendingProofs.count), Errors: \(result.errors)")
+        NDKLogger.log(.debug, category: .wallet, "🔍 Reconciliation complete - Checked: \(result.totalChecked), Spent: \(result.spentProofs.count), Pending: \(result.pendingProofs.count), Errors: \(result.errors)")
     }
     
     
@@ -659,9 +659,9 @@ public actor NIP60Wallet: NDKPaymentProvider {
     ///     ) {
     ///         switch status {
     ///         case .pending:
-    ///             print("Waiting for payment...")
+    ///             NDKLogger.log(.debug, category: .wallet, "Waiting for payment...")
     ///         case .minted(let proofs):
-    ///             print("Payment received!")
+    ///             NDKLogger.log(.debug, category: .wallet, "Payment received!")
     ///         // ... handle other cases
     ///         }
     ///     }
@@ -729,7 +729,7 @@ public actor NIP60Wallet: NDKPaymentProvider {
         
         let userPubkey = try await signer.pubkey
         
-        print("📡 Starting wallet configuration subscription...")
+        NDKLogger.log(.debug, category: .wallet, "📡 Starting wallet configuration subscription...")
         
         // Start configuration subscription and wait for EOSE
         configSubscriptionTask = Task {
@@ -812,14 +812,14 @@ public actor NIP60Wallet: NDKPaymentProvider {
         
         // Skip if older than 24 hours
         guard age < 86400 else { 
-            print("📜 Skipping quote tracking for \(quote.quoteId) - older than 24 hours")
+            NDKLogger.log(.debug, category: .wallet, "📜 Skipping quote tracking for \(quote.quoteId) - older than 24 hours")
             return 
         }
         
         // Cancel existing monitor if any
         activeQuoteMonitors[quote.quoteId]?.cancel()
         
-        print("📜 Starting quote tracking for \(quote.quoteId) - age: \(Int(age/60)) minutes")
+        NDKLogger.log(.debug, category: .wallet, "📜 Starting quote tracking for \(quote.quoteId) - age: \(Int(age/60)) minutes")
         
         // Start monitoring with dynamic interval
         let task = Task { [weak self] in
@@ -848,13 +848,13 @@ public actor NIP60Wallet: NDKPaymentProvider {
                     switch status {
                     case .minted:
                         // Success - delete the quote event
-                        print("✅ Quote \(quote.quoteId) successfully minted - deleting quote event")
+                        NDKLogger.log(.debug, category: .wallet, "✅ Quote \(quote.quoteId) successfully minted - deleting quote event")
                         try? await self.eventManager.deleteQuoteEvent(eventId: event.id, signer: self.signer)
                         await self.clearQuoteMonitor(quoteId: quote.quoteId)
                         return
                         
                     case .expired, .cancelled:
-                        print("❌ Quote \(quote.quoteId) expired or cancelled")
+                        NDKLogger.log(.debug, category: .wallet, "❌ Quote \(quote.quoteId) expired or cancelled")
                         await self.clearQuoteMonitor(quoteId: quote.quoteId)
                         return
                         
@@ -864,7 +864,7 @@ public actor NIP60Wallet: NDKPaymentProvider {
                     }
                 }
             } catch {
-                print("❌ Error monitoring quote \(quote.quoteId): \(error)")
+                NDKLogger.log(.debug, category: .wallet, "❌ Error monitoring quote \(quote.quoteId): \(error)")
                 await self.clearQuoteMonitor(quoteId: quote.quoteId)
             }
         }
@@ -960,7 +960,7 @@ public actor NIP60Wallet: NDKPaymentProvider {
     
     /// Handles all proof state changes using explicit state change instructions
     public func update(stateChange: WalletStateChange) async throws -> [String] {
-        print("NIP60Wallet.update() - Storing \(stateChange.store.count) proofs, destroying \(stateChange.destroy.count) proofs")
+        NDKLogger.log(.debug, category: .wallet, "NIP60Wallet.update() - Storing \(stateChange.store.count) proofs, destroying \(stateChange.destroy.count) proofs")
         
         // Update internal state immediately
         await updateInternalState(stateChange)
@@ -982,7 +982,7 @@ public actor NIP60Wallet: NDKPaymentProvider {
         // Add new proofs
         for proof in stateChange.store {
             await proofStateManager.addProof(proof, mint: stateChange.mint)
-            print("  Added proof: amount=\(proof.amount), C=\(proof.C)")
+            NDKLogger.log(.debug, category: .wallet, "  Added proof: amount=\(proof.amount), C=\(proof.C)")
         }
     }
     
@@ -1118,14 +1118,14 @@ public actor NIP60Wallet: NDKPaymentProvider {
                             let published = try await ndk.publish(tokenEvent.event, to: relayURLs)
                             if published.contains(relay) {
                                 repairedCount += 1
-                                print("✅ Repaired token event \(eventId) on relay \(relay.url)")
+                                NDKLogger.log(.debug, category: .wallet, "✅ Repaired token event \(eventId) on relay \(relay.url)")
                             } else {
                                 failedCount += 1
-                                print("❌ Failed to repair token event \(eventId) on relay \(relay.url)")
+                                NDKLogger.log(.debug, category: .wallet, "❌ Failed to repair token event \(eventId) on relay \(relay.url)")
                             }
                         } catch {
                             failedCount += 1
-                            print("❌ Error creating token event for repair: \(error)")
+                            NDKLogger.log(.debug, category: .wallet, "❌ Error creating token event for repair: \(error)")
                         }
                     }
                 }
@@ -1137,18 +1137,18 @@ public actor NIP60Wallet: NDKPaymentProvider {
                     let published = try await ndk.publish(event, to: relayURLs)
                     if published.contains(relay) {
                         repairedCount += 1
-                        print("✅ Repaired event \(eventId) on relay \(relay.url)")
+                        NDKLogger.log(.debug, category: .wallet, "✅ Repaired event \(eventId) on relay \(relay.url)")
                     } else {
                         failedCount += 1
                     }
                 } else {
                     failedCount += 1
-                    print("⚠️ Event \(eventId) not found in cache")
+                    NDKLogger.log(.debug, category: .wallet, "⚠️ Event \(eventId) not found in cache")
                 }
             }
         }
         
-        print("🔧 Relay repair complete: \(repairedCount) repaired, \(failedCount) failed")
+        NDKLogger.log(.debug, category: .wallet, "🔧 Relay repair complete: \(repairedCount) repaired, \(failedCount) failed")
     }
     
     // MARK: - Internal Helpers
@@ -1169,7 +1169,7 @@ public actor NIP60Wallet: NDKPaymentProvider {
         // Clear wallet configuration
         walletConfigRelays = []
         
-        print("🛑 NIP60Wallet stopped")
+        NDKLogger.log(.debug, category: .wallet, "🛑 NIP60Wallet stopped")
     }
     
     /// Check wallet health status
