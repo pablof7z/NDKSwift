@@ -62,17 +62,17 @@ extension CashuSwift {
                     
                     let dleq: CashuSwift.DLEQ?
                     if let dleqFields = p.dleqProof {
-                        dleq = CashuSwift.DLEQ(e: String(bytes: dleqFields.e),
-                                               s: String(bytes: dleqFields.s),
-                                               r: String(bytes: dleqFields.r))
+                        dleq = CashuSwift.DLEQ(e: Data(dleqFields.e).hexString,
+                                               s: Data(dleqFields.s).hexString,
+                                               r: Data(dleqFields.r).hexString)
                     } else {
                         dleq = nil
                     }
                     
-                    return Proof(keysetID: String(bytes: entry.keysetID),
+                    return Proof(keysetID: Data(entry.keysetID).hexString,
                                  amount: p.amount,
                                  secret: p.secret,
-                                 C: String(bytes: p.signature),
+                                 C: Data(p.signature).hexString,
                                  dleq: dleq)
                 }))
             }
@@ -118,25 +118,28 @@ extension CashuSwift {
             }
             
             let tokenEntries = try byKeysetID.map { (id, ps) in
-                TokenV4.TokenEntry(keysetID: Data(try id.bytes),
-                                   proofs: try ps.map({ p in
+                guard let keysetIDData = id.hexDecoded() else {
+                    throw CashuError.tokenEncoding("Invalid hex keyset ID: \(id)")
+                }
+                return TokenV4.TokenEntry(keysetID: keysetIDData,
+                                   proofs: ps.map({ p in
                     
                     let dleq: TokenV4.TokenEntry.Proof.DLEQProof?
                     if let data = p.dleq,
                        let r = data.r,
-                       let eBytes = try? data.e.bytes,
-                       let sBytes = try? data.s.bytes,
-                       let rBytes = try? r.bytes {
-                        dleq = TokenV4.TokenEntry.Proof.DLEQProof(e: Data(eBytes),
-                                                                  s: Data(sBytes),
-                                                                  r: Data(rBytes))
+                       let eData = data.e.hexDecoded(),
+                       let sData = data.s.hexDecoded(),
+                       let rData = r.hexDecoded() {
+                        dleq = TokenV4.TokenEntry.Proof.DLEQProof(e: eData,
+                                                                  s: sData,
+                                                                  r: rData)
                     } else {
                         dleq = nil
                     }
                     
                     return TokenV4.TokenEntry.Proof(amount: p.amount,
                                                     secret: p.secret,
-                                                    signature: Data(try p.C.bytes),
+                                                    signature: p.C.hexDecoded() ?? Data(),
                                                     dleqProof: dleq,
                                                     witness: nil)
                 }))

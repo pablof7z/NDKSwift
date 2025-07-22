@@ -91,7 +91,7 @@ extension CashuSwift {
                                                                              secret:String) {
             let x = try PrivateKey()
             
-            let xString = String(bytes: x.dataRepresentation)
+            let xString = x.dataRepresentation.hexString
             
             let Y = try secureHashToCurve(message: xString)
             
@@ -119,7 +119,7 @@ extension CashuSwift {
             
             let x = try childPrivateKeyForDerivationPath(seed: seed, derivationPath: secretPath)
             
-            let xString = String(bytes: x.dataRepresentation)
+            let xString = x.dataRepresentation.hexString
             
             let Y = try secureHashToCurve(message: xString)
             
@@ -164,13 +164,20 @@ extension CashuSwift {
             var proofs = [Proof]()
             for i in 0..<promises.count {
                 let promise = promises[i]
-                guard let pubkeyData = try? keyset.keys[String(promise.amount)]?.bytes else {
+                guard let pubkeyHex = keyset.keys[String(promise.amount)],
+                      let pubkeyData = Data(hexString: pubkeyHex) else {
                     throw CashuError.cryptoError("Could not associate mint pubkey from keyset. unblinding not possible")
                 }
                 
                 let mintPubKey = try PublicKey(dataRepresentation: pubkeyData, format: .compressed)
-                let r = try PrivateKey(dataRepresentation: blindingFactors[i].bytes)
-                let C_ = try PublicKey(dataRepresentation: promise.C_.bytes, format: .compressed)
+                guard let rData = Data(hexString: blindingFactors[i]) else {
+                    throw CashuError.cryptoError("Invalid blinding factor hex")
+                }
+                let r = try PrivateKey(dataRepresentation: rData)
+                guard let C_Data = Data(hexString: promise.C_) else {
+                    throw CashuError.cryptoError("Invalid C_ hex")
+                }
+                let C_ = try PublicKey(dataRepresentation: C_Data, format: .compressed)
                 let C = try unblind(C_: C_, r: r, A: mintPubKey)
                 
                 var dleq: DLEQ? = nil
@@ -181,7 +188,7 @@ extension CashuSwift {
                 let proof = Proof(keysetID: promises[i].id,
                                   amount: promises[i].amount,
                                   secret: secrets[i],
-                                  C: String(bytes: C.dataRepresentation),
+                                  C: C.dataRepresentation.hexString,
                                   dleq: dleq)
                 
                 proofs.append(proof)
@@ -190,7 +197,7 @@ extension CashuSwift {
         }
         
         static func unblind(C_:PublicKey, r: PrivateKey, A: PublicKey) throws -> PublicKey {
-            let rA = try A.multiply(r.dataRepresentation.bytes)
+            let rA = try A.multiply([UInt8](r.dataRepresentation))
             let C = try C_.combine([rA.negation])
             return C
         }
@@ -233,9 +240,9 @@ extension CashuSwift {
                                                                      """)
                 }
                 
-                guard let e = try p.dleq?.e.bytes,
-                      let s = try p.dleq?.s.bytes,
-                      let r = try p.dleq?.r?.bytes else {
+                guard let eData = p.dleq?.e.hexDecoded(),
+                      let sData = p.dleq?.s.hexDecoded(),
+                      let rData = p.dleq?.r?.hexDecoded() else {
                     throw Crypto.Error.DLEQVerificationNoData("""
                                                         At least one necessary parameter for DLEQ \
                                                         verification is not contained in proof.
@@ -243,10 +250,17 @@ extension CashuSwift {
                                                         """)
                 }
                 
-                let A = try PublicKey(dataRepresentation: AString.bytes, format: .compressed)
-                let C = try PublicKey(dataRepresentation: p.C.bytes, format: .compressed)
+                guard let AData = AString.hexDecoded() else {
+                    throw CashuError.cryptoError("Invalid A hex string")
+                }
+                let A = try PublicKey(dataRepresentation: AData, format: .compressed)
                 
-                checks.append(try verifyDLEQ(A: A, C: C, x: p.secret, e: Data(e), s: Data(s), r: Data(r)))
+                guard let CData = p.C.hexDecoded() else {
+                    throw CashuError.cryptoError("Invalid C hex string")
+                }
+                let C = try PublicKey(dataRepresentation: CData, format: .compressed)
+                
+                checks.append(try verifyDLEQ(A: A, C: C, x: p.secret, e: eData, s: sData, r: rData))
             }
             
             return checks.allSatisfy({ $0 == true })
@@ -265,16 +279,23 @@ extension CashuSwift {
                                                                      """)
                 }
                 
-                guard let e = try p.dleq?.e.bytes,
-                      let s = try p.dleq?.s.bytes,
-                      let r = try p.dleq?.r?.bytes else {
+                guard let eData = p.dleq?.e.hexDecoded(),
+                      let sData = p.dleq?.s.hexDecoded(),
+                      let rData = p.dleq?.r?.hexDecoded() else {
                     return .noData
                 }
                 
-                let A = try PublicKey(dataRepresentation: AString.bytes, format: .compressed)
-                let C = try PublicKey(dataRepresentation: p.C.bytes, format: .compressed)
+                guard let AData = AString.hexDecoded() else {
+                    throw CashuError.cryptoError("Invalid A hex string")
+                }
+                let A = try PublicKey(dataRepresentation: AData, format: .compressed)
                 
-                checks.append(try verifyDLEQ(A: A, C: C, x: p.secret, e: Data(e), s: Data(s), r: Data(r)))
+                guard let CData = p.C.hexDecoded() else {
+                    throw CashuError.cryptoError("Invalid C hex string")
+                }
+                let C = try PublicKey(dataRepresentation: CData, format: .compressed)
+                
+                checks.append(try verifyDLEQ(A: A, C: C, x: p.secret, e: eData, s: sData, r: rData))
             }
             
             return checks.allTrue ? .valid : .fail
@@ -321,13 +342,12 @@ extension CashuSwift {
         
         static func hashConcat(_ publicKeys: [PublicKey]) -> Data {
             
-            var concat = ""
+            var concatData = Data()
             for k in publicKeys {
-                let kData = k.uncompressedRepresentation
-                concat.append(String(bytes: kData))
+                concatData.append(k.uncompressedRepresentation)
             }
             
-            return Data(SHA256.hash(data: concat.data(using: .utf8)!))
+            return Data(SHA256.hash(data: concatData))
         }
         
         static func signatures(on secret: String,
@@ -336,8 +356,8 @@ extension CashuSwift {
                 throw Crypto.Error.invalidSecret("Could not turn secret string into data for signing.")
             }
             return try keys.map { key in
-                let sigBytes = try key.signature(for: secretData).bytes
-                return String(bytes: sigBytes)
+                let signature = try key.signature(for: secretData)
+                return Data(signature.dataRepresentation).hexString
             }
         }
         
@@ -390,15 +410,15 @@ func convertKeysetID(keysetID: String) -> Int? {
 }
 
 func convertHexKeysetID(keysetID: String) -> Int? {
-    let data = try! [UInt8](Data(keysetID.bytes))
-    let big = BInt(bytes: data)
+    guard let data = keysetID.hexDecoded() else { return nil }
+    let big = BInt(bytes: [UInt8](data))
     let result = big % (Int(pow(2.0, 31.0)) - 1)
     return Int(result)
 }
 
 extension secp256k1.Signing.PublicKey {
     var stringRepresentation:String {
-        return String(bytes: self.dataRepresentation)
+        return self.dataRepresentation.hexString
     }
     
     func subtract(_ publicKey: secp256k1.Signing.PublicKey, format: secp256k1.Format = .compressed) throws -> secp256k1.Signing.PublicKey {
@@ -408,6 +428,6 @@ extension secp256k1.Signing.PublicKey {
 
 extension secp256k1.Signing.PrivateKey {
     var stringRepresentation:String {
-        return String(bytes: self.dataRepresentation)
+        return self.dataRepresentation.hexString
     }
 }

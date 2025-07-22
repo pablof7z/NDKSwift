@@ -38,10 +38,11 @@ extension CashuSwift {
         
         var publicKey: String? = nil
         if let privateKey {
-            guard let k = try? secp256k1.Schnorr.PrivateKey(dataRepresentation: privateKey.bytes) else {
+            guard let privateKeyData = Data(hexString: privateKey),
+                  let k = try? secp256k1.Schnorr.PrivateKey(dataRepresentation: privateKeyData) else {
                 throw CashuError.spendingConditionError("Token contains locked proofs but private key was not provided or invalid.")
             }
-            publicKey = String(bytes: k.publicKey.dataRepresentation)
+            publicKey = k.publicKey.dataRepresentation.hexString
         }
         
         switch try token.checkAllInputsLocked(to: publicKey) {
@@ -51,11 +52,13 @@ extension CashuSwift {
             let proofsWitness = try inputProofs.map { p in
                 // FIXME: redundant
                 guard let privateKey,
-                      let k = try? secp256k1.Schnorr.PrivateKey(dataRepresentation: privateKey.bytes) else {
+                      let privateKeyData = Data(hexString: privateKey),
+                      let k = try? secp256k1.Schnorr.PrivateKey(dataRepresentation: privateKeyData) else {
                     throw CashuError.spendingConditionError("Token contains locked proofs but private key was not provided or invalid.")
                 }
-                let sigBytes = try k.signature(for: p.secret.data(using: .utf8)!).bytes
-                let witness = Proof.Witness(signatures: [String(bytes: sigBytes)])
+                let signature = try k.signature(for: p.secret.data(using: .utf8)!)
+                let signatureHex = Data(signature.dataRepresentation).hexString
+                let witness = Proof.Witness(signatures: [signatureHex])
                 return try Proof(keysetID: p.keysetID,
                                  amount: p.amount,
                                  secret: p.secret,

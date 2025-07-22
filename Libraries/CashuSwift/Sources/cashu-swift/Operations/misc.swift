@@ -55,17 +55,17 @@ public enum CashuSwift {
         var blindingFactors = [String]()
         var secrets = [String]()
         for amount in distribution {
-            let nonce = try String(bytes: secp256k1.Signing.PrivateKey().dataRepresentation)
+            let nonce = try secp256k1.Signing.PrivateKey().dataRepresentation.hexString
             let payload = SpendingCondition.Payload(nonce: nonce, data: publicKey, tags: nil)
             let sc = SpendingCondition(kind: .P2PK, payload: payload)
             let secret = try sc.serialize() // ONLY EVER SERIALIZE THIS ONCE to not have order of fields change
             let blindingFactor = try secp256k1.Signing.PrivateKey()
             let outputRaw = try Crypto.output(secret: secret, blindingFactor: blindingFactor)
             let output = Output(amount: amount,
-                                B_: String(bytes: outputRaw.dataRepresentation),
+                                B_: outputRaw.dataRepresentation.hexString,
                                 id: keyset.keysetID)
             outputs.append(output)
-            blindingFactors.append(String(bytes: blindingFactor.dataRepresentation))
+            blindingFactors.append(blindingFactor.dataRepresentation.hexString)
             secrets.append(secret)
         }
         return (outputs, blindingFactors, secrets)
@@ -419,8 +419,11 @@ extension CashuSwift {
     }
     
     public static func sign(all inputs: [Proof], using keyHex: String) throws {
-        let key = try secp256k1.Schnorr.PrivateKey(dataRepresentation: keyHex.bytes)
-        let publicKeyHex = String(bytes: key.publicKey.dataRepresentation)
+        guard let keyData = Data(hexString: keyHex) else {
+            throw CashuError.cryptoError("Invalid hex string for private key")
+        }
+        let key = try secp256k1.Schnorr.PrivateKey(dataRepresentation: keyData)
+        let publicKeyHex = key.publicKey.dataRepresentation.hexString
         
         for var p in inputs {
             guard let sc = SpendingCondition.deserialize(from: p.secret) else {
