@@ -7,6 +7,72 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.2] - 2025-07-21
+
+### Fixed
+- Nutzap fee handling to prevent `invalidSplit` errors when sending ecash
+  - Now uses CashuSwift's `pick()` function for automatic fee calculation and proof selection
+  - Ensures sufficient proofs are selected to cover both payment amount and fees
+  - Adds fee buffer when checking mint balances for payment routing
+  - Fixes issue where sending exact amounts (e.g., 10 sats) would fail due to unaccounted fees
+
+### Added
+- Immediate cache-first behavior for `NDKDataSource` subscriptions
+  - Cache is now queried immediately when creating a data source, eliminating the 100ms grouping delay
+  - Events from cache are delivered instantly, improving perceived performance
+  - Network fetch is skipped entirely when cache is fresh (based on `maxAge` parameter)
+  - `CachePolicy.networkOnly` prevents immediate cache hits when fresh data is required
+  - Cache observation handles are properly managed to prevent duplicate event delivery
+- Event-driven methods for `NDKDataSource` to replace polling patterns
+  - `first(timeout:)` - Wait for and return the first event or nil if none arrive
+  - `collect(timeout:limit:)` - Collect all events until EOSE or timeout
+  - `eventsUntilEOSE` - AsyncStream that emits events and completes on EOSE
+  - These methods properly wait for events to arrive from relays before returning
+- Example demonstrating event-driven nutzap preference handling (`EventDrivenNutzapExample.swift`)
+- Nutzap tracking and redemption state management in NIP60Wallet
+  - Track all incoming nutzaps with their amount, sender, and comment
+  - Monitor redemption status through kind:7376 spending history events
+  - Public APIs to query nutzaps by state (pending/redeemed)
+  - `getNutzaps()` - Get all nutzaps sorted by creation date
+  - `getPendingNutzaps()` - Get only unredeemed nutzaps
+  - `getRedeemedNutzaps()` - Get only redeemed nutzaps
+  - `isNutzapRedeemed(eventId)` - Check if a specific nutzap is redeemed
+  - `getTotalPendingNutzapAmount()` - Get total amount of pending nutzaps
+  - `getTotalRedeemedNutzapAmount()` - Get total amount of redeemed nutzaps
+  - Automatic tracking of nutzap state through spending history events
+  - Loads historical nutzaps and their redemption state on wallet initialization
+
+- Unified transaction history API in NIP60Wallet
+  - `WalletTransaction` struct represents all transaction types (mint, melt, send, receive, nutzaps)
+  - Uses random UUIDs for stable transaction IDs that persist across state changes
+  - Fully reactive implementation using NDKDataSource for real-time updates
+  - Comprehensive lookup indices for efficient transaction finding
+  - `getTransactionHistory()` - Get complete transaction history sorted by date
+  - `getTransactions(types:)` - Filter by transaction types
+  - `getTransactions(direction:)` - Filter by incoming/outgoing
+  - `getRecentTransactions(limit:)` - Get most recent transactions
+  - `getTransactionSummary()` - Get statistics (counts, amounts by type, totals)
+  - Real-time updates via event stream with `transactionAdded` and `transactionUpdated` events
+  - Support for pending transactions that exist before any Nostr events
+  - Automatic matching of events to existing transactions
+  - Progressive status updates (pending → processing → completed)
+  - Apps no longer need to merge different event types manually
+
+### Changed
+- Updated `NDKNutzapProtocol` to use event-driven `first()` method for fetching preferences
+- Improved subscription handling to ensure events are delivered before methods return
+
+### Fixed  
+- Fixed race condition where `NDKDataSource.currentValue()` could return empty array before subscription started
+  - Methods now properly wait for initial data or EOSE before returning
+
+### Deprecated
+- `currentValue()` method on `NDKDataSource` - use event-driven methods instead
+  - Use `first()` to get the first event
+  - Use `collect()` to get all events until EOSE
+  - Use `events` AsyncStream for continuous updates
+  - Use `eventsUntilEOSE` for processing events as they arrive until completion
+
 ## [0.4.1] - 2025-07-21
 
 ### Fixed

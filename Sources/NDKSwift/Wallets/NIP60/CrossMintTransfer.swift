@@ -99,9 +99,11 @@ public enum CrossMintTransfer {
     ) async -> PaymentRoute {
         NDKLogger.log(.debug, category: .general, "CrossMintTransfer.findBestPaymentRoute - amount: \(amount), acceptedMints: \(acceptedMints)")
         // First, try to find a direct payment option
+        // Add buffer for fees (typically 1-2 sats for small payments)
+        let amountWithFeeBuffer = amount + 2
         if let directMint = await findMintWithSufficientBalance(
             acceptedMints: acceptedMints,
-            requiredAmount: amount,
+            requiredAmount: amountWithFeeBuffer,
             mints: mints,
             proofStateManager: proofStateManager,
             blacklistedMints: blacklistedMints

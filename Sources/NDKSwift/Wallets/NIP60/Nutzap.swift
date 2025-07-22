@@ -33,7 +33,9 @@ public enum Nutzap {
         signer: NDKSigner
     ) async throws -> NDKEvent {
         // Get mints with sufficient balance, ordered by balance (highest first)
-        let viableMintURLs = await proofStateManager.getMintsWithSufficientBalance(amount: amount)
+        // Add a buffer for fees (typically 1-2 sats for small amounts)
+        let amountWithFeeBuffer = amount + 2
+        let viableMintURLs = await proofStateManager.getMintsWithSufficientBalance(amount: amountWithFeeBuffer)
         
         guard !viableMintURLs.isEmpty else {
             throw NDKError.insufficientBalance(amount: amount)
@@ -59,12 +61,23 @@ public enum Nutzap {
                 lastError = error
                 continue
             }
-            // Select and lock proofs
-            let selectedProofs = await proofStateManager.selectProofs(amount: amount, mint: mintURL)
-            guard !selectedProofs.isEmpty else {
+            // Get available proofs and use CashuSwift's pick function to handle fee calculation
+            let availableProofs = await proofStateManager.getAvailableProofs(mint: mintURL)
+            guard let pickResult = CashuSwift.pick(availableProofs, amount: Int(amount), mint: mint) else {
                 lastError = NDKError.insufficientBalance(amount: amount)
                 continue
             }
+            
+            // Convert ProofRepresenting to concrete Proof types
+            let selectedProofs = pickResult.selected.compactMap { $0 as? CashuSwift.Proof }
+            guard selectedProofs.count == pickResult.selected.count else {
+                lastError = NDKError.invalidProof("Failed to convert selected proofs")
+                continue
+            }
+            
+            let calculatedFee = pickResult.fee
+            
+            NDKLogger.log(.debug, category: .wallet, "Selected \(selectedProofs.count) proofs for nutzap. Amount: \(amount), Fee: \(calculatedFee)")
             
             // Reserve proofs
             do {
@@ -129,6 +142,29 @@ public enum Nutzap {
                     redeemedEventId: nil,
                     signer: signer
                 )
+                
+                // Add to transaction history
+                let nutzapData = NutzapData(
+                    recipientPubkey: recipient,
+                    nutzapEventId: nutzapEvent.id,
+                    comment: comment,
+                    eventBeingZapped: eventId
+                )
+                
+                let transaction = WalletTransaction(
+                    type: .nutzapSent,
+                    amount: amount,
+                    direction: .outgoing,
+                    status: .completed,
+                    memo: comment ?? "Nutzap sent",
+                    mint: mintURL,
+                    timestamp: Date(),
+                    events: TransactionEvents(nutzapEventId: nutzapEvent.id),
+                    lookupKeys: TransactionLookupKeys(nutzapEventId: nutzapEvent.id, recipientPubkey: recipient),
+                    nutzapData: nutzapData
+                )
+                
+                await wallet.transactionHistory.addManualTransaction(transaction)
                 
                 return nutzapEvent
                 
