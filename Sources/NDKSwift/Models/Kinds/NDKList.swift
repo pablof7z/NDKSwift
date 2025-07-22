@@ -380,50 +380,57 @@ public class NDKList {
         let items = allItems
 
         // Filter for events referenced by 'e' tags
-        let eventIds = items.compactMap { tag -> String? in
-            guard tag.count > 1, tag[0] == "e" else { return nil }
-            return tag[1]
-        }
+        let eventIds = items.eventIds
         if !eventIds.isEmpty {
             filters.append(NDKFilter(ids: eventIds))
         }
 
         // Filter for parameterized replaceable events referenced by 'a' tags
-        let aTagGroups = Dictionary(grouping: items.compactMap { tag -> (kind: Int, pubkey: String, dTag: String?)? in
-            guard tag.count > 1, tag[0] == "a" else { return nil }
-            let parts = tag[1].split(separator: ":")
-            guard parts.count >= 2,
-                  let kind = Int(parts[0]),
-                  let pubkey = String(parts[1]).isEmpty ? nil : String(parts[1]) else { return nil }
+        filters.append(contentsOf: createFiltersForATags(items))
 
-            let dTag = parts.count > 2 ? String(parts[2]) : nil
-            return (kind: kind, pubkey: pubkey, dTag: dTag)
-        }) { $0.kind }
+        // Filter for profiles referenced by 'p' tags
+        let pubkeys = items.pubkeys
+        if !pubkeys.isEmpty {
+            filters.append(NDKFilter(authors: pubkeys, kinds: [0]))
+        }
 
-        for (kind, items) in aTagGroups {
+        return filters
+    }
+    
+    /// Parse an 'a' tag value into its components
+    private func parseATag(_ value: String) -> (kind: Int, pubkey: String, dTag: String?)? {
+        let parts = value.split(separator: ":")
+        guard parts.count >= 2,
+              let kind = Int(parts[0]),
+              let pubkey = String(parts[1]).isEmpty ? nil : String(parts[1]) else { return nil }
+        
+        let dTag = parts.count > 2 ? String(parts[2]) : nil
+        return (kind: kind, pubkey: pubkey, dTag: dTag)
+    }
+    
+    /// Create filters for 'a' tags grouped by kind
+    private func createFiltersForATags(_ items: [[String]]) -> [NDKFilter] {
+        let aTags = items.extractTags(named: NostrTag.a)
+        let parsedATags = aTags.compactMap { tag -> (kind: Int, pubkey: String, dTag: String?)? in
+            guard let value = tag[safe: 1] else { return nil }
+            return parseATag(value)
+        }
+        
+        let aTagGroups = Dictionary(grouping: parsedATags) { $0.kind }
+        
+        return aTagGroups.map { (kind, items) in
             let authors = items.map { $0.pubkey }
             let filter = NDKFilter(authors: authors, kinds: [kind])
-
+            
             // Add d-tag filter if we have specific d-tags
             let dTags = items.compactMap { $0.dTag }
             if !dTags.isEmpty, dTags.count == items.count {
                 // Note: This would need proper tag filter implementation
                 // filter.addTagFilter("d", values: Set(dTags))
             }
-
-            filters.append(filter)
+            
+            return filter
         }
-
-        // Filter for profiles referenced by 'p' tags
-        let pubkeys = items.compactMap { tag -> String? in
-            guard tag.count > 1, tag[0] == "p" else { return nil }
-            return tag[1]
-        }
-        if !pubkeys.isEmpty {
-            filters.append(NDKFilter(authors: pubkeys, kinds: [0]))
-        }
-
-        return filters
     }
 
     /// Encrypt the content using the provided signer
