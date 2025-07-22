@@ -664,15 +664,15 @@ public final class NDK {
             
             // Create auth message manually for now
             let eventDict: [String: Any] = [
-                NostrJSONConstants.EventField.id: authEvent.id,
-                NostrJSONConstants.EventField.pubkey: authEvent.pubkey,
-                NostrJSONConstants.EventField.createdAt: authEvent.createdAt,
-                NostrJSONConstants.EventField.kind: authEvent.kind,
-                NostrJSONConstants.EventField.tags: authEvent.tags,
-                NostrJSONConstants.EventField.content: authEvent.content,
-                NostrJSONConstants.EventField.sig: authEvent.sig
+                NostrJSONConstants.id: authEvent.id,
+                NostrJSONConstants.pubkey: authEvent.pubkey,
+                NostrJSONConstants.createdAt: authEvent.createdAt,
+                NostrJSONConstants.kind: authEvent.kind,
+                NostrJSONConstants.tags: authEvent.tags,
+                NostrJSONConstants.content: authEvent.content,
+                NostrJSONConstants.sig: authEvent.sig
             ]
-            let authMessage: [Any] = [NostrJSONConstants.MessageType.auth, eventDict]
+            let authMessage: [Any] = ["AUTH", eventDict]
             let jsonData = try JSONSerialization.data(withJSONObject: authMessage, options: [.withoutEscapingSlashes])
             let jsonString = String(data: jsonData, encoding: .utf8) ?? ""
             try await relay.send(jsonString)

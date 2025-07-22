@@ -143,11 +143,11 @@ public final class NDKUser: Equatable, Hashable, Sendable {
         
         // Collect all relay list events and use the most recent
         let events = await dataSource.collect(timeout: NetworkConstants.timeoutDataCollectionMedium)
-        if let event = events.sorted(by: { $0.createdAt > $1.createdAt }).first {
+        if let event = events.mostRecent {
             // Parse relay tags
             let eventTags = event.tags
             let relays = eventTags
-                .filter { $0.first == "r" }
+                .extractTags(named: NostrTagConstants.TagName.reference)
                 .compactMap { tag -> NDKRelayInfo? in
                     guard let url = tag[safe: 1] else { return nil }
                     
@@ -190,11 +190,11 @@ public final class NDKUser: Equatable, Hashable, Sendable {
         
         // Collect all contact list events and use the most recent
         let events = await dataSource.collect(timeout: NetworkConstants.timeoutDataCollectionMedium)
-        if let event = events.sorted(by: { $0.createdAt > $1.createdAt }).first {
+        if let event = events.mostRecent {
             // Parse 'p' tags from contact list
             let eventTags = event.tags
             let followedPubkeys = eventTags
-                .filter { $0.first == "p" }
+                .extractTags(named: NostrTagConstants.TagName.pubkey)
                 .compactMap { $0[safe: 1] }
             
             // Create NDKUser instances for each followed pubkey

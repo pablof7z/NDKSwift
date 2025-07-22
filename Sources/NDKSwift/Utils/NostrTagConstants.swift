@@ -68,6 +68,12 @@ public enum NostrTagConstants {
         /// Unit tag ("unit") - for currency units
         public static let unit = "unit"
         
+        /// P2PK tag ("p2pk") - for peer-to-peer key
+        public static let p2pk = "p2pk"
+        
+        /// URL tag ("u") - for URL references
+        public static let url = "u"
+        
         // MARK: - Uppercase Tags (used in comments and split zaps)
         
         /// Uppercase pubkey tag ("P") - used for split zaps and comment threads

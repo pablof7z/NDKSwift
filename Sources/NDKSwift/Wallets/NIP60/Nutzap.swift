@@ -202,7 +202,7 @@ public enum Nutzap {
         NDKLogger.log(.warning, category: .wallet, "🎯 Processing nutzap with our P2PK pubkey: \(ourPubkeyHex)")
         
         // Verify p tag points to our Nostr pubkey
-        let pTags = event.tags.filter { $0.first == "p" }
+        let pTags = event.tags.pubkeyTags
         guard let recipientTag = pTags.first,
               recipientTag.count > 1 else {
             NDKLogger.log(.warning, category: .wallet, "🎯 No recipient tag in nutzap - ignoring")

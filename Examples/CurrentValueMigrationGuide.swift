@@ -51,7 +51,7 @@ func newGetMostRecentEvent() async {
     
     // Collect all events and pick the most recent
     let events = await dataSource.collect(timeout: 5.0)
-    if let mostRecent = events.sorted(by: { $0.createdAt > $1.createdAt }).first {
+    if let mostRecent = events.mostRecent {
         print("   Found most recent event: \(mostRecent.content)")
     } else {
         print("   No events found after waiting 5 seconds")
@@ -128,7 +128,7 @@ extension NDKUser {
         )
         // Collect all profile events and use the most recent
         let events = await dataSource.collect(timeout: 3.0)
-        return events.sorted(by: { $0.createdAt > $1.createdAt }).first?.userProfile()
+        return events.mostRecent?.userProfile()
     }
 }
 
@@ -154,7 +154,7 @@ class WalletExample {
         )
         // Collect all configs and use the most recent
         let events = await dataSource.collect(timeout: 2.0)
-        return events.sorted(by: { $0.createdAt > $1.createdAt }).first?.parseWalletConfig()
+        return events.mostRecent?.parseWalletConfig()
     }
 }
 

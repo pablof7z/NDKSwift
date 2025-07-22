@@ -306,7 +306,7 @@ public extension NDK {
         
         // Collect all contact list events and use the most recent
         let events = await dataSource.collect(timeout: NetworkConstants.timeoutDataCollectionMedium)
-        guard let event = events.sorted(by: { $0.createdAt > $1.createdAt }).first else { return nil }
+        guard let event = events.mostRecent else { return nil }
         return NDKContactList.fromEvent(event)
     }
 

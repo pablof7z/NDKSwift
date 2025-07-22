@@ -63,7 +63,7 @@ public enum TimeConstants {
 public extension Timestamp {
     /// Get the current timestamp
     static var now: Timestamp {
-        return Timestamp(Date().timeIntervalSince1970)
+        return Date.currentNostrTimestamp
     }
     
     /// Create a timestamp from a Date

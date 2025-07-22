@@ -69,8 +69,8 @@ struct ContentView: View {
     }
     
     private func isLightningInvoice(_ text: String) -> Bool {
-        let cleanText = text.lowercased().replacingOccurrences(of: "lightning:", with: "")
-        return cleanText.starts(with: "lnbc") || cleanText.starts(with: "lntb") || cleanText.starts(with: "lnbcrt")
+        let cleanText = text.replacingOccurrences(of: "lightning:", with: "")
+        return LightningConstants.isLightningInvoice(cleanText)
     }
 }
 
