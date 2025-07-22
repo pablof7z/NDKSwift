@@ -466,6 +466,7 @@ public struct NDKCashuSpendingHistory {
         destroyedEventIds: [String]? = nil,
         createdEventIds: [String]? = nil,
         redeemedEventId: String? = nil,
+        token: String? = nil,
         signer: NDKSigner
     ) async throws -> NDKCashuSpendingHistory {
         let historyEvent = try await create(
@@ -476,6 +477,7 @@ public struct NDKCashuSpendingHistory {
             destroyedEventIds: destroyedEventIds,
             createdEventIds: createdEventIds,
             redeemedEventId: redeemedEventId,
+            token: token,
             signer: signer
         )
         
@@ -494,6 +496,7 @@ public struct NDKCashuSpendingHistory {
         destroyedEventIds: [String]? = nil,
         createdEventIds: [String]? = nil,
         redeemedEventId: String? = nil,
+        token: String? = nil,
         signer: NDKSigner
     ) async throws -> NDKCashuSpendingHistory {
         var encryptedTags: [[String]] = []
@@ -502,6 +505,10 @@ public struct NDKCashuSpendingHistory {
         
         if let memo = memo {
             encryptedTags.append(["memo", memo])
+        }
+        
+        if let token = token {
+            encryptedTags.append(["token", token])
         }
         
         if let createdIds = createdEventIds {
@@ -531,6 +538,77 @@ public struct NDKCashuSpendingHistory {
             .encrypt(signer: signer, scheme: .nip44)
         
         return NDKCashuSpendingHistory(event: historyEvent)
+    }
+    
+    // MARK: - Data Extraction Methods
+    
+    /// Extract direction from the spending history event
+    public func direction(signer: NDKSigner) async throws -> SpendingDirection? {
+        let tags = try await decryptedTags(signer: signer)
+        guard let directionValue = tags.firstTagValue(named: "direction") else { return nil }
+        return SpendingDirection(rawValue: directionValue)
+    }
+    
+    /// Extract amount from the spending history event
+    public func amount(signer: NDKSigner) async throws -> Int64? {
+        let tags = try await decryptedTags(signer: signer)
+        guard let amountString = tags.firstTagValue(named: NostrTagConstants.TagName.amount) else { return nil }
+        return Int64(amountString)
+    }
+    
+    /// Extract memo from the spending history event
+    public func memo(signer: NDKSigner) async throws -> String? {
+        let tags = try await decryptedTags(signer: signer)
+        return tags.firstTagValue(named: "memo")
+    }
+    
+    /// Extract Cashu token from the spending history event
+    public func token(signer: NDKSigner) async throws -> String? {
+        let tags = try await decryptedTags(signer: signer)
+        return tags.firstTagValue(named: "token")
+    }
+    
+    /// Extract created event IDs from the spending history event
+    public func createdEventIds(signer: NDKSigner) async throws -> [String] {
+        let tags = try await decryptedTags(signer: signer)
+        return tags.filter { $0.count >= 4 && $0[0] == "e" && $0[3] == "created" }.map { $0[1] }
+    }
+    
+    /// Extract destroyed event IDs from the spending history event
+    public func destroyedEventIds(signer: NDKSigner) async throws -> [String] {
+        let tags = try await decryptedTags(signer: signer)
+        return tags.filter { $0.count >= 4 && $0[0] == "e" && $0[3] == "destroyed" }.map { $0[1] }
+    }
+    
+    /// Extract redeemed event ID from the unencrypted tags
+    public var redeemedEventId: String? {
+        event.tags.first(where: { $0.count >= 4 && $0[0] == "e" && $0[3] == "redeemed" })?[1]
+    }
+    
+    // MARK: - Private Helpers
+    
+    private func decryptedTags(signer: NDKSigner) async throws -> [[String]] {
+        // Check cache first
+        if let cachedTags = await decryptedWalletCache.get(for: event.id) {
+            return cachedTags
+        }
+        
+        let sender = NDKUser(pubkey: event.pubkey)
+        let decryptedContent = try await signer.decrypt(
+            sender: sender,
+            value: event.content,
+            scheme: .nip44
+        )
+        
+        guard let tagsData = decryptedContent.data(using: .utf8),
+              let tags = JSONCoding.safeDecode([[String]].self, from: tagsData) else {
+            throw NDKError.invalidContent("Failed to parse spending history tags")
+        }
+        
+        // Cache the decrypted tags
+        await decryptedWalletCache.set(tags, for: event.id)
+        
+        return tags
     }
 }
 

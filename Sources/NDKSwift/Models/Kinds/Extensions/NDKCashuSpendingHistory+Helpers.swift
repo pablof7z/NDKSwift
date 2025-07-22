@@ -25,6 +25,7 @@ extension NDKCashuSpendingHistory {
         var amount: Int64?
         var memo: String?
         var mint: String?
+        var token: String?
         var createdEventIds: [String] = []
         var destroyedEventIds: [String] = []
         
@@ -40,6 +41,8 @@ extension NDKCashuSpendingHistory {
                 memo = tag[1]
             case "mint":
                 mint = tag[1]
+            case "token":
+                token = tag[1]
             case "description": // Also check for description tag (legacy)
                 if memo == nil {
                     memo = tag[1]
@@ -78,6 +81,7 @@ extension NDKCashuSpendingHistory {
             amount: amount ?? 0,
             memo: memo,
             mint: mint,
+            token: token,
             createdEventIds: createdEventIds,
             destroyedEventIds: destroyedEventIds,
             redeemedEventId: redeemedEventId,
@@ -91,6 +95,7 @@ extension NDKCashuSpendingHistory {
         public let amount: Int64
         public let memo: String?
         public let mint: String?
+        public let token: String?
         public let createdEventIds: [String]
         public let destroyedEventIds: [String]
         public let redeemedEventId: String?

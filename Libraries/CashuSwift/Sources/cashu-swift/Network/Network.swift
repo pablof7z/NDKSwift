@@ -22,12 +22,26 @@ struct Network {
     ///Make a HTTP GET request to the specified URL, returns the decoded response of the expected type T or an error if decoding fails
     ///Timeout in seconds, default is 10
     static func get<T:Decodable>(url:URL, expected:T.Type, timeout:Double = 10) async throws -> T {
+        // Use simulator workaround if needed
+        #if targetEnvironment(simulator)
+        if SimulatorWorkaround.needsWorkaround(for: url) {
+            return try await SimulatorWorkaround.performRequest(
+                url: url,
+                method: "GET",
+                expected: expected,
+                timeout: timeout
+            )
+        }
+        #endif
+        
         var req = URLRequest(url: url, timeoutInterval: timeout)
         req.httpMethod = "GET"
         req.timeoutInterval = timeout
+        req.setValue("application/json", forHTTPHeaderField: "Accept")
+        req.setValue("CashuSwift/1.0", forHTTPHeaderField: "User-Agent")
         
         do {
-            let (data, response) = try await URLSession.shared.data(for: req)
+            let (data, response) = try await URLSessionConfig.shared.data(for: req)
             
             // Log response details for debugging
             if let httpResponse = response as? HTTPURLResponse {
@@ -48,6 +62,16 @@ struct Network {
             }
         } catch {
             logger.error("Network error for \(url.absoluteString): \(error)")
+            
+            // More detailed error logging for iOS debugging
+            if let urlError = error as? URLError {
+                logger.error("URLError code: \(urlError.code.rawValue)")
+                logger.error("URLError description: \(urlError.localizedDescription)")
+                if let underlyingError = urlError.userInfo[NSUnderlyingErrorKey] as? NSError {
+                    logger.error("Underlying error: \(underlyingError)")
+                }
+            }
+            
             throw CashuError.networkError
         }
     }
@@ -58,9 +82,11 @@ struct Network {
         var req = URLRequest(url: url, timeoutInterval: timeout)
         req.httpMethod = "GET"
         req.timeoutInterval = timeout
+        req.setValue("application/json", forHTTPHeaderField: "Accept")
+        req.setValue("CashuSwift/1.0", forHTTPHeaderField: "User-Agent")
         
         do {
-            let (data, response) = try await URLSession.shared.data(for: req)
+            let (data, response) = try await URLSessionConfig.shared.data(for: req)
             
             if let httpResponse = response as? HTTPURLResponse {
                 logger.debug("GET \(url.absoluteString) - Status: \(httpResponse.statusCode)")
@@ -73,6 +99,16 @@ struct Network {
             return data
         } catch {
             logger.error("Network error for \(url.absoluteString): \(error)")
+            
+            // More detailed error logging for iOS debugging
+            if let urlError = error as? URLError {
+                logger.error("URLError code: \(urlError.code.rawValue)")
+                logger.error("URLError description: \(urlError.localizedDescription)")
+                if let underlyingError = urlError.userInfo[NSUnderlyingErrorKey] as? NSError {
+                    logger.error("Underlying error: \(underlyingError)")
+                }
+            }
+            
             throw CashuError.networkError
         }
     }
@@ -81,6 +117,22 @@ struct Network {
     ///returns the decoded response of the expected type `T` or an error if decoding fails
     ///Timeout in seconds, default is 10
     static func post<I:Encodable, T:Decodable>(url:URL, body:I, expected:T.Type, timeout:Double = 10) async throws -> T {
+        // Use simulator workaround if needed
+        #if targetEnvironment(simulator)
+        if SimulatorWorkaround.needsWorkaround(for: url) {
+            guard let payload = try? JSONEncoder().encode(body) else {
+                throw Error.encoding
+            }
+            return try await SimulatorWorkaround.performRequest(
+                url: url,
+                method: "POST",
+                body: payload,
+                expected: expected,
+                timeout: timeout
+            )
+        }
+        #endif
+        
         var req = URLRequest(url: url, timeoutInterval: timeout)
         req.httpMethod = "POST"
         req.addValue("application/json", forHTTPHeaderField: "Content-Type")
@@ -92,15 +144,35 @@ struct Network {
         req.httpBody = payload
         req.timeoutInterval = timeout
         
-        guard let (data, _) = try? await URLSession.shared.data(for: req) else {
-            throw CashuError.networkError
-        }
-        
         do {
-            let decoded = try JSONDecoder().decode(T.self, from: data)
-            return decoded
+            let (data, response) = try await URLSessionConfig.shared.data(for: req)
+            
+            // Log response details for debugging
+            if let httpResponse = response as? HTTPURLResponse {
+                logger.debug("POST \(url.absoluteString) - Status: \(httpResponse.statusCode)")
+                if httpResponse.statusCode >= 400 {
+                    logger.error("Server error - Status: \(httpResponse.statusCode), Data: \(String(data: data, encoding: .utf8) ?? "nil")")
+                    throw CashuError.networkError
+                }
+            }
+            
+            return try JSONDecoder().decode(T.self, from: data)
+        } catch let decodingError as DecodingError {
+            logger.error("Decoding error for POST \(url.absoluteString): \(decodingError)")
+            throw CashuError.networkError
         } catch {
-            throw parse(data)
+            logger.error("Network error for POST \(url.absoluteString): \(error)")
+            
+            // More detailed error logging for iOS debugging
+            if let urlError = error as? URLError {
+                logger.error("URLError code: \(urlError.code.rawValue)")
+                logger.error("URLError description: \(urlError.localizedDescription)")
+                if let underlyingError = urlError.userInfo[NSUnderlyingErrorKey] as? NSError {
+                    logger.error("Underlying error: \(underlyingError)")
+                }
+            }
+            
+            throw CashuError.networkError
         }
     }
     

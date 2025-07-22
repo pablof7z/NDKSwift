@@ -136,9 +136,13 @@ struct WalletSettingsView: View {
             }
             .sheet(isPresented: $showAddMintSheet) {
                 AddMintSheet { url in
+                    print("DEBUG: AddMintSheet callback - adding mint URL: \(url)")
+                    print("DEBUG: Current mints before addition: \(mints.map { $0.url.absoluteString })")
+                    
                     do {
                         let mintInfo = try await fetchMintInfo(url: url)
                         mints.append(mintInfo)
+                        print("DEBUG: Successfully added mint with info: \(mintInfo.name ?? "Unknown")")
                     } catch {
                         // Still add the mint even if we can't fetch info
                         // This allows users to add mints that might be temporarily down
@@ -147,11 +151,15 @@ struct WalletSettingsView: View {
                             name: url.host ?? "Unknown Mint"
                         )
                         mints.append(fallbackMintInfo)
+                        print("DEBUG: Added mint with fallback info due to error: \(error)")
                         
                         // Show error but don't prevent mint addition
                         errorMessage = "Note: Could not fetch mint details (\(error.localizedDescription)). Mint added with basic info."
                         showError = true
                     }
+                    
+                    print("DEBUG: Mints after addition: \(mints.map { $0.url.absoluteString })")
+                    print("DEBUG: Total mints count: \(mints.count)")
                 }
             }
             .sheet(isPresented: $showAddRelaySheet) {
@@ -201,14 +209,20 @@ struct WalletSettingsView: View {
     private func loadCurrentSettings() async {
         isLoading = true
         
+        print("DEBUG: loadCurrentSettings() called")
+        
         // Load current configuration directly from the wallet
         if let wallet = walletManager.activeWallet {
             // Get mints from the wallet's mint manager, filtering out blacklisted ones
             let mintURLs = await wallet.mints.getMintURLs()
+            print("DEBUG: Loaded mint URLs from wallet: \(mintURLs)")
+            
             let mintURLObjects = mintURLs
                 .filter { !appState.isMintBlacklisted($0) }
                 .compactMap { URL(string: $0) }
             mints = mintURLObjects.map { MintInfo(url: $0, name: $0.host ?? "Unknown Mint") }
+            
+            print("DEBUG: Loaded \(mints.count) mints after filtering: \(mints.map { $0.url.absoluteString })")
             
             // Get relays from the wallet's configuration
             relays = await wallet.walletConfigRelays
@@ -272,10 +286,25 @@ struct WalletSettingsView: View {
                 throw WalletError.noActiveWallet
             }
             
+            // Debug logging
+            print("DEBUG: saveSettings() called")
+            print("DEBUG: mints array before conversion: \(mints.map { $0.url.absoluteString })")
+            print("DEBUG: mints count: \(mints.count)")
+            
             // Convert mints to URL strings, filtering out blacklisted ones
+            let allMintURLs = mints.map { $0.url.absoluteString }
+            print("DEBUG: All mint URLs: \(allMintURLs)")
+            
             let mintURLs = mints
                 .map { $0.url.absoluteString }
-                .filter { !appState.isMintBlacklisted($0) }
+                .filter { url in
+                    let isBlacklisted = appState.isMintBlacklisted(url)
+                    print("DEBUG: Mint \(url) blacklisted: \(isBlacklisted)")
+                    return !isBlacklisted
+                }
+            
+            print("DEBUG: Filtered mint URLs to setup: \(mintURLs)")
+            print("DEBUG: Filtered mint count: \(mintURLs.count)")
             
             // Setup wallet with new configuration
             try await wallet.setup(

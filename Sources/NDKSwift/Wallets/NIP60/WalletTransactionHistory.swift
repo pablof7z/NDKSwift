@@ -239,9 +239,12 @@ public actor WalletTransactionHistory {
     
     /// Process a spending history event (kind 7376)
     public func processSpendingHistoryEvent(_ event: NDKEvent) async throws {
+        NDKLogger.log(.info, category: .wallet, "📥 Processing spending history event: \(event.id)")
         // Parse the spending history data
         let historyEvent = NDKCashuSpendingHistory(event: event)
         let historyData = try await historyEvent.decryptedHistoryData(signer: signer)
+        
+        NDKLogger.log(.info, category: .wallet, "📥 History data: \(historyData.direction) \(historyData.amount) sats - \(historyData.memo ?? "no memo")")
         
         // Check if we already have a transaction for this event
         if findTransactionForHistory(eventId: event.id) != nil {
@@ -278,6 +281,7 @@ public actor WalletTransactionHistory {
                 historyData: historyData
             )
             storeTransaction(transaction)
+            NDKLogger.log(.info, category: .wallet, "📤 Emitting transactionAdded event for transaction: \(transaction.id)")
             eventStream?.yield(NIP60WalletEvent(type: .transactionAdded(transaction)))
         }
     }
@@ -664,6 +668,23 @@ public actor WalletTransactionHistory {
             tokenEventIds: historyData.createdEventIds + historyData.destroyedEventIds
         )
         
+        // Build ecash token data if token is present
+        var ecashTokenData: EcashTokenData?
+        if let token = historyData.token {
+            // Parse token to get actual proof count
+            var proofCount = 0
+            if let cashuToken = try? CashuSwift.Token.from(tokenString: token) {
+                for (_, proofs) in cashuToken.proofsByMint {
+                    proofCount += proofs.count
+                }
+            }
+            
+            ecashTokenData = EcashTokenData(
+                tokenString: token,
+                proofCount: proofCount
+            )
+        }
+        
         return WalletTransaction(
             type: transactionType,
             amount: historyData.amount,
@@ -674,7 +695,8 @@ public actor WalletTransactionHistory {
             timestamp: Date(timeIntervalSince1970: TimeInterval(event.createdAt)),
             events: events,
             lookupKeys: lookupKeys,
-            nutzapData: nutzapData
+            nutzapData: nutzapData,
+            ecashTokenData: ecashTokenData
         )
     }
     

@@ -56,7 +56,10 @@ struct RecentTransactionsView: View {
 struct TransactionRow: View {
     let transaction: Transaction
     @Environment(NostrManager.self) private var nostrManager
+    @Environment(WalletManager.self) private var walletManager
     @State private var senderProfile: NDKUserProfile?
+    @State private var showDetailDrawer = false
+    @State private var mintInfo: NDKMintInfo?
     
     var icon: String {
         switch transaction.type {
@@ -103,9 +106,10 @@ struct TransactionRow: View {
     }
     
     var body: some View {
-        HStack {
-            // Avatar for nutzaps, icon for other transactions
-            if transaction.type == .nutzap && transaction.senderPubkey != nil {
+        Button(action: { showDetailDrawer = true }) {
+            HStack {
+                // Avatar for nutzaps, icon for other transactions
+                if transaction.type == .nutzap && transaction.senderPubkey != nil {
                 ZStack {
                     // Sender avatar
                     AsyncImage(url: URL(string: senderProfile?.picture ?? "")) { image in
@@ -144,8 +148,17 @@ struct TransactionRow: View {
                     .fontWeight(.medium)
                     .lineLimit(1)
                 
-                // Show nutzap comment or transaction type
-                if transaction.type == .nutzap && transaction.memo != nil && !transaction.memo!.isEmpty {
+                // Show mint info or nutzap comment or transaction type
+                if let mintURL = transaction.mintURL {
+                    HStack(spacing: 4) {
+                        Image(systemName: "server.rack")
+                            .font(.caption2)
+                        Text(mintInfo?.name ?? URL(string: mintURL)?.host ?? mintURL)
+                            .font(.caption)
+                            .lineLimit(1)
+                    }
+                    .foregroundStyle(.secondary)
+                } else if transaction.type == .nutzap && transaction.memo != nil && !transaction.memo!.isEmpty {
                     Text(transaction.memo!)
                         .font(.caption)
                         .foregroundStyle(.secondary)
@@ -179,10 +192,15 @@ struct TransactionRow: View {
                     .font(.caption2)
                     .foregroundStyle(.secondary)
             }
+            }
         }
+        .buttonStyle(.plain)
         .padding(.horizontal, 12)
         .padding(.vertical, 8)
         .opacity(transaction.status == .pending ? 0.85 : 1.0)
+        .sheet(isPresented: $showDetailDrawer) {
+            TransactionDetailDrawer(transaction: transaction)
+        }
         .task {
             // Fetch sender profile for nutzaps
             if transaction.type == .nutzap, 
@@ -205,6 +223,19 @@ struct TransactionRow: View {
                         senderProfile = profile
                         break
                     }
+                }
+            }
+            
+            // Fetch mint info if we have a mint URL
+            if let mintURL = transaction.mintURL,
+               let wallet = walletManager.activeWallet,
+               let url = URL(string: mintURL) {
+                
+                do {
+                    mintInfo = try await wallet.mints.getMintInfo(url: url)
+                } catch {
+                    // Silently fail - we'll just show the URL
+                    NDKLogger.log(.debug, category: .wallet, "Failed to fetch mint info for \(mintURL): \(error)")
                 }
             }
         }
@@ -263,10 +294,14 @@ struct TransactionHistoryView: View {
 struct TransactionDetailRow: View {
     let transaction: Transaction
     @State private var showOfflineToken = false
+    @State private var showDetailDrawer = false
+    @State private var mintInfo: NDKMintInfo?
+    @Environment(WalletManager.self) private var walletManager
     
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            TransactionRow(transaction: transaction)
+        Button(action: { showDetailDrawer = true }) {
+            VStack(alignment: .leading, spacing: 8) {
+                TransactionRow(transaction: transaction)
             
             if transaction.status != .completed {
                 HStack {
@@ -276,6 +311,20 @@ struct TransactionDetailRow: View {
                         .font(.caption2)
                 }
                 .foregroundStyle(.yellow)
+                .padding(.horizontal, 12)
+                .padding(.bottom, 4)
+            }
+            
+            // Show mint info if available and not already shown in TransactionRow
+            if let mintURL = transaction.mintURL,
+               transaction.type != .nutzap || transaction.memo == nil || transaction.memo!.isEmpty {
+                HStack(spacing: 4) {
+                    Image(systemName: "server.rack")
+                        .font(.caption2)
+                    Text(mintInfo?.name ?? URL(string: mintURL)?.host ?? mintURL)
+                        .font(.caption)
+                }
+                .foregroundStyle(.secondary)
                 .padding(.horizontal, 12)
                 .padding(.bottom, 4)
             }
@@ -294,17 +343,37 @@ struct TransactionDetailRow: View {
                 .padding(.horizontal, 12)
                 .padding(.bottom, 4)
             }
+            }
         }
+        .buttonStyle(.plain)
         .listRowBackground(Color.secondary.opacity(0.1))
         .listRowInsets(EdgeInsets(top: 4, leading: 8, bottom: 4, trailing: 8))
+        .sheet(isPresented: $showDetailDrawer) {
+            TransactionDetailDrawer(transaction: transaction)
+        }
         .sheet(isPresented: $showOfflineToken) {
             if let token = transaction.offlineToken {
-                OfflineTokenView(
+                TokenConfirmationView(
                     token: token,
                     amount: transaction.amount,
                     memo: transaction.memo ?? "",
-                    mintURL: transaction.mintURL.flatMap { URL(string: $0) }
+                    mintURL: transaction.mintURL.flatMap { URL(string: $0) },
+                    isOfflineMode: true,
+                    onDismiss: { }
                 )
+            }
+        }
+        .task {
+            // Fetch mint info if we have a mint URL
+            if let mintURL = transaction.mintURL,
+               let wallet = walletManager.activeWallet,
+               let url = URL(string: mintURL) {
+                
+                do {
+                    mintInfo = try await wallet.mints.getMintInfo(url: url)
+                } catch {
+                    // Silently fail - we'll just show the URL
+                }
             }
         }
     }

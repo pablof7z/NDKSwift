@@ -7,11 +7,39 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- Fixed wallet configuration events being processed out of order during initial load
+  - Added tracking of newest configuration timestamp to ensure only the most recent config is applied
+  - Prevents older cached configurations from overwriting newer ones
+  - Removed duplicate timestamp tracking from WalletEventManager to eliminate technical debt
+- Fixed transaction history not updating reactively when new wallet events arrive in NutsackiOS
+  - WalletManager now uses property observer (didSet) to automatically update UI transactions array
+  - Payment operations now create pending transactions immediately for instant UI feedback
+  - Spending history events are now created synchronously to avoid race conditions
+  - Transaction status updates are properly propagated through the wallet's transaction history system
+- Fixed compilation errors in NutsackiOS WalletManager
+  - Updated transaction type enum values to match NDKSwift (`.send`, `.receive`, `.melt` instead of incorrect names)
+  - Added temporary nutzap event ID for pending transactions
+  - Resolved naming conflicts between view components
+
 ### Added
 - Extended `NostrJSONConstants` with Cashu/wallet JSON field constants
   - Added constants for Cashu proof fields: `amount`, `secret`, `C`, `proofs`, `proof`, `mint`, `unit`
   - Added wallet event fields: `direction`, `state`
   - Eliminates hardcoded JSON field names in wallet and Cashu-related code
+- Transaction detail drawer in NutsackiOS app for viewing detailed transaction information
+- Mint information display in transaction history for NutsackiOS app
+  - Shows mint name (when available) or hostname in transaction list
+  - Displays full mint information in transaction detail drawer
+  - Fetches mint metadata from NDKMintInfo including name and description
+  - Clickable transaction rows in Recent Activity and Transaction History views
+  - Comprehensive transaction details including status, date, memo, mint URL, and more
+  - Support for viewing sender/recipient profiles for nutzaps
+  - Share transaction functionality with formatted text output
+- Added zap functionality to NIP60Wallet example with `NDKUser.zap()` integration
+  - Support for sending zaps via npub, hex pubkey, or NIP-05 identifiers
+  - Automatic configuration of wallet as payment provider for NDK zap manager
+  - Profile fetching for recipient display names using `profileManager.observe()`
 
 ### Changed
 - Updated wallet and Cashu code to use `NostrTagConstants` and `NostrJSONConstants` instead of hardcoded strings
@@ -20,6 +48,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `WalletEventManager` now uses tag constants for `proof` and `url` tags
   - `WalletTransactionHistory` now uses tag constants for `proof` and `pubkey` tags
   - `Nutzap` now uses JSON constants for notification userInfo
+- Replaced duplicate `NostrTag` enum with `NostrTagConstants.TagName` throughout the codebase
+  - Updated `NDKBlockedMintsEvent`, `NDKCashuEvents`, `NDKList`, `NDKEvent`, `NDKEventExtensions`, `WalletEventProcessor`
+  - Removed duplicate `NostrTag` enum from `TagValidation.swift`
+  - All tag references now use the centralized `NostrTagConstants` for better maintainability
 
 ### Added
 - `EventPublishingHelper` utility to eliminate duplicate `createAndPublish` patterns across event types

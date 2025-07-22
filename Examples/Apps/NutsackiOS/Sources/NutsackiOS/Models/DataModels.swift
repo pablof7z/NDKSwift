@@ -156,6 +156,11 @@ extension WalletTransaction {
             transaction.mintURL = mint
         }
         
+        // Set offline token if available
+        if let tokenData = ecashTokenData {
+            transaction.offlineToken = tokenData.tokenString
+        }
+        
         return transaction
     }
     

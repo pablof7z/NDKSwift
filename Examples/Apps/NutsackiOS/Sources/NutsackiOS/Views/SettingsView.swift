@@ -9,6 +9,7 @@ struct SettingsView: View {
     @Environment(WalletManager.self) private var walletManager
     
     @State private var currentUser: NDKUser?
+    @State private var copiedNpub = false
     
     var body: some View {
         NavigationStack {
@@ -32,9 +33,18 @@ struct SettingsView: View {
                                     Text(nostrManager.currentUserProfile?.displayName ?? nostrManager.currentUserProfile?.name ?? "Nostr User")
                                         .font(.headline)
                                     
-                                    Text(String(currentUser.npub.prefix(16)) + "...")
-                                        .font(.caption)
-                                        .foregroundStyle(.secondary)
+                                    HStack(spacing: 4) {
+                                        Text(String(currentUser.npub.prefix(16)) + "...")
+                                            .font(.caption)
+                                            .foregroundStyle(.secondary)
+                                        
+                                        Button(action: { copyNpub(currentUser.npub) }) {
+                                            Image(systemName: copiedNpub ? "checkmark.circle.fill" : "doc.on.doc")
+                                                .font(.caption)
+                                                .foregroundColor(copiedNpub ? .green : .secondary)
+                                        }
+                                        .buttonStyle(.plain)
+                                    }
                                 }
                                 
                                 Spacer()
@@ -149,14 +159,10 @@ struct SettingsView: View {
                     NavigationLink(destination: DebugView()) {
                         Label("Debug", systemImage: "ladybug")
                     }
-                    
-                    NavigationLink(destination: DebugLoggingView()) {
-                        Label("Logging Settings", systemImage: "text.alignleft")
-                    }
                 } header: {
                     Text("Debug")
                 } footer: {
-                    Text("Debug tools and logging configuration")
+                    Text("Debug tools and cache statistics")
                 }
                 #endif
                 
@@ -173,6 +179,24 @@ struct SettingsView: View {
             #endif
             .task {
                 currentUser = await nostrManager.currentUser
+            }
+        }
+    }
+    
+    private func copyNpub(_ npub: String) {
+        #if os(iOS)
+        UIPasteboard.general.string = npub
+        #else
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(npub, forType: .string)
+        #endif
+        withAnimation {
+            copiedNpub = true
+        }
+        
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
+            withAnimation {
+                copiedNpub = false
             }
         }
     }
@@ -476,6 +500,7 @@ struct AccountDetailView: View {
     @Environment(NostrManager.self) private var nostrManager
     @State private var showPrivateKey = false
     @State private var copiedKey = false
+    @State private var copiedNpub = false
     @State private var nsecKey: String?
     
     var npub: String {
@@ -502,11 +527,25 @@ struct AccountDetailView: View {
             }
             
             Section {
-                LabeledContent("Public Key (npub)") {
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack {
+                        Text("Public Key (npub)")
+                        Spacer()
+                    }
+                    
                     Text(npub)
                         .font(.caption)
-                        .lineLimit(1)
                         .textSelection(.enabled)
+                    
+                    Button(action: copyPublicKey) {
+                        Label(
+                            copiedNpub ? "Copied!" : "Copy npub",
+                            systemImage: copiedNpub ? "checkmark.circle.fill" : "doc.on.doc"
+                        )
+                    }
+                    .buttonStyle(.bordered)
+                    .controlSize(.small)
+                    .tint(copiedNpub ? .green : .blue)
                 }
                 
                 if let nsecKey = nsecKey {
@@ -581,6 +620,24 @@ struct AccountDetailView: View {
     private func togglePrivateKey() {
         withAnimation {
             showPrivateKey.toggle()
+        }
+    }
+    
+    private func copyPublicKey() {
+        #if os(iOS)
+        UIPasteboard.general.string = npub
+        #else
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(npub, forType: .string)
+        #endif
+        withAnimation {
+            copiedNpub = true
+        }
+        
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
+            withAnimation {
+                copiedNpub = false
+            }
         }
     }
     

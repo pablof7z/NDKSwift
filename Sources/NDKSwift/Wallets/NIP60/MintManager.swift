@@ -23,11 +23,22 @@ public actor MintManager {
     
     /// Load a mint (uses cache if available)
     public func loadMint(url: URL, forceRefresh: Bool = false) async throws -> CashuSwift.Mint {
+        let mint: CashuSwift.Mint
         if let loader = mintLoader {
-            return try await loader.loadMint(url: url, forceRefresh: forceRefresh)
+            mint = try await loader.loadMint(url: url, forceRefresh: forceRefresh)
         } else {
-            return try await CashuSwift.loadMint(url: url)
+            mint = try await CashuSwift.loadMint(url: url)
         }
+        
+        // Store in memory for quick access
+        mints[url.absoluteString] = mint
+        
+        // Store keysets
+        for keyset in mint.keysets {
+            keysets[keyset.keysetID] = keyset
+        }
+        
+        return mint
     }
     
     
@@ -139,21 +150,12 @@ public actor MintManager {
             throw NDKError.invalidURL("Invalid mint URL: \(mintURL)")
         }
         
-        // Check if we have a mint with actual keysets
-        let existingMint = getMint(url: mintURL)
-        if existingMint == nil || existingMint!.keysets.isEmpty {
-            // Load or reload the mint data
-            let mint = try await loadMint(url: url)
-            mints[url.absoluteString] = mint
-            
-            // Store keysets
-            for keyset in mint.keysets {
-                keysets[keyset.keysetID] = keyset
-            }
-        }
+        // Get mint - loadMint will use cache and store in memory
+        let mint = try await loadMint(url: url)
         
-        guard let mint = getMint(url: mintURL) else {
-            throw NDKError.noMintAvailable("Failed to load mint")
+        // Verify we have valid keysets
+        guard !mint.keysets.isEmpty else {
+            throw NDKError.noMintAvailable("Mint has no keysets")
         }
         
         // Request mint quote from the mint

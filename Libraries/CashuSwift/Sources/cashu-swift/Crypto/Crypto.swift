@@ -183,6 +183,9 @@ extension CashuSwift {
                 var dleq: DLEQ? = nil
                 if let promiseDLEQ = promise.dleq {
                     dleq = DLEQ(e: promiseDLEQ.e, s: promiseDLEQ.s, r: blindingFactors[i])
+                    logger.debug("Promise DLEQ data - e: \(promiseDLEQ.e), s: \(promiseDLEQ.s), r: \(blindingFactors[i])")
+                } else {
+                    logger.warning("No DLEQ data in promise for amount \(promise.amount)")
                 }
                 
                 let proof = Proof(keysetID: promises[i].id,
@@ -239,6 +242,9 @@ extension CashuSwift {
                                                                      for DLEQ verification.
                                                                      """)
                 }
+                
+                logger.debug("Verifying DLEQ for proof amount \(p.amount), keysetID: \(p.keysetID)")
+                logger.debug("DLEQ data - e: \(p.dleq?.e ?? "nil"), s: \(p.dleq?.s ?? "nil"), r: \(p.dleq?.r ?? "nil")")
                 
                 guard let eData = p.dleq?.e.hexDecoded(),
                       let sData = p.dleq?.s.hexDecoded(),
@@ -309,18 +315,21 @@ extension CashuSwift {
             let sTimesG = try PrivateKey(dataRepresentation: s).publicKey
             let eTimesA = try A.multiply([UInt8](e))
             
-            let R1 = try sTimesG.subtract(eTimesA, format: .uncompressed)
+            let R1 = try sTimesG.combine([eTimesA.negation])
             
             let sTimesBprime = try B_.multiply([UInt8](s))
             let eTimesCprime = try C_.multiply([UInt8](e))
             
-            let R2 = try sTimesBprime.subtract(eTimesCprime, format: .uncompressed)
+            let R2 = try sTimesBprime.combine([eTimesCprime.negation])
 
             let hash = hashConcat([R1, R2, A, C_])
             
             if hash == e {
                 return true
             } else {
+                logger.warning("DLEQ verification failed: hash mismatch")
+                logger.warning("Expected e: \(e.hexString)")
+                logger.warning("Computed hash: \(hash.hexString)")
                 return false
             }
         }
@@ -336,6 +345,11 @@ extension CashuSwift {
             let C_ = try C.combine([rA])
             let rG = try PrivateKey(dataRepresentation: r).publicKey
             let B_ = try Y.combine([rG])
+            
+            logger.debug("DLEQ verification with secret - x: \(x)")
+            logger.debug("Y (hash_to_curve): \(Y.dataRepresentation.hexString)")
+            logger.debug("C_: \(C_.dataRepresentation.hexString)")
+            logger.debug("B_: \(B_.dataRepresentation.hexString)")
             
             return try verifyDLEQ(A: A, B_: B_, C_: C_, e: e, s: s)
         }
