@@ -204,7 +204,7 @@ public struct NDKNutzapPreferences {
     public var p2pkPubkey: String {
         get async {
             // Look for p2pk tag (as per NIP-61)
-            if let pubkey = event.tags.first(where: { $0.first == "p2pk" })?[safe: 1] {
+            if let pubkey = event.tags.firstTagValue(named: NostrTagConstants.TagName.p2pk) {
                 return pubkey
             }
             // Fall back to event author's pubkey

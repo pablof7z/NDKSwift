@@ -360,11 +360,9 @@ public class NDKLightningZapProtocol: NDKZapProtocol {
         
         // Collect all relay list events and use the most recent
         let events = await dataSource.collect(timeout: NetworkConstants.timeoutDataCollectionMedium)
-        if let relayListEvent = events.sorted(by: { $0.createdAt > $1.createdAt }).first {
+        if let relayListEvent = events.mostRecent {
             let eventTags = relayListEvent.tags
-            let relays = eventTags
-                .filter { $0.first == "r" }
-                .compactMap { $0[safe: 1] }
+            let relays = eventTags.tagValues(named: NostrTagConstants.TagName.reference)
             
             if !relays.isEmpty {
                 return relays

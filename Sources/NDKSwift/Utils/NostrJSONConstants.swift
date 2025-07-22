@@ -1,137 +1,49 @@
+import Foundation
+
 /// Constants for Nostr JSON field names used in event serialization
-public enum NostrJSONConstants {
+public struct NostrJSONConstants {
+    // Core event fields
+    public static let id = "id"
+    public static let pubkey = "pubkey"
+    public static let createdAt = "created_at"
+    public static let kind = "kind"
+    public static let tags = "tags"
+    public static let content = "content"
+    public static let sig = "sig"
     
-    // MARK: - Core Event Fields
+    // Filter fields
+    public static let ids = "ids"
+    public static let authors = "authors"
+    public static let kinds = "kinds"
+    public static let since = "since"
+    public static let until = "until"
+    public static let limit = "limit"
+    public static let search = "search"
     
-    /// Standard Nostr event JSON field names
-    public enum EventField {
-        /// Event ID field
-        public static let id = "id"
-        
-        /// Public key field
-        public static let pubkey = "pubkey"
-        
-        /// Creation timestamp field
-        public static let createdAt = "created_at"
-        
-        /// Event kind field
-        public static let kind = "kind"
-        
-        /// Tags array field
-        public static let tags = "tags"
-        
-        /// Content field
-        public static let content = "content"
-        
-        /// Signature field
-        public static let sig = "sig"
-    }
+    // Subscription fields
+    public static let subscription = "subscription"
     
-    // MARK: - Filter Fields
+    // Profile fields (kind 0)
+    public static let name = "name"
+    public static let about = "about"
+    public static let picture = "picture"
+    public static let nip05 = "nip05"
+    public static let banner = "banner"
+    public static let displayName = "display_name"
+    public static let website = "website"
+    public static let lud06 = "lud06"
+    public static let lud16 = "lud16"
     
-    /// Filter JSON field names used in REQ messages
-    public enum FilterField {
-        /// Event IDs filter
-        public static let ids = "ids"
-        
-        /// Authors filter (pubkeys)
-        public static let authors = "authors"
-        
-        /// Kinds filter
-        public static let kinds = "kinds"
-        
-        /// Since timestamp filter
-        public static let since = "since"
-        
-        /// Until timestamp filter
-        public static let until = "until"
-        
-        /// Limit filter
-        public static let limit = "limit"
-        
-        /// Generic tag filter prefix (#)
-        public static let tagPrefix = "#"
-    }
+    // NIP-05 fields
+    public static let names = "names"
+    public static let relays = "relays"
     
-    // MARK: - Relay Information Fields (NIP-11)
+    // Auth fields
+    public static let challenge = "challenge"
+    public static let relay = "relay"
     
-    /// Relay information document field names
-    public enum RelayInfoField {
-        /// Relay name
-        public static let name = "name"
-        
-        /// Relay description
-        public static let description = "description"
-        
-        /// Relay public key
-        public static let pubkey = "pubkey"
-        
-        /// Relay contact
-        public static let contact = "contact"
-        
-        /// Supported NIPs
-        public static let supportedNips = "supported_nips"
-        
-        /// Relay software
-        public static let software = "software"
-        
-        /// Relay version
-        public static let version = "version"
-        
-        /// Relay limitations
-        public static let limitation = "limitation"
-        
-        /// Relay retention policies
-        public static let retention = "retention"
-        
-        /// Relay countries
-        public static let relayCountries = "relay_countries"
-        
-        /// Language tags
-        public static let languageTags = "language_tags"
-        
-        /// Relay tags
-        public static let tags = "tags"
-        
-        /// Posting policy
-        public static let postingPolicy = "posting_policy"
-        
-        /// Payments URL
-        public static let paymentsUrl = "payments_url"
-        
-        /// Relay fees
-        public static let fees = "fees"
-        
-        /// Relay icon
-        public static let icon = "icon"
-    }
-    
-    // MARK: - Message Types
-    
-    /// WebSocket message type identifiers
-    public enum MessageType {
-        /// Event message
-        public static let event = "EVENT"
-        
-        /// Request message
-        public static let req = "REQ"
-        
-        /// Close message
-        public static let close = "CLOSE"
-        
-        /// Notice message
-        public static let notice = "NOTICE"
-        
-        /// End of stored events message
-        public static let eose = "EOSE"
-        
-        /// OK message (NIP-20)
-        public static let ok = "OK"
-        
-        /// Count message (NIP-45)
-        public static let count = "COUNT"
-        
-        /// Auth message (NIP-42)
-        public static let auth = "AUTH"
-    }
+    // Wallet fields
+    public static let balance = "balance"
+    public static let mints = "mints"
+    public static let p2pk = "p2pk"
 }
