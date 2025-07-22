@@ -192,10 +192,10 @@ public actor MintManager {
                 descriptionLong: nil,
                 contact: nil,
                 motd: nil,
-                iconUrl: nil,
+                iconURL: nil,
                 urls: [urlString],
                 time: nil,
-                tosUrl: nil,
+                tosURL: nil,
                 nuts: nil
             )
         }

@@ -10,10 +10,10 @@ public struct NDKMintInfo: Codable, Equatable, Sendable {
     public let descriptionLong: String?
     public let contact: [Contact]?
     public let motd: String?
-    public let iconUrl: String?
+    public let iconURL: String?
     public let urls: [String]?
     public let time: Int?
-    public let tosUrl: String?
+    public let tosURL: String?
     public let nuts: Nuts?
     
     public struct Contact: Codable, Equatable, Sendable {
@@ -87,8 +87,8 @@ public struct NDKMintInfo: Codable, Equatable, Sendable {
     enum CodingKeys: String, CodingKey {
         case name, pubkey, version, description, contact, motd, urls, time, nuts
         case descriptionLong = "description_long"
-        case iconUrl = "icon_url"
-        case tosUrl = "tos_url"
+        case iconURL = "icon_url"
+        case tosURL = "tos_url"
     }
     
     public init(
@@ -99,10 +99,10 @@ public struct NDKMintInfo: Codable, Equatable, Sendable {
         descriptionLong: String? = nil,
         contact: [Contact]? = nil,
         motd: String? = nil,
-        iconUrl: String? = nil,
+        iconURL: String? = nil,
         urls: [String]? = nil,
         time: Int? = nil,
-        tosUrl: String? = nil,
+        tosURL: String? = nil,
         nuts: Nuts? = nil
     ) {
         self.name = name
@@ -112,10 +112,10 @@ public struct NDKMintInfo: Codable, Equatable, Sendable {
         self.descriptionLong = descriptionLong
         self.contact = contact
         self.motd = motd
-        self.iconUrl = iconUrl
+        self.iconURL = iconURL
         self.urls = urls
         self.time = time
-        self.tosUrl = tosUrl
+        self.tosURL = tosURL
         self.nuts = nuts
     }
     
