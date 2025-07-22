@@ -93,7 +93,7 @@ public actor NDKSQLiteCache: NDKCache {
     ///   - error: The error that occurred
     private func logError(operation: String, parameter: String, error: Error) {
         if debugMode {
-            print("NDKSQLiteCache: Failed to \(operation) \(parameter). Error: \(error)")
+            NDKLogger.log(.error, category: .cache, "NDKSQLiteCache: Failed to \(operation) \(parameter). Error: \(error)")
         }
     }
     
