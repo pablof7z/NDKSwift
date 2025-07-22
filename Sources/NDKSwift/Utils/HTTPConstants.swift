@@ -11,6 +11,7 @@ public enum HTTPConstants {
     public static let headerContentType = "Content-Type"
     public static let headerAuthorization = "Authorization"
     public static let headerSecWebSocketProtocol = "Sec-WebSocket-Protocol"
+    public static let headerUserAgent = "User-Agent"
     
     // Content Types
     public static let contentTypeApplicationJSON = "application/json"
@@ -19,4 +20,7 @@ public enum HTTPConstants {
     
     // WebSocket Protocol
     public static let webSocketProtocolNostr = "nostr"
+    
+    // User Agent
+    public static let userAgentNDKSwift = "NDKSwift"
 }
