@@ -181,88 +181,27 @@ public actor NDKSQLiteCache: NDKCache {
         
         return try await dbQueue.read { [self] db in
             NDKLogger.log(.trace, category: .cache, "Inside dbQueue.read block")
-            var sql = "SELECT DISTINCT e.json FROM events e"
             var arguments = StatementArguments()
             var whereClauses: [String] = []
             var joins: [String] = []
             var tagIndex = 0
             
-            // Build WHERE clauses
+            // Build filter clauses using helper
+            SQLiteQueryBuilder.buildFilterClauses(
+                from: filter,
+                arguments: &arguments,
+                whereClauses: &whereClauses,
+                joins: &joins,
+                tagIndex: &tagIndex
+            )
             
-            // IDs filter
-            if let ids = filter.ids, !ids.isEmpty {
-                NDKLogger.log(.trace, category: .cache, "Adding IDs filter for \(ids.count) IDs")
-                let placeholders = ids.map { _ in "?" }.joined(separator: ", ")
-                whereClauses.append("e.id IN (\(placeholders))")
-                for id in ids {
-                    arguments += [id]
-                }
-            }
-            
-            // Authors filter
-            if let authors = filter.authors, !authors.isEmpty {
-                NDKLogger.log(.trace, category: .cache, "Adding authors filter for \(authors.count) authors")
-                let placeholders = authors.map { _ in "?" }.joined(separator: ", ")
-                whereClauses.append("e.pubkey IN (\(placeholders))")
-                for author in authors {
-                    arguments += [author]
-                }
-            }
-            
-            // Kinds filter
-            if let kinds = filter.kinds, !kinds.isEmpty {
-                let placeholders = kinds.map { _ in "?" }.joined(separator: ", ")
-                whereClauses.append("e.kind IN (\(placeholders))")
-                for kind in kinds {
-                    arguments += [kind]
-                }
-            }
-            
-            // Time filters
-            if let since = filter.since {
-                whereClauses.append("e.created_at >= ?")
-                arguments += [since]
-            }
-            
-            if let until = filter.until {
-                whereClauses.append("e.created_at <= ?")
-                arguments += [until]
-            }
-            
-            // Tag filters
-            if let tags = filter.tags {
-                for (tagName, tagValues) in tags {
-                    if !tagValues.isEmpty {
-                        let alias = "t\(tagIndex)"
-                        joins.append("JOIN tags \(alias) ON e.id = \(alias).event_id")
-                        
-                        let placeholders = tagValues.map { _ in "?" }.joined(separator: ", ")
-                        whereClauses.append("\(alias).tag_name = ? AND \(alias).tag_value IN (\(placeholders))")
-                        
-                        arguments += [tagName]
-                        for value in tagValues {
-                            arguments += [value]
-                        }
-                        
-                        tagIndex += 1
-                    }
-                }
-            }
-            
-            // Build final query
-            if !joins.isEmpty {
-                sql += " " + joins.joined(separator: " ")
-            }
-            
-            if !whereClauses.isEmpty {
-                sql += " WHERE " + whereClauses.joined(separator: " AND ")
-            }
-            
-            sql += " ORDER BY e.created_at DESC"
-            
-            if let limit = filter.limit, limit > 0 {
-                sql += " LIMIT \(limit)"
-            }
+            // Build final query using helper
+            let sql = SQLiteQueryBuilder.buildSelectQuery(
+                joins: joins,
+                whereClauses: whereClauses,
+                limit: filter.limit,
+                orderBy: "e.created_at DESC"
+            )
             
             // Execute query
             NDKLogger.log(.trace, category: .cache, "Executing SQL: \(sql)")
@@ -954,9 +893,7 @@ public actor NDKSQLiteCache: NDKCache {
     /// Process a kind:5 deletion event according to NIP-09
     private func processDeletionEvent(_ deletionEvent: NDKEvent) async {
         // Extract event IDs to delete from "e" tags
-        let eventIdsToDelete = deletionEvent.tags
-            .filter { $0.count >= 2 && $0[0] == "e" }
-            .map { $0[1] }
+        let eventIdsToDelete = deletionEvent.tags.eventIds
         
         guard !eventIdsToDelete.isEmpty else { return }
         
@@ -1236,67 +1173,33 @@ public actor NDKSQLiteCache: NDKCache {
     
     public func getEventsByTimeRange(from: Timestamp, to: Timestamp, filter: NDKFilter?) async throws -> [NDKEvent] {
         return try await dbQueue.read { db in
-            var sql = "SELECT DISTINCT e.json FROM events e"
             var arguments = StatementArguments()
             var whereClauses: [String] = []
             var joins: [String] = []
             var tagIndex = 0
             
-            // Time range
-            whereClauses.append("e.created_at >= ? AND e.created_at < ?")
-            arguments += [from, to]
-            
-            // Apply additional filter conditions if provided
+            // Build filter clauses using helper
             if let filter = filter {
-                // Authors filter
-                if let authors = filter.authors, !authors.isEmpty {
-                    let placeholders = authors.map { _ in "?" }.joined(separator: ", ")
-                    whereClauses.append("e.pubkey IN (\(placeholders))")
-                    for author in authors {
-                        arguments += [author]
-                    }
-                }
-                
-                // Kinds filter
-                if let kinds = filter.kinds, !kinds.isEmpty {
-                    let placeholders = kinds.map { _ in "?" }.joined(separator: ", ")
-                    whereClauses.append("e.kind IN (\(placeholders))")
-                    for kind in kinds {
-                        arguments += [kind]
-                    }
-                }
-                
-                // Tag filters
-                if let tags = filter.tags {
-                    for (tagName, tagValues) in tags {
-                        if !tagValues.isEmpty {
-                            let alias = "t\(tagIndex)"
-                            joins.append("JOIN tags \(alias) ON e.id = \(alias).event_id")
-                            
-                            let placeholders = tagValues.map { _ in "?" }.joined(separator: ", ")
-                            whereClauses.append("\(alias).tag_name = ? AND \(alias).tag_value IN (\(placeholders))")
-                            
-                            arguments += [tagName]
-                            for value in tagValues {
-                                arguments += [value]
-                            }
-                            
-                            tagIndex += 1
-                        }
-                    }
-                }
+                SQLiteQueryBuilder.buildFilterClauses(
+                    from: filter,
+                    arguments: &arguments,
+                    whereClauses: &whereClauses,
+                    joins: &joins,
+                    tagIndex: &tagIndex,
+                    includeTimeRange: (from: from, to: to)
+                )
+            } else {
+                // Just add time range
+                whereClauses.append("e.created_at >= ? AND e.created_at < ?")
+                arguments += [from, to]
             }
             
-            // Build final query
-            if !joins.isEmpty {
-                sql += " " + joins.joined(separator: " ")
-            }
-            
-            if !whereClauses.isEmpty {
-                sql += " WHERE " + whereClauses.joined(separator: " AND ")
-            }
-            
-            sql += " ORDER BY e.created_at ASC"
+            // Build final query using helper
+            let sql = SQLiteQueryBuilder.buildSelectQuery(
+                joins: joins,
+                whereClauses: whereClauses,
+                orderBy: "e.created_at ASC"
+            )
             
             let rows = try Row.fetchAll(db, sql: sql, arguments: arguments)
             
@@ -1310,67 +1213,33 @@ public actor NDKSQLiteCache: NDKCache {
     
     public func getEventIdsWithTimestamps(from: Timestamp, to: Timestamp, filter: NDKFilter?) async throws -> [(id: String, timestamp: Timestamp)] {
         return try await dbQueue.read { db in
-            var sql = "SELECT DISTINCT e.id, e.created_at FROM events e"
             var arguments = StatementArguments()
             var whereClauses: [String] = []
             var joins: [String] = []
             var tagIndex = 0
             
-            // Time range
-            whereClauses.append("e.created_at >= ? AND e.created_at < ?")
-            arguments += [from, to]
-            
-            // Apply additional filter conditions if provided
+            // Build filter clauses using helper
             if let filter = filter {
-                // Authors filter
-                if let authors = filter.authors, !authors.isEmpty {
-                    let placeholders = authors.map { _ in "?" }.joined(separator: ", ")
-                    whereClauses.append("e.pubkey IN (\(placeholders))")
-                    for author in authors {
-                        arguments += [author]
-                    }
-                }
-                
-                // Kinds filter
-                if let kinds = filter.kinds, !kinds.isEmpty {
-                    let placeholders = kinds.map { _ in "?" }.joined(separator: ", ")
-                    whereClauses.append("e.kind IN (\(placeholders))")
-                    for kind in kinds {
-                        arguments += [kind]
-                    }
-                }
-                
-                // Tag filters
-                if let tags = filter.tags {
-                    for (tagName, tagValues) in tags {
-                        if !tagValues.isEmpty {
-                            let alias = "t\(tagIndex)"
-                            joins.append("JOIN tags \(alias) ON e.id = \(alias).event_id")
-                            
-                            let placeholders = tagValues.map { _ in "?" }.joined(separator: ", ")
-                            whereClauses.append("\(alias).tag_name = ? AND \(alias).tag_value IN (\(placeholders))")
-                            
-                            arguments += [tagName]
-                            for value in tagValues {
-                                arguments += [value]
-                            }
-                            
-                            tagIndex += 1
-                        }
-                    }
-                }
+                SQLiteQueryBuilder.buildFilterClauses(
+                    from: filter,
+                    arguments: &arguments,
+                    whereClauses: &whereClauses,
+                    joins: &joins,
+                    tagIndex: &tagIndex,
+                    includeTimeRange: (from: from, to: to)
+                )
+            } else {
+                // Just add time range
+                whereClauses.append("e.created_at >= ? AND e.created_at < ?")
+                arguments += [from, to]
             }
             
-            // Build final query
-            if !joins.isEmpty {
-                sql += " " + joins.joined(separator: " ")
-            }
-            
-            if !whereClauses.isEmpty {
-                sql += " WHERE " + whereClauses.joined(separator: " AND ")
-            }
-            
-            sql += " ORDER BY e.created_at ASC"
+            // Build final query using helper
+            let sql = SQLiteQueryBuilder.buildSelectIdsQuery(
+                joins: joins,
+                whereClauses: whereClauses,
+                orderBy: "e.created_at ASC"
+            )
             
             let rows = try Row.fetchAll(db, sql: sql, arguments: arguments)
             

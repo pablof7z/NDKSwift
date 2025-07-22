@@ -20,7 +20,7 @@ public struct NIP60TokenEvent: Codable {
 
 /// NIP-60 Cashu Token Event (kind: 7375)
 /// Encrypted event that stores Cashu proofs for a wallet
-public struct NDKCashuTokenEvent {
+public struct NDKCashuTokenEvent: NDKPublishableEvent {
     public let event: NDKEvent
     
     public init(event: NDKEvent) {
@@ -41,17 +41,18 @@ public struct NDKCashuTokenEvent {
         signer: NDKSigner,
         deletedEventIds: [String]? = nil
     ) async throws -> NDKCashuTokenEvent {
-        let tokenEvent = try await create(
+        return try await EventPublishingHelper.createAndPublish(
+            type: NDKCashuTokenEvent.self,
             ndk: ndk,
-            token: token,
-            signer: signer,
-            deletedEventIds: deletedEventIds
-        )
-        
-        let publishedRelays = try await ndk.publish(tokenEvent.event)
-        NDKLogger.log(.info, category: .event, "NDKCashuTokenEvent - Published to \(publishedRelays.count) relays")
-        
-        return tokenEvent
+            logPrefix: "NDKCashuTokenEvent"
+        ) {
+            try await create(
+                ndk: ndk,
+                token: token,
+                signer: signer,
+                deletedEventIds: deletedEventIds
+            )
+        }
     }
     
     /// Create without publishing
@@ -88,7 +89,7 @@ public struct NDKCashuTokenEvent {
 
 /// NIP-60 Cashu Quote Event (kind: 7374)
 /// Encrypted event that stores mint quotes for deposits
-public struct NDKCashuQuoteEvent {
+public struct NDKCashuQuoteEvent: NDKPublishableEvent {
     public let event: NDKEvent
     
     public init(event: NDKEvent) {
@@ -102,16 +103,17 @@ public struct NDKCashuQuoteEvent {
         quote: CashuMintQuote,
         signer: NDKSigner
     ) async throws -> NDKCashuQuoteEvent {
-        let quoteEvent = try await create(
+        return try await EventPublishingHelper.createAndPublishWithId(
+            type: NDKCashuQuoteEvent.self,
             ndk: ndk,
-            quote: quote,
-            signer: signer
-        )
-        
-        _ = try await ndk.publish(quoteEvent.event)
-        NDKLogger.log(.info, category: .event, "NDKCashuQuoteEvent - Published quote event: \(quoteEvent.event.id)")
-        
-        return quoteEvent
+            logPrefix: "NDKCashuQuoteEvent - Published quote event"
+        ) {
+            try await create(
+                ndk: ndk,
+                quote: quote,
+                signer: signer
+            )
+        }
     }
     
     /// Create without publishing
@@ -402,22 +404,19 @@ public struct NDKCashuWalletBackupEvent {
     
     /// The mints configured in this backup event
     public func mints(signer: NDKSigner) async throws -> [String] {
-        return try await decryptedWalletTags(signer: signer).compactMap { tag in
-            tag.count >= 2 && tag[0] == "mint" ? tag[1] : nil
-        }
+        let tags = try await decryptedWalletTags(signer: signer)
+        return tags.tagValues(named: NostrTag.mint)
     }
     
     /// The P2PK private key in this backup event
     public func p2pkPrivateKey(signer: NDKSigner) async throws -> String? {
         let tags = try await decryptedWalletTags(signer: signer)
-        return tags.first(where: { $0.count >= 2 && $0[0] == "privkey" })?[1]
+        return tags.firstTagValue(named: NostrTag.privkey)
     }
     
     /// The relays configured in this backup event
     public var relays: [String] {
-        event.tags.compactMap { tag in
-            tag.count >= 2 && tag[0] == "relay" ? tag[1] : nil
-        }
+        event.tags.tagValues(named: NostrTag.relay)
     }
     
     // Private helper using the same cache as wallet config
@@ -481,6 +480,7 @@ public struct NDKCashuSpendingHistory {
         )
         
         _ = try await ndk.publish(historyEvent.event)
+        NDKLogger.log(.info, category: .event, "NDKCashuSpendingHistory - Published spending history event")
         
         return historyEvent
     }
@@ -538,7 +538,7 @@ public struct NDKCashuSpendingHistory {
 
 /// NIP-60 Cashu Mint List Event (kind: 10019)
 /// Public event that advertises which mints a user accepts for nutzaps
-public struct NDKCashuMintList {
+public struct NDKCashuMintList: NDKPublishableEvent {
     public let event: NDKEvent
     
     public init(event: NDKEvent) {
@@ -697,24 +697,22 @@ public struct NDKCashuMintAnnouncement {
     
     /// Extract mint URL from the announcement
     public var mintURL: String? {
-        event.tags.first(where: { $0.count >= 2 && $0[0] == "u" })?[1]
+        event.tags.firstTagValue(named: NostrTag.url)
     }
     
     /// Extract supported nuts from the announcement
     public var supportedNuts: [String] {
-        event.tags
-            .filter { $0.count >= 2 && $0[0] == "nuts" }
-            .map { $0[1] }
+        event.tags.tagValues(named: NostrTag.nuts)
     }
     
     /// Extract network from the announcement
     public var network: String? {
-        event.tags.first(where: { $0.count >= 2 && $0[0] == "n" })?[1]
+        event.tags.firstTagValue(named: NostrTag.network)
     }
     
     /// Extract contact from the announcement
     public var contact: String? {
-        event.tags.first(where: { $0.count >= 2 && $0[0] == "contact" })?[1]
+        event.tags.firstTagValue(named: NostrTag.contact)
     }
     
     /// Extract description from content
@@ -841,7 +839,7 @@ public struct NDKNutzapEvent {
     /// Extract the token from the nutzap event
     public var token: CashuSwift.Token? {
         // Get all proof tags
-        let proofTags = event.tags.filter { $0.count >= 2 && $0[0] == "proof" }
+        let proofTags = event.tags.extractTags(named: NostrTag.proof)
         guard !proofTags.isEmpty else { return nil }
         
         // Parse all proofs
@@ -865,12 +863,12 @@ public struct NDKNutzapEvent {
     
     /// Extract the mint URL from the nutzap event
     public var mintURL: String? {
-        event.tags.first(where: { $0.count >= 2 && $0[0] == "u" })?[1]
+        event.tags.firstTagValue(named: NostrTag.url)
     }
     
     /// Extract the total amount from the amount tag
     public var amount: Int64? {
-        guard let amountString = event.tags.first(where: { $0.count >= 2 && $0[0] == "amount" })?[1] else {
+        guard let amountString = event.tags.firstTagValue(named: NostrTag.amount) else {
             return nil
         }
         return Int64(amountString)
@@ -878,17 +876,17 @@ public struct NDKNutzapEvent {
     
     /// Extract the unit from the nutzap event 
     public var unit: String? {
-        return event.tags.first(where: { $0.count >= 2 && $0[0] == "unit" })?[1] ?? "sat"
+        return event.tags.firstTagValue(named: NostrTag.unit) ?? "sat"
     }
     
     /// Extract the recipient from the p tag
     public var recipient: String? {
-        event.tags.first(where: { $0.count >= 2 && $0[0] == "p" })?[1]
+        event.tags.firstTagValue(named: NostrTag.pubkey)
     }
     
     /// Extract the nutzapped event ID from the e tag
     public var nutzappedEventId: String? {
-        event.tags.first(where: { $0.count >= 2 && $0[0] == "e" })?[1]
+        event.tags.firstTagValue(named: NostrTag.event)
     }
     
     /// Get the comment from the event content
@@ -940,8 +938,8 @@ public struct NDKMintRecommendation {
         tags.append(["k", "38172"])
         
         // Add d tag (event identifier from the announcement)
-        if let dTag = mintAnnouncementEvent.event.tags.first(where: { $0.count >= 2 && $0[0] == "d" }) {
-            tags.append(["d", dTag[1]])
+        if let dTagValue = mintAnnouncementEvent.event.tags.firstTagValue(named: NostrTag.description) {
+            tags.append(["d", dTagValue])
         }
         
         // Add u tag (mint URL)
@@ -967,12 +965,12 @@ public struct NDKMintRecommendation {
     
     /// Extract recommended mint URL
     public var mintURL: String? {
-        event.tags.first(where: { $0.count >= 2 && $0[0] == "u" })?[1]
+        event.tags.firstTagValue(named: NostrTag.url)
     }
     
     /// Extract the announcement event reference
     public var announcementReference: String? {
-        event.tags.first(where: { $0.count >= 2 && $0[0] == "a" })?[1]
+        event.tags.firstTagValue(named: NostrTag.a)
     }
     
     /// Extract recommendation reason

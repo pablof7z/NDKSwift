@@ -126,16 +126,10 @@ actor WalletEventProcessor {
     private func processDeleteEvent(_ event: NDKEvent, context: WalletEventContext) async throws {
         
         // Find 'e' tags that reference events to delete
-        let eventIdsToDelete = event.tags.compactMap { tag -> String? in
-            guard tag.count >= 2 && tag[0] == "e" else { return nil }
-            return tag[1]
-        }
+        let eventIdsToDelete = event.tags.eventIds
         
         // Find 'k' tags that specify kinds to delete
-        let kindsToDelete = event.tags.compactMap { tag -> Int32? in
-            guard tag.count >= 2 && tag[0] == "k" else { return nil }
-            return Int32(tag[1])
-        }
+        let kindsToDelete = event.tags.tagValues(named: NostrTag.kind).compactMap { Int32($0) }
         
         // We only care about token events and quote events
         let relevantKinds: Set<Int32> = [7375, 7374]

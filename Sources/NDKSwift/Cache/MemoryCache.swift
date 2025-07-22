@@ -396,9 +396,7 @@ public actor MemoryCache: NDKCache {
     /// Process a kind:5 deletion event according to NIP-09
     private func processDeletionEvent(_ deletionEvent: NDKEvent) async {
         // Extract event IDs to delete from "e" tags
-        let eventIdsToDelete = deletionEvent.tags
-            .filter { $0.count >= 2 && $0[0] == "e" }
-            .map { $0[1] }
+        let eventIdsToDelete = deletionEvent.tags.eventIds
         
         guard !eventIdsToDelete.isEmpty else { return }
         

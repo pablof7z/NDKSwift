@@ -11,10 +11,9 @@ public extension NDKEvent {
 
     /// Extract e tags with optional recommended relay
     var eTags: [(eventId: String, recommendedRelay: String?)] {
-        return tags.compactMap { tag in
-            guard tag.count >= 2, tag[0] == "e" else { return nil }
+        return tags.extractTags(named: NostrTag.event).compactMap { tag in
             let eventId = tag[1]
-            let recommendedRelay = tag.count > 2 ? tag[2] : nil
+            let recommendedRelay = tag[safe: 2]
             return (eventId, recommendedRelay)
         }
     }
