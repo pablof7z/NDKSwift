@@ -224,7 +224,7 @@ public enum Nutzap {
         }
         
         // Extract proofs from proof tags
-        let proofTags = event.tags.filter { $0.count >= 2 && $0[0] == "proof" }
+        let proofTags = event.tags.filter { $0.count >= 2 && $0[0] == NostrTagConstants.TagName.proof }
         guard !proofTags.isEmpty else {
             NDKLogger.log(.error, category: .wallet, "🎯 No proofs in nutzap")
             throw NutzapRedemptionError.invalidProofs(reason: "No proofs in nutzap event")

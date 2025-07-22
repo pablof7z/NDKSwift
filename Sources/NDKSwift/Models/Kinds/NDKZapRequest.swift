@@ -110,7 +110,7 @@ public struct NDKZapRequest {
 
 private func encodeLNURL(_ input: String) throws -> String {
     // Handle both lud06 (LNURL) and lud16 (Lightning Address) formats
-    if input.lowercased().starts(with: "lnurl") {
+    if input.lowercased().starts(with: Bech32HRP.lnurl) {
         // Already encoded
         return input
     } else if input.contains("@") {
@@ -128,13 +128,13 @@ private func encodeLNURL(_ input: String) throws -> String {
             throw NDKError.invalidInput(message: "Failed to encode URL")
         }
         
-        return try Bech32.encode(hrp: "lnurl", data: Array(data))
+        return try Bech32.encode(hrp: Bech32HRP.lnurl, data: Array(data))
     } else {
         // Assume it's a URL that needs encoding
         guard let data = input.data(using: .utf8) else {
             throw NDKError.invalidInput(message: "Failed to encode URL")
         }
         
-        return try Bech32.encode(hrp: "lnurl", data: Array(data))
+        return try Bech32.encode(hrp: Bech32HRP.lnurl, data: Array(data))
     }
 }
