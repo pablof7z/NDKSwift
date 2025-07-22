@@ -11,7 +11,7 @@ public actor NIP05Manager {
     private var inFlightRequests: [String: Task<NDKUser?, Error>] = [:]
     
     /// Default TTL for cache entries (24 hours)
-    public static let defaultTTL: TimeInterval = 86400
+    public static let defaultTTL: TimeInterval = TimeConstants.nip05CacheTTL
     
     /// Rate limit per domain (10 requests per hour)
     private static let domainRateLimit: TimeInterval = 360 // 6 minutes between requests
@@ -22,8 +22,8 @@ public actor NIP05Manager {
     public init(ndk: NDK) {
         self.ndk = ndk
         self.cache = ndk.cache
-        self.memoryCache = LRUCache(capacity: 1000, defaultTTL: 3600) // 1 hour memory cache
-        self.domainRateLimiter = LRUCache(capacity: 500, defaultTTL: 3600)
+        self.memoryCache = LRUCache(capacity: 1000, defaultTTL: TimeConstants.hour)
+        self.domainRateLimiter = LRUCache(capacity: 500, defaultTTL: TimeConstants.hour)
     }
     
     // MARK: - Public API
