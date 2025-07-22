@@ -719,7 +719,7 @@ public final class NDKEventBuilder {
     public func build(signer: NDKSigner? = nil, generateContentTags: Bool = true) async throws -> NDKEvent {
         // Use provided signer or fall back to NDK's signer
         guard let actualSigner = signer ?? ndk?.signer else {
-            throw NDKError.signingFailed("No signer available")
+            throw NDKError.configurationError("No signer available")
         }
         // Set pubkey from signer if not already set
         if pubkey.isEmpty {

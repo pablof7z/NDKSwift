@@ -494,7 +494,7 @@ public final class NDKRelay: RelayProtocol, Hashable, Equatable, @unchecked Send
         if let conn = await stateActor.getConnection() {
             try await conn.connect()
         } else {
-            throw NDKError.connectionFailed(relay: url.absoluteString, message: "Connection is nil")
+            throw NDKError.failedTo("establish connection", message: "Connection is nil")
         }
     }
 
@@ -827,7 +827,7 @@ public extension NDKRelay {
     /// Publish an event and wait for response
     func publish(_ event: NDKEvent) async throws -> (success: Bool, message: String?) {
         guard let connection = await connection else {
-            throw NDKError.connectionFailed(relay: url, message: "No connection available")
+            throw NDKError.connectionLost(relay: url, message: "No connection available")
         }
         
         do {

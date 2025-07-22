@@ -118,7 +118,7 @@ public class NDKLightningZapProtocol: NDKZapProtocol {
         // Extract metadata
         guard let zapRequest = prepared.metadata["zapRequest"] as? NDKZapRequest,
               let endpoint = prepared.metadata["endpoint"] as? LNURLPayEndpoint else {
-            throw NDKError.invalidInput(message: "Missing zap metadata")
+            throw NDKError.missingRequired("zapRequest and endpoint", in: "metadata")
         }
         
         // For Lightning zaps, the payment confirmation doesn't directly create the zap receipt

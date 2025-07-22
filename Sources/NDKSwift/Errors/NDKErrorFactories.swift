@@ -41,4 +41,12 @@ extension NDKError {
         let lowercased = operation.lowercased()
         return operationMap[lowercased]?(message, error) ?? .unknown(message, underlying: error)
     }
+    
+    static func validationError(_ message: String) -> NDKError {
+        return .invalidInput(message: message)
+    }
+    
+    static func configurationError(_ message: String) -> NDKError {
+        return .notConfigured(message)
+    }
 }

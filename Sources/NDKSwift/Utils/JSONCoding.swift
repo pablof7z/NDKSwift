@@ -56,7 +56,7 @@ public enum JSONCoding {
     /// Decode JSON string to object
     public static func decode<T: Decodable>(_ type: T.Type, from string: String) throws -> T {
         guard let data = string.data(using: .utf8) else {
-            throw NDKError.invalidInput(message: "Invalid UTF-8 string")
+            throw NDKError.validationError("Invalid UTF-8 string")
         }
         return try decode(type, from: data)
     }
@@ -120,7 +120,7 @@ public enum JSONCoding {
     /// Parse JSON string to Any (object or array)
     public static func parseJSON(from string: String) throws -> Any {
         guard let data = string.data(using: .utf8) else {
-            throw NDKError.invalidInput(message: "Invalid UTF-8 string")
+            throw NDKError.validationError("Invalid UTF-8 string")
         }
         return try parseJSON(from: data)
     }
@@ -136,7 +136,7 @@ public enum JSONCoding {
     /// Parse JSON string to dictionary
     public static func parseDictionary(from string: String) throws -> [String: Any] {
         guard let data = string.data(using: .utf8) else {
-            throw NDKError.invalidInput(message: "Invalid UTF-8 string")
+            throw NDKError.validationError("Invalid UTF-8 string")
         }
         return try parseDictionary(from: data)
     }
@@ -154,10 +154,10 @@ public enum JSONCoding {
     /// Parse JSON string to array
     public static func parseArray(from string: String) throws -> [Any] {
         guard !string.isEmpty else {
-            throw NDKError.invalidInput(message: "Empty string cannot be parsed as JSON array")
+            throw NDKError.validationError("Empty string cannot be parsed as JSON array")
         }
         guard let data = string.data(using: .utf8) else {
-            throw NDKError.invalidInput(message: "Invalid UTF-8 string")
+            throw NDKError.validationError("Invalid UTF-8 string")
         }
         return try parseArray(from: data)
     }

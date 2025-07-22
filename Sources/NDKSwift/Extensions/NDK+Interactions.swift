@@ -16,7 +16,7 @@ public extension NDK {
     /// - Adds appropriate tags (e, p, and k for non-text events)
     func repost(_ event: NDKEvent) async throws -> NDKEvent {
         guard let signer = signer else {
-            throw NDKError.notConfigured("No signer configured")
+            throw NDKError.configurationError("No signer configured")
         }
         
         let repostEvent = try await event.repost(signer: signer, ndk: self)
@@ -33,7 +33,7 @@ public extension NDK {
     /// - Returns: The published quote repost event
     func quoteRepost(_ event: NDKEvent, comment: String) async throws -> NDKEvent {
         guard let signer = signer else {
-            throw NDKError.notConfigured("No signer configured")
+            throw NDKError.configurationError("No signer configured")
         }
         
         let quoteEvent = try await event.quoteRepost(comment: comment, signer: signer, ndk: self)
@@ -52,7 +52,7 @@ public extension NDK {
     /// - Returns: The published reaction event
     func react(to event: NDKEvent, with content: String) async throws -> NDKEvent {
         guard let signer = signer else {
-            throw NDKError.notConfigured("No signer configured")
+            throw NDKError.configurationError("No signer configured")
         }
         
         let reaction = try await event.react(with: content, signer: signer, ndk: self)
