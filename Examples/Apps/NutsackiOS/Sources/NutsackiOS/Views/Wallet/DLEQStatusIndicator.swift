@@ -62,8 +62,9 @@ struct DLEQStatusIndicator: View {
     }
     
     private func updateStats() async {
-        // TODO: Get proof stats from wallet manager when available
-        // For now, just show placeholder values
+        // Implementation pending: Requires WalletManager to track DLEQ verification status of proofs
+        // This would involve tracking each proof's verification state in the wallet
+        // Currently showing placeholder values until wallet infrastructure supports this
         proofStats = (0, 0, 0)
     }
 }

@@ -9,6 +9,7 @@ struct RelayHealthView: View {
     @State private var lastUpdateTime: Date?
     @State private var showingRepairSheet = false
     @State private var selectedUnhealthyRelay: WalletHealthMonitor.RelayHealth?
+    @State private var showWalletSettings = false
     
     var body: some View {
         NavigationView {
@@ -75,6 +76,9 @@ struct RelayHealthView: View {
                         }
                     }
                 }
+            }
+            .sheet(isPresented: $showWalletSettings) {
+                WalletSettingsView()
             }
         }
     }
@@ -173,7 +177,7 @@ struct RelayHealthView: View {
                 .padding(.horizontal)
             
             Button("Configure Wallet Relays") {
-                // TODO: Navigate to relay configuration
+                showWalletSettings = true
             }
             .buttonStyle(.borderedProminent)
         }
@@ -325,6 +329,8 @@ struct RelayRepairSheet: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(WalletManager.self) private var walletManager
     @State private var isRepairing = false
+    @State private var showErrorAlert = false
+    @State private var errorMessage = ""
     
     var body: some View {
         NavigationView {
@@ -407,6 +413,11 @@ struct RelayRepairSheet: View {
                     dismiss()
                 }
             )
+            .alert("Repair Failed", isPresented: $showErrorAlert) {
+                Button("OK", role: .cancel) { }
+            } message: {
+                Text(errorMessage)
+            }
         }
     }
     
@@ -426,7 +437,11 @@ struct RelayRepairSheet: View {
                 }
             } catch {
                 print("Repair failed: \(error)")
-                // TODO: Show error alert
+                await MainActor.run {
+                    errorMessage = error.localizedDescription
+                    showErrorAlert = true
+                    isRepairing = false
+                }
             }
         }
     }
