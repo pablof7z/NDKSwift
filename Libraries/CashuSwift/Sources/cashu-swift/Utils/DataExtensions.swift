@@ -35,6 +35,18 @@ public extension Data {
     var hexString: String {
         return map { String(format: "%02x", $0) }.joined()
     }
+    
+    /// Pad Data to specified length with zeros
+    /// - Parameter length: Target length
+    /// - Returns: Data padded with zeros to reach the specified length
+    func paddedToLength(_ length: Int) -> Data {
+        if count >= length {
+            return self
+        }
+        var padded = self
+        padded.append(Data(repeating: 0, count: length - count))
+        return padded
+    }
 }
 
 // MARK: - String extensions for hex conversion
