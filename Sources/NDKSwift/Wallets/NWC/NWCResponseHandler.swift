@@ -20,14 +20,14 @@ public struct NWCResponseHandler {
     ) async throws -> T {
         let requestId = event.id
         
-        print("[NWC Response] Setting up response listener for request \(requestId)")
+        NDKLogger.log(.debug, category: .wallet, "[NWC Response] Setting up response listener for request \(requestId)")
         
         // 1. First, create filter for response events
         var filter = NDKFilter()
         filter.kinds = [.nostrWalletConnectRes]
         filter.addTagFilter("e", values: [requestId])
         filter.limit = 1
-        print("[NWC Response] Filter: kinds=\(filter.kinds ?? []), e-tag=\(requestId)")
+        NDKLogger.log(.trace, category: .wallet, "[NWC Response] Filter: kinds=\(filter.kinds ?? []), e-tag=\(requestId)")
         
         // Get the connected relays
         let allRelays = await ndk.relays
@@ -37,7 +37,7 @@ public struct NWCResponseHandler {
                 relay.url == url
             }
         }
-        print("[NWC Response] Using \(connectedRelays.count) connected relays")
+        NDKLogger.log(.debug, category: .wallet, "[NWC Response] Using \(connectedRelays.count) connected relays")
         
         // 2. Create subscription for the response BEFORE publishing
         let relayUrls = Set(connectedRelays.map { $0.url })
@@ -53,25 +53,25 @@ public struct NWCResponseHandler {
         
         // Collect response in a task
         let responseTask = Task { () -> T in
-            print("[NWC Response] Waiting for response event...")
+            NDKLogger.log(.trace, category: .wallet, "[NWC Response] Waiting for response event...")
             
             for await responseEvent in dataSource.events {
-                print("[NWC Response] Got response event:")
-                print("[NWC Response]   ID: \(responseEvent.id)")
-                print("[NWC Response]   Pubkey: \(responseEvent.pubkey)")
-                print("[NWC Response]   Tags: \(responseEvent.tags)")
+                NDKLogger.log(.debug, category: .wallet, "[NWC Response] Got response event:")
+                NDKLogger.log(.trace, category: .wallet, "[NWC Response]   ID: \(responseEvent.id)")
+                NDKLogger.log(.trace, category: .wallet, "[NWC Response]   Pubkey: \(responseEvent.pubkey)")
+                NDKLogger.log(.trace, category: .wallet, "[NWC Response]   Tags: \(responseEvent.tags)")
                 
                 // Decrypt the content
                 let senderPubkey = responseEvent.pubkey
                 let sender = NDKUser(pubkey: senderPubkey)
-                print("[NWC Response] Decrypting content from \(sender.pubkey)")
+                NDKLogger.log(.trace, category: .wallet, "[NWC Response] Decrypting content from \(sender.pubkey)")
                 let eventContent = responseEvent.content
                 let decryptedContent = try await signer.decrypt(
                     sender: sender,
                     value: eventContent,
                     scheme: .nip04
                 )
-                print("[NWC Response] Decrypted content: \(decryptedContent)")
+                NDKLogger.log(.trace, category: .wallet, "[NWC Response] Decrypted content: \(decryptedContent)")
                 
                 // Parse and return the response
                 let result = try parseResponse(decryptedContent, expectedType: responseType)
@@ -87,9 +87,9 @@ public struct NWCResponseHandler {
         // 3. AsyncStream starts immediately, no need to wait for EOSE
         
         // 4. Now publish the request
-        print("[NWC Response] Publishing request event \(requestId)")
+        NDKLogger.log(.debug, category: .wallet, "[NWC Response] Publishing request event \(requestId)")
         let publishedRelays = try await ndk.publish(event)
-        print("[NWC Response] Published to \(publishedRelays.count) relays")
+        NDKLogger.log(.debug, category: .wallet, "[NWC Response] Published to \(publishedRelays.count) relays")
         
         // 5. Set up timeout
         let timeoutTask = Task {

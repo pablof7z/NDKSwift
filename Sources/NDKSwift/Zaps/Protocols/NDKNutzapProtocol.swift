@@ -22,7 +22,7 @@ public class NDKNutzapProtocol: NDKZapProtocol {
         amountSats: Int64,
         comment: String?
     ) async throws -> PreparedZap {
-        print("prepareZap")
+        NDKLogger.log(.debug, category: .wallet, "prepareZap")
         // We already have the preferences!
         guard let preferences = recipientInfo.nutzapPreferences else {
             throw ZapError.nutzapPreferencesNotFound
@@ -81,7 +81,7 @@ public class NDKNutzapProtocol: NDKZapProtocol {
         
         // Handle NutzapConfirmation - the nutzap event is already created
         guard let nutzapConfirmation = confirmation as? NutzapConfirmation else {
-            print("\(confirmation)")
+            NDKLogger.log(.error, category: .wallet, "Invalid confirmation type: \(confirmation)")
             throw NDKError.invalidInput(message: "Invalid payment confirmation type for nutzap")
         }
         

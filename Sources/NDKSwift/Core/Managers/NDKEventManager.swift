@@ -102,7 +102,7 @@ public actor NDKEventManager {
                     do {
                         try await cache.confirmEvent(eventId: event.id, onRelay: relay.url)
                     } catch {
-                        print("[NDKEventManager] Warning: Failed to confirm event: \(error)")
+                        NDKLogger.log(.warning, category: .event, "[NDKEventManager] Failed to confirm event: \(error)")
                     }
                 } else {
                     failedRelays.insert(relay)

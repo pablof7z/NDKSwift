@@ -71,7 +71,7 @@ public actor MintRetryHandler {
                 NDKLogger.log(.info, category: .wallet, "⏳ Mint retry attempt \(attemptCount)/\(config.maxRetries) - waiting \(Int(delay))s...")
                 onRetryAttempt?(attemptCount, delay)
                 
-                try await Task.sleep(nanoseconds: UInt64(delay * 1_000_000_000))
+                try await Task.sleep(nanoseconds: UInt64(delay * Double(TimeConstants.nanosecondsPerSecond)))
             }
             
             do {

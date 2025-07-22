@@ -165,7 +165,7 @@ public final class NDKDataSource<T>: ObservableObject, CacheObserver {
             // No data requirement manager available
             NDKLogger.log(.error, category: .subscription, "❌ No data requirement manager available! Data source will not receive events", correlationId: correlationId)
             if ndk.debugMode {
-                print("[NDKDataSource] Warning: No data requirement manager available")
+                NDKLogger.log(.warning, category: .general, "[NDKDataSource] No data requirement manager available")
             }
         }
         
@@ -243,7 +243,7 @@ public final class NDKDataSource<T>: ObservableObject, CacheObserver {
         return await withTaskGroup(of: T?.self) { group in
             // Timeout task
             group.addTask {
-                try? await Task.sleep(nanoseconds: UInt64(timeout * 1_000_000_000))
+                try? await Task.sleep(nanoseconds: UInt64(timeout * Double(TimeConstants.nanosecondsPerSecond)))
                 return nil
             }
             
@@ -309,7 +309,7 @@ public final class NDKDataSource<T>: ObservableObject, CacheObserver {
         await withTaskGroup(of: Void.self) { group in
             // Timeout task
             group.addTask {
-                try? await Task.sleep(nanoseconds: UInt64(timeout * 1_000_000_000))
+                try? await Task.sleep(nanoseconds: UInt64(timeout * Double(TimeConstants.nanosecondsPerSecond)))
             }
             
             // Collection task

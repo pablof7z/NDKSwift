@@ -193,7 +193,7 @@ public enum CashuDeposit {
                         let maxInterval: TimeInterval = 7200.0 // 2 hours
                         let interval = min(baseInterval * pow(1.5, hoursOld), maxInterval)
                         
-                        print("📜 Quote \(quote.quoteId) still pending - next check in \(Int(interval)) seconds")
+                        NDKLogger.log(.debug, category: .wallet, "📜 Quote \(quote.quoteId) still pending - next check in \(Int(interval)) seconds")
                         
                         // Wait before next check, but allow manual trigger
                         if let manualCheckTrigger = manualCheckTrigger {
@@ -207,7 +207,7 @@ public enum CashuDeposit {
                                 // Manual trigger task
                                 group.addTask {
                                     for await _ in manualCheckTrigger {
-                                        print("🔄 Manual check triggered...")
+                                        NDKLogger.log(.debug, category: .wallet, "🔄 Manual check triggered...")
                                         break
                                     }
                                 }

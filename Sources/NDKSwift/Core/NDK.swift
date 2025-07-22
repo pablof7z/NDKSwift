@@ -162,76 +162,76 @@ public final class NDK {
     /// - Returns: Number of connected relays
     @discardableResult
     public func waitForRelayConnections(minimumRelays: Int = 1, timeout: TimeInterval = 5.0) async -> Int {
-        print("[waitForRelayConnections] Starting wait for \(minimumRelays) relays with timeout \(timeout)s")
+        NDKLogger.log(.debug, category: .relay, "Starting wait for \(minimumRelays) relays with timeout \(timeout)s")
         
         // Create a task that will timeout
         let timeoutTask = Task {
-            print("[waitForRelayConnections] Timeout task started")
-            try? await Task.sleep(nanoseconds: UInt64(timeout * 1_000_000_000))
-            print("[waitForRelayConnections] Timeout reached!")
+            NDKLogger.log(.trace, category: .relay, "Timeout task started")
+            try? await Task.sleep(nanoseconds: UInt64(timeout * Double(TimeConstants.nanosecondsPerSecond)))
+            NDKLogger.log(.debug, category: .relay, "Timeout reached!")
             return -1 // Sentinel value for timeout
         }
         
         // Create a task that monitors relay connections
         let connectionTask = Task { () -> Int in
-            print("[waitForRelayConnections] Connection monitoring task started")
+            NDKLogger.log(.trace, category: .relay, "Connection monitoring task started")
             var connectedCount = 0
             
             // Check initial state
-            print("[waitForRelayConnections] Checking initial relay state...")
+            NDKLogger.log(.trace, category: .relay, "Checking initial relay state...")
             connectedCount = await pool.connectedRelays().count
-            print("[waitForRelayConnections] Initial connected relays: \(connectedCount)")
+            NDKLogger.log(.debug, category: .relay, "Initial connected relays: \(connectedCount)")
             if connectedCount >= minimumRelays {
-                print("[waitForRelayConnections] Already have enough relays connected!")
+                NDKLogger.log(.info, category: .relay, "Already have enough relays connected!")
                 return connectedCount
             }
             
             // Monitor pool changes
-            print("[waitForRelayConnections] Starting to monitor pool changes...")
+            NDKLogger.log(.trace, category: .relay, "Starting to monitor pool changes...")
             for await change in await pool.relayChanges {
-                print("[waitForRelayConnections] Received pool change: \(change)")
+                NDKLogger.log(.trace, category: .relay, "Received pool change: \(change)")
                 switch change {
                 case .relayConnected:
                     connectedCount = await pool.connectedRelays().count
-                    print("[waitForRelayConnections] Relay connected! Total: \(connectedCount)")
+                    NDKLogger.log(.info, category: .relay, "Relay connected! Total: \(connectedCount)")
                     if connectedCount >= minimumRelays {
-                        print("[waitForRelayConnections] Minimum relay count reached!")
+                        NDKLogger.log(.info, category: .relay, "Minimum relay count reached!")
                         return connectedCount
                     }
                 case .relayDisconnected:
                     connectedCount = await pool.connectedRelays().count
-                    print("[waitForRelayConnections] Relay disconnected! Total: \(connectedCount)")
+                    NDKLogger.log(.info, category: .relay, "Relay disconnected! Total: \(connectedCount)")
                 default:
-                    print("[waitForRelayConnections] Other change: \(change)")
+                    NDKLogger.log(.trace, category: .relay, "Other change: \(change)")
                     break
                 }
             }
             
-            print("[waitForRelayConnections] Pool changes stream ended")
+            NDKLogger.log(.debug, category: .relay, "Pool changes stream ended")
             return connectedCount
         }
         
         // Race between timeout and connection
-        print("[waitForRelayConnections] Starting race between timeout and connection tasks")
+        NDKLogger.log(.trace, category: .relay, "Starting race between timeout and connection tasks")
         let result = await withTaskGroup(of: Int.self) { group in
             group.addTask { await timeoutTask.value }
             group.addTask { await connectionTask.value }
             
-            print("[waitForRelayConnections] Waiting for first task to complete...")
+            NDKLogger.log(.trace, category: .relay, "Waiting for first task to complete...")
             if let firstResult = await group.next() {
-                print("[waitForRelayConnections] First result received: \(firstResult)")
+                NDKLogger.log(.debug, category: .relay, "First result received: \(firstResult)")
                 // Cancel the other task
                 group.cancelAll()
                 let finalCount = firstResult == -1 ? await pool.connectedRelays().count : firstResult
-                print("[waitForRelayConnections] Final count: \(finalCount)")
+                NDKLogger.log(.debug, category: .relay, "Final count: \(finalCount)")
                 return finalCount
             }
             
-            print("[waitForRelayConnections] No task completed?")
+            NDKLogger.log(.warning, category: .relay, "No task completed?")
             return 0
         }
         
-        print("[waitForRelayConnections] Returning result: \(result)")
+        NDKLogger.log(.debug, category: .relay, "Returning result: \(result)")
         return result
     }
     
@@ -634,25 +634,25 @@ public final class NDK {
             do {
                 try await cache.confirmEvent(eventId: eventId, onRelay: relay.url)
             } catch {
-                print("[NDK] Warning: Failed to confirm event: \(error)")
+                NDKLogger.log(.warning, category: .event, "Failed to confirm event: \(error)")
             }
         } else {
-            print("[NDK] Event \(eventId) rejected by relay \(relay.url): \(message ?? "No reason given")")
+            NDKLogger.log(.warning, category: .event, "Event \(eventId) rejected by relay \(relay.url): \(message ?? "No reason given")")
         }
     }
     
     func processNotice(message: String, from relay: RelayProtocol) {
-        print("[NDK] Notice from \(relay.url): \(message)")
+        NDKLogger.log(.info, category: .relay, "Notice from \(relay.url): \(message)")
     }
     
     func processCount(subscriptionId: String, count: Int, from relay: RelayProtocol) {
         // Count messages not supported in declarative API yet
-        print("[NDK] Received COUNT from \(relay.url): \(count)")
+        NDKLogger.log(.debug, category: .event, "Received COUNT from \(relay.url): \(count)")
     }
     
     func handleAuthChallenge(challenge: String, from relay: RelayProtocol) async {
         guard let signer = signer else {
-            print("[NDK] Cannot respond to auth challenge - no signer available")
+            NDKLogger.log(.warning, category: .auth, "Cannot respond to auth challenge - no signer available")
             return
         }
         
@@ -678,7 +678,7 @@ public final class NDK {
             let jsonString = String(data: jsonData, encoding: .utf8) ?? ""
             try await relay.send(jsonString)
         } catch {
-            print("[NDK] Failed to respond to auth challenge: \(error)")
+            NDKLogger.log(.error, category: .auth, "Failed to respond to auth challenge: \(error)")
         }
     }
     
@@ -720,21 +720,21 @@ public final class NDK {
     
     /// Process NIP-77 Negentropy message from relay
     internal func processNIP77Message(_ message: NostrMessage, from relay: NDKRelay) async {
-        print("[NDK] Processing NIP-77 message from \(relay.url)")
+        NDKLogger.log(.debug, category: .sync, "Processing NIP-77 message from \(relay.url)")
         
         // Get the sync handler for this relay
         guard let handler = await pool.getSyncHandler(for: relay.url) else {
-            print("⚠️ Received NIP-77 message but no sync handler found for \(relay.url)")
+            NDKLogger.log(.warning, category: .sync, "⚠️ Received NIP-77 message but no sync handler found for \(relay.url)")
             return
         }
         
-        print("[NDK] Found sync handler, processing message...")
+        NDKLogger.log(.trace, category: .sync, "Found sync handler, processing message...")
         
         // Process the message
         do {
             try await handler.handleMessage(message)
         } catch {
-            print("❌ Failed to handle NIP-77 message: \(error)")
+            NDKLogger.log(.error, category: .sync, "❌ Failed to handle NIP-77 message: \(error)")
         }
     }
     
