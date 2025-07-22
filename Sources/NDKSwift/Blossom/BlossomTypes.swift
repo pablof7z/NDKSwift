@@ -143,17 +143,17 @@ public struct BlossomAuth {
         expiration: Date? = nil
     ) async throws -> BlossomAuth {
         var tags: [[String]] = [
-            ["t", "upload"],
-            ["x", sha256],
-            ["size", String(size)]
+            [NostrTagConstants.TagName.hashtag, NostrTagConstants.BlossomTag.upload],
+            [NostrTagConstants.BlossomTag.hash, sha256],
+            [NostrTagConstants.BlossomTag.size, String(size)]
         ]
 
         if let mimeType = mimeType {
-            tags.append(["type", mimeType])
+            tags.append([NostrTagConstants.BlossomTag.type, mimeType])
         }
 
         if let expiration = expiration {
-            tags.append(["expiration", String(Timestamp.from(expiration))])
+            tags.append([NostrTagConstants.BlossomTag.expiration, String(Timestamp.from(expiration))])
         }
 
         let event = try await NDKEventBuilder()
@@ -172,8 +172,8 @@ public struct BlossomAuth {
         reason: String? = nil
     ) async throws -> BlossomAuth {
         let tags: [[String]] = [
-            ["t", "delete"],
-            ["x", sha256]
+            [NostrTagConstants.TagName.hashtag, NostrTagConstants.BlossomTag.delete],
+            [NostrTagConstants.BlossomTag.hash, sha256]
         ]
 
         let event = try await NDKEventBuilder()
@@ -192,7 +192,7 @@ public struct BlossomAuth {
         until: Date? = nil
     ) async throws -> BlossomAuth {
         var tags: [[String]] = [
-            ["t", "list"]
+            [NostrTagConstants.TagName.hashtag, NostrTagConstants.BlossomTag.list]
         ]
 
         if let since = since {

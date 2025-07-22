@@ -379,18 +379,28 @@ public struct NDKUserProfile: Codable, Sendable {
     public init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: DynamicCodingKey.self)
 
-        self.name = try container.decodeIfPresent(String.self, forKey: DynamicCodingKey(stringValue: "name")!)
-        self.displayName = try container.decodeIfPresent(String.self, forKey: DynamicCodingKey(stringValue: "display_name")!)
-        self.about = try container.decodeIfPresent(String.self, forKey: DynamicCodingKey(stringValue: "about")!)
-        self.picture = try container.decodeIfPresent(String.self, forKey: DynamicCodingKey(stringValue: "picture")!)
-        self.banner = try container.decodeIfPresent(String.self, forKey: DynamicCodingKey(stringValue: "banner")!)
-        self.nip05 = try container.decodeIfPresent(String.self, forKey: DynamicCodingKey(stringValue: "nip05")!)
-        self.lud16 = try container.decodeIfPresent(String.self, forKey: DynamicCodingKey(stringValue: "lud16")!)
-        self.lud06 = try container.decodeIfPresent(String.self, forKey: DynamicCodingKey(stringValue: "lud06")!)
-        self.website = try container.decodeIfPresent(String.self, forKey: DynamicCodingKey(stringValue: "website")!)
+        self.name = try container.decodeIfPresent(String.self, forKey: DynamicCodingKey(stringValue: NostrTagConstants.ProfileField.name)!)
+        self.displayName = try container.decodeIfPresent(String.self, forKey: DynamicCodingKey(stringValue: NostrTagConstants.ProfileField.displayName)!)
+        self.about = try container.decodeIfPresent(String.self, forKey: DynamicCodingKey(stringValue: NostrTagConstants.ProfileField.about)!)
+        self.picture = try container.decodeIfPresent(String.self, forKey: DynamicCodingKey(stringValue: NostrTagConstants.ProfileField.picture)!)
+        self.banner = try container.decodeIfPresent(String.self, forKey: DynamicCodingKey(stringValue: NostrTagConstants.ProfileField.banner)!)
+        self.nip05 = try container.decodeIfPresent(String.self, forKey: DynamicCodingKey(stringValue: NostrTagConstants.ProfileField.nip05)!)
+        self.lud16 = try container.decodeIfPresent(String.self, forKey: DynamicCodingKey(stringValue: NostrTagConstants.ProfileField.lud16)!)
+        self.lud06 = try container.decodeIfPresent(String.self, forKey: DynamicCodingKey(stringValue: NostrTagConstants.ProfileField.lud06)!)
+        self.website = try container.decodeIfPresent(String.self, forKey: DynamicCodingKey(stringValue: NostrTagConstants.ProfileField.website)!)
 
         // Store any additional fields
-        let knownKeys = ["name", "display_name", "about", "picture", "banner", "nip05", "lud16", "lud06", "website"]
+        let knownKeys = [
+            NostrTagConstants.ProfileField.name,
+            NostrTagConstants.ProfileField.displayName,
+            NostrTagConstants.ProfileField.about,
+            NostrTagConstants.ProfileField.picture,
+            NostrTagConstants.ProfileField.banner,
+            NostrTagConstants.ProfileField.nip05,
+            NostrTagConstants.ProfileField.lud16,
+            NostrTagConstants.ProfileField.lud06,
+            NostrTagConstants.ProfileField.website
+        ]
         for key in container.allKeys {
             if !knownKeys.contains(key.stringValue) {
                 if let value = try container.decodeIfPresent(String.self, forKey: key) {
@@ -403,15 +413,15 @@ public struct NDKUserProfile: Codable, Sendable {
     public func encode(to encoder: Encoder) throws {
         var container = encoder.container(keyedBy: DynamicCodingKey.self)
 
-        try container.encodeIfPresent(name, forKey: DynamicCodingKey(stringValue: "name")!)
-        try container.encodeIfPresent(displayName, forKey: DynamicCodingKey(stringValue: "display_name")!)
-        try container.encodeIfPresent(about, forKey: DynamicCodingKey(stringValue: "about")!)
-        try container.encodeIfPresent(picture, forKey: DynamicCodingKey(stringValue: "picture")!)
-        try container.encodeIfPresent(banner, forKey: DynamicCodingKey(stringValue: "banner")!)
-        try container.encodeIfPresent(nip05, forKey: DynamicCodingKey(stringValue: "nip05")!)
-        try container.encodeIfPresent(lud16, forKey: DynamicCodingKey(stringValue: "lud16")!)
-        try container.encodeIfPresent(lud06, forKey: DynamicCodingKey(stringValue: "lud06")!)
-        try container.encodeIfPresent(website, forKey: DynamicCodingKey(stringValue: "website")!)
+        try container.encodeIfPresent(name, forKey: DynamicCodingKey(stringValue: NostrTagConstants.ProfileField.name)!)
+        try container.encodeIfPresent(displayName, forKey: DynamicCodingKey(stringValue: NostrTagConstants.ProfileField.displayName)!)
+        try container.encodeIfPresent(about, forKey: DynamicCodingKey(stringValue: NostrTagConstants.ProfileField.about)!)
+        try container.encodeIfPresent(picture, forKey: DynamicCodingKey(stringValue: NostrTagConstants.ProfileField.picture)!)
+        try container.encodeIfPresent(banner, forKey: DynamicCodingKey(stringValue: NostrTagConstants.ProfileField.banner)!)
+        try container.encodeIfPresent(nip05, forKey: DynamicCodingKey(stringValue: NostrTagConstants.ProfileField.nip05)!)
+        try container.encodeIfPresent(lud16, forKey: DynamicCodingKey(stringValue: NostrTagConstants.ProfileField.lud16)!)
+        try container.encodeIfPresent(lud06, forKey: DynamicCodingKey(stringValue: NostrTagConstants.ProfileField.lud06)!)
+        try container.encodeIfPresent(website, forKey: DynamicCodingKey(stringValue: NostrTagConstants.ProfileField.website)!)
 
         // Encode additional fields
         for (key, value) in additionalFields {
