@@ -13,17 +13,17 @@ public struct NDKZapReceipt {
     
     /// The bolt11 invoice
     public var bolt11: String? {
-        return event.tags.first(where: { $0.first == "bolt11" })?[safe: 1]
+        return event.tags.first(where: { $0.first == NostrTagConstants.TagName.bolt11 })?[safe: 1]
     }
     
     /// The preimage (payment proof)
     public var preimage: String? {
-        return event.tags.first(where: { $0.first == "preimage" })?[safe: 1]
+        return event.tags.first(where: { $0.first == NostrTagConstants.TagName.preimage })?[safe: 1]
     }
     
     /// The original zap request as JSON
     public var descriptionJSON: String? {
-        return event.tags.first(where: { $0.first == "description" })?[safe: 1]
+        return event.tags.first(where: { $0.first == NostrTagConstants.TagName.description })?[safe: 1]
     }
     
     /// The decoded zap request
@@ -130,21 +130,24 @@ public struct NDKZapReceipt {
         // Copy p, e, a, P tags from zap request
         for tag in zapRequest.event.tags {
             if let tagName = tag.first,
-               ["p", "e", "a", "P"].contains(tagName) {
+               [NostrTagConstants.TagName.pubkey, 
+                NostrTagConstants.TagName.event, 
+                NostrTagConstants.TagName.address, 
+                NostrTagConstants.TagName.uppercasePubkey].contains(tagName) {
                 tags.append(tag)
             }
         }
         
         // Add bolt11 tag
-        tags.append(["bolt11", bolt11])
+        tags.append([NostrTagConstants.TagName.bolt11, bolt11])
         
         // Add description tag (JSON-encoded zap request)
         let description = try zapRequest.encodeForCallback()
-        tags.append(["description", description])
+        tags.append([NostrTagConstants.TagName.description, description])
         
         // Add preimage if available
         if let preimage = preimage {
-            tags.append(["preimage", preimage])
+            tags.append([NostrTagConstants.TagName.preimage, preimage])
         }
         
         let event = try await NDKEventBuilder()

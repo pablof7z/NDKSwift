@@ -168,9 +168,16 @@ public class NDKList {
             guard !tag.isEmpty else { return false }
             let tagType = tag[0]
             switch tagType {
-            case "p", "e", "a", "r", "t":
+            case NostrTagConstants.TagName.pubkey,
+                 NostrTagConstants.TagName.event,
+                 NostrTagConstants.TagName.address,
+                 NostrTagConstants.TagName.reference,
+                 NostrTagConstants.TagName.hashtag:
                 return true
-            case "title", "name", "description", "image":
+            case NostrTagConstants.TagName.title,
+                 NostrTagConstants.TagName.name,
+                 NostrTagConstants.TagName.description,
+                 NostrTagConstants.TagName.image:
                 return false
             default:
                 // Include other non-metadata tags
@@ -244,10 +251,14 @@ public class NDKList {
             let tagValue = tag[1]
 
             switch tagType {
-            case "p", "e": return tagValue == reference
-            case "a": return tagValue == reference
-            case "r": return tagValue == reference
-            case "t": return tagValue == reference
+            case NostrTagConstants.TagName.pubkey, NostrTagConstants.TagName.event:
+                return tagValue == reference
+            case NostrTagConstants.TagName.address:
+                return tagValue == reference
+            case NostrTagConstants.TagName.reference:
+                return tagValue == reference
+            case NostrTagConstants.TagName.hashtag:
+                return tagValue == reference
             default: return false
             }
         }
@@ -340,7 +351,12 @@ public class NDKList {
             let tagValue = tag[1]
 
             switch tagType {
-            case "p", "e", "a", "r", "t": return tagValue == reference
+            case NostrTagConstants.TagName.pubkey,
+                 NostrTagConstants.TagName.event,
+                 NostrTagConstants.TagName.address,
+                 NostrTagConstants.TagName.reference,
+                 NostrTagConstants.TagName.hashtag:
+                return tagValue == reference
             default: return false
             }
         }
@@ -353,7 +369,12 @@ public class NDKList {
             let tagValue = tag[1]
 
             switch tagType {
-            case "p", "e", "a", "r", "t": return tagValue != reference
+            case NostrTagConstants.TagName.pubkey,
+                 NostrTagConstants.TagName.event,
+                 NostrTagConstants.TagName.address,
+                 NostrTagConstants.TagName.reference,
+                 NostrTagConstants.TagName.hashtag:
+                return tagValue != reference
             default: return true
             }
         }
@@ -493,7 +514,7 @@ public class NDKList {
 
 extension NDKUser: NDKListItem {
     public func toListTag() async -> Tag {
-        return ["p", pubkey]
+        return [NostrTagConstants.TagName.pubkey, pubkey]
     }
 
     public var reference: String {
@@ -507,20 +528,20 @@ extension NDKEvent: NDKListItem {
     public func toListTag() async -> Tag {
         if isParameterizedReplaceable {
             // Use 'a' tag for parameterized replaceable events
-            let dTagElement = tags.first { !$0.isEmpty && $0[0] == "d" }
+            let dTagElement = tags.first { !$0.isEmpty && $0[0] == NostrTagConstants.TagName.identifier }
             let dTag = (dTagElement?.count ?? 0) > 1 ? dTagElement![1] : ""
             let aTagValue = "\(kind):\(pubkey):\(dTag)"
-            return ["a", aTagValue]
+            return [NostrTagConstants.TagName.address, aTagValue]
         } else {
             // Use 'e' tag for regular events
-            return ["e", id]
+            return [NostrTagConstants.TagName.event, id]
         }
     }
 
     public var reference: String {
         get async {
             if isParameterizedReplaceable {
-                let dTagElement = tags.first { !$0.isEmpty && $0[0] == "d" }
+                let dTagElement = tags.first { !$0.isEmpty && $0[0] == NostrTagConstants.TagName.identifier }
                 let dTag = (dTagElement?.count ?? 0) > 1 ? dTagElement![1] : ""
                 return "\(kind):\(pubkey):\(dTag)"
             } else {
@@ -532,7 +553,7 @@ extension NDKEvent: NDKListItem {
 
 extension NDKRelay: NDKListItem {
     public func toListTag() async -> Tag {
-        return ["r", url]
+        return [NostrTagConstants.TagName.reference, url]
     }
 
     public var reference: String {
@@ -568,20 +589,20 @@ public struct NDKStringListItem: NDKListItem {
 public extension NDKList {
     /// Add a hashtag to this list
     func addHashtag(_ hashtag: String, mark: String? = nil, encrypted: Bool = false, position: ListPosition = .bottom) async throws {
-        let item = NDKStringListItem(tagType: "t", value: hashtag.hasPrefix("#") ? String(hashtag.dropFirst()) : hashtag)
+        let item = NDKStringListItem(tagType: NostrTagConstants.TagName.hashtag, value: hashtag.hasPrefix("#") ? String(hashtag.dropFirst()) : hashtag)
         try await addItem(item, mark: mark, encrypted: encrypted, position: position)
     }
 
     /// Add a URL to this list
     func addURL(_ url: String, mark: String? = nil, encrypted: Bool = false, position: ListPosition = .bottom) async throws {
-        let item = NDKStringListItem(tagType: "r", value: url)
+        let item = NDKStringListItem(tagType: NostrTagConstants.TagName.reference, value: url)
         try await addItem(item, mark: mark, encrypted: encrypted, position: position)
     }
 
     /// Get all hashtags in this list
     var hashtags: [String] {
         return allItems.compactMap { tag in
-            guard tag.count > 1, tag[0] == "t" else { return nil }
+            guard tag.count > 1, tag[0] == NostrTagConstants.TagName.hashtag else { return nil }
             return tag[1]
         }
     }
@@ -589,7 +610,7 @@ public extension NDKList {
     /// Get all URLs in this list
     var urls: [String] {
         return allItems.compactMap { tag in
-            guard tag.count > 1, tag[0] == "r" else { return nil }
+            guard tag.count > 1, tag[0] == NostrTagConstants.TagName.reference else { return nil }
             return tag[1]
         }
     }
@@ -597,7 +618,7 @@ public extension NDKList {
     /// Get all user pubkeys in this list
     var userPubkeys: [String] {
         return allItems.compactMap { tag in
-            guard tag.count > 1, tag[0] == "p" else { return nil }
+            guard tag.count > 1, tag[0] == NostrTagConstants.TagName.pubkey else { return nil }
             return tag[1]
         }
     }
@@ -605,7 +626,7 @@ public extension NDKList {
     /// Get all event IDs in this list
     var eventIds: [String] {
         return allItems.compactMap { tag in
-            guard tag.count > 1, tag[0] == "e" else { return nil }
+            guard tag.count > 1, tag[0] == NostrTagConstants.TagName.event else { return nil }
             return tag[1]
         }
     }
