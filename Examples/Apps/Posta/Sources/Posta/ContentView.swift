@@ -3,7 +3,7 @@ import NDKSwift
 
 struct ContentView: View {
     @Environment(NDKAuthManager.self) var authManager
-    @EnvironmentObject var ndkManager: NDKManager
+    @Environment(NDKManager.self) var ndkManager
     
     var body: some View {
         NDKAuthView(authManager: authManager, ndk: ndkManager.ndk, authenticatedContent: {
@@ -43,6 +43,6 @@ struct MainTabView: View {
 #Preview {
     ContentView()
         .environment(NDKAuthManager.shared)
-        .environmentObject(NDKManager.shared)
-        .environmentObject(RelayManager())
+        .environment(NDKManager.shared)
+        .environment(RelayManager())
 }

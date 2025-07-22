@@ -3,8 +3,8 @@ import NDKSwift
 
 struct HomeView: View {
     @Environment(NDKAuthManager.self) var authManager
-    @EnvironmentObject var subscriptionManager: SubscriptionManager
-    @State private var profileCache: [String: NDKUserProfile] = [:]
+    @Environment(SubscriptionManager.self) var subscriptionManager
+    @Environment(NDKManager.self) var ndkManager
     @State private var selectedProfile: String?
     
     var body: some View {
@@ -32,7 +32,7 @@ struct HomeView: View {
                     } else if subscriptionManager.notes.isEmpty && !subscriptionManager.isLoadingNotes {
                         emptyStateView
                     } else {
-                        chatListView(manager: subscriptionManager)
+                        chatListView
                     }
                 }
             }
@@ -40,9 +40,6 @@ struct HomeView: View {
         }
         .sheet(item: $selectedProfile) { pubkey in
             ProfileView(pubkey: pubkey)
-        }
-        .onAppear {
-            // SubscriptionManager is now passed via environment
         }
     }
     
@@ -102,113 +99,84 @@ struct HomeView: View {
                     }
                 }
                 .padding(.horizontal, 20)
-                .padding(.vertical, 16)
+                .padding(.top, 56)
+                .padding(.bottom, 12)
+                
+                // Connection status
+                if let error = subscriptionManager.error {
+                    ErrorBanner(error: error)
+                        .padding(.horizontal, 20)
+                        .padding(.bottom, 8)
+                }
                 
                 // Sync status
                 if !subscriptionManager.syncStatus.isEmpty {
                     Text(subscriptionManager.syncStatus)
-                        .font(.system(size: 12))
+                        .font(.caption)
                         .foregroundColor(.secondary)
-                        .padding(.horizontal, 20)
                         .padding(.bottom, 8)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .transition(.opacity.combined(with: .move(edge: .top)))
                 }
             }
         }
-        .frame(minHeight: 98)
-        .overlay(
-            Rectangle()
-                .fill(Color(.separator).opacity(0.2))
-                .frame(height: 0.5),
-            alignment: .bottom
-        )
-        .animation(.easeInOut(duration: 0.2), value: subscriptionManager.syncStatus)
+        .frame(height: error != nil ? 140 : 120)
+        .shadow(color: Color.black.opacity(0.05), radius: 5, x: 0, y: 2)
+        
+        var error: Error? {
+            subscriptionManager.error
+        }
     }
     
     private var loadingFollowsView: some View {
-        VStack(spacing: 24) {
-            ProgressView()
-                .scaleEffect(1.1)
-                .tint(.accentColor)
-            
-            VStack(spacing: 8) {
-                Text("Loading your network")
-                    .font(.system(size: 17, weight: .semibold))
-                    .foregroundColor(.primary)
-                
-                Text("Fetching your follow list...")
-                    .font(.system(size: 15))
-                    .foregroundColor(.secondary)
-            }
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-    }
-    
-    private var loadingView: some View {
         VStack(spacing: 20) {
             ProgressView()
-                .scaleEffect(1.1)
-                .tint(.accentColor)
+                .scaleEffect(1.2)
             
-            Text("Initializing...")
-                .font(.system(size: 15))
+            Text("Loading your follows...")
+                .font(.headline)
                 .foregroundColor(.secondary)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
     
     private var emptyStateView: some View {
-        VStack(spacing: 24) {
-            ZStack {
-                Circle()
-                    .fill(Color(.quaternarySystemFill))
-                    .frame(width: 120, height: 120)
-                
-                Image(systemName: "bubble.left.and.bubble.right.fill")
-                    .font(.system(size: 56))
-                    .foregroundColor(.secondary.opacity(0.6))
-                    .symbolRenderingMode(.hierarchical)
-            }
+        VStack(spacing: 20) {
+            Image(systemName: "bubble.left.and.bubble.right")
+                .font(.system(size: 60))
+                .foregroundColor(.secondary.opacity(0.5))
             
-            VStack(spacing: 8) {
-                Text("No messages yet")
-                    .font(.system(size: 22, weight: .semibold))
-                    .foregroundColor(.primary)
-                
-                Text("Messages from people you follow will appear here")
-                    .font(.system(size: 16))
-                    .foregroundColor(.secondary)
-                    .multilineTextAlignment(.center)
-                    .padding(.horizontal, 40)
-            }
+            Text("No messages yet")
+                .font(.title3)
+                .fontWeight(.medium)
+            
+            Text("Messages from people you follow will appear here")
+                .font(.body)
+                .foregroundColor(.secondary)
+                .multilineTextAlignment(.center)
+                .padding(.horizontal, 40)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
     
-    private func chatListView(manager: SubscriptionManager) -> some View {
+    private var chatListView: some View {
         ScrollView {
             LazyVStack(spacing: 0) {
-                ForEach(manager.notes, id: \.id) { event in
+                ForEach(subscriptionManager.notes, id: \.id) { event in
                     ChatRowView(
                         event: event,
-                        profile: profileCache[event.pubkey],
-                        onProfileLoad: { profile in
-                            profileCache[event.pubkey] = profile
-                        },
+                        profile: subscriptionManager.profile(for: event.pubkey),
                         onTap: {
                             selectedProfile = event.pubkey
                         }
                     )
                     .transition(.opacity.combined(with: .move(edge: .bottom)))
                     
-                    if event.id != manager.notes.last?.id {
+                    if event.id != subscriptionManager.notes.last?.id {
                         Divider()
                             .padding(.leading, 76)
                     }
                 }
             }
-            .animation(.spring(response: 0.4, dampingFraction: 0.8), value: manager.notes.count)
+            .animation(.spring(response: 0.4, dampingFraction: 0.8), value: subscriptionManager.notes.count)
         }
         .scrollIndicators(.hidden)
     }
@@ -217,12 +185,9 @@ struct HomeView: View {
 struct ChatRowView: View {
     let event: NDKEvent
     let profile: NDKUserProfile?
-    let onProfileLoad: (NDKUserProfile) -> Void
     let onTap: () -> Void
     
     @State private var isPressed = false
-    @State private var profileTask: Task<Void, Never>?
-    @EnvironmentObject var ndkManager: NDKManager
     
     var body: some View {
         HStack(alignment: .top, spacing: 0) {
@@ -236,155 +201,111 @@ struct ChatRowView: View {
                     } placeholder: {
                         Circle()
                             .fill(Color(.tertiarySystemFill))
-                            .overlay(
-                                Text(avatarInitial)
-                                    .font(.system(size: 22, weight: .medium))
-                                    .foregroundColor(.secondary)
-                            )
                     }
-                    .frame(width: 56, height: 56)
+                    .frame(width: 52, height: 52)
                     .clipShape(Circle())
                 } else {
                     Circle()
                         .fill(Color(.tertiarySystemFill))
-                        .frame(width: 56, height: 56)
+                        .frame(width: 52, height: 52)
                         .overlay(
-                            Text(avatarInitial)
+                            Text(String(profile?.name?.prefix(1) ?? "?").uppercased())
                                 .font(.system(size: 22, weight: .medium))
                                 .foregroundColor(.secondary)
                         )
                 }
             }
-            .padding(.leading, 16)
+            .padding(.leading, 20)
             .padding(.trailing, 12)
             
             // Content section
-            VStack(alignment: .leading, spacing: 3) {
-                // Header row
+            VStack(alignment: .leading, spacing: 4) {
                 HStack(alignment: .firstTextBaseline) {
-                    Text(displayName)
-                        .font(.system(size: 17, weight: .semibold))
-                        .foregroundColor(.primary)
+                    Text(profile?.displayName ?? profile?.name ?? "Unknown")
+                        .font(.system(size: 16, weight: .semibold))
                         .lineLimit(1)
                     
                     Spacer()
                     
-                    HStack(spacing: 4) {
-                        Text(formatTimestamp(event.createdAt))
-                            .font(.system(size: 15))
-                            .foregroundColor(Color.secondary.opacity(0.6))
-                        
-                        Image(systemName: "chevron.right")
-                            .font(.system(size: 12, weight: .semibold))
-                            .foregroundColor(Color.secondary.opacity(0.3))
-                    }
+                    Text(event.createdAt.formatted)
+                        .font(.caption)
+                        .foregroundColor(.secondary)
                 }
                 
-                // Message preview
-                Text(cleanContent(event.content))
+                Text(event.content)
                     .font(.system(size: 15))
-                    .lineSpacing(2)
-                    .foregroundColor(.secondary)
                     .lineLimit(2)
-                    .multilineTextAlignment(.leading)
+                    .foregroundColor(.primary.opacity(0.9))
             }
-            .padding(.trailing, 16)
-            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.trailing, 20)
+            .padding(.vertical, 16)
         }
-        .padding(.vertical, 12)
-        .contentShape(Rectangle())
         .background(
-            Color(.systemBackground)
-                .brightness(isPressed ? -0.02 : 0)
+            Color.primary.opacity(isPressed ? 0.05 : 0)
         )
+        .contentShape(Rectangle())
         .onTapGesture {
-            withAnimation(.easeInOut(duration: 0.1)) {
-                isPressed = true
-            }
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                isPressed = false
-                onTap()
-            }
+            onTap()
         }
-        .task {
-            if profile == nil, let ndk = ndkManager.ndk {
-                profileTask = Task {
-                    let profileStream = await ndk.profileManager.observe(for: event.pubkey)
-                    
-                    for await profileUpdate in profileStream {
-                        if let profile = profileUpdate {
-                            await MainActor.run {
-                                onProfileLoad(profile)
-                            }
-                            // We only need the first valid profile for the list view
-                            break
-                        }
-                    }
-                }
-            }
-        }
-        .onDisappear {
-            profileTask?.cancel()
-        }
-    }
-    
-    private var displayName: String {
-        if let name = profile?.displayName ?? profile?.name {
-            return name
-        }
-        return shortenPubkey(event.pubkey)
-    }
-    
-    private var avatarInitial: String {
-        let name = displayName
-        return String(name.prefix(1)).uppercased()
-    }
-    
-    private func shortenPubkey(_ pubkey: String) -> String {
-        if pubkey.count > 16 {
-            return String(pubkey.prefix(8)) + "..." + String(pubkey.suffix(8))
-        }
-        return pubkey
-    }
-    
-    private func cleanContent(_ content: String) -> String {
-        // Remove extra whitespace and newlines for preview
-        return content
-            .components(separatedBy: .newlines)
-            .joined(separator: " ")
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-    }
-    
-    private func formatTimestamp(_ timestamp: Timestamp) -> String {
-        let date = Date(timeIntervalSince1970: TimeInterval(timestamp))
-        let now = Date()
-        let calendar = Calendar.current
-        
-        if calendar.isDateInToday(date) {
-            let formatter = DateFormatter()
-            formatter.timeStyle = .short
-            return formatter.string(from: date)
-        } else if calendar.isDateInYesterday(date) {
-            return "Yesterday"
-        } else if let days = calendar.dateComponents([.day], from: date, to: now).day, days < 7 {
-            let formatter = DateFormatter()
-            formatter.dateFormat = "EEEE"
-            return formatter.string(from: date)
-        } else {
-            let formatter = DateFormatter()
-            formatter.dateStyle = .short
-            return formatter.string(from: date)
-        }
+        .scaleEffect(isPressed ? 0.98 : 1)
+        .animation(.easeInOut(duration: 0.1), value: isPressed)
+        .onLongPressGesture(
+            minimumDuration: 0,
+            maximumDistance: .infinity,
+            pressing: { pressing in
+                isPressed = pressing
+            },
+            perform: { }
+        )
     }
 }
 
+struct ErrorBanner: View {
+    let error: Error
+    
+    var body: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "exclamationmark.triangle.fill")
+                .foregroundColor(.orange)
+                .font(.caption)
+            
+            Text(error.localizedDescription)
+                .font(.caption)
+                .lineLimit(1)
+                .foregroundColor(.secondary)
+            
+            Spacer()
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 6)
+        .background(Color.orange.opacity(0.1))
+        .cornerRadius(8)
+    }
+}
 
-extension String: @retroactive Identifiable {
+// Extension to make String identifiable for sheet
+extension String: Identifiable {
     public var id: String { self }
 }
 
-#Preview {
-    HomeView()
-        .environment(NDKAuthManager.shared)
-        .environmentObject(SubscriptionManager())
+// Extension for formatted timestamps
+extension Timestamp {
+    var formatted: String {
+        let date = Date(timeIntervalSince1970: TimeInterval(self))
+        let now = Date()
+        let interval = now.timeIntervalSince(date)
+        
+        if interval < 60 {
+            return "now"
+        } else if interval < 3600 {
+            let minutes = Int(interval / 60)
+            return "\(minutes)m"
+        } else if interval < 86400 {
+            let hours = Int(interval / 3600)
+            return "\(hours)h"
+        } else {
+            let days = Int(interval / 86400)
+            return "\(days)d"
+        }
+    }
 }

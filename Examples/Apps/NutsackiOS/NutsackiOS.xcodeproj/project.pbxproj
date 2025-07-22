@@ -3,7 +3,7 @@
 	archiveVersion = 1;
 	classes = {
 	};
-	objectVersion = 54;
+	objectVersion = 63;
 	objects = {
 
 /* Begin PBXBuildFile section */
@@ -25,7 +25,6 @@
 		541EA1BE0A780695052037D0 /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 9A0E485A77CC33154C81E180 /* LaunchScreen.storyboard */; };
 		578BFBDCED5863A68DA9A05D /* DiscoveredMintsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 85C54882260F3096F3402AEE /* DiscoveredMintsView.swift */; };
 		5D8EC63090D54040C7CEB07C /* PlatformHelpers.swift in Sources */ = {isa = PBXBuildFile; fileRef = 322B1C29BAF815D820653E1A /* PlatformHelpers.swift */; };
-		5EDCE35F42864BCE557E9FA0 /* QR_CODE_IMPROVEMENTS.md in Resources */ = {isa = PBXBuildFile; fileRef = 17F97C33AF566AB7F6955324 /* QR_CODE_IMPROVEMENTS.md */; };
 		6BA1850F5A5A565895F45E8D /* DataModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 700018D5285AFEF01AAB1679 /* DataModels.swift */; };
 		6C3619BBC1925CD2012C3030 /* NostrManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0474797B3D70A3F5E50DE4E0 /* NostrManager.swift */; };
 		6FCBCB96D05F363442410449 /* PaymentReceivedAnimation.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA415E993BB5A7710A803BD9 /* PaymentReceivedAnimation.swift */; };
@@ -72,7 +71,6 @@
 		06737C2A632A68CE0C55183C /* WalletSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WalletSettingsView.swift; sourceTree = "<group>"; };
 		139C4ED82E0344CDED10AAA3 /* WalletManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WalletManager.swift; sourceTree = "<group>"; };
 		179914F131C3EA8E9C86C2DF /* RelayConnectionViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RelayConnectionViews.swift; sourceTree = "<group>"; };
-		17F97C33AF566AB7F6955324 /* QR_CODE_IMPROVEMENTS.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = QR_CODE_IMPROVEMENTS.md; sourceTree = "<group>"; };
 		20CD4E4BCD9A73999656B525 /* RelayStatusIndicator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RelayStatusIndicator.swift; sourceTree = "<group>"; };
 		29823E16BE363E01B66A8DE5 /* ReceiveView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReceiveView.swift; sourceTree = "<group>"; };
 		29DD716C975387491C98884E /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
@@ -109,7 +107,7 @@
 		B43D3EE06E7A1612A33CC851 /* AsyncContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AsyncContentView.swift; sourceTree = "<group>"; };
 		BFD3618F6ACCDFC05E146B73 /* MintView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MintView.swift; sourceTree = "<group>"; };
 		C53A61281693438AA3C00939 /* BalanceCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BalanceCard.swift; sourceTree = "<group>"; };
-		C9F082EB0BD47AC488F1643F /* NutsackiOS.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = NutsackiOS.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		C9F082EB0BD47AC488F1643F /* Nutsack.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Nutsack.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		CC302DE92627A808C4316A97 /* DLEQStatusIndicator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DLEQStatusIndicator.swift; sourceTree = "<group>"; };
 		CD23BF78658593B392C7FF56 /* WalletEventDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WalletEventDetailView.swift; sourceTree = "<group>"; };
 		D2DF5538965B7EB3C64426FB /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
@@ -148,7 +146,7 @@
 		3F9A56A4A696A91EC7F21DED /* Products */ = {
 			isa = PBXGroup;
 			children = (
-				C9F082EB0BD47AC488F1643F /* NutsackiOS.app */,
+				C9F082EB0BD47AC488F1643F /* Nutsack.app */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -161,7 +159,6 @@
 				9A0E485A77CC33154C81E180 /* LaunchScreen.storyboard */,
 				7E5246359CDA91D9B7847663 /* NutsackApp.swift */,
 				A9C1DE3157B002CB979102D6 /* NutsackiOS.xcconfig */,
-				17F97C33AF566AB7F6955324 /* QR_CODE_IMPROVEMENTS.md */,
 				C9B07B0AC5AC5491C3CEF625 /* DataSources */,
 				71B5AF5C50678245B601E60C /* Models */,
 				8DA64FA8832FB83F5A983501 /* Utils */,
@@ -226,7 +223,6 @@
 		89D520A27A28FB620595C7DA /* Auth */ = {
 			isa = PBXGroup;
 			children = (
-				FF0BA09D2D4987F500000001 /* AuthenticationView.swift */,
 				98B33CB2CD71269193050EE8 /* CreateAccountView.swift */,
 				FD1FAFE4A7259CADFAF7276C /* ImportAccountView.swift */,
 			);
@@ -272,6 +268,7 @@
 		E0773FDC9C216AB2F6191480 /* Views */ = {
 			isa = PBXGroup;
 			children = (
+				FF0BA09D2D4987F500000001 /* AuthenticationView.swift */,
 				7260E070B2366527CE8E93CF /* ContactsView.swift */,
 				29DD716C975387491C98884E /* ContentView.swift */,
 				435DAF7B5D81505B2F8A7B91 /* DebugLoggingView.swift */,
@@ -311,7 +308,7 @@
 				8D61774580F270BFA6E25A26 /* NDKSwift */,
 			);
 			productName = NutsackiOS;
-			productReference = C9F082EB0BD47AC488F1643F /* NutsackiOS.app */;
+			productReference = C9F082EB0BD47AC488F1643F /* Nutsack.app */;
 			productType = "com.apple.product-type.application";
 		};
 /* End PBXNativeTarget section */
@@ -322,11 +319,6 @@
 			attributes = {
 				BuildIndependentTargetsInParallel = YES;
 				LastUpgradeCheck = 1430;
-				TargetAttributes = {
-					9CDA0F91746A66D57BA0C900 = {
-						DevelopmentTeam = "";
-					};
-				};
 			};
 			buildConfigurationList = 98383901B72F432DF50A273D /* Build configuration list for PBXProject "NutsackiOS" */;
 			compatibilityVersion = "Xcode 14.0";
@@ -341,7 +333,6 @@
 			packageReferences = (
 				9A266D9534540C3B77DC8DA1 /* XCLocalSwiftPackageReference "../../.." */,
 			);
-			preferredProjectObjectVersion = 54;
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
@@ -357,7 +348,6 @@
 			files = (
 				A3F5D391D9E9635B38003B40 /* Assets.xcassets in Resources */,
 				541EA1BE0A780695052037D0 /* LaunchScreen.storyboard in Resources */,
-				5EDCE35F42864BCE557E9FA0 /* QR_CODE_IMPROVEMENTS.md in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -451,6 +441,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
+				DEVELOPMENT_TEAM = 456SHKPP26;
 				INFOPLIST_FILE = Sources/NutsackiOS/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -536,6 +527,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
+				DEVELOPMENT_TEAM = 456SHKPP26;
 				INFOPLIST_FILE = Sources/NutsackiOS/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",

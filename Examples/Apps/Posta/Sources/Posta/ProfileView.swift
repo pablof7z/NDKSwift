@@ -4,23 +4,40 @@ import NDKSwift
 struct ProfileView: View {
     let pubkey: String?
     @Environment(NDKAuthManager.self) var authManager
-    @EnvironmentObject var ndkManager: NDKManager
+    @Environment(NDKManager.self) var ndkManager
     @Environment(\.dismiss) private var dismiss
+    
+    @StateObject private var profileDataSource: UserProfileDataSource
+    @StateObject private var notesDataSource: NotesDataSource
+    @State private var followCount: Int?
+    @State private var followerCount: Int?
+    @State private var isFollowing = false
+    @State private var showingQRCode = false
     
     private var displayPubkey: String {
         pubkey ?? authManager.activeSession?.pubkey ?? ""
     }
     
-    @State private var profile: NDKUserProfile?
-    @State private var isLoading = true
-    @State private var notes: [NDKEvent] = []
-    @State private var followCount: Int?
-    @State private var followerCount: Int?
-    @State private var isFollowing = false
-    @State private var showingQRCode = false
-    @State private var notesDataSource: NDKDataSource<NDKEvent>?
-    @State private var notesTask: Task<Void, Never>?
-    @State private var profileTask: Task<Void, Never>?
+    init(pubkey: String?) {
+        self.pubkey = pubkey
+        let targetPubkey = pubkey ?? NDKAuthManager.shared.activeSession?.pubkey ?? ""
+        
+        // Initialize data sources
+        if let ndk = NDKManager.shared.ndk {
+            _profileDataSource = StateObject(wrappedValue: UserProfileDataSource(ndk: ndk, pubkey: targetPubkey))
+            
+            let notesFilter = NDKFilter(
+                authors: [targetPubkey],
+                kinds: [EventKind.textNote],
+                limit: 50
+            )
+            _notesDataSource = StateObject(wrappedValue: NotesDataSource(ndk: ndk, filter: notesFilter))
+        } else {
+            // Fallback - this shouldn't happen in practice
+            _profileDataSource = StateObject(wrappedValue: UserProfileDataSource(ndk: NDK(relayUrls: []), pubkey: targetPubkey))
+            _notesDataSource = StateObject(wrappedValue: NotesDataSource(ndk: NDK(relayUrls: []), filter: NDKFilter()))
+        }
+    }
     
     var body: some View {
         NavigationView {
@@ -37,27 +54,41 @@ struct ProfileView: View {
                 )
                 .ignoresSafeArea()
                 
-                ScrollView {
-                    VStack(spacing: 0) {
-                        // Header with banner and avatar
-                        profileHeaderView
-                        
-                        // Profile info section
-                        profileInfoView
-                            .padding(.horizontal, 20)
-                            .padding(.top, -30)
-                        
-                        // Stats and action buttons
-                        statsAndActionsView
-                            .padding(.horizontal, 20)
-                            .padding(.top, 20)
-                        
-                        // Notes section
-                        notesSection
-                            .padding(.top, 32)
+                if profileDataSource.isLoading && profileDataSource.profile == nil {
+                    ProgressView("Loading profile...")
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                } else {
+                    ScrollView {
+                        VStack(spacing: 0) {
+                            // Header with banner and avatar
+                            profileHeaderView
+                            
+                            // Profile info section
+                            profileInfoView
+                                .padding(.horizontal, 20)
+                                .padding(.top, -30)
+                            
+                            // Stats and action buttons
+                            statsAndActionsView
+                                .padding(.horizontal, 20)
+                                .padding(.top, 20)
+                            
+                            // Notes section
+                            notesSection
+                                .padding(.top, 32)
+                        }
+                    }
+                    .ignoresSafeArea(edges: .top)
+                }
+                
+                // Error overlay
+                if let error = profileDataSource.error {
+                    VStack {
+                        Spacer()
+                        ErrorBanner(error: error)
+                            .padding()
                     }
                 }
-                .ignoresSafeArea(edges: .top)
             }
             .navigationBarHidden(true)
             .overlay(alignment: .topTrailing) {
@@ -65,17 +96,11 @@ struct ProfileView: View {
             }
         }
         .task {
-            await loadProfile()
-        }
-        .onDisappear {
-            Task {
-                notesTask?.cancel()
-            }
-            profileTask?.cancel()
+            await loadStats()
         }
         .sheet(isPresented: $showingQRCode) {
-            if let pubkey = pubkey {
-                QRCodeView(pubkey: pubkey, profile: profile)
+            if let pubkey = displayPubkey.isEmpty ? nil : displayPubkey {
+                QRCodeView(pubkey: pubkey, profile: profileDataSource.profile)
             }
         }
     }
@@ -83,7 +108,7 @@ struct ProfileView: View {
     private var profileHeaderView: some View {
         ZStack(alignment: .bottom) {
             // Banner
-            if let banner = profile?.banner, let url = URL(string: banner) {
+            if let banner = profileDataSource.profile?.banner, let url = URL(string: banner) {
                 AsyncImage(url: url) { image in
                     image
                         .resizable()
@@ -128,7 +153,7 @@ struct ProfileView: View {
     
     private var avatarView: some View {
         Group {
-            if let picture = profile?.picture, let url = URL(string: picture) {
+            if let picture = profileDataSource.profile?.picture, let url = URL(string: picture) {
                 AsyncImage(url: url) { image in
                     image
                         .resizable()
@@ -148,7 +173,7 @@ struct ProfileView: View {
                     Circle()
                         .stroke(Color(.systemBackground), lineWidth: 4)
                 )
-                .shadow(color: .black.opacity(0.1), radius: 10, x: 0, y: 5)
+                .shadow(radius: 8)
             } else {
                 Circle()
                     .fill(Color(.tertiarySystemFill))
@@ -162,162 +187,121 @@ struct ProfileView: View {
                         Circle()
                             .stroke(Color(.systemBackground), lineWidth: 4)
                     )
-                    .shadow(color: .black.opacity(0.1), radius: 10, x: 0, y: 5)
+                    .shadow(radius: 8)
             }
         }
     }
     
+    private var avatarInitial: String {
+        let name = profileDataSource.profile?.displayName ?? profileDataSource.profile?.name ?? "?"
+        return String(name.prefix(1)).uppercased()
+    }
+    
     private var profileInfoView: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            // Name and verification
-            HStack(alignment: .center, spacing: 8) {
-                Text(displayName)
-                    .font(.system(size: 28, weight: .bold))
-                    .foregroundColor(.primary)
-                    .onAppear {
-                        print("[ProfileView] Displaying name: \(displayName), profile: \(profile?.displayName ?? "nil")")
+        VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(profileDataSource.profile?.displayName ?? profileDataSource.profile?.name ?? "Unknown")
+                        .font(.title)
+                        .fontWeight(.bold)
+                    
+                    if let nip05 = profileDataSource.profile?.nip05 {
+                        Label(nip05, systemImage: "checkmark.seal.fill")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
                     }
+                }
                 
-                if profile?.nip05 != nil {
-                    Image(systemName: "checkmark.seal.fill")
-                        .font(.system(size: 20))
-                        .foregroundColor(.blue)
-                }
+                Spacer()
             }
+            .padding(.top, 60)
             
-            // Username/NIP-05
-            if let nip05 = profile?.nip05 {
-                Text(nip05)
-                    .font(.system(size: 16))
-                    .foregroundColor(.secondary)
-            } else if let pubkey = pubkey {
-                Text(shortenPubkey(pubkey))
-                    .font(.system(size: 16, weight: .medium))
-                    .foregroundColor(.secondary)
-                    .textSelection(.enabled)
-            }
-            
-            // Bio
-            if let about = profile?.about, !about.isEmpty {
+            if let about = profileDataSource.profile?.about, !about.isEmpty {
                 Text(about)
-                    .font(.system(size: 16))
-                    .foregroundColor(.primary)
-                    .lineSpacing(4)
-                    .padding(.top, 8)
+                    .font(.body)
+                    .foregroundColor(.primary.opacity(0.9))
                     .fixedSize(horizontal: false, vertical: true)
-            }
-            
-            // Website
-            if let website = profile?.website, let url = URL(string: website) {
-                Link(destination: url) {
-                    HStack(spacing: 6) {
-                        Image(systemName: "link")
-                            .font(.system(size: 14))
-                        Text(cleanWebsiteURL(website))
-                            .font(.system(size: 15))
-                    }
-                    .foregroundColor(.blue)
-                }
-                .padding(.top, 4)
+                    .padding(.top, 4)
             }
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.top, 60)
     }
     
     private var statsAndActionsView: some View {
         VStack(spacing: 16) {
-            // Stats
-            HStack(spacing: 24) {
-                statView(count: followCount, label: "Following")
-                statView(count: followerCount, label: "Followers")
-                statView(count: notes.count, label: "Notes")
+            HStack(spacing: 40) {
+                StatView(count: notesDataSource.notes.count, label: "Posts")
+                StatView(count: followCount ?? 0, label: "Following")
+                StatView(count: followerCount ?? 0, label: "Followers")
                 Spacer()
             }
             
-            // Action buttons
             HStack(spacing: 12) {
-                // Follow/Unfollow button
-                Button(action: toggleFollow) {
-                    HStack(spacing: 6) {
-                        Image(systemName: isFollowing ? "person.badge.minus" : "person.badge.plus")
-                            .font(.system(size: 16, weight: .medium))
-                        Text(isFollowing ? "Unfollow" : "Follow")
-                            .font(.system(size: 16, weight: .semibold))
+                if displayPubkey != authManager.activeSession?.pubkey {
+                    Button(action: {
+                        // Toggle follow
+                    }) {
+                        HStack {
+                            Image(systemName: isFollowing ? "person.badge.minus" : "person.badge.plus")
+                            Text(isFollowing ? "Unfollow" : "Follow")
+                        }
+                        .font(.system(size: 16, weight: .medium))
+                        .foregroundColor(isFollowing ? .primary : .white)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 10)
+                        .background(isFollowing ? Color(.tertiarySystemFill) : Color.accentColor)
+                        .cornerRadius(10)
                     }
-                    .foregroundColor(isFollowing ? .primary : .white)
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 12)
-                    .background(
-                        isFollowing ? 
-                        LinearGradient(
-                            colors: [Color(.tertiarySystemFill)],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        ) : 
-                        LinearGradient(
-                            colors: [Color.blue, Color.blue.opacity(0.8)],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        )
-                    )
-                    .cornerRadius(12)
                 }
                 
-                // Message button
-                Button(action: sendMessage) {
-                    Image(systemName: "paperplane")
-                        .font(.system(size: 18, weight: .medium))
-                        .foregroundColor(.primary)
-                        .frame(width: 48, height: 48)
-                        .background(Color(.tertiarySystemFill))
-                        .cornerRadius(12)
-                }
-                
-                // QR Code button
-                Button(action: { showingQRCode = true }) {
+                Button(action: {
+                    showingQRCode = true
+                }) {
                     Image(systemName: "qrcode")
-                        .font(.system(size: 18, weight: .medium))
+                        .font(.system(size: 16, weight: .medium))
                         .foregroundColor(.primary)
-                        .frame(width: 48, height: 48)
+                        .frame(width: 44, height: 44)
                         .background(Color(.tertiarySystemFill))
-                        .cornerRadius(12)
+                        .cornerRadius(10)
                 }
             }
-        }
-    }
-    
-    private func statView(count: Int?, label: String) -> some View {
-        VStack(spacing: 4) {
-            Text(count.map { formatCount($0) } ?? "—")
-                .font(.system(size: 20, weight: .bold))
-                .foregroundColor(.primary)
-            Text(label)
-                .font(.system(size: 14))
-                .foregroundColor(.secondary)
         }
     }
     
     private var notesSection: some View {
-        VStack(spacing: 0) {
-            // Section header
+        VStack(alignment: .leading, spacing: 0) {
             HStack {
-                Text("Notes")
-                    .font(.system(size: 22, weight: .bold))
-                    .foregroundColor(.primary)
+                Text("Posts")
+                    .font(.title2)
+                    .fontWeight(.bold)
+                    .padding(.horizontal, 20)
+                
                 Spacer()
+                
+                if notesDataSource.isLoading {
+                    ProgressView()
+                        .scaleEffect(0.8)
+                        .padding(.trailing, 20)
+                }
             }
-            .padding(.horizontal, 20)
             .padding(.bottom, 16)
             
-            if notes.isEmpty && !isLoading {
-                emptyNotesView
+            if notesDataSource.notes.isEmpty && !notesDataSource.isLoading {
+                VStack(spacing: 12) {
+                    Image(systemName: "note.text")
+                        .font(.largeTitle)
+                        .foregroundColor(.secondary)
+                    Text("No posts yet")
+                        .font(.body)
+                        .foregroundColor(.secondary)
+                }
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 40)
             } else {
                 LazyVStack(spacing: 0) {
-                    ForEach(notes, id: \.id) { event in
-                        NoteRowView(event: event)
+                    ForEach(notesDataSource.notes, id: \.id) { note in
+                        NoteRowView(note: note, profile: profileDataSource.profile)
                         
-                        if event.id != notes.last?.id {
+                        if note.id != notesDataSource.notes.last?.id {
                             Divider()
                                 .padding(.leading, 20)
                         }
@@ -327,184 +311,107 @@ struct ProfileView: View {
         }
     }
     
-    private var emptyNotesView: some View {
-        VStack(spacing: 12) {
-            Image(systemName: "note.text")
-                .font(.system(size: 48))
-                .foregroundColor(.secondary.opacity(0.5))
-            Text("No notes yet")
-                .font(.system(size: 18))
-                .foregroundColor(.secondary)
-        }
-        .frame(maxWidth: .infinity)
-        .padding(.vertical, 60)
-    }
-    
     private var closeButton: some View {
-        Button(action: { dismiss() }) {
-            ZStack {
-                VisualEffectBlur(blurStyle: .systemThinMaterial)
-                    .clipShape(Circle())
-                
-                Image(systemName: "xmark")
-                    .font(.system(size: 16, weight: .semibold))
-                    .foregroundColor(.secondary)
-            }
-            .frame(width: 36, height: 36)
+        Button(action: {
+            dismiss()
+        }) {
+            Image(systemName: "xmark.circle.fill")
+                .font(.title2)
+                .foregroundStyle(.secondary, Color(.tertiarySystemFill))
         }
-        .padding(.top, 60)
-        .padding(.trailing, 20)
+        .padding()
     }
     
-    // MARK: - Helper Methods
-    
-    private var displayName: String {
-        if let displayName = profile?.displayName {
-            return displayName
-        } else if let name = profile?.name {
-            return name
-        } else if let pubkey = pubkey {
-            return shortenPubkey(pubkey)
-        } else {
-            return "Unknown"
-        }
-    }
-    
-    private var avatarInitial: String {
-        String(displayName.prefix(1)).uppercased()
-    }
-    
-    private func shortenPubkey(_ pubkey: String) -> String {
-        if pubkey.count > 16 {
-            return String(pubkey.prefix(8)) + "..." + String(pubkey.suffix(8))
-        }
-        return pubkey
-    }
-    
-    private func cleanWebsiteURL(_ url: String) -> String {
-        url.replacingOccurrences(of: "https://", with: "")
-           .replacingOccurrences(of: "http://", with: "")
-           .trimmingCharacters(in: CharacterSet(charactersIn: "/"))
-    }
-    
-    private func formatCount(_ count: Int) -> String {
-        if count >= 1_000_000 {
-            return String(format: "%.1fM", Double(count) / 1_000_000)
-        } else if count >= 1_000 {
-            return String(format: "%.1fK", Double(count) / 1_000)
-        }
-        return "\(count)"
-    }
-    
-    // MARK: - Actions
-    
-    private func toggleFollow() {
-        // Implementation for follow/unfollow
-    }
-    
-    private func sendMessage() {
-        // Implementation for sending message
-    }
-    
-    private func loadProfile() async {
+    private func loadStats() async {
         guard let ndk = ndkManager.ndk else { return }
         
-        // Use the observeProfile API for reactive profile updates
-        profileTask = Task {
-            let profileStream = await ndk.profileManager.observe(for: displayPubkey)
+        // Load follow count
+        do {
+            let followFilter = NDKFilter(
+                authors: [displayPubkey],
+                kinds: [EventKind.contacts],
+                limit: 1
+            )
             
-            for await profileUpdate in profileStream {
+            let events = try await ndk.fetchEvents(filter: followFilter).allObjects()
+            if let event = events.first {
+                let follows = event.tags.filter { $0.name == "p" }.count
                 await MainActor.run {
-                    self.profile = profileUpdate
-                    if let profile = profileUpdate {
-                        print("[ProfileView] Profile updated for \(displayPubkey): \(profile.displayName ?? "unknown")")
-                    } else {
-                        print("[ProfileView] No profile available for \(displayPubkey)")
-                    }
+                    followCount = follows
                 }
             }
+        } catch {
+            print("Error loading follow count: \(error)")
         }
         
-        // Subscribe to notes
-        let filter = NDKFilter(
-            authors: [displayPubkey],
-            kinds: [1],
-            limit: 50
-        )
-        
-        notesDataSource = ndk.observe(
-            filter: filter,
-            cachePolicy: .cacheWithNetwork
-        )
-        
-        if let dataSource = notesDataSource {
-            notesTask = Task {
-                for await event in dataSource.events {
-                    // Insert new note in sorted order
-                    if !notes.contains(where: { $0.id == event.id }) {
-                        notes.append(event)
-                        notes.sort { $0.createdAt > $1.createdAt }
-                    }
-                }
-            }
-        }
-        
-        await MainActor.run {
-            isLoading = false
+        // Note: Follower count would require scanning all contact lists
+        // which is expensive. This is typically done with a specialized relay.
+    }
+}
+
+struct StatView: View {
+    let count: Int
+    let label: String
+    
+    var body: some View {
+        VStack(spacing: 4) {
+            Text("\(count)")
+                .font(.system(size: 20, weight: .semibold))
+            
+            Text(label)
+                .font(.caption)
+                .foregroundColor(.secondary)
         }
     }
 }
 
 struct NoteRowView: View {
-    let event: NDKEvent
+    let note: NDKEvent
+    let profile: NDKUserProfile?
     
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text(event.content)
-                .font(.system(size: 16))
-                .foregroundColor(.primary)
-                .lineSpacing(4)
-                .fixedSize(horizontal: false, vertical: true)
-            
-            HStack(spacing: 16) {
-                Text(formatTimestamp(event.createdAt))
-                    .font(.system(size: 14))
-                    .foregroundColor(.secondary)
-                
-                Spacer()
-                
-                // Engagement buttons
-                HStack(spacing: 20) {
-                    Button(action: {}) {
-                        Image(systemName: "bubble.right")
-                            .font(.system(size: 16))
-                            .foregroundColor(.secondary)
-                    }
-                    
-                    Button(action: {}) {
-                        Image(systemName: "arrow.2.squarepath")
-                            .font(.system(size: 16))
-                            .foregroundColor(.secondary)
-                    }
-                    
-                    Button(action: {}) {
-                        Image(systemName: "heart")
-                            .font(.system(size: 16))
-                            .foregroundColor(.secondary)
-                    }
+        HStack(alignment: .top, spacing: 12) {
+            // Small avatar
+            if let picture = profile?.picture, let url = URL(string: picture) {
+                AsyncImage(url: url) { image in
+                    image
+                        .resizable()
+                        .aspectRatio(contentMode: .fill)
+                } placeholder: {
+                    Circle()
+                        .fill(Color(.tertiarySystemFill))
                 }
+                .frame(width: 40, height: 40)
+                .clipShape(Circle())
+            } else {
+                Circle()
+                    .fill(Color(.tertiarySystemFill))
+                    .frame(width: 40, height: 40)
             }
+            
+            VStack(alignment: .leading, spacing: 4) {
+                HStack {
+                    Text(profile?.displayName ?? profile?.name ?? "Unknown")
+                        .font(.subheadline)
+                        .fontWeight(.medium)
+                    
+                    Spacer()
+                    
+                    Text(note.createdAt.formatted)
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+                
+                Text(note.content)
+                    .font(.body)
+                    .foregroundColor(.primary.opacity(0.9))
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            
+            Spacer(minLength: 0)
         }
         .padding(.horizontal, 20)
-        .padding(.vertical, 16)
-        .contentShape(Rectangle())
-    }
-    
-    private func formatTimestamp(_ timestamp: Timestamp) -> String {
-        let date = Date(timeIntervalSince1970: TimeInterval(timestamp))
-        let formatter = RelativeDateTimeFormatter()
-        formatter.unitsStyle = .abbreviated
-        return formatter.localizedString(for: date, relativeTo: Date())
+        .padding(.vertical, 12)
     }
 }
 
@@ -515,27 +422,26 @@ struct QRCodeView: View {
     
     var body: some View {
         NavigationView {
-            VStack(spacing: 24) {
-                Text(profile?.displayName ?? "Nostr Profile")
-                    .font(.system(size: 24, weight: .bold))
+            VStack(spacing: 20) {
+                Text(profile?.displayName ?? profile?.name ?? "User")
+                    .font(.title2)
+                    .fontWeight(.semibold)
                 
                 // QR Code would go here
-                RoundedRectangle(cornerRadius: 20)
-                    .fill(Color(.systemGray6))
-                    .frame(width: 280, height: 280)
-                    .overlay(
-                        Text("QR Code")
-                            .foregroundColor(.secondary)
-                    )
+                Image(systemName: "qrcode")
+                    .font(.system(size: 200))
+                    .foregroundColor(.primary)
+                    .padding(40)
+                    .background(Color(.secondarySystemBackground))
+                    .cornerRadius(20)
                 
-                Text("npub1...")
-                    .font(.system(size: 16, weight: .medium))
+                Text("npub: \(String(pubkey.prefix(16)))...")
+                    .font(.caption)
                     .foregroundColor(.secondary)
-                
-                Spacer()
+                    .monospaced()
             }
-            .padding(.top, 40)
-            .navigationTitle("Share Profile")
+            .padding()
+            .navigationTitle("QR Code")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
@@ -546,10 +452,4 @@ struct QRCodeView: View {
             }
         }
     }
-}
-
-#Preview {
-    ProfileView(pubkey: "test_pubkey")
-        .environment(NDKAuthManager.shared)
-        .environmentObject(NDKManager.shared)
 }

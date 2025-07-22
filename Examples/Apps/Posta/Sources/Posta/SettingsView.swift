@@ -4,7 +4,7 @@ import NDKSwift
 struct SettingsView: View {
     @Environment(NDKAuthManager.self) var authManager
     @EnvironmentObject var themeManager: ThemeManager
-    @EnvironmentObject var relayManager: RelayManager
+    @Environment(RelayManager.self) var relayManager
     
     @State private var showingAbout = false
     @State private var showingProfile = false
