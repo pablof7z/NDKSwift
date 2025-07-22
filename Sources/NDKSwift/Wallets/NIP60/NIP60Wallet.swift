@@ -841,7 +841,7 @@ public actor NIP60Wallet: NDKPaymentProvider {
         let age = Date().timeIntervalSince(eventDate)
         
         // Skip if older than 24 hours
-        guard age < 86400 else { 
+        guard age < TimeConstants.day else { 
             NDKLogger.log(.debug, category: .wallet, "📜 Skipping quote tracking for \(quote.quoteId) - older than 24 hours")
             return 
         }
@@ -862,7 +862,7 @@ public actor NIP60Wallet: NDKPaymentProvider {
                     mints: self.mints,
                     eventManager: self.eventManager,
                     signer: self.signer,
-                    timeout: 86400 - age, // Remaining time until 24h
+                    timeout: TimeConstants.day - age, // Remaining time until 24h
                     quoteAge: age,
                     onProofsReceived: { proofs in
                         // Let the wallet handle proof state updates

@@ -275,7 +275,7 @@ public extension NDK {
         let dataSource = NDKDataSource(
             ndk: self,
             filter: filter,
-            maxAge: 86400 // 24 hours - relay lists rarely change
+            maxAge: TimeConstants.day // 24 hours - relay lists rarely change
         )
         
         // Collect all relay list events and use the most recent

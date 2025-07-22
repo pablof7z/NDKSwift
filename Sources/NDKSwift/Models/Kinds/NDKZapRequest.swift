@@ -29,7 +29,7 @@ public struct NDKZapRequest {
         tags.append(["amount", String(amountMillisats)])
         
         // Optional: lnurl tag
-        for await profile in await ndk.profileManager.observe(for: recipient.pubkey, maxAge: 3600) {
+        for await profile in await ndk.profileManager.observe(for: recipient.pubkey, maxAge: TimeConstants.hour) {
             if let profile = profile,
                let lnurl = profile.lud06 ?? profile.lud16 {
                 let encoded = try encodeLNURL(lnurl)

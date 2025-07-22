@@ -188,7 +188,7 @@ public enum CashuDeposit {
                         
                         // Calculate dynamic polling interval based on quote age using exponential backoff
                         let currentAge = quoteAge + Date().timeIntervalSince(startTime)
-                        let hoursOld = currentAge / 3600.0
+                        let hoursOld = currentAge / TimeConstants.hour
                         let baseInterval: TimeInterval = 120.0 // 2 minutes
                         let maxInterval: TimeInterval = 7200.0 // 2 hours
                         let interval = min(baseInterval * pow(1.5, hoursOld), maxInterval)

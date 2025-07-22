@@ -17,7 +17,7 @@ actor LRUCache<Key: Hashable, Value> {
     private var hits: Int = 0
     private var misses: Int = 0
     
-    init(capacity: Int = 100, defaultTTL: TimeInterval = 3600) {
+    init(capacity: Int = 100, defaultTTL: TimeInterval = TimeConstants.hour) {
         self.capacity = capacity
         self.defaultTTL = defaultTTL
     }
