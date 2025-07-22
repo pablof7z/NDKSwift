@@ -7,7 +7,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.1] - 2025-01-22
+
 ### Fixed
+- Validate P2PK pubkey format in nutzaps (must be 33 bytes starting with "02")
+- Update transaction status to 'failed' for malformed nutzaps instead of keeping them as 'processing'
+- Add detailed error information to failed transactions for better user feedback
+- Include P2PK pubkey data in proof decoding logs for easier debugging
+
+### Improved
+- Enhanced error handling for invalid nutzaps with malformed P2PK pubkeys
+- Better transaction status tracking for failed nutzap redemptions
+- More informative logging when processing nutzap proofs
+
+## [0.4.0] - 2025-01-21
+
+### Fixed
+- Fixed wallet balance showing as 0 even when token events are processed
+  - Changed token event processing to add new proofs before processing deletions
+  - This ensures proofs that appear in both old and new events are properly transferred
+  - Added enhanced logging to ProofStateManager for debugging balance calculations
+  - Fixed issue where proofs marked as deleted were not being restored when re-added in newer events
 - Fixed wallet configuration events being processed out of order during initial load
   - Added tracking of newest configuration timestamp to ensure only the most recent config is applied
   - Prevents older cached configurations from overwriting newer ones
@@ -21,6 +41,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Updated transaction type enum values to match NDKSwift (`.send`, `.receive`, `.melt` instead of incorrect names)
   - Added temporary nutzap event ID for pending transactions
   - Resolved naming conflicts between view components
+- Fixed mint keysets being fetched repeatedly instead of using cached versions
+  - MintManager now properly stores loaded mints in memory after loading from cache
+  - requestMintQuote now uses loadMint which respects the cache instead of checking empty in-memory state
+  - This significantly reduces network requests when minting tokens
+  - Updated cache TTLs to more reasonable values: mint info cached for 7 days (was 24 hours), keysets cached for 3 days (was 1 hour)
+- Fixed initial balance not displaying in NutsackiOS home screen
+  - WalletManager now explicitly fetches and sets the initial balance after wallet loads
+  - Added missing pendingAmount property to WalletManager (computed property that calculates from pending transactions)
+  - Fixed ProofStateManager to properly update proof state when processing token events with same timestamp
+  - Added balance change notification after processing token events in NIP60Wallet
+  - Changed initial lastNotifiedBalance to -1 to ensure first balance notification is always emitted
+  - Enhanced logging in ProofStateManager to track proof additions and balance calculations
 
 ### Added
 - Extended `NostrJSONConstants` with Cashu/wallet JSON field constants

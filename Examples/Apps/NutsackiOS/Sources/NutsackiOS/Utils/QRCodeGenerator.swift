@@ -16,31 +16,62 @@ public struct QRCodeGenerator {
     /// - Returns: A platform-specific image (UIImage for iOS, NSImage for macOS) or nil if generation fails
     #if os(iOS)
     public static func generate(from string: String, scale: CGFloat = 10) -> UIImage? {
-        guard let data = string.data(using: .utf8) else { return nil }
+        guard let data = string.data(using: .utf8) else { 
+            print("QRCodeGenerator: Failed to convert string to UTF8 data")
+            return nil 
+        }
+        
+        // For very long strings (like cashu tokens), use low error correction
+        let correctionLevel: String
+        if string.count > 500 {
+            correctionLevel = "L" // Low error correction for more data capacity
+        } else {
+            correctionLevel = "M" // Medium error correction for normal data
+        }
         
         let filter = CIFilter.qrCodeGenerator()
         filter.message = data
-        filter.correctionLevel = "M" // Medium error correction
+        filter.correctionLevel = correctionLevel
         
-        guard let outputImage = filter.outputImage else { return nil }
+        guard let outputImage = filter.outputImage else { 
+            print("QRCodeGenerator: CIFilter failed to generate output image")
+            return nil 
+        }
         
         let transform = CGAffineTransform(scaleX: scale, y: scale)
         let scaledImage = outputImage.transformed(by: transform)
         
         let context = CIContext()
-        guard let cgImage = context.createCGImage(scaledImage, from: scaledImage.extent) else { return nil }
+        guard let cgImage = context.createCGImage(scaledImage, from: scaledImage.extent) else { 
+            print("QRCodeGenerator: Failed to create CGImage from CIImage")
+            return nil 
+        }
         
         return UIImage(cgImage: cgImage)
     }
     #else
     public static func generate(from string: String, scale: CGFloat = 10) -> NSImage? {
-        guard let data = string.data(using: .utf8) else { return nil }
+        guard let data = string.data(using: .utf8) else { 
+            print("QRCodeGenerator: Failed to convert string to UTF8 data")
+            return nil 
+        }
+        
+        // For very long strings (like cashu tokens), use low error correction
+        let correctionLevel: String
+        if string.count > 500 {
+            correctionLevel = "L" // Low error correction for more data capacity
+        } else {
+            correctionLevel = "M" // Medium error correction for normal data
+        }
         
         let filter = CIFilter.qrCodeGenerator()
         filter.message = data
-        filter.correctionLevel = "M" // Medium error correction
+        filter.correctionLevel = correctionLevel
         
-        guard let outputImage = filter.outputImage else { return nil }
+        guard let outputImage = filter.outputImage else { 
+            print("QRCodeGenerator: CIFilter failed to generate output image")
+            return nil 
+        }
         
         let transform = CGAffineTransform(scaleX: scale, y: scale)
         let scaledImage = outputImage.transformed(by: transform)
@@ -92,12 +123,15 @@ public struct QRCodeView: View {
                     .fill(Color.secondary.opacity(0.2))
                     .frame(width: size, height: size)
                     .overlay(
-                        VStack {
-                            Image(systemName: "qrcode")
+                        VStack(spacing: 8) {
+                            Image(systemName: "qrcode.viewfinder")
                                 .font(.largeTitle)
                                 .foregroundColor(.secondary)
-                            Text("Unable to generate QR code")
+                            Text("Token too large for QR")
                                 .font(.caption)
+                                .foregroundColor(.secondary)
+                            Text("Use copy button below")
+                                .font(.caption2)
                                 .foregroundColor(.secondary)
                         }
                     )

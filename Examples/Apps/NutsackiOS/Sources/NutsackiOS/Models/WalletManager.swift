@@ -122,6 +122,11 @@ class WalletManager {
         // The wallet's load() method will emit a balanceChanged event
         // which our event monitoring task will catch and update currentBalance
         
+        // However, we should also fetch the initial balance directly to ensure it's set
+        let initialBalance = try await ndkWallet.getBalance() ?? 0
+        self.currentBalance = initialBalance
+        print("📘 Initial balance fetched: \(initialBalance) sats")
+        
         // Check if wallet has mints configured
         let fetchedMintURLs = await ndkWallet.mints.getMintURLs()
         self.mintURLs = fetchedMintURLs

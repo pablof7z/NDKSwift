@@ -217,6 +217,11 @@ public actor NIP60Wallet: NDKPaymentProvider {
         
         // Process event using consolidated processor
         await eventProcessor.processEvent(event, context: context)
+        
+        // Check if balance changed after processing token events
+        if event.kind == EventKind.cashuToken {
+            await notifyBalanceChangeIfNeeded()
+        }
     }
     
     
@@ -525,6 +530,13 @@ public actor NIP60Wallet: NDKPaymentProvider {
                     attempts: 1,
                     lastAttempt: .now
                 )
+            )
+            
+            // Update transaction status to failed with error details
+            await transactionHistory.updateNutzapTransactionStatus(
+                nutzapEventId: event.id,
+                status: .failed,
+                errorDetails: redemptionError.localizedDescription
             )
             
             // Re-throw the error for upstream handling
@@ -1053,7 +1065,7 @@ public actor NIP60Wallet: NDKPaymentProvider {
         }
     }
     
-    private var lastNotifiedBalance: Int64 = 0
+    private var lastNotifiedBalance: Int64 = -1 // Start with -1 to ensure first balance notification
     
     
     

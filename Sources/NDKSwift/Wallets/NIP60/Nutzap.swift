@@ -233,14 +233,41 @@ public enum Nutzap {
         NDKLogger.log(.warning, category: .wallet, "🎯 Found \(proofTags.count) proof tags in nutzap")
         
         var allProofs: [CashuSwift.Proof] = []
+        var invalidP2PKError: String?
+        
         for proofTag in proofTags {
             guard let proofData = proofTag[1].data(using: .utf8),
                   let proof = try? JSONCoding.decode(CashuSwift.Proof.self, from: proofData) else {
                 NDKLogger.log(.error, category: .wallet, "🎯 Failed to decode proof from tag: \(proofTag[1])")
                 continue
             }
-            NDKLogger.log(.warning, category: .wallet, "🎯 Decoded proof: amount=\(proof.amount), C=\(proof.C)")
+            
+            // Extract P2PK data from proof secret for logging
+            var p2pkInfo = "none"
+            if let secretData = proof.secret.data(using: .utf8),
+               let secret = try? JSONSerialization.jsonObject(with: secretData, options: []) as? [[String: Any]] {
+                for condition in secret {
+                    if condition[NostrJSONConstants.kind] as? String == "P2PK",
+                       let data = condition["data"] as? String {
+                        p2pkInfo = data
+                        
+                        // Validate P2PK pubkey format
+                        if data.count != 66 || !data.hasPrefix("02") {
+                            NDKLogger.log(.error, category: .wallet, "🎯 Invalid P2PK pubkey format: \(data) (must be 66 hex chars starting with 02)")
+                            invalidP2PKError = "Invalid P2PK pubkey format: \(data) (must be 66 hex chars starting with 02)"
+                        }
+                        break
+                    }
+                }
+            }
+            
+            NDKLogger.log(.warning, category: .wallet, "🎯 Decoded proof: amount=\(proof.amount), C=\(proof.C), P2PK=\(p2pkInfo)")
             allProofs.append(proof)
+        }
+        
+        // If we found invalid P2PK pubkeys, throw the error
+        if let errorMessage = invalidP2PKError {
+            throw NutzapRedemptionError.invalidProofs(reason: errorMessage)
         }
         
         var totalReceived: Int64 = 0

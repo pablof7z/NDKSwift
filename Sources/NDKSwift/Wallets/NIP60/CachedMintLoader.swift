@@ -4,10 +4,10 @@ import CashuSwift
 // MARK: - Cache Constants
 
 public enum CacheConstants {
-    /// Default max age for mint info (24 hours)
+    /// Default max age for mint info (7 days)
     public static let defaultMintInfoMaxAge: TimeInterval = TimeConstants.mintInfoCacheTTL
     
-    /// Default max age for keysets (1 hour)
+    /// Default max age for keysets (3 days)
     public static let defaultKeysetMaxAge: TimeInterval = TimeConstants.keysetsCacheTTL
 }
 
@@ -20,8 +20,8 @@ public actor CachedMintLoader {
     /// Initialize with a cache and staleness intervals
     /// - Parameters:
     ///   - cache: The cache implementation to use
-    ///   - mintInfoMaxAge: How long before mint info is considered stale (default: 24 hours)
-    ///   - keysetMaxAge: How long before keysets are considered stale (default: 1 hour)
+    ///   - mintInfoMaxAge: How long before mint info is considered stale (default: 7 days)
+    ///   - keysetMaxAge: How long before keysets are considered stale (default: 3 days)
     public init(
         cache: NDKCache,
         mintInfoMaxAge: TimeInterval = CacheConstants.defaultMintInfoMaxAge,

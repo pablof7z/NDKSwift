@@ -43,6 +43,7 @@ final class Transaction {
     var timestamp: Date  // Transaction timestamp from wallet event
     var direction: TransactionDirection  // Direction of the transaction
     var mintURL: String?  // Mint URL for the transaction
+    var errorDetails: String?  // Error details for failed transactions
     
     
     init(type: TransactionType, amount: Int, memo: String? = nil) {
@@ -160,6 +161,9 @@ extension WalletTransaction {
         if let tokenData = ecashTokenData {
             transaction.offlineToken = tokenData.tokenString
         }
+        
+        // Set error details if available
+        transaction.errorDetails = errorDetails
         
         return transaction
     }
