@@ -9,7 +9,7 @@ public final class NDKPrivateKeySigner: NDKSigner {
     /// Initialize with a private key
     public init(privateKey: PrivateKey) throws {
         do {
-            _ = try HexValidator.validate32ByteHex(privateKey)
+            try HexValidator.validate32ByteHex(privateKey)
         } catch {
             throw NDKError.invalidDataFormat("private key", details: "Must be 64 character hex string")
         }
