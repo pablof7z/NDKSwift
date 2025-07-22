@@ -189,8 +189,8 @@ public enum CashuDeposit {
                         // Calculate dynamic polling interval based on quote age using exponential backoff
                         let currentAge = quoteAge + Date().timeIntervalSince(startTime)
                         let hoursOld = currentAge / TimeConstants.hour
-                        let baseInterval: TimeInterval = 120.0 // 2 minutes
-                        let maxInterval: TimeInterval = 7200.0 // 2 hours
+                        let baseInterval: TimeInterval = NetworkConstants.depositCheckBaseInterval
+                        let maxInterval: TimeInterval = NetworkConstants.depositCheckMaxInterval
                         let interval = min(baseInterval * pow(1.5, hoursOld), maxInterval)
                         
                         NDKLogger.log(.debug, category: .wallet, "📜 Quote \(quote.quoteId) still pending - next check in \(Int(interval)) seconds")

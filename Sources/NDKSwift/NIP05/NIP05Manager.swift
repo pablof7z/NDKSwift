@@ -14,16 +14,16 @@ public actor NIP05Manager {
     public static let defaultTTL: TimeInterval = TimeConstants.nip05CacheTTL
     
     /// Rate limit per domain (10 requests per hour)
-    private static let domainRateLimit: TimeInterval = 360 // 6 minutes between requests
+    private static let domainRateLimit: TimeInterval = NetworkConstants.nip05RateLimit
     
     /// Maximum response size to prevent DoS (1MB)
-    private static let maxResponseSize = 1_048_576
+    private static let maxResponseSize = NetworkConstants.maxNIP05ResponseSize
     
     public init(ndk: NDK) {
         self.ndk = ndk
         self.cache = ndk.cache
-        self.memoryCache = LRUCache(capacity: 1000, defaultTTL: TimeConstants.hour)
-        self.domainRateLimiter = LRUCache(capacity: 500, defaultTTL: TimeConstants.hour)
+        self.memoryCache = LRUCache(capacity: NetworkConstants.nip05CacheCapacity, defaultTTL: TimeConstants.hour)
+        self.domainRateLimiter = LRUCache(capacity: NetworkConstants.domainRateLimiterCapacity, defaultTTL: TimeConstants.hour)
     }
     
     // MARK: - Public API
@@ -312,7 +312,7 @@ public actor NIP05Manager {
         
         // Perform network request
         var request = URLRequest(url: url)
-        request.timeoutInterval = 10
+        request.timeoutInterval = NetworkConstants.timeoutRelayInfo
         request.setValue("NDKSwift", forHTTPHeaderField: "User-Agent")
         
         let (data, response) = try await URLSession.shared.data(for: request)

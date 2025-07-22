@@ -23,4 +23,36 @@ public enum NetworkConstants {
     
     // Subscription Parameters
     public static let eoseTimeoutRatio = 0.5 // 50% of relays for timeout
+    
+    // Ping/Health Check
+    public static let timeoutPing: TimeInterval = 3.0
+    
+    // Cache Parameters
+    public static let tombstoneTTL: TimeInterval = 600 // 10 minutes
+    public static let cleanupInterval: TimeInterval = 300 // 5 minutes
+    public static let defaultCacheCapacity = 1000
+    public static let profileCacheSize = 1000
+    public static let nip05CacheCapacity = 1000
+    public static let domainRateLimiterCapacity = 500
+    public static let outboxTrackerCapacity = 500
+    
+    // Retry Configuration
+    public static let retryBaseDelay: TimeInterval = 5.0
+    public static let retryDelayIncrement: TimeInterval = 5.0
+    public static let maxMintRetries = 6
+    public static let maxRetryDelay: TimeInterval = 30.0
+    
+    // NIP-05 Configuration
+    public static let nip05RateLimit: TimeInterval = 360 // 6 minutes between requests
+    public static let maxNIP05ResponseSize = 1_048_576 // 1MB
+    
+    // Filter Limits
+    public static let maxFilterLimit = 1000
+    
+    // Data Collection
+    public static let dataGroupingWindow: TimeInterval = 0.1 // 100ms
+    
+    // Deposit Monitoring
+    public static let depositCheckBaseInterval: TimeInterval = 120.0 // 2 minutes
+    public static let depositCheckMaxInterval: TimeInterval = 7200.0 // 2 hours
 }

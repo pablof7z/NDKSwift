@@ -24,7 +24,7 @@ public actor NDKSQLiteCache: NDKCache {
     
     // Tombstone cache for deletion events that arrive before the original event
     private var deletionTombstones: [String: Timestamp] = [:] // eventId -> deletion timestamp
-    private let tombstoneTTL: TimeInterval = 600 // 10 minutes
+    private let tombstoneTTL: TimeInterval = NetworkConstants.tombstoneTTL
     
     // Periodic cleanup task
     private var cleanupTask: Task<Void, Never>?
@@ -1451,7 +1451,7 @@ public actor NDKSQLiteCache: NDKCache {
     private func startPeriodicCleanup() async {
         while !Task.isCancelled {
             // Wait for 5 minutes between cleanups
-            try? await Task.sleep(nanoseconds: 5 * 60 * 1_000_000_000)
+            try? await Task.sleep(nanoseconds: UInt64(NetworkConstants.cleanupInterval * Double(TimeConstants.nanosecondsPerSecond)))
             
             await cleanupObservers()
             await cleanupTombstones()

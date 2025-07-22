@@ -4,16 +4,16 @@ import CashuSwift
 /// Configuration for mint retry behavior
 public struct MintRetryConfig {
     /// Base delay between retries in seconds
-    let baseDelay: TimeInterval = 5.0
+    let baseDelay: TimeInterval = NetworkConstants.retryBaseDelay
     
     /// Linear increment for each retry (5s, 10s, 15s, etc.)
-    let delayIncrement: TimeInterval = 5.0
+    let delayIncrement: TimeInterval = NetworkConstants.retryDelayIncrement
     
     /// Maximum number of retry attempts
-    let maxRetries: Int = 6  // Total wait time: 5+10+15+20+25+30 = 105 seconds
+    let maxRetries: Int = NetworkConstants.maxMintRetries  // Total wait time: 5+10+15+20+25+30 = 105 seconds
     
     /// Maximum delay between retries
-    let maxDelay: TimeInterval = 30.0
+    let maxDelay: TimeInterval = NetworkConstants.maxRetryDelay
     
     public init() {}
 }

@@ -197,7 +197,7 @@ public actor NDKNostrRPC {
     private func handleTimeout(id: String, continuation: CheckedContinuation<NDKRPCResponse, Error>) async {
         timeoutTasks.removeValue(forKey: id)
         if pendingRequests.removeValue(forKey: id) != nil {
-            continuation.resume(throwing: NDKError.timeout(operation: "RPC request", seconds: 30))
+            continuation.resume(throwing: NDKError.timeout(operation: "RPC request", seconds: Int(NetworkConstants.timeoutRPCRequest)))
         }
     }
     

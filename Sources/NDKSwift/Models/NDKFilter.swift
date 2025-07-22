@@ -333,7 +333,7 @@ public struct NDKFilter: Codable, Equatable, Sendable {
         
         // For limit, sum them up (capped at some reasonable max)
         if let selfLimit = limit, let otherLimit = other.limit {
-            merged.limit = min(selfLimit + otherLimit, 1000)
+            merged.limit = min(selfLimit + otherLimit, NetworkConstants.maxFilterLimit)
         }
         
         // Don't merge if tag filters differ

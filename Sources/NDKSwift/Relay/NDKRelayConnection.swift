@@ -271,7 +271,7 @@ public actor NDKRelayConnection {
     /// Handle timeout for a pending event (actor-isolated)
     private func handleTimeout(eventId: EventID) {
         if let continuation = pendingEvents.removeValue(forKey: eventId) {
-            continuation.resume(throwing: NDKError.timeout(operation: "publishEvent", seconds: 10))
+            continuation.resume(throwing: NDKError.timeout(operation: "publishEvent", seconds: Int(NetworkConstants.timeoutRelayConnection)))
         }
     }
     
@@ -396,10 +396,10 @@ public actor NDKRelayConnection {
             
             // Set up timeout
             let timeoutTask = Task {
-                try? await Task.sleep(nanoseconds: 3 * TimeConstants.nanosecondsPerSecond)
+                try? await Task.sleep(nanoseconds: UInt64(NetworkConstants.timeoutPing * Double(TimeConstants.nanosecondsPerSecond)))
                 if !pingHandled {
                     pingHandled = true
-                    NDKLogger.log(.error, category: .connection, "⏰ Ping timeout for \(url) after 3 seconds")
+                    NDKLogger.log(.error, category: .connection, "⏰ Ping timeout for \(url) after \(Int(NetworkConstants.timeoutPing)) seconds")
                     continuation.resume(returning: false)
                 }
             }
@@ -429,7 +429,7 @@ public actor NDKRelayConnection {
         }
         
         if !pingCompleted {
-            let timeoutError = NDKError.timeout(operation: "ping", seconds: 3)
+            let timeoutError = NDKError.timeout(operation: "ping", seconds: Int(NetworkConstants.timeoutPing))
             await resumeContinuationWithError(timeoutError)
             await handleConnectionError(timeoutError)
         }
