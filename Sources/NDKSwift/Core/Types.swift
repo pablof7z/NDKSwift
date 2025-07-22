@@ -85,6 +85,7 @@ public typealias Kind = Int
 
 /// Common Nostr event kinds
 public enum EventKind {
+    // MARK: - Core Events (0-999)
     public static let metadata = 0
     public static let textNote = 1
     public static let recommendRelay = 2
@@ -94,29 +95,41 @@ public enum EventKind {
     public static let repost = 6
     public static let reaction = 7
     public static let genericRepost = 16
-    public static let genericReply = 1111  // NIP-22 comment
     public static let image = 20
+    
+    // MARK: - Extended Events (1000-9999)
     public static let fileMetadata = 1063
-    public static let zapRequest = 9734
-    public static let zap = 9735
-    public static let zapReceipt = 9735  // Alias for clarity
+    public static let genericReply = 1111  // NIP-22 comment
+    
+    // MARK: - NIP-60 Cashu Events
     public static let cashuWalletBackup = 375  // Wallet backup event (NIP-60)
     public static let cashuQuote = 7374
     public static let cashuToken = 7375  // Token event (NIP-60)
     public static let cashuSpendingHistory = 7376  // Spending history (NIP-60)
     public static let nutzap = 9321
     public static let cashuWalletConfig = 17375  // Wallet configuration (NIP-60)
+    
+    // MARK: - Zap Events
+    public static let zapRequest = 9734
+    public static let zap = 9735
+    public static let zapReceipt = 9735  // Alias for clarity
+    
+    // MARK: - List Events (10000-19999)
     public static let muteList = 10000
     public static let pinList = 10001
     public static let relayList = 10002
     public static let cashuMintList = 10019
     public static let nutzapPreferences = 10019  // Alias for NIP-61
+    
+    // MARK: - Authentication Events (20000-29999)
     public static let clientAuthentication = 22242
     public static let nwcRequest = 23194
     public static let nwcResponse = 23195
     public static let nostrConnect = 24133
     public static let blossomAuth = 24242
     public static let httpAuth = 27235
+    
+    // MARK: - Parameterized Replaceable Events (30000-39999)
     public static let longFormContent = 30023
     public static let applicationSpecificData = 30078
     public static let mintAnnouncement = 38000  // NIP-87 mint discovery

@@ -1,5 +1,4 @@
 import Foundation
-import CryptoSwift
 
 /// Main entry point for NDKSwift
 public final class NDK {
