@@ -1,8 +1,9 @@
 import XCTest
 @testable import NDKSwift
 
-// Temporarily disabled due to URLSession mocking issues
-// TODO: Update BlossomClient to accept a protocol for easier testing
+// Tests disabled: BlossomClient currently uses concrete URLSession type
+// To enable these tests, BlossomClient would need to accept a URLSessionProtocol
+// This would be a breaking API change and is not a priority at this time
 /*
 final class BlossomClientMetadataTests: XCTestCase {
     var mockURLSession: SimpleMockURLSession!

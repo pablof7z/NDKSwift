@@ -303,7 +303,7 @@ struct TransactionDetailRow: View {
                     token: token,
                     amount: transaction.amount,
                     memo: transaction.memo ?? "",
-                    mintURL: nil  // TODO: Store mint URL with transaction
+                    mintURL: transaction.mintURL.flatMap { URL(string: $0) }
                 )
             }
         }
