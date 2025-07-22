@@ -2,13 +2,7 @@ import XCTest
 @testable import NDKSwift
 
 final class RelayPoolE2ETests: XCTestCase {
-    let testRelays = [
-        "wss://relay.damus.io",
-        "wss://relay.nostr.band",
-        "wss://nos.lol",
-        "wss://nostr.wine",
-        "wss://relay.snort.social"
-    ]
+    let testRelays = RelayConstants.extendedRelays
     
     override func setUp() async throws {
         try await super.setUp()
@@ -98,7 +92,7 @@ final class RelayPoolE2ETests: XCTestCase {
         
         // Test 5: Add relay after connection
         print("\n[\(timestamp())] Test 5: Adding relay after connection...")
-        let newRelay = "wss://relay.current.fyi"
+        let newRelay = RelayConstants.currentFyi
         await ndk.addRelay(newRelay)
         
         // New relay should auto-connect
@@ -194,7 +188,7 @@ final class RelayPoolE2ETests: XCTestCase {
         let ndk = NDK(cache: MemoryCache())
         
         // Use a reliable relay for this test
-        let testRelay = "wss://relay.damus.io"
+        let testRelay = RelayConstants.damus
         await ndk.addRelay(testRelay)
         
         // Connect and verify

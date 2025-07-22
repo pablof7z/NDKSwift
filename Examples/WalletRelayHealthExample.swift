@@ -13,9 +13,9 @@ struct WalletRelayHealthExample {
         
         let ndk = NDK(
             relayUrls: [
-                "wss://relay.damus.io",
-                "wss://relay.nostr.band",
-                "wss://nos.lol"
+                RelayConstants.damus,
+                RelayConstants.nostrBand,
+                RelayConstants.nosLol
             ],
             signer: signer
         )

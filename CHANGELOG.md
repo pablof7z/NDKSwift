@@ -10,6 +10,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - `EventPublishingHelper` utility to eliminate duplicate `createAndPublish` patterns across event types
 - `SQLiteQueryBuilder` to consolidate SQL query building logic and eliminate code duplication
+- `RelayConstants` enum to centralize commonly used Nostr relay URLs
+  - Provides constants for popular relays like Damus, Nostr Band, nos.lol, Primal, etc.
+  - Includes pre-defined relay sets for different use cases (default, extended, test, wallet)
+  - Eliminates hardcoded relay URLs throughout the codebase
 
 ### Fixed
 - Relay health monitoring now correctly uses wallet-configured relays from kind 17375 events
@@ -22,6 +26,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Refactored `NDKSQLiteCache` to use `SQLiteQueryBuilder`, eliminating duplicate query building logic
 - Cleaned up Package.swift by removing commented-out dependencies (YAGNI principle)
 - Removed unnecessary Foundation imports from utility files that don't need them
+- Updated examples, tests, and source code to use `RelayConstants` instead of hardcoded relay URLs
 
 ## [0.4.2] - 2025-07-21
 

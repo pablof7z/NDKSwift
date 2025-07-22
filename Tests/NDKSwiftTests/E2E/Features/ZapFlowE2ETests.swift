@@ -4,7 +4,7 @@ import XCTest
 final class ZapFlowE2ETests: XCTestCase {
     
     // Test configuration
-    let testRelays = ["wss://relay.damus.io", "wss://relay.nostr.band", "wss://nos.lol"]
+    let testRelays = RelayConstants.testRelays
     let timeout: TimeInterval = 30.0
     
     override func setUp() async throws {

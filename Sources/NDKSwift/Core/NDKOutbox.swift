@@ -64,7 +64,7 @@ public struct NDKOutboxConfig {
 
     public init(
         blacklistedRelays: Set<String> = [],
-        outboxRelays: Set<String> = ["wss://purplepag.es"],
+        outboxRelays: Set<String> = RelayConstants.defaultOutboxRelays,
         defaultPublishConfig: OutboxPublishConfig = .default,
         defaultFetchConfig: OutboxFetchConfig = .default,
         defaultSubscriptionConfig: OutboxSubscriptionConfig = .default,

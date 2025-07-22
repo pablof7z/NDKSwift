@@ -53,11 +53,7 @@ enum TestError: LocalizedError {
 }
 
 /// Test relay URLs commonly used across E2E tests
-let testRelays = [
-    "wss://relay.damus.io",
-    "wss://relay.nostr.band", 
-    "wss://nos.lol"
-]
+let testRelays = RelayConstants.testRelays
 
 /// Creates test users with signers
 struct TestUser {
