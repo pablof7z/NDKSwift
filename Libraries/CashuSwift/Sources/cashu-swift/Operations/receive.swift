@@ -82,7 +82,7 @@ extension CashuSwift {
     }
     
     
-    @available(*, deprecated, message: "function does not check DLEQ")
+    @available(*, deprecated, message: "Use receive() with DLEQ checking or NIP60Wallet.receive() for integrated proof validation")
     public static func receive(mint:MintRepresenting,
                                token:Token,
                                seed:String? = nil) async throws -> [ProofRepresenting] {
@@ -104,7 +104,7 @@ extension CashuSwift {
         return try await swap(mint:mint, proofs: inputProofs, seed: seed).new
     }
     
-    @available(*, deprecated, message: "function does not check DLEQ")
+    @available(*, deprecated, message: "Use receive() with DLEQ checking or NIP60Wallet.receive() for integrated proof validation")
     public static func receive(mint: Mint,
                              token: Token,
                              seed: String? = nil) async throws -> [Proof] {
@@ -113,7 +113,7 @@ extension CashuSwift {
                                 seed: seed) as! [Proof]
     }
     
-    @available(*, deprecated, message: "use function with precise DLEQ check results and P2PK unlocking ability.")
+    @available(*, deprecated, message: "Use receive() with DLEQVerificationResult or NIP60Wallet.receive() for P2PK support and DLEQ validation")
     public static func receive(token: Token,
                                with mint: Mint,
                                seed: String?) async throws -> (proofs: [Proof],
