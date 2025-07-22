@@ -32,6 +32,13 @@ public enum NostrMessage {
     case negMsg(subscriptionId: String, message: String)
     case negClose(subscriptionId: String)
     case negErr(subscriptionId: String, error: String)
+    
+    // MARK: - Helper Functions
+    
+    /// Create an invalid message error with consistent formatting
+    private static func invalidMessageError(for messageType: String) -> NDKError {
+        return .invalidMessage("Invalid \(messageType) message")
+    }
 
     /// Parse a message from relay
     public static func parse(from json: String) throws -> NostrMessage {
@@ -49,7 +56,7 @@ public enum NostrMessage {
         switch type {
         case .event:
             guard array.count >= 2 else {
-                throw NDKError.invalidMessage( "Invalid EVENT message")
+                throw invalidMessageError(for: "EVENT")
             }
 
             let subscriptionId = array.count > 2 ? array[1] as? String : nil
@@ -67,7 +74,7 @@ public enum NostrMessage {
             guard array.count >= 3,
                   let subscriptionId = array[1] as? String
             else {
-                throw NDKError.invalidMessage( "Invalid REQ message")
+                throw invalidMessageError(for: "REQ")
             }
 
             var filters: [NDKFilter] = []
@@ -83,7 +90,7 @@ public enum NostrMessage {
             guard array.count >= 2,
                   let subscriptionId = array[1] as? String
             else {
-                throw NDKError.invalidMessage( "Invalid CLOSE message")
+                throw invalidMessageError(for: "CLOSE")
             }
             return .close(subscriptionId: subscriptionId)
 
@@ -91,7 +98,7 @@ public enum NostrMessage {
             guard array.count >= 2,
                   let message = array[1] as? String
             else {
-                throw NDKError.invalidMessage( "Invalid NOTICE message")
+                throw invalidMessageError(for: "NOTICE")
             }
             return .notice(message: message)
 
@@ -99,7 +106,7 @@ public enum NostrMessage {
             guard array.count >= 2,
                   let subscriptionId = array[1] as? String
             else {
-                throw NDKError.invalidMessage( "Invalid EOSE message")
+                throw invalidMessageError(for: "EOSE")
             }
             return .eose(subscriptionId: subscriptionId)
 
@@ -108,7 +115,7 @@ public enum NostrMessage {
                   let eventId = array[1] as? String,
                   let accepted = array[2] as? Bool
             else {
-                throw NDKError.invalidMessage( "Invalid OK message")
+                throw invalidMessageError(for: "OK")
             }
             let message = array.count > 3 ? array[3] as? String : nil
             return .ok(eventId: eventId, accepted: accepted, message: message)
@@ -117,7 +124,7 @@ public enum NostrMessage {
             guard array.count >= 2,
                   let challenge = array[1] as? String
             else {
-                throw NDKError.invalidMessage( "Invalid AUTH message")
+                throw invalidMessageError(for: "AUTH")
             }
             return .auth(challenge: challenge)
 
@@ -127,7 +134,7 @@ public enum NostrMessage {
                   let countDict = array[2] as? [String: Any],
                   let count = countDict["count"] as? Int
             else {
-                throw NDKError.invalidMessage( "Invalid COUNT message")
+                throw invalidMessageError(for: "COUNT")
             }
             return .count(subscriptionId: subscriptionId, count: count)
             
@@ -137,7 +144,7 @@ public enum NostrMessage {
                   let filterDict = array[2] as? [String: Any],
                   let hexMessage = array[3] as? String
             else {
-                throw NDKError.invalidMessage("Invalid NEG-OPEN message")
+                throw invalidMessageError(for: "NEG-OPEN")
             }
             let filter = try NDKFilter.fromDictionary(filterDict)
             return .negOpen(subscriptionId: subscriptionId, filter: filter, message: hexMessage)
@@ -147,7 +154,7 @@ public enum NostrMessage {
                   let subscriptionId = array[1] as? String,
                   let hexMessage = array[2] as? String
             else {
-                throw NDKError.invalidMessage("Invalid NEG-MSG message")
+                throw invalidMessageError(for: "NEG-MSG")
             }
             return .negMsg(subscriptionId: subscriptionId, message: hexMessage)
             
@@ -155,7 +162,7 @@ public enum NostrMessage {
             guard array.count >= 2,
                   let subscriptionId = array[1] as? String
             else {
-                throw NDKError.invalidMessage("Invalid NEG-CLOSE message")
+                throw invalidMessageError(for: "NEG-CLOSE")
             }
             return .negClose(subscriptionId: subscriptionId)
             
@@ -164,7 +171,7 @@ public enum NostrMessage {
                   let subscriptionId = array[1] as? String,
                   let error = array[2] as? String
             else {
-                throw NDKError.invalidMessage("Invalid NEG-ERR message")
+                throw invalidMessageError(for: "NEG-ERR")
             }
             return .negErr(subscriptionId: subscriptionId, error: error)
         }
