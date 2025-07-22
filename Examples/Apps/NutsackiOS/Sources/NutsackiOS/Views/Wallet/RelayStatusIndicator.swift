@@ -103,6 +103,6 @@ struct RelayStatusIndicator: View {
     let context = container.mainContext
     
     RelayStatusIndicator()
-        .environment(WalletManager(nostrManager: nostrManager, modelContext: context))
+        .environment(WalletManager(nostrManager: nostrManager, modelContext: context, appState: AppState()))
         .padding()
 }

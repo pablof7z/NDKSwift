@@ -456,5 +456,5 @@ struct RelayRepairSheet: View {
     let context = container.mainContext
     
     RelayHealthView()
-        .environment(WalletManager(nostrManager: nostrManager, modelContext: context))
+        .environment(WalletManager(nostrManager: nostrManager, modelContext: context, appState: AppState()))
 }

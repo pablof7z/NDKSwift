@@ -31,6 +31,7 @@ class WalletManager {
     
     private let nostrManager: NostrManager
     private let modelContext: ModelContext
+    private let appState: AppState
     
     // Task for monitoring wallet events
     private nonisolated(unsafe) var walletEventTask: Task<Void, Never>?
@@ -39,9 +40,10 @@ class WalletManager {
     private nonisolated(unsafe) var transactionMonitorTask: Task<Void, Never>?
     
     
-    init(nostrManager: NostrManager, modelContext: ModelContext) {
+    init(nostrManager: NostrManager, modelContext: ModelContext, appState: AppState) {
         self.nostrManager = nostrManager
         self.modelContext = modelContext
+        self.appState = appState
     }
     
     deinit {
@@ -669,84 +671,17 @@ class WalletManager {
     
     // MARK: - Mint Management
     
-    /// Get current blacklisted mints
-    func getBlacklistedMints() async -> [String] {
-        guard let wallet = activeWallet else {
-            return []
-        }
-        
-        return Array(await wallet.getBlacklistedMints())
+    /// Get mint URLs excluding blacklisted ones
+    func getActiveMintsURLs() async -> [String] {
+        guard let wallet = activeWallet else { return [] }
+        let allMints = await wallet.mints.getMintURLs()
+        return allMints.filter { !appState.isMintBlacklisted($0) }
     }
     
-    /// Check if a mint is blacklisted
-    func isMintBlacklisted(_ mintURL: String) async -> Bool {
-        guard let wallet = activeWallet else {
-            return false
-        }
-        
-        let blacklistedMints = await wallet.getBlacklistedMints()
-        return blacklistedMints.contains(mintURL)
+    /// Check if mint operations should be allowed for a URL
+    func shouldAllowMintOperations(for mintURL: String) -> Bool {
+        return !appState.isMintBlacklisted(mintURL)
     }
-    
-    /// Add a mint to the blacklist
-    func blacklistMint(_ mintURL: String) async throws {
-        guard let wallet = activeWallet else {
-            throw WalletError.noActiveWallet
-        }
-        
-        guard let ndk = nostrManager.ndk,
-              let signer = ndk.signer else {
-            throw WalletError.ndkNotInitialized
-        }
-        
-        // Get current blacklisted mints and add the new one
-        var blacklistedMints = await wallet.getBlacklistedMints()
-        blacklistedMints.insert(mintURL)
-        
-        // Publish updated blocked mints event
-        try await NDKBlockedMintsEvent.createAndPublish(
-            ndk: ndk,
-            blockedMints: Array(blacklistedMints),
-            signer: signer
-        )
-        
-        // Remove from wallet if currently added
-        let currentMints = await wallet.mints.getMintURLs()
-        if currentMints.contains(mintURL) {
-            if let url = URL(string: mintURL) {
-                _ = await wallet.mints.removeMint(url: url)
-            }
-            
-            // Update local mint list
-            await MainActor.run {
-                self.mintURLs = self.mintURLs.filter { $0 != mintURL }
-            }
-        }
-    }
-    
-    /// Remove a mint from the blacklist
-    func unblacklistMint(_ mintURL: String) async throws {
-        guard let wallet = activeWallet else {
-            throw WalletError.noActiveWallet
-        }
-        
-        guard let ndk = nostrManager.ndk,
-              let signer = ndk.signer else {
-            throw WalletError.ndkNotInitialized
-        }
-        
-        // Get current blacklisted mints and remove the specified one
-        var blacklistedMints = await wallet.getBlacklistedMints()
-        blacklistedMints.remove(mintURL)
-        
-        // Publish updated blocked mints event
-        try await NDKBlockedMintsEvent.createAndPublish(
-            ndk: ndk,
-            blockedMints: Array(blacklistedMints),
-            signer: signer
-        )
-    }
-    
     
     
     // MARK: - Cross-mint Operations

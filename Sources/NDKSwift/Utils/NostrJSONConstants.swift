@@ -46,4 +46,17 @@ public struct NostrJSONConstants {
     public static let balance = "balance"
     public static let mints = "mints"
     public static let p2pk = "p2pk"
+    
+    // Cashu proof fields
+    public static let amount = "amount"
+    public static let secret = "secret"
+    public static let C = "C"
+    public static let proofs = "proofs"
+    public static let proof = "proof"
+    public static let mint = "mint"
+    public static let unit = "unit"
+    
+    // Additional wallet event fields
+    public static let direction = "direction"
+    public static let state = "state"
 }

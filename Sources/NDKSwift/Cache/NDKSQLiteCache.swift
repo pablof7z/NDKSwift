@@ -207,13 +207,11 @@ public actor NDKSQLiteCache: NDKCache {
             NDKLogger.log(.trace, category: .cache, "Executing SQL: \(sql)")
             
             let rows = try Row.fetchAll(db, sql: sql, arguments: arguments)
-            NDKLogger.log(.debug, category: .cache, "Query returned \(rows.count) rows")
             
             let events: [NDKEvent] = rows.compactMap { row in
                 return self.decodeEventFromRow(row)
             }
             
-            NDKLogger.log(.debug, category: .cache, "Decoded \(events.count) events")
             NDKLogger.log(.trace, category: .cache, "Exiting dbQueue.read block")
             return events
         }
