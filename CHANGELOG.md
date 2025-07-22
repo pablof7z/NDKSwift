@@ -7,12 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- `EventPublishingHelper` utility to eliminate duplicate `createAndPublish` patterns across event types
+- `SQLiteQueryBuilder` to consolidate SQL query building logic and eliminate code duplication
+
 ### Fixed
 - Relay health monitoring now correctly uses wallet-configured relays from kind 17375 events
   - Previously checked all NDK pool relays instead of wallet-specific ones
   - `getRelayHealth()` and `checkWalletHealth()` now use `walletRelays` property
   - Ensures accurate health reporting for relays that should contain wallet state
   - NutsackiOS: Added "Relay Health" menu item to access the monitoring UI
+
+### Changed
+- Refactored `NDKSQLiteCache` to use `SQLiteQueryBuilder`, eliminating duplicate query building logic
+- Cleaned up Package.swift by removing commented-out dependencies (YAGNI principle)
+- Removed unnecessary Foundation imports from utility files that don't need them
 
 ## [0.4.2] - 2025-07-21
 

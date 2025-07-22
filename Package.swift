@@ -23,7 +23,6 @@ let package = Package(
         .package(url: "https://github.com/zeugmaster/swift-secp256k1.git", branch: "main"),
         .package(url: "https://github.com/groue/GRDB.swift.git", from: "6.29.3"),
         .package(path: "Libraries/CashuSwift"),
-        // .package(url: "https://github.com/simonbs/UnifiedBlurHash.git", from: "1.0.0"),
     ],
     targets: [
         // Targets are the basic building blocks of a package, defining a module or a test suite.
@@ -35,7 +34,6 @@ let package = Package(
                 .product(name: "secp256k1", package: "swift-secp256k1"),
                 .product(name: "GRDB", package: "GRDB.swift"),
                 .product(name: "CashuSwift", package: "CashuSwift"),
-                // .product(name: "UnifiedBlurHash", package: "UnifiedBlurHash"),
             ]
         ),
         .testTarget(

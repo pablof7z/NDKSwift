@@ -51,9 +51,7 @@ public struct NDKBlockedMintsEvent {
     
     /// The blocked mint URLs in this event
     public var blockedMints: [String] {
-        event.tags
-            .filter { $0.count >= 2 && $0[0] == "u" }
-            .map { $0[1] }
+        event.tags.tagValues(named: NostrTag.url)
     }
     
     /// Check if a specific mint URL is blocked
