@@ -118,7 +118,7 @@ extension NDKEvent {
     
     /// Parses a mint announcement from the event content
     public func parseMintAnnouncement() throws -> NDKMintAnnouncement? {
-        guard self.kind == 38000 else { return nil }
+        guard self.kind == EventKind.mintAnnouncement else { return nil }
         
         let eventContent = self.content
         let data = eventContent.data(using: .utf8) ?? Data()

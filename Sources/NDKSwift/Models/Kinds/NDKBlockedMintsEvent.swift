@@ -63,7 +63,7 @@ public struct NDKBlockedMintsEvent {
 extension NDKEvent {
     /// Convert to NDKBlockedMintsEvent if this is a kind 10020 event
     public var asBlockedMintsEvent: NDKBlockedMintsEvent? {
-        guard kind == 10020 else { return nil }
+        guard kind == EventKind.blockedMints else { return nil }
         return NDKBlockedMintsEvent(event: self)
     }
 }

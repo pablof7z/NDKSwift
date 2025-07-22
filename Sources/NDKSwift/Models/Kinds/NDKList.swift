@@ -617,12 +617,12 @@ public extension NDKList {
 public extension NDKList {
     /// Check if this is a mute list (kind 10000)
     var isMuteList: Bool {
-        return kind == 10000
+        return kind == EventKind.muteList
     }
     
     /// Check if this is a blocked relays list (kind 10006)
     var isBlockedRelaysList: Bool {
-        return kind == 10006
+        return kind == EventKind.blockedRelays
     }
     
     /// Check if a specific mint URL is blacklisted (for mute lists containing mint URLs)

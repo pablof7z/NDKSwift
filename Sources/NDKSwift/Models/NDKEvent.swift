@@ -255,7 +255,7 @@ public struct NDKEvent: Codable, Equatable, Hashable, Sendable {
     public var isReplaceable: Bool {
         // Kind 0 (metadata) and kind 3 (contacts) are replaceable
         // Also kinds 10000-19999 are replaceable
-        return kind == 0 || kind == 3 || (kind >= 10000 && kind < 20000)
+        return kind == EventKind.metadata || kind == EventKind.contacts || (kind >= 10000 && kind < 20000)
     }
 
     /// Check if this event is parameterized replaceable

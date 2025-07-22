@@ -112,7 +112,7 @@ public extension NDKEvent {
     ///   - ndk: The NDK instance (optional, used for caching)
     /// - Returns: The decrypted message content
     func decryptedContent(signer: NDKSigner, senderPubkey: PublicKey? = nil, ndk: NDK? = nil) async throws -> String {
-        guard kind == 4 else {
+        guard kind == EventKind.encryptedDirectMessage else {
             throw NDKEncryptionError.invalidFormat
         }
         
