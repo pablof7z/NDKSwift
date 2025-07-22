@@ -59,8 +59,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Apps no longer need to merge different event types manually
 
 ### Changed
-- Updated `NDKNutzapProtocol` to use event-driven `first()` method for fetching preferences
+- Major refactoring of zap protocol selection to eliminate redundant fetches
+  - All recipient data (profile, nutzap preferences) now fetched once and cached
+  - Created `RecipientZapInfo` struct to hold all zap-related data
+  - Updated `NDKZapProtocol` interface to accept pre-fetched `RecipientZapInfo`
+  - `canZap()` is now a synchronous check on pre-fetched data
+  - Zap manager caches recipient info for 24 hours with automatic deduplication
+  - Relay selection uses nutzap-specific relays from kind:10019 or falls back to user's connected relays
+- Updated `NDKNutzapProtocol` to use event-driven `collect()` method for fetching preferences
 - Improved subscription handling to ensure events are delivered before methods return
+- Completed migration from `currentValue()` to `collect()` throughout the codebase
+  - `fetchRelayList()`, `fetchContactList()`, and `fetchProfiles()` now use `collect()` to ensure most recent events are used
+  - All example code migrated to use event-driven patterns
+  - Test code updated to use appropriate async methods
+  - `NDKFetchingStrategy`, `NDKLightningZapProtocol`, `NDKZapManager`, and `WalletTransactionHistory` migrated
+  - Created comprehensive migration guide in `Examples/CurrentValueMigrationGuide.swift`
 
 ### Fixed  
 - Fixed race condition where `NDKDataSource.currentValue()` could return empty array before subscription started

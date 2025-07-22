@@ -35,7 +35,7 @@ let package = Package(
                 .product(name: "NDKSwift", package: "NDKSwift")
             ],
             path: "GettingStarted",
-            sources: ["main.swift", "Example01_ConnectToRelay.swift", "Example02_PublishEvent.swift", "Example03_Subscribe.swift", "Example03_1_SimpleObserver.swift", "Example03_2_GroupedSubscriptions.swift", "Example04_UserProfile.swift", "Example05_EncryptedMessages.swift", "Example06_OutboxModel.swift", "Example07_MultipleObservers.swift", "Example08_PublishWithNIP46.swift"],
+            sources: ["main.swift", "Example01_ConnectToRelay.swift", "Example02_PublishEvent.swift", "Example03_Subscribe.swift", "Example03_1_SimpleObserver.swift", "Example03_2_GroupedSubscriptions.swift", "Example04_UserProfile.swift", "Example05_EncryptedMessages.swift", "Example06_OutboxModel.swift", "Example07_MultipleObservers.swift", "Example08_PublishWithNIP46.swift", "Example09_NutzapsAndHistory.swift"],
             swiftSettings: [
                 .unsafeFlags(["-parse-as-library"])
             ]

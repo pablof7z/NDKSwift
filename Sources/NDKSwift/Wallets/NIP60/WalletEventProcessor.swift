@@ -29,6 +29,8 @@ actor WalletEventProcessor {
                 try await processDeleteEvent(event, context: context)
             case EventKind.nutzap:
                 try await processNutzapEvent(event, context: context)
+            case EventKind.cashuSpendingHistory:
+                try await processSpendingHistoryEvent(event, context: context)
             default:
                 NDKLogger.log(.warning, category: .wallet, "No handler for event kind \(event.kind)")
             }
@@ -49,7 +51,6 @@ actor WalletEventProcessor {
         
         NDKLogger.log(.debug, category: .wallet, "Processing token event: \(event.id)")
         NDKLogger.log(.debug, category: .wallet, "Event Kind: \(event.kind)")
-        NDKLogger.log(.debug, category: .wallet, "Event Author: \(event.pubkey)")
         
         // Decrypt and process token
         let sender = NDKUser(pubkey: event.pubkey)
@@ -59,11 +60,6 @@ actor WalletEventProcessor {
             scheme: .nip44
         )
         
-        NDKLogger.log(.debug, category: .wallet, "DECRYPTED TOKEN CONTENT:")
-        NDKLogger.log(.debug, category: .wallet, "Decrypted length: \(decryptedContent.count) characters")
-        NDKLogger.log(.debug, category: .wallet, "Decrypted content: \(decryptedContent)")
-        NDKLogger.log(.debug, category: .wallet, "Decrypted content (raw): \(String(describing: decryptedContent.data(using: .utf8)))")
-        
         // Parse token data
         guard let tokenData = decryptedContent.data(using: .utf8),
               let nip60Token = JSONCoding.safeDecode(NIP60TokenEvent.self, from: tokenData) else {
@@ -71,21 +67,9 @@ actor WalletEventProcessor {
             throw NDKError.invalidContent("Failed to parse NIP-60 token event data")
         }
         
-        NDKLogger.log(.debug, category: .wallet, "PARSED TOKEN EVENT:")
-        NDKLogger.log(.debug, category: .wallet, "Mint URL: \(nip60Token.mint)")
-        NDKLogger.log(.debug, category: .wallet, "Proofs count: \(nip60Token.proofs.count)")
-        NDKLogger.log(.debug, category: .wallet, "Del tags count: \(nip60Token.del?.count ?? 0)")
-        if let delTags = nip60Token.del {
-            NDKLogger.log(.debug, category: .wallet, "Del tags: \(delTags)")
-        }
-        for (index, proof) in nip60Token.proofs.enumerated() {
-            NDKLogger.log(.debug, category: .wallet, "Proof \(index): amount=\(proof.amount), keysetID=\(proof.keysetID), C=\(proof.C.prefix(20))...")
-        }
-        
         // Handle del tags - these events are no longer valid
         if let delIds = nip60Token.del {
             for delId in delIds {
-                NDKLogger.log(.debug, category: .wallet, "Processing del tag for event: \(delId)")
                 await deleteEventAndProofs(delId, context: context)
             }
         }
@@ -140,7 +124,6 @@ actor WalletEventProcessor {
     
     /// Process delete events (kind 5)
     private func processDeleteEvent(_ event: NDKEvent, context: WalletEventContext) async throws {
-        NDKLogger.log(.debug, category: .wallet, "Processing delete event")
         
         // Find 'e' tags that reference events to delete
         let eventIdsToDelete = event.tags.compactMap { tag -> String? in
@@ -181,7 +164,29 @@ actor WalletEventProcessor {
         // Track the nutzap in the event manager
         await context.eventManager.trackNutzap(event)
         
+        // Transaction history will automatically pick up this event through NDKDataSource
+        // No need to manually process it here
+        
         try await context.wallet.processIncomingNutzap(event)
+    }
+    
+    /// Process spending history events
+    private func processSpendingHistoryEvent(_ event: NDKEvent, context: WalletEventContext) async throws {
+        NDKLogger.log(.debug, category: .wallet, "Processing spending history event: \(event.id)")
+        
+        // Check for redeemed nutzap events in the clear tags
+        for tag in event.tags {
+            if tag.count >= 4 && tag[0] == "e" && tag[3] == "redeemed" {
+                let redeemedNutzapId = tag[1]
+                NDKLogger.log(.info, category: .wallet, "Found redeemed nutzap in history: \(redeemedNutzapId)")
+                
+                // Mark the nutzap as redeemed
+                await context.eventManager.markNutzapRedeemed(redeemedNutzapId)
+            }
+        }
+        
+        // Transaction history will automatically pick up this event through NDKDataSource
+        // No need to manually process it here
     }
     
     // MARK: - Helper Methods

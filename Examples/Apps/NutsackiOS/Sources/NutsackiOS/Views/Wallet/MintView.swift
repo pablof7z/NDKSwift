@@ -24,6 +24,7 @@ struct MintView: View {
     @State private var loadMintTask: Task<Void, Never>?
     @State private var showPaymentAnimation = false
     @State private var mintedAmount: Int64 = 0
+    @State private var manualCheckContinuation: AsyncStream<Void>.Continuation?
     @FocusState private var amountFieldFocused: Bool
     
     var body: some View {
@@ -63,7 +64,8 @@ struct MintView: View {
                 InvoiceView(
                     invoice: quote.invoice,
                     amount: Int(quote.amount),
-                    onPaid: { checkMintStatus() }
+                    onPaid: { checkMintStatus() },
+                    onCheckNow: { manualCheckContinuation?.yield() }
                 )
             }
         }
@@ -327,10 +329,17 @@ struct MintView: View {
     private func startDepositMonitoring(quote: CashuMintQuote) {
         depositTask?.cancel()
         
+        // Create manual check trigger stream
+        let (triggerStream, continuation) = AsyncStream<Void>.makeStream()
+        manualCheckContinuation = continuation
+        
         depositTask = Task {
             do {
                 guard let wallet = walletManager.activeWallet else { return }
-                let depositSequence = await wallet.monitorDeposit(quote: quote)
+                let depositSequence = await wallet.monitorDeposit(
+                    quote: quote,
+                    manualCheckTrigger: triggerStream
+                )
                 for try await status in depositSequence {
                     switch status {
                     case .pending:
@@ -385,8 +394,10 @@ struct InvoiceView: View {
     let invoice: String
     let amount: Int
     let onPaid: () -> Void
+    let onCheckNow: () -> Void
     
     @State private var copied = false
+    @State private var isChecking = false
     @Environment(\.dismiss) private var dismiss
     
     var body: some View {
@@ -426,6 +437,23 @@ struct InvoiceView: View {
                 }
                 .padding(.horizontal)
                 
+                // Check Now button
+                Button(action: checkNow) {
+                    HStack {
+                        if isChecking {
+                            ProgressView()
+                                .progressViewStyle(CircularProgressViewStyle())
+                                .scaleEffect(0.8)
+                        } else {
+                            Image(systemName: "arrow.clockwise")
+                        }
+                        Text("Check Payment Status")
+                    }
+                }
+                .buttonStyle(.borderedProminent)
+                .tint(.orange)
+                .disabled(isChecking)
+                
                 Spacer()
                 
                 // Status
@@ -452,12 +480,34 @@ struct InvoiceView: View {
             copied = true
         }
         
-        DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
-            withAnimation {
-                copied = false
+        // Reset copied state after 2 seconds
+        Task {
+            try? await Task.sleep(nanoseconds: 2_000_000_000)
+            await MainActor.run {
+                withAnimation {
+                    copied = false
+                }
             }
         }
     }
     
+    private func checkNow() {
+        withAnimation {
+            isChecking = true
+        }
+        
+        // Trigger manual check
+        onCheckNow()
+        
+        // Reset checking state after a brief delay
+        Task {
+            try? await Task.sleep(nanoseconds: 1_000_000_000) // 1 second
+            await MainActor.run {
+                withAnimation {
+                    isChecking = false
+                }
+            }
+        }
+    }
 }
 

@@ -424,8 +424,6 @@ public final class NDK {
         relays: Set<RelayURL>? = nil,
         subscriptionId: String? = nil
     ) -> NDKDataSource<NDKEvent> {
-        NDKLogger.log(.info, category: .general, "🔍 observe() called - filter: \(filter.fingerprint), maxAge: \(maxAge), cachePolicy: \(cachePolicy), relays: \(relays?.map { $0 } ?? ["auto"]), subscriptionId: \(subscriptionId ?? "auto")")
-        
         return NDKDataSource(
             ndk: self,
             filter: filter,
@@ -444,8 +442,6 @@ public final class NDK {
         subscriptionId: String? = nil,
         transform: @escaping (NDKEvent) -> T?
     ) -> NDKDataSource<T> {
-        NDKLogger.log(.info, category: .general, "🔍 observe<T>() called - filter: \(filter.fingerprint), maxAge: \(maxAge), cachePolicy: \(cachePolicy), relays: \(relays?.map { $0 } ?? ["auto"]), subscriptionId: \(subscriptionId ?? "auto")")
-        
         return NDKDataSource(
             ndk: self,
             filter: filter,
@@ -609,12 +605,9 @@ public final class NDK {
     // MARK: - Internal Methods (for relay communication)
     
     func processEvent(_ event: NDKEvent, subscriptionId: String, from relay: RelayProtocol) async {
-        NDKLogger.log(.trace, category: .event, "🎯 Processing event - id: \(event.id), kind: \(event.kind), subId: \(subscriptionId), relay: \(relay.url)")
-        
         // Process event through cache for observation
         do {
             try await cache.processEvent(event, from: relay.url, subscriptionId: subscriptionId)
-            NDKLogger.log(.trace, category: .event, "✅ Event processed by cache")
         } catch {
             NDKLogger.log(.error, category: .event, "❌ Cache processing failed: \(error)")
         }
@@ -630,7 +623,6 @@ public final class NDK {
     }
     
     func processEOSE(subscriptionId: String, from relay: RelayProtocol) {
-        NDKLogger.log(.debug, category: .subscription, "🏁 Processing EOSE - subId: \(subscriptionId), relay: \(relay.url)")
         Task {
             await internalSubscriptionManager.processEOSE(subscriptionId: subscriptionId, from: relay)
         }
@@ -638,8 +630,6 @@ public final class NDK {
     
     func processOKMessage(eventId: EventID, accepted: Bool, message: String?, from relay: RelayProtocol) async {
         if accepted {
-            print("[NDK] Event \(eventId) accepted by relay \(relay.url)")
-            
             // Always confirm event in cache
             do {
                 try await cache.confirmEvent(eventId: eventId, onRelay: relay.url)

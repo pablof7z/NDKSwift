@@ -23,12 +23,17 @@ actor NDKRelaySelector {
         config: PublishingConfig = .default
     ) async -> RelaySelectionResult {
         let correlationId = event.id.prefix(8)
-        NDKLogger.log(.debug, category: .outbox, "🎯 Selecting relays for publishing - event: \(event.id), kind: \(event.kind), p-tags: \(event.pTags.count)", correlationId: String(correlationId))
         
         var targetRelays = Set<String>()
         var missingRelayPubkeys = Set<String>()
 
-        // 1. Add user's primary write relays
+        // 1. ALWAYS include explicit relays for publishing
+        let explicitRelays = await ndk.pool.explicitRelays()
+        let explicitRelayUrls = explicitRelays.map { $0.url }
+        targetRelays.formUnion(explicitRelayUrls)
+        NDKLogger.log(.debug, category: .outbox, "📌 Added \(explicitRelayUrls.count) explicit relays", correlationId: String(correlationId))
+
+        // 2. Add user's primary write relays
         if let userItem = await tracker.getRelaysSyncFor(pubkey: event.pubkey, type: .write) {
             let writeRelays = userItem.writeRelays.map { $0.url }
             targetRelays.formUnion(writeRelays)
@@ -40,14 +45,13 @@ actor NDKRelaySelector {
             targetRelays.formUnion(readRelays)
             NDKLogger.log(.debug, category: .outbox, "📖 Using \(readRelays.count) read relays as fallback", correlationId: String(correlationId))
         } else {
-            NDKLogger.log(.warning, category: .outbox, "⚠️ No relay info found for author: \(event.pubkey)", correlationId: String(correlationId))
+            NDKLogger.log(.debug, category: .outbox, "⚠️ No relay info found for author: \(event.pubkey)", correlationId: String(correlationId))
         }
 
         // 2. Add contextual relays from event tags
         let contextualRelays = await extractContextualRelays(from: event, for: .publishing)
         targetRelays.formUnion(contextualRelays.relays)
         missingRelayPubkeys.formUnion(contextualRelays.missingPubkeys)
-        NDKLogger.log(.debug, category: .outbox, "🎯 Added \(contextualRelays.relays.count) contextual relays, missing info for \(contextualRelays.missingPubkeys.count) pubkeys", correlationId: String(correlationId))
 
         // 3. Special handling for NIP-65 relay lists
         if event.kind == NDKRelayList.kind {
@@ -59,14 +63,12 @@ actor NDKRelaySelector {
 
         // 4. Apply fallback if needed
         if targetRelays.count < config.minRelayCount {
-            NDKLogger.log(.debug, category: .outbox, "🆘 Need fallback relays - have: \(targetRelays.count), min: \(config.minRelayCount)", correlationId: String(correlationId))
             let fallbackRelays = await selectFallbackRelays(
                 currentCount: targetRelays.count,
                 targetCount: config.minRelayCount,
                 excludeRelays: targetRelays
             )
             targetRelays.formUnion(fallbackRelays)
-            NDKLogger.log(.debug, category: .outbox, "➕ Added \(fallbackRelays.count) fallback relays", correlationId: String(correlationId))
         }
 
         // 5. Rank and limit relays
@@ -80,7 +82,6 @@ actor NDKRelaySelector {
             .map { $0.url }
         
         let selectionMethod = determineSelectionMethod(targetRelays)
-        NDKLogger.log(.info, category: .outbox, "✅ Selected \(selectedRelays.count) relays for publishing - method: \(selectionMethod), relays: \(selectedRelays)", correlationId: String(correlationId))
 
         return RelaySelectionResult(
             relays: Set(selectedRelays),
@@ -94,7 +95,6 @@ actor NDKRelaySelector {
         filter: NDKFilter,
         config: FetchingConfig = .default
     ) async -> RelaySelectionResult {
-        NDKLogger.log(.debug, category: .outbox, "🔍 Selecting relays for fetching - filter: \(filter.fingerprint)")
         
         var sourceRelays = Set<String>()
         var missingRelayPubkeys = Set<String>()
@@ -108,7 +108,6 @@ actor NDKRelaySelector {
 
         // 2. Add author-specific relays
         if let authors = filter.authors, !authors.isEmpty {
-            NDKLogger.log(.debug, category: .outbox, "👥 Selecting relays for \(authors.count) authors")
             let authorRelays = await selectRelaysForAuthors(
                 authors,
                 type: .read,
@@ -116,7 +115,6 @@ actor NDKRelaySelector {
             )
             sourceRelays.formUnion(authorRelays.relays)
             missingRelayPubkeys.formUnion(authorRelays.missingPubkeys)
-            NDKLogger.log(.debug, category: .outbox, "📖 Added \(authorRelays.relays.count) author relays")
         }
 
         // 3. Add contextual relays from filter tags
@@ -149,7 +147,6 @@ actor NDKRelaySelector {
             .map { $0.url }
         
         let selectionMethod = determineSelectionMethod(sourceRelays)
-        NDKLogger.log(.info, category: .outbox, "✅ Selected \(selectedRelays.count) relays for fetching - method: \(selectionMethod), relays: \(selectedRelays)")
 
         return RelaySelectionResult(
             relays: Set(selectedRelays),
@@ -347,13 +344,26 @@ actor NDKRelaySelector {
         let neededCount = targetCount - currentCount
         guard neededCount > 0 else { return [] }
 
-        // Get default relays from pool
-        let poolRelays = (await ndk.pool.relays)
+        // Prioritize explicit relays for fallback
+        let explicitRelays = await ndk.pool.explicitRelays()
+        let availableExplicitRelays = explicitRelays
             .filter { !excludeRelays.contains($0.url) }
             .prefix(neededCount)
             .map { $0.url }
 
-        return Set(poolRelays)
+        var fallbackRelays = Set(availableExplicitRelays)
+        
+        // If we still need more relays, use any from the pool
+        if fallbackRelays.count < neededCount {
+            let remainingNeeded = neededCount - fallbackRelays.count
+            let poolRelays = (await ndk.pool.relays)
+                .filter { !excludeRelays.contains($0.url) && !fallbackRelays.contains($0.url) }
+                .prefix(remainingNeeded)
+                .map { $0.url }
+            fallbackRelays.formUnion(poolRelays)
+        }
+
+        return fallbackRelays
     }
 
     private func getAllRelaysForPubkeys(

@@ -42,8 +42,6 @@ actor NDKOutboxTracker {
         maxAge: TimeInterval = 3600,
         type: RelayListType = .both
     ) async throws -> NDKOutboxItem? {
-        print("🔍 [OutboxTracker] getRelaysFor called for pubkey: \(pubkey), maxAge: \(maxAge)")
-        
         // 1. Check memory cache first
         if let cached = await checkMemoryCache(pubkey: pubkey, maxAge: maxAge) {
             print("🔍 [OutboxTracker] Memory cache hit for pubkey: \(pubkey)")
@@ -66,26 +64,18 @@ actor NDKOutboxTracker {
             }
         }
 
-        print("🔍 [OutboxTracker] No cache found, checking pending fetches...")
-        
         // 3. Check if there's already a pending fetch
         if let pendingTask = pendingFetches[pubkey] {
-            print("🔍 [OutboxTracker] Found pending fetch for pubkey: \(pubkey), waiting...")
             let result = try await pendingTask.value
-            print("🔍 [OutboxTracker] Pending fetch completed for pubkey: \(pubkey)")
             return result.flatMap { filterByType($0, type: type) }
         }
-
-        print("🔍 [OutboxTracker] Creating new fetch task for pubkey: \(pubkey)")
         
         // 4. Create new fetch task
         let fetchTask = Task<NDKOutboxItem?, Error> {
             defer {
-                print("🔍 [OutboxTracker] Removing pending fetch for pubkey: \(pubkey)")
                 pendingFetches.removeValue(forKey: pubkey)
             }
 
-            print("🔍 [OutboxTracker] Starting fetchRelayListFromNetwork for pubkey: \(pubkey)")
             let (item, eoseRelays) = try await fetchRelayListFromNetwork(for: pubkey)
             
             // Cache the result
@@ -95,9 +85,7 @@ actor NDKOutboxTracker {
         }
 
         pendingFetches[pubkey] = fetchTask
-        print("🔍 [OutboxTracker] Waiting for fetch task to complete...")
         let result = try await fetchTask.value
-        print("🔍 [OutboxTracker] Fetch task completed for pubkey: \(pubkey)")
         return result.flatMap { filterByType($0, type: type) }
     }
 
@@ -392,37 +380,26 @@ actor NDKOutboxTracker {
     }
     
     private func fetchRelayList(for pubkey: String) async throws -> NDKOutboxItem? {
-        print("🔍 [OutboxTracker] fetchRelayList: Trying NIP-65 (kind 10002) for pubkey: \(pubkey)")
-        
         // First try NIP-65 (kind 10002)
         if let nip65Item = try await fetchNIP65RelayList(for: pubkey) {
-            print("🔍 [OutboxTracker] fetchRelayList: Found NIP-65 relay list for pubkey: \(pubkey)")
             return nip65Item
         }
 
-        print("🔍 [OutboxTracker] fetchRelayList: No NIP-65 list found, trying contact list (kind 3) for pubkey: \(pubkey)")
-        
         // Fallback to contact list (kind 3)
         return try await fetchContactListRelays(for: pubkey)
     }
 
     private func fetchNIP65RelayList(for pubkey: String) async throws -> NDKOutboxItem? {
-        print("🔍 [OutboxTracker] fetchNIP65RelayList: Starting for pubkey: \(pubkey)")
-        
         var filter = NDKFilter()
         filter.authors = [pubkey]
         filter.kinds = [NDKRelayList.kind]
 
-        print("🔍 [OutboxTracker] fetchNIP65RelayList: Creating subscription with filter - authors: \(filter.authors ?? []), kinds: \(filter.kinds ?? [])")
-        
         // Use a direct subscription to avoid recursive outbox calls
         let subscriptionId = "outbox_fetch_\(UUID().uuidString)"
-        print("🔍 [OutboxTracker] fetchNIP65RelayList: Creating subscription ID: \(subscriptionId)")
         
         // IMPORTANT: We must specify relays here to prevent outbox recursion
         // Use all currently connected relays
         let currentRelays = await ndk.pool.connectedRelays().map { $0.url }
-        print("🔍 [OutboxTracker] fetchNIP65RelayList: Using \(currentRelays.count) connected relays to avoid outbox recursion")
         
         let subscription = await ndk.internalSubscriptionManager.createSubscription(
             id: subscriptionId,
@@ -430,20 +407,16 @@ actor NDKOutboxTracker {
             relays: Set(currentRelays) // Use all connected relays to prevent recursion
         )
         
-        print("🔍 [OutboxTracker] fetchNIP65RelayList: Subscription created")
         
         var latestEvent: NDKEvent?
         var didReceiveEvent = false
         
         // Set up EOSE handler
-        print("🔍 [OutboxTracker] fetchNIP65RelayList: Setting up EOSE handler")
         await subscription.onEOSE { _ in
-            print("🔍 [OutboxTracker] fetchNIP65RelayList: EOSE received")
             didReceiveEvent = true
         }
         
         // Listen for events with a timeout
-        print("🔍 [OutboxTracker] fetchNIP65RelayList: Starting event listener task")
         let eventTask = Task {
             for await (event, _) in await subscription.events {
                 print("🔍 [OutboxTracker] fetchNIP65RelayList: Event received! ID: \(event.id)")

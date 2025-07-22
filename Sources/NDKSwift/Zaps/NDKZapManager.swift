@@ -9,6 +9,11 @@ public actor NDKZapManager {
     private var zapProtocols: [ZapType: NDKZapProtocol] = [:]
     private var paymentProviders: [NDKPaymentProvider] = []
     
+    // Cache for recipient zap info (pubkey -> info)
+    private var recipientInfoCache: [String: RecipientZapInfo] = [:]
+    // Track in-flight fetches to prevent duplicate requests
+    private var fetchTasks: [String: Task<RecipientZapInfo, Never>] = [:]
+    
     public init(ndk: NDK) {
         self.ndk = ndk
         
@@ -58,6 +63,78 @@ public actor NDKZapManager {
         register(provider: QRCodePaymentProvider())
     }
     
+    // MARK: - Recipient Info Management
+    
+    /// Fetch all zap-related info for a recipient in one go
+    private func fetchRecipientZapInfo(for user: NDKUser, maxAge: TimeInterval = 86400) async -> RecipientZapInfo {
+        let pubkey = user.pubkey
+        
+        // Check cache first
+        if let cached = recipientInfoCache[pubkey], cached.isFresh(maxAge: maxAge) {
+            return cached
+        }
+        
+        // Check if there's already a fetch in progress
+        if let existingTask = fetchTasks[pubkey] {
+            return await existingTask.value
+        }
+        
+        // Create a new fetch task
+        let task = Task<RecipientZapInfo, Never> {
+            // Create a combined filter for all event types we need
+            var filter = NDKFilter()
+            filter.authors = [pubkey]
+            filter.kinds = [
+                EventKind.metadata,           // kind:0 - profile with lightning address
+                EventKind.nutzapPreferences  // kind:10019 - nutzap preferences
+            ]
+            
+            // Create data source and collect until EOSE
+            let dataSource = NDKDataSource(
+                ndk: ndk,
+                filter: filter,
+                maxAge: maxAge
+            )
+            
+            // Collect all events with a reasonable timeout
+            let events = await dataSource.collect(timeout: 5.0)
+            
+            // Create RecipientZapInfo from fetched events
+            let info = await RecipientZapInfo.from(
+                pubkey: pubkey,
+                events: events
+            )
+            
+            // Cache the result
+            recipientInfoCache[pubkey] = info
+            
+            // Clean up the task reference
+            fetchTasks.removeValue(forKey: pubkey)
+            
+            return info
+        }
+        
+        // Store the task to prevent duplicate fetches
+        fetchTasks[pubkey] = task
+        
+        return await task.value
+    }
+    
+    /// Clear cached recipient info
+    public func clearRecipientCache(for pubkey: String? = nil) {
+        if let pubkey = pubkey {
+            recipientInfoCache.removeValue(forKey: pubkey)
+            fetchTasks[pubkey]?.cancel()
+            fetchTasks.removeValue(forKey: pubkey)
+        } else {
+            recipientInfoCache.removeAll()
+            for task in fetchTasks.values {
+                task.cancel()
+            }
+            fetchTasks.removeAll()
+        }
+    }
+    
     // MARK: - Zapping
     
     /// Smart zap with automatic protocol and payment provider selection
@@ -69,25 +146,33 @@ public actor NDKZapManager {
         preferredType: ZapType? = nil,
         preferredProvider: String? = nil
     ) async throws -> ZapResult {
-        // 1. Select zap protocol
-        let zapProtocol = try await selectZapProtocol(
-            for: recipient,
+        print("// 1. Fetch all recipient info ONCE")
+        // 1. Fetch all recipient info ONCE
+        let recipientInfo = await fetchRecipientZapInfo(for: recipient)
+        
+        print("// 2. Select zap protocol based on available options")
+        // 2. Select zap protocol based on available options
+        let zapProtocol = try selectZapProtocol(
+            recipientInfo: recipientInfo,
             preferredType: preferredType
         )
         
-        // 2. Prepare the zap
+        print("// 3. Prepare the zap with pre-fetched info")
+        // 3. Prepare the zap with pre-fetched info
         let prepared = try await zapProtocol.prepareZap(
             event: event,
-            to: recipient,
+            recipientInfo: recipientInfo,
             amountSats: amountSats,
             comment: comment
         )
         
+        print("// 3. Try to find a provider that can directly fulfill the request")
         // 3. Try to find a provider that can directly fulfill the request
         if let provider = try? await selectPaymentProvider(
             for: prepared.paymentRequest,
             preferredId: preferredProvider
         ) {
+            print("// Direct fulfillment path")
             // Direct fulfillment path
             let confirmation = try await provider.fulfill(prepared.paymentRequest)
             return try await zapProtocol.completeZap(
@@ -96,6 +181,7 @@ public actor NDKZapManager {
             )
         }
         
+        print("// 4. No direct provider - try protocol transformation")
         // 4. No direct provider - try protocol transformation
         // If this is a Nutzap, try Lightning fallback
         if zapProtocol.type == .nutzap,
@@ -410,7 +496,8 @@ public actor NDKZapManager {
             maxAge: 300 // 5 minutes - zaps are fairly static once created
         )
         
-        let events = await dataSource.currentValue()
+        // Collect all zap events
+        let events = await dataSource.collect(timeout: 5.0)
         
         var zaps: [ZapInfo] = []
         
@@ -448,27 +535,30 @@ public actor NDKZapManager {
     // MARK: - Private Methods
     
     private func selectZapProtocol(
-        for recipient: NDKUser,
+        recipientInfo: RecipientZapInfo,
         preferredType: ZapType?
-    ) async throws -> NDKZapProtocol {
-        // Try preferred type first
+    ) throws -> NDKZapProtocol {
+        print("selectZapProtocol \(preferredType), supported: \(recipientInfo.supportedZapTypes)")
+        
+        // Try preferred type first if it's supported
         if let preferredType = preferredType,
-           let zapProtocol = zapProtocols[preferredType],
-           try await zapProtocol.canZap(user: recipient) {
+           recipientInfo.supports(preferredType),
+           let zapProtocol = zapProtocols[preferredType] {
             return zapProtocol
         }
         
         // Smart routing: Prioritize Nutzap for privacy
-        if let nutzapProtocol = zapProtocols[.nutzap],
-           try await nutzapProtocol.canZap(user: recipient) {
+        if recipientInfo.hasNutzapSupport,
+           let nutzapProtocol = zapProtocols[.nutzap] {
             return nutzapProtocol
         }
         
         // Fallback to Lightning
-        if let lightningProtocol = zapProtocols[.lightning],
-           try await lightningProtocol.canZap(user: recipient) {
+        if recipientInfo.hasLightningSupport,
+           let lightningProtocol = zapProtocols[.lightning] {
             return lightningProtocol
         }
+        print("recipientDoesNotSupportZaps")
         
         throw ZapError.recipientDoesNotSupportZaps
     }

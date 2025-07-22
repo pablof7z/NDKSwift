@@ -18,6 +18,9 @@ public actor NDKPool {
     private weak var ndk: NDK?
     private var relayMap: [String: NDKRelay] = [:]
     
+    /// Set of relay URLs that were explicitly added by the developer
+    private var explicitRelayUrls: Set<String> = []
+    
     /// Stream of relay pool changes for event-driven observation
     private let poolChangeStream: AsyncStream<NDKPoolChangeEvent>
     private let poolChangeContinuation: AsyncStream<NDKPoolChangeEvent>.Continuation
@@ -144,13 +147,11 @@ public actor NDKPool {
     
     /// Add a relay to the pool
     @discardableResult
-    public func addRelay(_ url: RelayURL) async -> NDKRelay {
+    public func addRelay(_ url: RelayURL, origin: NDKRelayOrigin = .explicit) async -> NDKRelay {
         let normalizedUrl = URLNormalizer.tryNormalizeRelayUrl(url) ?? url
-        NDKLogger.log(.debug, category: .relay, "➕ Adding relay to pool - original: \(url), normalized: \(normalizedUrl)")
         
         // Check if already exists
         if let existing = relayMap[normalizedUrl] {
-            NDKLogger.log(.trace, category: .relay, "♻️ Relay already exists in pool: \(normalizedUrl)")
             return existing
         }
         
@@ -168,13 +169,17 @@ public actor NDKPool {
         if let ndk = ndk {
             relay.setNDK(ndk)
         }
+        await relay.setOrigin(origin)
         relayMap[normalizedUrl] = relay
-        NDKLogger.log(.info, category: .relay, "✅ Added new relay to pool: \(normalizedUrl), total relays: \(relayMap.count)")
+        
+        // Track explicit relays
+        if case .explicit = origin {
+            explicitRelayUrls.insert(normalizedUrl)
+        }
         
         // Set up connection state observer to publish queued events and emit pool events
         await relay.observeConnectionState { [weak self, weak relay] state in
             guard let self = self, let relay = relay else { return }
-            NDKLogger.log(.debug, category: .relay, "🔄 Relay state changed - url: \(relay.url), state: \(state)")
             switch state {
             case .connected:
                 // Emit pool connection event
@@ -186,7 +191,6 @@ public actor NDKPool {
             case .disconnected:
                 // Emit pool disconnection event
                 self.poolChangeContinuation.yield(.relayDisconnected(relay))
-                NDKLogger.log(.info, category: .relay, "🔴 Relay disconnected: \(relay.url)")
             case .failed(let error):
                 // Emit pool disconnection event
                 self.poolChangeContinuation.yield(.relayDisconnected(relay))
@@ -232,6 +236,20 @@ public actor NDKPool {
         }
     }
     
+    /// Get explicit relays (added by developer)
+    public func explicitRelays() async -> [NDKRelay] {
+        relayMap.values.filter { relay in
+            explicitRelayUrls.contains(relay.url)
+        }
+    }
+    
+    /// Get connected explicit relays
+    public func connectedExplicitRelays() async -> [NDKRelay] {
+        await explicitRelays().asyncFilter { relay in
+            await relay.connectionState == .connected
+        }
+    }
+    
     /// Get a specific relay by URL
     public func getRelay(for url: RelayURL) async -> NDKRelay? {
         let normalizedUrl = URLNormalizer.tryNormalizeRelayUrl(url) ?? url
@@ -258,13 +276,11 @@ public actor NDKPool {
     /// Connect to all relays
     public func connectAll() async {
         let relayCount = relays.count
-        NDKLogger.log(.info, category: .relay, "🔌 Connecting to all relays (\(relayCount) total)")
         
         await withTaskGroup(of: Void.self) { group in
             for relay in relays {
                 group.addTask {
                     do {
-                        NDKLogger.log(.trace, category: .relay, "🔌 Attempting connection to \(relay.url)")
                         try await relay.connect()
                     } catch {
                         NDKLogger.log(.error, category: .relay, "❌ Failed to connect to \(relay.url): \(error)")

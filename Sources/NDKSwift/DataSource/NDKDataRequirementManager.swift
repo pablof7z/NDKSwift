@@ -15,6 +15,9 @@ actor NDKDataRequirementManager {
     // Timer tasks for flushing pending requirements
     private var flushTasks: [FilterSignature: Task<Void, Never>] = [:]
     
+    // Track requirements that have immediate cache observations
+    private var immediateCacheHandles: [RequirementID: ObservationHandle] = [:]
+    
     init(ndk: NDK) {
         self.ndk = ndk
         NDKLogger.log(.debug, category: .subscription, "🏗️ NDKDataRequirementManager initialized")
@@ -39,12 +42,31 @@ actor NDKDataRequirementManager {
     ) async -> DataRequirementHandle {
         let requirementId = RequirementID()
         let correlationId = requirementId.uuidString.prefix(8)
+        
+        // IMMEDIATELY register cache observer to deliver existing events
+        // This happens before any delay, giving instant cache hits
+        var cacheObservationHandle: ObservationHandle?
+        if cachePolicy != .networkOnly {
+            NDKLogger.log(.debug, category: .subscription, "📦 Immediately querying cache for existing events", correlationId: String(correlationId))
+            cacheObservationHandle = await ndk.cache.observeEvents(
+                matching: filter,
+                observer: observer
+            )
+            // Track this handle so we can clean it up if needed
+            if let handle = cacheObservationHandle {
+                immediateCacheHandles[requirementId] = handle
+            }
+        }
+        
         // Handle cache-only policy
         if cachePolicy == .cacheOnly {
             NDKLogger.log(.debug, category: .subscription, "📦 Cache-only policy - no network subscription", correlationId: String(correlationId))
-            // The cache observer will deliver existing events
-            // Just return a dummy handle since no subscription is needed
-            return DataRequirementHandle(id: requirementId, manager: nil)
+            // Return handle that can cancel the cache observation
+            return DataRequirementHandle(
+                id: requirementId, 
+                manager: nil,
+                cacheObservationHandle: cacheObservationHandle
+            )
         }
         
         // For networkOnly or when cache is stale/empty, proceed with network request
@@ -56,7 +78,8 @@ actor NDKDataRequirementManager {
             await existing.addObserver(observer, id: requirementId, individualFilter: filter)
             return DataRequirementHandle(
                 id: requirementId,
-                manager: self
+                manager: self,
+                cacheObservationHandle: cacheObservationHandle
             )
         }
         
@@ -69,17 +92,15 @@ actor NDKDataRequirementManager {
             maxAge: maxAge,
             cachePolicy: cachePolicy,
             relays: relays,
-            subscriptionId: subscriptionId
+            subscriptionId: subscriptionId,
+            cacheObservationHandle: cacheObservationHandle
         )
         
         // Add to pending queue
         pendingRequirements[signature, default: []].append(pending)
-        let pendingCount = pendingRequirements[signature]?.count ?? 0
-        NDKLogger.log(.debug, category: .subscription, "⏳ Added to pending queue - signature: \(signature), pending count: \(pendingCount)", correlationId: String(correlationId))
         
         // Start or extend grouping timer
         if flushTasks[signature] == nil {
-            NDKLogger.log(.debug, category: .subscription, "⏲️ Starting grouping timer (\(groupingWindow * 1000)ms)", correlationId: String(correlationId))
             flushTasks[signature] = Task {
                 try? await Task.sleep(nanoseconds: UInt64(groupingWindow * 1_000_000_000))
                 await flushPendingRequirements(for: signature)
@@ -90,7 +111,8 @@ actor NDKDataRequirementManager {
         
         return DataRequirementHandle(
             id: requirementId,
-            manager: self
+            manager: self,
+            cacheObservationHandle: cacheObservationHandle
         )
     }
     
@@ -98,6 +120,11 @@ actor NDKDataRequirementManager {
     func releaseRequirement(id: RequirementID) async {
         let correlationId = id.uuidString.prefix(8)
         NDKLogger.log(.debug, category: .subscription, "🔓 Releasing requirement", correlationId: String(correlationId))
+        
+        // Clean up any immediate cache handle
+        if let handle = immediateCacheHandles.removeValue(forKey: id) {
+            await handle.cancel()
+        }
         
         guard let requirement = activeRequirements[id] else {
             NDKLogger.log(.trace, category: .subscription, "⚠️ Requirement not found in active list", correlationId: String(correlationId))
@@ -129,7 +156,6 @@ actor NDKDataRequirementManager {
     }
     
     private func flushPendingRequirements(for signature: FilterSignature) async {
-        NDKLogger.log(.debug, category: .subscription, "🚀 Flushing pending requirements for signature: \(signature)")
         flushTasks.removeValue(forKey: signature)
         
         guard let pending = pendingRequirements.removeValue(forKey: signature),
@@ -138,7 +164,6 @@ actor NDKDataRequirementManager {
             return
         }
         
-        NDKLogger.log(.info, category: .subscription, "📦 Processing \(pending.count) pending requirements")
         
         // Group by maxAge and cachePolicy to handle lifecycle correctly
         let groupedByLifecycle = Dictionary(grouping: pending) { p in
@@ -153,6 +178,35 @@ actor NDKDataRequirementManager {
             // Determine if this group needs a live subscription
             let maxAge = lifecycleGroup.first?.maxAge ?? 0
             let closeOnEose = maxAge > 0
+            let cachePolicy = lifecycleGroup.first?.cachePolicy ?? .cacheWithNetwork
+            
+            // Check cache freshness if maxAge > 0 and cachePolicy allows it
+            var shouldFetchFromNetwork = true
+            if maxAge > 0 && cachePolicy == .cacheWithNetwork {
+                // Check if we have fresh data in cache
+                if let lastFetchTime = await ndk.cache.getLastFetchTime(for: aggregatedFilters[0]) {
+                    let age = Date().timeIntervalSince(lastFetchTime)
+                    if age <= maxAge {
+                        NDKLogger.log(.info, category: .subscription, "✅ Cache is fresh (age: \(Int(age))s, maxAge: \(Int(maxAge))s) - skipping network fetch")
+                        shouldFetchFromNetwork = false
+                        
+                        // We're not creating a subscription since cache is fresh
+                        // The immediate cache observations will continue to deliver events
+                        // Just remove from immediate handles tracking since they're now owned by the DataRequirementHandle
+                        for p in lifecycleGroup {
+                            immediateCacheHandles.removeValue(forKey: p.id)
+                        }
+                        continue
+                    } else {
+                        NDKLogger.log(.info, category: .subscription, "🔄 Cache is stale (age: \(Int(age))s, maxAge: \(Int(maxAge))s) - fetching from network")
+                    }
+                }
+            }
+            
+            // Skip network fetch if not needed
+            if !shouldFetchFromNetwork {
+                continue
+            }
             
             // Create a subscription for each aggregated filter
             for aggregatedFilter in aggregatedFilters {
@@ -167,6 +221,8 @@ actor NDKDataRequirementManager {
                             Set(aggregatedFilter.ids ?? []).isSuperset(of: Set(p.filter.ids ?? []))) {
                             // The cache observer will deliver the cached events
                             NDKLogger.log(.debug, category: .subscription, "📦 Observer will receive cached events for filter: \(p.filter.fingerprint)")
+                            // Remove from immediate handles tracking since they're now owned by the DataRequirementHandle
+                            immediateCacheHandles.removeValue(forKey: p.id)
                         }
                     }
                     continue // Skip creating subscription
@@ -175,23 +231,20 @@ actor NDKDataRequirementManager {
                 // Use specified relays if provided, otherwise use outbox if enabled
                 var relays: Set<RelayURL>? = lifecycleGroup.first?.relays
                 if relays == nil && ndk.outboxEnabled {
-                    print("🔍 [DataRequirementManager] No relays specified and outbox enabled, fetching recommended relays...")
                     relays = await ndk.outbox.getRecommendedRelaysForSubscription(filters: [optimizedFilter])
-                    print("🔍 [DataRequirementManager] Got \(relays?.count ?? 0) recommended relays")
                     
                     // Add and connect to any new relays
                     if let recommendedRelays = relays, !recommendedRelays.isEmpty {
-                        print("🔍 [DataRequirementManager] Ensuring recommended relays are connected...")
                         for relayUrl in recommendedRelays {
                             // This will add the relay if not already in the pool
-                            await ndk.addRelayAndConnect(relayUrl)
+                            // Mark as outbox relay since it came from author's relay list
+                            let authorPubkey = optimizedFilter.authors?.first ?? "unknown"
+                            await ndk.pool.addRelayAndConnect(url: relayUrl, origin: .outbox(authorPubkey: authorPubkey))
                         }
-                        print("🔍 [DataRequirementManager] All recommended relays added to pool")
                     }
                     
                     // If outbox returned empty set, fall back to all connected relays
                     if relays?.isEmpty ?? true {
-                        print("🔍 [DataRequirementManager] Outbox returned empty relay set, falling back to all connected relays")
                         relays = nil // This will cause the subscription to use all connected relays
                     }
                 }
@@ -199,7 +252,6 @@ actor NDKDataRequirementManager {
                 // Create subscription using internal manager
                 // Use custom subscription ID if provided, otherwise generate one
                 let subscriptionId = lifecycleGroup.compactMap { $0.subscriptionId }.first ?? "ds_\(IDGenerator.randomId(length: 8))"
-                NDKLogger.log(.info, category: .subscription, "🎯 Creating subscription - id: \(subscriptionId), filter: \(optimizedFilter.fingerprint), relays: \(relays?.map { $0 } ?? ["all"])")
                 let internalSubscription = await ndk.internalSubscriptionManager.createSubscription(
                     id: subscriptionId,
                     filters: [optimizedFilter],
@@ -218,13 +270,16 @@ actor NDKDataRequirementManager {
                 
                 // Add relevant observers to this requirement
                 var addedObservers = 0
-                NDKLogger.log(.debug, category: .subscription, "🔍 Checking \(lifecycleGroup.count) pending requirements for coverage")
                 for p in lifecycleGroup {
                     // Only add observer if this aggregated filter covers their individual filter
                     let covers = requirement.includesFilter(p.filter)
-                    NDKLogger.log(.debug, category: .subscription, "🔍 Filter coverage check - aggregated: \(aggregatedFilter.fingerprint), individual: \(p.filter.fingerprint), covers: \(covers)")
                     
                     if covers {
+                        // Cancel the immediate cache observation since DataRequirement will set up its own
+                        await p.cacheObservationHandle?.cancel()
+                        // Remove from immediate cache handles tracking
+                        immediateCacheHandles.removeValue(forKey: p.id)
+                        
                         await requirement.addObserver(p.observer, id: p.id, individualFilter: p.filter)
                         addedObservers += 1
                         if !closeOnEose {
@@ -235,16 +290,13 @@ actor NDKDataRequirementManager {
                         NDKLogger.log(.warning, category: .subscription, "⚠️ Aggregated filter doesn't cover individual filter - this shouldn't happen!")
                     }
                 }
-                NDKLogger.log(.debug, category: .subscription, "👥 Added \(addedObservers) observers to requirement")
                 
                 // Start processing events
                 Task {
-                    NDKLogger.log(.debug, category: .subscription, "▶️ Starting event processing for subscription: \(subscriptionId)")
                     await requirement.startProcessing()
                     
                     // Record fetch time after processing starts
                     await ndk.cache.recordFetchTime(for: aggregatedFilter, timestamp: Date())
-                    NDKLogger.log(.trace, category: .subscription, "🕰️ Recorded fetch time for filter")
                 }
             }
         }
@@ -252,11 +304,9 @@ actor NDKDataRequirementManager {
     
     /// Smart filter aggregation that returns multiple filters when needed
     private func aggregateFilters(_ filters: [NDKFilter]) -> [NDKFilter] {
-        NDKLogger.log(.debug, category: .subscription, "🧮 Aggregating \(filters.count) filters")
         
         // Group filters by compatibility
         let filterGroups = groupCompatibleFilters(filters)
-        NDKLogger.log(.debug, category: .subscription, "📦 Grouped into \(filterGroups.count) compatible groups")
         
         // Aggregate each group separately
         let aggregated = filterGroups.map { group in
@@ -278,13 +328,9 @@ actor NDKDataRequirementManager {
             return filter
         }
         
-        NDKLogger.log(.debug, category: .subscription, "🔍 Checking cache for \(requestedIds.count) event IDs")
-        
         // Check which IDs we already have
         let cacheStatus = await ndk.cache.hasEvents(ids: requestedIds)
         let missingIds = requestedIds.filter { cacheStatus[$0] != true }
-        
-        NDKLogger.log(.info, category: .subscription, "📊 Cache check - requested: \(requestedIds.count), missing: \(missingIds.count)")
         
         // If we have all IDs, no need for subscription
         if missingIds.isEmpty {
@@ -448,6 +494,7 @@ struct PendingRequirement {
     let cachePolicy: CachePolicy
     let relays: Set<RelayURL>?
     let subscriptionId: String?
+    let cacheObservationHandle: ObservationHandle?
 }
 
 /// Manages a single data requirement - events flow ONLY through cache
@@ -474,7 +521,6 @@ class DataRequirement {
     
     func addObserver(_ observer: CacheObserver, id: RequirementID, individualFilter: NDKFilter) async {
         let correlationId = id.uuidString.prefix(8)
-        NDKLogger.log(.debug, category: .subscription, "👁️ Adding observer to DataRequirement - filter: \(individualFilter.fingerprint)", correlationId: String(correlationId))
         
         // Store observer reference for relay updates
         observers[id] = observer
@@ -486,7 +532,6 @@ class DataRequirement {
                 observer: observer
             )
             observerHandles[id] = handle
-            NDKLogger.log(.trace, category: .subscription, "✅ Observer registered with cache", correlationId: String(correlationId))
         } else {
             NDKLogger.log(.error, category: .subscription, "❌ No cache available - observer not registered!", correlationId: String(correlationId))
         }
@@ -568,8 +613,6 @@ class DataRequirement {
             return
         }
         
-        NDKLogger.log(.info, category: .subscription, "🏁 Starting event processing - subscriptionId: \(subscriptionId), closeOnEose: \(closeOnEose)")
-        
         // Track received event IDs if this filter is for specific IDs
         let requestedIds = filter.ids
         var receivedIds: Set<String>? = requestedIds != nil ? Set() : nil
@@ -577,7 +620,6 @@ class DataRequirement {
         // Set up EOSE handler
         await internalSubscription.onEOSE { [weak self] relay in
             guard let self = self else { return }
-            NDKLogger.log(.info, category: .subscription, "🏁 EOSE received from \(relay) - subscriptionId: \(self.subscriptionId)")
             
             // Forward EOSE to all observers as relay updates
             for (_, observer) in self.observers {
@@ -589,7 +631,6 @@ class DataRequirement {
                 (requestedIds != nil && receivedIds != nil && Set(requestedIds!) == receivedIds!)
             
             if shouldClose {
-                NDKLogger.log(.info, category: .subscription, "🏁 Closing subscription after EOSE: \(self.subscriptionId)")
                 Task {
                     await self.internalSubscription.close()
                 }
@@ -599,7 +640,6 @@ class DataRequirement {
         // Process events from subscription
         Task {
             var eventCount = 0
-            NDKLogger.log(.debug, category: .subscription, "👂 Listening for events on subscription: \(subscriptionId)")
             
             for await (event, relay) in await internalSubscription.events {
                 eventCount += 1
@@ -645,9 +685,19 @@ class DataRequirement {
 public struct DataRequirementHandle {
     let id: RequirementID
     weak var manager: NDKDataRequirementManager?
+    let cacheObservationHandle: ObservationHandle?
+    
+    init(id: RequirementID, manager: NDKDataRequirementManager?, cacheObservationHandle: ObservationHandle? = nil) {
+        self.id = id
+        self.manager = manager
+        self.cacheObservationHandle = cacheObservationHandle
+    }
     
     /// Release this data requirement
     public func release() async {
+        // Cancel cache observation if present
+        await cacheObservationHandle?.cancel()
+        // Release the requirement from manager
         await manager?.releaseRequirement(id: id)
     }
 }

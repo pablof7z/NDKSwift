@@ -89,7 +89,6 @@ public actor NDKRelayConnection {
         
         // Mark that we're connecting
         isConnecting = true
-        NDKLogger.log(.info, category: .connection, "🔌 Initiating connection to \(url)")
         
         do {
             try await withCheckedThrowingContinuation { continuation in
@@ -139,7 +138,6 @@ public actor NDKRelayConnection {
                 return
             }
             
-            NDKLogger.log(.info, category: .connection, "🌐 Creating WebSocket connection to \(url)")
             
             // Create WebSocket request
             var request = URLRequest(url: url)
@@ -149,7 +147,6 @@ public actor NDKRelayConnection {
             // Create WebSocket task
             webSocketTask = Self.sharedURLSession.webSocketTask(with: request)
             webSocketTask?.resume()
-            NDKLogger.log(.debug, category: .connection, "🚀 WebSocket task resumed")
             
             
             // Start receiving messages in a detached task so it doesn't block
@@ -310,7 +307,6 @@ public actor NDKRelayConnection {
             return 
         }
         
-        NDKLogger.log(.debug, category: .connection, "👂 Starting message receive loop for \(url)")
         
         do {
             while true {
@@ -369,9 +365,7 @@ public actor NDKRelayConnection {
                 }
             }
             
-            print("🔍 [NDKRelayConnection] Notifying delegate about message: \(message)")
             await notifyDelegate { delegate in
-                print("🔍 [NDKRelayConnection] Calling delegate.relayConnection(didReceiveMessage)")
                 delegate.relayConnection(self, didReceiveMessage: message)
             }
         } catch {
@@ -395,7 +389,6 @@ public actor NDKRelayConnection {
             return
         }
         
-        NDKLogger.log(.debug, category: .connection, "🏓 Sending ping to verify connection to \(url)")
         
         // Use a single task with timeout built-in
         let pingCompleted = await withCheckedContinuation { continuation in
@@ -428,7 +421,6 @@ public actor NDKRelayConnection {
                         await self.handleConnectionError(error)
                         continuation.resume(returning: false)
                     } else {
-                        NDKLogger.log(.debug, category: .connection, "✅ Ping successful for \(self.url)")
                         await self.markAsConnected()
                         continuation.resume(returning: true)
                     }
@@ -458,7 +450,6 @@ public actor NDKRelayConnection {
         connectedAt = Date()
         retryPolicy.reset()
         
-        NDKLogger.log(.info, category: .connection, "🎉 Successfully connected to \(url) - stats: sent=\(messagesSent), received=\(messagesReceived)")
         
         // Resume all waiting continuations
         for continuation in connectionContinuations {

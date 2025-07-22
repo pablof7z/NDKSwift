@@ -169,12 +169,6 @@ public struct NDKCashuWalletEvent {
         p2pkPrivateKey: String? = nil,
         signer: NDKSigner
     ) async throws -> NDKCashuWalletEvent {
-        // Log stack trace to identify caller
-        NDKLogger.log(.warning, category: .event, "📍 KIND 17375 PUBLISH TRIGGERED - Stack trace:")
-        Thread.callStackSymbols.prefix(15).enumerated().forEach { index, symbol in
-            NDKLogger.log(.warning, category: .event, "📍   [\(index)] \(symbol)")
-        }
-        
         NDKLogger.log(.info, category: .event, "📍 Publishing Kind 17375 wallet configuration event with:")
         NDKLogger.log(.info, category: .event, "📍   - Mints: \(mints)")
         NDKLogger.log(.info, category: .event, "📍   - Relays: \(relays ?? [])")

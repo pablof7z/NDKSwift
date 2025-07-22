@@ -114,57 +114,37 @@ public actor NDKOutboxManager {
     ///   - filters: The filters to analyze for relay selection
     /// - Returns: Set of relay URLs recommended for this subscription
     public func getRecommendedRelaysForSubscription(filters: [NDKFilter]) async -> Set<String> {
-        print("🔍 [OutboxManager] getRecommendedRelaysForSubscription called with \(filters.count) filters")
         var allRelays = Set<String>()
         var missingPubkeys = Set<String>()
         
         for (index, filter) in filters.enumerated() {
-            print("🔍 [OutboxManager] Processing filter \(index + 1)/\(filters.count)")
-            if let authors = filter.authors {
-                print("🔍 [OutboxManager] Filter has authors: \(authors.joined(separator: ", "))")
-            } else {
-                print("🔍 [OutboxManager] Filter has no authors. Filter details: \(filter)")
-            }
             let result = await selector.selectRelaysForFetching(
                 filter: filter,
                 config: FetchingConfig(maxRelayCount: 10)
             )
-            print("🔍 [OutboxManager] Filter \(index + 1) returned \(result.relays.count) relays")
             allRelays.formUnion(result.relays)
             missingPubkeys.formUnion(result.missingRelayInfoPubkeys)
         }
         
-        print("🔍 [OutboxManager] After initial selection: \(allRelays.count) relays, \(missingPubkeys.count) missing pubkeys")
         
         // If we have missing pubkeys, fetch their relay lists first
         if !missingPubkeys.isEmpty {
-            NDKLogger.log(.debug, category: .outbox, "📋 Missing relay info for \(missingPubkeys.count) pubkeys, fetching...")
-            print("🔍 [OutboxManager] Missing pubkeys: \(missingPubkeys.joined(separator: ", "))")
-            
             // Fetch relay lists for missing pubkeys
             for (index, pubkey) in missingPubkeys.enumerated() {
-                print("🔍 [OutboxManager] Fetching relay list for pubkey \(index + 1)/\(missingPubkeys.count): \(pubkey)")
                 _ = try? await tracker.getRelaysFor(pubkey: pubkey)
-                print("🔍 [OutboxManager] Completed fetch for pubkey \(index + 1)/\(missingPubkeys.count)")
             }
-            
-            print("🔍 [OutboxManager] All relay lists fetched, re-running selection...")
             
             // Re-run the selection now that we have the relay lists
             allRelays.removeAll()
             for (index, filter) in filters.enumerated() {
-                print("🔍 [OutboxManager] Re-processing filter \(index + 1)/\(filters.count)")
                 let result = await selector.selectRelaysForFetching(
                     filter: filter,
                     config: FetchingConfig(maxRelayCount: 10)
                 )
-                print("🔍 [OutboxManager] Re-run filter \(index + 1) returned \(result.relays.count) relays")
                 allRelays.formUnion(result.relays)
             }
         }
         
-        print("🔍 [OutboxManager] Final result: returning \(allRelays.count) relays")
-        print("🔍 [OutboxManager] Relays: \(allRelays.joined(separator: ", "))")
         return allRelays
     }
 }

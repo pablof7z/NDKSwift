@@ -66,14 +66,12 @@ public actor ProofStateManager {
     
     /// Update ownership of existing proofs to a new event
     func updateProofOwnership(_ proofs: [CashuSwift.Proof], eventId: String, timestamp: Timestamp) {
-        print("ProofStateManager.updateProofOwnership - Updating \(proofs.count) proofs to event \(eventId)")
         for proof in proofs {
             if var entry = proofState[proof.C] {
                 let previousOwner = entry.ownerEventId ?? "none"
                 // Only update if the new event is newer
                 if let existingTimestamp = entry.ownerTimestamp {
                     if timestamp <= existingTimestamp {
-                        print("  Proof \(proof.C): NOT updating owner from \(previousOwner) to \(eventId) - existing timestamp is newer")
                         continue // Don't update, existing owner is newer
                     }
                 }

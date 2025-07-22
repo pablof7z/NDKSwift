@@ -5,19 +5,20 @@ public protocol NDKZapProtocol {
     /// The type of zap this protocol handles
     var type: ZapType { get }
     
-    /// Check if this protocol can zap the given user
-    func canZap(user: NDKUser) async throws -> Bool
+    /// Check if this protocol can zap the given recipient info
+    /// This is now a simple check based on pre-fetched data
+    func canZap(recipientInfo: RecipientZapInfo) -> Bool
     
-    /// Prepare the zap by creating necessary events and payment request
+    /// Prepare the zap using pre-fetched recipient information
     /// - Parameters:
     ///   - event: Optional event being zapped
-    ///   - user: The recipient of the zap
+    ///   - recipientInfo: Pre-fetched recipient zap information
     ///   - amountSats: Amount in satoshis
     ///   - comment: Optional comment
     /// - Returns: Prepared zap data including payment request
     func prepareZap(
         event: NDKEvent?,
-        to user: NDKUser,
+        recipientInfo: RecipientZapInfo,
         amountSats: Int64,
         comment: String?
     ) async throws -> PreparedZap

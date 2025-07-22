@@ -84,6 +84,33 @@ public enum CashuDeposit {
     }
     
     /// Monitor deposit status for a mint quote
+    /// 
+    /// This method monitors a mint quote to check if the associated Lightning invoice has been paid.
+    /// It uses progressive intervals that increase based on the quote's age (older quotes are checked less frequently).
+    /// 
+    /// - Parameters:
+    ///   - quote: The mint quote to monitor
+    ///   - quoteEventId: Optional ID of the Nostr event storing this quote (for cleanup after success)
+    ///   - mints: MintManager instance for mint operations
+    ///   - eventManager: WalletEventManager for event management
+    ///   - signer: NDKSigner for signing events
+    ///   - timeout: Maximum time to monitor before giving up (default: 600 seconds)
+    ///   - quoteAge: How old the quote already is (affects check intervals)
+    ///   - onProofsReceived: Callback to handle newly minted proofs
+    ///   - manualCheckTrigger: Optional AsyncStream that allows manual triggering of status checks.
+    ///                         Yield a value to this stream to immediately check the payment status
+    ///                         instead of waiting for the automatic interval.
+    /// 
+    /// - Returns: An AsyncThrowingStream that yields DepositStatus updates
+    /// 
+    /// The monitoring uses dynamic intervals:
+    /// - Base interval: 2 minutes
+    /// - Increases by 1.5x for each hour the quote has existed
+    /// - Maximum interval: 2 hours
+    /// 
+    /// When `manualCheckTrigger` is provided, the method will race between the automatic
+    /// interval timer and the manual trigger, checking immediately when a value is yielded
+    /// to the trigger stream.
     public static func monitorDeposit(
         quote: CashuMintQuote,
         quoteEventId: String? = nil,

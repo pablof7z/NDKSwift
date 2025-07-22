@@ -110,6 +110,10 @@ struct NIP60WalletREPL {
             "https://testnut.cashu.space"
         ]
         
+        let relayUrls = [
+            "wss://relay.primal.net"
+        ]
+        
         print("🏦 Initializing wallet with mints:")
         for url in mintUrls {
             print("   - \(url)")
@@ -120,23 +124,14 @@ struct NIP60WalletREPL {
         do {
             wallet = try NIP60Wallet(ndk: ndk)
             
-            // Add and load mints to the wallet
-            print("🔄 Loading mint data...")
-            for mintUrlString in mintUrls {
-                guard let mintUrl = URL(string: mintUrlString) else {
-                    print("⚠️ Invalid mint URL: \(mintUrlString)")
-                    continue
-                }
-                
-                do {
-                    // Load the mint to ensure keysets are available
-                    _ = try await wallet.mints.loadMint(url: mintUrl)
-                    await wallet.mints.addMintURL(url: mintUrl)
-                    print("✅ Loaded mint: \(mintUrlString)")
-                } catch {
-                    print("❌ Failed to load mint \(mintUrlString): \(error)")
-                }
-            }
+            // Setup wallet with mints and relays
+            print("🔄 Setting up wallet...")
+            try await wallet.setup(
+                mints: mintUrls,
+                relays: relayUrls,
+                publishMintList: true
+            )
+            print("✅ Wallet setup complete")
             
             // Load wallet (starts subscriptions)
             try await wallet.load()

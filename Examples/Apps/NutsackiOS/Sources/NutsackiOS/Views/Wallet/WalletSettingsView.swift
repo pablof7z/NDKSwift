@@ -55,9 +55,12 @@ struct WalletSettingsView: View {
                         )
                     } else {
                         ForEach(mints, id: \.url.absoluteString) { mint in
-                            MintSettingsRow(mintInfo: mint) {
-                                mints.removeAll { $0.url == mint.url }
+                            NavigationLink(destination: MintDetailView(mintURL: mint.url.absoluteString)) {
+                                MintSettingsRow(mintInfo: mint) {
+                                    mints.removeAll { $0.url == mint.url }
+                                }
                             }
+                            .buttonStyle(.plain)
                         }
                     }
                     

@@ -20,7 +20,6 @@ struct RealDeclarativeDemo {
         // Enable reasonable logging
         NDKLogger.logLevel = .info
         NDKLogger.logNetworkTraffic = false
-        NDKLogger.sanitizeSensitiveData = true
         
         print("1. Creating NDK instance...")
         let ndk = NDK(relayUrls: [

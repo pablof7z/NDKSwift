@@ -304,8 +304,9 @@ public extension NDK {
             maxAge: 600 // 10 minutes - contact lists don't change frequently
         )
         
-        let events = await dataSource.currentValue()
-        guard let event = events.first else { return nil }
+        // Collect all contact list events and use the most recent
+        let events = await dataSource.collect(timeout: 3.0)
+        guard let event = events.sorted(by: { $0.createdAt > $1.createdAt }).first else { return nil }
         return NDKContactList.fromEvent(event)
     }
 

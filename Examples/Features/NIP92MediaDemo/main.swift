@@ -11,8 +11,8 @@ struct NIP92MediaDemo {
         let ndk = NDK()
         
         // Configure with a test private key
-        let privateKey = NDKPrivateKey.generate()
-        ndk.signer = NDKPrivateKeySigner(privateKey: privateKey)
+        let signer = try NDKPrivateKeySigner.generate()
+        ndk.signer = signer
         
         print("NIP-92 Media Attachments Demo")
         print("============================\n")
