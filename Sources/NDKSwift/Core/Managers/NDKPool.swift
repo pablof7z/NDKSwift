@@ -329,7 +329,7 @@ public actor NDKPool {
                             do {
                                 try await relay.connect()
                             } catch {
-                                print("[NDKPool] Failed to connect to relay \(relay.url): \(error)")
+                                NDKLogger.log(.error, category: .relay, "[NDKPool] Failed to connect to relay \(relay.url): \(error)")
                             }
                         }
                     }

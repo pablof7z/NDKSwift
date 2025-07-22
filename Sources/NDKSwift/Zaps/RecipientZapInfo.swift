@@ -73,7 +73,7 @@ public struct RecipientZapInfo {
     }
     
     /// Check if the cached data is still fresh
-    public func isFresh(maxAge: TimeInterval = 86400) -> Bool {
+    public func isFresh(maxAge: TimeInterval = TimeConstants.day) -> Bool {
         Date().timeIntervalSince(fetchedAt) < maxAge
     }
 }

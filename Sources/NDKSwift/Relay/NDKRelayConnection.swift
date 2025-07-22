@@ -396,7 +396,7 @@ public actor NDKRelayConnection {
             
             // Set up timeout
             let timeoutTask = Task {
-                try? await Task.sleep(nanoseconds: 3_000_000_000)
+                try? await Task.sleep(nanoseconds: 3 * TimeConstants.nanosecondsPerSecond)
                 if !pingHandled {
                     pingHandled = true
                     NDKLogger.log(.error, category: .connection, "⏰ Ping timeout for \(url) after 3 seconds")

@@ -102,7 +102,7 @@ actor NDKDataRequirementManager {
         // Start or extend grouping timer
         if flushTasks[signature] == nil {
             flushTasks[signature] = Task {
-                try? await Task.sleep(nanoseconds: UInt64(groupingWindow * 1_000_000_000))
+                try? await Task.sleep(nanoseconds: UInt64(groupingWindow * Double(TimeConstants.nanosecondsPerSecond)))
                 await flushPendingRequirements(for: signature)
             }
         } else {

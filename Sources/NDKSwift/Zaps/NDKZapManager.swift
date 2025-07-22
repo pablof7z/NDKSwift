@@ -66,7 +66,7 @@ public actor NDKZapManager {
     // MARK: - Recipient Info Management
     
     /// Fetch all zap-related info for a recipient in one go
-    private func fetchRecipientZapInfo(for user: NDKUser, maxAge: TimeInterval = 86400) async -> RecipientZapInfo {
+    private func fetchRecipientZapInfo(for user: NDKUser, maxAge: TimeInterval = TimeConstants.day) async -> RecipientZapInfo {
         let pubkey = user.pubkey
         
         // Check cache first
@@ -493,7 +493,7 @@ public actor NDKZapManager {
         let dataSource = NDKDataSource(
             ndk: ndk,
             filter: filter,
-            maxAge: 300 // 5 minutes - zaps are fairly static once created
+            maxAge: TimeConstants.minute * 5 // 5 minutes - zaps are fairly static once created
         )
         
         // Collect all zap events
@@ -601,7 +601,7 @@ public actor NDKZapManager {
         
         // Try to get provider pubkey from recipient's profile
         var providerPubkey: String?
-        for await profile in await ndk.profileManager.observe(for: recipientPubkey, maxAge: 3600) {
+        for await profile in await ndk.profileManager.observe(for: recipientPubkey, maxAge: TimeConstants.hour) {
             if let profile = profile {
                 // Try to resolve LNURL to get provider pubkey
                 if let lnurlAddress = profile.lud16 ?? profile.lud06 {

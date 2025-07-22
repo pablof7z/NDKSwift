@@ -265,7 +265,7 @@ actor NDKRelaySelector {
         } else if purpose == .publishing {
             // For events with 10+ p-tags, don't apply outbox model to avoid too many relays
             // Just use author's own relays (handled in selectRelaysForPublishing)
-            print("[NDKRelaySelector] Event has \(pTags.count) p-tags, skipping outbox model for p-tagged users")
+            NDKLogger.log(.debug, category: .outbox, "Event has \(pTags.count) p-tags, skipping outbox model for p-tagged users")
         } else {
             // For fetching, always consider p-tagged users regardless of count
             for pubkey in pTags {

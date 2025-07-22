@@ -3,10 +3,10 @@ import Foundation
 /// Tracks relay information for users to implement the outbox model
 actor NDKOutboxTracker {
     /// Default TTL for positive cache entries (24 hours)
-    static let positiveEntryTTL: TimeInterval = 86400
+    static let positiveEntryTTL: TimeInterval = TimeConstants.day
     
     /// Default TTL for negative cache entries (1 hour)
-    static let negativeEntryTTL: TimeInterval = 3600
+    static let negativeEntryTTL: TimeInterval = TimeConstants.hour
 
     /// Default in-memory cache capacity
     static let defaultCapacity = 500
@@ -39,12 +39,12 @@ actor NDKOutboxTracker {
     /// Get relay information for a user
     func getRelaysFor(
         pubkey: String,
-        maxAge: TimeInterval = 3600,
+        maxAge: TimeInterval = TimeConstants.hour,
         type: RelayListType = .both
     ) async throws -> NDKOutboxItem? {
         // 1. Check memory cache first
         if let cached = await checkMemoryCache(pubkey: pubkey, maxAge: maxAge) {
-            print("🔍 [OutboxTracker] Memory cache hit for pubkey: \(pubkey)")
+            NDKLogger.log(.debug, category: .outbox, "🔍 Memory cache hit for pubkey: \(pubkey)")
             if let item = cached.item {
                 return filterByType(item, type: type)
             } else {
@@ -55,7 +55,7 @@ actor NDKOutboxTracker {
         
         // 2. Check database cache
         if let cached = await checkDatabaseCache(pubkey: pubkey, maxAge: maxAge) {
-            print("🔍 [OutboxTracker] Database cache hit for pubkey: \(pubkey)")
+            NDKLogger.log(.debug, category: .outbox, "🔍 Database cache hit for pubkey: \(pubkey)")
             if let item = cached.item {
                 return filterByType(item, type: type)
             } else {
@@ -344,7 +344,7 @@ actor NDKOutboxTracker {
             
             // Task 3: Timeout after 2 seconds
             group.addTask {
-                try? await Task.sleep(nanoseconds: 2_000_000_000)
+                try? await Task.sleep(nanoseconds: 2 * TimeConstants.nanosecondsPerSecond)
             }
             
             // Wait for the first task to complete (timeout or data)
@@ -419,7 +419,7 @@ actor NDKOutboxTracker {
         // Listen for events with a timeout
         let eventTask = Task {
             for await (event, _) in await subscription.events {
-                print("🔍 [OutboxTracker] fetchNIP65RelayList: Event received! ID: \(event.id)")
+                NDKLogger.log(.debug, category: .outbox, "🔍 fetchNIP65RelayList: Event received! ID: \(event.id)")
                 latestEvent = event
                 didReceiveEvent = true
                 break // We only need the first event
@@ -427,27 +427,27 @@ actor NDKOutboxTracker {
         }
         
         // Wait for event or timeout
-        print("🔍 [OutboxTracker] fetchNIP65RelayList: Starting timeout task (2 seconds)")
+        NDKLogger.log(.trace, category: .outbox, "🔍 fetchNIP65RelayList: Starting timeout task (2 seconds)")
         let timeoutTask = Task {
-            try await Task.sleep(nanoseconds: 2_000_000_000) // 2 second timeout
-            print("🔍 [OutboxTracker] fetchNIP65RelayList: Timeout reached")
+            try await Task.sleep(nanoseconds: 2 * TimeConstants.nanosecondsPerSecond) // 2 second timeout
+            NDKLogger.log(.debug, category: .outbox, "🔍 fetchNIP65RelayList: Timeout reached")
             didReceiveEvent = true
         }
         
         // Wait until we receive an event or timeout
-        print("🔍 [OutboxTracker] fetchNIP65RelayList: Waiting for event or timeout...")
+        NDKLogger.log(.trace, category: .outbox, "🔍 fetchNIP65RelayList: Waiting for event or timeout...")
         while !didReceiveEvent {
-            try? await Task.sleep(nanoseconds: 100_000_000) // 100ms
+            try? await Task.sleep(nanoseconds: 100 * TimeConstants.nanosecondsPerMillisecond) // 100ms
         }
         
-        print("🔍 [OutboxTracker] fetchNIP65RelayList: Done waiting, cancelling tasks")
+        NDKLogger.log(.trace, category: .outbox, "🔍 fetchNIP65RelayList: Done waiting, cancelling tasks")
         
         // Cancel tasks
         eventTask.cancel()
         timeoutTask.cancel()
         
         // Close the subscription
-        print("🔍 [OutboxTracker] fetchNIP65RelayList: Closing subscription")
+        NDKLogger.log(.trace, category: .outbox, "🔍 fetchNIP65RelayList: Closing subscription")
         await ndk.internalSubscriptionManager.closeSubscription(id: subscriptionId)
         
         guard let event = latestEvent else {
@@ -490,7 +490,7 @@ actor NDKOutboxTracker {
         // IMPORTANT: We must specify relays here to prevent outbox recursion
         // Use all currently connected relays
         let currentRelays = await ndk.pool.connectedRelays().map { $0.url }
-        print("🔍 [OutboxTracker] fetchNIP65RelayList: Using \(currentRelays.count) connected relays to avoid outbox recursion")
+        NDKLogger.log(.debug, category: .outbox, "🔍 fetchNIP65RelayList: Using \(currentRelays.count) connected relays to avoid outbox recursion")
         
         let subscription = await ndk.internalSubscriptionManager.createSubscription(
             id: subscriptionId,
@@ -517,13 +517,13 @@ actor NDKOutboxTracker {
         
         // Wait for event or timeout
         let timeoutTask = Task {
-            try await Task.sleep(nanoseconds: 2_000_000_000) // 2 second timeout
+            try await Task.sleep(nanoseconds: 2 * TimeConstants.nanosecondsPerSecond) // 2 second timeout
             didReceiveEvent = true
         }
         
         // Wait until we receive an event or timeout
         while !didReceiveEvent {
-            try? await Task.sleep(nanoseconds: 100_000_000) // 100ms
+            try? await Task.sleep(nanoseconds: 100 * TimeConstants.nanosecondsPerMillisecond) // 100ms
         }
         
         // Cancel tasks

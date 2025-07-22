@@ -186,7 +186,7 @@ public actor NDKSignatureVerificationSampler {
     /// Handle an invalid signature detection
     private func handleInvalidSignature(event: NDKEvent, relay: RelayProtocol) async {
         // A single invalid signature means the relay is evil
-        print("⚠️ EVIL RELAY DETECTED: \(relay.url) provided event \(event.id) with invalid signature")
+        NDKLogger.log(.error, category: .security, "⚠️ EVIL RELAY DETECTED: \(relay.url) provided event \(event.id) with invalid signature")
 
         // Notify delegate on main thread
         let delegateCopy = delegate
