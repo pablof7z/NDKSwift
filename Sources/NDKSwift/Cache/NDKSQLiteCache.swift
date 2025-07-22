@@ -1525,7 +1525,7 @@ public actor NDKSQLiteCache: NDKCache {
     /// Record the fetch time for a filter
     public func recordFetchTime(for filter: NDKFilter, timestamp: Date) async {
         let fingerprint = filter.fingerprint
-        let timestampInt = Int64(timestamp.timeIntervalSince1970)
+        let timestampInt = Timestamp.from(timestamp)
         
         // Encode filter as JSON for debugging purposes
         let filterJSON: String
@@ -1555,7 +1555,7 @@ public actor NDKSQLiteCache: NDKCache {
     // MARK: - NIP-05 Cache Operations
     
     public func saveNIP05Claim(_ identifier: String, pubkey: String, retrievedAt: Date = Date()) async throws {
-        let claimedAt = Int64(retrievedAt.timeIntervalSince1970)
+        let claimedAt = Timestamp.from(retrievedAt)
         
         do {
             try await dbQueue.write { [debugMode] db in
@@ -1646,9 +1646,9 @@ public actor NDKSQLiteCache: NDKCache {
     }
     
     public func saveNIP05Resolution(_ entry: NIP05CacheEntry) async throws {
-        let claimedAt = Int64(entry.claimedAt.timeIntervalSince1970)
-        let verifiedAt = entry.verifiedAt.map { Int64($0.timeIntervalSince1970) }
-        let lastCheckAt = entry.lastCheckAt.map { Int64($0.timeIntervalSince1970) }
+        let claimedAt = Timestamp.from(entry.claimedAt)
+        let verifiedAt = entry.verifiedAt.map { Timestamp.from($0) }
+        let lastCheckAt = entry.lastCheckAt.map { Timestamp.from($0) }
         let nip46RelaysJSON = entry.nip46Relays.flatMap { try? JSONCoding.encodeToString($0) }
         
         do {
@@ -1691,7 +1691,7 @@ public actor NDKSQLiteCache: NDKCache {
                     WHERE identifier = ?
                 """, arguments: [
                     NIP05VerificationStatus.invalid.rawValue,
-                    Int64(Date().timeIntervalSince1970),
+                    Timestamp.from(Date()),
                     "Belongs to different pubkey",
                     identifier
                 ])
@@ -1706,8 +1706,8 @@ public actor NDKSQLiteCache: NDKCache {
                         identifier,
                         actualPubkey,
                         NIP05VerificationStatus.verified.rawValue,
-                        Int64(Date().timeIntervalSince1970),
-                        Int64(Date().timeIntervalSince1970),
+                        Timestamp.from(Date()),
+                        Timestamp.from(Date()),
                         Int64(Date().timeIntervalSince1970)
                     ])
                 }
@@ -1781,7 +1781,7 @@ public actor NDKSQLiteCache: NDKCache {
     public func canVerifyDomain(_ domain: String) async -> Bool {
         let rateLimitWindow: TimeInterval = TimeConstants.hour // 1 hour
         let maxAttemptsPerWindow = 10
-        let now = Int64(Date().timeIntervalSince1970)
+        let now = Timestamp.from(Date())
         
         do {
             return try await dbQueue.read { db in
@@ -1811,7 +1811,7 @@ public actor NDKSQLiteCache: NDKCache {
     
     public func recordDomainVerificationAttempt(_ domain: String) async {
         let rateLimitWindow: TimeInterval = TimeConstants.hour // 1 hour
-        let now = Int64(Date().timeIntervalSince1970)
+        let now = Timestamp.from(Date())
         
         do {
             try await dbQueue.write { db in
@@ -1884,8 +1884,8 @@ public actor NDKSQLiteCache: NDKCache {
         expiresAt: Date,
         checkedRelays: Set<String>?
     ) async throws {
-        let fetchedAtInt = Int64(fetchedAt.timeIntervalSince1970)
-        let expiresAtInt = Int64(expiresAt.timeIntervalSince1970)
+        let fetchedAtInt = Timestamp.from(fetchedAt)
+        let expiresAtInt = Timestamp.from(expiresAt)
         
         // Encode relay arrays as JSON
         let writeRelaysJSON = writeRelays != nil ? try? JSONCoding.encodeToString(writeRelays!) : nil

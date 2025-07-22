@@ -326,7 +326,7 @@ public actor NDKZapManager {
                 "amount": Int(quote.amount),
                 "request": quote.invoice,
                 "state": "PAID",
-                "expiry": Int(quote.expiry.timeIntervalSince1970)
+                "expiry": Int(Timestamp.from(quote.expiry))
             ]
             
             let jsonData = try JSONSerialization.data(withJSONObject: mintQuoteData)

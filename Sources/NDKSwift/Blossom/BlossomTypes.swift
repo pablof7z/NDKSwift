@@ -153,7 +153,7 @@ public struct BlossomAuth {
         }
 
         if let expiration = expiration {
-            tags.append(["expiration", String(Int(expiration.timeIntervalSince1970))])
+            tags.append(["expiration", String(Timestamp.from(expiration))])
         }
 
         let event = try await NDKEventBuilder()
@@ -196,11 +196,11 @@ public struct BlossomAuth {
         ]
 
         if let since = since {
-            tags.append(["since", String(Int(since.timeIntervalSince1970))])
+            tags.append(["since", String(Timestamp.from(since))])
         }
 
         if let until = until {
-            tags.append(["until", String(Int(until.timeIntervalSince1970))])
+            tags.append(["until", String(Timestamp.from(until))]) 
         }
 
         let event = try await NDKEventBuilder()

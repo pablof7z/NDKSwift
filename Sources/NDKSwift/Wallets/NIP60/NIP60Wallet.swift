@@ -112,7 +112,7 @@ public actor NIP60Wallet: NDKPaymentProvider {
         walletSubscriptionTask = Task {
             do {
                 let userPubkey = try await signer.pubkey
-                let twentyFourHoursAgo = Int64(Date(timeIntervalSinceNow: -60 * 60 * 24).timeIntervalSince1970)
+                let twentyFourHoursAgo = Timestamp.from(Date(timeIntervalSinceNow: -TimeConstants.day))
                 
                 // Create filters for wallet events
                 let filters = [
