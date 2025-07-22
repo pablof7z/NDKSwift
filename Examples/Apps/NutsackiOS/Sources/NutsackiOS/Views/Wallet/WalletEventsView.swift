@@ -116,11 +116,8 @@ struct WalletEventsView: View {
 struct WalletEventRow: View {
     let eventInfo: WalletEventInfo
     
-    private var formattedDate: String {
-        let formatter = RelativeDateTimeFormatter()
-        formatter.unitsStyle = .abbreviated
-        let date = Date(timeIntervalSince1970: TimeInterval(eventInfo.event.createdAt))
-        return formatter.localizedString(for: date, relativeTo: Date())
+    private var eventDate: Date {
+        Date(timeIntervalSince1970: TimeInterval(eventInfo.event.createdAt))
     }
     
     private var totalAmount: Int {
@@ -168,7 +165,7 @@ struct WalletEventRow: View {
                         
                         Spacer()
                         
-                        Text(formattedDate)
+                        RelativeTimeView(date: eventDate)
                             .font(.caption)
                             .foregroundStyle(.tertiary)
                     }

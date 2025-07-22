@@ -236,7 +236,7 @@ struct TransactionRow: View {
                     }
                 }
                 
-                Text(transaction.createdAt.formatted(.relative(presentation: .numeric)))
+                RelativeTimeView(date: transaction.createdAt)
                     .font(.caption2)
                     .foregroundStyle(.secondary)
             }

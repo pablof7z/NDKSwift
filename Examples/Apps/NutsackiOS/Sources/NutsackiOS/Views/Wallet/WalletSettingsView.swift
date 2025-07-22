@@ -27,7 +27,7 @@ struct WalletSettingsView: View {
                 // Wallet Configuration Warning
                 if !hasWalletInfo && walletManager.activeWallet != nil {
                     Section {
-                        VStack(alignment: .leading, spacing: 12) {
+                        VStack(alignment: .leading, spacing: 8) {
                             HStack {
                                 Image(systemName: "exclamationmark.triangle.fill")
                                     .foregroundColor(.orange)
@@ -42,7 +42,7 @@ struct WalletSettingsView: View {
                             }
                             .buttonStyle(.borderedProminent)
                         }
-                        .padding(.vertical, 4)
+                        .padding(.vertical, 1)
                     }
                 }
                 
@@ -54,6 +54,7 @@ struct WalletSettingsView: View {
                             systemImage: "building.columns",
                             description: Text("Add mints to start using ecash")
                         )
+                        .scaleEffect(0.85)
                     } else {
                         ForEach(mints, id: \.url.absoluteString) { mint in
                             NavigationLink(destination: MintDetailView(mintURL: mint.url.absoluteString)) {
@@ -62,17 +63,19 @@ struct WalletSettingsView: View {
                                 }
                             }
                             .buttonStyle(.plain)
+            .padding(.leading, 2)
                         }
                     }
                     
                     // Add mint buttons
-                    HStack(spacing: 12) {
+                    HStack(spacing: 8) {
                         Button(action: { showAddMintSheet = true }) {
-                            Label("Add Mint", systemImage: "plus.circle")
-                                .font(.footnote)
+                            Label("Add Mint", systemImage: "plus")
+                                .font(.caption)
                         }
                         .buttonStyle(.bordered)
                         .controlSize(.small)
+                        .tint(.blue)
                         
                         Button(action: discoverMints) {
                             if isDiscovering {
@@ -80,22 +83,24 @@ struct WalletSettingsView: View {
                                     ProgressView()
                                         .scaleEffect(0.7)
                                     Text("Discovering...")
-                                        .font(.footnote)
+                                        .font(.caption)
                                 }
                             } else {
-                                Label("Discover", systemImage: "magnifyingglass")
-                                    .font(.footnote)
+                                Label("Discover", systemImage: "sparkle.magnifyingglass")
+                                    .font(.caption)
                             }
                         }
                         .buttonStyle(.bordered)
                         .controlSize(.small)
+                        .tint(.blue)
                         .disabled(isDiscovering)
                     }
-                    .padding(.top, 4)
+                    .padding(.top, 0)
                 } header: {
                     Text("MINTS")
                         .font(.caption)
                         .foregroundColor(.secondary)
+                        .textCase(.none)
                 }
                 
                 // Relays Section
@@ -106,6 +111,7 @@ struct WalletSettingsView: View {
                             systemImage: "antenna.radiowaves.left.and.right",
                             description: Text("Add relays to sync your wallet data")
                         )
+                        .scaleEffect(0.85)
                     } else {
                         ForEach(relays, id: \.self) { relay in
                             RelaySettingsRow(relayURL: relay) {
@@ -119,6 +125,7 @@ struct WalletSettingsView: View {
                         Text("WALLET RELAYS")
                             .font(.caption)
                             .foregroundColor(.secondary)
+                            .textCase(.none)
                         Spacer()
                         Button(action: { showAddRelaySheet = true }) {
                             Image(systemName: "plus.circle")
@@ -128,7 +135,8 @@ struct WalletSettingsView: View {
                 } footer: {
                     Text("These relays will be used to sync your wallet events and mint lists")
                         .font(.caption2)
-                        .foregroundColor(.secondary.opacity(0.8))
+                        .foregroundColor(.secondary.opacity(0.7))
+                        .padding(.top, -6)
                 }
                 
             }
@@ -144,7 +152,8 @@ struct WalletSettingsView: View {
                     Button("Save") {
                         Task { await saveSettings() }
                     }
-                    .fontWeight(.semibold)
+                    .fontWeight(.bold)
+                    .tint(.blue)
                     .disabled(isSaving)
                 }
             }
@@ -391,41 +400,41 @@ struct MintSettingsRow: View {
     @Environment(WalletManager.self) private var walletManager
     
     var body: some View {
-        HStack(spacing: 8) {
+        HStack(spacing: 6) {
             // Favicon
             Group {
                 if let favicon = favicon {
                     favicon
                         .resizable()
                         .aspectRatio(contentMode: .fit)
-                        .frame(width: 32, height: 32)
+                        .frame(width: 28, height: 28)
                         .clipShape(RoundedRectangle(cornerRadius: 6))
                 } else {
                     Image(systemName: "building.columns.fill")
-                        .font(.body)
+                        .font(.footnote)
                         .foregroundColor(.orange)
-                        .frame(width: 32, height: 32)
+                        .frame(width: 28, height: 28)
                         .background(Color.orange.opacity(0.1))
                         .clipShape(RoundedRectangle(cornerRadius: 6))
                 }
             }
             
-            VStack(alignment: .leading, spacing: 2) {
+            VStack(alignment: .leading, spacing: 1) {
                 Text(mintInfo.name ?? mintInfo.url.host ?? "Unknown Mint")
-                    .font(.subheadline)
+                    .font(.footnote)
                     .fontWeight(.medium)
                 Text(mintInfo.url.host ?? mintInfo.url.absoluteString)
                     .font(.caption)
                     .foregroundColor(.secondary)
                     .lineLimit(1)
-                    .truncationMode(.tail)
+                    .truncationMode(.middle)
             }
             
-            Spacer()
+            Spacer(minLength: 2)
             
-            VStack(alignment: .trailing, spacing: 1) {
+            VStack(alignment: .trailing, spacing: 0) {
                 Text("\(balance)")
-                    .font(.subheadline)
+                    .font(.footnote)
                     .fontWeight(.semibold)
                     .foregroundColor(.orange)
                 Text("sats")
@@ -435,12 +444,13 @@ struct MintSettingsRow: View {
             
             Button(action: onDelete) {
                 Image(systemName: "xmark.circle.fill")
-                    .font(.callout)
+                    .font(.footnote)
                     .foregroundColor(.secondary)
             }
             .buttonStyle(.plain)
+            .padding(.leading, 2)
         }
-        .padding(.vertical, 2)
+        .padding(.vertical, 1)
         .task {
             await updateBalance()
             await loadFavicon()
@@ -480,17 +490,17 @@ struct RelaySettingsRow: View {
     @Environment(NostrManager.self) private var nostrManager
     
     var body: some View {
-        HStack(spacing: 8) {
+        HStack(spacing: 6) {
             // Relay Icon
-            RelayIconView(icon: relayIcon, size: 32)
+            RelayIconView(icon: relayIcon, size: 28)
             
-            VStack(alignment: .leading, spacing: 2) {
+            VStack(alignment: .leading, spacing: 1) {
                 // Use NIP-11 name if available, otherwise use hostname
                 Text(relayState?.info?.name ?? getRelayHost(relayURL) ?? "Unknown Relay")
-                    .font(.subheadline)
+                    .font(.footnote)
                     .fontWeight(.medium)
                     
-                HStack(spacing: 6) {
+                HStack(spacing: 4) {
                     Text(getRelayHost(relayURL) ?? relayURL)
                         .font(.caption)
                         .foregroundColor(.secondary)
@@ -513,12 +523,13 @@ struct RelaySettingsRow: View {
             
             Button(action: onDelete) {
                 Image(systemName: "xmark.circle.fill")
-                    .font(.callout)
+                    .font(.footnote)
                     .foregroundColor(.secondary)
             }
             .buttonStyle(.plain)
+            .padding(.leading, 2)
         }
-        .padding(.vertical, 2)
+        .padding(.vertical, 1)
         .task {
             await loadRelayInfo()
         }

@@ -14,9 +14,6 @@ struct SwapView: View {
     @State private var showSuccess = false
     @State private var transferResult: TransferResult?
     
-    // Fee estimation
-    @State private var estimatedFees: (lightningFee: Int64, inputFee: Int64, totalFee: Int64)?
-    @State private var isEstimatingFees = false
     @State private var mintBalances: [MintBalance] = []
     
     // Allocation slider
@@ -112,10 +109,8 @@ struct SwapView: View {
             } header: {
                 Text("Balance Allocation")
             } footer: {
-                if transferAmount > 0 {
-                    Text("Transfer \(transferAmount) sats from \(source.displayName) to \(destination.displayName)")
-                } else if transferAmount < 0 {
-                    Text("Transfer \(-transferAmount) sats from \(destination.displayName) to \(source.displayName)")
+                if transferAmount != 0 {
+                    Text("Transfer \(abs(transferAmount)) sats between mints")
                 } else {
                     Text("Balances are already allocated as desired")
                 }
@@ -126,73 +121,89 @@ struct SwapView: View {
     @ViewBuilder
     var mintPickerSection: some View {
         Section {
-            Picker("From Mint", selection: $sourceMint) {
-                Text("Select mint").tag(nil as MintBalance?)
-                ForEach(mintBalances.filter { $0.balance > 0 }, id: \.url) { mintBalance in
-                    MintBalancePickerRow(mintBalance: mintBalance)
-                        .tag(mintBalance as MintBalance?)
+            HStack(spacing: 16) {
+                // Source mint selector
+                Menu {
+                    ForEach(mintBalances.filter { $0.balance > 0 }, id: \.url) { mintBalance in
+                        Button(action: { sourceMint = mintBalance }) {
+                            HStack {
+                                Text(mintBalance.displayName)
+                                Spacer()
+                                Text("\(mintBalance.balance) sats")
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
+                    }
+                } label: {
+                    VStack(spacing: 8) {
+                        Circle()
+                            .fill(.orange)
+                            .frame(width: 40, height: 40)
+                            .overlay {
+                                Image(systemName: "building.columns")
+                                    .foregroundStyle(.white)
+                            }
+                        Text(sourceMint?.displayName ?? "Select Mint")
+                            .font(.caption)
+                            .lineLimit(1)
+                        if let source = sourceMint {
+                            Text("\(source.balance) sats")
+                                .font(.caption2)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                    .frame(maxWidth: .infinity)
                 }
-            }
-            
-            Button(action: swapMints) {
-                HStack {
-                    Image(systemName: "arrow.up.arrow.down")
-                    Text("Swap Direction")
+                .buttonStyle(.plain)
+                
+                // Swap button
+                Button(action: swapMints) {
+                    Image(systemName: "arrow.left.arrow.right")
+                        .font(.body)
+                        .foregroundStyle(.secondary)
                 }
-                .frame(maxWidth: .infinity)
-            }
-            .disabled(sourceMint == nil || destinationMint == nil)
-            
-            Picker("To Mint", selection: $destinationMint) {
-                Text("Select mint").tag(nil as MintBalance?)
-                ForEach(mintBalances, id: \.url) { mintBalance in
-                    MintBalancePickerRow(mintBalance: mintBalance)
-                        .tag(mintBalance as MintBalance?)
+                .disabled(sourceMint == nil || destinationMint == nil)
+                
+                // Destination mint selector
+                Menu {
+                    ForEach(mintBalances, id: \.url) { mintBalance in
+                        Button(action: { destinationMint = mintBalance }) {
+                            HStack {
+                                Text(mintBalance.displayName)
+                                Spacer()
+                                Text("\(mintBalance.balance) sats")
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
+                    }
+                } label: {
+                    VStack(spacing: 8) {
+                        Circle()
+                            .fill(.blue)
+                            .frame(width: 40, height: 40)
+                            .overlay {
+                                Image(systemName: "building.columns")
+                                    .foregroundStyle(.white)
+                            }
+                        Text(destinationMint?.displayName ?? "Select Mint")
+                            .font(.caption)
+                            .lineLimit(1)
+                        if let destination = destinationMint {
+                            Text("\(destination.balance) sats")
+                                .font(.caption2)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                    .frame(maxWidth: .infinity)
                 }
+                .buttonStyle(.plain)
             }
+            .padding(.vertical, 8)
         } header: {
             Text("Select Mints")
-        } footer: {
-            Text("Only mints with available balance are shown as source options")
         }
     }
     
-    @ViewBuilder
-    var feesSection: some View {
-        if let fees = estimatedFees {
-            Section {
-                HStack {
-                    Text("Lightning Fee")
-                    Spacer()
-                    Text("\(fees.lightningFee) sats")
-                        .foregroundStyle(.secondary)
-                }
-                HStack {
-                    Text("Input Fee")
-                    Spacer()
-                    Text("\(fees.inputFee) sats")
-                        .foregroundStyle(.secondary)
-                }
-                HStack {
-                    Text("Total Fee")
-                    Spacer()
-                    Text("\(fees.totalFee) sats")
-                        .fontWeight(.medium)
-                }
-                HStack {
-                    Text("You'll Receive")
-                    Spacer()
-                    Text("\(max(0, abs(transferAmount) - fees.totalFee)) sats")
-                        .fontWeight(.bold)
-                        .foregroundStyle(.orange)
-                }
-            } header: {
-                Text("Estimated Fees")
-            } footer: {
-                Text("Actual fees may vary slightly")
-            }
-        }
-    }
     
     @ViewBuilder
     var actionSection: some View {
@@ -214,7 +225,6 @@ struct SwapView: View {
         Form {
             mintPickerSection
             allocationSection
-            feesSection
             actionSection
         }
         .navigationTitle("Balance Reconcile")
@@ -238,14 +248,9 @@ struct SwapView: View {
         }
         .onChange(of: sourceMint) { _, _ in
             updateAllocationPercentage()
-            estimateFees()
         }
         .onChange(of: destinationMint) { _, _ in
             updateAllocationPercentage()
-            estimateFees()
-        }
-        .onChange(of: allocationPercentage) { _, _ in
-            estimateFees()
         }
         .onAppear {
             loadMintBalances()
@@ -267,37 +272,6 @@ struct SwapView: View {
         }
     }
     
-    private func estimateFees() {
-        guard abs(transferAmount) > 0,
-              let source = sourceMint,
-              let destination = destinationMint,
-              source.url != destination.url else {
-            estimatedFees = nil
-            return
-        }
-        
-        isEstimatingFees = true
-        
-        Task {
-            do {
-                let fees = try await walletManager.estimateTransferFees(
-                    amount: abs(transferAmount),
-                    fromMint: source.url,
-                    toMint: destination.url
-                )
-                
-                await MainActor.run {
-                    estimatedFees = fees
-                    isEstimatingFees = false
-                }
-            } catch {
-                await MainActor.run {
-                    estimatedFees = nil
-                    isEstimatingFees = false
-                }
-            }
-        }
-    }
     
     private func performSwap() {
         guard canSwap else { return }
@@ -369,32 +343,3 @@ struct MintBalance: Hashable {
     }
 }
 
-// MARK: - Helper Views
-struct MintBalancePickerRow: View {
-    let mintBalance: MintBalance
-    
-    var body: some View {
-        HStack {
-            Text(mintBalance.displayName)
-            Spacer()
-            Text("\(mintBalance.balance) sats")
-                .font(.caption)
-                .foregroundStyle(.secondary)
-        }
-    }
-}
-
-struct MintPickerRow: View {
-    let mint: MintInfo
-    let balance: Int
-    
-    var body: some View {
-        HStack {
-            Text(mint.url.host ?? mint.url.absoluteString)
-            Spacer()
-            Text("\(balance) sats")
-                .font(.caption)
-                .foregroundStyle(.secondary)
-        }
-    }
-}

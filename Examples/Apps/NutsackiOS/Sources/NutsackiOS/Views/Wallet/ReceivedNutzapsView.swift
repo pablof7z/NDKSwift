@@ -293,7 +293,7 @@ struct NutzapRow: View {
                 }
                 
                 // Timestamp
-                Text(relativeTime(from: Date(timeIntervalSince1970: TimeInterval(nutzap.createdAt))))
+                RelativeTimeView(date: Date(timeIntervalSince1970: TimeInterval(nutzap.createdAt)))
                     .font(.caption2)
                     .foregroundColor(.secondary)
                 
@@ -331,12 +331,6 @@ struct NutzapRow: View {
             }
         }
         .padding(.vertical, 2)
-    }
-    
-    private func relativeTime(from date: Date) -> String {
-        let formatter = RelativeDateTimeFormatter()
-        formatter.unitsStyle = .abbreviated
-        return formatter.localizedString(for: date, relativeTo: Date())
     }
 }
 
