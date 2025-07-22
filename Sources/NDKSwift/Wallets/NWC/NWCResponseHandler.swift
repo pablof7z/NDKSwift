@@ -16,7 +16,7 @@ public struct NWCResponseHandler {
     public func executeRequestAndWaitForResponse<T: Decodable>(
         event: NDKEvent,
         responseType: T.Type,
-        timeout: TimeInterval = 30
+        timeout: TimeInterval = NetworkConstants.timeoutStandardRequest
     ) async throws -> T {
         let requestId = event.id
         
@@ -142,7 +142,7 @@ public struct NWCResponseHandler {
         requestId: String,
         responseType: T.Type,
         expectedCount: Int,
-        timeout: TimeInterval = 30
+        timeout: TimeInterval = NetworkConstants.timeoutStandardRequest
     ) async throws -> [String: Result<T, NDKError>] {
         // Create filter for responses with this request ID
         var filter = NDKFilter()

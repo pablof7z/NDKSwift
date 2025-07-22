@@ -115,7 +115,7 @@ actor RelayStateActor {
     var connection: NDKRelayConnection?
     var reconnectTask: Task<Void, Never>?
     var reconnectDelay: TimeInterval = 1.0
-    let maxReconnectDelay: TimeInterval = 300.0 // 5 minutes
+    let maxReconnectDelay: TimeInterval = NetworkConstants.timeoutResource // 5 minutes
     var manuallyDisconnected: Bool = false
     
     // MARK: - Connection State

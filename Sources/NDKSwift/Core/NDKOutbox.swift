@@ -69,7 +69,7 @@ public struct NDKOutboxConfig {
         defaultFetchConfig: OutboxFetchConfig = .default,
         defaultSubscriptionConfig: OutboxSubscriptionConfig = .default,
         autoRetryFailedPublishes: Bool = true,
-        retryInterval: TimeInterval = 300
+        retryInterval: TimeInterval = NetworkConstants.timeoutResource
     ) {
         self.blacklistedRelays = blacklistedRelays
         self.outboxRelays = outboxRelays
