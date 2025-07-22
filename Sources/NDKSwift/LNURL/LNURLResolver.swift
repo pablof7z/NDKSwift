@@ -58,7 +58,7 @@ public class LNURLResolver: LNURLResolving {
         }
         
         // Try to decode as bech32 LNURL
-        if input.lowercased().hasPrefix("lnurl") {
+        if input.lowercased().hasPrefix(Bech32HRP.lnurl) {
             return try decodeLNURL(input)
         }
         

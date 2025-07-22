@@ -658,21 +658,21 @@ public final class NDK {
         do {
             let authEvent = try await self.event()
                 .kind(EventKind.clientAuthentication)
-                .tag(["challenge", challenge])
-                .tag(["relay", relay.url])
+                .tag([NostrTagConstants.TagName.challenge, challenge])
+                .tag([NostrTagConstants.TagName.relay, relay.url])
                 .build(signer: signer)
             
             // Create auth message manually for now
             let eventDict: [String: Any] = [
-                "id": authEvent.id,
-                "pubkey": authEvent.pubkey,
-                "created_at": authEvent.createdAt,
-                "kind": authEvent.kind,
-                "tags": authEvent.tags,
-                "content": authEvent.content,
-                "sig": authEvent.sig
+                NostrJSONConstants.EventField.id: authEvent.id,
+                NostrJSONConstants.EventField.pubkey: authEvent.pubkey,
+                NostrJSONConstants.EventField.createdAt: authEvent.createdAt,
+                NostrJSONConstants.EventField.kind: authEvent.kind,
+                NostrJSONConstants.EventField.tags: authEvent.tags,
+                NostrJSONConstants.EventField.content: authEvent.content,
+                NostrJSONConstants.EventField.sig: authEvent.sig
             ]
-            let authMessage: [Any] = ["AUTH", eventDict]
+            let authMessage: [Any] = [NostrJSONConstants.MessageType.auth, eventDict]
             let jsonData = try JSONSerialization.data(withJSONObject: authMessage, options: [.withoutEscapingSlashes])
             let jsonString = String(data: jsonData, encoding: .utf8) ?? ""
             try await relay.send(jsonString)

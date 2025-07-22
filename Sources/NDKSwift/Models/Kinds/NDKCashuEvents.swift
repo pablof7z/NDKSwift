@@ -218,9 +218,9 @@ public struct NDKCashuWalletEvent {
         
         // Add mint tags
         for mint in mints {
-            walletTags.append(["mint", mint])
+            walletTags.append([NostrTagConstants.TagName.mint, mint])
         }
-        NDKLogger.log(.debug, category: .event, "🔐 NDKCashuWalletEvent - Added mint tags: \(walletTags.filter { $0[0] == "mint" })")
+        NDKLogger.log(.debug, category: .event, "🔐 NDKCashuWalletEvent - Added mint tags: \(walletTags.filter { $0[0] == NostrTagConstants.TagName.mint })")
         
         // Add P2PK private key if provided
         if let privkey = p2pkPrivateKey {
@@ -262,7 +262,7 @@ public struct NDKCashuWalletEvent {
     public func mints(signer: NDKSigner) async throws -> [String] {
         let tags = try await decryptedTags(signer: signer)
         let mintURLs = tags
-            .filter { $0.first == "mint" && $0.count > 1 }
+            .filter { $0.first == NostrTagConstants.TagName.mint && $0.count > 1 }
             .map { $0[1] }
         return mintURLs
     }
@@ -366,7 +366,7 @@ public struct NDKCashuWalletBackupEvent {
         
         // Add mint tags
         for mint in mints {
-            walletTags.append(["mint", mint])
+            walletTags.append([NostrTagConstants.TagName.mint, mint])
         }
         
         // Add P2PK private key if provided
@@ -498,7 +498,7 @@ public struct NDKCashuSpendingHistory {
     ) async throws -> NDKCashuSpendingHistory {
         var encryptedTags: [[String]] = []
         encryptedTags.append(["direction", direction.rawValue])
-        encryptedTags.append(["amount", String(amount)])
+        encryptedTags.append([NostrTagConstants.TagName.amount, String(amount)])
         
         if let memo = memo {
             encryptedTags.append(["memo", memo])
@@ -586,7 +586,7 @@ public struct NDKCashuMintList: NDKPublishableEvent {
         
         // Add mint tags
         for mint in mints {
-            _ = builder.tag(["mint", mint])
+            _ = builder.tag([NostrTagConstants.TagName.mint, mint])
         }
         
         // Add P2PK pubkey tag if provided (required for nutzaps per NIP-61)
@@ -609,7 +609,7 @@ public struct NDKCashuMintList: NDKPublishableEvent {
     /// The mints advertised in this mint list event
     public var mints: [String] {
         event.tags
-            .filter { $0.first == "mint" && $0.count > 1 }
+            .filter { $0.first == NostrTagConstants.TagName.mint && $0.count > 1 }
             .map { $0[1] }
     }
 }
@@ -822,14 +822,14 @@ public struct NDKNutzapEvent {
         _ = builder.tag(["u", mintURL])
         
         // Add amount tag
-        _ = builder.tag(["amount", String(totalAmount)])
+        _ = builder.tag([NostrTagConstants.TagName.amount, String(totalAmount)])
         
         // Add unit tag (hardcoded to "sat")
-        _ = builder.tag(["unit", "sat"])
+        _ = builder.tag([NostrTagConstants.TagName.unit, "sat"])
         
         for proof in proofs {
             let proofJSON = try JSONCoding.encodeToString(proof)
-            _ = builder.tag(["proof", proofJSON])
+            _ = builder.tag([NostrTagConstants.TagName.proof, proofJSON])
         }
         
         let nutzapEvent = try await builder.build(signer: signer)

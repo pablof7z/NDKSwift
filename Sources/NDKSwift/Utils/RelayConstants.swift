@@ -2,6 +2,25 @@
 /// Centralized constants for commonly used Nostr relay URLs
 public enum RelayConstants {
     
+    // MARK: - WebSocket Schemes
+    
+    /// WebSocket scheme constants
+    public enum WebSocketScheme {
+        /// Secure WebSocket scheme
+        public static let secure = "wss://"
+        
+        /// Insecure WebSocket scheme
+        public static let insecure = "ws://"
+        
+        /// Check if a URL string uses WebSocket scheme
+        /// - Parameter url: The URL string to check
+        /// - Returns: true if the URL starts with ws:// or wss://
+        public static func isWebSocketURL(_ url: String) -> Bool {
+            let lowercased = url.lowercased()
+            return lowercased.hasPrefix(secure) || lowercased.hasPrefix(insecure)
+        }
+    }
+    
     // MARK: - Popular Public Relays
     
     /// Damus relay - One of the most popular Nostr relays

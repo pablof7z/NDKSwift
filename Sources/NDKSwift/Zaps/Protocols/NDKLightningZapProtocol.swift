@@ -236,11 +236,11 @@ public class NDKLightningZapProtocol: NDKZapProtocol {
                 throw ZapError.invalidLNURL("Failed to construct LNURL")
             }
             url = lnurlURL
-        } else if lnurlString.lowercased().starts(with: "lnurl") {
+        } else if lnurlString.lowercased().starts(with: Bech32HRP.lnurl) {
             // Decode bech32 LNURL
             do {
                 let decoded = try Bech32.decode(lnurlString)
-                guard decoded.hrp == "lnurl" else {
+                guard decoded.hrp == Bech32HRP.lnurl else {
                     throw ZapError.invalidLNURL("Invalid LNURL bech32 format")
                 }
                 

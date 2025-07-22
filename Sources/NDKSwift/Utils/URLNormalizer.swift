@@ -26,9 +26,9 @@ public enum URLNormalizer {
         }
 
         // Ensure proper protocol
-        if !normalized.lowercased().hasPrefix("ws://") && !normalized.lowercased().hasPrefix("wss://") {
+        if !RelayConstants.WebSocketScheme.isWebSocketURL(normalized) {
             // Default to wss:// for security
-            normalized = "wss://\(normalized)"
+            normalized = "\(RelayConstants.WebSocketScheme.secure)\(normalized)"
         }
 
         // Parse URL to ensure validity and perform normalization

@@ -166,13 +166,13 @@ public extension Bech32 {
         } catch {
             throw NDKError.validationError("Invalid bech32 data")
         }
-        return try encode(hrp: "npub", data: Array(data))
+        return try encode(hrp: Bech32HRP.npub, data: Array(data))
     }
 
     /// Decode npub to public key
     static func pubkey(from npub: String) throws -> PublicKey {
         let (hrp, data) = try decode(npub)
-        guard hrp == "npub" else {
+        guard hrp == Bech32HRP.npub else {
             throw NDKError.validationError("Invalid bech32: no separator found")
         }
         return Data(data).hexString
@@ -192,13 +192,13 @@ public extension Bech32 {
             throw NDKError.validationError("Invalid bech32 data")
         }
 
-        return try encode(hrp: "nsec", data: Array(data))
+        return try encode(hrp: Bech32HRP.nsec, data: Array(data))
     }
 
     /// Decode nsec to private key
     static func privateKey(from nsec: String) throws -> PrivateKey {
         let (hrp, data) = try decode(nsec)
-        guard hrp == "nsec" else {
+        guard hrp == Bech32HRP.nsec else {
             throw NDKError.validationError("Invalid bech32: no separator found")
         }
         return Data(data).hexString
@@ -212,13 +212,13 @@ public extension Bech32 {
         } catch {
             throw NDKError.validationError("Invalid bech32 data")
         }
-        return try encode(hrp: "note", data: Array(data))
+        return try encode(hrp: Bech32HRP.note, data: Array(data))
     }
 
     /// Decode note to event ID
     static func eventId(from note: String) throws -> EventID {
         let (hrp, data) = try decode(note)
-        guard hrp == "note" else {
+        guard hrp == Bech32HRP.note else {
             throw NDKError.validationError("Invalid bech32: no separator found")
         }
         return Data(data).hexString
@@ -270,7 +270,7 @@ public extension Bech32 {
             tlvData.append(contentsOf: kindBytes)
         }
 
-        return try encode(hrp: "nevent", data: tlvData)
+        return try encode(hrp: Bech32HRP.nevent, data: tlvData)
     }
 
     /// Encode addressable event to naddr format
@@ -316,6 +316,6 @@ public extension Bech32 {
         tlvData.append(UInt8(kindBytes.count))
         tlvData.append(contentsOf: kindBytes)
 
-        return try encode(hrp: "naddr", data: tlvData)
+        return try encode(hrp: Bech32HRP.naddr, data: tlvData)
     }
 }

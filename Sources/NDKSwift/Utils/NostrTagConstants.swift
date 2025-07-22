@@ -50,6 +50,24 @@ public enum NostrTagConstants {
         /// Preimage tag ("preimage") - for Lightning payment preimages
         public static let preimage = "preimage"
         
+        /// Challenge tag ("challenge") - for authentication challenges
+        public static let challenge = "challenge"
+        
+        /// Relay tag ("relay") - for relay hints
+        public static let relay = "relay"
+        
+        /// LNURL tag ("lnurl") - for Lightning URL
+        public static let lnurl = "lnurl"
+        
+        /// Proof tag ("proof") - for proof of work or payment
+        public static let proof = "proof"
+        
+        /// Mint tag ("mint") - for Cashu mint URLs
+        public static let mint = "mint"
+        
+        /// Unit tag ("unit") - for currency units
+        public static let unit = "unit"
+        
         // MARK: - Uppercase Tags (used in comments and split zaps)
         
         /// Uppercase pubkey tag ("P") - used for split zaps and comment threads
