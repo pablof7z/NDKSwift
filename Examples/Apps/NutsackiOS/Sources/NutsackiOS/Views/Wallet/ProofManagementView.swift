@@ -248,17 +248,24 @@ struct ProofManagementView: View {
                 .filter { selectedProofs.contains($0.proof.C) }
                 .map { $0.proof }
             
-            // For now, just mark the proofs as deleted in the state manager
-            // In a real implementation, we would need to:
-            // 1. Group proofs by their owner events
-            // 2. Create new token events that exclude the deleted proofs
-            // 3. Add del tags to supersede the old events
+            // Group proofs by mint
+            var proofsByMint: [String: [CashuSwift.Proof]] = [:]
+            for entry in allProofEntries where selectedProofs.contains(entry.proof.C) {
+                proofsByMint[entry.mint, default: []].append(entry.proof)
+            }
             
-            // This is a simplified implementation that just marks proofs as deleted
-            // The next token event update will properly handle creating new events
-            
-            // Mark the deleted proofs as deleted in the state manager
-            await wallet.proofStateManager.markProofsAsDeleted(proofsToDelete)
+            // Create wallet state change for each mint
+            for (mint, proofs) in proofsByMint {
+                let stateChange = WalletStateChange(
+                    store: [],
+                    destroy: proofs,
+                    mint: mint,
+                    memo: "Manual proof deletion"
+                )
+                
+                // Use the wallet's update method which properly creates token events with del tags
+                _ = try await wallet.update(stateChange: stateChange)
+            }
             
             // Reload proofs
             await loadAllProofs()

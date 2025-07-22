@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- Relay health monitoring now correctly uses wallet-configured relays from kind 17375 events
+  - Previously checked all NDK pool relays instead of wallet-specific ones
+  - `getRelayHealth()` and `checkWalletHealth()` now use `walletRelays` property
+  - Ensures accurate health reporting for relays that should contain wallet state
+  - NutsackiOS: Added "Relay Health" menu item to access the monitoring UI
+
 ## [0.4.2] - 2025-07-21
 
 ### Fixed
