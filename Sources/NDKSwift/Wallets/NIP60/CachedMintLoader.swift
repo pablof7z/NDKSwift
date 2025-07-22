@@ -5,10 +5,10 @@ import CashuSwift
 
 public enum CacheConstants {
     /// Default max age for mint info (24 hours)
-    public static let defaultMintInfoMaxAge: TimeInterval = 86400
+    public static let defaultMintInfoMaxAge: TimeInterval = TimeConstants.mintInfoCacheTTL
     
     /// Default max age for keysets (1 hour)
-    public static let defaultKeysetMaxAge: TimeInterval = 3600
+    public static let defaultKeysetMaxAge: TimeInterval = TimeConstants.keysetsCacheTTL
 }
 
 /// A simple wrapper that provides mint caching with automatic refresh

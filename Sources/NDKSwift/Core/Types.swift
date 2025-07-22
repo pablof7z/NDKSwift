@@ -17,12 +17,46 @@ public typealias Timestamp = Int64
 
 // MARK: - Time Constants
 
-/// Constants for time conversion
+/// Constants for time conversion and common intervals
 public enum TimeConstants {
     /// Nanoseconds per second (for Task.sleep conversion)
     public static let nanosecondsPerSecond: UInt64 = 1_000_000_000
     /// Nanoseconds per millisecond (for Task.sleep conversion)
     public static let nanosecondsPerMillisecond: UInt64 = 1_000_000
+    
+    // MARK: - Common Time Intervals
+    
+    /// One minute in seconds
+    public static let minute: TimeInterval = 60
+    
+    /// One hour in seconds
+    public static let hour: TimeInterval = 60 * 60
+    
+    /// One day in seconds
+    public static let day: TimeInterval = 24 * 60 * 60
+    
+    /// One week in seconds
+    public static let week: TimeInterval = 7 * 24 * 60 * 60
+    
+    // MARK: - Cache TTLs
+    
+    /// Default cache TTL for profiles and metadata (1 hour)
+    public static let defaultCacheTTL: TimeInterval = hour
+    
+    /// Default TTL for NIP-05 verification cache (24 hours)
+    public static let nip05CacheTTL: TimeInterval = day
+    
+    /// Default TTL for relay list cache (24 hours)
+    public static let relayListCacheTTL: TimeInterval = day
+    
+    /// Default TTL for unpublished events retry window (1 hour)
+    public static let unpublishedEventRetryWindow: TimeInterval = hour
+    
+    /// Default TTL for mint info cache (24 hours)
+    public static let mintInfoCacheTTL: TimeInterval = day
+    
+    /// Default TTL for keysets cache (1 hour)
+    public static let keysetsCacheTTL: TimeInterval = hour
 }
 
 // MARK: - Timestamp utilities

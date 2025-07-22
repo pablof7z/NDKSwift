@@ -10,7 +10,7 @@ public struct NDKProfileConfig {
     
     public init(
         cacheSize: Int = 1000,
-        staleAfter: TimeInterval = 3600 // 1 hour
+        staleAfter: TimeInterval = TimeConstants.hour
     ) {
         self.cacheSize = cacheSize
         self.staleAfter = staleAfter
