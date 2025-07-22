@@ -213,7 +213,7 @@ public actor Negentropy {
         var skip = false
         
         while input.hasMore {
-            print("[Negentropy] Processing next bound, bytes remaining: \(input.remaining)")
+            NDKLogger.log(.trace, category: .sync, "[Negentropy] Processing next bound, bytes remaining: \(input.remaining)")
             var output = Data()
             
             let doSkip = { [self] in
@@ -228,19 +228,19 @@ public actor Negentropy {
             do {
                 currBound = try decodeBound(&input)
             } catch {
-                print("[Negentropy] Failed to decode bound: \(error), remaining bytes: \(input.remaining)")
+                NDKLogger.log(.error, category: .sync, "[Negentropy] Failed to decode bound: \(error), remaining bytes: \(input.remaining)")
                 throw error
             }
             
             guard let mode = decodeVarint(&input) else {
-                print("[Negentropy] Failed to decode mode, remaining bytes: \(input.remaining)")
+                NDKLogger.log(.error, category: .sync, "[Negentropy] Failed to decode mode, remaining bytes: \(input.remaining)")
                 throw NegentropyError.decodingError
             }
             
             let lower = prevIndex
             let upper = try await storage.findLowerBound(prevIndex, storageSize, currBound)
             
-            print("[Negentropy] Processing bound: timestamp=\(currBound.timestamp), id=\(currBound.id.hexString), mode=\(mode), lower=\(lower), upper=\(upper), storageSize=\(storageSize)")
+            NDKLogger.log(.trace, category: .sync, "[Negentropy] Processing bound: timestamp=\(currBound.timestamp), id=\(currBound.id.hexString), mode=\(mode), lower=\(lower), upper=\(upper), storageSize=\(storageSize)")
             
             if mode == NegentropyMode.skip {
                 skip = true
@@ -262,7 +262,7 @@ public actor Negentropy {
                     throw NegentropyError.decodingError
                 }
                 
-                print("[Negentropy] Received ID list with \(numIds) IDs (isInitiator=\(isInitiator))")
+                NDKLogger.log(.debug, category: .sync, "[Negentropy] Received ID list with \(numIds) IDs (isInitiator=\(isInitiator))")
                 
                 var theirIds = Set<Data>()
                 for i in 0..<numIds {
@@ -270,7 +270,7 @@ public actor Negentropy {
                         throw NegentropyError.decodingError
                     }
                     theirIds.insert(id)
-                    print("[Negentropy] ID \(i): \(id.hexString)")
+                    NDKLogger.log(.trace, category: .sync, "[Negentropy] ID \(i): \(id.hexString)")
                 }
                 
                 if isInitiator {
@@ -291,7 +291,7 @@ public actor Negentropy {
                         needIds.append(id.hexString)
                     }
                     
-                    print("[Negentropy] After ID list: have \(haveIds.count) to send, need \(needIds.count) to receive")
+                    NDKLogger.log(.debug, category: .sync, "[Negentropy] After ID list: have \(haveIds.count) to send, need \(needIds.count) to receive")
                 } else {
                     doSkip()
                     
@@ -344,9 +344,9 @@ public actor Negentropy {
         let finalOutput = (fullOutput.count == 1 && haveIds.isEmpty && needIds.isEmpty) ? nil : fullOutput
         
         if let output = finalOutput {
-            print("[Negentropy] Sending response: \(output.hexString)")
+            NDKLogger.log(.trace, category: .sync, "[Negentropy] Sending response: \(output.hexString)")
         } else {
-            print("[Negentropy] No response to send (reconciliation complete)")
+            NDKLogger.log(.debug, category: .sync, "[Negentropy] No response to send (reconciliation complete)")
         }
         
         return (finalOutput, haveIds, needIds)
@@ -494,19 +494,19 @@ public actor Negentropy {
     private func decodeBound(_ input: inout DataReader) throws -> NegentropyBound {
         let timestamp = try decodeTimestampIn(&input)
         guard let len = decodeVarint(&input) else {
-            print("[Negentropy] decodeBound: Failed to decode length")
+            NDKLogger.log(.error, category: .sync, "[Negentropy] decodeBound: Failed to decode length")
             throw NegentropyError.decodingError
         }
         
-        print("[Negentropy] decodeBound: timestamp=\(timestamp), id_length=\(len)")
+        NDKLogger.log(.trace, category: .sync, "[Negentropy] decodeBound: timestamp=\(timestamp), id_length=\(len)")
         
         if len > NegentropyConstants.idSize {
-            print("[Negentropy] decodeBound: ID length \(len) exceeds maximum \(NegentropyConstants.idSize)")
+            NDKLogger.log(.error, category: .sync, "[Negentropy] decodeBound: ID length \(len) exceeds maximum \(NegentropyConstants.idSize)")
             throw NegentropyError.decodingError
         }
         
         guard let id = input.readBytes(Int(len)) else {
-            print("[Negentropy] decodeBound: Failed to read \(len) bytes for ID, only \(input.remaining) bytes remaining")
+            NDKLogger.log(.error, category: .sync, "[Negentropy] decodeBound: Failed to read \(len) bytes for ID, only \(input.remaining) bytes remaining")
             throw NegentropyError.decodingError
         }
         return NegentropyBound(timestamp: timestamp, id: id)

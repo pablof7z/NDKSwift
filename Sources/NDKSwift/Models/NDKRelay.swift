@@ -677,7 +677,6 @@ public final class NDKRelay: RelayProtocol, Hashable, Equatable, @unchecked Send
                 await ndk.processEvent(event, subscriptionId: subId, from: self)
             }
         } else {
-            print("🔍 [NDKRelay] Cannot route event - ndk: \(ndk != nil), subId: \(subscriptionId != nil)")
             NDKLogger.log(.warning, category: .relay, "⚠️ Cannot route event - ndk: \(ndk != nil), subId: \(subscriptionId != nil)")
         }
     }
@@ -688,7 +687,6 @@ public final class NDKRelay: RelayProtocol, Hashable, Equatable, @unchecked Send
         if let ndk = ndk {
             ndk.processEOSE(subscriptionId: subscriptionId, from: self)
         } else {
-            print("🔍 [NDKRelay] Cannot process EOSE - no NDK instance")
             NDKLogger.log(.warning, category: .relay, "⚠️ Cannot process EOSE - no NDK instance")
         }
     }

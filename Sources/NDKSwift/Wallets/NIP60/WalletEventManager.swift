@@ -37,9 +37,9 @@ public actor WalletEventManager {
         proofStateManager: ProofStateManager,
         signer: NDKSigner
     ) async throws -> [String] {
-        print("\n=== WalletEventManager.updateTokenEvents START ===")
-        print("Tokens to delete: \(tokenChange.deletedTokenIds)")
-        print("Proofs to save: \(tokenChange.saveProofs.count)")
+        NDKLogger.log(.debug, category: .wallet, "=== WalletEventManager.updateTokenEvents START ===")
+        NDKLogger.log(.debug, category: .wallet, "Tokens to delete: \(tokenChange.deletedTokenIds)")
+        NDKLogger.log(.debug, category: .wallet, "Proofs to save: \(tokenChange.saveProofs.count)")
         
         var newEventIds = Set<String>()
         
@@ -68,7 +68,7 @@ public actor WalletEventManager {
                     do {
                         try await self.createDeleteEvent(eventId: tokenId, signer: signer)
                     } catch {
-                        print("⚠️ Failed to create Kind 5 deletion event for \(tokenId)")
+                        NDKLogger.log(.warning, category: .wallet, "⚠️ Failed to create Kind 5 deletion event for \(tokenId): \(error)")
                     }
                 }
             }
@@ -110,7 +110,7 @@ public actor WalletEventManager {
         // Update tracking
         currentTokenEventIds = newEventIds
         
-        print("=== WalletEventManager.updateTokenEvents END ===\n")
+        NDKLogger.log(.debug, category: .wallet, "=== WalletEventManager.updateTokenEvents END ===")
         return Array(newEventIds)
     }
     
@@ -149,7 +149,7 @@ public actor WalletEventManager {
         }
         
         deletedTokenEventIds.insert(eventId)
-        print("WalletEventManager - Created delete event for token: \(eventId)")
+        NDKLogger.log(.debug, category: .wallet, "WalletEventManager - Created delete event for token: \(eventId)")
     }
     
     // MARK: - Quote Event Management
@@ -184,7 +184,7 @@ public actor WalletEventManager {
             try await quoteEvent.delete(reason: "Quote expired or used", signer: signer, ndk: ndk)
         }
         
-        print("WalletEventManager - Deleted quote event: \(eventId)")
+        NDKLogger.log(.debug, category: .wallet, "WalletEventManager - Deleted quote event: \(eventId)")
     }
     
     // MARK: - Spending History
@@ -259,8 +259,10 @@ public actor WalletEventManager {
     
     /// Track a nutzap event
     public func trackNutzap(_ event: NDKEvent) {
-        // Extract amount from proof tags
+        // Extract amount and mint from proof tags
         var totalAmount: Int64 = 0
+        var mint = ""
+        
         for tag in event.tags {
             if tag.count >= 2 && tag[0] == "proof" {
                 if let proofData = tag[1].data(using: .utf8),
@@ -268,24 +270,34 @@ public actor WalletEventManager {
                     totalAmount += Int64(proof.amount)
                 }
             }
+            // Extract mint from tags
+            if tag.count >= 2 && tag[0] == "u" {
+                mint = tag[1]
+            }
         }
+        
+        // Determine initial status based on whether it was already redeemed
+        let status: NutzapRedemptionStatus = redeemedNutzaps.contains(event.id) 
+            ? .redeemed(at: event.createdAt, proofsCount: 0) 
+            : .pending
         
         nutzapEvents[event.id] = NutzapInfo(
             eventId: event.id,
+            event: event,
             sender: event.pubkey,
             amount: totalAmount,
             comment: event.content.isEmpty ? nil : event.content,
             createdAt: event.createdAt,
-            isRedeemed: redeemedNutzaps.contains(event.id)
+            mint: mint,
+            status: status
         )
     }
     
     /// Mark a nutzap as redeemed
-    public func markNutzapRedeemed(_ eventId: String) {
+    public func markNutzapRedeemed(_ eventId: String, proofsCount: Int = 0) {
         redeemedNutzaps.insert(eventId)
         if var info = nutzapEvents[eventId] {
-            info.isRedeemed = true
-            info.redeemedAt = Timestamp.now
+            info.status = .redeemed(at: Timestamp.now, proofsCount: proofsCount)
             nutzapEvents[eventId] = info
         }
     }
@@ -319,27 +331,121 @@ public actor WalletEventManager {
         nutzapEvents.removeAll()
         redeemedNutzaps.removeAll()
     }
+    
+    /// Update nutzap status
+    public func updateNutzapStatus(_ eventId: String, status: NutzapRedemptionStatus) {
+        if var info = nutzapEvents[eventId] {
+            info.status = status
+            // Update redeemed set if needed
+            if case .redeemed = status {
+                redeemedNutzaps.insert(eventId)
+            }
+            nutzapEvents[eventId] = info
+        }
+    }
+    
+    /// Update nutzap redemption attempt timestamp
+    public func updateNutzapAttemptTimestamp(_ eventId: String) {
+        if var info = nutzapEvents[eventId] {
+            info.latestRedemptionAttemptTimestamp = Timestamp.now
+            nutzapEvents[eventId] = info
+        }
+    }
+    
+    /// Get specific nutzap info
+    public func getNutzapInfo(_ eventId: String) -> NutzapInfo? {
+        return nutzapEvents[eventId]
+    }
+    
+    /// Get nutzaps by status filter
+    public func getNutzapsByStatus(_ filter: NutzapStatusFilter) -> [NutzapInfo] {
+        let filtered: [NutzapInfo]
+        
+        switch filter {
+        case .all:
+            filtered = Array(nutzapEvents.values)
+        case .pending:
+            filtered = nutzapEvents.values.filter { nutzap in
+                if case .pending = nutzap.status { return true }
+                return false
+            }
+        case .redeemed:
+            filtered = nutzapEvents.values.filter { nutzap in
+                if case .redeemed = nutzap.status { return true }
+                return false
+            }
+        case .failed:
+            filtered = nutzapEvents.values.filter { nutzap in
+                if case .failed = nutzap.status { return true }
+                return false
+            }
+        case .retryableFailed:
+            filtered = nutzapEvents.values.filter { nutzap in
+                if case .failed(let error, _, _) = nutzap.status {
+                    return error.isRetryable
+                }
+                return false
+            }
+        }
+        
+        return filtered.sorted { $0.createdAt > $1.createdAt }
+    }
+    
+    /// Get failed nutzaps
+    public func getFailedNutzaps() -> [NutzapInfo] {
+        return getNutzapsByStatus(.failed)
+    }
 }
 
 // MARK: - NutzapInfo
 
-/// Information about a nutzap event
-public struct NutzapInfo: Sendable {
+/// Information about a nutzap event with enhanced status tracking
+public struct NutzapInfo: Sendable, Codable {
     public let eventId: String
+    public let event: NDKEvent // Store full event for retries
     public let sender: String
     public let amount: Int64
     public let comment: String?
     public let createdAt: Timestamp
-    public var isRedeemed: Bool
-    public var redeemedAt: Timestamp?
+    public let mint: String
+    public var status: NutzapRedemptionStatus
+    public var latestRedemptionAttemptTimestamp: Timestamp?
     
-    public init(eventId: String, sender: String, amount: Int64, comment: String?, createdAt: Timestamp, isRedeemed: Bool, redeemedAt: Timestamp? = nil) {
+    public init(
+        eventId: String,
+        event: NDKEvent,
+        sender: String,
+        amount: Int64,
+        comment: String?,
+        createdAt: Timestamp,
+        mint: String,
+        status: NutzapRedemptionStatus = .pending,
+        latestRedemptionAttemptTimestamp: Timestamp? = nil
+    ) {
         self.eventId = eventId
+        self.event = event
         self.sender = sender
         self.amount = amount
         self.comment = comment
         self.createdAt = createdAt
-        self.isRedeemed = isRedeemed
-        self.redeemedAt = redeemedAt
+        self.mint = mint
+        self.status = status
+        self.latestRedemptionAttemptTimestamp = latestRedemptionAttemptTimestamp
+    }
+    
+    // For backward compatibility
+    public var isRedeemed: Bool {
+        if case .redeemed = status {
+            return true
+        }
+        return false
+    }
+    
+    // For backward compatibility
+    public var redeemedAt: Timestamp? {
+        if case .redeemed(let at, _) = status {
+            return at
+        }
+        return nil
     }
 }
