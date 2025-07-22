@@ -26,4 +26,6 @@ Examples/NutsackiOS/.build/
 
 **/.build
 **/build
-test_output.log
+
+# Log files
+*.log
