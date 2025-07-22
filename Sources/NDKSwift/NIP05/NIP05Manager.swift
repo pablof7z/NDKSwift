@@ -313,7 +313,7 @@ public actor NIP05Manager {
         // Perform network request
         var request = URLRequest(url: url)
         request.timeoutInterval = NetworkConstants.timeoutRelayInfo
-        request.setValue("NDKSwift", forHTTPHeaderField: "User-Agent")
+        request.setValue(HTTPConstants.userAgentNDKSwift, forHTTPHeaderField: HTTPConstants.headerUserAgent)
         
         let (data, response) = try await URLSession.shared.data(for: request)
         
