@@ -382,27 +382,32 @@ public actor NDKBunkerSigner: NDKSigner, Sendable {
         }
         NDKLogger.log(.debug, category: .auth, "[BunkerSigner] Connect params: \(maskedParams)")
 
-        return try await withCheckedThrowingContinuation { continuation in
-            self.connectionContinuation = continuation
-
-            Task {
-                do {
-                    NDKLogger.log(.info, category: .auth, "[BunkerSigner] Sending connect request to bunker...")
-                    try await rpcClient?.sendRequest(
-                        to: bunkerPubkey,
-                        method: "connect",
-                        params: params
-                    ) { [weak self] response in
-                        Task { [weak self] in
-                            NDKLogger.log(.debug, category: .auth, "[BunkerSigner] Received response from bunker: result=\(response.result), error=\(response.error ?? "nil")")
-                            await self?.handleConnectResponse(response)
-                        }
-                    }
-                } catch {
-                    NDKLogger.log(.error, category: .auth, "[BunkerSigner] ERROR: Failed to send connect request: \(error)")
-                    continuation.resume(throwing: error)
-                }
-            }
+        // Send connect request and wait for response
+        NDKLogger.log(.info, category: .auth, "[BunkerSigner] Sending connect request to bunker...")
+        let response = try await rpcClient?.sendRequest(
+            to: bunkerPubkey,
+            method: "connect",
+            params: params
+        )
+        
+        guard let response = response else {
+            throw NDKError.connectionLost(relay: "bunker", message: "No response received")
+        }
+        
+        NDKLogger.log(.debug, category: .auth, "[BunkerSigner] Received connect response: result=\(response.result), error=\(response.error ?? "nil")")
+        
+        if response.result == "ack" {
+            // Now get the public key
+            let pubkey = try await getPublicKey()
+            self.userPubkey = pubkey
+            isConnected = true
+            
+            let user = NDKUser(pubkey: pubkey)
+            NDKLogger.log(.info, category: .auth, "[BunkerSigner] Successfully connected. User pubkey: \(pubkey)")
+            return user
+        } else {
+            let error = NDKError.networkError(for: "bunker", operation: "connect", error: NSError(domain: "BunkerError", code: -1, userInfo: [NSLocalizedDescriptionKey: response.error ?? StringConstants.ErrorMessages.connectionFailed]))
+            throw error
         }
     }
 
@@ -414,6 +419,8 @@ public actor NDKBunkerSigner: NDKSigner, Sendable {
             if parsed is NDKRPCRequest {
                 // Handle incoming requests (not implemented in this basic version)
             } else if let response = parsed as? NDKRPCResponse {
+                // Note: parseEvent already handles resuming continuations for matching IDs
+                // We only need to handle special cases here
                 await handleResponse(response)
             }
         } catch {
@@ -448,22 +455,14 @@ public actor NDKBunkerSigner: NDKSigner, Sendable {
     }
 
     private func handleConnectResponse(_ response: NDKRPCResponse) async {
-        if response.result == "ack" {
-            do {
-                let pubkey = try await getPublicKey()
-                self.userPubkey = pubkey
-                isConnected = true
-
-                let user = NDKUser(pubkey: pubkey)
-                connectionContinuation?.resume(returning: user)
-            } catch {
-                connectionContinuation?.resume(throwing: error)
-            }
-        } else {
-            let error = NDKError.networkError(for: "bunker", operation: "connect", error: NSError(domain: "BunkerError", code: -1, userInfo: [NSLocalizedDescriptionKey: response.error ?? StringConstants.ErrorMessages.connectionFailed]))
-            connectionContinuation?.resume(throwing: error)
+        // This is now only used for special response handling in the nostrconnect flow
+        // The bunker flow handles responses directly in connectBunker()
+        
+        // Handle auth_url
+        if response.result == "auth_url", let error = response.error {
+            authUrlPublisher.send(error)
+            return
         }
-        connectionContinuation = nil
     }
 
     // MARK: - NDKSigner Protocol

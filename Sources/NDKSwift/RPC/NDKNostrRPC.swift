@@ -101,8 +101,7 @@ public actor NDKNostrRPC {
         }
     }
 
-    func sendRequest(to pubkey: String, method: String, params: [String], handler: ((NDKRPCResponse) -> Void)? = nil) async throws {
-        let id = IDGenerator.randomId(length: 8)
+    private func sendRequestInternal(to pubkey: String, method: String, params: [String], id: String) async throws {
         NDKLogger.log(.debug, category: .auth, "Creating request - id: \(id), method: \(method), to: \(pubkey)")
 
         let request: [String: Any] = [
@@ -142,7 +141,13 @@ public actor NDKNostrRPC {
             NDKLogger.log(.warning, category: .auth, "Failed to publish to any relay! Attempting direct send fallback...")
             await attemptDirectSend(event: event, to: relayUrls)
         }
-
+    }
+    
+    func sendRequest(to pubkey: String, method: String, params: [String], handler: ((NDKRPCResponse) -> Void)? = nil) async throws {
+        let id = IDGenerator.randomId(length: 8)
+        
+        try await sendRequestInternal(to: pubkey, method: method, params: params, id: id)
+        
         // If handler provided, call it when response arrives
         if let handler = handler {
             Task {
@@ -161,9 +166,8 @@ public actor NDKNostrRPC {
 
             Task {
                 do {
-                    try await sendRequest(to: pubkey, method: method, params: params) { _ in
-                        // Response is handled in parseEvent
-                    }
+                    // Send the request with the same ID we're waiting for
+                    try await sendRequestInternal(to: pubkey, method: method, params: params, id: id)
 
                     // Set up timeout
                     setupTimeout(for: id, continuation: continuation)

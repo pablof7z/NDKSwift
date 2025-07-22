@@ -91,14 +91,6 @@ public actor P2PKManager {
         keyCreatedAt = Date()
     }
     
-    /// Export keypair for backup
-    func exportKeypair() async throws -> (privateKey: String, publicKey: String) {
-        guard let keypair = currentKeypair else {
-            throw NDKError.notConfigured("No P2PK keypair available")
-        }
-        return keypair
-    }
-    
     /// Clear stored keypair
     func clearKeypair() {
         currentKeypair = nil
