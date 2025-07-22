@@ -2,7 +2,7 @@
 
 ## Overview
 
-NDKSwift implements relay health monitoring for NIP-60 Cashu wallets to ensure wallet state consistency across multiple relays. This feature helps detect and repair relay inconsistencies by tracking which wallet events each relay has.
+NDKSwift implements relay health monitoring for NIP-60 Cashu wallets to ensure wallet state consistency across wallet-configured relays. This feature helps detect and repair relay inconsistencies by tracking which wallet events each relay has. The system specifically monitors relays configured in the wallet's kind 17375 event, not the general NDK relay pool.
 
 ## How It Works
 
@@ -64,18 +64,22 @@ let subscription = try await wallet.startRealtimeMonitoring()
 ## Usage Example
 
 ```swift
-// Load wallet
-let wallet = NDKCashuWallet(ndk: ndk)
-try await wallet.load()
+// Create and load wallet
+let wallet = try NIP60Wallet(ndk: ndk)
 
-// Check relay health
-let health = await wallet.getRelayHealth()
+// Check relay health (uses wallet-configured relays from kind 17375)
+let healthStatus = try await wallet.checkWalletHealth()
 
-for relayHealth in health {
+print("Overall Health: \(healthStatus.isHealthy)")
+print("Synced Relays: \(healthStatus.syncedRelays)/\(healthStatus.relayHealth.count)")
+
+// Get detailed relay health
+let relayHealthList = await wallet.getRelayHealth()
+
+for relayHealth in relayHealthList {
     if !relayHealth.isHealthy {
         print("Relay \(relayHealth.relay.url) has issues:")
         print("  Missing events: \(relayHealth.missingEvents.count)")
-        print("  Extra events: \(relayHealth.extraEvents.count)")
         
         // Repair the relay
         try await wallet.repairRelay(
@@ -84,10 +88,22 @@ for relayHealth in health {
         )
     }
 }
-
-// Start real-time monitoring
-let subscription = try await wallet.startRealtimeMonitoring()
 ```
+
+## NutsackiOS Integration
+
+The relay health monitoring is fully integrated into the NutsackiOS wallet app:
+
+1. **Access**: Tap the ellipsis (⋯) menu in the top-right corner of the wallet view
+2. **Navigate**: Select "Relay Health" from the menu
+3. **View Status**: See the health status of each wallet-configured relay
+4. **Repair**: Tap "Repair" on any unhealthy relay to fix synchronization issues
+
+The UI provides:
+- Overall health summary with counts of healthy/unhealthy relays
+- Detailed view of each relay's status
+- One-tap repair functionality for out-of-sync relays
+- Real-time updates after repairs
 
 ## RelayHealth Structure
 
@@ -103,10 +119,11 @@ public struct RelayHealth: Sendable {
 
 ## Key Implementation Details
 
-1. **Event Source Tracking**: Uses `NDKEventTracker` to record which relays have seen each event
-2. **Subscription-based Loading**: Uses `subscribe()` instead of `fetchEvents()` to ensure relay tracking
+1. **Wallet-Specific Relays**: Uses relays configured in kind 17375 event, not the general NDK pool
+2. **Event Source Tracking**: Uses `NDKEventTracker` to record which relays have seen each event
 3. **Canonical Event Set**: Current wallet state minus deleted events
 4. **Automatic Repair**: Can republish missing events to unhealthy relays
+5. **Fixed Implementation**: Previously checked all NDK pool relays; now correctly uses only wallet-configured relays
 
 ## Comparison with NDK TypeScript
 
