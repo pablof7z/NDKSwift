@@ -142,7 +142,7 @@ public final class NDKUser: Equatable, Hashable, Sendable {
         )
         
         // Collect all relay list events and use the most recent
-        let events = await dataSource.collect(timeout: 3.0)
+        let events = await dataSource.collect(timeout: NetworkConstants.timeoutDataCollectionMedium)
         if let event = events.sorted(by: { $0.createdAt > $1.createdAt }).first {
             // Parse relay tags
             let eventTags = event.tags
@@ -189,7 +189,7 @@ public final class NDKUser: Equatable, Hashable, Sendable {
         )
         
         // Collect all contact list events and use the most recent
-        let events = await dataSource.collect(timeout: 3.0)
+        let events = await dataSource.collect(timeout: NetworkConstants.timeoutDataCollectionMedium)
         if let event = events.sorted(by: { $0.createdAt > $1.createdAt }).first {
             // Parse 'p' tags from contact list
             let eventTags = event.tags
