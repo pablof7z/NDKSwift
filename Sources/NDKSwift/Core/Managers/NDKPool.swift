@@ -89,7 +89,7 @@ public actor NDKPool {
             blockedRelaySubscriptionTask = Task {
                 let filter = NDKFilter(
                     authors: [userPubkey],
-                    kinds: [10006]
+                    kinds: [EventKind.blockedRelays]
                 )
                 
                 // Use NDKDataSource with 24 hour maxAge for blocked relay lists

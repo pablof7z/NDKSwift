@@ -61,21 +61,21 @@ public class NDKList {
 
     /// Supported list kinds from NIP-51 and related NIPs
     public static let supportedKinds: Set<Int> = [
-        3, // Contact list
-        10000, // Mute list
-        10001, // Pin list
-        10002, // Relay list
-        10003, // Bookmark list
-        10004, // Communities list
-        10005, // Public chats list
-        10006, // Blocked relays list
-        10007, // Search relays list
-        10015, // Interest list
-        10030, // User emoji list
-        30000, // Categorized people list
-        30001, // Categorized bookmark list
-        30002, // Relay list metadata
-        30063 // Blossom server list
+        EventKind.contacts, // Contact list
+        EventKind.muteList, // Mute list
+        EventKind.pinList, // Pin list
+        EventKind.relayList, // Relay list
+        EventKind.bookmarkList, // Bookmark list
+        EventKind.communitiesList, // Communities list
+        EventKind.publicChatsList, // Public chats list
+        EventKind.blockedRelays, // Blocked relays list
+        EventKind.searchRelays, // Search relays list
+        EventKind.interestList, // Interest list
+        EventKind.userEmojiList, // User emoji list
+        EventKind.categorizedPeopleList, // Categorized people list
+        EventKind.categorizedBookmarkList, // Categorized bookmark list
+        EventKind.relayListMetadata, // Relay list metadata
+        EventKind.blossomServerList // Blossom server list
     ]
 
     /// Initialize a new list
@@ -115,21 +115,21 @@ public class NDKList {
     /// Default title based on the list kind
     private var defaultTitleForKind: String? {
         switch kind {
-        case 3: return "Contacts"
-        case 10000: return "Muted"
-        case 10001: return "Pinned"
-        case 10002: return "Relays"
-        case 10003: return "Bookmarks"
-        case 10004: return "Communities"
-        case 10005: return "Public Chats"
-        case 10006: return "Blocked Relays"
-        case 10007: return "Search Relays"
-        case 10015: return "Interests"
-        case 10030: return "Emojis"
-        case 30000: return "People"
-        case 30001: return "Bookmarks"
-        case 30002: return "Relay Metadata"
-        case 30063: return "Blossom Servers"
+        case EventKind.contacts: return "Contacts"
+        case EventKind.muteList: return "Muted"
+        case EventKind.pinList: return "Pinned"
+        case EventKind.relayList: return "Relays"
+        case EventKind.bookmarkList: return "Bookmarks"
+        case EventKind.communitiesList: return "Communities"
+        case EventKind.publicChatsList: return "Public Chats"
+        case EventKind.blockedRelays: return "Blocked Relays"
+        case EventKind.searchRelays: return "Search Relays"
+        case EventKind.interestList: return "Interests"
+        case EventKind.userEmojiList: return "Emojis"
+        case EventKind.categorizedPeopleList: return "People"
+        case EventKind.categorizedBookmarkList: return "Bookmarks"
+        case EventKind.relayListMetadata: return "Relay Metadata"
+        case EventKind.blossomServerList: return "Blossom Servers"
         default: return nil
         }
     }

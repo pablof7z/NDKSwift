@@ -26,7 +26,7 @@ final class TagAddressableEventTests: XCTestCase {
         // Create a parameterized replaceable event (kind 30023 - long-form content)
         let articleEvent = try await ndk.event()
             .content("This is a long-form article")
-            .kind(30023)
+            .kind(EventKind.longFormContent)
             .dTag("my-article")
             .tag(["title", "My Article"])
             .build(signer: signer)
@@ -45,7 +45,7 @@ final class TagAddressableEventTests: XCTestCase {
         
         let aTag = aTags[0]
         XCTAssertEqual(aTag[0], "a")
-        XCTAssertEqual(aTag[1], "30023:\(articleEvent.pubkey):my-article")
+        XCTAssertEqual(aTag[1], "\(EventKind.longFormContent):\(articleEvent.pubkey):my-article")
         XCTAssertEqual(aTag[2], "") // Empty relay hint
     }
     
@@ -53,7 +53,7 @@ final class TagAddressableEventTests: XCTestCase {
         // Create a regular replaceable event (kind 10002 - relay list)
         let relayListEvent = try await ndk.event()
             .content("")
-            .kind(10002)
+            .kind(EventKind.relayList)
             .tag(["r", "wss://relay.example.com"])
             .build(signer: signer)
         
@@ -71,7 +71,7 @@ final class TagAddressableEventTests: XCTestCase {
         
         let aTag = aTags[0]
         XCTAssertEqual(aTag[0], "a")
-        XCTAssertEqual(aTag[1], "10002:\(relayListEvent.pubkey):")
+        XCTAssertEqual(aTag[1], "\(EventKind.relayList):\(relayListEvent.pubkey):")
         XCTAssertEqual(aTag[2], "") // Empty relay hint
     }
     
@@ -109,7 +109,7 @@ final class TagAddressableEventTests: XCTestCase {
         // Create a parameterized replaceable event
         let articleEvent = try await ndk.event()
             .content("Article with relay hint")
-            .kind(30023)
+            .kind(EventKind.longFormContent)
             .dTag("article-with-relay")
             .build(signer: signer)
         
@@ -129,7 +129,7 @@ final class TagAddressableEventTests: XCTestCase {
         
         let aTag = aTags[0]
         XCTAssertEqual(aTag[0], "a")
-        XCTAssertEqual(aTag[1], "30023:\(articleEvent.pubkey):article-with-relay")
+        XCTAssertEqual(aTag[1], "\(EventKind.longFormContent):\(articleEvent.pubkey):article-with-relay")
         XCTAssertEqual(aTag[2], preferredRelay) // Explicit relay hint
     }
     
@@ -137,7 +137,7 @@ final class TagAddressableEventTests: XCTestCase {
         // Create a parameterized replaceable event
         let articleEvent = try await ndk.event()
             .content("Article with NDK tracking")
-            .kind(30023)
+            .kind(EventKind.longFormContent)
             .dTag("tracked-article")
             .build(signer: signer)
         
@@ -160,7 +160,7 @@ final class TagAddressableEventTests: XCTestCase {
         
         let aTag = aTags[0]
         XCTAssertEqual(aTag[0], "a")
-        XCTAssertEqual(aTag[1], "30023:\(articleEvent.pubkey):tracked-article")
+        XCTAssertEqual(aTag[1], "\(EventKind.longFormContent):\(articleEvent.pubkey):tracked-article")
         XCTAssertEqual(aTag[2], trackedRelay) // Tracked relay hint
     }
     
@@ -168,7 +168,7 @@ final class TagAddressableEventTests: XCTestCase {
         // Create a parameterized replaceable event
         let articleEvent = try await ndk.event()
             .content("Direct tag method test")
-            .kind(30023)
+            .kind(EventKind.longFormContent)
             .dTag("direct-tag-article")
             .build(signer: signer)
         
@@ -186,7 +186,7 @@ final class TagAddressableEventTests: XCTestCase {
         
         let aTag = aTags[0]
         XCTAssertEqual(aTag[0], "a")
-        XCTAssertEqual(aTag[1], "30023:\(articleEvent.pubkey):direct-tag-article")
+        XCTAssertEqual(aTag[1], "\(EventKind.longFormContent):\(articleEvent.pubkey):direct-tag-article")
         XCTAssertEqual(aTag[2], "wss://direct.relay.com")
     }
 }

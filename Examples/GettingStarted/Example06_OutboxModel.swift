@@ -48,7 +48,7 @@ public func runOutboxExample() async throws {
     print("\nFetching user's relay list (kind:10002) directly to inspect...")
     let relayListFilter = NDKFilter(
         authors: [fiatjafPubkey],
-        kinds: [10002]
+        kinds: [EventKind.relayList]
     )
     
     // Use observe to fetch a single event

@@ -182,7 +182,7 @@ let dataSource = ndk.observe(
 
 // With custom subscription ID for debugging
 let walletSource = ndk.observe(
-    filter: NDKFilter(kinds: [7375]),
+    filter: NDKFilter(kinds: [EventKind.cashuToken]),
     subscriptionId: "nip60-wallet-events"  // Shows in relay logs
 )
 

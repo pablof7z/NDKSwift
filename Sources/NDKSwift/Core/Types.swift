@@ -118,7 +118,13 @@ public enum EventKind {
     public static let muteList = 10000
     public static let pinList = 10001
     public static let relayList = 10002
+    public static let bookmarkList = 10003
+    public static let communitiesList = 10004
+    public static let publicChatsList = 10005
     public static let blockedRelays = 10006
+    public static let searchRelays = 10007
+    public static let interestList = 10015
+    public static let userEmojiList = 10030
     public static let cashuMintList = 10019
     public static let nutzapPreferences = 10019  // Alias for NIP-61
     public static let blockedMints = 10020
@@ -132,9 +138,14 @@ public enum EventKind {
     public static let httpAuth = 27235
     
     // MARK: - Parameterized Replaceable Events (30000-39999)
+    public static let categorizedPeopleList = 30000
+    public static let categorizedBookmarkList = 30001
+    public static let relayListMetadata = 30002
     public static let longFormContent = 30023
+    public static let blossomServerList = 30063
     public static let applicationSpecificData = 30078
     public static let mintAnnouncement = 38000  // NIP-87 mint discovery
+    public static let cashuMintAnnouncement = 38172  // NIP-87
 }
 
 /// Tag structure

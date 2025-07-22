@@ -143,7 +143,7 @@ final class BlossomE2ETests: XCTestCase {
         // Fetch the event back
         let filter = NDKFilter(
             authors: [fileMetadata.pubkey],
-            kinds: [1063],
+            kinds: [EventKind.fileMetadata],
             limit: 1
         )
         
