@@ -34,7 +34,7 @@ public enum NostrIdentifier {
             }
         } else {
             // Assume it's a hex event ID
-            guard identifier.count == 64 else {
+            guard HexValidator.isValid32ByteHex(identifier) else {
                 throw NDKError.invalidEventID("Invalid event ID: must be 64-character hex or valid bech32")
             }
             return NDKFilter(ids: [identifier])

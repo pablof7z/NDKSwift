@@ -68,15 +68,9 @@ public actor P2PKManager {
     /// Set keypair (for restoration from backup)
     func setKeypair(privateKey: String, publicKey: String) throws {
         // Validate keys
-        guard let privateKeyData = Data(hexString: privateKey),
-              privateKeyData.count == 32 else {
-            throw NDKError.invalidDataFormat("P2PK private key", details: "Must be 32 bytes")
-        }
+        _ = try HexValidator.validate32ByteHex(privateKey)
         
-        guard let publicKeyData = Data(hexString: publicKey),
-              publicKeyData.count == 32 else {
-            throw NDKError.invalidDataFormat("P2PK public key", details: "Must be 32 bytes")
-        }
+        _ = try HexValidator.validate32ByteHex(publicKey)
         
         currentKeypair = (privateKey, publicKey)
         keyCreatedAt = Date()
@@ -84,10 +78,7 @@ public actor P2PKManager {
     
     /// Restore keypair from private key only (derives public key)
     public func restoreFromPrivateKey(_ privateKeyHex: String) throws {
-        guard let privateKeyData = Data(hexString: privateKeyHex),
-              privateKeyData.count == 32 else {
-            throw NDKError.invalidDataFormat("P2PK private key", details: "Must be 32 bytes")
-        }
+        let privateKeyData = try HexValidator.validate32ByteHex(privateKeyHex)
         
         // Derive public key from private key
         let privateKey = try secp256k1.Schnorr.PrivateKey(dataRepresentation: privateKeyData)

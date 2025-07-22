@@ -54,11 +54,13 @@ public struct NegentropyItem: Comparable, Hashable {
     ///
     /// - Note: Hex string can include "0x" prefix and is case-insensitive
     public init(hexId: String, timestamp: UInt64) throws {
-        guard let idData = hexId.hexDecoded(), idData.count == 32 else {
+        do {
+            let idData = try HexValidator.validate32ByteHex(hexId)
+            self.id = idData
+            self.timestamp = timestamp
+        } catch {
             throw NegentropyError.invalidItemId
         }
-        self.id = idData
-        self.timestamp = timestamp
     }
     
     /// Creates a new Negentropy item from a Nostr event.
@@ -69,11 +71,13 @@ public struct NegentropyItem: Comparable, Hashable {
     ///
     /// - Note: Uses the event's `createdAt` timestamp and hex-decoded `id`
     public init(event: NDKEvent) throws {
-        guard let idData = event.id.hexDecoded(), idData.count == 32 else {
+        do {
+            let idData = try HexValidator.validate32ByteHex(event.id)
+            self.id = idData
+            self.timestamp = UInt64(event.createdAt)
+        } catch {
             throw NegentropyError.invalidItemId
         }
-        self.id = idData
-        self.timestamp = UInt64(event.createdAt)
     }
     
     // MARK: - Comparable
