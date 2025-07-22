@@ -359,7 +359,7 @@ public class NDKLightningZapProtocol: NDKZapProtocol {
         )
         
         // Collect all relay list events and use the most recent
-        let events = await dataSource.collect(timeout: 3.0)
+        let events = await dataSource.collect(timeout: NetworkConstants.timeoutDataCollectionMedium)
         if let relayListEvent = events.sorted(by: { $0.createdAt > $1.createdAt }).first {
             let eventTags = relayListEvent.tags
             let relays = eventTags

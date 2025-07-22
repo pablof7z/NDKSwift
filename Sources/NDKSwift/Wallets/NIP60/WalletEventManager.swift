@@ -143,7 +143,7 @@ public actor WalletEventManager {
         )
         
         // Collect all matching events to ensure we find it
-        let events = await dataSource.collect(timeout: 2.0)
+        let events = await dataSource.collect(timeout: NetworkConstants.timeoutDataCollectionShort)
         if let eventToDelete = events.first {
             try await eventToDelete.delete(reason: "Deleted token event", signer: signer, ndk: ndk)
         }
@@ -179,7 +179,7 @@ public actor WalletEventManager {
         )
         
         // Collect all matching events to ensure we find it
-        let events = await dataSource.collect(timeout: 2.0)
+        let events = await dataSource.collect(timeout: NetworkConstants.timeoutDataCollectionShort)
         if let quoteEvent = events.first {
             try await quoteEvent.delete(reason: "Quote expired or used", signer: signer, ndk: ndk)
         }

@@ -97,7 +97,7 @@ public actor NDKZapManager {
             )
             
             // Collect all events with a reasonable timeout
-            let events = await dataSource.collect(timeout: 5.0)
+            let events = await dataSource.collect(timeout: NetworkConstants.timeoutDataCollectionLong)
             
             // Create RecipientZapInfo from fetched events
             let info = await RecipientZapInfo.from(
@@ -497,7 +497,7 @@ public actor NDKZapManager {
         )
         
         // Collect all zap events
-        let events = await dataSource.collect(timeout: 5.0)
+        let events = await dataSource.collect(timeout: NetworkConstants.timeoutDataCollectionLong)
         
         var zaps: [ZapInfo] = []
         
