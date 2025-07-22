@@ -683,22 +683,36 @@ public final class NDK {
     
     // MARK: - Signature Verification
     
+    /// Get statistics about signature verification performance
+    /// - Returns: A tuple containing:
+    ///   - totalVerifications: Total number of signature verifications performed
+    ///   - failedVerifications: Number of signature verifications that failed
+    ///   - blacklistedRelays: Number of relays currently blacklisted due to signature failures
     public func getSignatureVerificationStats() async -> (totalVerifications: Int, failedVerifications: Int, blacklistedRelays: Int) {
         await signatureVerificationSampler.getStats()
     }
     
+    /// Check if a relay is blacklisted due to signature verification failures
+    /// - Parameter relay: The relay to check
+    /// - Returns: true if the relay is blacklisted, false otherwise
     public func isRelayBlacklisted(_ relay: NDKRelay) async -> Bool {
         await signatureVerificationSampler.isRelayBlacklisted(relay.url)
     }
     
+    /// Get the set of relay URLs that are currently blacklisted
+    /// - Returns: Set of blacklisted relay URLs
     public func getBlacklistedRelays() async -> Set<String> {
         await signatureVerificationSampler.getBlacklistedRelays()
     }
     
+    /// Clear the signature verification cache
+    /// - Note: This can be useful for testing or when you want to force re-verification
     public func clearSignatureCache() async {
         await signatureVerificationSampler.clearCache()
     }
     
+    /// Set a custom delegate for signature verification
+    /// - Parameter delegate: The delegate that will handle signature verification decisions
     public func setSignatureVerificationDelegate(_ delegate: NDKSignatureVerificationDelegate) async {
         self.signatureVerificationDelegate = delegate
     }
