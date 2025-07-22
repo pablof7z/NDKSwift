@@ -148,6 +148,42 @@ public enum EventKind {
     public static let cashuMintAnnouncement = 38172  // NIP-87
 }
 
+// MARK: - Event Kind Ranges
+
+public extension EventKind {
+    /// Regular events (0-999)
+    static let regularRange = 0..<1000
+    
+    /// Replaceable events (10000-19999)
+    static let replaceableRange = 10000..<20000
+    
+    /// Ephemeral events (20000-29999)
+    static let ephemeralRange = 20000..<30000
+    
+    /// Parameterized replaceable events (30000-39999)
+    static let parameterizedReplaceableRange = 30000..<40000
+    
+    /// Check if a kind is replaceable
+    static func isReplaceable(_ kind: Int) -> Bool {
+        return replaceableRange.contains(kind)
+    }
+    
+    /// Check if a kind is ephemeral
+    static func isEphemeral(_ kind: Int) -> Bool {
+        return ephemeralRange.contains(kind)
+    }
+    
+    /// Check if a kind is parameterized replaceable
+    static func isParameterizedReplaceable(_ kind: Int) -> Bool {
+        return parameterizedReplaceableRange.contains(kind)
+    }
+    
+    /// Check if a kind is regular
+    static func isRegular(_ kind: Int) -> Bool {
+        return regularRange.contains(kind)
+    }
+}
+
 /// Tag structure
 public typealias Tag = [String]
 
