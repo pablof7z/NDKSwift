@@ -171,19 +171,23 @@ public struct NDKEvent: Codable, Equatable, Hashable, Sendable {
         return tags.first { $0.first == name }
     }
 
-    /// Get all referenced event IDs
+    /// Get all referenced event IDs from 'e' tags
+    /// - Returns: Array of event IDs referenced in this event
     public var referencedEventIds: [EventID] {
         let eTags = tags(withName: "e")
         return eTags.compactMap { $0.count > 1 ? $0[1] : nil }
     }
 
-    /// Get all referenced pubkeys
+    /// Get all referenced public keys from 'p' tags
+    /// - Returns: Array of public keys referenced in this event
     public var referencedPubkeys: [PublicKey] {
         let pTags = tags(withName: "p")
         return pTags.compactMap { $0.count > 1 ? $0[1] : nil }
     }
 
-    /// Get the value of a tag by name
+    /// Get the first value of a tag by name
+    /// - Parameter name: The tag name to search for
+    /// - Returns: The first value of the tag (second element) if it exists, nil otherwise
     public func tagValue(_ name: String) -> String? {
         let foundTag = tag(withName: name)
         return foundTag?.count ?? 0 > 1 ? foundTag?[1] : nil
@@ -223,6 +227,7 @@ public struct NDKEvent: Codable, Equatable, Hashable, Sendable {
     // MARK: - Convenience
 
     /// Check if this event is a reply to another event
+    /// - Returns: true if this event has an 'e' tag marked as "reply"
     public var isReply: Bool {
         return tags.contains { tag in
             tag.count >= 4 && tag[0] == "e" && tag[3] == "reply"
@@ -230,6 +235,7 @@ public struct NDKEvent: Codable, Equatable, Hashable, Sendable {
     }
 
     /// Get the event ID this is replying to
+    /// - Returns: The event ID from the first 'e' tag marked as "reply", or nil if not a reply
     public var replyEventId: EventID? {
         let replyTag = tags.first { tag in
             tag.count >= 4 && tag[0] == "e" && tag[3] == "reply"
@@ -237,12 +243,15 @@ public struct NDKEvent: Codable, Equatable, Hashable, Sendable {
         return replyTag?.count ?? 0 > 1 ? replyTag?[1] : nil
     }
 
-    /// Check if this event is ephemeral
+    /// Check if this event is ephemeral (not stored by relays)
+    /// - Returns: true if the event kind is between 20000-29999 (NIP-16)
     public var isEphemeral: Bool {
         return kind >= 20000 && kind < 30000
     }
 
     /// Check if this event is replaceable
+    /// - Returns: true if the event is replaceable (kind 0, 3, or 10000-19999)
+    /// - Note: Replaceable events can be overwritten by newer events with the same kind from the same author
     public var isReplaceable: Bool {
         // Kind 0 (metadata) and kind 3 (contacts) are replaceable
         // Also kinds 10000-19999 are replaceable
@@ -250,11 +259,15 @@ public struct NDKEvent: Codable, Equatable, Hashable, Sendable {
     }
 
     /// Check if this event is parameterized replaceable
+    /// - Returns: true if the event kind is between 30000-39999 (NIP-33)
+    /// - Note: These events are replaceable based on kind, author, and 'd' tag value
     public var isParameterizedReplaceable: Bool {
         return kind >= 30000 && kind < 40000
     }
     
     /// Check if this event is protected (NIP-70)
+    /// - Returns: true if the event contains a '-' tag indicating it's protected
+    /// - Note: Protected events should not be deleted by relays even when requested
     public var isProtected: Bool {
         return tags.contains { $0.first == "-" }
     }
