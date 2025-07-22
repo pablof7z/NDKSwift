@@ -196,7 +196,7 @@ struct ContactsView: View {
         
         // Only resolve if it looks like a pubkey, npub, or NIP-05
         guard searchText.starts(with: "npub1") || 
-              searchText.count == 64 || 
+              HexValidator.isValid32ByteHex(searchText) || 
               searchText.contains("@") else {
             resolvedUser = nil
             return
@@ -217,7 +217,7 @@ struct ContactsView: View {
                     pubkey = try? Bech32.pubkey(from: searchText)
                 }
                 // Try as hex pubkey
-                else if searchText.count == 64 {
+                else if HexValidator.isValid32ByteHex(searchText) {
                     pubkey = searchText
                 }
                 // Try as NIP-05
