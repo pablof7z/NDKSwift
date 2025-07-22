@@ -54,8 +54,7 @@ struct UserDisplayName: View {
         )
         
         for await event in profileDataSource.events {
-            if let profileData = event.content.data(using: .utf8),
-               let fetchedProfile = try? JSONDecoder().decode(NDKUserProfile.self, from: profileData) {
+            if let fetchedProfile = JSONCoding.safeDecode(NDKUserProfile.self, from: event.content) {
                 await MainActor.run {
                     self.profile = fetchedProfile
                 }
@@ -140,8 +139,7 @@ struct UserProfilePicture: View {
         )
         
         for await event in profileDataSource.events {
-            if let profileData = event.content.data(using: .utf8),
-               let fetchedProfile = try? JSONDecoder().decode(NDKUserProfile.self, from: profileData) {
+            if let fetchedProfile = JSONCoding.safeDecode(NDKUserProfile.self, from: event.content) {
                 await MainActor.run {
                     self.profile = fetchedProfile
                 }
@@ -212,8 +210,7 @@ struct UserNIP05: View {
         )
         
         for await event in profileDataSource.events {
-            if let profileData = event.content.data(using: .utf8),
-               let fetchedProfile = try? JSONDecoder().decode(NDKUserProfile.self, from: profileData) {
+            if let fetchedProfile = JSONCoding.safeDecode(NDKUserProfile.self, from: event.content) {
                 await MainActor.run {
                     self.profile = fetchedProfile
                 }

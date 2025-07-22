@@ -32,7 +32,7 @@ struct Example04_UserProfile {
         let fetchTask = Task {
             for await event in profileSource.events {
                 if event.kind == EventKind.metadata,
-                   let profileData = try? JSONDecoder().decode(NDKUserProfile.self, from: event.content.data(using: .utf8) ?? Data()) {
+                   let profileData = JSONCoding.safeDecode(NDKUserProfile.self, from: event.content) {
                     fetchedProfile = profileData
                     break
                 }
@@ -73,7 +73,7 @@ struct Example04_UserProfile {
         )
         
         // Create metadata event manually
-        let profileContent = try JSONEncoder().encode(myProfile)
+        let profileContent = try JSONCoding.encode(myProfile)
         let profileString = String(data: profileContent, encoding: .utf8)!
         
         let (profileEvent, result) = try await ndk.publish { builder in
@@ -119,7 +119,7 @@ struct Example04_UserProfile {
         
         for event in profileEvents {
             if event.kind == EventKind.metadata,
-               let profileData = try? JSONDecoder().decode(NDKUserProfile.self, from: event.content.data(using: .utf8) ?? Data()) {
+               let profileData = JSONCoding.safeDecode(NDKUserProfile.self, from: event.content) {
                 print("\n👤 Profile: \(profileData.name ?? "Unknown")")
                 print("   Pubkey: \(String(event.pubkey.prefix(16)))...")
             }
@@ -140,7 +140,7 @@ struct Example04_UserProfile {
             for await event in updateSource.events {
                 updateCount += 1
                 if event.kind == EventKind.metadata,
-                   let profile = try? JSONDecoder().decode(NDKUserProfile.self, from: event.content.data(using: .utf8) ?? Data()) {
+                   let profile = JSONCoding.safeDecode(NDKUserProfile.self, from: event.content) {
                     print("🔔 Profile update #\(updateCount): \(profile.name ?? "Unknown")")
                 }
                 if updateCount >= 3 {

@@ -50,7 +50,7 @@ struct Example02_PublishEvent {
         )
         
         // Create metadata event manually
-        let profileContent = try JSONEncoder().encode(metadata)
+        let profileContent = try JSONCoding.encode(metadata)
         let profileString = String(data: profileContent, encoding: .utf8)!
         
         let (metadataEvent, _) = try await ndk.publish { builder in

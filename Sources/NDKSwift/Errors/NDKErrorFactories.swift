@@ -28,19 +28,19 @@ extension NDKError {
     static func cryptoOperation(_ operation: String, nip: String? = nil, error: Error) -> NDKError {
         let message = nip.map { "\(operation) failed (\($0))" } ?? "\(operation) failed"
         
-        switch operation.lowercased() {
-        case "encryption", "encrypt":
-            return .encryptionFailed(message, underlying: error)
-        case "decryption", "decrypt":
-            return .decryptionFailed(message, underlying: error)
-        case "signing", "sign":
-            return .signingFailed(message, underlying: error)
-        case "verification", "verify":
-            return .verificationFailed(message, underlying: error)
-        case "key derivation":
-            return .keyDerivationFailed(message, underlying: error)
-        default:
-            return .unknown(message, underlying: error)
-        }
+        let operationMap: [String: (String, Error?) -> NDKError] = [
+            "encryption": NDKError.encryptionFailed,
+            "encrypt": NDKError.encryptionFailed,
+            "decryption": NDKError.decryptionFailed,
+            "decrypt": NDKError.decryptionFailed,
+            "signing": NDKError.signingFailed,
+            "sign": NDKError.signingFailed,
+            "verification": NDKError.verificationFailed,
+            "verify": NDKError.verificationFailed,
+            "key derivation": NDKError.keyDerivationFailed
+        ]
+        
+        let lowercased = operation.lowercased()
+        return operationMap[lowercased]?(message, error) ?? .unknown(message, underlying: error)
     }
 }
