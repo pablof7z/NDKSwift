@@ -49,7 +49,7 @@ public actor P2PKManager {
         
         // Convert hex private key back to PrivateKey object
         guard let privateKeyData = Data(hexString: privateKeyHex) else {
-            throw NDKError.invalidPrivateKey("Invalid P2PK private key format")
+            throw NDKError.invalidDataFormat("P2PK private key", details: "Invalid hex format")
         }
         let privateKey = try secp256k1.Schnorr.PrivateKey(dataRepresentation: privateKeyData)
         
@@ -70,12 +70,12 @@ public actor P2PKManager {
         // Validate keys
         guard let privateKeyData = Data(hexString: privateKey),
               privateKeyData.count == 32 else {
-            throw NDKError.invalidPrivateKey("Invalid P2PK private key: must be 32 bytes")
+            throw NDKError.invalidDataFormat("P2PK private key", details: "Must be 32 bytes")
         }
         
         guard let publicKeyData = Data(hexString: publicKey),
               publicKeyData.count == 32 else {
-            throw NDKError.invalidPublicKey("Invalid P2PK public key: must be 32 bytes")
+            throw NDKError.invalidDataFormat("P2PK public key", details: "Must be 32 bytes")
         }
         
         currentKeypair = (privateKey, publicKey)
@@ -86,7 +86,7 @@ public actor P2PKManager {
     public func restoreFromPrivateKey(_ privateKeyHex: String) throws {
         guard let privateKeyData = Data(hexString: privateKeyHex),
               privateKeyData.count == 32 else {
-            throw NDKError.invalidPrivateKey("Invalid P2PK private key: must be 32 bytes")
+            throw NDKError.invalidDataFormat("P2PK private key", details: "Must be 32 bytes")
         }
         
         // Derive public key from private key

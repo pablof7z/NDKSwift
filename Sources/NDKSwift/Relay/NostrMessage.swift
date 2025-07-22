@@ -44,13 +44,13 @@ public enum NostrMessage {
     public static func parse(from json: String) throws -> NostrMessage {
         let array = try JSONCoding.parseArray(from: json)
         guard !array.isEmpty else {
-            throw NDKError.invalidMessage("Invalid message format: empty array")
+            throw NDKError.parseError(for: "Nostr message", details: "Empty array")
         }
 
         guard let typeString = array[0] as? String,
               let type = NostrMessageType(rawValue: typeString)
         else {
-            throw NDKError.invalidMessage("Unknown message type")
+            throw NDKError.parseError(for: "Nostr message type", details: "Unknown message type: \(array[0])")
         }
 
         switch type {
@@ -63,7 +63,7 @@ public enum NostrMessage {
             let eventIndex = subscriptionId != nil ? 2 : 1
 
             guard let eventDict = array[eventIndex] as? [String: Any] else {
-                throw NDKError.invalidMessage( "Invalid event data")
+                throw NDKError.parseError(for: "EVENT message", details: "Invalid event data structure")
             }
 
             let event = try JSONCoding.decodeFromDictionary(NDKEvent.self, from: eventDict)

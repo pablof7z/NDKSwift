@@ -43,38 +43,38 @@ public struct NWCConnectionURI {
         
         // Validate pubkey format (64 character hex)
         guard pubkey.count == 64, pubkey.range(of: "^[0-9a-fA-F]{64}$", options: .regularExpression) != nil else {
-            throw NDKError.invalidPublicKey(pubkey)
+            throw NDKError.invalidDataFormat("wallet public key", details: "Expected 64 character hex, got \(pubkey.count)")
         }
         self.walletPubkey = pubkey.lowercased()
         
         // Parse query parameters
         guard let components = URLComponents(url: url, resolvingAgainstBaseURL: false),
               let queryItems = components.queryItems else {
-            throw NDKError.invalidInput(message: "Missing query parameters in URI")
+            throw NDKError.missingRequired("query parameters", in: "NWC URI")
         }
         
         // Extract relay URLs
         let relays = queryItems.filter { $0.name == "relay" }.compactMap { $0.value }
         guard !relays.isEmpty else {
-            throw NDKError.invalidInput(message: "Missing required parameter: relay")
+            throw NDKError.missingRequired("relay", in: "NWC URI")
         }
         
         // Validate relay URLs
         for relay in relays {
             guard URL(string: relay) != nil else {
-                throw NDKError.invalidURL(relay)
+                throw NDKError.invalidDataFormat("relay URL", details: "Invalid URL: \(relay)")
             }
         }
         self.relayURLs = relays
         
         // Extract secret
         guard let secret = queryItems.first(where: { $0.name == "secret" })?.value else {
-            throw NDKError.invalidInput(message: "Missing required parameter: secret")
+            throw NDKError.missingRequired("secret", in: "NWC URI")
         }
         
         // Validate secret format (64 character hex)
         guard secret.count == 64, secret.range(of: "^[0-9a-fA-F]{64}$", options: .regularExpression) != nil else {
-            throw NDKError.invalidInput(message: "Invalid client secret format (expected 64 hex characters, got \(secret.count))")
+            throw NDKError.invalidDataFormat("client secret", details: "Expected 64 hex characters, got \(secret.count)")
         }
         self.secret = secret.lowercased()
         
@@ -86,21 +86,21 @@ public struct NWCConnectionURI {
     public init(walletPubkey: String, relayURLs: [String], secret: String, lud16: String? = nil) throws {
         // Validate inputs
         guard walletPubkey.count == 64, walletPubkey.range(of: "^[0-9a-fA-F]{64}$", options: .regularExpression) != nil else {
-            throw NDKError.invalidPublicKey(walletPubkey)
+            throw NDKError.invalidDataFormat("wallet public key", details: "Expected 64 character hex")
         }
         
         guard secret.count == 64, secret.range(of: "^[0-9a-fA-F]{64}$", options: .regularExpression) != nil else {
-            throw NDKError.invalidInput(message: "Invalid client secret format")
+            throw NDKError.invalidDataFormat("client secret", details: "Expected 64 character hex")
         }
         
         guard !relayURLs.isEmpty else {
-            throw NDKError.invalidInput(message: "Missing required parameter: relayURLs")
+            throw NDKError.missingRequired("relayURLs")
         }
         
         // Validate relay URLs
         for relay in relayURLs {
             guard URL(string: relay) != nil else {
-                throw NDKError.invalidURL(relay)
+                throw NDKError.invalidDataFormat("relay URL", details: "Invalid URL: \(relay)")
             }
         }
         
@@ -125,7 +125,7 @@ public struct NWCConnectionURI {
         components.queryItems = queryItems
         
         guard let uri = components.string else {
-            throw NDKError.invalidInput(message: "Failed to construct URI from components")
+            throw NDKError.failedTo("construct URI from components")
         }
         self.uri = uri
     }
