@@ -1,4 +1,3 @@
-import Foundation
 
 /// Centralized constants for commonly used Nostr relay URLs
 public enum RelayConstants {

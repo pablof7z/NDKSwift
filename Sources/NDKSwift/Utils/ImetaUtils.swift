@@ -1,4 +1,3 @@
-import Foundation
 
 /// Utility functions for handling imeta tags
 public enum ImetaUtils {

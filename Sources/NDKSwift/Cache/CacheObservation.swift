@@ -1,4 +1,3 @@
-import Foundation
 
 /// Protocol for objects that observe cache changes
 public protocol CacheObserver: AnyObject {
