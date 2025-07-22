@@ -124,9 +124,7 @@ public actor NDKEventManager {
             throw NDKError.notConfigured("NDK reference lost")
         }
         
-        guard let signer = ndk.signer else {
-            throw NDKError.notConfigured("No signer available")
-        }
+        let signer = try ndk.requireSigner()
         
         let eventBuilder = ndk.event()
         let configuredBuilder = builder(eventBuilder)
