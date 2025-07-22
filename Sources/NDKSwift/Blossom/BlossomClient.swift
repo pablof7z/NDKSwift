@@ -169,10 +169,10 @@ public actor BlossomClient {
         // Add query parameters
         var queryItems: [URLQueryItem] = []
         if let since = since {
-            queryItems.append(URLQueryItem(name: "since", value: String(Int(since.timeIntervalSince1970))))
+            queryItems.append(URLQueryItem(name: "since", value: String(Timestamp.from(since))))
         }
         if let until = until {
-            queryItems.append(URLQueryItem(name: "until", value: String(Int(until.timeIntervalSince1970))))
+            queryItems.append(URLQueryItem(name: "until", value: String(Timestamp.from(until))))
         }
 
         if !queryItems.isEmpty {
