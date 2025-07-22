@@ -14,11 +14,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Update transaction status to 'failed' for malformed nutzaps instead of keeping them as 'processing'
 - Add detailed error information to failed transactions for better user feedback
 - Include P2PK pubkey data in proof decoding logs for easier debugging
+- LocalizedError conformance for NutzapRedemptionError to provide user-friendly error messages
 
 ### Improved
 - Enhanced error handling for invalid nutzaps with malformed P2PK pubkeys
 - Better transaction status tracking for failed nutzap redemptions
 - More informative logging when processing nutzap proofs
+- UI improvements for failed transactions:
+  - Show amount in red instead of green for failed transactions
+  - Display X icon overlay on avatar for failed nutzaps
+  - Remove "+" sign prefix for failed incoming transactions
+  - Reduce opacity of failed transactions to indicate disabled state
+  - Show detailed error information in transaction details
 
 ## [0.4.0] - 2025-01-21
 

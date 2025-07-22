@@ -51,6 +51,10 @@ public actor NIP60Wallet: NDKPaymentProvider {
     private var newestConfigTimestamp: Timestamp = 0
     private var hasProcessedInitialConfig = false
     
+    // MARK: - Startup Nutzap Redemption
+    
+    private var startupRedemption: StartupNutzapRedemption?
+    
     // MARK: - Initialization
     
     public init(ndk: NDK, cache: NDKCache? = nil) throws {
@@ -162,6 +166,9 @@ public actor NIP60Wallet: NDKPaymentProvider {
                 
                 // Create NDKDataSource for each filter
                 var dataSources: [NDKDataSource<NDKEvent>] = []
+                var nutzapDataSource: NDKDataSource<NDKEvent>?
+                var spendingHistoryDataSource: NDKDataSource<NDKEvent>?
+                
                 for (index, filter) in filters.enumerated() {
                     let subscriptionId: String
                     switch index {
@@ -182,6 +189,33 @@ public actor NIP60Wallet: NDKPaymentProvider {
                         subscriptionId: subscriptionId
                     )
                     dataSources.append(dataSource)
+                    
+                    // Track specific data sources for EOSE monitoring
+                    if index == 3 { nutzapDataSource = dataSource }
+                    if index == 4 { spendingHistoryDataSource = dataSource }
+                }
+                
+                // Monitor EOSE for nutzap and spending history
+                if let nutzapDS = nutzapDataSource {
+                    Task {
+                        for await update in nutzapDS.relayUpdates {
+                            if case .eose = update {
+                                await self.startupRedemption?.markNutzapEoseReceived()
+                                break
+                            }
+                        }
+                    }
+                }
+                
+                if let spendingHistoryDS = spendingHistoryDataSource {
+                    Task {
+                        for await update in spendingHistoryDS.relayUpdates {
+                            if case .eose = update {
+                                await self.startupRedemption?.markSpendingHistoryEoseReceived()
+                                break
+                            }
+                        }
+                    }
                 }
                 
                 // Process wallet events
@@ -206,6 +240,27 @@ public actor NIP60Wallet: NDKPaymentProvider {
     
     /// Process a wallet event (tokens, quotes, nutzaps, etc)
     private func processWalletEvent(_ event: NDKEvent) async {
+        // During startup, handle nutzaps and spending history specially
+        if let startupRedemption = startupRedemption {
+            switch event.kind {
+            case EventKind.nutzap:
+                // Track nutzap for batch redemption after EOSE
+                await startupRedemption.trackNutzap(event)
+                // Also process normally to track in event manager
+                await eventManager.trackNutzap(event)
+                return
+                
+            case EventKind.cashuSpendingHistory:
+                // Process spending history to mark redeemed nutzaps
+                await startupRedemption.processSpendingHistory(event)
+                // Continue with normal processing
+                break
+                
+            default:
+                break
+            }
+        }
+        
         // Create context for handlers
         let context = WalletEventContext(
             wallet: self,
@@ -773,6 +828,7 @@ public actor NIP60Wallet: NDKPaymentProvider {
         walletConfigRelays = []
         newestConfigTimestamp = 0
         hasProcessedInitialConfig = false
+        
         
         // Cancel any existing subscriptions
         configSubscriptionTask?.cancel()
