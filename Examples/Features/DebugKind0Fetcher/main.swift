@@ -64,7 +64,7 @@ struct DebugKind0Fetcher {
             )
         ) { event in
             guard let data = event.content.data(using: .utf8),
-                  let profile = try? JSONDecoder().decode(NDKUserProfile.self, from: data) else {
+                  let profile = JSONCoding.safeDecode(NDKUserProfile.self, from: data) else {
                 return nil
             }
             return profile

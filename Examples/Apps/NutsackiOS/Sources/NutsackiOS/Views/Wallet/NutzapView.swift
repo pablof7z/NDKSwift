@@ -342,7 +342,7 @@ struct NutzapView: View {
             profileTask = Task {
                 for await event in profileDataSource.events {
                     if let profileData = event.content.data(using: .utf8),
-                       let profile = try? JSONDecoder().decode(NDKUserProfile.self, from: profileData) {
+                       let profile = JSONCoding.safeDecode(NDKUserProfile.self, from: profileData) {
                         await MainActor.run {
                             self.recipientProfile = profile
                         }
@@ -510,7 +510,7 @@ struct NutzapView: View {
         var profile: NDKUserProfile?
         for await event in profileDataSource.events {
             if let profileData = event.content.data(using: .utf8) {
-                profile = try? JSONDecoder().decode(NDKUserProfile.self, from: profileData)
+                profile = JSONCoding.safeDecode(NDKUserProfile.self, from: profileData)
                 break
             }
         }

@@ -201,7 +201,7 @@ struct TransactionRow: View {
                 
                 for await event in profileDataSource.events {
                     if let profileData = event.content.data(using: .utf8),
-                       let profile = try? JSONDecoder().decode(NDKUserProfile.self, from: profileData) {
+                       let profile = JSONCoding.safeDecode(NDKUserProfile.self, from: profileData) {
                         senderProfile = profile
                         break
                     }
