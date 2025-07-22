@@ -106,6 +106,10 @@ struct WalletView: View {
                                 Label("Wallet Settings", systemImage: "gearshape")
                             }
                             
+                            NavigationLink(value: WalletDestination.relayHealth) {
+                                Label("Relay Health", systemImage: "antenna.radiowaves.left.and.right")
+                            }
+                            
                             NavigationLink(value: WalletDestination.walletEvents) {
                                 Label("Token Events", systemImage: "doc.text")
                             }
