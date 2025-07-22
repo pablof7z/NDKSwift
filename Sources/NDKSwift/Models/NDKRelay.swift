@@ -310,7 +310,7 @@ actor RelayStateActor {
 /// 
 /// Example usage:
 /// ```swift
-/// let relay = NDKRelay(url: "wss://relay.example.com")
+/// let relay = NDKRelay(url: RelayConstants.example)
 /// try await relay.connect()
 /// 
 /// // Monitor connection state
