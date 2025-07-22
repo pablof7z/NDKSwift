@@ -293,7 +293,7 @@ public actor WalletTransactionHistory {
         // Extract nutzap data
         var amount: Int64 = 0
         for tag in event.tags {
-            if tag.count >= 2 && tag[0] == "proof" {
+            if tag.count >= 2 && tag[0] == NostrTagConstants.TagName.proof {
                 if let proofData = tag[1].data(using: .utf8),
                    let proof = try? JSONCoding.decode(CashuSwift.Proof.self, from: proofData) {
                     amount += Int64(proof.amount)
@@ -343,9 +343,9 @@ public actor WalletTransactionHistory {
         for tag in event.tags {
             if tag.count >= 2 {
                 switch tag[0] {
-                case "p":
+                case NostrTagConstants.TagName.pubkey:
                     recipient = tag[1]
-                case "proof":
+                case NostrTagConstants.TagName.proof:
                     if let proofData = tag[1].data(using: .utf8),
                        let proof = try? JSONCoding.decode(CashuSwift.Proof.self, from: proofData) {
                         amount += Int64(proof.amount)

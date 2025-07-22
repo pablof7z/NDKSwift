@@ -399,7 +399,7 @@ public enum Nutzap {
                 object: nil,
                 userInfo: [
                     "event": event,
-                    "amount": amount
+                    NostrJSONConstants.amount: amount
                 ]
             )
         }

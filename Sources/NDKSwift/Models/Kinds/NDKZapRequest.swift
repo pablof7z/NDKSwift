@@ -24,16 +24,16 @@ public struct NDKZapRequest {
         var tags: [[String]] = []
         
         // Required tags
-        tags.append(["p", recipient.pubkey])
+        tags.append([NostrTagConstants.TagName.pubkey, recipient.pubkey])
         tags.append(["relays"] + relays)
-        tags.append(["amount", String(amountMillisats)])
+        tags.append([NostrTagConstants.TagName.amount, String(amountMillisats)])
         
         // Optional: lnurl tag
         for await profile in await ndk.profileManager.observe(for: recipient.pubkey, maxAge: TimeConstants.hour) {
             if let profile = profile,
                let lnurl = profile.lud06 ?? profile.lud16 {
                 let encoded = try encodeLNURL(lnurl)
-                tags.append(["lnurl", encoded])
+                tags.append([NostrTagConstants.TagName.lnurl, encoded])
             }
             break // Only need first value
         }
@@ -41,12 +41,12 @@ public struct NDKZapRequest {
         // Optional: zapped event
         if let zappedEvent = zappedEvent {
             let eventId = zappedEvent.id
-            tags.append(["e", eventId])
+            tags.append([NostrTagConstants.TagName.event, eventId])
         }
         
         // Optional: zapped event coordinate (for addressable events)
         if let coordinate = zappedEventCoordinate {
-            tags.append(["a", coordinate])
+            tags.append([NostrTagConstants.TagName.address, coordinate])
         }
         
         let event = try await NDKEventBuilder()
@@ -62,7 +62,7 @@ public struct NDKZapRequest {
     
     /// Amount in millisatoshis
     public var amountMillisats: Int64? {
-        return event.tags.first(where: { $0.first == "amount" })?[safe: 1].flatMap { Int64($0) }
+        return event.tags.first(where: { $0.first == NostrTagConstants.TagName.amount })?[safe: 1].flatMap { Int64($0) }
     }
     
     /// Amount in satoshis
@@ -77,7 +77,7 @@ public struct NDKZapRequest {
     
     /// Recipient's pubkey
     public var recipientPubkey: String? {
-        return event.tags.first(where: { $0.first == "p" })?[safe: 1]
+        return event.tags.first(where: { $0.first == NostrTagConstants.TagName.pubkey })?[safe: 1]
     }
     
     /// Relays where the zap receipt should be published
