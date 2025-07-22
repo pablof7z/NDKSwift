@@ -8,6 +8,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Extended `NostrJSONConstants` with Cashu/wallet JSON field constants
+  - Added constants for Cashu proof fields: `amount`, `secret`, `C`, `proofs`, `proof`, `mint`, `unit`
+  - Added wallet event fields: `direction`, `state`
+  - Eliminates hardcoded JSON field names in wallet and Cashu-related code
+
+### Changed
+- Updated wallet and Cashu code to use `NostrTagConstants` and `NostrJSONConstants` instead of hardcoded strings
+  - `NDKNutzap` now uses tag constants for `amount`, `unit`, `proof`, `url`, `pubkey`, `event` tags
+  - `NDKZapRequest` now uses tag constants for `pubkey`, `amount`, `lnurl`, `event`, `address` tags
+  - `WalletEventManager` now uses tag constants for `proof` and `url` tags
+  - `WalletTransactionHistory` now uses tag constants for `proof` and `pubkey` tags
+  - `Nutzap` now uses JSON constants for notification userInfo
+
+### Added
 - `EventPublishingHelper` utility to eliminate duplicate `createAndPublish` patterns across event types
 - `SQLiteQueryBuilder` to consolidate SQL query building logic and eliminate code duplication
 - `RelayConstants` enum to centralize commonly used Nostr relay URLs
