@@ -33,10 +33,10 @@ class WalletManager {
     private let modelContext: ModelContext
     
     // Task for monitoring wallet events
-    private var walletEventTask: Task<Void, Never>?
+    private nonisolated(unsafe) var walletEventTask: Task<Void, Never>?
     
     // Task for monitoring transaction updates
-    private var transactionMonitorTask: Task<Void, Never>?
+    private nonisolated(unsafe) var transactionMonitorTask: Task<Void, Never>?
     
     
     init(nostrManager: NostrManager, modelContext: ModelContext) {
@@ -45,10 +45,9 @@ class WalletManager {
     }
     
     deinit {
-        Task { @MainActor in
-            walletEventTask?.cancel()
-            transactionMonitorTask?.cancel()
-        }
+        // Cancel tasks
+        walletEventTask?.cancel()
+        transactionMonitorTask?.cancel()
     }
     
     // MARK: - Wallet Operations
@@ -348,10 +347,7 @@ class WalletManager {
         modelContext.insert(transaction)
         try modelContext.save()
         
-        // Add to transactions array
-        await MainActor.run {
-            self.transactions.insert(transaction, at: 0)
-        }
+        // Transaction will be added when wallet event is processed
         
         return (token: token, transactionId: transaction.transactionID)
     }
@@ -372,10 +368,7 @@ class WalletManager {
         )
         transaction.status = .pending
         
-        // Add to transactions list immediately
-        await MainActor.run {
-            self.transactions.insert(transaction, at: 0)
-        }
+        // Transaction will be added when wallet event is processed
         
         do {
             // Select mint if not specified
@@ -514,10 +507,7 @@ class WalletManager {
         )
         transaction.status = .pending
         
-        // Add to transactions list immediately
-        await MainActor.run {
-            self.transactions.insert(transaction, at: 0)
-        }
+        // Transaction will be added when wallet event is processed
         
         do {
             var totalReceived: Int64 = 0
@@ -586,10 +576,7 @@ class WalletManager {
         transaction.status = .pending
         transaction.lightningInvoice = invoice
         
-        // Add to transactions list immediately
-        await MainActor.run {
-            self.transactions.insert(transaction, at: 0)
-        }
+        // Transaction will be added when wallet event is processed
         
         do {
             let (preimage, feePaid) = try await wallet.payLightning(
@@ -644,10 +631,7 @@ class WalletManager {
         transaction.status = .pending
         // Note: For outgoing nutzaps, we don't set senderPubkey as that's for incoming
         
-        // Add to transactions list immediately
-        await MainActor.run {
-            self.transactions.insert(transaction, at: 0)
-        }
+        // Transaction will be added when wallet event is processed
         
         do {
             // Create nutzap request
@@ -684,6 +668,84 @@ class WalletManager {
     }
     
     // MARK: - Mint Management
+    
+    /// Get current blacklisted mints
+    func getBlacklistedMints() async -> [String] {
+        guard let wallet = activeWallet else {
+            return []
+        }
+        
+        return Array(await wallet.getBlacklistedMints())
+    }
+    
+    /// Check if a mint is blacklisted
+    func isMintBlacklisted(_ mintURL: String) async -> Bool {
+        guard let wallet = activeWallet else {
+            return false
+        }
+        
+        let blacklistedMints = await wallet.getBlacklistedMints()
+        return blacklistedMints.contains(mintURL)
+    }
+    
+    /// Add a mint to the blacklist
+    func blacklistMint(_ mintURL: String) async throws {
+        guard let wallet = activeWallet else {
+            throw WalletError.noActiveWallet
+        }
+        
+        guard let ndk = nostrManager.ndk,
+              let signer = ndk.signer else {
+            throw WalletError.ndkNotInitialized
+        }
+        
+        // Get current blacklisted mints and add the new one
+        var blacklistedMints = await wallet.getBlacklistedMints()
+        blacklistedMints.insert(mintURL)
+        
+        // Publish updated blocked mints event
+        try await NDKBlockedMintsEvent.createAndPublish(
+            ndk: ndk,
+            blockedMints: Array(blacklistedMints),
+            signer: signer
+        )
+        
+        // Remove from wallet if currently added
+        let currentMints = await wallet.mints.getMintURLs()
+        if currentMints.contains(mintURL) {
+            if let url = URL(string: mintURL) {
+                _ = await wallet.mints.removeMint(url: url)
+            }
+            
+            // Update local mint list
+            await MainActor.run {
+                self.mintURLs = self.mintURLs.filter { $0 != mintURL }
+            }
+        }
+    }
+    
+    /// Remove a mint from the blacklist
+    func unblacklistMint(_ mintURL: String) async throws {
+        guard let wallet = activeWallet else {
+            throw WalletError.noActiveWallet
+        }
+        
+        guard let ndk = nostrManager.ndk,
+              let signer = ndk.signer else {
+            throw WalletError.ndkNotInitialized
+        }
+        
+        // Get current blacklisted mints and remove the specified one
+        var blacklistedMints = await wallet.getBlacklistedMints()
+        blacklistedMints.remove(mintURL)
+        
+        // Publish updated blocked mints event
+        try await NDKBlockedMintsEvent.createAndPublish(
+            ndk: ndk,
+            blockedMints: Array(blacklistedMints),
+            signer: signer
+        )
+    }
     
     
     

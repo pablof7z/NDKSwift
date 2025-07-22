@@ -1530,10 +1530,7 @@ public actor NDKSQLiteCache: NDKCache {
         // Encode filter as JSON for debugging purposes
         let filterJSON: String
         do {
-            let encoder = JSONEncoder()
-            encoder.outputFormatting = .sortedKeys
-            let data = try encoder.encode(filter)
-            filterJSON = String(data: data, encoding: .utf8) ?? "{}"
+            filterJSON = try JSONCoding.encodeToString(filter)
         } catch {
             filterJSON = "{}"
         }

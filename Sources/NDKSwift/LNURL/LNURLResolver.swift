@@ -102,8 +102,7 @@ public class LNURLResolver: LNURLResolving {
                 throw LNURLError.invalidResponse("HTTP request failed")
             }
             
-            let decoder = JSONDecoder()
-            return try decoder.decode(LNURLPayResponse.self, from: data)
+            return try JSONCoding.decode(LNURLPayResponse.self, from: data)
             
         } catch let error as LNURLError {
             throw error

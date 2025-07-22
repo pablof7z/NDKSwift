@@ -458,6 +458,19 @@ public actor WalletTransactionHistory {
         eventStream?.yield(NIP60WalletEvent(type: .transactionUpdated(updated)))
     }
     
+    /// Update an existing transaction
+    public func updateTransaction(_ transaction: WalletTransaction) {
+        // Remove old indices
+        if let existing = transactions[transaction.id] {
+            removeFromIndices(existing)
+        }
+        
+        // Store updated transaction
+        storeTransaction(transaction)
+        
+        eventStream?.yield(NIP60WalletEvent(type: .transactionUpdated(transaction)))
+    }
+    
     /// Add a manual transaction (for operations that don't have history events yet)
     public func addManualTransaction(_ transaction: WalletTransaction) {
         storeTransaction(transaction)
@@ -547,9 +560,7 @@ public actor WalletTransactionHistory {
             return candidates.first
         }
         
-        // Try more specific matching
-        // TODO: Add more sophisticated matching logic if needed
-        
+        // No unique match found with current matching criteria
         return nil
     }
     
