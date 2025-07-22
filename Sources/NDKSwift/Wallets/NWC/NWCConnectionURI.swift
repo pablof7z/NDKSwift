@@ -42,7 +42,7 @@ public struct NWCConnectionURI {
         }
         
         // Validate pubkey format (64 character hex)
-        guard pubkey.count == 64, pubkey.range(of: "^[0-9a-fA-F]{64}$", options: .regularExpression) != nil else {
+        guard HexValidator.isValid32ByteHex(pubkey) else {
             throw NDKError.invalidDataFormat("wallet public key", details: "Expected 64 character hex, got \(pubkey.count)")
         }
         self.walletPubkey = pubkey.lowercased()
@@ -73,7 +73,7 @@ public struct NWCConnectionURI {
         }
         
         // Validate secret format (64 character hex)
-        guard secret.count == 64, secret.range(of: "^[0-9a-fA-F]{64}$", options: .regularExpression) != nil else {
+        guard HexValidator.isValid32ByteHex(secret) else {
             throw NDKError.invalidDataFormat("client secret", details: "Expected 64 hex characters, got \(secret.count)")
         }
         self.secret = secret.lowercased()
@@ -85,11 +85,11 @@ public struct NWCConnectionURI {
     /// Initialize with individual components
     public init(walletPubkey: String, relayURLs: [String], secret: String, lud16: String? = nil) throws {
         // Validate inputs
-        guard walletPubkey.count == 64, walletPubkey.range(of: "^[0-9a-fA-F]{64}$", options: .regularExpression) != nil else {
+        guard HexValidator.isValid32ByteHex(walletPubkey) else {
             throw NDKError.invalidDataFormat("wallet public key", details: "Expected 64 character hex")
         }
         
-        guard secret.count == 64, secret.range(of: "^[0-9a-fA-F]{64}$", options: .regularExpression) != nil else {
+        guard HexValidator.isValid32ByteHex(secret) else {
             throw NDKError.invalidDataFormat("client secret", details: "Expected 64 character hex")
         }
         
