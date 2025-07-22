@@ -138,7 +138,7 @@ public final class NDKUser: Equatable, Hashable, Sendable {
         let dataSource = NDKDataSource(
             ndk: ndk,
             filter: filter,
-            maxAge: 86400 // 24 hours - relay lists rarely change
+            maxAge: TimeConstants.day // 24 hours - relay lists rarely change
         )
         
         // Collect all relay list events and use the most recent
@@ -251,7 +251,7 @@ public final class NDKUser: Equatable, Hashable, Sendable {
     /// Verify this user's NIP-05 identifier
     /// - Parameter maxAge: Maximum age before re-verification is needed (default: 24 hours)
     /// - Returns: True if the NIP-05 is verified and belongs to this user
-    public func verifyNIP05(maxAge: TimeInterval = 86400) async throws -> Bool {
+    public func verifyNIP05(maxAge: TimeInterval = TimeConstants.day) async throws -> Bool {
         guard let ndk = ndk else {
             throw NDKError.notConfigured("NDK instance not set")
         }
@@ -297,7 +297,7 @@ public final class NDKUser: Equatable, Hashable, Sendable {
         let dataSource = NDKDataSource(
             ndk: ndk,
             filter: filter,
-            maxAge: 300 // 5 minutes - payment methods don't change often
+            maxAge: 5 * TimeConstants.minute // 5 minutes - payment methods don't change often
         )
         
         // Collect all profile events

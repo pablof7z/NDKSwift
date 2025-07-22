@@ -203,7 +203,7 @@ public class NDKLightningZapProtocol: NDKZapProtocol {
     private func resolveLNURL(for user: NDKUser) async throws -> LNURLPayEndpoint {
         var userProfile: NDKUserProfile?
         
-        for await profile in await ndk.profileManager.observe(for: user.pubkey, maxAge: 3600) {
+        for await profile in await ndk.profileManager.observe(for: user.pubkey, maxAge: TimeConstants.hour) {
             userProfile = profile
             break // Only need first value
         }
@@ -355,7 +355,7 @@ public class NDKLightningZapProtocol: NDKZapProtocol {
         let dataSource = NDKDataSource(
             ndk: ndk,
             filter: relayListFilter,
-            maxAge: 3600 // 1 hour - relay lists don't change frequently
+            maxAge: TimeConstants.hour // 1 hour - relay lists don't change frequently
         )
         
         // Collect all relay list events and use the most recent

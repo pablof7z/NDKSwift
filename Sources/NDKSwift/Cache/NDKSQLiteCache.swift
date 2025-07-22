@@ -469,7 +469,7 @@ public actor NDKSQLiteCache: NDKCache {
         }
     }
     
-    public func isMintInfoStale(url: String, maxAge: TimeInterval = 86400) async -> Bool {
+    public func isMintInfoStale(url: String, maxAge: TimeInterval = TimeConstants.day) async -> Bool {
         let staleThreshold = Timestamp.now - Timestamp(maxAge)
         return (try? await dbQueue.read { db in
             if let lastUpdated = try Int64.fetchOne(db, sql: "SELECT last_updated FROM mint_info WHERE url = ?", arguments: [url]) {
@@ -622,7 +622,7 @@ public actor NDKSQLiteCache: NDKCache {
         }
     }
     
-    public func areKeysetsStale(mintUrl: String, maxAge: TimeInterval = 3600) async -> Bool {
+    public func areKeysetsStale(mintUrl: String, maxAge: TimeInterval = TimeConstants.hour) async -> Bool {
         let staleThreshold = Timestamp.now - Timestamp(maxAge)
         return (try? await dbQueue.read { db in
             if let oldestUpdate = try Int64.fetchOne(
@@ -1191,7 +1191,7 @@ public actor NDKSQLiteCache: NDKCache {
         }
     }
     
-    public func getUnpublishedEvents(maxAge: TimeInterval = 3600, limit: Int? = nil) async -> [(event: NDKEvent, targetRelays: Set<String>)] {
+    public func getUnpublishedEvents(maxAge: TimeInterval = TimeConstants.hour, limit: Int? = nil) async -> [(event: NDKEvent, targetRelays: Set<String>)] {
         let cutoffTime = Timestamp.now - Timestamp(maxAge)
         
         do {
@@ -1779,7 +1779,7 @@ public actor NDKSQLiteCache: NDKCache {
     }
     
     public func canVerifyDomain(_ domain: String) async -> Bool {
-        let rateLimitWindow: TimeInterval = 3600 // 1 hour
+        let rateLimitWindow: TimeInterval = TimeConstants.hour // 1 hour
         let maxAttemptsPerWindow = 10
         let now = Int64(Date().timeIntervalSince1970)
         
@@ -1810,7 +1810,7 @@ public actor NDKSQLiteCache: NDKCache {
     }
     
     public func recordDomainVerificationAttempt(_ domain: String) async {
-        let rateLimitWindow: TimeInterval = 3600 // 1 hour
+        let rateLimitWindow: TimeInterval = TimeConstants.hour // 1 hour
         let now = Int64(Date().timeIntervalSince1970)
         
         do {
