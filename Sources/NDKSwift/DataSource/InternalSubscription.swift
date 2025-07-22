@@ -260,8 +260,7 @@ actor InternalSubscription {
         }
         
         do {
-            let jsonData = try JSONSerialization.data(withJSONObject: message, options: [.withoutEscapingSlashes])
-            return String(data: jsonData, encoding: .utf8) ?? ""
+            return try JSONCoding.serializeToString(message)
         } catch {
             NDKLogger.log(.error, category: .subscription, "Failed to create REQ message: \(error)")
             return ""
@@ -273,8 +272,7 @@ actor InternalSubscription {
         let message: [Any] = ["CLOSE", id]
         
         do {
-            let jsonData = try JSONSerialization.data(withJSONObject: message, options: [.withoutEscapingSlashes])
-            return String(data: jsonData, encoding: .utf8) ?? ""
+            return try JSONCoding.serializeToString(message)
         } catch {
             NDKLogger.log(.error, category: .subscription, "Failed to create CLOSE message: \(error)")
             return ""
