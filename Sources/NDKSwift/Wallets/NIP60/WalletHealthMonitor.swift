@@ -137,7 +137,7 @@ public actor WalletHealthMonitor {
         mintManager: MintManager,
         signer: NDKSigner
     ) async throws -> ProofReconciliationResult {
-        print("🔍 Starting proof state reconciliation...")
+        NDKLogger.log(.debug, category: .wallet, "🔍 Starting proof state reconciliation...")
         
         // Group proofs by mint for efficient checking
         var proofsByMint: [String: [(proof: CashuSwift.Proof, entryKey: String)]] = [:]
@@ -164,7 +164,7 @@ public actor WalletHealthMonitor {
             // If not found, try to load it and add to mint manager
             if mint == nil, let url = URL(string: mintURL) {
                 do {
-                    print("🔄 Auto-loading mint: \(mintURL)")
+                    NDKLogger.log(.debug, category: .wallet, "🔄 Auto-loading mint: \(mintURL)")
                     let loadedMint = try await mintManager.loadMint(url: url)
                     
                     // Add to mint manager (following the pattern from requestMintQuote)
@@ -175,16 +175,16 @@ public actor WalletHealthMonitor {
                     }
                     
                     mint = loadedMint
-                    print("✅ Successfully loaded mint: \(mintURL)")
+                    NDKLogger.log(.debug, category: .wallet, "✅ Successfully loaded mint: \(mintURL)")
                 } catch {
-                    print("⚠️ Failed to load mint \(mintURL): \(error)")
+                    NDKLogger.log(.debug, category: .wallet, "⚠️ Failed to load mint \(mintURL): \(error)")
                     errorCount += 1
                     continue
                 }
             }
             
             guard let mint = mint else {
-                print("⚠️ Mint not found for URL: \(mintURL)")
+                NDKLogger.log(.debug, category: .wallet, "⚠️ Mint not found for URL: \(mintURL)")
                 errorCount += 1
                 continue
             }
@@ -192,7 +192,7 @@ public actor WalletHealthMonitor {
             let proofs = proofEntries.map { $0.proof }
             
             do {
-                print("🏦 Checking \(proofs.count) proofs with mint: \(mintURL)")
+                NDKLogger.log(.debug, category: .wallet, "🏦 Checking \(proofs.count) proofs with mint: \(mintURL)")
                 
                 // Query mint for proof states
                 let states = try await CashuSwift.check(proofs, mint: mint)
@@ -203,7 +203,7 @@ public actor WalletHealthMonitor {
                     
                     switch state {
                     case .spent:
-                        print("💸 Found spent proof: \(proofEntry.proof.C.suffix(8))")
+                        NDKLogger.log(.debug, category: .wallet, "💸 Found spent proof: \(proofEntry.proof.C.suffix(8))")
                         spentProofs.append(proofEntry.proof)
                         if spentProofsByMint[mintURL] == nil {
                             spentProofsByMint[mintURL] = []
@@ -211,7 +211,7 @@ public actor WalletHealthMonitor {
                         spentProofsByMint[mintURL]?.append(proofEntry.proof)
                         
                     case .pending:
-                        print("⏳ Found pending proof: \(proofEntry.proof.C.suffix(8))")
+                        NDKLogger.log(.debug, category: .wallet, "⏳ Found pending proof: \(proofEntry.proof.C.suffix(8))")
                         pendingProofs.append(proofEntry.proof)
                         
                     case .unspent:
@@ -221,14 +221,14 @@ public actor WalletHealthMonitor {
                 }
                 
             } catch {
-                print("❌ Error checking mint \(mintURL): \(error)")
+                NDKLogger.log(.debug, category: .wallet, "❌ Error checking mint \(mintURL): \(error)")
                 errorCount += 1
             }
         }
         
         // Update proof state manager with spent proofs
         if !spentProofs.isEmpty {
-            print("🗑️ Marking \(spentProofs.count) proofs as spent")
+            NDKLogger.log(.debug, category: .wallet, "🗑️ Marking \(spentProofs.count) proofs as spent")
             await proofStateManager.markProofsAsDeleted(spentProofs)
             
             // Update wallet state if we found spent proofs
@@ -257,7 +257,7 @@ public actor WalletHealthMonitor {
         }
         
         let totalChecked = proofsByMint.values.flatMap { $0 }.count
-        print("✅ Reconciliation complete. Checked: \(totalChecked), Spent: \(spentProofs.count), Pending: \(pendingProofs.count)")
+        NDKLogger.log(.debug, category: .wallet, "✅ Reconciliation complete. Checked: \(totalChecked), Spent: \(spentProofs.count), Pending: \(pendingProofs.count)")
         
         return ProofReconciliationResult(
             totalChecked: totalChecked,
