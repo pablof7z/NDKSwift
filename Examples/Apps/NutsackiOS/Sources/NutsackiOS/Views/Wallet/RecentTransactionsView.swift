@@ -73,6 +73,11 @@ struct TransactionRow: View {
     }
     
     var color: Color {
+        // Failed transactions should always show in red
+        if transaction.status == .failed {
+            return .red
+        }
+        
         switch transaction.type {
         case .mint, .deposit, .receive, .nutzap: return .green  // Nutzaps are received, so green
         case .melt, .withdraw, .send: return .orange
@@ -81,6 +86,11 @@ struct TransactionRow: View {
     }
     
     var sign: String {
+        // Don't show a sign for failed transactions
+        if transaction.status == .failed {
+            return ""
+        }
+        
         switch transaction.direction {
         case .incoming: return "+"
         case .outgoing: return "-"
@@ -127,12 +137,22 @@ struct TransactionRow: View {
                     .frame(width: 30, height: 30)
                     .clipShape(Circle())
                     
-                    // Overlay zap icon
-                    Image(systemName: "bolt.heart.fill")
-                        .font(.caption2)
-                        .foregroundColor(.yellow)
-                        .background(Circle().fill(.white).frame(width: 12, height: 12))
-                        .offset(x: 10, y: -10)
+                    // Overlay icon based on status
+                    if transaction.status == .failed {
+                        // Failed icon
+                        Image(systemName: "xmark.circle.fill")
+                            .font(.caption)
+                            .foregroundColor(.red)
+                            .background(Circle().fill(.white).frame(width: 14, height: 14))
+                            .offset(x: 10, y: -10)
+                    } else {
+                        // Normal zap icon
+                        Image(systemName: "bolt.heart.fill")
+                            .font(.caption2)
+                            .foregroundColor(.yellow)
+                            .background(Circle().fill(.white).frame(width: 12, height: 12))
+                            .offset(x: 10, y: -10)
+                    }
                 }
                 .frame(width: 30, height: 30)
             } else {
@@ -197,7 +217,7 @@ struct TransactionRow: View {
         .buttonStyle(.plain)
         .padding(.horizontal, 12)
         .padding(.vertical, 8)
-        .opacity(transaction.status == .pending ? 0.85 : 1.0)
+        .opacity(transaction.status == .pending ? 0.85 : (transaction.status == .failed ? 0.7 : 1.0))
         .sheet(isPresented: $showDetailDrawer) {
             TransactionDetailDrawer(transaction: transaction)
         }

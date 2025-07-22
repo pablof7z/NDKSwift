@@ -225,3 +225,10 @@ public enum NutzapStatusFilter: Sendable {
     case failed
     case retryableFailed
 }
+
+// MARK: - LocalizedError conformance
+extension NutzapRedemptionError: LocalizedError {
+    public var errorDescription: String? {
+        return userFriendlyMessage
+    }
+}

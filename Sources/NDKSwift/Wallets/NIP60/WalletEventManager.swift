@@ -199,7 +199,7 @@ public actor WalletEventManager {
         signer: NDKSigner
     ) async throws {
         NDKLogger.log(.info, category: .wallet, "📝 Creating spending history event: \(direction) \(amount) sats - \(memo ?? "no memo")")
-        let event = try await NDKCashuSpendingHistory.createAndPublish(
+        _ = try await NDKCashuSpendingHistory.createAndPublish(
             ndk: ndk,
             direction: direction,
             amount: amount,
