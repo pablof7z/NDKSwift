@@ -1,5 +1,3 @@
-import Foundation
-
 /// Extension to simplify tag validation and extraction in Nostr events
 public extension Array where Element == [String] {
     /// Extracts all tags with the specified name

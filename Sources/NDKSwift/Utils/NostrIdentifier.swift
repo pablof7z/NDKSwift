@@ -1,5 +1,3 @@
-import Foundation
-
 /// Utilities for working with Nostr identifiers (hex and bech32)
 public enum NostrIdentifier {
     
