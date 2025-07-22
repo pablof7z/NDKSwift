@@ -1,5 +1,3 @@
-import Foundation
-
 // MARK: - NDKBlockedMintsEvent
 
 /// NIP-60 Blocked Mints Event (kind: 10020)

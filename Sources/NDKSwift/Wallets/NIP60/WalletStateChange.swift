@@ -1,4 +1,3 @@
-import Foundation
 import CashuSwift
 
 /// Represents a change to wallet state - what proofs to store, destroy, or reserve

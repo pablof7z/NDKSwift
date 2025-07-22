@@ -1,5 +1,3 @@
-import Foundation
-
 /// Extensions for NDKEvent to handle user interactions (NIP-09, NIP-18, NIP-25)
 public extension NDKEvent {
     
