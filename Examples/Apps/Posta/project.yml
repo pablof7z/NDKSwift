@@ -11,7 +11,7 @@ settings:
     CURRENT_PROJECT_VERSION: "1"
 packages:
   NDKSwift:
-    path: ../..
+    path: ../../..
 targets:
   Posta:
     type: application

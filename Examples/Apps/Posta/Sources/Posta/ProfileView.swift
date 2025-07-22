@@ -18,7 +18,8 @@ struct ProfileView: View {
     @State private var followerCount: Int?
     @State private var isFollowing = false
     @State private var showingQRCode = false
-    @State private var notesSubscription: NDKSubscription?
+    @State private var notesDataSource: NDKDataSource<NDKEvent>?
+    @State private var notesTask: Task<Void, Never>?
     @State private var profileTask: Task<Void, Never>?
     
     var body: some View {
@@ -68,7 +69,7 @@ struct ProfileView: View {
         }
         .onDisappear {
             Task {
-                await notesSubscription?.close()
+                notesTask?.cancel()
             }
             profileTask?.cancel()
         }
@@ -408,9 +409,9 @@ struct ProfileView: View {
     private func loadProfile() async {
         guard let ndk = ndkManager.ndk else { return }
         
-        // Use the new observeProfile API for reactive profile updates
+        // Use the observeProfile API for reactive profile updates
         profileTask = Task {
-            let profileStream = await ndk.observeProfile(for: displayPubkey)
+            let profileStream = await ndk.profileManager.observe(for: displayPubkey)
             
             for await profileUpdate in profileStream {
                 await MainActor.run {
@@ -431,20 +432,19 @@ struct ProfileView: View {
             limit: 50
         )
         
-        notesSubscription = await ndk.subscribe(filters: [filter])
+        notesDataSource = ndk.observe(
+            filter: filter,
+            cachePolicy: .cacheWithNetwork
+        )
         
-        if let subscription = notesSubscription {
-            Task {
-                do {
-                    for try await event in subscription {
-                        // Insert new note in sorted order
-                        if !notes.contains(where: { $0.id == event.id }) {
-                            notes.append(event)
-                            notes.sort { $0.createdAt > $1.createdAt }
-                        }
+        if let dataSource = notesDataSource {
+            notesTask = Task {
+                for await event in dataSource.events {
+                    // Insert new note in sorted order
+                    if !notes.contains(where: { $0.id == event.id }) {
+                        notes.append(event)
+                        notes.sort { $0.createdAt > $1.createdAt }
                     }
-                } catch {
-                    print("Subscription error: \(error)")
                 }
             }
         }

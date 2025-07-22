@@ -350,13 +350,13 @@ class NostrManager {
                 let relayChanges = await ndk.relayChanges
                 for await change in relayChanges {
                     switch change {
-                    case .relayConnected(let relay):
+                    case .relayConnected(_):
                         return // Exit successfully
-                    case .relayDisconnected(let relay):
+                    case .relayDisconnected(_):
                         continue // Keep waiting
-                    case .relayAdded(let relay):
+                    case .relayAdded(_):
                         continue // Keep waiting for connection
-                    case .relayRemoved(let url):
+                    case .relayRemoved(_):
                         continue // Keep waiting
                     }
                 }

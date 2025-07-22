@@ -13,8 +13,10 @@ class SubscriptionManager: ObservableObject {
     private var ndk: NDK?
     private var currentUserPubkey: String?
     
-    private var followSubscription: NDKSubscription?
-    private var notesSubscription: NDKSubscription?
+    private var followDataSource: NDKDataSource<NDKEvent>?
+    private var notesDataSource: NDKDataSource<NDKEvent>?
+    private var followTask: Task<Void, Never>?
+    private var notesTask: Task<Void, Never>?
     
     private var hasEOSEd = false
     private var mostRecentFollowEvent: NDKEvent?
@@ -25,15 +27,29 @@ class SubscriptionManager: ObservableObject {
         self.ndk = ndk
         self.currentUserPubkey = userPubkey
         
+        print("SubscriptionManager - Initializing for user: \(userPubkey)")
+        
+        // Ensure we have connected relays before starting
+        let (connected, total) = await ndk.getRelayConnectionSummary()
+        print("SubscriptionManager - Connected relays: \(connected)/\(total)")
+        
+        if connected == 0 {
+            print("SubscriptionManager - No connected relays, waiting...")
+            // Wait a bit for relays to connect
+            try? await Task.sleep(nanoseconds: 2_000_000_000) // 2 seconds
+            let (retriedConnected, retriedTotal) = await ndk.getRelayConnectionSummary()
+            print("SubscriptionManager - After wait, connected relays: \(retriedConnected)/\(retriedTotal)")
+        }
+        
         // Start the follow list subscription
         await startFollowSubscription()
     }
     
     func cleanup() async {
-        await followSubscription?.close()
-        await notesSubscription?.close()
-        followSubscription = nil
-        notesSubscription = nil
+        followTask?.cancel()
+        notesTask?.cancel()
+        followDataSource = nil
+        notesDataSource = nil
         hasEOSEd = false
         mostRecentFollowEvent = nil
         notes.removeAll()
@@ -45,32 +61,35 @@ class SubscriptionManager: ObservableObject {
         
         isLoadingFollows = true
         
+        print("SubscriptionManager - Starting follow subscription for user: \(userPubkey)")
+        
         // Create filter for kind:3 (follow list) events from the current user
         let followFilter = NDKFilter(
             authors: [userPubkey],
-            kinds: [EventKind.contacts]
+            kinds: [EventKind.contacts],
+            limit: 1  // We only need the latest contact list
         )
         
-        // Subscribe to follow list events
-        followSubscription = await ndk.subscribe(
-            filters: [followFilter],
-            closeOnEose: false  // Keep subscription open for updates
+        // Subscribe to follow list events using observe
+        // Use .networkOnly to ensure we get fresh data
+        followDataSource = ndk.observe(
+            filter: followFilter,
+            cachePolicy: .networkOnly
         )
         
-        Task {
-            do {
-                for try await event in followSubscription! {
-                    await processFollowEvent(event)
-                }
-            } catch {
-                print("Follow subscription error: \(error)")
+        // Start observing events
+        followTask = Task {
+            // Wait for the first kind:3 event
+            for await event in followDataSource!.events {
+                print("SubscriptionManager - Received kind:3 event with \(event.tags.count) tags")
+                await processFollowEvent(event)
+                
+                // After processing the first event, we have our contact list
+                await handleFollowEOSE()
+                
+                // Continue listening for updates to the contact list
+                // (The loop continues to catch any future updates)
             }
-        }
-        
-        // Listen for EOSE
-        Task {
-            await followSubscription!.waitForEOSE()
-            await handleFollowEOSE()
         }
     }
     
@@ -87,6 +106,7 @@ class SubscriptionManager: ObservableObject {
                 }
             }
             
+            print("SubscriptionManager - Parsed \(newFollowList.count) contacts from kind:3 event")
             latestFollowList = newFollowList
             
             // If we've already EOSEd, restart the notes subscription
@@ -100,6 +120,8 @@ class SubscriptionManager: ObservableObject {
         hasEOSEd = true
         isLoadingFollows = false
         
+        print("SubscriptionManager - Follow list loaded, starting notes subscription")
+        
         // Start the notes subscription now that we have the follow list
         await startNotesSubscription()
         
@@ -108,12 +130,16 @@ class SubscriptionManager: ObservableObject {
     }
     
     private func startNotesSubscription() async {
-        guard let ndk = ndk, !latestFollowList.isEmpty else { return }
+        guard let ndk = ndk, !latestFollowList.isEmpty else { 
+            print("SubscriptionManager - Cannot start notes subscription: ndk=\(ndk != nil), followList=\(latestFollowList.count)")
+            return 
+        }
         
+        print("SubscriptionManager - Starting notes subscription for \(latestFollowList.count) authors")
         isLoadingNotes = true
         
-        // Close existing notes subscription if any
-        await notesSubscription?.close()
+        // Cancel existing notes task if any
+        notesTask?.cancel()
         
         // Create filter for kind:1 notes from followed users
         let notesFilter = NDKFilter(
@@ -121,26 +147,27 @@ class SubscriptionManager: ObservableObject {
             kinds: [EventKind.textNote]
         )
         
-        // Subscribe to notes
-        notesSubscription = await ndk.subscribe(
-            filters: [notesFilter],
-            closeOnEose: false  // Keep subscription open for real-time updates
+        // Subscribe to notes using observe
+        notesDataSource = ndk.observe(
+            filter: notesFilter,
+            cachePolicy: .cacheWithNetwork
         )
         
-        Task {
-            do {
-                for try await event in notesSubscription! {
-                    await processNoteEvent(event)
+        // Start observing notes
+        notesTask = Task {
+            var receivedInitialEvents = false
+            for await event in notesDataSource!.events {
+                await processNoteEvent(event)
+                
+                // After receiving some events, set loading to false
+                if !receivedInitialEvents {
+                    receivedInitialEvents = true
+                    Task {
+                        try? await Task.sleep(nanoseconds: 500_000_000) // 0.5 seconds
+                        isLoadingNotes = false
+                    }
                 }
-            } catch {
-                print("Notes subscription error: \(error)")
             }
-        }
-        
-        // Set loading to false after initial EOSE
-        Task {
-            await notesSubscription!.waitForEOSE()
-            isLoadingNotes = false
         }
     }
     

@@ -1,9 +1,11 @@
 import Foundation
 import NDKSwift
 import Combine
+import Observation
 
 @MainActor
-class RelayManager: ObservableObject {
+@Observable
+class RelayManager {
     struct RelayInfo: Identifiable, Codable {
         let id = UUID()
         var url: String
@@ -16,10 +18,11 @@ class RelayManager: ObservableObject {
         }
     }
     
-    @Published var relays: [RelayInfo] = []
+    var relays: [RelayInfo] = []
     private var ndk: NDK?
     private var relayCollection: NDKRelayCollection?
     private var cancellables = Set<AnyCancellable>()
+    var error: Error?
     
     private let defaultRelays = [
         "wss://relay.damus.io",

@@ -23,7 +23,7 @@ struct DebugLoggingView: View {
                     Text("Debug").tag(NDKLogLevel.debug.rawValue)
                     Text("Trace").tag(NDKLogLevel.trace.rawValue)
                 }
-                .onChange(of: logLevel) { _ in
+                .onChange(of: logLevel) {
                     applyLogLevel()
                     hasChanges = true
                 }
@@ -36,14 +36,14 @@ struct DebugLoggingView: View {
             // Network Logging Section
             Section {
                 Toggle("Log Network Traffic", isOn: $logNetworkTraffic)
-                    .onChange(of: logNetworkTraffic) { _ in
+                    .onChange(of: logNetworkTraffic) {
                         NDKLogger.logNetworkTraffic = logNetworkTraffic
                         hasChanges = true
                     }
                 
                 Toggle("Pretty Print Messages", isOn: $prettyPrintNetworkMessages)
                     .disabled(!logNetworkTraffic)
-                    .onChange(of: prettyPrintNetworkMessages) { _ in
+                    .onChange(of: prettyPrintNetworkMessages) {
                         NDKLogger.prettyPrintNetworkMessages = prettyPrintNetworkMessages
                         hasChanges = true
                     }
@@ -232,7 +232,7 @@ struct DebugLoggingView: View {
         logLevel = NDKLogLevel.warning.rawValue
         logNetworkTraffic = false
         prettyPrintNetworkMessages = false
-        enabledCategories = [.error, .security]
+        enabledCategories = [.general, .security]
         
         applyLogLevel()
         applyCategories()
