@@ -32,9 +32,8 @@ final class NDKSignerRegistryTests: XCTestCase {
         XCTAssertNotNil(signer)
         // Verify it's a private key signer by checking pubkey
         let signerPubkey = try await signer.pubkey
-        // Just verify it's a valid pubkey (64 char hex)
-        XCTAssertEqual(signerPubkey.count, 64)
-        XCTAssertTrue(signerPubkey.allSatisfy { $0.isHexDigit })
+        // Verify it's a valid 32-byte pubkey
+        XCTAssertTrue(HexValidator.isValid32ByteHex(signerPubkey))
     }
     
     // MARK: - Custom Signer Registration Tests
