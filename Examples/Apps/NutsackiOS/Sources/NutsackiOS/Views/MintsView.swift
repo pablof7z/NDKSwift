@@ -100,7 +100,7 @@ struct MintsView: View {
     }
     
     private func loadMints() async {
-        guard let wallet = walletManager.activeWallet else { 
+        guard walletManager.activeWallet != nil else { 
             await MainActor.run {
                 isLoading = false
             }

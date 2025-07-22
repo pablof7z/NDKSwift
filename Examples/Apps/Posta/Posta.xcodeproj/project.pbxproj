@@ -3,7 +3,7 @@
 	archiveVersion = 1;
 	classes = {
 	};
-	objectVersion = 63;
+	objectVersion = 54;
 	objects = {
 
 /* Begin PBXBuildFile section */
@@ -11,7 +11,6 @@
 		1089942926B933752761F2EF /* SplashView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1582DA2D0964FB86FFD22737 /* SplashView.swift */; };
 		11ACF5202A0A6CD1804D99E2 /* PrivacySettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CABF96A49CF7DCDEA2A81490 /* PrivacySettingsView.swift */; };
 		15DF43D8E7C3FFF42A66F674 /* AccountSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA715CB14D15CD0742DCB3F8 /* AccountSettingsView.swift */; };
-		271ABE552E295BB300143D62 /* NDKSwift in Frameworks */ = {isa = PBXBuildFile; productRef = 271ABE542E295BB300143D62 /* NDKSwift */; };
 		34A3155A8F4A7FFC920E2E2D /* PostaAuthView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1012AEA99F138AE75498AF50 /* PostaAuthView.swift */; };
 		6A1C3CE24E1DE3A27D51523A /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7FC51DF064CDBF43562A49B7 /* ContentView.swift */; };
 		6C97E674C32B0E1C93C8487A /* RelayManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0D7BB846C97E0CE4754F485A /* RelayManager.swift */; };
@@ -39,19 +38,19 @@
 		1012AEA99F138AE75498AF50 /* PostaAuthView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PostaAuthView.swift; sourceTree = "<group>"; };
 		1582DA2D0964FB86FFD22737 /* SplashView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SplashView.swift; sourceTree = "<group>"; };
 		22FA6D73D50DF5AF2CCCF558 /* AdvancedSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AdvancedSettingsView.swift; sourceTree = "<group>"; };
-		337E36311AB841CE15B215F3 /* Posta.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Posta.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		337E36311AB841CE15B215F3 /* Posta.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = Posta.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		409933079609CEDCF33B802B /* ThemeManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ThemeManager.swift; sourceTree = "<group>"; };
 		473DF610696C7C8D6BE3D7C9 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		49A90AAD5FC23A2B0F94BDC7 /* RelaySettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RelaySettingsView.swift; sourceTree = "<group>"; };
 		4FFAA2438B334E8D89CA9115 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		57E4286C68B29F1067E1E5E9 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
 		723539740E0D28EEC30522D9 /* HomeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeView.swift; sourceTree = "<group>"; };
+		72D6BFBD33E98D40E63B673F /* NDKSwift */ = {isa = PBXFileReference; lastKnownFileType = folder; name = NDKSwift; path = ../../..; sourceTree = SOURCE_ROOT; };
 		7AA98904E3EA794C29708D45 /* ProfileView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProfileView.swift; sourceTree = "<group>"; };
 		7FC51DF064CDBF43562A49B7 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
 		91767EC64A1E67DD57D491CA /* PostaApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PostaApp.swift; sourceTree = "<group>"; };
 		986A841F13D6BA43B035F2A6 /* NotificationSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotificationSettingsView.swift; sourceTree = "<group>"; };
 		AA715CB14D15CD0742DCB3F8 /* AccountSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AccountSettingsView.swift; sourceTree = "<group>"; };
-		B34D563ED0B52F02C166DE78 /* NDKSwift-sfodj5 */ = {isa = PBXFileReference; lastKnownFileType = folder; name = "NDKSwift-sfodj5"; path = ../..; sourceTree = SOURCE_ROOT; };
 		B88397F1C4B9DC130C6BF474 /* VisualEffectBlur.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VisualEffectBlur.swift; sourceTree = "<group>"; };
 		BEDEBABCCA89FA3B2EC9CF49 /* NDKManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NDKManager.swift; sourceTree = "<group>"; };
 		CABF96A49CF7DCDEA2A81490 /* PrivacySettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PrivacySettingsView.swift; sourceTree = "<group>"; };
@@ -64,7 +63,6 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				271ABE552E295BB300143D62 /* NDKSwift in Frameworks */,
 				CC71AFB2EBB3A74CB1B743A0 /* NDKSwift in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -75,7 +73,7 @@
 		65488ADDDECC7D7E75BA08EA /* Packages */ = {
 			isa = PBXGroup;
 			children = (
-				B34D563ED0B52F02C166DE78 /* NDKSwift-sfodj5 */,
+				72D6BFBD33E98D40E63B673F /* NDKSwift */,
 			);
 			name = Packages;
 			sourceTree = "<group>";
@@ -145,7 +143,6 @@
 			name = Posta;
 			packageProductDependencies = (
 				BCF0556AD7A95C6D64794BE7 /* NDKSwift */,
-				271ABE542E295BB300143D62 /* NDKSwift */,
 			);
 			productName = Posta;
 			productReference = 337E36311AB841CE15B215F3 /* Posta.app */;
@@ -159,6 +156,11 @@
 			attributes = {
 				BuildIndependentTargetsInParallel = YES;
 				LastUpgradeCheck = 1430;
+				TargetAttributes = {
+					2AAE453AA4C67B9374ADE9D4 = {
+						DevelopmentTeam = "";
+					};
+				};
 			};
 			buildConfigurationList = 1DB44697353CD6786C536FFF /* Build configuration list for PBXProject "Posta" */;
 			compatibilityVersion = "Xcode 14.0";
@@ -171,8 +173,9 @@
 			mainGroup = 793456AB7C2E3E1702AB7702;
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
-				722C516399829E67DE90D713 /* XCLocalSwiftPackageReference "../.." */,
+				97AD969B8512E9D4488CD991 /* XCLocalSwiftPackageReference "../../.." */,
 			);
+			preferredProjectObjectVersion = 54;
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
@@ -288,7 +291,6 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
-				DEVELOPMENT_TEAM = 456SHKPP26;
 				INFOPLIST_FILE = Sources/Posta/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -307,7 +309,6 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
-				DEVELOPMENT_TEAM = 456SHKPP26;
 				INFOPLIST_FILE = Sources/Posta/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -412,17 +413,13 @@
 /* End XCConfigurationList section */
 
 /* Begin XCLocalSwiftPackageReference section */
-		722C516399829E67DE90D713 /* XCLocalSwiftPackageReference "../.." */ = {
+		97AD969B8512E9D4488CD991 /* XCLocalSwiftPackageReference "../../.." */ = {
 			isa = XCLocalSwiftPackageReference;
-			relativePath = ../..;
+			relativePath = ../../..;
 		};
 /* End XCLocalSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
-		271ABE542E295BB300143D62 /* NDKSwift */ = {
-			isa = XCSwiftPackageProductDependency;
-			productName = NDKSwift;
-		};
 		BCF0556AD7A95C6D64794BE7 /* NDKSwift */ = {
 			isa = XCSwiftPackageProductDependency;
 			productName = NDKSwift;

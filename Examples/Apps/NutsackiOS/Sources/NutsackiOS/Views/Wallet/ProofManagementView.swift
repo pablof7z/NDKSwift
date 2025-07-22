@@ -215,7 +215,7 @@ struct ProofManagementView: View {
         }
         
         // Validate proofs for each mint
-        for (mint, proofs) in groupedProofs {
+        for (mint, _) in groupedProofs {
             guard let mintURL = URL(string: mint) else { continue }
             
             do {
@@ -244,7 +244,7 @@ struct ProofManagementView: View {
         
         do {
             // Get the proofs to delete
-            let proofsToDelete = allProofEntries
+            _ = allProofEntries
                 .filter { selectedProofs.contains($0.proof.C) }
                 .map { $0.proof }
             

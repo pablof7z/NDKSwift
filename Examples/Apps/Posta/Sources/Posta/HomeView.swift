@@ -309,7 +309,7 @@ struct ChatRowView: View {
         .task {
             if profile == nil, let ndk = ndkManager.ndk {
                 profileTask = Task {
-                    let profileStream = await ndk.observeProfile(for: event.pubkey)
+                    let profileStream = await ndk.profileManager.observe(for: event.pubkey)
                     
                     for await profileUpdate in profileStream {
                         if let profile = profileUpdate {

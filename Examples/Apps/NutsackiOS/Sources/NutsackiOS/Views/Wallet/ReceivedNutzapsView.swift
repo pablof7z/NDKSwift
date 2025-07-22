@@ -166,7 +166,7 @@ struct ReceivedNutzapsView: View {
 
 // MARK: - NutzapInfo Extension
 
-extension NutzapInfo: Identifiable {
+extension NutzapInfo: @retroactive Identifiable {
     public var id: String { eventId }
 }
 

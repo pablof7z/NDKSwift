@@ -16,37 +16,124 @@ struct CreateAccountView: View {
     
     var body: some View {
         NavigationStack {
-            Form {
-                Section {
-                    TextField("Display Name", text: $displayName)
-                        .textContentType(.name)
-                    
-                    TextField("About (optional)", text: $about, axis: .vertical)
-                        .lineLimit(3...6)
-                } header: {
-                    Text("Profile Information")
-                } footer: {
-                    Text("This information will be public on Nostr")
-                }
+            ZStack {
+                // Dark gradient background
+                LinearGradient(
+                    gradient: Gradient(colors: [
+                        Color(red: 0.05, green: 0.02, blue: 0.08),
+                        Color(red: 0.02, green: 0.01, blue: 0.03),
+                        Color.black
+                    ]),
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                )
+                .ignoresSafeArea()
                 
-                Section {
-                    Button(action: createAccount) {
-                        if isCreating {
-                            ProgressView()
-                                .frame(maxWidth: .infinity)
-                        } else {
-                            Text("Create Account")
-                                .frame(maxWidth: .infinity)
+                ScrollView {
+                    VStack(spacing: 30) {
+                        // Header
+                        VStack(spacing: 16) {
+                            ZStack {
+                                Circle()
+                                    .fill(
+                                        LinearGradient(
+                                            gradient: Gradient(colors: [
+                                                Color.orange.opacity(0.3),
+                                                Color.purple.opacity(0.2)
+                                            ]),
+                                            startPoint: .topLeading,
+                                            endPoint: .bottomTrailing
+                                        )
+                                    )
+                                    .frame(width: 80, height: 80)
+                                    .blur(radius: 20)
+                                
+                                Image(systemName: "bolt.fill")
+                                    .font(.system(size: 40))
+                                    .foregroundColor(.orange)
+                            }
+                            
+                            Text("Create Your Wallet")
+                                .font(.system(size: 28, weight: .bold))
+                                .foregroundColor(.white)
+                            
+                            Text("Your gateway to the Lightning Network")
+                                .font(.system(size: 14))
+                                .foregroundColor(Color.white.opacity(0.6))
                         }
+                        .padding(.top, 40)
+                        
+                        // Form fields
+                        VStack(spacing: 20) {
+                            VStack(alignment: .leading, spacing: 8) {
+                                Text("Display Name")
+                                    .font(.system(size: 14, weight: .medium))
+                                    .foregroundColor(Color.white.opacity(0.8))
+                                
+                                TextField("", text: $displayName)
+                                    .textFieldStyle(DarkTextFieldStyle())
+                                    .textContentType(.name)
+                            }
+                            
+                            VStack(alignment: .leading, spacing: 8) {
+                                Text("About (optional)")
+                                    .font(.system(size: 14, weight: .medium))
+                                    .foregroundColor(Color.white.opacity(0.8))
+                                
+                                TextField("", text: $about, axis: .vertical)
+                                    .textFieldStyle(DarkTextFieldStyle())
+                                    .lineLimit(3...6)
+                            }
+                            
+                            Text("This information will be public on Nostr")
+                                .font(.system(size: 12))
+                                .foregroundColor(Color.white.opacity(0.4))
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                        }
+                        .padding(.horizontal, 24)
+                        
+                        // Create button
+                        Button(action: createAccount) {
+                            ZStack {
+                                if isCreating {
+                                    ProgressView()
+                                        .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                                } else {
+                                    HStack {
+                                        Image(systemName: "bolt.fill")
+                                        Text("Create Wallet")
+                                            .fontWeight(.semibold)
+                                    }
+                                }
+                            }
+                            .frame(maxWidth: .infinity)
+                            .frame(height: 56)
+                            .background(
+                                LinearGradient(
+                                    gradient: Gradient(colors: [
+                                        displayName.isEmpty ? Color.gray : Color.orange,
+                                        displayName.isEmpty ? Color.gray.opacity(0.8) : Color(red: 0.9, green: 0.5, blue: 0.1)
+                                    ]),
+                                    startPoint: .leading,
+                                    endPoint: .trailing
+                                )
+                            )
+                            .foregroundColor(.white)
+                            .clipShape(RoundedRectangle(cornerRadius: 16))
+                            .shadow(color: displayName.isEmpty ? Color.clear : Color.orange.opacity(0.3), radius: 10, x: 0, y: 4)
+                        }
+                        .disabled(displayName.isEmpty || isCreating)
+                        .padding(.horizontal, 24)
+                        .padding(.top, 20)
                     }
-                    .disabled(displayName.isEmpty || isCreating)
+                    .padding(.bottom, 40)
                 }
             }
-            .navigationTitle("Create Account")
-            .platformNavigationBarTitleDisplayMode(inline: true)
+            .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") { dismiss() }
+                        .foregroundColor(.orange)
                 }
             }
             .alert("Error", isPresented: $showError) {
@@ -108,6 +195,22 @@ struct CreateAccountView: View {
     }
 }
 
+// MARK: - Dark Text Field Style
+struct DarkTextFieldStyle: TextFieldStyle {
+    func _body(configuration: TextField<Self._Label>) -> some View {
+        configuration
+            .padding(16)
+            .background(Color.white.opacity(0.08))
+            .foregroundColor(.white)
+            .accentColor(.orange)
+            .overlay(
+                RoundedRectangle(cornerRadius: 12)
+                    .stroke(Color.white.opacity(0.2), lineWidth: 1)
+            )
+            .clipShape(RoundedRectangle(cornerRadius: 12))
+    }
+}
+
 // MARK: - Backup Key View
 struct BackupKeyView: View {
     @Environment(\.dismiss) private var dismiss
@@ -125,74 +228,160 @@ struct BackupKeyView: View {
     }
     
     var body: some View {
-        VStack(spacing: 30) {
-            // Warning header
-            VStack(spacing: 16) {
-                Image(systemName: "exclamationmark.triangle.fill")
-                    .font(.system(size: 60))
-                    .foregroundStyle(.yellow)
-                
-                Text("Save Your Private Key")
-                    .font(.largeTitle)
-                    .fontWeight(.bold)
-                
-                Text("This is the only way to access your account. Save it somewhere safe!")
-                    .multilineTextAlignment(.center)
-                    .foregroundStyle(.secondary)
-            }
-            .padding(.top, 40)
+        ZStack {
+            // Dark gradient background
+            LinearGradient(
+                gradient: Gradient(colors: [
+                    Color(red: 0.05, green: 0.02, blue: 0.08),
+                    Color(red: 0.02, green: 0.01, blue: 0.03),
+                    Color.black
+                ]),
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+            .ignoresSafeArea()
             
-            Spacer()
-            
-            // Key display
-            VStack(spacing: 16) {
-                Text("Your private key (nsec):")
-                    .font(.headline)
-                
-                VStack {
-                    if let nsec = nsec {
-                        Text(nsec)
-                            .font(.system(.body, design: .monospaced))
-                            .padding()
-                            .background(Color.secondary.opacity(0.2))
-                            .cornerRadius(8)
-                            .textSelection(.enabled)
-                        
-                        Button(action: copyKey) {
-                            Label(
-                                copiedPrivateKey ? "Copied!" : "Copy to Clipboard",
-                                systemImage: copiedPrivateKey ? "checkmark.circle.fill" : "doc.on.doc"
+            VStack(spacing: 30) {
+                // Warning header
+                VStack(spacing: 20) {
+                    ZStack {
+                        Circle()
+                            .fill(
+                                RadialGradient(
+                                    gradient: Gradient(colors: [
+                                        Color.yellow.opacity(0.3),
+                                        Color.orange.opacity(0.2),
+                                        Color.clear
+                                    ]),
+                                    center: .center,
+                                    startRadius: 10,
+                                    endRadius: 60
+                                )
                             )
-                        }
-                        .buttonStyle(.bordered)
-                        .tint(copiedPrivateKey ? .green : .orange)
-                    } else {
-                        ProgressView("Loading private key...")
-                            .padding()
+                            .frame(width: 120, height: 120)
+                            .blur(radius: 20)
+                        
+                        Image(systemName: "exclamationmark.triangle.fill")
+                            .font(.system(size: 60))
+                            .foregroundStyle(
+                                LinearGradient(
+                                    gradient: Gradient(colors: [Color.yellow, Color.orange]),
+                                    startPoint: .top,
+                                    endPoint: .bottom
+                                )
+                            )
+                    }
+                    
+                    VStack(spacing: 12) {
+                        Text("SAVE YOUR KEYS")
+                            .font(.system(size: 32, weight: .black))
+                            .tracking(2)
+                            .foregroundColor(.white)
+                        
+                        Text("This is your only way back. Guard it with your life!")
+                            .font(.system(size: 14, weight: .medium))
+                            .multilineTextAlignment(.center)
+                            .foregroundColor(Color.white.opacity(0.6))
                     }
                 }
-            }
+                .padding(.top, 40)
             
             Spacer()
             
-            // Confirmation
-            Toggle(isOn: $savedKey) {
-                Text("I have saved my private key")
-            }
-            .toggleStyle(CheckboxToggleStyle())
-            .padding(.horizontal)
+                // Key display
+                VStack(spacing: 20) {
+                    Text("Your private key (nsec)")
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundColor(Color.white.opacity(0.8))
+                    
+                    VStack(spacing: 16) {
+                        if let nsec = nsec {
+                            VStack {
+                                Text(nsec)
+                                    .font(.system(size: 14, design: .monospaced))
+                                    .foregroundColor(.white)
+                                    .padding(20)
+                                    .frame(maxWidth: .infinity)
+                                    .background(
+                                        RoundedRectangle(cornerRadius: 16)
+                                            .fill(Color.white.opacity(0.08))
+                                            .overlay(
+                                                RoundedRectangle(cornerRadius: 16)
+                                                    .stroke(Color.orange.opacity(0.3), lineWidth: 1)
+                                            )
+                                    )
+                                    .textSelection(.enabled)
+                            }
+                            .padding(.horizontal, 24)
+                            
+                            Button(action: copyKey) {
+                                HStack {
+                                    Image(systemName: copiedPrivateKey ? "checkmark.circle.fill" : "doc.on.doc")
+                                    Text(copiedPrivateKey ? "Copied!" : "Copy to Clipboard")
+                                        .fontWeight(.medium)
+                                }
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 14)
+                                .background(
+                                    LinearGradient(
+                                        gradient: Gradient(colors: [
+                                            copiedPrivateKey ? Color.green : Color.orange,
+                                            copiedPrivateKey ? Color.green.opacity(0.8) : Color.orange.opacity(0.8)
+                                        ]),
+                                        startPoint: .leading,
+                                        endPoint: .trailing
+                                    )
+                                )
+                                .foregroundColor(.white)
+                                .clipShape(RoundedRectangle(cornerRadius: 12))
+                            }
+                            .padding(.horizontal, 24)
+                        } else {
+                            ProgressView("Loading private key...")
+                                .progressViewStyle(CircularProgressViewStyle(tint: .orange))
+                                .foregroundColor(Color.white.opacity(0.6))
+                                .padding()
+                        }
+                    }
+                }
             
-            Button(action: continueToWallet) {
-                Text("Continue to Wallet")
+            Spacer()
+            
+                // Confirmation
+                Toggle(isOn: $savedKey) {
+                    Text("I have saved my private key")
+                        .foregroundColor(.white)
+                        .font(.system(size: 16, weight: .medium))
+                }
+                .toggleStyle(DarkCheckboxToggleStyle())
+                .padding(.horizontal, 24)
+                
+                Button(action: continueToWallet) {
+                    HStack {
+                        Image(systemName: "bolt.fill")
+                        Text("Enter the Nutsack")
+                            .fontWeight(.bold)
+                    }
                     .frame(maxWidth: .infinity)
-                    .padding()
-                    .background(savedKey ? Color.orange : Color.gray)
+                    .frame(height: 56)
+                    .background(
+                        LinearGradient(
+                            gradient: Gradient(colors: [
+                                savedKey ? Color.orange : Color.gray,
+                                savedKey ? Color(red: 0.9, green: 0.5, blue: 0.1) : Color.gray.opacity(0.8)
+                            ]),
+                            startPoint: .leading,
+                            endPoint: .trailing
+                        )
+                    )
                     .foregroundColor(.white)
-                    .cornerRadius(12)
+                    .clipShape(RoundedRectangle(cornerRadius: 16))
+                    .shadow(color: savedKey ? Color.orange.opacity(0.3) : Color.clear, radius: 10, x: 0, y: 4)
+                }
+                .disabled(!savedKey)
+                .padding(.horizontal, 24)
+                .padding(.bottom, 40)
             }
-            .disabled(!savedKey)
-            .padding(.horizontal)
-            .padding(.bottom, 40)
         }
         .navigationTitle("Backup Key")
         .platformNavigationBarTitleDisplayMode(inline: true)
@@ -253,24 +442,30 @@ struct BackupKeyView: View {
     }
 }
 
-// Checkbox toggle style from macademia
-struct CheckboxToggleStyle: ToggleStyle {
+// Dark checkbox toggle style
+struct DarkCheckboxToggleStyle: ToggleStyle {
     func makeBody(configuration: Configuration) -> some View {
         HStack {
-            RoundedRectangle(cornerRadius: 5.0)
-                .stroke(lineWidth: 2)
-                .frame(width: 22, height: 22)
-                .cornerRadius(5.0)
+            RoundedRectangle(cornerRadius: 6)
+                .fill(configuration.isOn ? Color.orange : Color.white.opacity(0.08))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 6)
+                        .stroke(configuration.isOn ? Color.orange : Color.white.opacity(0.3), lineWidth: 2)
+                )
+                .frame(width: 24, height: 24)
                 .overlay {
                     if configuration.isOn {
                         Image(systemName: "checkmark")
-                            .bold()
+                            .font(.system(size: 14, weight: .bold))
+                            .foregroundColor(.white)
                     }
                 }
             configuration.label
         }
         .onTapGesture {
-            configuration.isOn.toggle()
+            withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) {
+                configuration.isOn.toggle()
+            }
         }
     }
 }
