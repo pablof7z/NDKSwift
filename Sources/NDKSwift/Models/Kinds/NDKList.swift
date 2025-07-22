@@ -634,20 +634,11 @@ public extension NDKList {
     func isRelayBlocked(_ relayUrl: String) -> Bool {
         guard isBlockedRelaysList else { return false }
         // Normalize the relay URL before checking
-        let normalizedUrl = normalizeRelayUrl(relayUrl)
+        let normalizedUrl = URLNormalizer.tryNormalizeRelayUrl(relayUrl) ?? relayUrl
         return urls.contains { url in
-            normalizeRelayUrl(url) == normalizedUrl
+            let normalizedListUrl = URLNormalizer.tryNormalizeRelayUrl(url) ?? url
+            return normalizedListUrl == normalizedUrl
         }
-    }
-    
-    /// Normalize relay URL for comparison (add trailing slash, lowercase, etc.)
-    private func normalizeRelayUrl(_ url: String) -> String {
-        var normalized = url.lowercased()
-        // Ensure trailing slash for relay URLs
-        if !normalized.hasSuffix("/") && !normalized.contains("?") {
-            normalized += "/"
-        }
-        return normalized
     }
     
     /// Get all blacklisted mint URLs from a mute list
