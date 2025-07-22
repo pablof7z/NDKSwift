@@ -58,6 +58,7 @@ struct TransactionRow: View {
     @Environment(NostrManager.self) private var nostrManager
     @Environment(WalletManager.self) private var walletManager
     @State private var senderProfile: NDKUserProfile?
+    @State private var recipientProfile: NDKUserProfile?
     @State private var showDetailDrawer = false
     @State private var mintInfo: NDKMintInfo?
     
@@ -100,13 +101,29 @@ struct TransactionRow: View {
     
     var displayText: String {
         if transaction.type == .nutzap {
-            if let senderProfile = senderProfile {
-                let senderName = senderProfile.name ?? senderProfile.displayName ?? "Anonymous"
-                return "Nutzap from \(senderName)"
-            } else if let senderPubkey = transaction.senderPubkey {
-                return "Nutzap from \(senderPubkey.prefix(8))..."
+            // For incoming nutzaps (received), show sender
+            if transaction.direction == .incoming {
+                if let senderProfile = senderProfile {
+                    let senderName = senderProfile.name ?? senderProfile.displayName ?? "Anonymous"
+                    return "Zap from \(senderName)"
+                } else if let senderPubkey = transaction.senderPubkey {
+                    return "Zap from \(senderPubkey.prefix(8))..."
+                } else {
+                    return "Zap received"
+                }
+            }
+            // For outgoing nutzaps (sent), show recipient
+            else if transaction.direction == .outgoing {
+                if let recipientProfile = recipientProfile {
+                    let recipientName = recipientProfile.name ?? recipientProfile.displayName ?? "Anonymous"
+                    return "Zap to \(recipientName)"
+                } else if let recipientPubkey = transaction.recipientPubkey {
+                    return "Zap to \(recipientPubkey.prefix(8))..."
+                } else {
+                    return "Zap sent"
+                }
             } else {
-                return "Nutzap"
+                return "Zap"
             }
         } else if let memo = transaction.memo {
             return memo
@@ -119,23 +136,27 @@ struct TransactionRow: View {
         Button(action: { showDetailDrawer = true }) {
             HStack {
                 // Avatar for nutzaps, icon for other transactions
-                if transaction.type == .nutzap && transaction.senderPubkey != nil {
-                ZStack {
-                    // Sender avatar
-                    AsyncImage(url: URL(string: senderProfile?.picture ?? "")) { image in
-                        image
-                            .resizable()
-                            .aspectRatio(contentMode: .fill)
-                    } placeholder: {
-                        Circle()
-                            .fill(Color.secondary.opacity(0.3))
-                            .overlay(
-                                Image(systemName: "person.fill")
-                                    .foregroundColor(.secondary)
-                            )
-                    }
-                    .frame(width: 30, height: 30)
-                    .clipShape(Circle())
+                if transaction.type == .nutzap {
+                    let profile = transaction.direction == .incoming ? senderProfile : recipientProfile
+                    let pubkey = transaction.direction == .incoming ? transaction.senderPubkey : transaction.recipientPubkey
+                    
+                    if pubkey != nil {
+                        ZStack {
+                            // User avatar
+                            AsyncImage(url: URL(string: profile?.picture ?? "")) { image in
+                                image
+                                    .resizable()
+                                    .aspectRatio(contentMode: .fill)
+                            } placeholder: {
+                                Circle()
+                                    .fill(Color.secondary.opacity(0.3))
+                                    .overlay(
+                                        Image(systemName: "person.fill")
+                                            .foregroundColor(.secondary)
+                                    )
+                            }
+                            .frame(width: 30, height: 30)
+                            .clipShape(Circle())
                     
                     // Overlay icon based on status
                     if transaction.status == .failed {
@@ -153,14 +174,21 @@ struct TransactionRow: View {
                             .background(Circle().fill(.white).frame(width: 12, height: 12))
                             .offset(x: 10, y: -10)
                     }
+                        }
+                        .frame(width: 30, height: 30)
+                    } else {
+                        // Fallback to icon if no pubkey
+                        Image(systemName: icon)
+                            .font(.body)
+                            .foregroundStyle(color)
+                            .frame(width: 30)
+                    }
+                } else {
+                    Image(systemName: icon)
+                        .font(.body)
+                        .foregroundStyle(color)
+                        .frame(width: 30)
                 }
-                .frame(width: 30, height: 30)
-            } else {
-                Image(systemName: icon)
-                    .font(.body)
-                    .foregroundStyle(color)
-                    .frame(width: 30)
-            }
             
             VStack(alignment: .leading, spacing: 2) {
                 Text(displayText)
@@ -222,8 +250,9 @@ struct TransactionRow: View {
             TransactionDetailDrawer(transaction: transaction)
         }
         .task {
-            // Fetch sender profile for nutzaps
+            // Fetch sender profile for incoming nutzaps
             if transaction.type == .nutzap, 
+               transaction.direction == .incoming,
                let senderPubkey = transaction.senderPubkey,
                let ndk = nostrManager.ndk {
                 
@@ -241,6 +270,31 @@ struct TransactionRow: View {
                     if let profileData = event.content.data(using: .utf8),
                        let profile = JSONCoding.safeDecode(NDKUserProfile.self, from: profileData) {
                         senderProfile = profile
+                        break
+                    }
+                }
+            }
+            
+            // Fetch recipient profile for outgoing nutzaps
+            if transaction.type == .nutzap,
+               transaction.direction == .outgoing,
+               let recipientPubkey = transaction.recipientPubkey,
+               let ndk = nostrManager.ndk {
+                
+                // Use declarative data source for profile
+                let profileDataSource = ndk.observe(
+                    filter: NDKFilter(
+                        authors: [recipientPubkey],
+                        kinds: [0]
+                    ),
+                    maxAge: 3600,
+                    cachePolicy: .cacheWithNetwork
+                )
+                
+                for await event in profileDataSource.events {
+                    if let profileData = event.content.data(using: .utf8),
+                       let profile = JSONCoding.safeDecode(NDKUserProfile.self, from: profileData) {
+                        recipientProfile = profile
                         break
                     }
                 }

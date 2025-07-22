@@ -55,7 +55,7 @@ struct WalletView: View {
                     EmptyWalletView()
                 } else {
                     ScrollView {
-                        VStack(spacing: 20) {
+                        VStack(spacing: 12) {
                             // Balance card with expandable pie chart
                             BalanceCard()
                                 .padding(.horizontal)
@@ -63,13 +63,13 @@ struct WalletView: View {
                             
                             // Contacts horizontal scroll
                             ContactsScrollView(navigationDestination: $navigationDestination)
-                                .padding(.top, -10)
+                                .padding(.top, -8)
                             
                             // Recent transactions
                             RecentTransactionsView()
                                 .padding(.horizontal)
                         }
-                        .padding(.top)
+                        .padding(.top, 8)
                     }
                     .scrollIndicators(.hidden)
                     

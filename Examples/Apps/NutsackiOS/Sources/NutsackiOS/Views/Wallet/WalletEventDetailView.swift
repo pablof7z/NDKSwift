@@ -1,6 +1,9 @@
 import SwiftUI
 import NDKSwift
 import CashuSwift
+#if os(iOS)
+import UIKit
+#endif
 
 struct WalletEventDetailView: View {
     let eventInfo: WalletEventInfo
@@ -8,6 +11,7 @@ struct WalletEventDetailView: View {
     @State private var proofStates: [String: CashuSwift.Proof.ProofState] = [:]
     @State private var isCheckingProofs = false
     @State private var checkError: Error?
+    @State private var copiedBech32 = false
     
     private var totalAmount: Int {
         eventInfo.tokenData?.proofs.reduce(0) { $0 + Int($1.amount) } ?? 0
@@ -59,6 +63,59 @@ struct WalletEventDetailView: View {
                         Text(eventInfo.event.id)
                             .font(.system(.caption, design: .monospaced))
                             .textSelection(.enabled)
+                    }
+                    
+                    // Bech32 encoding
+                    if let bech32 = try? eventInfo.event.encode(includeRelays: true) {
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text("Bech32")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                            
+                            HStack(spacing: 8) {
+                                Text(String(bech32.prefix(40)) + "...")
+                                    .font(.system(.caption, design: .monospaced))
+                                    .lineLimit(1)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                
+                                // Copy button
+                                Button(action: {
+                                    #if os(iOS)
+                                    UIPasteboard.general.string = bech32
+                                    #endif
+                                    withAnimation {
+                                        copiedBech32 = true
+                                    }
+                                    DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
+                                        copiedBech32 = false
+                                    }
+                                }) {
+                                    Image(systemName: copiedBech32 ? "checkmark.circle.fill" : "doc.on.doc")
+                                        .foregroundColor(copiedBech32 ? .green : .accentColor)
+                                }
+                                .buttonStyle(.plain)
+                                
+                                // Open in njump.me button
+                                Button(action: {
+                                    if let url = URL(string: "https://njump.me/\(bech32)") {
+                                        #if os(iOS)
+                                        UIApplication.shared.open(url)
+                                        #endif
+                                    }
+                                }) {
+                                    Image(systemName: "arrow.up.forward.square")
+                                        .foregroundColor(.accentColor)
+                                }
+                                .buttonStyle(.plain)
+                            }
+                        }
+                        
+                        if copiedBech32 {
+                            Text("Copied to clipboard!")
+                                .font(.caption)
+                                .foregroundStyle(.green)
+                                .transition(.opacity)
+                        }
                     }
                     
                     LabeledContent("Created") {

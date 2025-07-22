@@ -632,7 +632,7 @@ class WalletManager {
             type: .nutzapSent,
             amount: amount,
             direction: .outgoing,
-            memo: comment ?? "Nutzap sent",
+            memo: comment ?? "Zap sent",
             lookupKeys: TransactionLookupKeys(recipientPubkey: recipient),
             nutzapData: nutzapData
         )

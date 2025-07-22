@@ -15,7 +15,7 @@ struct NutzapSettingsView: View {
             publicKeySection
             mintsSection
         }
-        .navigationTitle("Nutzap Settings")
+        .navigationTitle("Zap Settings")
         .platformNavigationBarTitleDisplayMode(inline: true)
         .alert("Error", isPresented: $showError) {
             Button("OK") { }
@@ -56,9 +56,9 @@ struct NutzapSettingsView: View {
                 .cornerRadius(8)
             }
         } header: {
-            Text("Your Nutzap Receiving Key")
+            Text("Your Zap Receiving Key")
         } footer: {
-            Text("This is your wallet's P2PK public key. Others need this to send you nutzaps.")
+            Text("This is your wallet's P2PK public key. Others need this to send you zaps.")
         }
     }
     
@@ -90,7 +90,7 @@ struct NutzapSettingsView: View {
         } header: {
             Text("Accepted Mints")
         } footer: {
-            Text("People can only send you nutzaps using these mints")
+            Text("People can only send you zaps using these mints")
         }
     }
     
