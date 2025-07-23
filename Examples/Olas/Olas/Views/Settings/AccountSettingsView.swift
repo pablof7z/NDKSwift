@@ -61,8 +61,8 @@ struct AccountSettingsView: View {
     private var profileSection: some View {
         VStack(spacing: OlasDesign.Spacing.lg) {
             // Avatar
-            if let currentUser = appState.currentUser {
-                AsyncImage(url: URL(string: currentUser.picture ?? "")) { image in
+            if let currentUserProfile = appState.currentUserProfile {
+                AsyncImage(url: URL(string: currentUserProfile.picture ?? "")) { image in
                     image
                         .resizable()
                         .scaledToFill()
@@ -85,11 +85,11 @@ struct AccountSettingsView: View {
                 )
                 
                 VStack(spacing: OlasDesign.Spacing.sm) {
-                    Text(currentUser.displayName ?? currentUser.name ?? "Unknown")
+                    Text(currentUserProfile.displayName ?? currentUserProfile.name ?? "Unknown")
                         .font(OlasDesign.Typography.title2)
                         .foregroundColor(OlasDesign.Colors.text)
                     
-                    if let nip05 = currentUser.nip05 {
+                    if let nip05 = currentUserProfile.nip05 {
                         Text(nip05)
                             .font(OlasDesign.Typography.caption)
                             .foregroundColor(OlasDesign.Colors.textSecondary)
