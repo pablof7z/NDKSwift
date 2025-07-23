@@ -21,6 +21,28 @@ public class NDKSessionData {
     /// Latest follow list event ID for delta detection
     private var latestFollowListEventId: String?
     
+    /// Mute list state
+    public private(set) var muteListState: DataState<Set<String>> = .loading
+    
+    /// Computed mute list (muted pubkeys)
+    public var muteList: Set<String> {
+        muteListState.data ?? []
+    }
+    
+    /// Latest mute list event ID for delta detection
+    private var latestMuteListEventId: String?
+    
+    /// Blocked relays state
+    public private(set) var blockedRelaysState: DataState<Set<String>> = .loading
+    
+    /// Computed blocked relays
+    public var blockedRelays: Set<String> {
+        blockedRelaysState.data ?? []
+    }
+    
+    /// Latest blocked relays event ID for delta detection
+    private var latestBlockedRelaysEventId: String?
+    
     /// Lazy-loaded Web of Trust scores
     private var _wotScores: [String: Int]?
     private var wotLastUpdated: Date?
@@ -28,9 +50,6 @@ public class NDKSessionData {
     
     /// Whether session is ready (all required data loaded)
     public private(set) var isReady = false
-    
-    /// Active data source for follow list
-    private var followListDataSource: NDKDataSource<NDKEvent>?
     
     /// Initialize session data
     /// - Parameters:
@@ -44,43 +63,74 @@ public class NDKSessionData {
     /// Load required session data
     /// - Parameter requirements: Data requirements from configuration
     func load(_ requirements: Set<SessionData>) async {
+        // Create a combined filter for all lists to minimize subscriptions
+        var kinds = Set<Int>()
+        var needsFollowList = false
+        var needsMuteList = false
+        var needsBlockedRelays = false
+        
         for requirement in requirements {
             switch requirement {
             case .followList:
-                await loadFollowList()
+                kinds.insert(EventKind.contacts)
+                needsFollowList = true
+            case .muteList:
+                kinds.insert(EventKind.muteList)
+                needsMuteList = true
+            case .blockedRelays:
+                kinds.insert(EventKind.blockedRelays)
+                needsBlockedRelays = true
             case .webOfTrust:
                 // WOT is lazy-loaded on first access
-                break
-            case .muteList, .relayList:
-                // Future implementation
-                break
+                // But we need follow list first
+                kinds.insert(EventKind.contacts)
+                needsFollowList = true
+            case .relayList:
+                kinds.insert(EventKind.relayList)
             }
+        }
+        
+        if !kinds.isEmpty {
+            await loadLists(kinds: kinds, 
+                          needsFollowList: needsFollowList,
+                          needsMuteList: needsMuteList, 
+                          needsBlockedRelays: needsBlockedRelays)
         }
         
         // Mark session as ready
         isReady = true
     }
     
-    // MARK: - Follow List Management
+    // MARK: - List Management
     
-    private func loadFollowList() async {
+    /// Active data source for all lists
+    private var listsDataSource: NDKDataSource<NDKEvent>?
+    
+    private func loadLists(kinds: Set<Int>, needsFollowList: Bool, needsMuteList: Bool, needsBlockedRelays: Bool) async {
         guard let ndk = ndk else { return }
         
         let filter = NDKFilter(
             authors: [pubkey],
-            kinds: [EventKind.contacts],
-            limit: 1
+            kinds: Array(kinds),
+            limit: kinds.count  // We want the latest of each kind
         )
         
         // Create data source for continuous updates
         let dataSource = NDKDataSource<NDKEvent>(ndk: ndk, filter: filter)
-        self.followListDataSource = dataSource
+        self.listsDataSource = dataSource
         
         // Process events as they arrive from the data source
-        
-        // Subscribe for updates
         for await event in dataSource.events {
-            processFollowListEvent(event, fromCache: false)
+            switch event.kind {
+            case EventKind.contacts where needsFollowList:
+                processFollowListEvent(event, fromCache: false)
+            case EventKind.muteList where needsMuteList:
+                processMuteListEvent(event, fromCache: false)
+            case EventKind.blockedRelays where needsBlockedRelays:
+                processBlockedRelaysEvent(event, fromCache: false)
+            default:
+                break
+            }
         }
     }
     
@@ -122,6 +172,68 @@ public class NDKSessionData {
         }
         
         return follows
+    }
+    
+    // MARK: - Mute List Management
+    
+    private func processMuteListEvent(_ event: NDKEvent, fromCache: Bool) {
+        // Check for delta by event ID
+        guard event.id != latestMuteListEventId else { return }
+        
+        let mutedPubkeys = extractMutedPubkeys(from: event)
+        
+        // Update state based on whether this is initial load or update
+        if latestMuteListEventId == nil {
+            muteListState = .ready(mutedPubkeys, fromCache: fromCache)
+        } else {
+            if case .ready(let current, _) = muteListState {
+                muteListState = .updating(current: current, changes: mutedPubkeys)
+            }
+        }
+        
+        latestMuteListEventId = event.id
+        
+        // Update to ready state after processing
+        muteListState = .ready(mutedPubkeys, fromCache: fromCache)
+    }
+    
+    private func extractMutedPubkeys(from event: NDKEvent) -> Set<String> {
+        // Use NDKList to parse the mute list
+        let muteList = NDKList.from(event)
+        return Set(muteList.userPubkeys)
+    }
+    
+    // MARK: - Blocked Relays Management
+    
+    private func processBlockedRelaysEvent(_ event: NDKEvent, fromCache: Bool) {
+        // Check for delta by event ID
+        guard event.id != latestBlockedRelaysEventId else { return }
+        
+        let blockedUrls = extractBlockedRelays(from: event)
+        
+        // Update state based on whether this is initial load or update
+        if latestBlockedRelaysEventId == nil {
+            blockedRelaysState = .ready(blockedUrls, fromCache: fromCache)
+        } else {
+            if case .ready(let current, _) = blockedRelaysState {
+                blockedRelaysState = .updating(current: current, changes: blockedUrls)
+            }
+        }
+        
+        latestBlockedRelaysEventId = event.id
+        
+        // Update to ready state after processing
+        blockedRelaysState = .ready(blockedUrls, fromCache: fromCache)
+    }
+    
+    private func extractBlockedRelays(from event: NDKEvent) -> Set<String> {
+        // Use NDKList to parse the blocked relays list
+        let blockedList = NDKList.from(event)
+        // Normalize relay URLs for consistent comparison
+        let normalizedUrls = blockedList.urls.compactMap { url in
+            URLNormalizer.tryNormalizeRelayUrl(url)
+        }
+        return Set(normalizedUrls)
     }
     
     // MARK: - Web of Trust Management
@@ -213,6 +325,24 @@ public class NDKSessionData {
         }
         
         return score >= config.minimumScore
+    }
+    
+    // MARK: - Efficient Lookups (O(1))
+    
+    /// Check if a pubkey is muted
+    /// - Parameter pubkey: Public key to check
+    /// - Returns: Whether the pubkey is muted
+    public func isMuted(_ pubkey: String) -> Bool {
+        return muteList.contains(pubkey)
+    }
+    
+    /// Check if a relay is blocked
+    /// - Parameter relayUrl: Relay URL to check (will be normalized)
+    /// - Returns: Whether the relay is blocked
+    public func isRelayBlocked(_ relayUrl: String) -> Bool {
+        // Normalize the URL before checking
+        let normalizedUrl = URLNormalizer.tryNormalizeRelayUrl(relayUrl) ?? relayUrl
+        return blockedRelays.contains(normalizedUrl)
     }
     
     // MARK: - Cache Management

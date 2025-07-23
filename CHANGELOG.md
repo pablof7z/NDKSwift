@@ -9,20 +9,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 - Session Data Management System with reactive subscriptions
-  - NDKSessionData for managing follow lists and web-of-trust data
+  - NDKSessionData for managing follow lists, mute lists, blocked relays, and web-of-trust data
   - Observable states for session data readiness
   - Automatic session restoration with data preloading
   - Progressive loading strategy (cache-first, update in background)
+  - Efficient O(1) lookups for muted pubkeys and blocked relays
 - Reactive Filter System
   - ReactiveFilter struct for dependency-based filter updates
   - Automatic subscription swapping when follows change
   - Efficient re-subscription with minimal event re-downloading
   - Support for Web of Trust filtering (optional)
+  - Automatic filtering of muted pubkeys from event streams
 - NDK Session Extensions
   - `startSession()` method for initializing authenticated sessions
-  - `observe(ReactiveFilter)` for reactive event streams
-  - `fetchEvents(ReactiveFilter)` for one-time reactive queries
+  - `observe(ReactiveFilter)` for reactive event streams with mute filtering
+  - `fetchEvents(ReactiveFilter)` for one-time reactive queries with mute filtering
 - SubscriptionSwapManager for efficient subscription updates
+- Blocked Relay Protection
+  - Automatic exclusion of blocked relays from outbox operations
+  - Relay selector respects user's blocked relay list (kind:10006)
+  - Cached blocked relay checks for performance
 - Support for NDKFollowPack (NIP-51, kinds 39089 and 39092)
   - Create and manage follow packs with title, description, image, and pubkey collections
   - Support for both regular follow packs and media follow packs

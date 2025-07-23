@@ -22,8 +22,9 @@ final class CacheObserverTest: XCTestCase {
         // Create test event
         let signer = try NDKPrivateKeySigner.generate()
         let pubkey = try await signer.pubkey
+        let ndk = NDK(signer: signer)
         
-        let builder = NDKEventBuilder()
+        let builder = NDKEventBuilder(ndk: ndk)
             .content("Test event")
             .kind(1)
         

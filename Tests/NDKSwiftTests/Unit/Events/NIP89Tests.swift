@@ -6,7 +6,8 @@ final class NIP89Tests: XCTestCase {
     // MARK: - Client Tag Tests
     
     func testClientTagBuilder() throws {
-        let builder = NDKEventBuilder()
+        let ndk = NDK()
+        let builder = NDKEventBuilder(ndk: ndk)
         
         _ = builder
             .content("Hello, world!")
@@ -17,7 +18,8 @@ final class NIP89Tests: XCTestCase {
     }
     
     func testClientTagBuilderWithoutRelay() throws {
-        let builder = NDKEventBuilder()
+        let ndk = NDK()
+        let builder = NDKEventBuilder(ndk: ndk)
         
         _ = builder
             .content("Hello, world!")
@@ -28,7 +30,8 @@ final class NIP89Tests: XCTestCase {
     }
     
     func testClientTagBuilderWithoutAddress() throws {
-        let builder = NDKEventBuilder()
+        let ndk = NDK()
+        let builder = NDKEventBuilder(ndk: ndk)
         
         _ = builder
             .content("Hello, world!")
@@ -39,7 +42,8 @@ final class NIP89Tests: XCTestCase {
     }
     
     func testClientTagBuilderWithoutAddressButWithRelay() throws {
-        let builder = NDKEventBuilder()
+        let ndk = NDK()
+        let builder = NDKEventBuilder(ndk: ndk)
         
         _ = builder
             .content("Hello, world!")
@@ -132,7 +136,8 @@ final class NIP89Tests: XCTestCase {
     // MARK: - Handler Information Tests
     
     func testHandlerInfoBuilder() throws {
-        let builder = NDKEventBuilder()
+        let ndk = NDK()
+        let builder = NDKEventBuilder(ndk: ndk)
         
         let metadata = NIP89HandlerMetadata(
             name: "Test Handler",
@@ -193,7 +198,8 @@ final class NIP89Tests: XCTestCase {
     // MARK: - Recommendation Tests
     
     func testRecommendationBuilder() throws {
-        let builder = NDKEventBuilder()
+        let ndk = NDK()
+        let builder = NDKEventBuilder(ndk: ndk)
         
         let handlers = [
             NIP89HandlerReference(

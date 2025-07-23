@@ -50,12 +50,12 @@ class SubscriptionManager {
             print("SubscriptionManager - After wait, connected relays: \(retriedConnected)/\(retriedTotal)")
         }
         
-        // Start session with follow list requirement
+        // Start session with follow list and mute list requirements
         do {
             let sessionData = try await ndk.startSession(
                 signer: ndk.signer!,
                 config: NDKSessionConfiguration(
-                    dataRequirements: [.followList],
+                    dataRequirements: [.followList, .muteList],
                     preloadStrategy: .progressive
                 )
             )

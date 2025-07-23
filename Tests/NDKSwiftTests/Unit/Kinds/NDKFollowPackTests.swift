@@ -261,7 +261,7 @@ final class NDKFollowPackTests: XCTestCase {
     
     func testPublishWithBuilder() async throws {
         // Mock relay to avoid actual network calls
-        let mockRelay = MockRelay()
+        let mockRelay = FollowPackMockRelay()
         ndk.relayPool.relays[mockRelay.url] = mockRelay
         
         let followPack = try await NDKFollowPackBuilder(ndk: ndk)
@@ -301,12 +301,21 @@ final class NDKFollowPackTests: XCTestCase {
 
 // MARK: - Mock Relay for Testing
 
-class MockRelay: NDKRelay {
-    init() {
-        super.init(url: "wss://mock.relay")
-    }
+class FollowPackMockRelay: RelayProtocol, @unchecked Sendable {
+    let url: String = "wss://mock.relay"
+    var connectionState: NDKRelayConnectionState { .connected }
+    var ndk: NDK?
+    var activeSubscriptionIds: [String] { [] }
     
-    override func publish(_ event: NDKEvent) async throws -> PublishResult {
-        return PublishResult(relay: self, success: true, message: nil)
+    func connect() async {}
+    func disconnect() async {}
+    func send(_ message: String) async throws {}
+    func addSubscriptionId(_ subscriptionId: String) async {}
+    func removeSubscription(byId id: String) async {}
+    func getSignatureStats() async -> NDKRelaySignatureStats { NDKRelaySignatureStats() }
+    func updateSignatureStats(_ updater: @Sendable (inout NDKRelaySignatureStats) -> Void) async {}
+    func observeConnectionState(_ observer: @escaping @Sendable (NDKRelayConnectionState) -> Void) async {}
+    func publish(_ event: NDKEvent) async throws -> (success: Bool, message: String?) {
+        return (true, nil)
     }
 }
