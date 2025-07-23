@@ -14,9 +14,6 @@ struct ContentView: View {
     @State private var showScanner = false
     @State private var scannedInvoice: String?
     @State private var showInvoicePreview = false
-    @State private var showWalletOnboarding = false
-    @State private var hasCheckedWallet = false
-    @State private var isCheckingWallet = false
     
     var body: some View {
         ZStack {
@@ -25,9 +22,6 @@ struct ContentView: View {
             NDKAuthView(authManager: nostrManager.authManager, ndk: nostrManager.ndk) {
                 // Main app interface - shown when authenticated
                 WalletView(urlState: $urlState, showScanner: $showScanner)
-                    .task {
-                        await checkWalletStatus()
-                    }
             } authenticationContent: {
                 // Use SplashView as the authentication screen
                 SplashView()
@@ -45,46 +39,6 @@ struct ContentView: View {
         .sheet(isPresented: $showInvoicePreview) {
             if let invoice = scannedInvoice {
                 LightningInvoicePreviewView(invoice: invoice)
-            }
-        }
-        .fullScreenCover(isPresented: $showWalletOnboarding) {
-            WalletOnboardingView()
-                .onDisappear {
-                    // Reload wallet after onboarding
-                    Task {
-                        try? await walletManager.loadWalletForCurrentUser()
-                    }
-                }
-        }
-    }
-    
-    private func checkWalletStatus() async {
-        guard !hasCheckedWallet && !isCheckingWallet else { return }
-        
-        isCheckingWallet = true
-        defer { isCheckingWallet = false }
-        
-        do {
-            // Try to load the wallet
-            try await walletManager.loadWalletForCurrentUser()
-            
-            // Check if wallet has been configured with relays
-            if let wallet = walletManager.activeWallet {
-                let relays = await wallet.walletConfigRelays
-                if relays.isEmpty {
-                    // No wallet configuration found, show onboarding
-                    await MainActor.run {
-                        showWalletOnboarding = true
-                    }
-                }
-            }
-            
-            hasCheckedWallet = true
-        } catch {
-            print("Error checking wallet status: \(error)")
-            // If wallet doesn't exist or has issues, show onboarding
-            await MainActor.run {
-                showWalletOnboarding = true
             }
         }
     }

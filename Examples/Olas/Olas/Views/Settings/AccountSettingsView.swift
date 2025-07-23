@@ -360,14 +360,14 @@ struct AccountSettingsView: View {
                             // Hex format
                             keyDisplayBox(
                                 title: "Hex Format",
-                                value: signer.privateKey,
+                                value: signer.privateKeyValue,
                                 action: {
-                                    copyToClipboard(signer.privateKey, label: "Private key (hex)")
+                                    copyToClipboard(signer.privateKeyValue, label: "Private key (hex)")
                                 }
                             )
                             
                             // nsec format
-                            if let nsec = try? signer.privateKey.nsec() {
+                            if let nsec = try? signer.nsec {
                                 keyDisplayBox(
                                     title: "nsec Format",
                                     value: nsec,
@@ -433,8 +433,16 @@ struct AccountSettingsView: View {
     private func copyPublicKey() {
         guard let signer = NDKAuthManager.shared.activeSigner as? NDKPrivateKeySigner else { return }
         
-        let pubkey = signer.publicKey
-        copyToClipboard(pubkey, label: "Public key")
+        Task {
+            do {
+                let pubkey = try await signer.pubkey
+                await MainActor.run {
+                    copyToClipboard(pubkey, label: "Public key")
+                }
+            } catch {
+                print("Failed to get public key: \(error)")
+            }
+        }
     }
     
     private func copyToClipboard(_ text: String, label: String) {

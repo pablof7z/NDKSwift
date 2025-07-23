@@ -41,7 +41,7 @@ final class NDKOutboxModelTests: XCTestCase {
         await setupMockRelayList(for: user3, readRelays: ["wss://user3-read1.com"], writeRelays: ["wss://user3-write1.com"])
         
         // Create an event with 3 p-tags (< 10)
-        let event = try await ndk.event()
+        let event = try await NDKEventBuilder(ndk: ndk)
             .kind(1)
             .content("Hello everyone!")
             .tag(["p", user1])
@@ -96,7 +96,7 @@ final class NDKOutboxModelTests: XCTestCase {
         }
         
         // Create an event with 11 p-tags (>= 10)
-        var eventBuilder = ndk.event()
+        var eventBuilder = NDKEventBuilder(ndk: ndk)
             .kind(1)
             .content("Hello to many people!")
         
@@ -135,7 +135,7 @@ final class NDKOutboxModelTests: XCTestCase {
         await setupMockRelayList(for: user2, readRelays: [], writeRelays: ["wss://user2-write1.com"])
         
         // Create an event with 2 p-tags (< 10)
-        let event = try await ndk.event()
+        let event = try await NDKEventBuilder(ndk: ndk)
             .kind(1)
             .content("Hello!")
             .tag(["p", user1])
@@ -171,7 +171,7 @@ final class NDKOutboxModelTests: XCTestCase {
         
         // User3: No relay list available (will be in missingPubkeys)
         
-        let event = try await ndk.event()
+        let event = try await NDKEventBuilder(ndk: ndk)
             .kind(1)
             .content("Mixed scenario!")
             .tag(["p", user1])
@@ -229,7 +229,7 @@ final class NDKOutboxModelTests: XCTestCase {
         await setupMockRelayList(for: authorPubkey, readRelays: ["wss://author-read.com"], writeRelays: ["wss://author-write.com"])
         
         // Create an event with no p-tags
-        let event = try await ndk.event()
+        let event = try await NDKEventBuilder(ndk: ndk)
             .kind(1)
             .content("Hello world!")
             .build(signer: signer)
@@ -248,7 +248,7 @@ final class NDKOutboxModelTests: XCTestCase {
         let user1 = "user1_pubkey_64_chars_hex_abcdef1234567890abcdef1234567890abcdef12"
         
         // Create an event with both e-tags (with relay hints) and p-tags
-        let event = try await ndk.event()
+        let event = try await NDKEventBuilder(ndk: ndk)
             .kind(1)
             .content("Reply with mention")
             .tag(["e", "event_id_123", "wss://etag-relay.com"])

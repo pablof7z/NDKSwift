@@ -68,7 +68,7 @@ try await Task.sleep(nanoseconds: 100_000_000) // 0.1 seconds
 
 // Publish BEFORE connecting (simulating offline state)
 print("\n🔌 Publishing while offline...")
-let offlineEvent = try await ndk.event()
+let offlineEvent = try await NDKEventBuilder(ndk: ndk)
     .content("This was published while offline! 📴")
     .tag(["client", "ndk-swift-demo"])
     .build()
@@ -94,7 +94,7 @@ print("✅ Connected! Unpublished events will retry automatically.")
 
 // Publish another event while online
 print("\n📤 Publishing while online...")
-let onlineEvent = try await ndk.event()
+let onlineEvent = try await NDKEventBuilder(ndk: ndk)
     .content("This was published while online! 🌐")
     .tag(["client", "ndk-swift-demo"])
     .build()
@@ -157,7 +157,7 @@ Task {
 }
 
 // Publish while offline
-let testEvent = try await ndk.event()
+let testEvent = try await NDKEventBuilder(ndk: ndk)
     .content("Testing strict subscription - you won't see this immediately! 🚫")
     .build()
 _ = try await ndk.publish(testEvent)

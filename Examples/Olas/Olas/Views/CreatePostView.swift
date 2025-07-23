@@ -521,7 +521,7 @@ struct CreatePostView: View {
             
             // 2. Create and publish event
             // Use kind 20 for picture posts as per Olas spec
-            let event = try await ndk.event()
+            let event = try await NDKEventBuilder(ndk: ndk)
                 .content(caption) // Only caption in content for kind 20
                 .kind(20) // kind 20 - picture post
                 .tags(imetaTags) // Image metadata in tags

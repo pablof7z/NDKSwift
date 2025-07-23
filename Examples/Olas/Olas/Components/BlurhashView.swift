@@ -103,7 +103,7 @@ struct OlasProgressiveImage: View {
                         .opacity(phase == .empty || phase == .blurhash ? 1 : 0)
                         .animation(.easeOut(duration: 0.3), value: phase)
                 } else {
-                    ShimmerView()
+                    OlasShimmer()
                         .opacity(phase == .empty ? 1 : 0)
                         .animation(.easeOut(duration: 0.3), value: phase)
                 }
@@ -243,41 +243,6 @@ struct OlasProgressiveImage: View {
     }
 }
 
-// MARK: - Shimmer Effect
-struct ShimmerView: View {
-    @State private var isAnimating = false
-    
-    var body: some View {
-        GeometryReader { geometry in
-            Rectangle()
-                .fill(Color(.systemGray6))
-                .overlay(
-                    Rectangle()
-                        .fill(
-                            LinearGradient(
-                                colors: [
-                                    Color(.systemGray6),
-                                    Color(.systemGray5),
-                                    Color(.systemGray6)
-                                ],
-                                startPoint: .leading,
-                                endPoint: .trailing
-                            )
-                        )
-                        .rotationEffect(.degrees(10))
-                        .offset(x: isAnimating ? geometry.size.width * 2 : -geometry.size.width * 2)
-                        .animation(
-                            .linear(duration: 1.5).repeatForever(autoreverses: false),
-                            value: isAnimating
-                        )
-                )
-                .clipped()
-        }
-        .onAppear {
-            isAnimating = true
-        }
-    }
-}
 
 // MARK: - Image Cache Manager
 class ImageCacheManager {

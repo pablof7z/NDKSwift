@@ -155,7 +155,7 @@ class NostrManager {
             print("🏚️ [NostrManager] User is authenticated, publishing metadata...")
             // Create metadata event
             let metadataContent = try JSONCoding.encodeToString(metadata)
-            let metadataEvent = try await ndk.event()
+            let metadataEvent = try await NDKEventBuilder(ndk: ndk)
                 .content(metadataContent)
                 .kind(0)
                 .build(signer: signer)

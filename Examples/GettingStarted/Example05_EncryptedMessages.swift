@@ -69,6 +69,7 @@ struct Example05_EncryptedMessages {
             content: secretMessage,
             recipientPubkey: bobPubkey,
             signer: aliceSigner,
+            ndk: aliceNDK,
             useNIP44: false // Using NIP-04 for this example
         )
         
@@ -90,6 +91,7 @@ struct Example05_EncryptedMessages {
                 content: "This uses NIP-44 encryption! 🔒",
                 recipientPubkey: bobPubkey,
                 signer: aliceSigner,
+                ndk: aliceNDK,
                 useNIP44: true
             )
             

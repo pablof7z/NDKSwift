@@ -49,7 +49,7 @@ public actor WalletEventManager {
         
         // Create deletion events for tokens being deleted
         if !tokenChange.deletedTokenIds.isEmpty {
-            let deleteEvent = try await ndk.event()
+            let deleteEvent = try await NDKEventBuilder(ndk: ndk)
                 .kind(5) // Event deletion
                 .content("")
                 .tags([

@@ -118,7 +118,7 @@ public actor NDKNostrRPC {
         let encryptedContent = try await localSigner.encrypt(recipient: remoteUser, value: requestString, scheme: encryptionScheme)
         NDKLogger.log(.debug, category: .auth, "Encrypted content using scheme: \(encryptionScheme)")
 
-        let event = try await ndk.event()
+        let event = try await NDKEventBuilder(ndk: ndk)
             .content(encryptedContent)
             .kind(24133)
             .tags([["p", pubkey]])

@@ -121,7 +121,7 @@ final class StartupNutzapRedemptionTests: XCTestCase {
         let proofData = try JSONCoding.encode(proof)
         let proofString = String(data: proofData, encoding: .utf8)!
         
-        let nutzap = try await ndk.event()
+        let nutzap = try await NDKEventBuilder(ndk: ndk)
             .kind(EventKind.nutzap)
             .content("Test nutzap")
             .tags([
@@ -136,7 +136,7 @@ final class StartupNutzapRedemptionTests: XCTestCase {
     
     private func createSpendingHistoryEvent(redeemedNutzapId: String) async throws -> NDKEvent {
         // Create a spending history event marking a nutzap as redeemed
-        let event = try await ndk.event()
+        let event = try await NDKEventBuilder(ndk: ndk)
             .kind(EventKind.cashuSpendingHistory)
             .content("")
             .tags([

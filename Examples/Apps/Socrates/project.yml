@@ -1,0 +1,51 @@
+name: Socrates
+options:
+  bundleIdPrefix: com.socrates
+  deploymentTarget:
+    iOS: 16.0
+  developmentLanguage: en
+  xcodeVersion: "15.0"
+  createIntermediateGroups: true
+  
+packages:
+  NDKSwift:
+    path: ../../../
+
+targets:
+  Socrates:
+    type: application
+    platform: iOS
+    sources:
+      - Sources
+    dependencies:
+      - package: NDKSwift
+        product: NDKSwift
+    settings:
+      base:
+        PRODUCT_NAME: Socrates
+        PRODUCT_BUNDLE_IDENTIFIER: com.socrates.app
+        INFOPLIST_FILE: Sources/Socrates/Info.plist
+        DEVELOPMENT_TEAM: ""
+        CODE_SIGN_STYLE: Automatic
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
+        TARGETED_DEVICE_FAMILY: "1,2"
+        ENABLE_PREVIEWS: YES
+        SWIFT_VERSION: 5.9
+      configs:
+        Debug:
+          SWIFT_OPTIMIZATION_LEVEL: "-Onone"
+          SWIFT_ACTIVE_COMPILATION_CONDITIONS: DEBUG
+          DEBUG_INFORMATION_FORMAT: dwarf
+        Release:
+          SWIFT_OPTIMIZATION_LEVEL: "-O"
+          DEBUG_INFORMATION_FORMAT: dwarf-with-dsym
+    info:
+      path: Sources/Socrates/Info.plist
+      properties:
+        CFBundleDisplayName: Socrates
+        UILaunchStoryboardName: LaunchScreen
+        UISupportedInterfaceOrientations:
+          - UIInterfaceOrientationPortrait
+        UIRequiresFullScreen: true
+        ITSAppUsesNonExemptEncryption: false

@@ -60,7 +60,7 @@ final class SubscriptionPatternsE2ETests: XCTestCase {
         // Publish events while subscription is active
         print("[\(timestamp())] Publishing events...")
         for i in 1...3 {
-            let event = try await ndk.event()
+            let event = try await NDKEventBuilder(ndk: ndk)
                 .content("Real-time test #\(i) at \(Date())")
                 .kind(EventKind.textNote)
                 .tag(["test", "realtime"])
@@ -179,7 +179,7 @@ final class SubscriptionPatternsE2ETests: XCTestCase {
         let testTag = "e2e-test-\(Int.random(in: 1000...9999))"
         
         for i in 1...3 {
-            let event = try await ndk.event()
+            let event = try await NDKEventBuilder(ndk: ndk)
                 .content("Tagged event #\(i)")
                 .kind(EventKind.textNote)
                 .tag(["t", testTag])

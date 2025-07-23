@@ -10,7 +10,7 @@ final class OutboxModelPTagTests: XCTestCase {
         let ndk = NDK(relayUrls: [], signer: signer, cache: cache)
         
         // Create test event with 3 p-tags (< 10)
-        let event = try await ndk.event()
+        let event = try await NDKEventBuilder(ndk: ndk)
             .kind(1)
             .content("Hello!")
             .tag(["p", "user1_64_char_hex_key_0000000000000000000000000000000000000001"])
@@ -39,7 +39,7 @@ final class OutboxModelPTagTests: XCTestCase {
         let ndk = NDK(relayUrls: [], signer: signer, cache: cache)
         
         // Create test event with 11 p-tags (>= 10)
-        var eventBuilder = ndk.event()
+        var eventBuilder = NDKEventBuilder(ndk: ndk)
             .kind(1)
             .content("Hello to many people!")
         
@@ -68,7 +68,7 @@ final class OutboxModelPTagTests: XCTestCase {
         let ndk = NDK(relayUrls: [], signer: signer, cache: cache)
         
         // Create test event with no p-tags
-        let event = try await ndk.event()
+        let event = try await NDKEventBuilder(ndk: ndk)
             .kind(1)
             .content("Hello world!")
             .build()
@@ -92,7 +92,7 @@ final class OutboxModelPTagTests: XCTestCase {
         let ndk = NDK(relayUrls: [], signer: signer, cache: cache)
         
         // Create test event with mixed tags
-        let event = try await ndk.event()
+        let event = try await NDKEventBuilder(ndk: ndk)
             .kind(1)
             .content("Mixed tags test")
             .tag(["p", "pubkey1"])

@@ -485,7 +485,7 @@ public class NDKList {
         let event = toNDKEvent()
 
         // Use NDKEventBuilder for signing
-        let signedEvent = try await ndk.event()
+        let signedEvent = try await NDKEventBuilder(ndk: ndk)
             .pubkey(try await signer.pubkey)
             .createdAt(event.createdAt)
             .kind(event.kind)

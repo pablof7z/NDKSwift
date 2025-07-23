@@ -25,13 +25,13 @@ final class NIP22Tests: XCTestCase {
     
     func testReplyToKind1Event() async throws {
         // Create a root event
-        let rootEvent = try await ndk.event()
+        let rootEvent = try await NDKEventBuilder(ndk: ndk)
             .content("Hello world")
             .kind(EventKind.textNote)
             .build()
         
         // Create a reply
-        let reply = ndk.reply(to: rootEvent)
+        let reply = NDKEventBuilder.reply(to: rootEvent, ndk: ndk)
         
         // Should be kind 1
         XCTAssertEqual(reply.kind, EventKind.textNote)
@@ -49,18 +49,18 @@ final class NIP22Tests: XCTestCase {
     
     func testReplyToKind1Reply() async throws {
         // Create a root event
-        let rootEvent = try await ndk.event()
+        let rootEvent = try await NDKEventBuilder(ndk: ndk)
             .content("Hello world")
             .kind(EventKind.textNote)
             .build()
         
         // Create first reply
-        let reply1 = try await ndk.reply(to: rootEvent)
+        let reply1 = try await NDKEventBuilder.reply(to: rootEvent, ndk: ndk)
             .content("First reply")
             .build()
         
         // Create second reply
-        let reply2 = ndk.reply(to: reply1)
+        let reply2 = NDKEventBuilder.reply(to: reply1, ndk: ndk)
         
         // Should be kind 1
         XCTAssertEqual(reply2.kind, EventKind.textNote)
@@ -88,7 +88,7 @@ final class NIP22Tests: XCTestCase {
     
     func testReplyToArticle() async throws {
         // Create an article (kind 30023)
-        let article = try await ndk.event()
+        let article = try await NDKEventBuilder(ndk: ndk)
             .content("Long article content...")
             .kind(EventKind.longFormContent)
             .tag(["d", "my-article"])
@@ -96,7 +96,7 @@ final class NIP22Tests: XCTestCase {
             .build()
         
         // Create a comment
-        let comment = ndk.reply(to: article)
+        let comment = NDKEventBuilder.reply(to: article, ndk: ndk)
         
         // Should be kind 1111
         XCTAssertEqual(comment.kind, EventKind.genericReply)
@@ -134,7 +134,7 @@ final class NIP22Tests: XCTestCase {
     
     func testReplyToFileMetadata() async throws {
         // Create a file metadata event (kind 1063)
-        let fileEvent = try await ndk.event()
+        let fileEvent = try await NDKEventBuilder(ndk: ndk)
             .content("File description")
             .kind(EventKind.fileMetadata)
             .tag(["url", "https://example.com/file.jpg"])
@@ -142,7 +142,7 @@ final class NIP22Tests: XCTestCase {
             .build()
         
         // Create a comment
-        let comment = ndk.reply(to: fileEvent)
+        let comment = NDKEventBuilder.reply(to: fileEvent, ndk: ndk)
         
         // Should be kind 1111
         XCTAssertEqual(comment.kind, EventKind.genericReply)
@@ -160,19 +160,19 @@ final class NIP22Tests: XCTestCase {
     
     func testReplyToComment() async throws {
         // Create a blog post
-        let blogPost = try await ndk.event()
+        let blogPost = try await NDKEventBuilder(ndk: ndk)
             .content("Blog content")
             .kind(EventKind.longFormContent)
             .tag(["d", "blog-123"])
             .build()
         
         // Create first comment
-        let comment1 = try await ndk.reply(to: blogPost)
+        let comment1 = try await NDKEventBuilder.reply(to: blogPost, ndk: ndk)
             .content("First comment")
             .build()
         
         // Create reply to comment
-        let comment2 = ndk.reply(to: comment1)
+        let comment2 = NDKEventBuilder.reply(to: comment1, ndk: ndk)
         
         // Should be kind 1111
         XCTAssertEqual(comment2.kind, EventKind.genericReply)
@@ -211,13 +211,13 @@ final class NIP22Tests: XCTestCase {
     
     func testReplyToReplaceableEvent() async throws {
         // Create a replaceable event (kind 0 - metadata)
-        let metadata = try await ndk.event()
+        let metadata = try await NDKEventBuilder(ndk: ndk)
             .content("{\"name\": \"Test User\"}")
             .kind(EventKind.metadata)
             .build()
         
         // Create a comment
-        let comment = ndk.reply(to: metadata)
+        let comment = NDKEventBuilder.reply(to: metadata, ndk: ndk)
         
         // Should be kind 1111
         XCTAssertEqual(comment.kind, EventKind.genericReply)
@@ -234,7 +234,7 @@ final class NIP22Tests: XCTestCase {
         let ndk2 = NDK(signer: signer2)
         
         // Create blog post by user 1
-        let blogPost = try await ndk.event()
+        let blogPost = try await NDKEventBuilder(ndk: ndk)
             .content("Blog content")
             .kind(EventKind.longFormContent)
             .tag(["d", "blog-456"])
@@ -246,7 +246,7 @@ final class NIP22Tests: XCTestCase {
             .build()
         
         // Create reply by user 1
-        let comment2 = ndk.reply(to: comment1)
+        let comment2 = NDKEventBuilder.reply(to: comment1, ndk: ndk)
         
         // Should have p tags for both users (but not duplicate self)
         let pTags = comment2.tags.filter { $0.first == "p" }

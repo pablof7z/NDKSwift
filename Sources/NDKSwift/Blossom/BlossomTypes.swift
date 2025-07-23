@@ -140,6 +140,7 @@ public struct BlossomAuth {
         size: Int64,
         mimeType: String? = nil,
         signer: NDKSigner,
+        ndk: NDK,
         expiration: Date? = nil
     ) async throws -> BlossomAuth {
         var tags: [[String]] = [
@@ -156,7 +157,7 @@ public struct BlossomAuth {
             tags.append([NostrTagConstants.BlossomTag.expiration, String(Timestamp.from(expiration))])
         }
 
-        let event = try await NDKEventBuilder()
+        let event = try await NDKEventBuilder(ndk: ndk)
             .content("Authorize upload")
             .kind(EventKind.blossomAuth)
             .tags(tags)
@@ -169,6 +170,7 @@ public struct BlossomAuth {
     public static func createDeleteAuth(
         sha256: String,
         signer: NDKSigner,
+        ndk: NDK,
         reason: String? = nil
     ) async throws -> BlossomAuth {
         let tags: [[String]] = [
@@ -176,7 +178,7 @@ public struct BlossomAuth {
             [NostrTagConstants.BlossomTag.hash, sha256]
         ]
 
-        let event = try await NDKEventBuilder()
+        let event = try await NDKEventBuilder(ndk: ndk)
             .content(reason ?? "Delete blob")
             .kind(EventKind.blossomAuth)
             .tags(tags)
@@ -188,6 +190,7 @@ public struct BlossomAuth {
     /// Create authorization event for list
     public static func createListAuth(
         signer: NDKSigner,
+        ndk: NDK,
         since: Date? = nil,
         until: Date? = nil
     ) async throws -> BlossomAuth {
@@ -203,7 +206,7 @@ public struct BlossomAuth {
             tags.append(["until", String(Timestamp.from(until))]) 
         }
 
-        let event = try await NDKEventBuilder()
+        let event = try await NDKEventBuilder(ndk: ndk)
             .content("List blobs")
             .kind(EventKind.blossomAuth)
             .tags(tags)

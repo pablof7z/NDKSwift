@@ -89,6 +89,7 @@ public extension NDKEvent {
         content: String,
         recipientPubkey: PublicKey,
         signer: NDKSigner,
+        ndk: NDK,
         useNIP44: Bool = true
     ) async throws -> NDKEvent {
         let user = NDKUser(pubkey: recipientPubkey)
@@ -96,7 +97,7 @@ public extension NDKEvent {
         
         let encryptedContent = try await signer.encrypt(recipient: user, value: content, scheme: scheme)
         
-        let event = try await NDKEventBuilder()
+        let event = try await NDKEventBuilder(ndk: ndk)
             .content(encryptedContent)
             .kind(4) // Encrypted Direct Message
             .tags([["p", recipientPubkey]])

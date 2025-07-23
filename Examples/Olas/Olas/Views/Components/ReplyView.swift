@@ -150,7 +150,7 @@ struct ReplyView: View {
         Task { @MainActor in
             do {
                 // Use NDK's built-in reply() method which handles NIP-22 automatically
-                let reply = try await ndk.reply(to: parentEvent)
+                let reply = try await NDKEventBuilder.reply(to: parentEvent, ndk: ndk)
                     .content(replyText)
                     .build(signer: signer)
                 

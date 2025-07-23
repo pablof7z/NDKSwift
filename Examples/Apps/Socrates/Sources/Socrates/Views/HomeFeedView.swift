@@ -1,0 +1,480 @@
+import SwiftUI
+import NDKSwift
+import AVFoundation
+
+struct HomeFeedView: View {
+    @EnvironmentObject var nostrManager: NostrManager
+    @EnvironmentObject var appState: AppState
+    
+    @State private var audioEvents: [AudioEvent] = []
+    @State private var isRefreshing = false
+    @State private var showRecordingHint = true
+    @State private var recordingScale: CGFloat = 1
+    @State private var recordingOpacity: Double = 1
+    @State private var dragOffset = CGSize.zero
+    @State private var isDragging = false
+    
+    // Recording states
+    @State private var audioRecorder: AVAudioRecorder?
+    @State private var recordingTimer: Timer?
+    @State private var recordingDuration: TimeInterval = 0
+    @State private var showingRecordingUI = false
+    @State private var recordingWaveform: [CGFloat] = []
+    
+    var sortedEvents: [AudioEvent] {
+        audioEvents.sorted { $0.sortScore > $1.sortScore }
+    }
+    
+    var body: some View {
+        ZStack {
+            VStack(spacing: 0) {
+                // Header
+                HeaderView()
+                    .padding(.horizontal)
+                    .padding(.vertical, 10)
+                
+                // Feed
+                if audioEvents.isEmpty && !isRefreshing {
+                    EmptyFeedView()
+                } else {
+                    ScrollView {
+                        LazyVStack(spacing: 16) {
+                            ForEach(sortedEvents) { audioEvent in
+                                AudioEventCard(audioEvent: audioEvent)
+                                    .transition(.asymmetric(
+                                        insertion: .slide.combined(with: .opacity),
+                                        removal: .scale(scale: 0.8).combined(with: .opacity)
+                                    ))
+                            }
+                        }
+                        .padding()
+                    }
+                    .refreshable {
+                        await loadAudioEvents()
+                    }
+                }
+            }
+            
+            // Recording UI overlay
+            if showingRecordingUI {
+                RecordingOverlay(
+                    duration: recordingDuration,
+                    waveform: recordingWaveform,
+                    onCancel: cancelRecording,
+                    onComplete: completeRecording
+                )
+                .transition(.opacity.combined(with: .scale))
+            }
+            
+            // Floating record button
+            VStack {
+                Spacer()
+                HStack {
+                    Spacer()
+                    
+                    RecordButton(
+                        isRecording: $appState.isRecording,
+                        onStartRecording: startRecording,
+                        onStopRecording: stopRecording
+                    )
+                    .padding(.horizontal, 24)
+                    .padding(.bottom, 30)
+                }
+            }
+        }
+        .onAppear {
+            Task {
+                await loadAudioEvents()
+            }
+        }
+    }
+    
+    private func loadAudioEvents() async {
+        guard let ndk = nostrManager.ndk else { return }
+        
+        await MainActor.run {
+            isRefreshing = true
+        }
+        
+        // Create filter for audio events
+        let filter = NDKFilter(
+            kinds: [1222, 1244],
+            limit: 100
+        )
+        
+        let events = await ndk.fetchEvents(filter)
+        
+        var newAudioEvents: [AudioEvent] = []
+        
+        for event in events {
+            let wotScore = appState.webOfTrust[event.pubkey] ?? 0.1
+            if let audioEvent = AudioEvent.from(event: event, webOfTrustScore: wotScore) {
+                newAudioEvents.append(audioEvent)
+            }
+        }
+        
+        await MainActor.run {
+            self.audioEvents = newAudioEvents
+            isRefreshing = false
+        }
+    }
+    
+    private func startRecording() {
+        // Request microphone permission
+        AVAudioSession.sharedInstance().requestRecordPermission { granted in
+            if granted {
+                Task { @MainActor in
+                    setupRecording()
+                }
+            }
+        }
+    }
+    
+    private func setupRecording() {
+        let audioSession = AVAudioSession.sharedInstance()
+        
+        do {
+            try audioSession.setCategory(.playAndRecord, mode: .default)
+            try audioSession.setActive(true)
+            
+            let documentsPath = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
+            let audioFilename = documentsPath.appendingPathComponent("voice_\(Date().timeIntervalSince1970).m4a")
+            
+            let settings = [
+                AVFormatIDKey: Int(kAudioFormatMPEG4AAC),
+                AVSampleRateKey: 44100,
+                AVNumberOfChannelsKey: 1,
+                AVEncoderAudioQualityKey: AVAudioQuality.high.rawValue
+            ]
+            
+            audioRecorder = try AVAudioRecorder(url: audioFilename, settings: settings)
+            audioRecorder?.isMeteringEnabled = true
+            audioRecorder?.record()
+            
+            appState.isRecording = true
+            appState.recordingStartTime = Date()
+            showingRecordingUI = true
+            recordingDuration = 0
+            
+            // Start timer for duration and waveform
+            recordingTimer = Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { _ in
+                updateRecording()
+            }
+            
+        } catch {
+            print("Failed to start recording: \(error)")
+        }
+    }
+    
+    private func updateRecording() {
+        guard let recorder = audioRecorder,
+              let startTime = appState.recordingStartTime else { return }
+        
+        recorder.updateMeters()
+        
+        recordingDuration = Date().timeIntervalSince(startTime)
+        
+        // Update waveform
+        let normalizedValue = pow(10, recorder.averagePower(forChannel: 0) / 20)
+        recordingWaveform.append(normalizedValue)
+        
+        // Keep last 50 samples
+        if recordingWaveform.count > 50 {
+            recordingWaveform.removeFirst()
+        }
+        
+        // Auto-stop at 60 seconds
+        if recordingDuration >= 60 {
+            stopRecording()
+        }
+    }
+    
+    private func stopRecording() {
+        recordingTimer?.invalidate()
+        recordingTimer = nil
+        
+        audioRecorder?.stop()
+        appState.isRecording = false
+        
+        // Show completion UI
+        withAnimation(.spring(response: 0.6, dampingFraction: 0.8)) {
+            // Transition to publish state
+        }
+    }
+    
+    private func cancelRecording() {
+        recordingTimer?.invalidate()
+        recordingTimer = nil
+        
+        audioRecorder?.stop()
+        audioRecorder?.deleteRecording()
+        audioRecorder = nil
+        
+        appState.isRecording = false
+        showingRecordingUI = false
+        recordingWaveform = []
+    }
+    
+    private func completeRecording() {
+        guard let recorder = audioRecorder else { return }
+        
+        let fileURL = recorder.url
+        
+        // TODO: Upload to file hosting service
+        // TODO: Create and publish NDKEvent with kind 1222
+        
+        showingRecordingUI = false
+        recordingWaveform = []
+        
+        // Show success feedback
+    }
+}
+
+// MARK: - Header View
+struct HeaderView: View {
+    @EnvironmentObject var appState: AppState
+    
+    var body: some View {
+        HStack {
+            Text("SOCRATES")
+                .font(.system(size: 28, weight: .black))
+                .foregroundStyle(
+                    LinearGradient(
+                        gradient: Gradient(colors: [
+                            Color.white,
+                            Color.white.opacity(0.8)
+                        ]),
+                        startPoint: .top,
+                        endPoint: .bottom
+                    )
+                )
+            
+            Spacer()
+            
+            // Profile button
+            if let user = appState.currentUser {
+                AsyncImage(url: nil) { image in
+                    image
+                        .resizable()
+                        .scaledToFill()
+                } placeholder: {
+                    Circle()
+                        .fill(
+                            LinearGradient(
+                                gradient: Gradient(colors: [
+                                    Color.purple,
+                                    Color.blue
+                                ]),
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
+                        .overlay(
+                            Text(String(user.pubkey.prefix(2)))
+                                .font(.system(size: 16, weight: .bold))
+                                .foregroundColor(.white)
+                        )
+                }
+                .frame(width: 40, height: 40)
+                .clipShape(Circle())
+            }
+        }
+    }
+}
+
+// MARK: - Empty Feed View
+struct EmptyFeedView: View {
+    var body: some View {
+        VStack(spacing: 24) {
+            Spacer()
+            
+            Image(systemName: "waveform.circle")
+                .font(.system(size: 80))
+                .foregroundStyle(
+                    LinearGradient(
+                        gradient: Gradient(colors: [
+                            Color.purple.opacity(0.6),
+                            Color.blue.opacity(0.4)
+                        ]),
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                )
+            
+            VStack(spacing: 12) {
+                Text("No voices yet")
+                    .font(.system(size: 24, weight: .semibold))
+                    .foregroundColor(.white)
+                
+                Text("Be the first to share your wisdom")
+                    .font(.system(size: 16))
+                    .foregroundColor(Color.white.opacity(0.6))
+            }
+            
+            Spacer()
+        }
+    }
+}
+
+// MARK: - Record Button
+struct RecordButton: View {
+    @Binding var isRecording: Bool
+    let onStartRecording: () -> Void
+    let onStopRecording: () -> Void
+    
+    @State private var pulseScale: CGFloat = 1
+    @State private var pulseOpacity: Double = 0.5
+    
+    var body: some View {
+        ZStack {
+            // Pulse effect when recording
+            if isRecording {
+                Circle()
+                    .fill(Color.red.opacity(0.3))
+                    .frame(width: 80, height: 80)
+                    .scaleEffect(pulseScale)
+                    .opacity(pulseOpacity)
+                    .animation(
+                        .easeInOut(duration: 1)
+                        .repeatForever(autoreverses: true),
+                        value: pulseScale
+                    )
+            }
+            
+            // Main button
+            Button(action: {
+                if isRecording {
+                    onStopRecording()
+                } else {
+                    onStartRecording()
+                }
+            }) {
+                ZStack {
+                    Circle()
+                        .fill(
+                            LinearGradient(
+                                gradient: Gradient(colors: [
+                                    isRecording ? Color.red : Color.purple,
+                                    isRecording ? Color.red.opacity(0.8) : Color(red: 0.5, green: 0.1, blue: 0.9)
+                                ]),
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
+                        .frame(width: 64, height: 64)
+                        .shadow(color: isRecording ? Color.red.opacity(0.5) : Color.purple.opacity(0.5), 
+                               radius: 15, x: 0, y: 5)
+                    
+                    Image(systemName: isRecording ? "stop.fill" : "mic.fill")
+                        .font(.system(size: 28))
+                        .foregroundColor(.white)
+                }
+            }
+            .scaleEffect(isRecording ? 1.1 : 1)
+            .animation(.spring(response: 0.3, dampingFraction: 0.6), value: isRecording)
+        }
+        .onAppear {
+            if isRecording {
+                withAnimation(.easeInOut(duration: 1).repeatForever(autoreverses: true)) {
+                    pulseScale = 1.3
+                    pulseOpacity = 0
+                }
+            }
+        }
+        .onChange(of: isRecording) { newValue in
+            if newValue {
+                withAnimation(.easeInOut(duration: 1).repeatForever(autoreverses: true)) {
+                    pulseScale = 1.3
+                    pulseOpacity = 0
+                }
+            } else {
+                pulseScale = 1
+                pulseOpacity = 0.5
+            }
+        }
+    }
+}
+
+// MARK: - Recording Overlay
+struct RecordingOverlay: View {
+    let duration: TimeInterval
+    let waveform: [CGFloat]
+    let onCancel: () -> Void
+    let onComplete: () -> Void
+    
+    @State private var showingControls = false
+    
+    var formattedDuration: String {
+        let minutes = Int(duration) / 60
+        let seconds = Int(duration) % 60
+        return String(format: "%d:%02d", minutes, seconds)
+    }
+    
+    var body: some View {
+        ZStack {
+            // Background blur
+            Color.black.opacity(0.8)
+                .ignoresSafeArea()
+                .onTapGesture {
+                    withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                        showingControls.toggle()
+                    }
+                }
+            
+            VStack(spacing: 40) {
+                // Waveform visualization
+                HStack(spacing: 2) {
+                    ForEach(0..<waveform.count, id: \.self) { index in
+                        Capsule()
+                            .fill(
+                                LinearGradient(
+                                    gradient: Gradient(colors: [
+                                        Color.purple,
+                                        Color.blue
+                                    ]),
+                                    startPoint: .top,
+                                    endPoint: .bottom
+                                )
+                            )
+                            .frame(width: 4, height: 20 + waveform[index] * 80)
+                            .animation(.easeOut(duration: 0.1), value: waveform[index])
+                    }
+                }
+                .frame(height: 100)
+                
+                // Duration
+                Text(formattedDuration)
+                    .font(.system(size: 48, weight: .bold, design: .monospaced))
+                    .foregroundColor(.white)
+                
+                // Controls
+                if showingControls {
+                    HStack(spacing: 40) {
+                        Button(action: onCancel) {
+                            VStack(spacing: 8) {
+                                Image(systemName: "xmark.circle.fill")
+                                    .font(.system(size: 50))
+                                    .foregroundColor(.red)
+                                Text("Cancel")
+                                    .font(.caption)
+                                    .foregroundColor(.white)
+                            }
+                        }
+                        
+                        Button(action: onComplete) {
+                            VStack(spacing: 8) {
+                                Image(systemName: "checkmark.circle.fill")
+                                    .font(.system(size: 50))
+                                    .foregroundColor(.green)
+                                Text("Publish")
+                                    .font(.caption)
+                                    .foregroundColor(.white)
+                            }
+                        }
+                    }
+                    .transition(.scale.combined(with: .opacity))
+                }
+            }
+        }
+    }
+}

@@ -249,6 +249,7 @@ public struct DiscoveredMint: Identifiable {
     public var recommendedBy: [String]
     public let description: String?
     public let pubkey: String?
+    public var mintInfo: NDKMintInfo?
     
     public init(
         url: String,
@@ -258,7 +259,8 @@ public struct DiscoveredMint: Identifiable {
         announcementCreatedAt: Timestamp? = nil,
         recommendedBy: [String] = [],
         description: String? = nil,
-        pubkey: String? = nil
+        pubkey: String? = nil,
+        mintInfo: NDKMintInfo? = nil
     ) {
         self.id = url
         self.url = url
@@ -269,5 +271,6 @@ public struct DiscoveredMint: Identifiable {
         self.recommendedBy = recommendedBy
         self.description = description
         self.pubkey = pubkey
+        self.mintInfo = mintInfo
     }
 }

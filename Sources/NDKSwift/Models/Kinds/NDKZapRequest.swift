@@ -49,7 +49,7 @@ public struct NDKZapRequest {
             tags.append([NostrTagConstants.TagName.address, coordinate])
         }
         
-        let event = try await NDKEventBuilder()
+        let event = try await NDKEventBuilder(ndk: ndk)
             .content(comment ?? "")
             .kind(EventKind.zapRequest)
             .tags(tags)

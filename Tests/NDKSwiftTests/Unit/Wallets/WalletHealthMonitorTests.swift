@@ -140,7 +140,7 @@ final class WalletHealthMonitorTests: XCTestCase {
     
     func testEventPublishingUpdatesTracker() async throws {
         // Given: A new event to publish
-        let event = try await ndk.event()
+        let event = try await NDKEventBuilder(ndk: ndk)
             .content("Test wallet event")
             .kind(7375)
             .build(signer: signer)

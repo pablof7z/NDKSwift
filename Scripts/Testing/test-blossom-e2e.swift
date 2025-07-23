@@ -126,7 +126,7 @@ struct BlossomE2ERunner {
         let blossomUrl = firstBlob.url
         
         // Create file metadata event
-        let fileMetadata = try await ndk.event()
+        let fileMetadata = try await NDKEventBuilder(ndk: ndk)
             .content("Test image from Blossom E2E")
             .kind(1063)
             .tag(["url", blossomUrl])

@@ -254,7 +254,7 @@ struct ThreadView: View {
                     tags.append(["p", rootEvent.pubkey])
                 }
                 
-                let replyEvent = try await ndk.event()
+                let replyEvent = try await NDKEventBuilder(ndk: ndk)
                     .kind(EventKind.textNote)
                     .content(replyText)
                     .tags(tags)

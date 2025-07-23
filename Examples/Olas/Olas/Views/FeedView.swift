@@ -365,7 +365,7 @@ struct FeedItemView: View {
             do {
                 if isLiked {
                     // Create like reaction (kind 7)
-                    let reaction = try await ndk.event()
+                    let reaction = try await NDKEventBuilder(ndk: ndk)
                         .kind(7)
                         .content("+")
                         .tags([
@@ -705,14 +705,14 @@ struct FeedItem: Identifiable {
         
         // Extract blurhashes from imeta tags
         var hashes: [String] = []
-        for tag in event.tags where tag.name == "imeta" {
+        for tag in event.tags where tag.count >= 1 && tag[0] == "imeta" {
             var blurhash: String?
             
             // Parse imeta tag values
-            for i in stride(from: 1, to: tag.values.count, by: 2) {
-                if i + 1 < tag.values.count {
-                    let key = tag.values[i]
-                    let value = tag.values[i + 1]
+            for i in stride(from: 1, to: tag.count, by: 2) {
+                if i + 1 < tag.count {
+                    let key = tag[i]
+                    let value = tag[i + 1]
                     
                     if key == "blurhash" {
                         blurhash = value
@@ -994,7 +994,7 @@ struct LikeAnimationView: View {
     
     struct HeartParticle: Identifiable {
         let id = UUID()
-        let startPosition: CGPoint
+        var startPosition: CGPoint
         let endPosition: CGPoint
         let rotation: Double
         let scale: CGFloat

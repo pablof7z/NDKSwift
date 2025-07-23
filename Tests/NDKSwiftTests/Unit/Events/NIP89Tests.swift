@@ -266,7 +266,7 @@ final class NIP89Tests: XCTestCase {
         )
         
         // Test that client tag is automatically added
-        let event1 = try await ndk.event()
+        let event1 = try await NDKEventBuilder(ndk: ndk)
             .content("Hello, world!")
             .kind(1)
             .build(signer: signer)
@@ -277,7 +277,7 @@ final class NIP89Tests: XCTestCase {
         XCTAssertEqual(event1.clientTag?.relay, "wss://relay.test")
         
         // Test that excluded kinds don't get client tags
-        let event2 = try await ndk.event()
+        let event2 = try await NDKEventBuilder(ndk: ndk)
             .content("Secret message")
             .kind(4)
             .build(signer: signer)
@@ -298,7 +298,7 @@ final class NIP89Tests: XCTestCase {
         )
         
         // Test that client tag is not automatically added
-        let event = try await ndk.event()
+        let event = try await NDKEventBuilder(ndk: ndk)
             .content("Hello, world!")
             .kind(1)
             .build(signer: signer)
@@ -319,7 +319,7 @@ final class NIP89Tests: XCTestCase {
         )
         
         // Test that manual client tag overrides automatic one
-        let event = try await ndk.event()
+        let event = try await NDKEventBuilder(ndk: ndk)
             .content("Hello, world!")
             .kind(1)
             .clientTag(name: "ManualClient", address: "31990:manual:test")
@@ -343,7 +343,7 @@ final class NIP89Tests: XCTestCase {
         )
         
         // Test that client tag is automatically added
-        let event = try await ndk.event()
+        let event = try await NDKEventBuilder(ndk: ndk)
             .content("Hello, world!")
             .kind(1)
             .build(signer: signer)
