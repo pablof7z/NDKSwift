@@ -47,7 +47,6 @@ actor NDKDataRequirementManager {
         // This happens before any delay, giving instant cache hits
         var cacheObservationHandle: ObservationHandle?
         if cachePolicy != .networkOnly {
-            NDKLogger.log(.debug, category: .subscription, "📦 Immediately querying cache for existing events", correlationId: String(correlationId))
             cacheObservationHandle = await ndk.cache.observeEvents(
                 matching: filter,
                 observer: observer
@@ -60,7 +59,6 @@ actor NDKDataRequirementManager {
         
         // Handle cache-only policy
         if cachePolicy == .cacheOnly {
-            NDKLogger.log(.debug, category: .subscription, "📦 Cache-only policy - no network subscription", correlationId: String(correlationId))
             // Return handle that can cancel the cache observation
             return DataRequirementHandle(
                 id: requirementId, 
@@ -74,7 +72,6 @@ actor NDKDataRequirementManager {
         
         // Check if we can reuse an existing requirement (only for live subscriptions)
         if maxAge == 0, let existing = findMatchingRequirement(for: filter) {
-            NDKLogger.log(.info, category: .subscription, "♻️ Reusing existing requirement for filter", correlationId: String(correlationId))
             await existing.addObserver(observer, id: requirementId, individualFilter: filter)
             return DataRequirementHandle(
                 id: requirementId,

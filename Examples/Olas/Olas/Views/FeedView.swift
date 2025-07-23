@@ -42,12 +42,13 @@ struct FeedItemView: View {
     @State private var showingLikeAnimation = false
     @State private var showingZap = false
     @State private var doubleTapLocation: CGPoint = .zero
+    @State private var navigateToProfile = false
     
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             // Header
             HStack(spacing: OlasDesign.Spacing.md) {
-                NavigationLink(destination: ProfileView(pubkey: item.event.pubkey)) {
+                Button(action: { navigateToProfile = true }) {
                     HStack(spacing: OlasDesign.Spacing.md) {
                         OlasAvatar(
                             url: item.profile?.picture,
@@ -56,10 +57,19 @@ struct FeedItemView: View {
                         )
                         
                         VStack(alignment: .leading, spacing: 2) {
-                            Text(item.profile?.displayName ?? item.profile?.name ?? "Loading...")
-                                .font(OlasDesign.Typography.bodyMedium)
-                                .foregroundColor(OlasDesign.Colors.text)
-                                .olasTextShadow()
+                            HStack(spacing: 4) {
+                                Text(item.profile?.displayName ?? item.profile?.name ?? "Loading...")
+                                    .font(OlasDesign.Typography.bodyMedium)
+                                    .foregroundColor(OlasDesign.Colors.text)
+                                    .olasTextShadow()
+                                
+                                if let clientInfo = item.event.clientTag {
+                                    Text("via \(clientInfo.name)")
+                                        .font(OlasDesign.Typography.caption)
+                                        .foregroundColor(OlasDesign.Colors.textTertiary)
+                                        .olasTextShadow()
+                                }
+                            }
                             
                             Text("@\(item.profile?.name ?? String(item.event.pubkey.prefix(8)))")
                                 .font(OlasDesign.Typography.caption)
@@ -109,9 +119,6 @@ struct FeedItemView: View {
                                 // Down: Dismiss if in preview
                             }
                     )
-                    .navigationDestination(isPresented: $showProfile) {
-                        ProfileView(pubkey: item.event.pubkey)
-                    }
             } else {
                 // No image found
                 Rectangle()
@@ -230,6 +237,12 @@ struct FeedItemView: View {
         .sheet(isPresented: $showingZap) {
             ZapView(event: item.event)
                 .environmentObject(appState)
+        }
+        .navigationDestination(isPresented: $navigateToProfile) {
+            ProfileView(pubkey: item.event.pubkey)
+        }
+        .navigationDestination(isPresented: $showProfile) {
+            ProfileView(pubkey: item.event.pubkey)
         }
         .task {
             await loadEngagementCounts()

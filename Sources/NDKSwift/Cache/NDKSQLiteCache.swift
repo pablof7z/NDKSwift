@@ -177,10 +177,7 @@ public actor NDKSQLiteCache: NDKCache {
     }
     
     public func queryEvents(_ filter: NDKFilter) async throws -> [NDKEvent] {
-        NDKLogger.log(.debug, category: .cache, "Starting query with filter: ids=\(filter.ids?.joined(separator: ",") ?? "nil"), authors=\(filter.authors?.joined(separator: ",") ?? "nil"), kinds=\(filter.kinds?.map { String($0) }.joined(separator: ",") ?? "nil")")
-        
         return try await dbQueue.read { [self] db in
-            NDKLogger.log(.trace, category: .cache, "Inside dbQueue.read block")
             var arguments = StatementArguments()
             var whereClauses: [String] = []
             var joins: [String] = []

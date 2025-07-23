@@ -525,22 +525,15 @@ class ProfileViewModel: ObservableObject {
     private func loadReplies() {
         guard let ndk = ndk else { return }
         
-        // Load comments (NIP-22)
+        // This section would need proper implementation:
+        // - First load all posts by this user
+        // - Then for each post, load comments with proper NIP-22 tags
+        // - The current implementation that loads ALL comments by the user is conceptually wrong
+        
+        // For now, we'll just clear the replies to avoid the incorrect behavior
         Task {
-            let filter = NDKFilter(
-                authors: [pubkey],
-                kinds: [EventKind.genericReply]
-            )
-            
-            let dataSource = ndk.observe(filter: filter, cachePolicy: .cacheWithNetwork)
-            
-            for await event in dataSource.events {
-                await MainActor.run {
-                    if !replies.contains(where: { $0.id == event.id }) {
-                        replies.append(event)
-                        replies.sort { $0.createdAt > $1.createdAt }
-                    }
-                }
+            await MainActor.run {
+                replies.removeAll()
             }
         }
     }
