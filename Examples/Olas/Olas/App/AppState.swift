@@ -6,6 +6,7 @@ class AppState: ObservableObject {
     @Published var ndk: NDK?
     @Published var isAuthenticated = false
     @Published var currentUserProfile: NDKUserProfile?
+    @Published var currentUser: NDKUser?
     
     // Reactive data sources
     private(set) var profileManager: NDKProfileManager?
@@ -60,6 +61,7 @@ class AppState: ObservableObject {
         // Check if we have an active session
         if authManager.isAuthenticated, let session = authManager.activeSession {
             isAuthenticated = true
+            currentUser = NDKUser(pubkey: session.pubkey)
             
             // Load current user profile
             await loadCurrentUserProfile(pubkey: session.pubkey)
@@ -115,13 +117,14 @@ class AppState: ObservableObject {
         _ = try await ndk.publish(metadataEvent)
         
         // Update state
+        let pubkey = try await signer.pubkey
         await MainActor.run {
             self.isAuthenticated = true
             self.currentUserProfile = profile
+            self.currentUser = NDKUser(pubkey: pubkey)
         }
         
         // Start observing profile
-        let pubkey = try await signer.pubkey
         await loadCurrentUserProfile(pubkey: pubkey)
     }
     
@@ -142,12 +145,13 @@ class AppState: ObservableObject {
         try await authManager.switchToSession(session)
         
         // Update state
+        let pubkey = try await signer.pubkey
         await MainActor.run {
             self.isAuthenticated = true
+            self.currentUser = NDKUser(pubkey: pubkey)
         }
         
         // Load profile
-        let pubkey = try await signer.pubkey
         await loadCurrentUserProfile(pubkey: pubkey)
     }
     
@@ -156,6 +160,7 @@ class AppState: ObservableObject {
         await MainActor.run {
             self.isAuthenticated = false
             self.currentUserProfile = nil
+            self.currentUser = nil
         }
     }
 }

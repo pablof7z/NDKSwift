@@ -36,27 +36,33 @@ struct FeedItemView: View {
     @State private var isLiked = false
     @State private var scale: CGFloat = 1.0
     @State private var isZoomed = false
+    @State private var showProfile = false
     
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             // Header
             HStack(spacing: OlasDesign.Spacing.md) {
-                OlasAvatar(
-                    url: item.profile?.picture,
-                    size: 40,
-                    pubkey: item.event.pubkey
-                )
-                
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(item.profile?.displayName ?? item.profile?.name ?? "Loading...")
-                        .font(OlasDesign.Typography.bodyMedium)
-                        .foregroundColor(OlasDesign.Colors.text)
-                        .olasTextShadow()
-                    
-                    Text("@\(item.profile?.name ?? String(item.event.pubkey.prefix(8)))")
-                        .font(OlasDesign.Typography.caption)
-                        .foregroundColor(OlasDesign.Colors.textSecondary)
+                NavigationLink(destination: ProfileView(pubkey: item.event.pubkey)) {
+                    HStack(spacing: OlasDesign.Spacing.md) {
+                        OlasAvatar(
+                            url: item.profile?.picture,
+                            size: 40,
+                            pubkey: item.event.pubkey
+                        )
+                        
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(item.profile?.displayName ?? item.profile?.name ?? "Loading...")
+                                .font(OlasDesign.Typography.bodyMedium)
+                                .foregroundColor(OlasDesign.Colors.text)
+                                .olasTextShadow()
+                            
+                            Text("@\(item.profile?.name ?? String(item.event.pubkey.prefix(8)))")
+                                .font(OlasDesign.Typography.caption)
+                                .foregroundColor(OlasDesign.Colors.textSecondary)
+                        }
+                    }
                 }
+                .buttonStyle(PlainButtonStyle())
                 
                 Spacer()
                 
@@ -76,6 +82,26 @@ struct FeedItemView: View {
                         OlasDesign.Haptic.selection()
                         // TODO: Show full screen image viewer
                     }
+                    .gesture(
+                        DragGesture(minimumDistance: 50)
+                            .onEnded { value in
+                                if value.translation.height < -50 {
+                                    // Swipe up - View user profile
+                                    OlasDesign.Haptic.selection()
+                                    showProfile = true
+                                }
+                                // TODO: Add other swipe gestures
+                                // Left: Quick share sheet
+                                // Right: Save to collection
+                                // Down: Dismiss if in preview
+                            }
+                    )
+                    .background(
+                        NavigationLink(destination: ProfileView(pubkey: item.event.pubkey), isActive: $showProfile) {
+                            EmptyView()
+                        }
+                        .hidden()
+                    )
             } else {
                 // No image found
                 Rectangle()

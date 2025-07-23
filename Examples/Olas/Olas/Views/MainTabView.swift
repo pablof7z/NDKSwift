@@ -1,6 +1,8 @@
 import SwiftUI
+import NDKSwift
 
 struct MainTabView: View {
+    @EnvironmentObject var appState: AppState
     @State private var selectedTab = 0
     
     var body: some View {
@@ -23,11 +25,20 @@ struct MainTabView: View {
                 }
                 .tag(2)
             
-            Text("Profile")
-                .tabItem {
-                    Label("Profile", systemImage: "person.circle")
+            // Profile Tab
+            Group {
+                if let currentUserPubkey = appState.currentUser?.pubkey {
+                    NavigationStack {
+                        ProfileView(pubkey: currentUserPubkey)
+                    }
+                } else {
+                    Text("Profile")
                 }
-                .tag(3)
+            }
+            .tabItem {
+                Label("Profile", systemImage: "person.circle")
+            }
+            .tag(3)
             
             Text("Settings")
                 .tabItem {
@@ -35,6 +46,6 @@ struct MainTabView: View {
                 }
                 .tag(4)
         }
-        .tint(Color(hex: "667eea"))
+        .tint(OlasDesign.Colors.primary)
     }
 }
