@@ -109,10 +109,9 @@ struct FeedItemView: View {
                                 // Down: Dismiss if in preview
                             }
                     )
-                    .overlay(
-                        NavigationLink("", destination: ProfileView(pubkey: item.event.pubkey), isActive: $showProfile)
-                            .hidden()
-                    )
+                    .navigationDestination(isPresented: $showProfile) {
+                        ProfileView(pubkey: item.event.pubkey)
+                    }
             } else {
                 // No image found
                 Rectangle()
@@ -556,27 +555,13 @@ class FeedViewModel: ObservableObject {
         case like, reply, zap
     }
     
-    private func extractZapAmount(from zapReceipt: NDKEvent) -> Int {
-        // NIP-57: Zap receipts contain a "bolt11" tag with the invoice
-        // and a "description" tag with the zap request
-        if let bolt11Tag = zapReceipt.tags.first(where: { $0.count >= 2 && $0[0] == "bolt11" }) {
-            let _ = bolt11Tag[1]
-            // Parse the amount from the bolt11 invoice
-            // For now, extract amount from description tag if available
-            if let descriptionTag = zapReceipt.tags.first(where: { $0.count >= 2 && $0[0] == "description" }),
-               let descriptionData = descriptionTag[1].data(using: .utf8),
-               let zapRequest = try? JSONSerialization.jsonObject(with: descriptionData) as? [String: Any],
-               let amountString = zapRequest["amount"] as? String,
-               let amountMsat = Int(amountString) {
-                // Convert millisats to sats
-                return amountMsat / 1000
-            }
-        }
+    private func extractZapAmount(from zapReceiptEvent: NDKEvent) async -> Int {
+        // Use NDKSwift's built-in NDKZapReceipt for proper NIP-57 parsing
+        let zapReceipt = NDKZapReceipt(event: zapReceiptEvent)
         
-        // Try to get amount from amount tag (some implementations use this)
-        if let amountTag = zapReceipt.tags.first(where: { $0.count >= 2 && $0[0] == "amount" }),
-           let amount = Int(amountTag[1]) {
-            return amount / 1000  // Convert millisats to sats
+        // Get amount in sats (NDKZapReceipt handles bolt11 parsing)
+        if let amountSats = zapReceipt.amountSats {
+            return Int(amountSats)
         }
         
         return 0
