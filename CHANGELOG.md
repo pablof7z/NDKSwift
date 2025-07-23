@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- Support for NDKFollowPack (NIP-51, kinds 39089 and 39092)
+  - Create and manage follow packs with title, description, image, and pubkey collections
+  - Support for both regular follow packs and media follow packs
+  - Rich image metadata support using imeta tags
+  - Fetch follow packs by user, identifier, or globally
+  - Convert between NDKEvent and NDKFollowPack representations
+- Comprehensive tests for NDKFollowPack functionality
+- Example demonstrating follow pack creation and management
+
 ## [0.4.1] - 2025-01-22
 
 ### Fixed

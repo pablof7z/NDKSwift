@@ -146,6 +146,8 @@ public enum EventKind {
     public static let applicationSpecificData = 30078
     public static let mintAnnouncement = 38000  // NIP-87 mint discovery
     public static let cashuMintAnnouncement = 38172  // NIP-87
+    public static let followPack = 39089  // NIP-51 follow pack
+    public static let mediaFollowPack = 39092  // NIP-51 media follow pack
 }
 
 // MARK: - Event Kind Ranges
