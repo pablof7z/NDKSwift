@@ -59,7 +59,7 @@ struct SettingsView: View {
                 
                 // Relay Section
                 Section {
-                    NavigationLink(destination: RelaySettingsView(relayManager: relayManager)) {
+                    NavigationLink(destination: RelaySettingsView()) {
                         HStack {
                             Image(systemName: "network")
                                 .font(.title2)
@@ -161,7 +161,7 @@ struct SettingsView: View {
             .sheet(isPresented: $showingProfile) {
                 ProfileView(pubkey: nil)
                     .environment(authManager)
-                    .environmentObject(NDKManager.shared)
+                    .environment(NDKManager.shared)
             }
         }
         .preferredColorScheme(themeManager.currentTheme.colorScheme)

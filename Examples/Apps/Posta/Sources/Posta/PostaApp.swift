@@ -50,8 +50,7 @@ struct PostaApp: App {
             
             // Set NDK on managers
             await MainActor.run {
-                let userPubkey = authManager.activeSession?.pubkey
-                ndkManager.setNDK(ndkInstance, userPubkey: userPubkey)
+                ndkManager.setNDK(ndkInstance)
                 authManager.setNDK(ndkInstance)
                 relayManager.setNDK(ndkInstance)
             }

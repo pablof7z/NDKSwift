@@ -45,7 +45,7 @@ struct AsyncContentView<Content: View, T>: View {
             error = nil
             
             do {
-                result = try await Task.checkCancellation() // Check if cancelled
+                try Task.checkCancellation() // Check if cancelled
                 result = await operation()
             } catch {
                 self.error = error

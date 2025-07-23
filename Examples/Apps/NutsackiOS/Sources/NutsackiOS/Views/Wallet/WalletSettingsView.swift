@@ -27,34 +27,48 @@ struct WalletSettingsView: View {
                 // Wallet Configuration Warning
                 if !hasWalletInfo && walletManager.activeWallet != nil {
                     Section {
-                        VStack(alignment: .leading, spacing: 8) {
-                            HStack {
-                                Image(systemName: "exclamationmark.triangle.fill")
-                                    .foregroundColor(.orange)
-                                Text("Wallet Not Published")
-                                    .font(.headline)
-                            }
-                            Text("Your wallet configuration hasn't been published to relays. Publishing ensures your wallet data is synchronized across devices.")
+                        HStack {
+                            Image(systemName: "exclamationmark.triangle")
+                                .foregroundColor(.orange)
+                                .font(.caption)
+                            Text("Wallet not published - tap to sync across devices")
                                 .font(.caption)
                                 .foregroundColor(.secondary)
-                            Button("Publish Wallet Configuration") {
-                                Task { await saveSettings() }
-                            }
-                            .buttonStyle(.borderedProminent)
+                            Spacer()
                         }
-                        .padding(.vertical, 1)
+                        .contentShape(Rectangle())
+                        .onTapGesture {
+                            Task { await saveSettings() }
+                        }
                     }
                 }
                 
                 // Mints Section
                 Section {
                     if mints.isEmpty {
-                        ContentUnavailableView(
-                            "No Mints Configured",
-                            systemImage: "building.columns",
-                            description: Text("Add mints to start using ecash")
-                        )
-                        .scaleEffect(0.85)
+                        VStack(spacing: 16) {
+                            ContentUnavailableView(
+                                "No Mints Configured",
+                                systemImage: "building.columns",
+                                description: Text("Add mints to start using ecash")
+                            )
+                            .scaleEffect(0.85)
+                            
+                            Button(action: discoverMints) {
+                                if isDiscovering {
+                                    HStack(spacing: 4) {
+                                        ProgressView()
+                                            .scaleEffect(0.8)
+                                        Text("Discovering...")
+                                    }
+                                } else {
+                                    Label("Discover", systemImage: "sparkle.magnifyingglass")
+                                }
+                            }
+                            .buttonStyle(.borderedProminent)
+                            .controlSize(.regular)
+                            .disabled(isDiscovering)
+                        }
                     } else {
                         ForEach(mints, id: \.url.absoluteString) { mint in
                             NavigationLink(destination: MintDetailView(mintURL: mint.url.absoluteString)) {
@@ -66,41 +80,27 @@ struct WalletSettingsView: View {
             .padding(.leading, 2)
                         }
                     }
-                    
-                    // Add mint buttons
-                    HStack(spacing: 8) {
-                        Button(action: { showAddMintSheet = true }) {
-                            Label("Add Mint", systemImage: "plus")
-                                .font(.caption)
-                        }
-                        .buttonStyle(.bordered)
-                        .controlSize(.small)
-                        .tint(.blue)
-                        
-                        Button(action: discoverMints) {
-                            if isDiscovering {
-                                HStack(spacing: 4) {
-                                    ProgressView()
-                                        .scaleEffect(0.7)
-                                    Text("Discovering...")
-                                        .font(.caption)
-                                }
-                            } else {
-                                Label("Discover", systemImage: "sparkle.magnifyingglass")
-                                    .font(.caption)
-                            }
-                        }
-                        .buttonStyle(.bordered)
-                        .controlSize(.small)
-                        .tint(.blue)
-                        .disabled(isDiscovering)
-                    }
-                    .padding(.top, 0)
                 } header: {
-                    Text("MINTS")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                        .textCase(.none)
+                    HStack {
+                        Text("MINTS")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                            .textCase(.none)
+                        Spacer()
+                        Menu {
+                            Button(action: { showAddMintSheet = true }) {
+                                Label("Add by URL", systemImage: "link")
+                            }
+                            Button(action: discoverMints) {
+                                Label("Discover Mints", systemImage: "sparkle.magnifyingglass")
+                            }
+                            .disabled(isDiscovering)
+                        } label: {
+                            Image(systemName: "plus")
+                                .font(.caption)
+                                .foregroundColor(.accentColor)
+                        }
+                    }
                 }
                 
                 // Relays Section

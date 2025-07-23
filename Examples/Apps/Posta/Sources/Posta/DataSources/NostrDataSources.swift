@@ -130,24 +130,34 @@ public class FollowListDataSource: ObservableObject {
     }
     
     private func observeFollowList() async {
-        dataSource.$data
-            .compactMap { events in
-                events.sorted { $0.createdAt > $1.createdAt }.first
+        // Break complex expression into simpler parts
+        let latestEventPublisher = dataSource.$data
+            .map { events -> NDKEvent? in
+                let sorted = events.sorted { $0.createdAt > $1.createdAt }
+                return sorted.first
             }
-            .map { event in
+            .compactMap { $0 }
+        
+        let followListPublisher = latestEventPublisher
+            .map { event -> Set<String> in
                 let pubkeys = event.tags
-                    .filter { $0.name == "p" && $0.parameters.count > 0 }
-                    .map { $0.parameters[0] }
+                    .filter { tag in
+                        tag.count >= 2 && tag[0] == "p"
+                    }
+                    .map { tag in
+                        tag[1]
+                    }
                 return Set(pubkeys)
             }
-            .assign(to: &$followList)
         
-        dataSource.$data
-            .compactMap { events in
-                events.sorted { $0.createdAt > $1.createdAt }.first?.createdAt
+        followListPublisher.assign(to: &$followList)
+        
+        let timestampPublisher = latestEventPublisher
+            .map { event -> Date? in
+                Date(timeIntervalSince1970: TimeInterval(event.createdAt))
             }
-            .map { Date(timeIntervalSince1970: TimeInterval($0)) }
-            .assign(to: &$lastUpdate)
+        
+        timestampPublisher.assign(to: &$lastUpdate)
         
         dataSource.$isLoading.assign(to: &$isLoading)
         dataSource.$error.assign(to: &$error)
@@ -186,8 +196,10 @@ public class NotesDataSource: ObservableObject {
     private func observeNotes() async {
         // Monitor EOSE status
         eoseTask = Task {
-            for await eose in dataSource.eose {
-                hasEOSE = eose
+            for await update in dataSource.relayUpdates {
+                if case .eose = update {
+                    hasEOSE = true
+                }
             }
         }
         

@@ -95,7 +95,7 @@ public enum EventKind {
     public static let repost = 6
     public static let reaction = 7
     public static let genericRepost = 16
-    public static let image = 20
+    public static let image = 20  // NIP-68 Picture-first feeds
     
     // MARK: - Extended Events (1000-9999)
     public static let fileMetadata = 1063
@@ -197,6 +197,7 @@ public struct NDKImetaTag: Sendable {
     public var x: String?
     public var size: String?
     public var fallback: [String]?
+    public var userAnnotations: [UserAnnotation]?
     public var additionalFields: [String: String] = [:]
 
     public init(
@@ -208,6 +209,7 @@ public struct NDKImetaTag: Sendable {
         x: String? = nil,
         size: String? = nil,
         fallback: [String]? = nil,
+        userAnnotations: [UserAnnotation]? = nil,
         additionalFields: [String: String] = [:]
     ) {
         self.url = url
@@ -218,7 +220,21 @@ public struct NDKImetaTag: Sendable {
         self.x = x
         self.size = size
         self.fallback = fallback
+        self.userAnnotations = userAnnotations
         self.additionalFields = additionalFields
+    }
+}
+
+/// User annotation for tagging people in images (NIP-68)
+public struct UserAnnotation: Sendable {
+    public let pubkey: PublicKey
+    public let x: Int
+    public let y: Int
+    
+    public init(pubkey: PublicKey, x: Int, y: Int) {
+        self.pubkey = pubkey
+        self.x = x
+        self.y = y
     }
 }
 

@@ -7,7 +7,6 @@ struct NutsackApp: App {
     @StateObject private var appState = AppState()
     @State private var nostrManager: NostrManager
     @State private var walletManager: WalletManager
-    @State private var showSplash = true
     
     // Create a simple in-memory container
     let modelContainer: ModelContainer = {
@@ -72,22 +71,11 @@ struct NutsackApp: App {
     
     var body: some Scene {
         WindowGroup {
-            ZStack {
-                ContentView()
-                    .environmentObject(appState)
-                    .environment(nostrManager)
-                    .environment(walletManager)
-                    .opacity(showSplash ? 0 : 1)
-                    .animation(.easeInOut(duration: 0.5), value: showSplash)
-                
-                if showSplash {
-                    SplashView {
-                        showSplash = false
-                    }
-                    .transition(.opacity.combined(with: .scale(scale: 1.1)))
-                }
-            }
-            .preferredColorScheme(appState.themeMode.colorScheme)
+            ContentView()
+                .environmentObject(appState)
+                .environment(nostrManager)
+                .environment(walletManager)
+                .preferredColorScheme(appState.themeMode.colorScheme)
         }
         .modelContainer(modelContainer)
     }
