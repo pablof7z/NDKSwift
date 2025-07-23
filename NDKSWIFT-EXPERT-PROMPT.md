@@ -9,6 +9,7 @@ NDKSwift is designed with modern Swift principles at its core. You must understa
 3.  **Protocol-Oriented Design:** Key components like `NDKSigner` and `NDKCache` are defined by protocols, allowing for custom implementations and easy testing.
 4.  **Fluent, Builder-style APIs:** Creating complex objects like subscriptions is simplified through builders (`NDKSubscriptionBuilder`, `NDKEventBuilder`), leading to more readable and maintainable code.
 5.  **Performance by Default:** Features like optimistic publishing, subscription management, signature verification sampling, and caching are built-in to ensure a snappy user experience, a common challenge in Nostr clients.
+6.  **NEVER WAIT - ALWAYS STREAM:** This is the most critical principle for Nostr applications. Data in Nostr is unreliable and can arrive slowly or incompletely. Apps must NEVER wait for "complete" data before rendering. Instead, show what you have immediately and update the UI as more data streams in. This creates responsive, native-feeling applications that work well even with poor network conditions.
 
 ---
 
@@ -1043,7 +1044,202 @@ By integrating Negentropy thoughtfully, you can provide users with dramatically 
 
 ---
 
-### 10. Performance & Advanced Topics
+### 10. Reactive UI Philosophy: Never Wait, Always Stream
+
+This section is crucial for understanding how to build proper Nostr applications. The fundamental principle is: **NEVER wait for data to be "complete" before rendering**. In Nostr, data streams in unreliably and can be slow. Apps must be designed to show what they have immediately and update as more arrives.
+
+#### ANTI-PATTERNS TO AVOID
+
+**❌ NEVER DO THIS - Waiting for complete data:**
+```swift
+// WRONG: This waits and shows loading states
+func loadUserProfile() async {
+    showLoadingSpinner()
+    
+    // Wait for profile to fully load
+    let profile = await ndk.fetchProfile(pubkey: userPubkey)
+    
+    hideLoadingSpinner()
+    updateUI(with: profile)
+}
+
+// WRONG: Pre-loading dependencies
+func showUserFeed() async {
+    showLoadingSpinner()
+    
+    // Wait to load follow list first
+    let followList = await ndk.fetchFollowList(pubkey: currentUser)
+    
+    // Then wait to load all posts from followed users
+    let posts = await ndk.fetchEvents(authors: followList.follows)
+    
+    hideLoadingSpinner()
+    displayPosts(posts)
+}
+```
+
+**❌ NEVER DO THIS - Loading states for user profiles:**
+```swift
+// WRONG: Shows loading spinner for profile data
+struct UserProfileView: View {
+    @State private var profile: NDKUserProfile?
+    @State private var isLoading = true
+    
+    var body: some View {
+        if isLoading {
+            ProgressView("Loading profile...")
+        } else {
+            ProfileView(profile: profile)
+        }
+    }
+}
+```
+
+#### ✅ CORRECT PATTERNS - Stream and Render Immediately
+
+**✅ RIGHT: Stream data as it arrives:**
+```swift
+// RIGHT: Show UI immediately, update as data arrives
+func setupUserProfile(pubkey: String) {
+    // Show UI immediately with pubkey - no loading state
+    let profileSource = ndk.observe(
+        filter: NDKFilter(authors: [pubkey], kinds: [EventKind.metadata]),
+        maxAge: 3600  // Use cached data immediately
+    )
+    
+    // Update UI as profile data streams in
+    for await profile in profileSource.events {
+        await MainActor.run {
+            updateProfileUI(profile)  // Update immediately when received
+        }
+    }
+}
+
+// RIGHT: Cascade dependent queries without waiting
+func showUserFeed() {
+    // Start showing feed immediately with empty state
+    displayFeedUI()
+    
+    // Stream follow list as it arrives
+    let followSource = ndk.observe(
+        filter: NDKFilter(kinds: [EventKind.followList], authors: [currentUser]),
+        maxAge: 300
+    )
+    
+    for await followEvent in followSource.events {
+        let followList = NDKFollowList(event: followEvent)
+        
+        // As soon as we have ANY follows, start streaming their posts
+        // Don't wait for the "complete" follow list
+        startStreamingPosts(authors: followList.follows)
+    }
+}
+```
+
+**✅ RIGHT: Progressive UI updates:**
+```swift
+struct UserProfileView: View {
+    let pubkey: String
+    @State private var profile: NDKUserProfile?
+    @State private var displayName: String = ""
+    
+    var body: some View {
+        VStack {
+            // Show pubkey immediately - never a loading state
+            Text(displayName.isEmpty ? pubkey.prefix(8) + "..." : displayName)
+                .font(.headline)
+            
+            // Profile picture appears when available
+            if let profile = profile, let pictureURL = profile.picture {
+                AsyncImage(url: URL(string: pictureURL))
+                    .frame(width: 60, height: 60)
+            } else {
+                // Default avatar - no loading spinner
+                Image(systemName: "person.circle")
+                    .frame(width: 60, height: 60)
+            }
+            
+            // Bio appears when available
+            if let profile = profile, let about = profile.about {
+                Text(about)
+                    .font(.caption)
+            }
+        }
+        .task {
+            // Stream profile updates
+            let profileSource = ndk.observe(
+                filter: NDKFilter(authors: [pubkey], kinds: [0]),
+                maxAge: 3600
+            )
+            
+            for await profileEvent in profileSource.events {
+                if let userProfile = try? NDKUserProfile(event: profileEvent) {
+                    await MainActor.run {
+                        self.profile = userProfile
+                        self.displayName = userProfile.displayName ?? userProfile.name ?? ""
+                    }
+                }
+            }
+        }
+    }
+}
+```
+
+#### The Only Exception: Dependent Queries
+
+The ONLY time you should wait is when a query depends on the results of another query:
+
+```swift
+// RIGHT: This is the ONLY acceptable waiting pattern
+func loadUserPostsFromFollows() async {
+    // Must wait for follow list to know who to fetch posts from
+    let followListSource = ndk.observe(
+        filter: NDKFilter(kinds: [3], authors: [currentUserPubkey]),
+        maxAge: 300
+    )
+    
+    // Wait for first follow list result ONLY
+    if let followEvent = await followListSource.currentValue().first {
+        let followList = NDKFollowList(event: followEvent)
+        
+        // Now stream posts from followed users
+        let postsSource = ndk.observe(
+            filter: NDKFilter(kinds: [1], authors: Array(followList.follows)),
+            maxAge: 0
+        )
+        
+        for await post in postsSource.events {
+            await MainActor.run {
+                addPostToFeed(post)  // Add each post as it arrives
+            }
+        }
+    }
+}
+```
+
+#### Key Principles:
+
+1. **Show Something Immediately**: Always render some UI - pubkey, placeholder, cached data
+2. **No Loading Spinners**: Especially not for profile data or user content
+3. **Progressive Enhancement**: Start with basic info, enhance as data arrives
+4. **Cache-First**: Use `maxAge` to show cached data immediately while fetching fresh
+5. **Stream Everything**: Use `for await` loops to update UI as each piece arrives
+6. **Only Wait for Dependencies**: The rare case where query B needs results from query A
+
+#### Network Reality:
+
+Remember that in Nostr:
+- Relays may be offline
+- Data may arrive out of order
+- Some data may never arrive
+- First 50% of data might arrive instantly, last 50% might take 30 seconds
+- User profiles are particularly unreliable and slow
+
+Your app must handle all these scenarios gracefully by showing what it has and updating progressively.
+
+---
+
+### 11. Performance & Advanced Topics
 
 *   **Signature Verification Sampling:** NDKSwift does not verify every single signature by default to save CPU. It uses a sampling strategy defined by `NDKSignatureVerificationConfig`. For most apps, the default is fine. You can configure it to be more or less strict. It also automatically detects and can blacklist "evil relays" that serve events with invalid signatures.
 *   **Caching:** Use `NDKSQLiteCache` to persist events, profiles, and other Nostr data. This dramatically improves launch times and provides a basic offline experience. The `NDKProfileManager` also uses this cache to avoid re-fetching profile metadata.
