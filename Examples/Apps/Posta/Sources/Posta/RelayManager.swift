@@ -1,147 +1,76 @@
 import Foundation
 import NDKSwift
-import Combine
 import Observation
 
 @MainActor
 @Observable
 class RelayManager {
-    struct RelayInfo: Identifiable, Codable {
-        let id = UUID()
-        var url: String
-        var isActive: Bool = true
-        var isConnected: Bool = false
-        var lastSeen: Date?
-        
-        enum CodingKeys: String, CodingKey {
-            case url, isActive
-        }
-    }
-    
-    var relays: [RelayInfo] = []
-    private var ndk: NDK?
-    private var relayCollection: NDKRelayCollection?
-    private var cancellables = Set<AnyCancellable>()
-    var error: Error?
+    private(set) var ndk: NDK?
+    var userAddedRelays: Set<String> = []
     
     private let defaultRelays = [
-        "wss://relay.damus.io",
-        "wss://nos.lol",
-        "wss://relay.snort.social",
-        "wss://relay.nostr.band",
-        "wss://nostr.wine",
         "wss://relay.primal.net"
     ]
     
-    init() {
-        loadRelays()
-    }
+    private let userRelaysKey = "user_added_relays"
     
-    deinit {
-        // Cleanup handled by NDKRelayCollection
+    init() {
+        loadUserRelays()
     }
     
     func setNDK(_ ndk: NDK) {
         self.ndk = ndk
-        
-        // Create relay collection for observing state
-        self.relayCollection = ndk.createRelayCollection()
-        
-        // Observe relay collection changes
-        Task {
-            await observeRelayCollection()
-            await updateConnectionStatus()
-        }
     }
     
-    private func observeRelayCollection() async {
-        guard let collection = relayCollection else { return }
-        
-        // Observe changes from NDKRelayCollection
-        collection.$relays
-            .sink { [weak self] ndkRelays in
-                Task { @MainActor [weak self] in
-                    guard let self = self else { return }
-                    
-                    // Update our relay info based on NDK relay states
-                    for ndkRelay in ndkRelays {
-                        if let index = self.relays.firstIndex(where: { $0.url == ndkRelay.url }) {
-                            self.relays[index].isConnected = ndkRelay.isConnected
-                            if ndkRelay.isConnected {
-                                self.relays[index].lastSeen = ndkRelay.lastConnectedAt
-                            }
-                        }
-                    }
-                }
-            }
-            .store(in: &cancellables)
+    func getAllRelays() -> [String] {
+        var relays = Set(defaultRelays)
+        relays.formUnion(userAddedRelays)
+        return Array(relays)
     }
     
-    func addRelay(_ url: String) {
+    func addUserRelay(_ url: String) {
         let normalizedUrl = normalizeRelayUrl(url)
-        guard !relays.contains(where: { $0.url == normalizedUrl }) else { return }
+        userAddedRelays.insert(normalizedUrl)
+        saveUserRelays()
         
-        let relay = RelayInfo(url: normalizedUrl)
-        relays.append(relay)
-        saveRelays()
-        
-        if let collection = relayCollection {
+        // Add to NDK if initialized
+        if let ndk = ndk {
             Task {
-                await collection.addRelay(normalizedUrl)
+                await ndk.addRelayAndConnect(normalizedUrl)
             }
         }
     }
     
-    func removeRelay(_ relay: RelayInfo) {
-        relays.removeAll { $0.id == relay.id }
-        saveRelays()
+    func removeUserRelay(_ url: String) {
+        userAddedRelays.remove(url)
+        saveUserRelays()
         
-        if let collection = relayCollection {
+        // Remove from NDK if initialized and not a default relay
+        if let ndk = ndk, !defaultRelays.contains(url) {
             Task {
-                await collection.removeRelay(relay.url)
-            }
-        }
-    }
-    
-    func toggleRelay(_ relay: RelayInfo) {
-        guard let index = relays.firstIndex(where: { $0.id == relay.id }) else { return }
-        relays[index].isActive.toggle()
-        saveRelays()
-        
-        if let collection = relayCollection {
-            Task {
-                if relays[index].isActive {
-                    await collection.addRelay(relay.url)
-                } else {
-                    await collection.removeRelay(relay.url)
+                let allRelays = await ndk.relays
+                if let relay = allRelays.first(where: { $0.url == url }) {
+                    await relay.disconnect()
+                    // Note: NDK doesn't have a removeRelay method, so we just disconnect
                 }
             }
         }
     }
     
     func resetToDefaults() {
-        relays = defaultRelays.map { RelayInfo(url: $0) }
-        saveRelays()
+        userAddedRelays.removeAll()
+        saveUserRelays()
         
-        if let ndk = ndk, let collection = relayCollection {
+        // Reconnect with only default relays
+        if let ndk = ndk {
             Task {
-                // Remove all existing relays
-                for relay in await ndk.relays {
-                    await collection.removeRelay(relay.url)
-                }
-                
-                // Add default relays
-                for relay in relays where relay.isActive {
-                    await collection.addRelay(relay.url)
+                // Disconnect all non-default relays
+                let allRelays = await ndk.relays
+                for relay in allRelays where !defaultRelays.contains(relay.url) {
+                    await relay.disconnect()
                 }
             }
         }
-    }
-    
-    private func updateConnectionStatus() async {
-        // Update connection status from relay collection
-        guard let collection = relayCollection else { return }
-        await collection.refresh()
     }
     
     private func normalizeRelayUrl(_ url: String) -> String {
@@ -149,24 +78,17 @@ class RelayManager {
         if !normalized.hasPrefix("wss://") && !normalized.hasPrefix("ws://") {
             normalized = "wss://\(normalized)"
         }
-        if !normalized.hasSuffix("/") {
-            normalized += "/"
-        }
+        // Note: NDK handles URL normalization internally, including trailing slashes
         return normalized
     }
     
-    private func loadRelays() {
-        if let data = UserDefaults.standard.data(forKey: "relay_list"),
-           let decoded = try? JSONCoding.decoder.decode([RelayInfo].self, from: data) {
-            relays = decoded
-        } else {
-            relays = defaultRelays.map { RelayInfo(url: $0) }
+    private func loadUserRelays() {
+        if let savedRelays = UserDefaults.standard.array(forKey: userRelaysKey) as? [String] {
+            userAddedRelays = Set(savedRelays)
         }
     }
     
-    private func saveRelays() {
-        if let encoded = try? JSONCoding.encoder.encode(relays) {
-            UserDefaults.standard.set(encoded, forKey: "relay_list")
-        }
+    private func saveUserRelays() {
+        UserDefaults.standard.set(Array(userAddedRelays), forKey: userRelaysKey)
     }
 }

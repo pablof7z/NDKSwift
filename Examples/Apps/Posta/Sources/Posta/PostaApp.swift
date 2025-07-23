@@ -26,16 +26,8 @@ struct PostaApp: App {
     
     private func setupNDK() {
         Task {
-            // Create NDK instance with relay URLs from RelayManager
-            let activeRelayUrls = relayManager.relays
-                .filter { $0.isActive }
-                .map { $0.url }
-            
-            let relayUrls = activeRelayUrls.isEmpty ? [
-                "wss://relay.damus.io",
-                "wss://nos.lol",
-                "wss://relay.snort.social"
-            ] : activeRelayUrls
+            // Get all relays (default + user added)
+            let relayUrls = relayManager.getAllRelays()
             
             // Initialize with SQLite cache for better performance and negentropy sync support
             let ndkInstance: NDK

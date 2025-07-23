@@ -48,13 +48,15 @@ struct HomeView: View {
         }
         .onAppear {
             // Initialize reply tracker when NDK is available
-            if let ndk = ndkManager.ndk, replyTracker == nil {
-                replyTracker = ReplyTracker(ndk: ndk, following: subscriptionManager.latestFollowList)
+            if let ndk = ndkManager.ndk, replyTracker == nil, let sessionData = subscriptionManager.sessionData {
+                replyTracker = ReplyTracker(ndk: ndk, following: sessionData.followList)
             }
         }
-        .onChange(of: subscriptionManager.latestFollowList) { _, newFollows in
+        .onChange(of: subscriptionManager.sessionData?.followList) { _, newFollows in
             // Update reply tracker when follows change
-            replyTracker?.updateFollowing(newFollows)
+            if let newFollows = newFollows {
+                replyTracker?.updateFollowing(newFollows)
+            }
         }
         .onDisappear {
             // Clean up all reply tracking when view disappears

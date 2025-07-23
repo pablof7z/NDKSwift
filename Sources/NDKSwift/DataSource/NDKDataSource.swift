@@ -36,7 +36,7 @@ public final class NDKDataSource<T>: ObservableObject, CacheObserver {
     public let relayUpdates: AsyncStream<RelayUpdate>
     private let relayUpdatesContinuation: AsyncStream<RelayUpdate>.Continuation
     
-    private let filter: NDKFilter
+    private var filter: NDKFilter
     private let ndk: NDK
     private let transform: (NDKEvent) -> T?
     private let maxAge: TimeInterval
@@ -407,6 +407,116 @@ public final class NDKDataSource<T>: ObservableObject, CacheObserver {
                 
                 continuation.finish()
             }
+        }
+    }
+    
+    // MARK: - Private Helper Methods
+    
+    /// Fetch events from cache
+    private func fetchFromCache() async -> [NDKEvent]? {
+        // Check if data is already available from existing load
+        if !data.isEmpty {
+            return data.compactMap { $0 as? NDKEvent }
+        }
+        return nil
+    }
+    
+    /// Process cached events
+    private func processCachedEvents(_ events: [NDKEvent]) async {
+        for event in events {
+            await handleEvent(event)
+        }
+    }
+    
+    /// Process fetched events
+    private func processFetchedEvents(_ events: [NDKEvent]) async {
+        for event in events {
+            await handleEvent(event)
+        }
+    }
+    
+    /// Update the filter for this data source
+    /// - Parameter newFilter: The new filter to apply
+    /// - Note: This method cancels the current subscription and starts a new one
+    public func updateFilter(_ newFilter: NDKFilter) async {
+        // Update the filter property
+        self.filter = newFilter
+        
+        // Cancel current task
+        task?.cancel()
+        
+        // Clear processed events
+        await stateManager.clearProcessed()
+        
+        // Clear current data
+        await MainActor.run {
+            self.data.removeAll()
+        }
+        
+        // Remove old requirement if exists
+        if let handle = requirementHandle {
+            await handle.release()
+        }
+        
+        // Update the requirement handle for new filter
+        // The requirement will be added when fetchAndSubscribe is called
+        requirementHandle = nil
+        
+        // Start new task with updated filter
+        task = Task { [weak self] in
+            guard let self = self else { return }
+            await self.fetchAndSubscribe(filter: newFilter)
+        }
+    }
+    
+    /// Helper method to fetch and subscribe with a given filter
+    private func fetchAndSubscribe(filter: NDKFilter) async {
+        await MainActor.run {
+            self.isLoading = true
+            self.error = nil
+        }
+        
+        switch cachePolicy {
+        case .cacheOnly:
+            if let cachedEvents = await fetchFromCache() {
+                await processCachedEvents(cachedEvents)
+            }
+            await MainActor.run {
+                self.isLoading = false
+            }
+            
+        case .cacheWithNetwork:
+            if let cachedEvents = await fetchFromCache() {
+                await processCachedEvents(cachedEvents)
+            }
+            
+            // For cache with network, always subscribe for continuous updates
+            await subscribeToEvents(filter: filter)
+            
+        case .networkOnly:
+            // For network only, subscribe for events
+            await subscribeToEvents(filter: filter)
+        }
+    }
+    
+    /// Subscribe to events with the given filter
+    private func subscribeToEvents(filter: NDKFilter) async {
+        let dataSource = NDKDataSource<NDKEvent>(
+            ndk: ndk,
+            filter: filter,
+            maxAge: 0,
+            cachePolicy: cachePolicy,
+            relays: relays,
+            subscriptionId: subscriptionId
+        )
+        
+        await MainActor.run {
+            self.isLoading = false
+        }
+        
+        // Process events from the nested data source
+        for await event in dataSource.events {
+            await self.handleEvent(event)
         }
     }
 }
