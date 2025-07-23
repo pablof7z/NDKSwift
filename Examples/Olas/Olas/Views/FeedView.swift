@@ -33,10 +33,17 @@ struct FeedView: View {
 
 struct FeedItemView: View {
     let item: FeedItem
+    @EnvironmentObject var appState: AppState
     @State private var isLiked = false
+    @State private var likeCount = 0
+    @State private var replyCount = 0
+    @State private var zapAmount = 0
     @State private var scale: CGFloat = 1.0
     @State private var isZoomed = false
     @State private var showProfile = false
+    @State private var showingReplies = false
+    @State private var showingLikeAnimation = false
+    @State private var doubleTapLocation: CGPoint = .zero
     
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -78,9 +85,17 @@ struct FeedItemView: View {
             // Image display with multi-image support
             if !item.imageURLs.isEmpty {
                 OlasMultiImageView(imageURLs: item.imageURLs)
+                    .onTapGesture(count: 2) { location in
+                        // Double tap to like
+                        doubleTapLocation = location
+                        showingLikeAnimation = true
+                        if !isLiked {
+                            toggleLike()
+                        }
+                    }
                     .onTapGesture {
                         OlasDesign.Haptic.selection()
-                        // TODO: Show full screen image viewer
+                        // Single tap - show full screen (handled in OlasMultiImageView)
                     }
                     .gesture(
                         DragGesture(minimumDistance: 50)
@@ -96,11 +111,9 @@ struct FeedItemView: View {
                                 // Down: Dismiss if in preview
                             }
                     )
-                    .background(
-                        NavigationLink(destination: ProfileView(pubkey: item.event.pubkey), isActive: $showProfile) {
-                            EmptyView()
-                        }
-                        .hidden()
+                    .overlay(
+                        NavigationLink("", destination: ProfileView(pubkey: item.event.pubkey), isActive: $showProfile)
+                            .hidden()
                     )
             } else {
                 // No image found
@@ -121,40 +134,65 @@ struct FeedItemView: View {
             
             // Actions
             HStack(spacing: OlasDesign.Spacing.lg) {
-                Button(action: { 
-                    #if os(iOS)
-                    OlasDesign.Haptic.impact(.light)
-                    #else
-                    OlasDesign.Haptic.impact(0)
-                    #endif
-                    withAnimation(OlasDesign.Animation.spring) {
-                        isLiked.toggle()
+                // Like button with count
+                Button(action: { toggleLike() }) {
+                    HStack(spacing: 4) {
+                        Image(systemName: isLiked ? "heart.fill" : "heart")
+                            .font(.title2)
+                            .foregroundColor(isLiked ? OlasDesign.Colors.error : OlasDesign.Colors.text)
+                            .scaleEffect(isLiked ? 1.1 : 1.0)
+                            .olasTextShadow()
+                        
+                        if likeCount > 0 {
+                            Text("\(likeCount)")
+                                .font(OlasDesign.Typography.caption)
+                                .foregroundColor(OlasDesign.Colors.textSecondary)
+                                .olasTextShadow()
+                        }
                     }
+                }
+                
+                // Reply button with count
+                Button(action: { 
+                    OlasDesign.Haptic.selection()
+                    showingReplies.toggle()
                 }) {
-                    Image(systemName: isLiked ? "heart.fill" : "heart")
-                        .font(.title2)
-                        .foregroundColor(isLiked ? OlasDesign.Colors.error : OlasDesign.Colors.text)
-                        .scaleEffect(isLiked ? 1.1 : 1.0)
-                        .olasTextShadow()
+                    HStack(spacing: 4) {
+                        Image(systemName: "bubble.left")
+                            .font(.title2)
+                            .foregroundColor(OlasDesign.Colors.text)
+                            .olasTextShadow()
+                        
+                        if replyCount > 0 {
+                            Text("\(replyCount)")
+                                .font(OlasDesign.Typography.caption)
+                                .foregroundColor(OlasDesign.Colors.textSecondary)
+                                .olasTextShadow()
+                        }
+                    }
                 }
                 
-                Button(action: { OlasDesign.Haptic.selection() }) {
-                    Image(systemName: "bubble.left")
-                        .font(.title2)
-                        .foregroundColor(OlasDesign.Colors.text)
-                        .olasTextShadow()
-                }
-                
-                Button(action: { OlasDesign.Haptic.selection() }) {
-                    Image(systemName: "bolt")
-                        .font(.title2)
-                        .foregroundColor(OlasDesign.Colors.text)
-                        .olasTextShadow()
+                // Zap button with amount
+                Button(action: { sendZap() }) {
+                    HStack(spacing: 4) {
+                        Image(systemName: "bolt")
+                            .font(.title2)
+                            .foregroundColor(zapAmount > 0 ? OlasDesign.Colors.warning : OlasDesign.Colors.text)
+                            .olasTextShadow()
+                        
+                        if zapAmount > 0 {
+                            Text("\(zapAmount)")
+                                .font(OlasDesign.Typography.caption)
+                                .foregroundColor(OlasDesign.Colors.textSecondary)
+                                .olasTextShadow()
+                        }
+                    }
                 }
                 
                 Spacer()
                 
-                Button(action: { OlasDesign.Haptic.selection() }) {
+                // Share button
+                Button(action: { sharePost() }) {
                     Image(systemName: "square.and.arrow.up")
                         .font(.title2)
                         .foregroundColor(OlasDesign.Colors.text)
@@ -175,6 +213,144 @@ struct FeedItemView: View {
             }
         }
         .background(OlasDesign.Colors.background)
+        .overlay(
+            // Like animation overlay
+            Group {
+                if showingLikeAnimation {
+                    HeartAnimation(location: doubleTapLocation)
+                        .onAppear {
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
+                                showingLikeAnimation = false
+                            }
+                        }
+                }
+            }
+        )
+        .sheet(isPresented: $showingReplies) {
+            ReplyView(parentEvent: item.event)
+                .environmentObject(appState)
+        }
+        .task {
+            await loadEngagementCounts()
+        }
+    }
+    
+    // MARK: - Engagement Actions
+    
+    private func toggleLike() {
+        guard let ndk = appState.ndk,
+              let signer = NDKAuthManager.shared.activeSigner else { return }
+        
+        #if os(iOS)
+        OlasDesign.Haptic.impact(.light)
+        #else
+        OlasDesign.Haptic.impact(0)
+        #endif
+        
+        withAnimation(OlasDesign.Animation.spring) {
+            isLiked.toggle()
+            likeCount += isLiked ? 1 : -1
+        }
+        
+        Task {
+            do {
+                if isLiked {
+                    // Create like reaction (kind 7)
+                    let reaction = try await ndk.event()
+                        .kind(7)
+                        .content("+")
+                        .tags([
+                            ["e", item.event.id],
+                            ["p", item.event.pubkey]
+                        ])
+                        .build(signer: signer)
+                    _ = try await ndk.publish(reaction)
+                } else {
+                    // TODO: Delete reaction event
+                }
+            } catch {
+                print("Error toggling like: \(error)")
+                // Revert on error
+                withAnimation {
+                    isLiked.toggle()
+                    likeCount += isLiked ? 1 : -1
+                }
+            }
+        }
+    }
+    
+    private func sendZap() {
+        OlasDesign.Haptic.selection()
+        // TODO: Implement zap functionality
+        print("Zap not yet implemented")
+    }
+    
+    private func sharePost() {
+        OlasDesign.Haptic.selection()
+        
+        #if os(iOS)
+        let noteLink = "nostr:\(item.event.id)"
+        let activityVC = UIActivityViewController(
+            activityItems: [noteLink],
+            applicationActivities: nil
+        )
+        
+        if let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
+           let window = windowScene.windows.first,
+           let rootVC = window.rootViewController {
+            rootVC.present(activityVC, animated: true)
+        }
+        #else
+        // macOS sharing
+        let noteLink = "nostr:\(item.event.id)"
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(noteLink, forType: .string)
+        #endif
+    }
+    
+    private func loadEngagementCounts() async {
+        guard let ndk = appState.ndk else { return }
+        
+        // Check if we already liked this
+        let authManager = NDKAuthManager.shared
+        if let signer = authManager.activeSigner,
+           let myPubkey = try? await signer.pubkey {
+            let likeFilter = NDKFilter(
+                authors: [myPubkey],
+                kinds: [7],
+                events: [item.event.id]
+            )
+            
+            let likeDataSource = ndk.observe(filter: likeFilter, cachePolicy: .cacheOnly)
+            let likes = await likeDataSource.collect(timeout: 1.0)
+            await MainActor.run {
+                isLiked = !likes.isEmpty
+            }
+        }
+        
+        // Count total reactions
+        let reactionsFilter = NDKFilter(
+            kinds: [7],
+            events: [item.event.id]
+        )
+        
+        let reactionsDataSource = ndk.observe(filter: reactionsFilter, cachePolicy: .cacheOnly)
+        let reactions = await reactionsDataSource.collect(timeout: 1.0)
+        let positiveReactions = reactions.filter { $0.content == "+" || $0.content == "🤙" }
+        
+        // Count replies
+        let repliesFilter = NDKFilter(
+            kinds: [1],
+            events: [item.event.id]
+        )
+        
+        let repliesDataSource = ndk.observe(filter: repliesFilter, cachePolicy: .cacheOnly)
+        let replies = await repliesDataSource.collect(timeout: 1.0)
+        
+        await MainActor.run {
+            likeCount = positiveReactions.count
+            replyCount = replies.count
+        }
     }
 }
 
