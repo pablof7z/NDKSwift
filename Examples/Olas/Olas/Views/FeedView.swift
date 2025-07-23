@@ -14,7 +14,7 @@ struct FeedView: View {
                     }
                 }
             }
-            .background(Color.black)
+            .background(OlasDesign.Colors.background)
             .navigationTitle("Olas")
             #if os(iOS)
             .navigationBarTitleDisplayMode(.large)
@@ -34,143 +34,121 @@ struct FeedView: View {
 struct FeedItemView: View {
     let item: FeedItem
     @State private var isLiked = false
+    @State private var scale: CGFloat = 1.0
+    @State private var isZoomed = false
     
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             // Header
-            HStack {
-                Circle()
-                    .fill(Color.gray.opacity(0.3))
-                    .frame(width: 40, height: 40)
-                    .overlay(
-                        Text(item.profile?.name?.prefix(1) ?? "?")
-                            .font(.headline)
-                    )
+            HStack(spacing: OlasDesign.Spacing.md) {
+                OlasAvatar(
+                    url: item.profile?.picture,
+                    size: 40,
+                    pubkey: item.event.pubkey
+                )
                 
                 VStack(alignment: .leading, spacing: 2) {
                     Text(item.profile?.displayName ?? item.profile?.name ?? "Loading...")
-                        .font(.subheadline)
-                        .fontWeight(.semibold)
+                        .font(OlasDesign.Typography.bodyMedium)
+                        .foregroundColor(OlasDesign.Colors.text)
+                        .olasTextShadow()
                     
                     Text("@\(item.profile?.name ?? String(item.event.pubkey.prefix(8)))")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
+                        .font(OlasDesign.Typography.caption)
+                        .foregroundColor(OlasDesign.Colors.textSecondary)
                 }
                 
                 Spacer()
                 
-                Button(action: {}) {
+                Button(action: { OlasDesign.Haptic.selection() }) {
                     Image(systemName: "ellipsis")
-                        .foregroundColor(.secondary)
+                        .foregroundColor(OlasDesign.Colors.textSecondary)
+                        .font(.system(size: 18))
                 }
             }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 12)
+            .padding(.horizontal, OlasDesign.Spacing.md)
+            .padding(.vertical, OlasDesign.Spacing.md)
             
-            // Image display
+            // Image display with multi-image support
             if !item.imageURLs.isEmpty {
-                // For now, show first image
-                AsyncImage(url: URL(string: item.imageURLs[0])) { phase in
-                    switch phase {
-                    case .success(let image):
-                        image
-                            .resizable()
-                            .aspectRatio(contentMode: .fill)
-                            #if os(iOS)
-                            .frame(maxHeight: UIScreen.main.bounds.width * 1.25) // 4:5 aspect ratio
-                            #else
-                            .frame(maxHeight: 600) // Fixed height for macOS
-                            #endif
-                            .clipped()
-                    case .failure(_):
-                        Rectangle()
-                            .fill(Color.gray.opacity(0.1))
-                            .aspectRatio(4/5, contentMode: .fit)
-                            .overlay(
-                                VStack {
-                                    Image(systemName: "exclamationmark.triangle")
-                                        .font(.system(size: 40))
-                                        .foregroundColor(.gray.opacity(0.5))
-                                    Text("Failed to load")
-                                        .font(.caption)
-                                        .foregroundColor(.gray.opacity(0.5))
-                                }
-                            )
-                    case .empty:
-                        Rectangle()
-                            .fill(Color.gray.opacity(0.1))
-                            .aspectRatio(4/5, contentMode: .fit)
-                            .overlay(
-                                ProgressView()
-                                    .scaleEffect(1.5)
-                            )
-                    @unknown default:
-                        EmptyView()
+                OlasMultiImageView(imageURLs: item.imageURLs)
+                    .onTapGesture {
+                        OlasDesign.Haptic.selection()
+                        // TODO: Show full screen image viewer
                     }
-                }
-                .aspectRatio(4/5, contentMode: .fit)
             } else {
                 // No image found
                 Rectangle()
-                    .fill(Color.gray.opacity(0.1))
+                    .fill(OlasDesign.Colors.surface)
                     .aspectRatio(4/5, contentMode: .fit)
                     .overlay(
-                        VStack {
+                        VStack(spacing: OlasDesign.Spacing.sm) {
                             Image(systemName: "photo")
                                 .font(.system(size: 60))
-                                .foregroundColor(.gray.opacity(0.3))
+                                .foregroundColor(OlasDesign.Colors.textTertiary)
                             Text("No Image")
-                                .font(.caption)
-                                .foregroundColor(.gray.opacity(0.5))
+                                .font(OlasDesign.Typography.caption)
+                                .foregroundColor(OlasDesign.Colors.textTertiary)
                         }
                     )
             }
             
             // Actions
-            HStack(spacing: 24) {
+            HStack(spacing: OlasDesign.Spacing.lg) {
                 Button(action: { 
-                    withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) {
+                    #if os(iOS)
+                    OlasDesign.Haptic.impact(.light)
+                    #else
+                    OlasDesign.Haptic.impact(0)
+                    #endif
+                    withAnimation(OlasDesign.Animation.spring) {
                         isLiked.toggle()
                     }
                 }) {
                     Image(systemName: isLiked ? "heart.fill" : "heart")
                         .font(.title2)
-                        .foregroundColor(isLiked ? .red : .white)
+                        .foregroundColor(isLiked ? OlasDesign.Colors.error : OlasDesign.Colors.text)
                         .scaleEffect(isLiked ? 1.1 : 1.0)
+                        .olasTextShadow()
                 }
                 
-                Button(action: {}) {
+                Button(action: { OlasDesign.Haptic.selection() }) {
                     Image(systemName: "bubble.left")
                         .font(.title2)
-                        .foregroundColor(.white)
+                        .foregroundColor(OlasDesign.Colors.text)
+                        .olasTextShadow()
                 }
                 
-                Button(action: {}) {
+                Button(action: { OlasDesign.Haptic.selection() }) {
                     Image(systemName: "bolt")
                         .font(.title2)
-                        .foregroundColor(.white)
+                        .foregroundColor(OlasDesign.Colors.text)
+                        .olasTextShadow()
                 }
                 
                 Spacer()
                 
-                Button(action: {}) {
+                Button(action: { OlasDesign.Haptic.selection() }) {
                     Image(systemName: "square.and.arrow.up")
                         .font(.title2)
-                        .foregroundColor(.white)
+                        .foregroundColor(OlasDesign.Colors.text)
+                        .olasTextShadow()
                 }
             }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 12)
+            .padding(.horizontal, OlasDesign.Spacing.md)
+            .padding(.vertical, OlasDesign.Spacing.md)
             
-            // Content
+            // Content with rich text
             if !item.event.content.isEmpty {
-                Text(item.event.content)
-                    .font(.subheadline)
-                    .padding(.horizontal, 16)
-                    .padding(.bottom, 12)
+                OlasRichText(
+                    content: item.event.content,
+                    tags: item.event.tags
+                )
+                .padding(.horizontal, OlasDesign.Spacing.md)
+                .padding(.bottom, OlasDesign.Spacing.md)
             }
         }
-        .background(Color.black)
+        .background(OlasDesign.Colors.background)
     }
 }
 
