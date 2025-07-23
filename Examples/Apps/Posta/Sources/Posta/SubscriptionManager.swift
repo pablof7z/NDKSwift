@@ -7,7 +7,6 @@ import Observation
 class SubscriptionManager {
     // Published state
     var notes: [NDKEvent] = []
-    var latestFollowList: Set<String> = []
     var isLoadingFollows: Bool = false
     var isLoadingNotes: Bool = false
     var isSyncing = false
@@ -16,8 +15,16 @@ class SubscriptionManager {
     var newNotesCount: Int = 0
     var lastViewedNoteId: String?
     
+    // Session data
+    var sessionData: NDKSessionData? {
+        didSet {
+            if let sessionData = sessionData {
+                observeSessionData(sessionData)
+            }
+        }
+    }
+    
     // Subscriptions
-    private var followListTask: Task<Void, Never>?
     private var notesTask: Task<Void, Never>?
     
     private var ndk: NDK?
@@ -43,74 +50,72 @@ class SubscriptionManager {
             print("SubscriptionManager - After wait, connected relays: \(retriedConnected)/\(retriedTotal)")
         }
         
-        // Start loading follow list
-        await loadFollowList(userPubkey: userPubkey)
+        // Start session with follow list requirement
+        do {
+            let sessionData = try await ndk.startSession(
+                signer: ndk.signer!,
+                config: NDKSessionConfiguration(
+                    dataRequirements: [.followList],
+                    preloadStrategy: .progressive
+                )
+            )
+            self.sessionData = sessionData
+        } catch {
+            print("SubscriptionManager - Failed to start session: \(error)")
+            self.error = error
+        }
     }
     
     func cleanup() async {
-        followListTask?.cancel()
         notesTask?.cancel()
-        followListTask = nil
         notesTask = nil
         notes = []
-        latestFollowList = []
+        sessionData = nil
     }
     
-    private func loadFollowList(userPubkey: String) async {
-        guard let ndk = ndk else { return }
-        
-        isLoadingFollows = true
-        
-        // Fetch follow list
-        let filter = NDKFilter(
-            authors: [userPubkey],
-            kinds: [EventKind.contacts],
-            limit: 1
-        )
-        
-        let dataSource = ndk.observe(filter: filter, maxAge: 300) // 5 min cache
-        
-        for await contactEvent in dataSource.events {
-            let pubkeys = contactEvent.tags
-                .filter { $0.count >= 2 && $0[0] == "p" }
-                .map { $0[1] }
-            latestFollowList = Set(pubkeys)
-            
-            print("SubscriptionManager - Loaded \(latestFollowList.count) follows")
-            
-            // Now load notes from follows
-            await startNotesSubscription()
-            break // Only need the first/latest contact list
+    private func observeSessionData(_ sessionData: NDKSessionData) {
+        // Observe follow list state changes
+        Task { @MainActor in
+            switch sessionData.followListState {
+            case .loading:
+                isLoadingFollows = true
+            case .ready(let follows, _), .updating(let follows, _):
+                isLoadingFollows = false
+                print("SubscriptionManager - Follow list ready with \(follows.count) follows")
+                await startNotesSubscription()
+            case .error(let error):
+                isLoadingFollows = false
+                self.error = error
+                print("SubscriptionManager - Error loading follows: \(error)")
+            }
         }
-        
-        isLoadingFollows = false
     }
     
     private func startNotesSubscription() async {
         guard let ndk = ndk else { return }
         
-        let follows = Array(latestFollowList)
-        guard !follows.isEmpty else {
-            print("SubscriptionManager - No follows to load notes for")
-            return
-        }
+        // Cancel existing subscription
+        notesTask?.cancel()
         
-        print("SubscriptionManager - Starting notes subscription for \(follows.count) follows")
+        print("SubscriptionManager - Starting reactive notes subscription")
         
         isLoadingNotes = true
         
-        // Create filter for notes from follows
-        let notesFilter = NDKFilter(
-            authors: follows,
-            kinds: [EventKind.textNote],
-            limit: 100
+        // Create reactive filter that depends on follow list
+        let reactiveFilter = ReactiveFilter(
+            dependencies: [.followList],
+            builder: { sessionData in
+                NDKFilter(
+                    authors: Array(sessionData.followList),
+                    kinds: [EventKind.textNote],
+                    limit: 100
+                )
+            }
         )
         
-        // Start observing notes - this runs continuously
+        // Start observing notes - automatically updates when follows change
         notesTask = Task {
-            let notesDataSource = ndk.observe(filter: notesFilter, maxAge: 60) // 1 min cache
-            
-            for await note in notesDataSource.events {
+            for await note in ndk.observe(reactiveFilter) {
                 // Check if it's a reply
                 let isReply = note.tags.contains { tag in
                     tag.count >= 2 && tag[0] == "e"

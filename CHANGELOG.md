@@ -8,6 +8,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Session Data Management System with reactive subscriptions
+  - NDKSessionData for managing follow lists and web-of-trust data
+  - Observable states for session data readiness
+  - Automatic session restoration with data preloading
+  - Progressive loading strategy (cache-first, update in background)
+- Reactive Filter System
+  - ReactiveFilter struct for dependency-based filter updates
+  - Automatic subscription swapping when follows change
+  - Efficient re-subscription with minimal event re-downloading
+  - Support for Web of Trust filtering (optional)
+- NDK Session Extensions
+  - `startSession()` method for initializing authenticated sessions
+  - `observe(ReactiveFilter)` for reactive event streams
+  - `fetchEvents(ReactiveFilter)` for one-time reactive queries
+- SubscriptionSwapManager for efficient subscription updates
 - Support for NDKFollowPack (NIP-51, kinds 39089 and 39092)
   - Create and manage follow packs with title, description, image, and pubkey collections
   - Support for both regular follow packs and media follow packs
@@ -16,6 +31,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Convert between NDKEvent and NDKFollowPack representations
 - Comprehensive tests for NDKFollowPack functionality
 - Example demonstrating follow pack creation and management
+- ReactiveFilterDemo example showing automatic subscription updates
 
 ### Changed
 - **BREAKING**: Removed `ndk.event()` and `ndk.reply()` extension methods to reduce namespace pollution
@@ -27,6 +43,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `NDKEvent.mintAnnouncement()` now requires `ndk` parameter
   - `BlossomAuth` static methods now require `ndk` parameter
 - Made `NDKEventBuilder` init public for direct instantiation
+
+### Fixed
+- Fixed Posta app relay management to properly use NDKRelayCollection
+  - Removed duplicate state management that caused relay status to be incorrect
+  - Now directly uses NDK's relay collection for accurate real-time status
+  - Fixed relay initialization to use centralized relay list
 
 ## [0.4.1] - 2025-01-22
 

@@ -3,6 +3,7 @@ import NDKSwift
 
 struct SettingsView: View {
     @Environment(NDKAuthManager.self) var authManager
+    @Environment(NDKManager.self) var ndkManager
     @EnvironmentObject var themeManager: ThemeManager
     @Environment(RelayManager.self) var relayManager
     
@@ -67,9 +68,13 @@ struct SettingsView: View {
                             VStack(alignment: .leading) {
                                 Text("Relays")
                                     .font(.headline)
-                                Text("\(relayManager.relays.filter { $0.isConnected }.count) connected")
-                                    .font(.caption)
-                                    .foregroundColor(.secondary)
+                                if let ndk = ndkManager.ndk {
+                                    RelayCountView(ndk: ndk)
+                                } else {
+                                    Text("Not connected")
+                                        .font(.caption)
+                                        .foregroundColor(.secondary)
+                                }
                             }
                         }
                         .padding(.vertical, 4)
@@ -168,5 +173,22 @@ struct SettingsView: View {
         .onAppear {
             // NDK is now managed centrally
         }
+    }
+}
+
+// Helper view to show relay connection count
+struct RelayCountView: View {
+    let ndk: NDK
+    @StateObject private var relayCollection: NDKRelayCollection
+    
+    init(ndk: NDK) {
+        self.ndk = ndk
+        self._relayCollection = StateObject(wrappedValue: ndk.createRelayCollection())
+    }
+    
+    var body: some View {
+        Text("\(relayCollection.connectedCount) connected")
+            .font(.caption)
+            .foregroundColor(.secondary)
     }
 }
