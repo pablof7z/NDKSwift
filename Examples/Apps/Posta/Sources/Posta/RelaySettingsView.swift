@@ -12,10 +12,20 @@ struct RelaySettingsView: View {
         List {
             // Stats Section
             Section {
-                RelayStatsView(
-                    totalRelays: relayManager.relays.count,
-                    connectedRelays: relayManager.relays.filter { $0.isConnected }.count
-                )
+                HStack {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("\(relayManager.relays.filter { $0.isConnected }.count) of \(relayManager.relays.count) connected")
+                            .font(.headline)
+                        Text("Active relays")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
+                    Spacer()
+                    Image(systemName: "antenna.radiowaves.left.and.right")
+                        .font(.title2)
+                        .foregroundColor(.blue)
+                }
+                .padding()
                 .listRowInsets(EdgeInsets())
                 .listRowBackground(Color.clear)
             }
@@ -53,7 +63,7 @@ struct RelaySettingsView: View {
         .navigationTitle("Relays")
         .navigationBarTitleDisplayMode(.large)
         .sheet(isPresented: $showingAddRelay) {
-            AddRelayView(relayManager: relayManager)
+            AddRelayView()
         }
         .confirmationDialog(
             "Reset Relays",
@@ -80,12 +90,19 @@ struct RelayRow: View {
     
     var body: some View {
         HStack {
-            // Use the new RelayRowView component for consistent display
-            RelayRowView(
-                url: relay.url,
-                state: relay.isConnected ? .connected : .disconnected,
-                lastSeen: relay.lastSeen
-            )
+            VStack(alignment: .leading, spacing: 4) {
+                Text(relay.url)
+                    .font(.system(.body, design: .monospaced))
+                    .lineLimit(1)
+                HStack(spacing: 4) {
+                    Circle()
+                        .fill(relay.isConnected ? Color.green : Color.gray)
+                        .frame(width: 8, height: 8)
+                    Text(relay.isConnected ? "Connected" : "Disconnected")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+            }
             
             // Toggle
             Toggle("", isOn: Binding(

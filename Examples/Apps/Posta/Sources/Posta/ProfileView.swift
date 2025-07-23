@@ -7,8 +7,12 @@ struct ProfileView: View {
     @Environment(NDKManager.self) var ndkManager
     @Environment(\.dismiss) private var dismiss
     
-    @StateObject private var profileDataSource: UserProfileDataSource
-    @StateObject private var notesDataSource: NotesDataSource
+    @State private var profile: NDKUserProfile?
+    @State private var notes: [NDKEvent] = []
+    @State private var isLoadingProfile = false
+    @State private var isLoadingNotes = false
+    @State private var profileError: Error?
+    @State private var notesError: Error?
     @State private var followCount: Int?
     @State private var followerCount: Int?
     @State private var isFollowing = false
@@ -20,23 +24,6 @@ struct ProfileView: View {
     
     init(pubkey: String?) {
         self.pubkey = pubkey
-        let targetPubkey = pubkey ?? NDKAuthManager.shared.activeSession?.pubkey ?? ""
-        
-        // Initialize data sources
-        if let ndk = NDKManager.shared.ndk {
-            _profileDataSource = StateObject(wrappedValue: UserProfileDataSource(ndk: ndk, pubkey: targetPubkey))
-            
-            let notesFilter = NDKFilter(
-                authors: [targetPubkey],
-                kinds: [EventKind.textNote],
-                limit: 50
-            )
-            _notesDataSource = StateObject(wrappedValue: NotesDataSource(ndk: ndk, filter: notesFilter))
-        } else {
-            // Fallback - this shouldn't happen in practice
-            _profileDataSource = StateObject(wrappedValue: UserProfileDataSource(ndk: NDK(relayUrls: []), pubkey: targetPubkey))
-            _notesDataSource = StateObject(wrappedValue: NotesDataSource(ndk: NDK(relayUrls: []), filter: NDKFilter()))
-        }
     }
     
     var body: some View {
@@ -54,7 +41,7 @@ struct ProfileView: View {
                 )
                 .ignoresSafeArea()
                 
-                if profileDataSource.isLoading && profileDataSource.profile == nil {
+                if isLoadingProfile && profile == nil {
                     ProgressView("Loading profile...")
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                 } else {
@@ -82,7 +69,7 @@ struct ProfileView: View {
                 }
                 
                 // Error overlay
-                if let error = profileDataSource.error {
+                if let error = profileError ?? notesError {
                     VStack {
                         Spacer()
                         ErrorBanner(error: error)
@@ -96,11 +83,13 @@ struct ProfileView: View {
             }
         }
         .task {
+            await loadProfile()
+            await loadNotes()
             await loadStats()
         }
         .sheet(isPresented: $showingQRCode) {
             if let pubkey = displayPubkey.isEmpty ? nil : displayPubkey {
-                QRCodeView(pubkey: pubkey, profile: profileDataSource.profile)
+                QRCodeView(pubkey: pubkey, profile: profile)
             }
         }
     }
@@ -108,7 +97,7 @@ struct ProfileView: View {
     private var profileHeaderView: some View {
         ZStack(alignment: .bottom) {
             // Banner
-            if let banner = profileDataSource.profile?.banner, let url = URL(string: banner) {
+            if let banner = profile?.banner, let url = URL(string: banner) {
                 AsyncImage(url: url) { image in
                     image
                         .resizable()
@@ -153,7 +142,7 @@ struct ProfileView: View {
     
     private var avatarView: some View {
         Group {
-            if let picture = profileDataSource.profile?.picture, let url = URL(string: picture) {
+            if let picture = profile?.picture, let url = URL(string: picture) {
                 AsyncImage(url: url) { image in
                     image
                         .resizable()
@@ -193,7 +182,7 @@ struct ProfileView: View {
     }
     
     private var avatarInitial: String {
-        let name = profileDataSource.profile?.displayName ?? profileDataSource.profile?.name ?? "?"
+        let name = profile?.displayName ?? profile?.name ?? "?"
         return String(name.prefix(1)).uppercased()
     }
     
@@ -201,11 +190,11 @@ struct ProfileView: View {
         VStack(alignment: .leading, spacing: 8) {
             HStack {
                 VStack(alignment: .leading, spacing: 4) {
-                    Text(profileDataSource.profile?.displayName ?? profileDataSource.profile?.name ?? "Unknown")
+                    Text(profile?.displayName ?? profile?.name ?? "Unknown")
                         .font(.title)
                         .fontWeight(.bold)
                     
-                    if let nip05 = profileDataSource.profile?.nip05 {
+                    if let nip05 = profile?.nip05 {
                         Label(nip05, systemImage: "checkmark.seal.fill")
                             .font(.caption)
                             .foregroundColor(.secondary)
@@ -216,7 +205,7 @@ struct ProfileView: View {
             }
             .padding(.top, 60)
             
-            if let about = profileDataSource.profile?.about, !about.isEmpty {
+            if let about = profile?.about, !about.isEmpty {
                 Text(about)
                     .font(.body)
                     .foregroundColor(.primary.opacity(0.9))
@@ -229,7 +218,7 @@ struct ProfileView: View {
     private var statsAndActionsView: some View {
         VStack(spacing: 16) {
             HStack(spacing: 40) {
-                StatView(count: notesDataSource.notes.count, label: "Posts")
+                StatView(count: notes.count, label: "Posts")
                 StatView(count: followCount ?? 0, label: "Following")
                 StatView(count: followerCount ?? 0, label: "Followers")
                 Spacer()
@@ -277,7 +266,7 @@ struct ProfileView: View {
                 
                 Spacer()
                 
-                if notesDataSource.isLoading {
+                if isLoadingNotes {
                     ProgressView()
                         .scaleEffect(0.8)
                         .padding(.trailing, 20)
@@ -285,7 +274,7 @@ struct ProfileView: View {
             }
             .padding(.bottom, 16)
             
-            if notesDataSource.notes.isEmpty && !notesDataSource.isLoading {
+            if notes.isEmpty && !isLoadingNotes {
                 VStack(spacing: 12) {
                     Image(systemName: "note.text")
                         .font(.largeTitle)
@@ -298,10 +287,10 @@ struct ProfileView: View {
                 .padding(.vertical, 40)
             } else {
                 LazyVStack(spacing: 0) {
-                    ForEach(notesDataSource.notes, id: \.id) { note in
-                        NoteRowView(note: note, profile: profileDataSource.profile)
+                    ForEach(notes, id: \.id) { note in
+                        NoteRowView(note: note, profile: profile)
                         
-                        if note.id != notesDataSource.notes.last?.id {
+                        if note.id != notes.last?.id {
                             Divider()
                                 .padding(.leading, 20)
                         }
@@ -326,26 +315,78 @@ struct ProfileView: View {
         guard let ndk = ndkManager.ndk else { return }
         
         // Load follow count
-        do {
-            let followFilter = NDKFilter(
-                authors: [displayPubkey],
-                kinds: [EventKind.contacts],
-                limit: 1
-            )
-            
-            let events = try await ndk.fetchEvents(filter: followFilter).allObjects()
-            if let event = events.first {
-                let follows = event.tags.filter { $0.name == "p" }.count
-                await MainActor.run {
-                    followCount = follows
-                }
+        let followFilter = NDKFilter(
+            authors: [displayPubkey],
+            kinds: [EventKind.contacts],
+            limit: 1
+        )
+        
+        let dataSource = ndk.observe(filter: followFilter, maxAge: 3600)
+        
+        for await event in dataSource.events {
+            let follows = event.tags.filter { $0.count >= 1 && $0[0] == "p" }.count
+            await MainActor.run {
+                followCount = follows
             }
-        } catch {
-            print("Error loading follow count: \(error)")
+            break // Only need the first/latest contact list
         }
         
         // Note: Follower count would require scanning all contact lists
         // which is expensive. This is typically done with a specialized relay.
+    }
+    
+    private func loadProfile() async {
+        guard let ndk = ndkManager.ndk else { return }
+        
+        isLoadingProfile = true
+        profileError = nil
+        
+        let filter = NDKFilter(
+            authors: [displayPubkey],
+            kinds: [0],
+            limit: 1
+        )
+        
+        let dataSource = ndk.observe(filter: filter, maxAge: 3600) // Cache for 1 hour
+        
+        // Wait for first event
+        for await event in dataSource.events {
+            if let profileData = event.content.data(using: .utf8) {
+                profile = try? JSONDecoder().decode(NDKUserProfile.self, from: profileData)
+                isLoadingProfile = false
+                break // Only need the first/latest profile
+            }
+        }
+        
+        isLoadingProfile = false
+    }
+    
+    private func loadNotes() async {
+        guard let ndk = ndkManager.ndk else { return }
+        
+        isLoadingNotes = true
+        notesError = nil
+        
+        let filter = NDKFilter(
+            authors: [displayPubkey],
+            kinds: [EventKind.textNote],
+            limit: 50
+        )
+        
+        let dataSource = ndk.observe(filter: filter, maxAge: 300) // Cache for 5 minutes
+        
+        // Collect initial batch of notes
+        var collectedNotes: [NDKEvent] = []
+        for await event in dataSource.events {
+            collectedNotes.append(event)
+            // Wait for a moment to collect initial batch
+            if collectedNotes.count >= 20 {
+                break
+            }
+        }
+        
+        notes = collectedNotes.sorted(by: { $0.createdAt > $1.createdAt })
+        isLoadingNotes = false
     }
 }
 

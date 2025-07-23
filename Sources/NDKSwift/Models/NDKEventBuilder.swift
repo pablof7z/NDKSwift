@@ -915,6 +915,146 @@ public final class NDKEventBuilder {
         return self
     }
     
+    // MARK: - NIP-68 Support Methods
+    
+    /// Add a title tag (commonly used in NIP-68 and other events)
+    @discardableResult
+    public func title(_ title: String) -> NDKEventBuilder {
+        self.tags.removeAll { $0.first == "title" }
+        self.tags.append(["title", title])
+        return self
+    }
+    
+    /// Add media with comprehensive metadata support
+    /// - Parameters:
+    ///   - url: The media URL
+    ///   - mimeType: MIME type (e.g., "image/jpeg")
+    ///   - blurhash: Blurhash string for placeholder
+    ///   - dim: Dimensions in "widthxheight" format
+    ///   - alt: Alternative text description
+    ///   - sha256: SHA256 hash of the file
+    ///   - size: File size in bytes as string
+    ///   - fallbacks: Alternative URLs for the same content
+    ///   - userAnnotations: User tags with coordinates
+    @discardableResult
+    public func addMedia(
+        url: String,
+        mimeType: String? = nil,
+        blurhash: String? = nil,
+        dim: String? = nil,
+        alt: String? = nil,
+        sha256: String? = nil,
+        size: String? = nil,
+        fallbacks: [String]? = nil,
+        userAnnotations: [UserAnnotation]? = nil
+    ) -> NDKEventBuilder {
+        let imeta = NDKImetaTag(
+            url: url,
+            blurhash: blurhash,
+            dim: dim,
+            alt: alt,
+            m: mimeType,
+            x: sha256,
+            size: size,
+            fallback: fallbacks,
+            userAnnotations: userAnnotations
+        )
+        
+        self.imetaTag(imeta)
+        
+        // Add m tag for media type filtering (NIP-68)
+        if let mimeType = mimeType {
+            if !tags.contains(where: { $0.count >= 2 && $0[0] == "m" && $0[1] == mimeType }) {
+                self.tags.append(["m", mimeType])
+            }
+        }
+        
+        // Add x tag for hash querying (NIP-68)
+        if let sha256 = sha256 {
+            if !tags.contains(where: { $0.count >= 2 && $0[0] == "x" && $0[1] == sha256 }) {
+                self.tags.append(["x", sha256])
+            }
+        }
+        
+        return self
+    }
+    
+    /// Add media from a Blossom upload result with optional enhancements
+    @discardableResult
+    public func addMedia(
+        from upload: BlossomBlob,
+        alt: String? = nil,
+        fallbacks: [String]? = nil,
+        userAnnotations: [UserAnnotation]? = nil
+    ) async throws -> NDKEventBuilder {
+        var imeta = NDKImetaTag(
+            url: upload.url,
+            blurhash: upload.blurhash,
+            dim: upload.dimensionsString,
+            alt: alt,
+            m: upload.type,
+            x: upload.sha256,
+            size: String(upload.size),
+            fallback: fallbacks,
+            userAnnotations: userAnnotations
+        )
+        
+        self.imetaTag(imeta)
+        
+        // Add m tag for media type filtering
+        if let mimeType = upload.type {
+            if !tags.contains(where: { $0.count >= 2 && $0[0] == "m" && $0[1] == mimeType }) {
+                self.tags.append(["m", mimeType])
+            }
+        }
+        
+        // Add x tag for hash querying
+        if !tags.contains(where: { $0.count >= 2 && $0[0] == "x" && $0[1] == upload.sha256 }) {
+            self.tags.append(["x", upload.sha256])
+        }
+        
+        return self
+    }
+    
+    /// Add a content warning tag
+    @discardableResult
+    public func contentWarning(_ reason: String) -> NDKEventBuilder {
+        self.tags.removeAll { $0.first == "content-warning" }
+        self.tags.append(["content-warning", reason])
+        return self
+    }
+    
+    /// Add a location tag
+    @discardableResult
+    public func location(_ location: String) -> NDKEventBuilder {
+        self.tags.removeAll { $0.first == "location" }
+        self.tags.append(["location", location])
+        return self
+    }
+    
+    /// Add a geohash tag
+    @discardableResult
+    public func geohash(_ geohash: String) -> NDKEventBuilder {
+        self.tags.removeAll { $0.first == "g" }
+        self.tags.append(["g", geohash])
+        return self
+    }
+    
+    /// Add language tags (e.g., for text in images)
+    @discardableResult
+    public func language(_ languageCode: String) -> NDKEventBuilder {
+        // Remove existing language tags
+        self.tags.removeAll { tag in
+            (tag.first == "L" && tag.count >= 2 && tag[1] == "ISO-639-1") ||
+            (tag.first == "l" && tag.count >= 3 && tag[2] == "ISO-639-1")
+        }
+        
+        // Add new language tags
+        self.tags.append(["L", "ISO-639-1"])
+        self.tags.append(["l", languageCode, "ISO-639-1"])
+        return self
+    }
+    
     // MARK: - Private Helpers
     
     /// Extract media URLs from content based on file extensions

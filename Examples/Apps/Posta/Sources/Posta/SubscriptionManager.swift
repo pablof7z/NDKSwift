@@ -6,28 +6,19 @@ import Observation
 @Observable
 class SubscriptionManager {
     // Published state
-    var notes: [NDKEvent] {
-        notesDataSource?.notes ?? []
-    }
-    var latestFollowList: Set<String> {
-        followListDataSource?.followList ?? []
-    }
-    var isLoadingFollows: Bool {
-        followListDataSource?.isLoading ?? true
-    }
-    var isLoadingNotes: Bool {
-        notesDataSource?.isLoading ?? false
-    }
+    var notes: [NDKEvent] = []
+    var latestFollowList: Set<String> = []
+    var isLoadingFollows: Bool = false
+    var isLoadingNotes: Bool = false
     var isSyncing = false
     var syncStatus: String = ""
-    var error: Error? {
-        followListDataSource?.error ?? notesDataSource?.error
-    }
+    var error: Error?
+    var newNotesCount: Int = 0
+    var lastViewedNoteId: String?
     
-    // Data sources
-    private var followListDataSource: FollowListDataSource?
-    private var notesDataSource: NotesDataSource?
-    private var contactsMetadataDataSource: MultipleProfilesDataSource?
+    // Subscriptions
+    private var followListTask: Task<Void, Never>?
+    private var notesTask: Task<Void, Never>?
     
     private var ndk: NDK?
     private var currentUserPubkey: String?
@@ -52,51 +43,61 @@ class SubscriptionManager {
             print("SubscriptionManager - After wait, connected relays: \(retriedConnected)/\(retriedTotal)")
         }
         
-        // Initialize follow list data source
-        followListDataSource = FollowListDataSource(ndk: ndk, pubkey: userPubkey)
-        
-        // Wait for follow list to load
-        await waitForFollowList()
+        // Start loading follow list
+        await loadFollowList(userPubkey: userPubkey)
     }
     
     func cleanup() async {
-        followListDataSource = nil
-        notesDataSource = nil
-        contactsMetadataDataSource = nil
+        followListTask?.cancel()
+        notesTask?.cancel()
+        followListTask = nil
+        notesTask = nil
+        notes = []
+        latestFollowList = []
     }
     
-    private func waitForFollowList() async {
-        guard let followListDataSource = followListDataSource else { return }
+    private func loadFollowList(userPubkey: String) async {
+        guard let ndk = ndk else { return }
         
-        // Give the follow list a moment to load
-        try? await Task.sleep(nanoseconds: 1_000_000_000) // 1 second
+        isLoadingFollows = true
         
-        // Once we have a follow list, start loading notes
-        if !followListDataSource.followList.isEmpty {
+        // Fetch follow list
+        let filter = NDKFilter(
+            authors: [userPubkey],
+            kinds: [EventKind.contacts],
+            limit: 1
+        )
+        
+        let dataSource = ndk.observe(filter: filter, maxAge: 300) // 5 min cache
+        
+        for await contactEvent in dataSource.events {
+            let pubkeys = contactEvent.tags
+                .filter { $0.count >= 2 && $0[0] == "p" }
+                .map { $0[1] }
+            latestFollowList = Set(pubkeys)
+            
+            print("SubscriptionManager - Loaded \(latestFollowList.count) follows")
+            
+            // Now load notes from follows
             await startNotesSubscription()
-        } else {
-            // Keep checking for follow list updates
-            Task {
-                while followListDataSource.followList.isEmpty && !Task.isCancelled {
-                    try? await Task.sleep(nanoseconds: 500_000_000) // 0.5 seconds
-                }
-                if !Task.isCancelled {
-                    await startNotesSubscription()
-                }
-            }
+            break // Only need the first/latest contact list
         }
+        
+        isLoadingFollows = false
     }
     
     private func startNotesSubscription() async {
-        guard let ndk = ndk, let followListDataSource = followListDataSource else { return }
+        guard let ndk = ndk else { return }
         
-        let follows = Array(followListDataSource.followList)
+        let follows = Array(latestFollowList)
         guard !follows.isEmpty else {
             print("SubscriptionManager - No follows to load notes for")
             return
         }
         
         print("SubscriptionManager - Starting notes subscription for \(follows.count) follows")
+        
+        isLoadingNotes = true
         
         // Create filter for notes from follows
         let notesFilter = NDKFilter(
@@ -105,15 +106,38 @@ class SubscriptionManager {
             limit: 100
         )
         
-        // Initialize notes data source
-        notesDataSource = NotesDataSource(ndk: ndk, filter: notesFilter)
-        
-        // Initialize metadata data source for profiles
-        contactsMetadataDataSource = MultipleProfilesDataSource(
-            ndk: ndk,
-            pubkeys: Set(follows)
-        )
+        // Start observing notes - this runs continuously
+        notesTask = Task {
+            let notesDataSource = ndk.observe(filter: notesFilter, maxAge: 60) // 1 min cache
+            
+            for await note in notesDataSource.events {
+                // Check if it's a reply
+                let isReply = note.tags.contains { tag in
+                    tag.count >= 2 && tag[0] == "e"
+                }
+                
+                if !isReply {
+                    // Add to notes array if not already present
+                    if !notes.contains(where: { $0.id == note.id }) {
+                        notes.append(note)
+                        // Keep sorted by timestamp
+                        notes.sort { $0.createdAt > $1.createdAt }
+                        // Limit to reasonable number
+                        if notes.count > 200 {
+                            notes = Array(notes.prefix(200))
+                        }
+                    }
+                }
+                
+                // After first few notes, mark as not loading
+                if notes.count >= 5 && isLoadingNotes {
+                    isLoadingNotes = false
+                }
+            }
+        }
     }
+    
+    // Remove loadProfiles - profiles should be loaded on-demand by views
     
     func triggerSync() async {
         guard !isSyncing else { return }
@@ -142,8 +166,29 @@ class SubscriptionManager {
         }
     }
     
-    // Profile lookup helper
-    func profile(for pubkey: String) -> NDKUserProfile? {
-        contactsMetadataDataSource?.profile(for: pubkey)
+    // Create an observable profile source for a specific pubkey
+    func observeProfile(for pubkey: String) -> AsyncStream<NDKUserProfile?> {
+        guard let ndk = ndk else {
+            return AsyncStream { continuation in
+                continuation.finish()
+            }
+        }
+        
+        return AsyncStream { continuation in
+            Task {
+                let profileStream = await ndk.profileManager.observe(for: pubkey, maxAge: 3600)
+                for await profile in profileStream {
+                    continuation.yield(profile)
+                }
+                continuation.finish()
+            }
+        }
+    }
+    
+    func resetNewNotesCount() {
+        newNotesCount = 0
+        if let firstNote = notes.first {
+            lastViewedNoteId = firstNote.id
+        }
     }
 }

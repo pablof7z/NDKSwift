@@ -3,8 +3,8 @@ import NDKSwift
 
 struct PostaAuthView: View {
     @Environment(NDKAuthManager.self) var authManager
-    @EnvironmentObject var ndkManager: NDKManager
-    @EnvironmentObject var relayManager: RelayManager
+    @Environment(NDKManager.self) var ndkManager
+    @Environment(RelayManager.self) var relayManager
     @State private var loginInput: String = ""
     @State private var isLoading = false
     @State private var errorMessage: String?
@@ -245,6 +245,6 @@ private func extractConnectionToken(from bunkerUrl: String) -> String? {
 #Preview {
     PostaAuthView()
         .environment(NDKAuthManager.shared)
-        .environmentObject(NDKManager.shared)
-        .environmentObject(RelayManager())
+        .environment(NDKManager.shared)
+        .environment(RelayManager())
 }

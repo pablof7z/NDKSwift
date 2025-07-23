@@ -72,6 +72,13 @@ public enum ImetaUtils {
                 components.append("fallback \(fallbackUrl)")
             }
         }
+        
+        // Handle user annotations
+        if let annotations = imeta.userAnnotations {
+            for annotation in annotations {
+                components.append("annotate-user \(annotation.pubkey):\(annotation.x):\(annotation.y)")
+            }
+        }
 
         // Handle additional fields
         for (key, value) in imeta.additionalFields {
@@ -104,6 +111,18 @@ public enum ImetaUtils {
                 imeta.fallback = []
             }
             imeta.fallback?.append(value)
+        case "annotate-user":
+            // Parse format: pubkey:x:y
+            let parts = value.split(separator: ":")
+            if parts.count == 3,
+               let x = Int(parts[1]),
+               let y = Int(parts[2]) {
+                let annotation = UserAnnotation(pubkey: String(parts[0]), x: x, y: y)
+                if imeta.userAnnotations == nil {
+                    imeta.userAnnotations = []
+                }
+                imeta.userAnnotations?.append(annotation)
+            }
         default:
             imeta.additionalFields[field] = value
         }
