@@ -416,7 +416,7 @@ private class FollowState: ObservableObject {
         contacts: [String]
     ) async throws -> NDKEvent {
         
-        let eventBuilder = ndk.event()
+        let eventBuilder = NDKEventBuilder(ndk: ndk)
             .kind(3) // Contact list
             .content(currentContactListEvent?.content ?? "") // Preserve existing content
         
