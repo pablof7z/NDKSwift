@@ -43,6 +43,7 @@ struct FeedItemView: View {
     @State private var showProfile = false
     @State private var showingReplies = false
     @State private var showingLikeAnimation = false
+    @State private var showingZap = false
     @State private var doubleTapLocation: CGPoint = .zero
     
     var body: some View {
@@ -230,6 +231,10 @@ struct FeedItemView: View {
             ReplyView(parentEvent: item.event)
                 .environmentObject(appState)
         }
+        .sheet(isPresented: $showingZap) {
+            ZapView(event: item.event)
+                .environmentObject(appState)
+        }
         .task {
             await loadEngagementCounts()
         }
@@ -281,8 +286,7 @@ struct FeedItemView: View {
     
     private func sendZap() {
         OlasDesign.Haptic.selection()
-        // TODO: Implement zap functionality
-        print("Zap not yet implemented")
+        showingZap = true
     }
     
     private func sharePost() {
