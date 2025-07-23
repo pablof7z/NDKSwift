@@ -2,6 +2,12 @@ import SwiftUI
 import NDKSwift
 import CoreImage.CIFilterBuiltins
 
+#if canImport(UIKit)
+import UIKit
+#elseif canImport(AppKit)
+import AppKit
+#endif
+
 struct ZapView: View {
     let event: NDKEvent
     @EnvironmentObject var appState: AppState
@@ -61,7 +67,9 @@ struct ZapView: View {
                             placeholder: "Custom amount",
                             icon: "bitcoinsign.circle"
                         )
+                        #if os(iOS)
                         .keyboardType(.numberPad)
+                        #endif
                         .onChange(of: customAmount) { _, newValue in
                             if !newValue.isEmpty, let amount = Int(newValue) {
                                 selectedAmount = amount
@@ -136,7 +144,11 @@ struct ZapView: View {
                 .padding(OlasDesign.Spacing.md)
             }
             .background(OlasDesign.Colors.background)
+            #if os(iOS)
             .navigationBarHidden(true)
+            #else
+            .toolbar(.hidden)
+            #endif
         }
         .sheet(isPresented: $showingQRCode) {
             if let invoice = lightningInvoice {
@@ -229,6 +241,7 @@ struct QRCodeView: View {
     let invoice: String
     @Environment(\.dismiss) var dismiss
     
+    #if canImport(UIKit)
     var qrImage: UIImage? {
         let context = CIContext()
         let filter = CIFilter.qrCodeGenerator()
@@ -243,6 +256,22 @@ struct QRCodeView: View {
         
         return nil
     }
+    #elseif canImport(AppKit)
+    var qrImage: NSImage? {
+        let context = CIContext()
+        let filter = CIFilter.qrCodeGenerator()
+        filter.setValue(Data(invoice.utf8), forKey: "inputMessage")
+        
+        if let outputImage = filter.outputImage {
+            let scaledImage = outputImage.transformed(by: CGAffineTransform(scaleX: 10, y: 10))
+            if let cgImage = context.createCGImage(scaledImage, from: scaledImage.extent) {
+                return NSImage(cgImage: cgImage, size: NSSize(width: cgImage.width, height: cgImage.height))
+            }
+        }
+        
+        return nil
+    }
+    #endif
     
     var body: some View {
         NavigationView {
@@ -251,13 +280,19 @@ struct QRCodeView: View {
                     .font(OlasDesign.Typography.title)
                 
                 if let image = qrImage {
+                    #if canImport(UIKit)
                     Image(uiImage: image)
                         .interpolation(.none)
                         .resizable()
                         .scaledToFit()
-                        .frame(width: 300, height: 300)
-                        .background(Color.white)
-                        .cornerRadius(OlasDesign.CornerRadius.md)
+                    #elseif canImport(AppKit)
+                    Image(nsImage: image)
+                        .resizable()
+                        .scaledToFit()
+                    .frame(width: 300, height: 300)
+                    .background(Color.white)
+                    .cornerRadius(OlasDesign.CornerRadius.md)
+                    #endif
                 }
                 
                 Text(invoice)
@@ -284,7 +319,11 @@ struct QRCodeView: View {
             }
             .padding()
             .background(OlasDesign.Colors.background)
+            #if os(iOS)
             .navigationBarHidden(true)
+            #else
+            .toolbar(.hidden)
+            #endif
         }
     }
 }

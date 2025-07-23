@@ -114,6 +114,7 @@ struct ReplyView: View {
             #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
             #endif
+            #if os(iOS)
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button("Done") {
@@ -121,6 +122,15 @@ struct ReplyView: View {
                     }
                 }
             }
+            #else
+            .toolbar {
+                ToolbarItem(placement: .automatic) {
+                    Button("Done") {
+                        dismiss()
+                    }
+                }
+            }
+            #endif
             .onAppear {
                 if let ndk = appState.ndk {
                     viewModel.loadReplies(for: parentEvent, ndk: ndk)
