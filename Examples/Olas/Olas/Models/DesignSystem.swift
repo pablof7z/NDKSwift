@@ -53,6 +53,7 @@ enum OlasDesign {
         static let divider = Color.white.opacity(0.1)
         static let error = Color(hex: "FF6B6B")
         static let success = Color(hex: "4ECDC4")
+        static let primary = Color(hex: "667eea") // Default to day color
     }
     
     // MARK: - Typography
@@ -361,6 +362,14 @@ struct OlasSkeletonView: View {
             .overlay(OlasShimmer())
             .frame(height: height)
             .clipShape(RoundedRectangle(cornerRadius: OlasDesign.CornerRadius.sm))
+    }
+}
+
+struct OlasLoadingView: View {
+    var body: some View {
+        Rectangle()
+            .fill(OlasDesign.Colors.surface)
+            .overlay(OlasShimmer())
     }
 }
 
