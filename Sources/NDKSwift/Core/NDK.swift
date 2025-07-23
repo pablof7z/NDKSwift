@@ -452,116 +452,6 @@ public final class NDK {
         )
     }
     
-    // MARK: - Event Building
-    
-    /// Create a new event builder with full NDK context
-    /// 
-    /// The returned builder has access to:
-    /// - Automatic relay hint detection from event tracker
-    /// - Cache access for user metadata
-    /// - Default signer (if available)
-    /// 
-    /// ## Usage
-    /// ```swift
-    /// let event = try await ndk.event()
-    ///     .content("Hello, Nostr!")
-    ///     .kind(1)
-    ///     .build() // Uses ndk.signer automatically
-    /// ```
-    public func event() -> NDKEventBuilder {
-        return NDKEventBuilder(ndk: self)
-    }
-    
-    /// Create a reply event builder for NIP-22 comments
-    /// 
-    /// This method creates a properly configured event builder for replying to any event.
-    /// It automatically handles:
-    /// - Setting kind to 1111 (generic reply) for non-kind-1 events
-    /// - Propagating uppercase tags (A, E, I, K, P) from parent comments
-    /// - Adding proper lowercase tags (a, e, i, k, p) for the direct parent
-    /// - Following NIP-22 threading conventions
-    /// 
-    /// ## Usage
-    /// ```swift
-    /// let comment = try await ndk.reply(to: blogPost)
-    ///     .content("Great article!")
-    ///     .build()
-    /// ```
-    /// 
-    /// - Parameter event: The event to reply to
-    /// - Returns: An NDKEventBuilder configured for the reply
-    public func reply(to event: NDKEvent) -> NDKEventBuilder {
-        let builder = NDKEventBuilder(ndk: self)
-        
-        // For kind 1 events, use standard kind 1 replies
-        if event.kind == EventKind.textNote {
-            builder.kind(EventKind.textNote)
-            
-            // Standard NIP-10 reply tags
-            if event.tags.contains(where: { $0.first == "e" }) {
-                // Copy existing e-tags and p-tags
-                for tag in event.tags {
-                    if tag.first == "e" || tag.first == "p" {
-                        builder.tag(tag)
-                    }
-                }
-                // Add reference to the event we're replying to
-                builder.tag(["e", event.id, "", "reply"])
-                builder.tag(["p", event.pubkey])
-            } else {
-                // This is a root event, tag it as such
-                builder.tag(["e", event.id, "", "root"])
-                builder.tag(["p", event.pubkey])
-            }
-        } else {
-            // NIP-22 generic reply for all other kinds
-            builder.kind(EventKind.genericReply)
-            
-            // Check if the parent event has uppercase tags (indicating it's a comment)
-            let hasUppercaseTags = event.tags.contains { tag in
-                ["A", "E", "I", "K", "P"].contains(tag.first)
-            }
-            
-            if hasUppercaseTags {
-                // Parent is a comment - copy its uppercase tags
-                for tag in event.tags {
-                    if ["A", "E", "I", "K", "P"].contains(tag.first) {
-                        builder.tag(tag)
-                    }
-                }
-            } else {
-                // Parent is a root event - create new uppercase tags
-                let tagReference = event.tagReference()
-                let uppercaseTag = [tagReference[0].uppercased()] + Array(tagReference.dropFirst())
-                builder.tag(uppercaseTag)
-                
-                // Add K tag for root kind
-                builder.tag(["K", String(event.kind)])
-                
-                // Add P tag for root author
-                builder.tag(["P", event.pubkey])
-            }
-            
-            // Add lowercase tags for the direct parent
-            let parentReference = event.tagReference()
-            builder.tag(parentReference)
-            
-            // Add k tag for parent kind
-            builder.tag(["k", String(event.kind)])
-            
-            // Add p tag for parent author
-            builder.tag(["p", event.pubkey])
-            
-            // Carry over all p tags from parent
-            for tag in event.tags where tag.first == "p" {
-                if tag.count > 1 && tag[1] != event.pubkey {
-                    builder.tag(tag)
-                }
-            }
-        }
-        
-        return builder
-    }
     
     // MARK: - User Management
     
@@ -656,7 +546,7 @@ public final class NDK {
         }
         
         do {
-            let authEvent = try await self.event()
+            let authEvent = try await NDKEventBuilder(ndk: self)
                 .kind(EventKind.clientAuthentication)
                 .tag([NostrTagConstants.TagName.challenge, challenge])
                 .tag([NostrTagConstants.TagName.relay, relay.url])

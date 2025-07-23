@@ -134,83 +134,8 @@ struct NostrExplainerView: View {
             Spacer()
             
             // Network visualization
-            ZStack {
-                // Connection lines
-                ForEach(0..<5) { index in
-                    Path { path in
-                        let center = CGPoint(x: 150, y: 150)
-                        let angle = Double(index) * 72 * .pi / 180
-                        let endPoint = CGPoint(
-                            x: center.x + cos(angle) * 100,
-                            y: center.y + sin(angle) * 100
-                        )
-                        path.move(to: center)
-                        path.addLine(to: endPoint)
-                    }
-                    .stroke(
-                        LinearGradient(
-                            colors: [.white.opacity(0.2), .white.opacity(0.6)],
-                            startPoint: .center,
-                            endPoint: .init(x: 0.5 + cos(Double(index) * 72 * .pi / 180) * 0.5,
-                                          y: 0.5 + sin(Double(index) * 72 * .pi / 180) * 0.5)
-                        ),
-                        lineWidth: 2
-                    )
-                    .opacity(animate ? 1 : 0)
-                    .animation(.easeOut(duration: 0.5).delay(Double(index) * 0.1), value: animate)
-                }
-                
-                // Center node
-                Circle()
-                    .fill(
-                        LinearGradient(
-                            colors: OlasDesign.Colors.primaryGradient,
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        )
-                    )
-                    .frame(width: 60, height: 60)
-                    .overlay(
-                        Image(systemName: "person.fill")
-                            .foregroundStyle(.white)
-                            .font(.title2)
-                    )
-                    .scaleEffect(nodeAnimations[0] ? 1.1 : 1.0)
-                    .animation(
-                        .easeInOut(duration: 1.5).repeatForever(autoreverses: true),
-                        value: nodeAnimations[0]
-                    )
-                
-                // Surrounding nodes
-                ForEach(0..<5) { index in
-                    Circle()
-                        .fill(
-                            LinearGradient(
-                                colors: [.purple, .pink],
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
-                            )
-                        )
-                        .frame(width: 40, height: 40)
-                        .overlay(
-                            Image(systemName: "server.rack")
-                                .foregroundStyle(.white)
-                                .font(.caption)
-                        )
-                        .offset(
-                            x: cos(Double(index) * 72 * .pi / 180) * 100,
-                            y: sin(Double(index) * 72 * .pi / 180) * 100
-                        )
-                        .scaleEffect(nodeAnimations[index + 1] ? 1.1 : 1.0)
-                        .animation(
-                            .easeInOut(duration: 1.5)
-                            .repeatForever(autoreverses: true)
-                            .delay(Double(index) * 0.2),
-                            value: nodeAnimations[index + 1]
-                        )
-                }
-            }
-            .frame(width: 300, height: 300)
+            NetworkVisualization(animate: animate, nodeAnimations: nodeAnimations)
+                .frame(width: 300, height: 300)
             
             VStack(spacing: OlasDesign.Spacing.lg) {
                 Text("Your Content, Everywhere")
@@ -245,6 +170,130 @@ struct NostrExplainerView: View {
                 nodeAnimations[i] = true
             }
         }
+    }
+}
+
+// MARK: - Network Visualization Component
+struct NetworkVisualization: View {
+    let animate: Bool
+    let nodeAnimations: [Bool]
+    
+    var body: some View {
+        ZStack {
+            // Connection lines
+            ForEach(0..<5) { index in
+                ConnectionLine(index: index, animate: animate)
+            }
+            
+            // Center node
+            CenterNode(isAnimating: nodeAnimations[0])
+            
+            // Surrounding nodes
+            ForEach(0..<5) { index in
+                SurroundingNode(index: index, isAnimating: nodeAnimations[index + 1])
+            }
+        }
+    }
+}
+
+struct ConnectionLine: View {
+    let index: Int
+    let animate: Bool
+    
+    private var angle: Double {
+        Double(index) * 72 * .pi / 180
+    }
+    
+    private var endPoint: CGPoint {
+        let center = CGPoint(x: 150, y: 150)
+        return CGPoint(
+            x: center.x + cos(angle) * 100,
+            y: center.y + sin(angle) * 100
+        )
+    }
+    
+    private var gradientEndPoint: UnitPoint {
+        UnitPoint(
+            x: 0.5 + cos(angle) * 0.5,
+            y: 0.5 + sin(angle) * 0.5
+        )
+    }
+    
+    var body: some View {
+        Path { path in
+            let center = CGPoint(x: 150, y: 150)
+            path.move(to: center)
+            path.addLine(to: endPoint)
+        }
+        .stroke(
+            LinearGradient(
+                colors: [.white.opacity(0.2), .white.opacity(0.6)],
+                startPoint: .center,
+                endPoint: gradientEndPoint
+            ),
+            lineWidth: 2
+        )
+        .opacity(animate ? 1 : 0)
+        .animation(.easeOut(duration: 0.5).delay(Double(index) * 0.1), value: animate)
+    }
+}
+
+struct CenterNode: View {
+    let isAnimating: Bool
+    
+    var body: some View {
+        Circle()
+            .fill(
+                LinearGradient(
+                    colors: OlasDesign.Colors.primaryGradient,
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                )
+            )
+            .frame(width: 60, height: 60)
+            .overlay(
+                Image(systemName: "person.fill")
+                    .foregroundStyle(.white)
+                    .font(.title2)
+            )
+            .scaleEffect(isAnimating ? 1.1 : 1.0)
+            .animation(
+                .easeInOut(duration: 1.5).repeatForever(autoreverses: true),
+                value: isAnimating
+            )
+    }
+}
+
+struct SurroundingNode: View {
+    let index: Int
+    let isAnimating: Bool
+    
+    var body: some View {
+        Circle()
+            .fill(
+                LinearGradient(
+                    colors: [.purple, .pink],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                )
+            )
+            .frame(width: 40, height: 40)
+            .overlay(
+                Image(systemName: "server.rack")
+                    .foregroundStyle(.white)
+                    .font(.caption)
+            )
+            .offset(
+                x: cos(Double(index) * 72 * .pi / 180) * 100,
+                y: sin(Double(index) * 72 * .pi / 180) * 100
+            )
+            .scaleEffect(isAnimating ? 1.1 : 1.0)
+            .animation(
+                .easeInOut(duration: 1.5)
+                .repeatForever(autoreverses: true)
+                .delay(Double(index) * 0.2),
+                value: isAnimating
+            )
     }
 }
 

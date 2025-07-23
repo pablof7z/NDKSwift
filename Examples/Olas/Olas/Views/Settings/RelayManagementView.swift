@@ -340,21 +340,31 @@ struct RelayManagementView: View {
     private func loadRelays() {
         guard let ndk = appState.ndk else { return }
         
-        relays = ndk.relayPool.relays.map { relay in
-            RelayInfo(
-                url: relay.url,
-                status: relay.status == .connected ? .connected : .disconnected,
-                isRead: true,
-                isWrite: true,
-                latency: nil
-            )
-        }
-        
-        // Measure latency for connected relays
-        for (index, relay) in relays.enumerated() where relay.status == .connected {
-            measureLatency(for: relay) { latency in
-                if let latency = latency {
-                    relays[index].latency = latency
+        Task {
+            var loadedRelays: [RelayInfo] = []
+            
+            for relay in await ndk.relays {
+                let connectionState = await relay.connectionState
+                let relayInfo = RelayInfo(
+                    url: relay.url,
+                    status: connectionState == .connected ? .connected : .disconnected,
+                    isRead: true,
+                    isWrite: true,
+                    latency: nil
+                )
+                loadedRelays.append(relayInfo)
+            }
+            
+            await MainActor.run {
+                self.relays = loadedRelays
+                
+                // Measure latency for connected relays
+                for (index, relay) in relays.enumerated() where relay.status == .connected {
+                    measureLatency(for: relay) { latency in
+                        if let latency = latency {
+                            self.relays[index].latency = latency
+                        }
+                    }
                 }
             }
         }
@@ -366,28 +376,20 @@ struct RelayManagementView: View {
         isConnecting = true
         
         Task {
-            do {
-                // Normalize the URL
-                var normalizedURL = newRelayURL
-                if !normalizedURL.hasPrefix("wss://") && !normalizedURL.hasPrefix("ws://") {
-                    normalizedURL = "wss://\(normalizedURL)"
-                }
-                
-                // Add relay to pool
-                try await ndk.relayPool.addRelay(normalizedURL)
-                
-                await MainActor.run {
-                    OlasDesign.Haptic.success()
-                    showAddRelay = false
-                    newRelayURL = ""
-                    loadRelays()
-                }
-            } catch {
-                await MainActor.run {
-                    errorMessage = "Failed to add relay: \(error.localizedDescription)"
-                    showError = true
-                    OlasDesign.Haptic.error()
-                }
+            // Normalize the URL
+            var normalizedURL = newRelayURL
+            if !normalizedURL.hasPrefix("wss://") && !normalizedURL.hasPrefix("ws://") {
+                normalizedURL = "wss://\(normalizedURL)"
+            }
+            
+            // Add relay to pool
+            _ = await ndk.addRelay(normalizedURL)
+            
+            await MainActor.run {
+                OlasDesign.Haptic.success()
+                showAddRelay = false
+                newRelayURL = ""
+                loadRelays()
             }
             
             await MainActor.run {
@@ -401,7 +403,7 @@ struct RelayManagementView: View {
         
         Task {
             // Remove from pool
-            ndk.relayPool.removeRelay(relay.url)
+            await ndk.removeRelay(relay.url)
             
             await MainActor.run {
                 relays.removeAll { $0.id == relay.id }
@@ -432,7 +434,7 @@ struct RelayManagementView: View {
             
             Task {
                 // Reconnect
-                if let ndkRelay = ndk.relayPool.relays.first(where: { $0.url == relay.url }) {
+                if let ndkRelay = await ndk.relays.first(where: { $0.url == relay.url }) {
                     try? await ndkRelay.connect()
                 }
                 

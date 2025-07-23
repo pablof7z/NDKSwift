@@ -244,7 +244,7 @@ final class UserProfileE2ETests: XCTestCase {
         )
         
         let profileContent = try JSONCoding.encodeToString(minimalProfile)
-        let profileEvent = try await ndk.event()
+        let profileEvent = try await NDKEventBuilder(ndk: ndk)
             .content(profileContent)
             .kind(0)
             .build()
@@ -290,7 +290,7 @@ final class UserProfileE2ETests: XCTestCase {
         await ndk.waitForRelayConnections(minimumRelays: 1, timeout: 10.0)
         
         // Create event with invalid JSON content
-        let event = try await ndk.event()
+        let event = try await NDKEventBuilder(ndk: ndk)
             .content("{invalid json content")
             .kind(0)
             .build()

@@ -18,6 +18,7 @@ struct WalletView: View {
     @State private var showInvoicePreview = false
     @State private var showWalletSettings = false
     @State private var showSettings = false
+    @State private var showWalletOnboarding = false
     
     enum WalletDestination: Identifiable, Hashable {
         case mint
@@ -52,7 +53,7 @@ struct WalletView: View {
         NavigationStack {
             VStack {
                 if !walletManager.isWalletConfigured {
-                    EmptyWalletView()
+                    EmptyWalletView(showWalletOnboarding: $showWalletOnboarding)
                 } else {
                     ScrollView {
                         VStack(spacing: 12) {
@@ -167,6 +168,15 @@ struct WalletView: View {
                     loadWalletIfNeeded()
                 }
             }
+            .fullScreenCover(isPresented: $showWalletOnboarding) {
+                WalletOnboardingView()
+                    .onDisappear {
+                        // Reload wallet after onboarding
+                        Task {
+                            try? await walletManager.loadWalletForCurrentUser()
+                        }
+                    }
+            }
             .task {
                 print("🔵 WalletView - Task started at \(Date())")
                 // Monitor for signer availability when authenticated
@@ -233,70 +243,13 @@ struct WalletView: View {
 // MARK: - Empty Wallet View
 struct EmptyWalletView: View {
     @Environment(NostrManager.self) private var nostrManager
-    @State private var showWalletSettings = false
+    @Binding var showWalletOnboarding: Bool
     
     var body: some View {
-        VStack(spacing: 24) {
-            Spacer()
-            
-            Image(systemName: "wallet.pass")
-                .font(.system(size: 80))
-                .foregroundStyle(.secondary)
-            
-            Text("Wallet Not Configured")
-                .font(.title2)
-                .fontWeight(.semibold)
-            
-            Text("Configure mints to start using lightning-fast payments")
-                .multilineTextAlignment(.center)
-                .foregroundStyle(.secondary)
-                .padding(.horizontal, 40)
-            
-            Button(action: { showWalletSettings = true }) {
-                Label("Configure Wallet", systemImage: "gearshape.fill")
-                    .padding()
-                    .background(Color.orange)
-                    .foregroundColor(.white)
-                    .cornerRadius(12)
+        Color.clear
+            .onAppear {
+                showWalletOnboarding = true
             }
-            .sheet(isPresented: $showWalletSettings) {
-                WalletSettingsView()
-            }
-            
-            // Test button to verify NDK publishing works
-            Button(action: testPublishEvent) {
-                Text("Test Publish Simple Event")
-                    .font(.caption)
-                    .foregroundColor(.blue)
-            }
-            .padding(.top, 10)
-            
-            Spacer()
-        }
-    }
-    
-    private func testPublishEvent() {
-        Task {
-            guard let ndk = nostrManager.ndk,
-                  let signer = ndk.signer else {
-                print("Test: NDK or signer not available")
-                return
-            }
-            
-            do {
-                print("Test: Creating test event")
-                let testEvent = try await ndk.event()
-                    .content("Test event from Nutsack wallet - " + UUID().uuidString)
-                    .kind(1) // Regular text note
-                    .build(signer: signer)
-                
-                print("Test: Publishing test event...")
-                let relays = try await ndk.publish(testEvent)
-                print("Test: Published to \(relays.count) relays: \(relays.map { $0.url })")
-            } catch {
-                print("Test: Failed to publish test event: \(error)")
-            }
-        }
     }
 }
 

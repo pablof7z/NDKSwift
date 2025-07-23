@@ -24,7 +24,7 @@ final class TagAddressableEventTests: XCTestCase {
     
     func testTagParameterizedReplaceableEvent() async throws {
         // Create a parameterized replaceable event (kind 30023 - long-form content)
-        let articleEvent = try await ndk.event()
+        let articleEvent = try await NDKEventBuilder(ndk: ndk)
             .content("This is a long-form article")
             .kind(EventKind.longFormContent)
             .dTag("my-article")
@@ -32,7 +32,7 @@ final class TagAddressableEventTests: XCTestCase {
             .build(signer: signer)
         
         // Tag the article event
-        let replyBuilder = await ndk.event()
+        let replyBuilder = await NDKEventBuilder(ndk: ndk)
             .content("Reply to article")
             .kind(EventKind.textNote)
             .tagEvent(articleEvent)
@@ -51,14 +51,14 @@ final class TagAddressableEventTests: XCTestCase {
     
     func testTagRegularReplaceableEvent() async throws {
         // Create a regular replaceable event (kind 10002 - relay list)
-        let relayListEvent = try await ndk.event()
+        let relayListEvent = try await NDKEventBuilder(ndk: ndk)
             .content("")
             .kind(EventKind.relayList)
             .tag(["r", "wss://relay.example.com"])
             .build(signer: signer)
         
         // Tag the relay list event
-        let replyBuilder = await ndk.event()
+        let replyBuilder = await NDKEventBuilder(ndk: ndk)
             .content("Reply to relay list")
             .kind(EventKind.textNote)
             .tagEvent(relayListEvent)
@@ -77,13 +77,13 @@ final class TagAddressableEventTests: XCTestCase {
     
     func testTagRegularEventUsesETag() async throws {
         // Create a regular event (kind 1 - text note)
-        let textEvent = try await ndk.event()
+        let textEvent = try await NDKEventBuilder(ndk: ndk)
             .content("This is a regular text note")
             .kind(EventKind.textNote)
             .build(signer: signer)
         
         // Tag the regular event
-        let replyBuilder = await ndk.event()
+        let replyBuilder = await NDKEventBuilder(ndk: ndk)
             .content("Reply to text note")
             .kind(EventKind.textNote)
             .tagEvent(textEvent, marker: "reply")
@@ -107,7 +107,7 @@ final class TagAddressableEventTests: XCTestCase {
     
     func testTagAddressableEventWithRelayHint() async throws {
         // Create a parameterized replaceable event
-        let articleEvent = try await ndk.event()
+        let articleEvent = try await NDKEventBuilder(ndk: ndk)
             .content("Article with relay hint")
             .kind(EventKind.longFormContent)
             .dTag("article-with-relay")
@@ -116,7 +116,7 @@ final class TagAddressableEventTests: XCTestCase {
         let preferredRelay = "wss://article.relay.com"
         
         // Tag with explicit relay hint
-        let replyBuilder = await ndk.event()
+        let replyBuilder = await NDKEventBuilder(ndk: ndk)
             .content("Reply with relay hint")
             .kind(EventKind.textNote)
             .tagEvent(articleEvent, preferredRelay: preferredRelay)
@@ -135,7 +135,7 @@ final class TagAddressableEventTests: XCTestCase {
     
     func testTagAddressableEventWithNDKTracking() async throws {
         // Create a parameterized replaceable event
-        let articleEvent = try await ndk.event()
+        let articleEvent = try await NDKEventBuilder(ndk: ndk)
             .content("Article with NDK tracking")
             .kind(EventKind.longFormContent)
             .dTag("tracked-article")
@@ -147,7 +147,7 @@ final class TagAddressableEventTests: XCTestCase {
         await ndk.eventTracker.setSourceRelay(eventId: articleEvent.id, relay: trackedRelay)
         
         // Tag with NDK (should pick up relay from tracker)
-        let replyBuilder = await ndk.event()
+        let replyBuilder = await NDKEventBuilder(ndk: ndk)
             .content("Reply with tracked relay")
             .kind(EventKind.textNote)
             .tagEvent(articleEvent)
@@ -166,14 +166,14 @@ final class TagAddressableEventTests: XCTestCase {
     
     func testDirectTagAddressableEventMethod() async throws {
         // Create a parameterized replaceable event
-        let articleEvent = try await ndk.event()
+        let articleEvent = try await NDKEventBuilder(ndk: ndk)
             .content("Direct tag method test")
             .kind(EventKind.longFormContent)
             .dTag("direct-tag-article")
             .build(signer: signer)
         
         // Use the direct tagAddressableEvent method
-        let replyBuilder = await ndk.event()
+        let replyBuilder = await NDKEventBuilder(ndk: ndk)
             .content("Direct tag method reply")
             .kind(EventKind.textNote)
             .tagAddressableEvent(articleEvent, preferredRelay: "wss://direct.relay.com")

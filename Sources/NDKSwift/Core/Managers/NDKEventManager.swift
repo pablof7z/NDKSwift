@@ -126,7 +126,7 @@ public actor NDKEventManager {
         
         let signer = try ndk.requireSigner()
         
-        let eventBuilder = ndk.event()
+        let eventBuilder = NDKEventBuilder(ndk: ndk)
         let configuredBuilder = builder(eventBuilder)
         
         // Build the event

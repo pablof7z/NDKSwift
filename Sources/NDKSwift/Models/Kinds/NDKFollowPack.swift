@@ -156,7 +156,7 @@ public class NDKFollowPackBuilder {
     
     /// Build and sign the follow pack
     public func build() async throws -> NDKFollowPack {
-        let eventBuilder = ndk.event()
+        let eventBuilder = NDKEventBuilder(ndk: ndk)
             .kind(kind)
             .content(content)
         

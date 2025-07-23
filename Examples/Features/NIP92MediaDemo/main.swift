@@ -19,7 +19,7 @@ struct NIP92MediaDemo {
         
         // Example 1: Automatic imeta tag extraction
         print("1. Automatic media URL extraction:")
-        let event1 = try await ndk.event()
+        let event1 = try await NDKEventBuilder(ndk: ndk)
             .content("Check out these photos: https://example.com/sunset.jpg and https://example.com/beach.png")
             .kind(EventKind.textNote)
             .build()
@@ -33,7 +33,7 @@ struct NIP92MediaDemo {
         
         // Example 2: Manual imeta tag with additional metadata
         print("2. Manual imeta tag with metadata:")
-        let event2 = try await ndk.event()
+        let event2 = try await NDKEventBuilder(ndk: ndk)
             .content("My vacation photo: https://example.com/vacation.jpg")
             .imetaTag(url: "https://example.com/vacation.jpg") { imeta in
                 imeta.alt = "Beautiful sunset at the beach in Costa Rica"
@@ -53,7 +53,7 @@ struct NIP92MediaDemo {
         
         // Example 3: Disable automatic extraction
         print("3. Disable automatic imeta extraction:")
-        let event3 = try await ndk.event()
+        let event3 = try await NDKEventBuilder(ndk: ndk)
             .content("This URL won't get an imeta tag: https://github.com/image.png", extractImeta: false)
             .kind(EventKind.textNote)
             .build()
@@ -64,7 +64,7 @@ struct NIP92MediaDemo {
         
         // Example 4: Mix automatic and manual
         print("4. Mix automatic extraction with manual enhancement:")
-        let event4 = try await ndk.event()
+        let event4 = try await NDKEventBuilder(ndk: ndk)
             .content("Photos: https://example.com/photo1.jpg and https://example.com/photo2.jpg")
             .imetaTag(url: "https://example.com/photo1.jpg") { imeta in
                 imeta.alt = "First photo with custom description"
@@ -94,7 +94,7 @@ struct NIP92MediaDemo {
             dimensions: (width: 3024, height: 4032) // Automatically extracted during upload
         )
         
-        let event5 = try await ndk.event()
+        let event5 = try await NDKEventBuilder(ndk: ndk)
             .content("Just uploaded this photo: \(blossomUpload.url)")
             .imetaTag(from: blossomUpload) // Includes all metadata automatically
             .kind(EventKind.textNote)
@@ -120,7 +120,7 @@ struct NIP92MediaDemo {
         // - SHA256 hash
         // - file size
         
-        let event = try await ndk.event()
+        let event = try await NDKEventBuilder(ndk: ndk)
             .content("Check out my photo: \\(upload.first!.url)")
             .imetaTag(from: upload.first!)
             .build()
@@ -129,7 +129,7 @@ struct NIP92MediaDemo {
         
         // Example 6: Multiple media types
         print("6. Multiple media types:")
-        let event6 = try await ndk.event()
+        let event6 = try await NDKEventBuilder(ndk: ndk)
             .content("Check out my content: https://example.com/video.mp4, https://example.com/audio.mp3, and https://example.com/document.pdf")
             .kind(EventKind.textNote)
             .build()
@@ -150,7 +150,7 @@ struct NIP92MediaDemo {
         customImeta.dim = "800x600"
         customImeta.fallback = ["https://backup1.com/custom.jpg", "https://backup2.com/custom.jpg"]
         
-        let event7 = try await ndk.event()
+        let event7 = try await NDKEventBuilder(ndk: ndk)
             .content("Image with fallback URLs: https://example.com/custom.jpg")
             .imetaTag(customImeta)
             .kind(EventKind.textNote)

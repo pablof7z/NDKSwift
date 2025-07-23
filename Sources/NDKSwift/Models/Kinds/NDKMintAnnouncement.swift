@@ -93,7 +93,7 @@ public struct NDKMintAnnouncement: Codable, Sendable {
 // MARK: - NDKEvent Extension
 extension NDKEvent {
     /// Creates a mint announcement event (kind 38000)
-    public static func mintAnnouncement(announcement: NDKMintAnnouncement, pubkey: String, signer: NDKSigner) async throws -> NDKEvent {
+    public static func mintAnnouncement(announcement: NDKMintAnnouncement, pubkey: String, signer: NDKSigner, ndk: NDK) async throws -> NDKEvent {
         let contentString = (try? JSONCoding.encodeToString(announcement)) ?? "{}"
         
         // Build tags for mint URL and units
@@ -106,7 +106,7 @@ extension NDKEvent {
             }
         }
         
-        let event = try await NDKEventBuilder()
+        let event = try await NDKEventBuilder(ndk: ndk)
             .content(contentString)
             .kind(38000) // Mint announcement
             .tags(tags)

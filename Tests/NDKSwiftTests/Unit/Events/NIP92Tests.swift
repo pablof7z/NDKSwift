@@ -12,7 +12,7 @@ final class NIP92Tests: XCTestCase {
     
     func testAutomaticImetaExtraction() async throws {
         // Test automatic extraction of multiple media URLs
-        let event = try await ndk.event()
+        let event = try await NDKEventBuilder(ndk: ndk)
             .content("Check out these files: https://example.com/photo.jpg and https://example.com/video.mp4")
             .build()
         
@@ -30,7 +30,7 @@ final class NIP92Tests: XCTestCase {
     
     func testDisableAutomaticExtraction() async throws {
         // Test disabling automatic extraction
-        let event = try await ndk.event()
+        let event = try await NDKEventBuilder(ndk: ndk)
             .content("This URL should not create imeta: https://example.com/image.png", extractImeta: false)
             .build()
         
@@ -40,7 +40,7 @@ final class NIP92Tests: XCTestCase {
     
     func testManualImetaTag() async throws {
         // Test manual imeta tag with metadata
-        let event = try await ndk.event()
+        let event = try await NDKEventBuilder(ndk: ndk)
             .content("My photo: https://example.com/sunset.jpg")
             .imetaTag(url: "https://example.com/sunset.jpg") { imeta in
                 imeta.alt = "Beautiful sunset"
@@ -73,7 +73,7 @@ final class NIP92Tests: XCTestCase {
             dimensions: (width: 1920, height: 1080) // Automatically extracted
         )
         
-        let event = try await ndk.event()
+        let event = try await NDKEventBuilder(ndk: ndk)
             .content("Uploaded photo: \(blossomBlob.url)")
             .imetaTag(from: blossomBlob)
             .build()
@@ -92,7 +92,7 @@ final class NIP92Tests: XCTestCase {
     
     func testNoDuplicateImetaTags() async throws {
         // Test that manual imeta doesn't create duplicates
-        let event = try await ndk.event()
+        let event = try await NDKEventBuilder(ndk: ndk)
             .content("Photo: https://example.com/photo.jpg")
             .imetaTag(url: "https://example.com/photo.jpg") { imeta in
                 imeta.alt = "Custom description"
@@ -113,7 +113,7 @@ final class NIP92Tests: XCTestCase {
         With query: https://example.com/image.jpg?size=large&quality=100
         """
         
-        let event = try await ndk.event()
+        let event = try await NDKEventBuilder(ndk: ndk)
             .content(content)
             .build()
         
@@ -137,7 +137,7 @@ final class NIP92Tests: XCTestCase {
         imeta.dim = "800x600"
         imeta.fallback = ["https://backup1.com/custom.png", "https://backup2.com/custom.png"]
         
-        let event = try await ndk.event()
+        let event = try await NDKEventBuilder(ndk: ndk)
             .content("Image: https://example.com/custom.png")
             .imetaTag(imeta)
             .build()
@@ -155,7 +155,7 @@ final class NIP92Tests: XCTestCase {
     
     func testNoImetaForNonMediaURLs() async throws {
         // Test that non-media URLs don't get imeta tags
-        let event = try await ndk.event()
+        let event = try await NDKEventBuilder(ndk: ndk)
             .content("Check out https://github.com/repo and https://example.com/page.html")
             .build()
         
@@ -222,7 +222,7 @@ final class NIP92Tests: XCTestCase {
             // No blurhash or dimensions for PDFs
         )
         
-        let event = try await ndk.event()
+        let event = try await NDKEventBuilder(ndk: ndk)
             .content("Document: \(blossomBlob.url)")
             .imetaTag(from: blossomBlob)
             .build()
@@ -243,7 +243,7 @@ final class NIP92Tests: XCTestCase {
     
     func testMediaURLExtractionWithQueryParameters() async throws {
         // Test that URLs with query parameters are properly extracted
-        let event = try await ndk.event()
+        let event = try await NDKEventBuilder(ndk: ndk)
             .content("Images: https://example.com/photo.jpg?size=large&quality=100 and https://cdn.example.com/image.png?cache=bust")
             .build()
         
@@ -261,7 +261,7 @@ final class NIP92Tests: XCTestCase {
     
     func testMediaURLExtractionCaseInsensitive() async throws {
         // Test that file extensions are matched case-insensitively
-        let event = try await ndk.event()
+        let event = try await NDKEventBuilder(ndk: ndk)
             .content("Mixed case: https://example.com/photo.JPG and https://example.com/image.PNG and https://example.com/video.MP4")
             .build()
         
@@ -281,7 +281,7 @@ final class NIP92Tests: XCTestCase {
             // No dimensions
         )
         
-        let event = try await ndk.event()
+        let event = try await NDKEventBuilder(ndk: ndk)
             .content("Photo: \(blossomBlob.url)")
             .imetaTag(from: blossomBlob)
             .build()

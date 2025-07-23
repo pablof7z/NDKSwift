@@ -312,6 +312,7 @@ public actor BlossomClient {
         mimeType: String? = nil,
         to serverURL: String,
         signer: NDKSigner,
+        ndk: NDK,
         expiration: Date? = nil
     ) async throws -> BlossomBlob {
         // Calculate SHA256
@@ -337,6 +338,7 @@ public actor BlossomClient {
             size: Int64(data.count),
             mimeType: finalMimeType,
             signer: signer,
+            ndk: ndk,
             expiration: expiration
         )
         
@@ -365,11 +367,13 @@ public actor BlossomClient {
         sha256: String,
         from serverURL: String,
         signer: NDKSigner,
+        ndk: NDK,
         reason: String? = nil
     ) async throws {
         let auth = try await BlossomAuth.createDeleteAuth(
             sha256: sha256,
             signer: signer,
+            ndk: ndk,
             reason: reason
         )
 
@@ -380,11 +384,13 @@ public actor BlossomClient {
     public func listWithAuth(
         from serverURL: String,
         signer: NDKSigner,
+        ndk: NDK,
         since: Date? = nil,
         until: Date? = nil
     ) async throws -> [BlossomBlob] {
         let auth = try await BlossomAuth.createListAuth(
             signer: signer,
+            ndk: ndk,
             since: since,
             until: until
         )

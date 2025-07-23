@@ -152,7 +152,7 @@ final class RelayPoolE2ETests: XCTestCase {
         var relayDistribution: [String: Int] = [:]
         
         for i in 0..<10 {
-            let event = try await ndk.event()
+            let event = try await NDKEventBuilder(ndk: ndk)
                 .content("Load test event #\(i)")
                 .kind(EventKind.textNote)
                 .build()

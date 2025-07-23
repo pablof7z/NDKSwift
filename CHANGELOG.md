@@ -17,6 +17,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Comprehensive tests for NDKFollowPack functionality
 - Example demonstrating follow pack creation and management
 
+### Changed
+- **BREAKING**: Removed `ndk.event()` and `ndk.reply()` extension methods to reduce namespace pollution
+  - Use `NDKEventBuilder(ndk: ndk)` instead of `ndk.event()`
+  - Use `NDKEventBuilder.reply(to: event, ndk: ndk)` instead of `ndk.reply(to: event)`
+- **BREAKING**: Updated various static factory methods to require `ndk` parameter:
+  - `NDKEvent.encryptedDirectMessage()` now requires `ndk` parameter
+  - `NDKEvent.createFileMetadata()` now requires `ndk` parameter
+  - `NDKEvent.mintAnnouncement()` now requires `ndk` parameter
+  - `BlossomAuth` static methods now require `ndk` parameter
+- Made `NDKEventBuilder` init public for direct instantiation
+
 ## [0.4.1] - 2025-01-22
 
 ### Fixed

@@ -48,7 +48,7 @@ final class DeletionEventTests: XCTestCase {
     
     func testDeletionEventCreation() async throws {
         // Create a test event
-        let testEvent = try await ndk.event()
+        let testEvent = try await NDKEventBuilder(ndk: ndk)
             .content("Test post to delete")
             .kind(EventKind.textNote)
             .build(signer: signer)
@@ -75,7 +75,7 @@ final class DeletionEventTests: XCTestCase {
     
     func testDeletionEventProcessing() async throws {
         // Create and save an event
-        let originalEvent = try await ndk.event()
+        let originalEvent = try await NDKEventBuilder(ndk: ndk)
             .content("Original content")
             .kind(EventKind.textNote)
             .build(signer: signer)
@@ -88,7 +88,7 @@ final class DeletionEventTests: XCTestCase {
         XCTAssertNotNil(cachedEvent)
         
         // Create deletion event from same author
-        let deletionEvent = try await ndk.event()
+        let deletionEvent = try await NDKEventBuilder(ndk: ndk)
             .content("Deleting my post")
             .kind(EventKind.deletion)
             .tagEvent(originalEvent)
@@ -119,7 +119,7 @@ final class DeletionEventTests: XCTestCase {
     func testDeletionEventAuthorValidation() async throws {
         // Create event from one author
         let originalSigner = signer!
-        let originalEvent = try await ndk.event()
+        let originalEvent = try await NDKEventBuilder(ndk: ndk)
             .content("Original content")
             .kind(EventKind.textNote)
             .build(signer: originalSigner)
@@ -131,7 +131,7 @@ final class DeletionEventTests: XCTestCase {
         let otherSigner = try NDKPrivateKeySigner.generate()
         
         // Try to delete from different author
-        let deletionEvent = try await ndk.event()
+        let deletionEvent = try await NDKEventBuilder(ndk: ndk)
             .content("Trying to delete someone else's post")
             .kind(EventKind.deletion)
             .tagEvent(originalEvent)
@@ -160,17 +160,17 @@ final class DeletionEventTests: XCTestCase {
     
     func testMultipleEventDeletion() async throws {
         // Create multiple events
-        let event1 = try await ndk.event()
+        let event1 = try await NDKEventBuilder(ndk: ndk)
             .content("Event 1")
             .kind(EventKind.textNote)
             .build(signer: signer)
         
-        let event2 = try await ndk.event()
+        let event2 = try await NDKEventBuilder(ndk: ndk)
             .content("Event 2")
             .kind(EventKind.textNote)
             .build(signer: signer)
         
-        let event3 = try await ndk.event()
+        let event3 = try await NDKEventBuilder(ndk: ndk)
             .content("Event 3")
             .kind(EventKind.reaction)
             .build(signer: signer)
@@ -181,7 +181,7 @@ final class DeletionEventTests: XCTestCase {
         try await cache.saveEvent(event3)
         
         // Create deletion event for all three
-        let deletionEvent = try await ndk.event()
+        let deletionEvent = try await NDKEventBuilder(ndk: ndk)
             .content("Batch deletion")
             .kind(EventKind.deletion)
             .tagEvent(event1)
@@ -219,7 +219,7 @@ final class DeletionEventTests: XCTestCase {
         // Create deletion event for non-existent event
         let fakeEventId = "1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef"
         
-        let deletionEvent = try await ndk.event()
+        let deletionEvent = try await NDKEventBuilder(ndk: ndk)
             .content("Deleting non-existent event")
             .kind(EventKind.deletion)
             .tag(["e", fakeEventId])
@@ -254,7 +254,7 @@ final class DeletionEventTests: XCTestCase {
     
     func testEventDeleteMethod() async throws {
         // Create a test event
-        let testEvent = try await ndk.event()
+        let testEvent = try await NDKEventBuilder(ndk: ndk)
             .content("Test post to delete via method")
             .kind(EventKind.textNote)
             .build(signer: signer)
@@ -283,13 +283,13 @@ final class DeletionEventTests: XCTestCase {
         // This tests the case where a deletion event arrives before the event it's deleting
         
         // Create an event that will be deleted
-        let originalEvent = try await ndk.event()
+        let originalEvent = try await NDKEventBuilder(ndk: ndk)
             .content("This will be deleted before it arrives")
             .kind(EventKind.textNote)
             .build(signer: signer)
         
         // Create deletion event
-        let deletionEvent = try await ndk.event()
+        let deletionEvent = try await NDKEventBuilder(ndk: ndk)
             .content("Deleting an event that hasn't arrived yet")
             .kind(EventKind.deletion)
             .tagEvent(originalEvent)

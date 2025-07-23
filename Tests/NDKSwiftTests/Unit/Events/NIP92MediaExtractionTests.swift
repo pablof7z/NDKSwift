@@ -13,7 +13,7 @@ final class NIP92MediaExtractionTests: XCTestCase {
     // MARK: - URL Extraction Edge Cases
     
     func testExtractsURLsAtBeginningAndEnd() async throws {
-        let event = try await ndk.event()
+        let event = try await NDKEventBuilder(ndk: ndk)
             .content("https://example.com/start.jpg here's some text and ends with https://example.com/end.png")
             .build()
         
@@ -29,7 +29,7 @@ final class NIP92MediaExtractionTests: XCTestCase {
     }
     
     func testExtractsURLsWithVariousProtocols() async throws {
-        let event = try await ndk.event()
+        let event = try await NDKEventBuilder(ndk: ndk)
             .content("HTTP: http://example.com/image.jpg and HTTPS: https://secure.com/photo.png")
             .build()
         
@@ -38,7 +38,7 @@ final class NIP92MediaExtractionTests: XCTestCase {
     }
     
     func testIgnoresInvalidURLs() async throws {
-        let event = try await ndk.event()
+        let event = try await NDKEventBuilder(ndk: ndk)
             .content("Invalid: htp://example.com/image.jpg and ftp://example.com/photo.png and example.com/image.jpg")
             .build()
         
@@ -47,7 +47,7 @@ final class NIP92MediaExtractionTests: XCTestCase {
     }
     
     func testExtractsURLsWithComplexQueryParameters() async throws {
-        let event = try await ndk.event()
+        let event = try await NDKEventBuilder(ndk: ndk)
             .content("Complex: https://cdn.example.com/image.jpg?size=large&quality=100&cache=bust&format=webp")
             .build()
         
@@ -59,7 +59,7 @@ final class NIP92MediaExtractionTests: XCTestCase {
     }
     
     func testExtractsURLsWithAnchors() async throws {
-        let event = try await ndk.event()
+        let event = try await NDKEventBuilder(ndk: ndk)
             .content("With anchor: https://example.com/image.png#section and https://example.com/photo.jpg#top")
             .build()
         
@@ -68,7 +68,7 @@ final class NIP92MediaExtractionTests: XCTestCase {
     }
     
     func testIgnoresNonMediaExtensions() async throws {
-        let event = try await ndk.event()
+        let event = try await NDKEventBuilder(ndk: ndk)
             .content("Non-media: https://example.com/page.html and https://example.com/script.js and https://example.com/style.css")
             .build()
         
@@ -108,7 +108,7 @@ final class NIP92MediaExtractionTests: XCTestCase {
         ]
         
         let content = supportedTypes.joined(separator: " ")
-        let event = try await ndk.event()
+        let event = try await NDKEventBuilder(ndk: ndk)
             .content(content)
             .build()
         
@@ -117,7 +117,7 @@ final class NIP92MediaExtractionTests: XCTestCase {
     }
     
     func testExtractsURLsWithSpecialCharacters() async throws {
-        let event = try await ndk.event()
+        let event = try await NDKEventBuilder(ndk: ndk)
             .content("Special: https://example.com/image-with-dash.jpg and https://example.com/photo_with_underscore.png")
             .build()
         
@@ -126,7 +126,7 @@ final class NIP92MediaExtractionTests: XCTestCase {
     }
     
     func testExtractsURLsWithPortNumbers() async throws {
-        let event = try await ndk.event()
+        let event = try await NDKEventBuilder(ndk: ndk)
             .content("With ports: https://example.com:8080/image.jpg and http://localhost:3000/photo.png")
             .build()
         
@@ -135,7 +135,7 @@ final class NIP92MediaExtractionTests: XCTestCase {
     }
     
     func testExtractsURLsWithSubdomains() async throws {
-        let event = try await ndk.event()
+        let event = try await NDKEventBuilder(ndk: ndk)
             .content("Subdomains: https://cdn.example.com/image.jpg and https://static.files.example.co.uk/photo.png")
             .build()
         
@@ -144,7 +144,7 @@ final class NIP92MediaExtractionTests: XCTestCase {
     }
     
     func testExtractsURLsWithPaths() async throws {
-        let event = try await ndk.event()
+        let event = try await NDKEventBuilder(ndk: ndk)
             .content("Paths: https://example.com/path/to/image.jpg and https://example.com/deep/nested/path/photo.png")
             .build()
         
@@ -153,7 +153,7 @@ final class NIP92MediaExtractionTests: XCTestCase {
     }
     
     func testDoesNotExtractPartialURLs() async throws {
-        let event = try await ndk.event()
+        let event = try await NDKEventBuilder(ndk: ndk)
             .content("Partial: example.com/image.jpg and /path/to/image.png and image.jpg")
             .build()
         
@@ -162,7 +162,7 @@ final class NIP92MediaExtractionTests: XCTestCase {
     }
     
     func testExtractsURLsInMarkdown() async throws {
-        let event = try await ndk.event()
+        let event = try await NDKEventBuilder(ndk: ndk)
             .content("Markdown: ![alt text](https://example.com/image.jpg) and [link](https://example.com/photo.png)")
             .build()
         
@@ -171,7 +171,7 @@ final class NIP92MediaExtractionTests: XCTestCase {
     }
     
     func testExtractsURLsNextToEachOther() async throws {
-        let event = try await ndk.event()
+        let event = try await NDKEventBuilder(ndk: ndk)
             .content("Adjacent: https://example.com/1.jpg https://example.com/2.png https://example.com/3.gif")
             .build()
         
@@ -188,7 +188,7 @@ final class NIP92MediaExtractionTests: XCTestCase {
         let content = urls.joined(separator: " ")
         
         let startTime = Date()
-        let event = try await ndk.event()
+        let event = try await NDKEventBuilder(ndk: ndk)
             .content(content)
             .build()
         let elapsed = Date().timeIntervalSince(startTime)
@@ -201,7 +201,7 @@ final class NIP92MediaExtractionTests: XCTestCase {
     }
     
     func testExtractsURLsWithEncodedCharacters() async throws {
-        let event = try await ndk.event()
+        let event = try await NDKEventBuilder(ndk: ndk)
             .content("Encoded: https://example.com/image%20with%20spaces.jpg and https://example.com/photo%2Bplus.png")
             .build()
         

@@ -305,7 +305,7 @@ let eventSource = ndk.observe(
 if let events = await eventSource.currentValue(),
    let originalEvent = events.first {
     // Create a reply using the builder
-    let reply = try await ndk.reply(to: originalEvent)
+    let reply = try await NDKEventBuilder.reply(to: originalEvent, ndk: ndk)
         .content("Great post! 👍")
         .build()
     
@@ -317,7 +317,7 @@ if let events = await eventSource.currentValue(),
 
 ```swift
 // React to an event
-let reaction = try await ndk.event()
+let reaction = try await NDKEventBuilder(ndk: ndk)
     .kind(EventKind.reaction)
     .content("🔥")
     .tag(["e", event.id])

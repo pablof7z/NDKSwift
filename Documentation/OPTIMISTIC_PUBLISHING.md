@@ -17,7 +17,7 @@ Optimistic publishing means:
 When you publish an event:
 
 ```swift
-let event = try await ndk.event()
+let event = try await NDKEventBuilder(ndk: ndk)
     .content("Hello, Nostr!")
     .kind(1)
     .build()
@@ -245,7 +245,7 @@ class ChatViewModel: ObservableObject {
     
     func sendMessage(_ text: String) async {
         // Create and publish message
-        let event = try await ndk.event()
+        let event = try await NDKEventBuilder(ndk: ndk)
             .content(text)
             .kind(42)
             .tag(["e", chatRoomId])

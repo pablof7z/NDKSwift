@@ -206,7 +206,7 @@ struct PostDetailView: View {
         
         Task {
             do {
-                let reaction = try await ndk.event()
+                let reaction = try await NDKEventBuilder(ndk: ndk)
                     .content("+")
                     .kind(EventKind.reaction)
                     .tag(["e", event.id])

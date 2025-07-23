@@ -219,7 +219,7 @@ final class BasicEventFlowE2ETests: XCTestCase {
         let eventCount = 5
         
         for i in 0..<eventCount {
-            let event = try await ndk.event()
+            let event = try await NDKEventBuilder(ndk: ndk)
                 .content("Test event #\(i) at \(Date())")
                 .kind(EventKind.textNote)
                 .tag(["test", "e2e", "batch\(i)"])
@@ -299,7 +299,7 @@ final class BasicEventFlowE2ETests: XCTestCase {
         let referencedEventId = "abcd1234567890abcd1234567890abcd1234567890abcd1234567890abcd1234"
         let mentionedPubkey = "1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef"
         
-        let event = try await ndk.event()
+        let event = try await NDKEventBuilder(ndk: ndk)
             .content("Event with complex tags #nostr #test")
             .kind(EventKind.textNote)
             .tag(["e", referencedEventId])

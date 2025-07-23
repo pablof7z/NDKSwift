@@ -60,6 +60,7 @@ extension NDK {
                     mimeType: mimeType,
                     to: server,
                     signer: signer,
+                    ndk: self,
                     expiration: expiration
                 )
                 uploadedBlobs.append(blob)
@@ -95,7 +96,8 @@ public extension NDKEvent {
     static func createFileMetadata(
         blobs: [BlossomBlob],
         description: String? = nil,
-        signer: NDKSigner
+        signer: NDKSigner,
+        ndk: NDK
     ) async throws -> NDKEvent {
         var tags: [[String]] = []
 
@@ -115,7 +117,7 @@ public extension NDKEvent {
             tags.append(["alt", description])
         }
 
-        let event = try await NDKEventBuilder()
+        let event = try await NDKEventBuilder(ndk: ndk)
             .content(description ?? "")
             .kind(EventKind.fileMetadata)
             .tags(tags)
@@ -186,7 +188,7 @@ public extension NDKEvent {
 
         tags.append(imetaTag)
 
-        let event = try await ndk.event()
+        let event = try await NDKEventBuilder(ndk: ndk)
             .content(caption ?? firstBlob.url)
             .kind(EventKind.image)
             .tags(tags)

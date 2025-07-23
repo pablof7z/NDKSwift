@@ -49,7 +49,7 @@ public struct NDKNutzap {
             tags.append([NostrTagConstants.TagName.event, zappedEvent.id, ""])
         }
         
-        let event = try await NDKEventBuilder()
+        let event = try await NDKEventBuilder(ndk: ndk)
             .kind(9321)
             .content(comment ?? "")
             .tags(tags)
@@ -150,7 +150,7 @@ public struct NDKNutzap {
         let pubkey = try await signer.pubkey
         tags.append(["pubkey", pubkey])
         
-        let event = try await NDKEventBuilder()
+        let event = try await NDKEventBuilder(ndk: ndk)
             .kind(10019)
             .tags(tags)
             .build(signer: signer)

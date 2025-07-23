@@ -18,7 +18,7 @@ NIP-92 defines the `imeta` tag for adding metadata to media files referenced in 
 By default, NDKSwift automatically extracts media URLs from your content and creates `imeta` tags:
 
 ```swift
-let event = try await ndk.event()
+let event = try await NDKEventBuilder(ndk: ndk)
     .content("Check out this photo: https://example.com/sunset.jpg")
     .build()
 
@@ -36,7 +36,7 @@ Supported media extensions:
 When you need full control over `imeta` tags:
 
 ```swift
-let event = try await ndk.event()
+let event = try await NDKEventBuilder(ndk: ndk)
     .content("URL that won't get imeta: https://github.com/image.png", extractImeta: false)
     .build()
 ```
@@ -48,7 +48,7 @@ let event = try await ndk.event()
 Enhance automatically extracted URLs with additional metadata:
 
 ```swift
-let event = try await ndk.event()
+let event = try await NDKEventBuilder(ndk: ndk)
     .content("My vacation photo: https://example.com/beach.jpg")
     .imetaTag(url: "https://example.com/beach.jpg") { imeta in
         imeta.alt = "Sunset at the beach in Costa Rica"
@@ -70,7 +70,7 @@ imeta.alt = "Product photo"
 imeta.dim = "800x600"
 imeta.fallback = ["https://backup1.com/photo.jpg", "https://backup2.com/photo.jpg"]
 
-let event = try await ndk.event()
+let event = try await NDKEventBuilder(ndk: ndk)
     .content("New product: https://example.com/photo.jpg")
     .imetaTag(imeta)
     .build()
@@ -86,7 +86,7 @@ let imageData = UIImage(named: "photo")!.jpegData(compressionQuality: 0.8)!
 let upload = try await ndk.uploadToBlossom(data: imageData, mimeType: "image/jpeg")
 
 // Create event with Blossom metadata
-let event = try await ndk.event()
+let event = try await NDKEventBuilder(ndk: ndk)
     .content("Just uploaded: \(upload.first!.url)")
     .imetaTag(from: upload.first!)  // Includes all metadata automatically!
     .build()
@@ -142,7 +142,7 @@ The `NDKImetaTag` struct supports all NIP-92 fields:
 Start with automatic extraction, then enhance specific URLs:
 
 ```swift
-let event = try await ndk.event()
+let event = try await NDKEventBuilder(ndk: ndk)
     .content("Photos: https://example.com/1.jpg and https://example.com/2.jpg")
     .imetaTag(url: "https://example.com/1.jpg") { imeta in
         imeta.alt = "Main photo with description"
@@ -155,7 +155,7 @@ let event = try await ndk.event()
 ### Multiple Media Types
 
 ```swift
-let event = try await ndk.event()
+let event = try await NDKEventBuilder(ndk: ndk)
     .content("""
         Check out my content:
         Video: https://example.com/tutorial.mp4
@@ -173,7 +173,7 @@ let event = try await ndk.event()
 ### With Fallback URLs
 
 ```swift
-let event = try await ndk.event()
+let event = try await NDKEventBuilder(ndk: ndk)
     .content("Important image: https://primary.com/critical.jpg")
     .imetaTag(url: "https://primary.com/critical.jpg") { imeta in
         imeta.fallback = [

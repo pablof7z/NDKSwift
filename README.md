@@ -57,7 +57,7 @@ for await note in notes.events {
 }
 
 // Publish (works offline!)
-let event = try await ndk.event()
+let event = try await NDKEventBuilder(ndk: ndk)
     .content("Hello, Nostr! 🎉")
     .build()
 try await ndk.publish(event)
@@ -69,7 +69,7 @@ try await ndk.publish(event)
 ### 🔄 Offline-First Notes
 ```swift
 // Your app works without internet!
-let event = try await ndk.event()
+let event = try await NDKEventBuilder(ndk: ndk)
     .content("Posted from airplane mode ✈️")
     .build()
 try await ndk.publish(event)  // Queued locally, syncs when connected
@@ -93,7 +93,7 @@ try await event.zap(amountSats: 1000, comment: "Great post! ⚡")
 ### 🔐 End-to-End Encrypted DMs
 ```swift
 // Send encrypted messages (NIP-44)
-let dm = try await ndk.event()
+let dm = try await NDKEventBuilder(ndk: ndk)
     .encryptedDirectMessage(to: recipientPubkey, content: "Secret message 🤫")
     .build()
 ```
@@ -102,7 +102,7 @@ let dm = try await ndk.event()
 ```swift
 // Upload to Blossom servers
 let imageURL = try await ndk.blossom.upload(imageData)
-let event = try await ndk.event()
+let event = try await NDKEventBuilder(ndk: ndk)
     .content("Check out this photo!")
     .imageAttachment(url: imageURL, blurhash: blurhash)
     .build()

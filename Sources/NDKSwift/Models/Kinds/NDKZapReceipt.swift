@@ -150,7 +150,7 @@ public struct NDKZapReceipt {
             tags.append([NostrTagConstants.TagName.preimage, preimage])
         }
         
-        let event = try await NDKEventBuilder()
+        let event = try await NDKEventBuilder(ndk: ndk)
             .content("")
             .kind(EventKind.zap)
             .tags(tags)

@@ -121,7 +121,7 @@ final class BlossomE2ETests: XCTestCase {
         
         NDKLogger.log(.info, category: .general, "Creating file metadata event...")
         
-        let fileMetadata = try await ndk.event()
+        let fileMetadata = try await NDKEventBuilder(ndk: ndk)
             .content("Test image from Blossom E2E")
             .kind(1063) // File metadata
             .tag(["url", blossomUrl])

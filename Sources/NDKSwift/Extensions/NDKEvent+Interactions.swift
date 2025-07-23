@@ -28,7 +28,7 @@ public extension NDKEvent {
             content = ""
         }
         
-        var builder = await ndk.event()
+        var builder = await NDKEventBuilder(ndk: ndk)
             .content(content)
             .kind(repostKind)
             .tagUser(self.pubkey)
@@ -56,7 +56,7 @@ public extension NDKEvent {
         let fullContent = "\(comment)\n\n\(NostrConstants.nostrPrefix)\(reference)"
         
         // Create quote repost as a text note with q tag
-        let builder = await ndk.event()
+        let builder = await NDKEventBuilder(ndk: ndk)
             .content(fullContent)
             .kind(EventKind.textNote)
             .quoteEvent(self)
@@ -76,7 +76,7 @@ public extension NDKEvent {
     /// - Returns: The created reaction event
     func react(with content: String, signer: NDKSigner, ndk: NDK) async throws -> NDKEvent {
         // Create reaction event
-        let builder = await ndk.event()
+        let builder = await NDKEventBuilder(ndk: ndk)
             .content(content)
             .kind(EventKind.reaction)
             .tagUser(self.pubkey)
@@ -110,7 +110,7 @@ public extension NDKEvent {
     func delete(reason: String = "", signer: NDKSigner, ndk: NDK) async throws -> NDKEvent {
         
         // Create deletion event
-        let builder = await ndk.event()
+        let builder = await NDKEventBuilder(ndk: ndk)
             .content(reason)
             .kind(EventKind.deletion)
             .tag(["k", String(self.kind)])
@@ -134,7 +134,7 @@ public extension NDKEvent {
     /// - Returns: The created deletion event
     func createDeletionRequest(reason: String = "", signer: NDKSigner, ndk: NDK) async throws -> NDKEvent {
         // Create deletion event
-        let builder = await ndk.event()
+        let builder = await NDKEventBuilder(ndk: ndk)
             .content(reason)
             .kind(EventKind.deletion)
             .tag(["k", String(self.kind)])

@@ -255,7 +255,7 @@ final class EventDeletionE2ETests: XCTestCase {
         
         // Create deletion event for all
         let deletionTime = Date()
-        let builder = ndk.event()
+        let builder = NDKEventBuilder(ndk: ndk)
             .content("Deleting multiple events")
             .kind(EventKind.deletion)
         
@@ -448,7 +448,7 @@ final class EventDeletionE2ETests: XCTestCase {
         let timestamp = Timestamp.now
         
         // Build the event locally first to get its ID
-        let localEvent = try await ndk.event()
+        let localEvent = try await NDKEventBuilder(ndk: ndk)
             .content(content)
             .kind(EventKind.textNote)
             .createdAt(timestamp)

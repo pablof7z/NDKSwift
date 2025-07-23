@@ -76,7 +76,7 @@ public struct NDKCashuTokenEvent: NDKPublishableEvent {
         
         let plaintext = try JSONCoding.encodeToString(nip60Token)
         
-        let tokenEvent = try await ndk.event()
+        let tokenEvent = try await NDKEventBuilder(ndk: ndk)
             .content(plaintext)
             .kind(EventKind.cashuToken)
             .encrypt(signer: signer, scheme: .nip44)
@@ -124,7 +124,7 @@ public struct NDKCashuQuoteEvent: NDKPublishableEvent {
     ) async throws -> NDKCashuQuoteEvent {
         let plaintext = try JSONCoding.encodeToString(quote)
         
-        let quoteEvent = try await ndk.event()
+        let quoteEvent = try await NDKEventBuilder(ndk: ndk)
             .content(plaintext)
             .kind(EventKind.cashuQuote)
             .encrypt(signer: signer, scheme: .nip44)
@@ -233,7 +233,7 @@ public struct NDKCashuWalletEvent {
         // Encrypt wallet configuration
         let plaintext = try JSONCoding.encodeToString(walletTags)
         
-        let builder = ndk.event()
+        let builder = NDKEventBuilder(ndk: ndk)
             .content(plaintext)
             .kind(EventKind.cashuWalletConfig)
         
@@ -379,7 +379,7 @@ public struct NDKCashuWalletBackupEvent {
         
         let userPubkey = try await signer.pubkey
         
-        let builder = ndk.event()
+        let builder = NDKEventBuilder(ndk: ndk)
             .content(plaintext)
             .kind(EventKind.cashuWalletBackup)
             .tag(["p", userPubkey])  // Add public key tag for easy retrieval
@@ -531,7 +531,7 @@ public struct NDKCashuSpendingHistory {
         
         let plaintext = try JSONCoding.encodeToString(encryptedTags)
         
-        let historyEvent = try await ndk.event()
+        let historyEvent = try await NDKEventBuilder(ndk: ndk)
             .content(plaintext)
             .kind(EventKind.cashuSpendingHistory)
             .tags(clearTags)
@@ -659,7 +659,7 @@ public struct NDKCashuMintList: NDKPublishableEvent {
         p2pkPubkey: String? = nil,
         relays: [String]? = nil
     ) async throws -> NDKCashuMintList {
-        let builder = ndk.event()
+        let builder = NDKEventBuilder(ndk: ndk)
             .kind(10019)  // NIP-60 mint list kind
         
         // Add mint tags
@@ -755,7 +755,7 @@ public struct NDKCashuMintAnnouncement {
         // Add n tag (network)
         tags.append(["n", network])
         
-        let builder = NDKEventBuilder()
+        let builder = NDKEventBuilder(ndk: ndk)
             .kind(38172)  // NIP-87 Cashu Mint Announcement
             .tags(tags)
         
@@ -876,7 +876,7 @@ public struct NDKNutzapEvent {
         eventId: String? = nil,
         signer: NDKSigner
     ) async throws -> NDKNutzapEvent {
-        let builder = ndk.event()
+        let builder = NDKEventBuilder(ndk: ndk)
             .content(comment ?? "") // Content is the comment
             .kind(EventKind.nutzap) // 9321
         
@@ -1028,7 +1028,7 @@ public struct NDKMintRecommendation {
         // Add a tag (reference to the announcement event)
         tags.append(["a", "38172:\(mintAnnouncementEvent.event.pubkey):\(mintAnnouncementEvent.event.id)"])
         
-        let builder = NDKEventBuilder()
+        let builder = NDKEventBuilder(ndk: ndk)
             .kind(38000)  // NIP-87 Mint Recommendation
             .tags(tags)
         

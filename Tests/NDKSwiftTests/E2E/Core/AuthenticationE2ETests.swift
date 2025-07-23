@@ -108,7 +108,7 @@ final class AuthenticationE2ETests: XCTestCase {
         XCTAssertGreaterThan(connected, 0, "Should connect to at least one relay")
         
         print("[\(timestamp())] Publishing test event...")
-        let event = try await ndk.event()
+        let event = try await NDKEventBuilder(ndk: ndk)
             .content("Authentication E2E test event at \(Date())")
             .kind(EventKind.textNote)
             .build()
@@ -247,7 +247,7 @@ final class AuthenticationE2ETests: XCTestCase {
             XCTAssertEqual(currentPubkey, expectedPubkey)
             
             // Test we can sign with each account
-            let event = try await ndk.event()
+            let event = try await NDKEventBuilder(ndk: ndk)
                 .content("Event from account \(i+1)")
                 .kind(EventKind.textNote)
                 .build()
@@ -364,7 +364,7 @@ final class AuthenticationE2ETests: XCTestCase {
             XCTAssertEqual(restoredPubkey, pubkey)
             
             // Create and sign an event to verify functionality
-            let event = try await ndk.event()
+            let event = try await NDKEventBuilder(ndk: ndk)
                 .content("Event after restart #\(i)")
                 .kind(EventKind.textNote)
                 .build()
@@ -540,7 +540,7 @@ final class AuthenticationE2ETests: XCTestCase {
         try await authManager.switchToSession(session1)
         
         // Create event with first account
-        let event1 = try await ndk.event()
+        let event1 = try await NDKEventBuilder(ndk: ndk)
             .content("Message from Alice")
             .kind(EventKind.textNote)
             .build()
@@ -551,7 +551,7 @@ final class AuthenticationE2ETests: XCTestCase {
         try await authManager.switchToSession(session2)
         
         // Create event with second account
-        let event2 = try await ndk.event()
+        let event2 = try await NDKEventBuilder(ndk: ndk)
             .content("Message from Bob")
             .kind(EventKind.textNote)
             .build()
@@ -572,7 +572,7 @@ final class AuthenticationE2ETests: XCTestCase {
         XCTAssertEqual(authManager.availableSessions.count, 1)
         
         // Can still sign with session 2
-        let event3 = try await ndk.event()
+        let event3 = try await NDKEventBuilder(ndk: ndk)
             .content("Bob still active after Alice deleted")
             .kind(EventKind.textNote)
             .build()

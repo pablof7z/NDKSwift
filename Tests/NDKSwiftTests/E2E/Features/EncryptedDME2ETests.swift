@@ -101,6 +101,7 @@ final class EncryptedDME2ETests: XCTestCase {
             content: aliceMessage,
             recipientPubkey: bobPubkey,
             signer: aliceSigner,
+            ndk: aliceNDK,
             useNIP44: true
         )
         let encryptTime = Date()
@@ -156,6 +157,7 @@ final class EncryptedDME2ETests: XCTestCase {
             content: bobMessage,
             recipientPubkey: alicePubkey,
             signer: bobSigner,
+            ndk: bobNDK,
             useNIP44: true
         )
         
@@ -258,6 +260,7 @@ final class EncryptedDME2ETests: XCTestCase {
                     content: message,
                     recipientPubkey: receiverPubkey,
                     signer: senderSigner,
+                    ndk: senderNDK,
                     useNIP44: useNIP44
                 )
                 
@@ -301,6 +304,7 @@ final class EncryptedDME2ETests: XCTestCase {
             content: testMessage,
             recipientPubkey: receiverPubkey,
             signer: senderSigner,
+            ndk: senderNDK,
             useNIP44: true
         )
         
@@ -380,6 +384,7 @@ final class EncryptedDME2ETests: XCTestCase {
                 content: message,
                 recipientPubkey: recipientPubkey,
                 signer: senderSigner,
+                ndk: senderNDK,
                 useNIP44: true
             )
             
@@ -431,6 +436,7 @@ final class EncryptedDME2ETests: XCTestCase {
             content: isolationTestMessage,
             recipientPubkey: recipients[0].pubkey,
             signer: senderSigner,
+            ndk: senderNDK,
             useNIP44: true
         )
         
@@ -480,6 +486,7 @@ final class EncryptedDME2ETests: XCTestCase {
             content: message,
             recipientPubkey: receiverPubkey,
             signer: senderSigner,
+            ndk: senderNDK,
             useNIP44: true
         )
         
@@ -577,6 +584,7 @@ final class EncryptedDME2ETests: XCTestCase {
                     content: message,
                     recipientPubkey: pubkey2,
                     signer: signer1,
+                    ndk: ndk1,
                     useNIP44: useNIP44
                 )
                 let encryptTime = Date().timeIntervalSince(encryptStart)
