@@ -20,6 +20,7 @@ The most feature-complete Swift implementation of the Nostr Development Kit. Bui
 
 - **Offline-First** - Optimistic publishing with automatic retry
 - **Real-time Subscriptions** - Stream events with AsyncSequence
+- **Session Data Management** - Reactive filters that auto-update with follow list changes
 - **Smart Relay Management** - Automatic reconnection and message routing
 - **Integrated Payments** - Lightning & Cashu wallets with nutzaps
 - **File Storage** - Blossom protocol for decentralized media

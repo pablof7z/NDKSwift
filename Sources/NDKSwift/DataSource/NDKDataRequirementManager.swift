@@ -375,36 +375,50 @@ actor NDKDataRequirementManager {
     /// Check if two filters can be efficiently combined
     private func canCombineFilters(_ filter1: NDKFilter, _ filter2: NDKFilter) -> Bool {
         // Filters are compatible if they have:
-        // 1. Overlapping kinds OR one has no kind restrictions
-        // 2. Overlapping authors OR one has no author restrictions
-        // 3. Compatible tag filters
+        // 1. Same or compatible kinds
+        // 2. Same or compatible authors
+        // 3. Same tag keys (values can differ and will be merged)
         
         // Check kinds compatibility
         if let kinds1 = filter1.kinds, let kinds2 = filter2.kinds {
-            // Both have kinds - must have overlap
-            if Set(kinds1).isDisjoint(with: Set(kinds2)) {
-                return false // No overlap in kinds
+            // Both have kinds - check if they're the same or one is subset
+            let set1 = Set(kinds1)
+            let set2 = Set(kinds2)
+            
+            // Allow merging if:
+            // - They have overlap OR
+            // - They have the same count (likely similar queries) OR
+            // - One is a subset of the other
+            if set1.isDisjoint(with: set2) && 
+               kinds1.count != kinds2.count && 
+               !set1.isSubset(of: set2) && 
+               !set2.isSubset(of: set1) {
+                return false
             }
         }
         
         // Check authors compatibility
         if let authors1 = filter1.authors, let authors2 = filter2.authors {
-            // Both have authors - must have overlap
-            if Set(authors1).isDisjoint(with: Set(authors2)) {
-                return false // No overlap in authors
+            // Both have authors - must have overlap or be for same purpose
+            let set1 = Set(authors1)
+            let set2 = Set(authors2)
+            
+            if set1.isDisjoint(with: set2) && 
+               authors1.count != authors2.count &&
+               !set1.isSubset(of: set2) && 
+               !set2.isSubset(of: set1) {
+                return false
             }
         }
         
-        // Check if they have conflicting tag requirements
-        if let tags1 = filter1.tags, let tags2 = filter2.tags {
-            for (key, values1) in tags1 {
-                if let values2 = tags2[key] {
-                    // Both filters have requirements for this tag
-                    if Set(values1).isDisjoint(with: Set(values2)) {
-                        return false // No overlap in tag values
-                    }
-                }
-            }
+        // For tags: allow merging if they have the same tag keys
+        // Different values will be aggregated (unioned) during merge
+        let keys1 = filter1.tags?.keys != nil ? Set(filter1.tags!.keys) : Set<String>()
+        let keys2 = filter2.tags?.keys != nil ? Set(filter2.tags!.keys) : Set<String>()
+        
+        // If they have different tag keys, they're likely different queries
+        if !keys1.isEmpty && !keys2.isEmpty && keys1 != keys2 {
+            return false
         }
         
         // Filters are compatible

@@ -15,6 +15,7 @@ Welcome to the NDKSwift documentation. This directory contains comprehensive gui
 
 ### Feature Guides
 - [Authentication Guide](AUTHENTICATION.md) - Complete guide to authentication, sessions, and multi-account support
+- [Session Data Management](SESSION_DATA_MANAGEMENT.md) - Reactive filters, follow lists, and web-of-trust
 - [NIP-44 Encryption Guide](NIP44_ENCRYPTION_GUIDE.md) - End-to-end encryption implementation
 - [Signature Verification Sampling](SIGNATURE_VERIFICATION_SAMPLING.md) - Performance optimization for signature verification
 

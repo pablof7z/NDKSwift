@@ -68,8 +68,7 @@ public class NDKAuthManager {
     /// Currently active signer (derived from active session)
     public private(set) var activeSigner: (any NDKSigner)?
     
-    /// Session data manager for the active session
-    public private(set) var sessionData: NDKSessionData?
+    // Removed sessionData - apps should use ndk.startSession() instead
     
     /// Whether biometric authentication is available on this device
     public private(set) var biometricAuthAvailable = false
@@ -252,13 +251,8 @@ public class NDKAuthManager {
             // Set signer on NDK if available
             ndk?.signer = signer
             
-            // Initialize session data
-            if let ndk = ndk {
-                sessionData = NDKSessionData(pubkey: updatedSession.pubkey, ndk: ndk)
-                Task {
-                    await sessionData?.load([.followList])
-                }
-            }
+            // Don't initialize session data here - let the app call startSession()
+            // This avoids duplicate subscriptions
             
             // Save updated session metadata
             try await saveSessionMetadata(updatedSession)
@@ -391,7 +385,6 @@ public class NDKAuthManager {
         
         activeSession = nil
         activeSigner = nil
-        sessionData = nil
         authenticationState = .unauthenticated
         ndk?.signer = nil
         
