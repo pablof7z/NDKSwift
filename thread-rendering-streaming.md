@@ -54,9 +54,15 @@ struct StreamingLinearThreadView: View {
     private func startThreadStreaming() async {
         guard let ndk = appState.ndk else { return }
         
-        // Start with the selected event if we have it cached
-        if let cachedEvent = try? await ndk.fetchEvent(eventId) {
-            await processEvent(cachedEvent, depth: 0)
+        // Start observing the selected event
+        let selectedFilter = NDKFilter(ids: [eventId])
+        let selectedSub = ndk.observe(filter: selectedFilter)
+        
+        Task {
+            for await event in selectedSub.events {
+                await processEvent(event, depth: 0)
+                break // Only need first match
+            }
         }
         
         // Stream ancestors (working backwards)
@@ -77,39 +83,48 @@ struct StreamingLinearThreadView: View {
         var depth = -1
         
         while true {
-            // Find parent references
-            guard let event = threadNodes[currentId]?.event ?? (try? await ndk.fetchEvent(currentId)),
-                  let parentId = event.parentEventId else {
+            // Find parent references from what we have
+            guard let event = threadNodes[currentId]?.event else {
+                // Need to observe this event first
+                let filter = NDKFilter(ids: [currentId])
+                let sub = ndk.observe(filter: filter)
+                
+                for await evt in sub.events {
+                    if let parentId = evt.parentEventId {
+                        currentId = parentId
+                        depth -= 1
+                        await streamAncestors(of: parentId)
+                    }
+                    break
+                }
                 break
             }
             
-            // Check if parent exists
-            if let parentEvent = try? await ndk.fetchEvent(parentId) {
+            guard let parentId = event.parentEventId else { break }
+            
+            // Subscribe to parent event
+            let parentFilter = NDKFilter(ids: [parentId])
+            let parentSub = ndk.observe(filter: parentFilter)
+            
+            var foundParent = false
+            for await parentEvent in parentSub.events {
                 await processEvent(parentEvent, depth: depth)
                 currentId = parentId
                 depth -= 1
+                foundParent = true
                 
                 // Update root
                 await MainActor.run {
                     rootEventId = parentId
                     rebuildVisibleList()
                 }
-            } else {
-                // Parent not found, start subscription
-                let filter = NDKFilter(ids: [parentId])
-                let sub = ndk.observe(filter: filter)
-                
-                Task {
-                    for await event in sub.events {
-                        await processEvent(event, depth: depth)
-                        await MainActor.run {
-                            rootEventId = event.id
-                            rebuildVisibleList()
-                        }
-                        break // Only need the first match
-                    }
-                }
-                break
+                break // Found it, continue outer loop
+            }
+            
+            if !foundParent {
+                // Wait a bit for parent to arrive
+                try? await Task.sleep(nanoseconds: 2_000_000_000)
+                break // Give up on this ancestor chain
             }
         }
     }
@@ -253,8 +268,12 @@ struct StreamingTreeThreadView: View {
         await withTaskGroup(of: Void.self) { group in
             // Stream the root event
             group.addTask {
-                if let root = try? await ndk.fetchEvent(self.rootEventId) {
-                    await self.addEvent(root)
+                let rootFilter = NDKFilter(ids: [self.rootEventId])
+                let rootSub = ndk.observe(filter: rootFilter)
+                
+                for await event in rootSub.events {
+                    await self.addEvent(event)
+                    break // Only need first match
                 }
             }
             
