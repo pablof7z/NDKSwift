@@ -15,7 +15,7 @@ struct MainTabView: View {
                 }
                 .tag(0)
             
-            Text("Explore")
+            ExploreView()
                 .tabItem {
                     Label("Explore", systemImage: "magnifyingglass")
                 }

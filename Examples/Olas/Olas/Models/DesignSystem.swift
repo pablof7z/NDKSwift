@@ -57,6 +57,7 @@ enum OlasDesign {
         static let warning = Color(hex: "FFA726")
         static let primary = Color(hex: "667eea") // Default to day color
         static let secondary = Color(hex: "764ba2")
+        static let like = Color(hex: "FF4458") // Heart red
     }
     
     // MARK: - Typography
