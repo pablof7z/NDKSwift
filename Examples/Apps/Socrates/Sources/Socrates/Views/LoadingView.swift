@@ -283,7 +283,8 @@ struct LoadingView: View {
                 limit: batch.count
             )
             
-            let events = await ndk.fetchEvents(filter)
+            let dataSource = ndk.observe(filter: filter, maxAge: 300)
+            let events = await dataSource.collect(timeout: 5.0, limit: batch.count)
             
             for event in events {
                 let follows = extractFollows(from: event)
