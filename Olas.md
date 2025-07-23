@@ -62,8 +62,9 @@ Olas represents the pinnacle of decentralized visual storytelling—a Nostr clie
 
 #### Feed Architecture
 ```swift
-// Reactive subscription pattern
+// Reactive subscription pattern for NIP-68 picture events
 for await event in ndk.subscribe(NDKFilter(kinds: [20])) {
+    // Kind 20 events are picture-first posts with imeta tags
     feedItems.append(FeedItem(from: event))
     // Render immediately, don't wait for profile
 }
@@ -225,11 +226,17 @@ let results = await withTaskGroup(of: UploadResult.self) { group in
 
 #### Reply System
 ```swift
-// Using NDK reply builder
-let replyBuilder = event.reply()
+// Using NDK reply builder with NIP-22 for comments on kind 20 picture events
+let replyBuilder = event.reply()  // Creates kind 1111 comment
 replyBuilder.content(userText)
-replyBuilder.addImageReferences(selectedImages)
 let replyEvent = try await replyBuilder.publish()
+
+// NIP-22 is perfect for Olas: kind 1111 comments on kind 20 picture posts
+// NDKSwift's reply() automatically handles the proper tagging:
+// - ["K", "20"] for root kind
+// - ["E", "<event-id>"] for root event
+// - ["k", "20"] or ["k", "1111"] for parent kind
+// - Proper p/P tags for authors
 ```
 
 #### Reply Threading
@@ -322,6 +329,29 @@ let replyEvent = try await replyBuilder.publish()
 - **Reports**: NIP-69 moderation
 - **Data**: Local-first with sync options
 
+## Event Types & NIPs
+
+### Core Event Kinds
+- **Kind 20** (NIP-68): Picture-first posts with imeta tags
+  - Primary content type for Olas feed
+  - Contains title tag and description in content
+  - Multiple imeta tags for multi-image posts
+  - Photo tagging with annotate-user in imeta
+- **Kind 1111** (NIP-22): Comments on picture posts
+  - Used for all replies/comments via NDK's reply()
+  - Proper root/parent tagging structure
+  - Supports nested threading
+- **Kind 7**: Reactions (likes)
+- **Kind 0**: User metadata/profiles
+- **Kind 3**: Contact lists (following)
+
+### NIP Implementation
+- **NIP-68**: Picture-first feeds - Core protocol
+- **NIP-22**: Comment threads - Reply system
+- **NIP-10**: NOT used (only for kind 1 replies)
+- **NIP-94**: File metadata in imeta tags
+- **NIP-89**: Blossom server discovery
+
 ## Technical Architecture
 
 ### Core Stack
@@ -340,10 +370,11 @@ class FeedViewModel: ObservableObject {
     private var subscription: NDKSubscription?
     
     func startFeed() async {
-        let filter = NDKFilter(kinds: [20])
+        let filter = NDKFilter(kinds: [20])  // NIP-68 picture events
         
         for await event in ndk.subscribe(filter) {
             // Reactive pattern: render immediately
+            // Event contains title tag and imeta tags for images
             items.append(FeedItem(from: event))
             
             // Fetch profile asynchronously

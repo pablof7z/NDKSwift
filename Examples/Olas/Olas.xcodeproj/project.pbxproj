@@ -3,7 +3,7 @@
 	archiveVersion = 1;
 	classes = {
 	};
-	objectVersion = 54;
+	objectVersion = 63;
 	objects = {
 
 /* Begin PBXBuildFile section */
@@ -52,7 +52,7 @@
 		848F92FD4B07161B7C9C0CE6 /* ExploreView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExploreView.swift; sourceTree = "<group>"; };
 		908095A718E167C984E44C97 /* PostDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PostDetailView.swift; sourceTree = "<group>"; };
 		96F5F7B892C30F9D786CDE99 /* FeedView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FeedView.swift; sourceTree = "<group>"; };
-		A0687A67FF77241C3031DC9D /* Olas.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = Olas.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		A0687A67FF77241C3031DC9D /* Olas.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Olas.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		A71169960D37CBCEE47EAA21 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		AD6C17EF35CA0BA6764177D5 /* OlasRichText.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OlasRichText.swift; sourceTree = "<group>"; };
 		AE5D2F12FC56EE978555C47B /* ExploreGridItem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExploreGridItem.swift; sourceTree = "<group>"; };
@@ -206,11 +206,6 @@
 			attributes = {
 				BuildIndependentTargetsInParallel = YES;
 				LastUpgradeCheck = 1430;
-				TargetAttributes = {
-					B84BF25033E01E4965E0FC9E = {
-						DevelopmentTeam = "";
-					};
-				};
 			};
 			buildConfigurationList = 189D4C0388F74E869B4F3CAC /* Build configuration list for PBXProject "Olas" */;
 			compatibilityVersion = "Xcode 14.0";
@@ -225,7 +220,6 @@
 			packageReferences = (
 				3758340B3514A1031C0B6C20 /* XCLocalSwiftPackageReference "../.." */,
 			);
-			preferredProjectObjectVersion = 54;
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
@@ -335,6 +329,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
+				DEVELOPMENT_TEAM = 456SHKPP26;
 				INFOPLIST_FILE = Olas/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -353,6 +348,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
+				DEVELOPMENT_TEAM = 456SHKPP26;
 				INFOPLIST_FILE = Olas/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
