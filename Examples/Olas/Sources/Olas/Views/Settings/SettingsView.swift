@@ -7,84 +7,134 @@ struct SettingsView: View {
     
     var body: some View {
         NavigationStack {
-            List {
-                // Account Section
-                Section("Account") {
-                    HStack {
-                        Image(systemName: "person.circle")
-                        Text("Account Details")
+            ZStack {
+                OlasDesign.Colors.background
+                    .ignoresSafeArea()
+                
+                List {
+                    // Account Section
+                    Section {
+                        NavigationLink(destination: AccountSettingsView()) {
+                            settingRow(
+                                icon: "person.circle",
+                                title: "Account Settings",
+                                color: OlasDesign.Colors.primary
+                            )
+                        }
                     }
                     
-                    HStack {
-                        Image(systemName: "key")
-                        Text("Backup Keys")
+                    // Relay Section
+                    Section {
+                        NavigationLink(destination: RelayManagementView()) {
+                            HStack {
+                                Image(systemName: "server.rack")
+                                    .font(.body)
+                                    .foregroundColor(.blue)
+                                    .frame(width: 30)
+                                
+                                Text("Relay Configuration")
+                                    .font(OlasDesign.Typography.body)
+                                
+                                Spacer()
+                                
+                                Text("\(appState.ndk?.relayPool.relays.count ?? 0)")
+                                    .font(OlasDesign.Typography.caption)
+                                    .foregroundColor(OlasDesign.Colors.textSecondary)
+                            }
+                        }
                     }
                     
-                    HStack {
-                        Image(systemName: "lock")
-                        Text("Security")
-                    }
-                }
-                
-                // Relay Section
-                Section("Relays") {
-                    HStack {
-                        Image(systemName: "server.rack")
-                        Text("Relay Configuration")
-                        Spacer()
-                        Text("\(appState.ndk?.relayPool.relays.count ?? 0)")
-                            .foregroundColor(.secondary)
-                    }
-                }
-                
-                // Blossom Section
-                Section("Blossom Servers") {
-                    HStack {
-                        Image(systemName: "cloud")
-                        Text("Server Management")
-                    }
-                }
-                
-                // Privacy Section
-                Section("Privacy") {
-                    HStack {
-                        Image(systemName: "eye.slash")
-                        Text("Blocked Users")
+                    // Appearance & Notifications
+                    Section {
+                        NavigationLink(destination: ThemeSettingsView()) {
+                            settingRow(
+                                icon: "paintbrush",
+                                title: "Theme",
+                                color: .purple
+                            )
+                        }
+                        
+                        NavigationLink(destination: NotificationSettingsView()) {
+                            settingRow(
+                                icon: "bell",
+                                title: "Notifications",
+                                color: .orange
+                            )
+                        }
                     }
                     
-                    HStack {
-                        Image(systemName: "hand.raised")
-                        Text("Content Filtering")
-                    }
-                }
-                
-                // About Section
-                Section("About") {
-                    HStack {
-                        Image(systemName: "info.circle")
-                        Text("About Olas")
+                    // Blossom Section
+                    Section {
+                        NavigationLink(destination: Text("Blossom Server Management")) {
+                            settingRow(
+                                icon: "cloud",
+                                title: "Blossom Servers",
+                                color: .green
+                            )
+                        }
                     }
                     
-                    HStack {
-                        Image(systemName: "questionmark.circle")
-                        Text("Help & Support")
+                    // Privacy Section
+                    Section {
+                        NavigationLink(destination: Text("Blocked Users")) {
+                            settingRow(
+                                icon: "eye.slash",
+                                title: "Blocked Users",
+                                color: .red
+                            )
+                        }
+                        
+                        NavigationLink(destination: Text("Content Filtering")) {
+                            settingRow(
+                                icon: "hand.raised",
+                                title: "Content Filtering",
+                                color: .orange
+                            )
+                        }
                     }
-                }
-                
-                // Logout
-                Section {
-                    Button(action: { showingLogoutAlert = true }) {
-                        HStack {
-                            Image(systemName: "rectangle.portrait.and.arrow.right")
-                                .foregroundColor(.red)
-                            Text("Logout")
-                                .foregroundColor(.red)
+                    
+                    // About Section
+                    Section {
+                        NavigationLink(destination: Text("About Olas")) {
+                            settingRow(
+                                icon: "info.circle",
+                                title: "About Olas",
+                                color: .blue
+                            )
+                        }
+                        
+                        NavigationLink(destination: Text("Help & Support")) {
+                            settingRow(
+                                icon: "questionmark.circle",
+                                title: "Help & Support",
+                                color: .green
+                            )
+                        }
+                    }
+                    
+                    // Logout
+                    Section {
+                        Button(action: { showingLogoutAlert = true }) {
+                            HStack {
+                                Image(systemName: "rectangle.portrait.and.arrow.right")
+                                    .font(.body)
+                                    .foregroundColor(.red)
+                                    .frame(width: 30)
+                                
+                                Text("Logout")
+                                    .font(OlasDesign.Typography.body)
+                                    .foregroundColor(.red)
+                            }
                         }
                     }
                 }
+                .listStyle(.insetGrouped)
+                .scrollContentBackground(.hidden)
             }
             .navigationTitle("Settings")
+            #if os(iOS)
             .navigationBarTitleDisplayMode(.large)
+            #endif
             .alert("Logout", isPresented: $showingLogoutAlert) {
                 Button("Cancel", role: .cancel) {}
                 Button("Logout", role: .destructive) {
@@ -96,9 +146,24 @@ struct SettingsView: View {
         }
     }
     
+    @ViewBuilder
+    private func settingRow(icon: String, title: String, color: Color) -> some View {
+        HStack {
+            Image(systemName: icon)
+                .font(.body)
+                .foregroundColor(color)
+                .frame(width: 30)
+            
+            Text(title)
+                .font(OlasDesign.Typography.body)
+                .foregroundColor(OlasDesign.Colors.text)
+        }
+    }
+    
     private func logout() {
         appState.isAuthenticated = false
         appState.currentUser = nil
-        appState.ndk?.signer = nil
+        appState.ndk = nil
+        NDKAuthManager.shared.signOut()
     }
 }

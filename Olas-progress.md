@@ -6,7 +6,7 @@
 - ✅ Updated AppState to use NDKAuthManager for secure key storage
 - ✅ Implemented proper authentication with key generation and biometric support
 - ✅ Added SQLite cache support for offline functionality
-- ✅ Switched feed to kind 1 events (text notes) that contain image URLs
+- ✅ Switched feed to kind 20 events (NIP-68 picture-first posts with imeta tags)
 - ✅ Implemented reactive profile loading using NDKProfileManager
 - ✅ Updated FeedItemView to display actual images using AsyncImage
 - ✅ Fixed all NDK API usage to match actual implementation
@@ -23,7 +23,7 @@
 
 ### Current Architecture
 - **AppState**: Central state management with NDKAuthManager integration
-- **FeedViewModel**: Reactive subscription to kind 1 events with image filtering
+- **FeedViewModel**: Reactive subscription to kind 20 events (NIP-68 picture posts)
 - **Profile Loading**: Asynchronous, non-blocking profile updates
 - **Image Pipeline**: Basic AsyncImage implementation (ready for enhancement)
 
@@ -310,7 +310,7 @@ Missing from Xcode project but exist in filesystem:
 ### Current Implementation Status
 The Olas app now has:
 1. **Authentication System** - Complete with secure key storage
-2. **Feed View** - Reactive subscription to kind 1 events with images
+2. **Feed View** - Reactive subscription to kind 20 events (NIP-68 picture posts)
 3. **Profile Pages** - Full implementation with 3-column grid
 4. **Design System** - Time-based gradients, typography, components
 5. **Rich Text Rendering** - Nostr entities with reactive profile loading
@@ -347,10 +347,10 @@ With the build verified and reactive patterns confirmed, the next priorities are
   - Cross-platform compatible
 
 - ✅ Implemented Reply System
-  - Full reply view with thread display
+  - Full reply view with thread display using NIP-22 (kind 1111)
   - Inline reply composer with user avatar
   - Real-time reply loading with reactive profiles
-  - Proper Nostr tagging (root/reply markers)
+  - Proper NIP-22 comment tagging for kind 20 posts
   - Reply count display on feed items
   - Nested reply support (UI ready, threading logic prepared)
   - Sheet presentation for reply interface
@@ -381,8 +381,8 @@ With the build verified and reactive patterns confirmed, the next priorities are
    - Optimistic UI updates with rollback on error
 
 3. **Reply Threading**
-   - Proper NIP-10 implementation with root/reply markers
-   - Handles nested replies with correct tag structure
+   - Proper NIP-22 implementation for comments on kind 20 posts
+   - Handles nested replies with correct tag structure (K/k tags)
    - Reactive profile loading for all reply authors
    - Real-time updates as new replies arrive
 
