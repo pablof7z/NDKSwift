@@ -3,16 +3,21 @@
 	archiveVersion = 1;
 	classes = {
 	};
-	objectVersion = 63;
+	objectVersion = 54;
 	objects = {
 
 /* Begin PBXBuildFile section */
 		06AC116E460E4F31DD3BBD57 /* ExploreGridItem.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE5D2F12FC56EE978555C47B /* ExploreGridItem.swift */; };
 		0F5CE064001E306B1B790C55 /* CreateAccountView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 705A87128F6D1AEBA79A339E /* CreateAccountView.swift */; };
+		180647DC6D1F69704EA8A6C9 /* RelayManagementView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A38516C3E4BB7DAAF6E8E239 /* RelayManagementView.swift */; };
 		2A29D6554673DAA6F190F3DE /* OlasApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A286AD4220C7848F6E96670 /* OlasApp.swift */; };
+		30900EADB1C47C320161DE31 /* NotificationSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2A3C92BB7D7C104011B72E0 /* NotificationSettingsView.swift */; };
 		360DE0B38471B7920BC2063B /* CategoryPill.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4EF431B820BD21FA77DA3788 /* CategoryPill.swift */; };
+		3768BC344C36D0D653C1EEDB /* OnboardingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 73503FD4E5003DD5CA7487A7 /* OnboardingView.swift */; };
 		3EE5693A545144E9B0161A1F /* ExploreView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 848F92FD4B07161B7C9C0CE6 /* ExploreView.swift */; };
+		40F6D573CBAEC07884013088 /* AccountSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2C5B0D5FDA5CD8A4B1D7EC3D /* AccountSettingsView.swift */; };
 		486054C690B69D02E841B06E /* OlasImageEditor.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0753CE6950CB82115B0371 /* OlasImageEditor.swift */; };
+		4CF2F71413873993509D9708 /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 9440F2ACC121795D0DD878D2 /* LaunchScreen.storyboard */; };
 		4F7AB496D2EACFCF9588CE81 /* HeartAnimation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 64A22C0E8157BAB1D6F87DC0 /* HeartAnimation.swift */; };
 		52C8A3E24BA0F5D7F9884660 /* OlasCaptionComposer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0F05007F8118B0E79C2A3ADB /* OlasCaptionComposer.swift */; };
 		5A2FB10AD16E8B4B095AE7B3 /* OlasMultiImageView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 14D8D07AC09D2E5371438874 /* OlasMultiImageView.swift */; };
@@ -20,16 +25,21 @@
 		7DE28A4D4D38BD8A85AED62D /* FeedView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 96F5F7B892C30F9D786CDE99 /* FeedView.swift */; };
 		807D5A3A9C77CD85CACB741A /* PostDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 908095A718E167C984E44C97 /* PostDetailView.swift */; };
 		8F40443D2C8F504CC37FDC27 /* ZapView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 354D62DFA4445337C08BF974 /* ZapView.swift */; };
+		94538F4CB2769C17DC35092E /* ImetaUtils.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4AABC79BC6DFBC543250469D /* ImetaUtils.swift */; };
 		A136013AB9390198484B893D /* CreatePostView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1204549B5A0A2545A6BE397 /* CreatePostView.swift */; };
 		AEC0A8C28C4D986F0D692041 /* TrendingHashtagPill.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7E0B2A99137ED5B72E8CB5D5 /* TrendingHashtagPill.swift */; };
 		B8BC21E8CCEA9D3D36982769 /* AppState.swift in Sources */ = {isa = PBXBuildFile; fileRef = C30D4C6D7E0FBCFA086E1A14 /* AppState.swift */; };
 		C2A3272349AA15DF12B1DFFC /* HashtagView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FD3FAD3D84B90385C0E19BF7 /* HashtagView.swift */; };
 		C402BF5BEA9C5B8298E59048 /* ReplyView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4B673BF49DAC65DDF01AE3DE /* ReplyView.swift */; };
 		D109CAAD7B0CB24AA2BEA4CF /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEBCFD4730EA570CF77AC6AE /* ContentView.swift */; };
+		D902ABD89CEEC5ECC73FA005 /* ThemeSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 29C39E91C10971E68365A9BB /* ThemeSettingsView.swift */; };
 		E41B33117D720DF62A208927 /* MainTabView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 29C0295E5754245F8E85B8F0 /* MainTabView.swift */; };
 		E64AFCC01633D0F2BE3CCA80 /* NDKSwift in Frameworks */ = {isa = PBXBuildFile; productRef = 8AA960B808EB700D62AED64F /* NDKSwift */; };
 		E719C86C48E19C300B0DC21D /* OlasCameraView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D7FEE893C1986FEF0987BFAC /* OlasCameraView.swift */; };
 		E9B5E3D9D503DFBDC206DF2F /* Color+Extensions.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2CACDD908BC9D11BF314BE1 /* Color+Extensions.swift */; };
+		EDD04226FB268D4CA368D040 /* OlasUtilities.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5B230A536A508E6F2711DA52 /* OlasUtilities.swift */; };
+		F56A43E6A9EF0E351584759F /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = C568672BABA5A65535DBAA1F /* Assets.xcassets */; };
+		F628A659FC569615500777C0 /* BlurhashView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2889EBFAC7191DB90EF5A718 /* BlurhashView.swift */; };
 		F949382BAFCE1327F2782ED3 /* AuthenticationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6D7EDC8314A9A5A7B85A20EC /* AuthenticationView.swift */; };
 		FBCE5F4649AA36855003BF51 /* OlasRichText.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD6C17EF35CA0BA6764177D5 /* OlasRichText.swift */; };
 		FE73F3A115D7AE36B2065165 /* DesignSystem.swift in Sources */ = {isa = PBXBuildFile; fileRef = 612AB9C195293120935CEAAE /* DesignSystem.swift */; };
@@ -40,28 +50,38 @@
 		0F05007F8118B0E79C2A3ADB /* OlasCaptionComposer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OlasCaptionComposer.swift; sourceTree = "<group>"; };
 		1006330845B578B0E1BA44AF /* NDKSwift */ = {isa = PBXFileReference; lastKnownFileType = folder; name = NDKSwift; path = ../..; sourceTree = SOURCE_ROOT; };
 		14D8D07AC09D2E5371438874 /* OlasMultiImageView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OlasMultiImageView.swift; sourceTree = "<group>"; };
+		2889EBFAC7191DB90EF5A718 /* BlurhashView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BlurhashView.swift; sourceTree = "<group>"; };
 		29C0295E5754245F8E85B8F0 /* MainTabView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MainTabView.swift; sourceTree = "<group>"; };
+		29C39E91C10971E68365A9BB /* ThemeSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ThemeSettingsView.swift; sourceTree = "<group>"; };
+		2C5B0D5FDA5CD8A4B1D7EC3D /* AccountSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AccountSettingsView.swift; sourceTree = "<group>"; };
 		354D62DFA4445337C08BF974 /* ZapView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ZapView.swift; sourceTree = "<group>"; };
+		4AABC79BC6DFBC543250469D /* ImetaUtils.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImetaUtils.swift; sourceTree = "<group>"; };
 		4B673BF49DAC65DDF01AE3DE /* ReplyView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReplyView.swift; sourceTree = "<group>"; };
 		4EF431B820BD21FA77DA3788 /* CategoryPill.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CategoryPill.swift; sourceTree = "<group>"; };
+		5B230A536A508E6F2711DA52 /* OlasUtilities.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OlasUtilities.swift; sourceTree = "<group>"; };
 		612AB9C195293120935CEAAE /* DesignSystem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesignSystem.swift; sourceTree = "<group>"; };
 		64A22C0E8157BAB1D6F87DC0 /* HeartAnimation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HeartAnimation.swift; sourceTree = "<group>"; };
 		6D7EDC8314A9A5A7B85A20EC /* AuthenticationView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuthenticationView.swift; sourceTree = "<group>"; };
 		705A87128F6D1AEBA79A339E /* CreateAccountView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CreateAccountView.swift; sourceTree = "<group>"; };
+		73503FD4E5003DD5CA7487A7 /* OnboardingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingView.swift; sourceTree = "<group>"; };
 		7E0B2A99137ED5B72E8CB5D5 /* TrendingHashtagPill.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrendingHashtagPill.swift; sourceTree = "<group>"; };
 		848F92FD4B07161B7C9C0CE6 /* ExploreView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExploreView.swift; sourceTree = "<group>"; };
 		908095A718E167C984E44C97 /* PostDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PostDetailView.swift; sourceTree = "<group>"; };
+		9440F2ACC121795D0DD878D2 /* LaunchScreen.storyboard */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; path = LaunchScreen.storyboard; sourceTree = "<group>"; };
 		96F5F7B892C30F9D786CDE99 /* FeedView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FeedView.swift; sourceTree = "<group>"; };
-		A0687A67FF77241C3031DC9D /* Olas.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Olas.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		A0687A67FF77241C3031DC9D /* Olas.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = Olas.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		A38516C3E4BB7DAAF6E8E239 /* RelayManagementView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RelayManagementView.swift; sourceTree = "<group>"; };
 		A71169960D37CBCEE47EAA21 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		AD6C17EF35CA0BA6764177D5 /* OlasRichText.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OlasRichText.swift; sourceTree = "<group>"; };
 		AE5D2F12FC56EE978555C47B /* ExploreGridItem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExploreGridItem.swift; sourceTree = "<group>"; };
 		B2CACDD908BC9D11BF314BE1 /* Color+Extensions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Color+Extensions.swift"; sourceTree = "<group>"; };
 		BB0753CE6950CB82115B0371 /* OlasImageEditor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OlasImageEditor.swift; sourceTree = "<group>"; };
 		C30D4C6D7E0FBCFA086E1A14 /* AppState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppState.swift; sourceTree = "<group>"; };
+		C568672BABA5A65535DBAA1F /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		D7FEE893C1986FEF0987BFAC /* OlasCameraView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OlasCameraView.swift; sourceTree = "<group>"; };
 		D9AC67F043144FFC6CBB7302 /* ProfileView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProfileView.swift; sourceTree = "<group>"; };
 		F1204549B5A0A2545A6BE397 /* CreatePostView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CreatePostView.swift; sourceTree = "<group>"; };
+		F2A3C92BB7D7C104011B72E0 /* NotificationSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotificationSettingsView.swift; sourceTree = "<group>"; };
 		FD3FAD3D84B90385C0E19BF7 /* HashtagView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HashtagView.swift; sourceTree = "<group>"; };
 		FEBCFD4730EA570CF77AC6AE /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
@@ -78,6 +98,25 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
+		1E0E52E5000C2391339E0CD6 /* Settings */ = {
+			isa = PBXGroup;
+			children = (
+				2C5B0D5FDA5CD8A4B1D7EC3D /* AccountSettingsView.swift */,
+				F2A3C92BB7D7C104011B72E0 /* NotificationSettingsView.swift */,
+				A38516C3E4BB7DAAF6E8E239 /* RelayManagementView.swift */,
+				29C39E91C10971E68365A9BB /* ThemeSettingsView.swift */,
+			);
+			path = Settings;
+			sourceTree = "<group>";
+		};
+		3175453F76E92BC66C0DAD80 /* Components */ = {
+			isa = PBXGroup;
+			children = (
+				2889EBFAC7191DB90EF5A718 /* BlurhashView.swift */,
+			);
+			path = Components;
+			sourceTree = "<group>";
+		};
 		5B246F9744CFEEE1AB08646C = {
 			isa = PBXGroup;
 			children = (
@@ -85,6 +124,14 @@
 				B58D784B1ABA32F8865CB4E2 /* Packages */,
 				CFE7D3B330FDFD275FB9F30E /* Products */,
 			);
+			sourceTree = "<group>";
+		};
+		74739EECF086534C983194B1 /* Onboarding */ = {
+			isa = PBXGroup;
+			children = (
+				73503FD4E5003DD5CA7487A7 /* OnboardingView.swift */,
+			);
+			path = Onboarding;
 			sourceTree = "<group>";
 		};
 		7C7B83DD7DF473EA2C3F61E1 /* Views */ = {
@@ -100,6 +147,8 @@
 				D9AC67F043144FFC6CBB7302 /* ProfileView.swift */,
 				C11C1420A07269F24B4D3411 /* Components */,
 				92362D4DC6ABBEC36EA5AA36 /* Explore */,
+				74739EECF086534C983194B1 /* Onboarding */,
+				1E0E52E5000C2391339E0CD6 /* Settings */,
 			);
 			path = Views;
 			sourceTree = "<group>";
@@ -107,12 +156,24 @@
 		8EF384136D14289E9B42B384 /* Olas */ = {
 			isa = PBXGroup;
 			children = (
+				C568672BABA5A65535DBAA1F /* Assets.xcassets */,
 				A71169960D37CBCEE47EAA21 /* Info.plist */,
+				9440F2ACC121795D0DD878D2 /* LaunchScreen.storyboard */,
 				FA36505FE1BE2A92A084EA6A /* App */,
+				3175453F76E92BC66C0DAD80 /* Components */,
 				AC776A9DD7F4D72B0183BCE2 /* Models */,
+				91B9F73E4710576A6F09840C /* Utils */,
 				7C7B83DD7DF473EA2C3F61E1 /* Views */,
 			);
 			path = Olas;
+			sourceTree = "<group>";
+		};
+		91B9F73E4710576A6F09840C /* Utils */ = {
+			isa = PBXGroup;
+			children = (
+				5B230A536A508E6F2711DA52 /* OlasUtilities.swift */,
+			);
+			path = Utils;
 			sourceTree = "<group>";
 		};
 		92362D4DC6ABBEC36EA5AA36 /* Explore */ = {
@@ -132,6 +193,7 @@
 			children = (
 				B2CACDD908BC9D11BF314BE1 /* Color+Extensions.swift */,
 				612AB9C195293120935CEAAE /* DesignSystem.swift */,
+				4AABC79BC6DFBC543250469D /* ImetaUtils.swift */,
 			);
 			path = Models;
 			sourceTree = "<group>";
@@ -184,6 +246,7 @@
 			buildConfigurationList = 6B11C9D7BE86DC9A0BEDBDC2 /* Build configuration list for PBXNativeTarget "Olas" */;
 			buildPhases = (
 				D8F9E32619D2338085BB7107 /* Sources */,
+				09131CC888163C211506E61C /* Resources */,
 				5CEB777103E3EB19F9A22A33 /* Frameworks */,
 			);
 			buildRules = (
@@ -206,6 +269,11 @@
 			attributes = {
 				BuildIndependentTargetsInParallel = YES;
 				LastUpgradeCheck = 1430;
+				TargetAttributes = {
+					B84BF25033E01E4965E0FC9E = {
+						DevelopmentTeam = "";
+					};
+				};
 			};
 			buildConfigurationList = 189D4C0388F74E869B4F3CAC /* Build configuration list for PBXProject "Olas" */;
 			compatibilityVersion = "Xcode 14.0";
@@ -220,6 +288,7 @@
 			packageReferences = (
 				3758340B3514A1031C0B6C20 /* XCLocalSwiftPackageReference "../.." */,
 			);
+			preferredProjectObjectVersion = 54;
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
@@ -228,13 +297,27 @@
 		};
 /* End PBXProject section */
 
+/* Begin PBXResourcesBuildPhase section */
+		09131CC888163C211506E61C /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				F56A43E6A9EF0E351584759F /* Assets.xcassets in Resources */,
+				4CF2F71413873993509D9708 /* LaunchScreen.storyboard in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
 /* Begin PBXSourcesBuildPhase section */
 		D8F9E32619D2338085BB7107 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				40F6D573CBAEC07884013088 /* AccountSettingsView.swift in Sources */,
 				B8BC21E8CCEA9D3D36982769 /* AppState.swift in Sources */,
 				F949382BAFCE1327F2782ED3 /* AuthenticationView.swift in Sources */,
+				F628A659FC569615500777C0 /* BlurhashView.swift in Sources */,
 				360DE0B38471B7920BC2063B /* CategoryPill.swift in Sources */,
 				E9B5E3D9D503DFBDC206DF2F /* Color+Extensions.swift in Sources */,
 				D109CAAD7B0CB24AA2BEA4CF /* ContentView.swift in Sources */,
@@ -246,16 +329,22 @@
 				7DE28A4D4D38BD8A85AED62D /* FeedView.swift in Sources */,
 				C2A3272349AA15DF12B1DFFC /* HashtagView.swift in Sources */,
 				4F7AB496D2EACFCF9588CE81 /* HeartAnimation.swift in Sources */,
+				94538F4CB2769C17DC35092E /* ImetaUtils.swift in Sources */,
 				E41B33117D720DF62A208927 /* MainTabView.swift in Sources */,
+				30900EADB1C47C320161DE31 /* NotificationSettingsView.swift in Sources */,
 				2A29D6554673DAA6F190F3DE /* OlasApp.swift in Sources */,
 				E719C86C48E19C300B0DC21D /* OlasCameraView.swift in Sources */,
 				52C8A3E24BA0F5D7F9884660 /* OlasCaptionComposer.swift in Sources */,
 				486054C690B69D02E841B06E /* OlasImageEditor.swift in Sources */,
 				5A2FB10AD16E8B4B095AE7B3 /* OlasMultiImageView.swift in Sources */,
 				FBCE5F4649AA36855003BF51 /* OlasRichText.swift in Sources */,
+				EDD04226FB268D4CA368D040 /* OlasUtilities.swift in Sources */,
+				3768BC344C36D0D653C1EEDB /* OnboardingView.swift in Sources */,
 				807D5A3A9C77CD85CACB741A /* PostDetailView.swift in Sources */,
 				774FD4738B5F1EAAC3603CF0 /* ProfileView.swift in Sources */,
+				180647DC6D1F69704EA8A6C9 /* RelayManagementView.swift in Sources */,
 				C402BF5BEA9C5B8298E59048 /* ReplyView.swift in Sources */,
+				D902ABD89CEEC5ECC73FA005 /* ThemeSettingsView.swift in Sources */,
 				AEC0A8C28C4D986F0D692041 /* TrendingHashtagPill.swift in Sources */,
 				8F40443D2C8F504CC37FDC27 /* ZapView.swift in Sources */,
 			);
@@ -329,7 +418,6 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
-				DEVELOPMENT_TEAM = 456SHKPP26;
 				INFOPLIST_FILE = Olas/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -348,7 +436,6 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
-				DEVELOPMENT_TEAM = 456SHKPP26;
 				INFOPLIST_FILE = Olas/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
