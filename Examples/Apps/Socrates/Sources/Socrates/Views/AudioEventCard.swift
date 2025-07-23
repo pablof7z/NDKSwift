@@ -154,7 +154,7 @@ struct AudioEventCard: View {
         .onDisappear {
             cleanup()
         }
-        .onChange(of: appState.currentlyPlayingId) { newId in
+        .onChange(of: appState.currentlyPlayingId) { _, newId in
             if newId != audioEvent.id && isPlaying {
                 pausePlayback()
             }
@@ -168,10 +168,11 @@ struct AudioEventCard: View {
         Task {
             guard let ndk = nostrManager.ndk else { return }
             
-            if let profile = await ndk.fetchProfile(audioEvent.author.pubkey) {
+            for await profile in ndk.profileManager.observe(for: audioEvent.author.pubkey, maxAge: 3600) {
                 await MainActor.run {
                     self.author = profile
                 }
+                break // Just get the first result
             }
         }
     }
@@ -192,20 +193,19 @@ struct AudioEventCard: View {
         
         // Observe playback progress
         let interval = CMTime(seconds: 0.1, preferredTimescale: CMTimeScale(NSEC_PER_SEC))
-        timeObserver = audioPlayer?.addPeriodicTimeObserver(forInterval: interval, queue: .main) { [weak self] time in
-            guard let self = self,
-                  let duration = self.audioPlayer?.currentItem?.duration else { return }
+        timeObserver = audioPlayer?.addPeriodicTimeObserver(forInterval: interval, queue: .main) { time in
+            guard let duration = audioPlayer?.currentItem?.duration else { return }
             
             let currentTime = time.seconds
             let totalTime = duration.seconds
             
             if totalTime > 0 {
-                self.playbackProgress = currentTime / totalTime
+                playbackProgress = currentTime / totalTime
             }
             
             // Check if playback ended
             if currentTime >= totalTime - 0.1 {
-                self.pausePlayback()
+                pausePlayback()
             }
         }
     }

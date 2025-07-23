@@ -322,7 +322,7 @@ struct LoadingView: View {
         
         if appState.followLists[userPubkey]?.contains(pubkey) == true {
             appState.webOfTrust[pubkey] = 1.0
-        } else if !appState.followLists[userPubkey]?.intersection(follows).isEmpty {
+        } else if let userFollows = appState.followLists[userPubkey], !userFollows.intersection(follows).isEmpty {
             appState.webOfTrust[pubkey] = 0.5
         } else {
             appState.webOfTrust[pubkey] = 0.1

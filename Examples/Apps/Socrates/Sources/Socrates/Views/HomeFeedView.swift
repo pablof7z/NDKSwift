@@ -102,7 +102,8 @@ struct HomeFeedView: View {
             limit: 100
         )
         
-        let events = await ndk.fetchEvents(filter)
+        let dataSource = ndk.observe(filter: filter, maxAge: 0)
+        let events = await dataSource.currentValue() ?? []
         
         var newAudioEvents: [AudioEvent] = []
         
@@ -121,9 +122,10 @@ struct HomeFeedView: View {
     
     private func startRecording() {
         // Request microphone permission
-        AVAudioSession.sharedInstance().requestRecordPermission { granted in
+        Task {
+            let granted = await AVAudioApplication.requestRecordPermission()
             if granted {
-                Task { @MainActor in
+                await MainActor.run {
                     setupRecording()
                 }
             }
@@ -176,7 +178,7 @@ struct HomeFeedView: View {
         
         // Update waveform
         let normalizedValue = pow(10, recorder.averagePower(forChannel: 0) / 20)
-        recordingWaveform.append(normalizedValue)
+        recordingWaveform.append(CGFloat(normalizedValue))
         
         // Keep last 50 samples
         if recordingWaveform.count > 50 {
@@ -218,7 +220,7 @@ struct HomeFeedView: View {
     private func completeRecording() {
         guard let recorder = audioRecorder else { return }
         
-        let fileURL = recorder.url
+        let _ = recorder.url
         
         // TODO: Upload to file hosting service
         // TODO: Create and publish NDKEvent with kind 1222
@@ -381,7 +383,7 @@ struct RecordButton: View {
                 }
             }
         }
-        .onChange(of: isRecording) { newValue in
+        .onChange(of: isRecording) { _, newValue in
             if newValue {
                 withAnimation(.easeInOut(duration: 1).repeatForever(autoreverses: true)) {
                     pulseScale = 1.3
