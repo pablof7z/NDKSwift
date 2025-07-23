@@ -10,6 +10,10 @@ actor NDKRelaySelector {
     private let ndk: NDK
     let tracker: NDKOutboxTracker
     private let ranker: NDKRelayRanker
+    
+    /// Cache for blocked relays to avoid repeated fetches
+    private var blockedRelaysCache: Set<String>?
+    private var blockedRelaysCacheExpiry: Date?
 
     public init(ndk: NDK, tracker: NDKOutboxTracker, ranker: NDKRelayRanker) {
         self.ndk = ndk
@@ -71,9 +75,12 @@ actor NDKRelaySelector {
             targetRelays.formUnion(fallbackRelays)
         }
 
-        // 5. Rank and limit relays
+        // 5. Filter out blocked relays
+        let filteredRelays = await filterBlockedRelays(targetRelays)
+        
+        // 6. Rank and limit relays
         let rankedRelays = await ranker.rankRelays(
-            Array(targetRelays),
+            Array(filteredRelays),
             for: [event.pubkey] + event.pTags,
             preferences: config.rankingPreferences
         )
@@ -81,7 +88,7 @@ actor NDKRelaySelector {
         let selectedRelays = Array(rankedRelays.prefix(config.maxRelayCount))
             .map { $0.url }
         
-        let selectionMethod = determineSelectionMethod(targetRelays)
+        let selectionMethod = determineSelectionMethod(filteredRelays)
 
         return RelaySelectionResult(
             relays: Set(selectedRelays),
@@ -132,13 +139,16 @@ actor NDKRelaySelector {
             sourceRelays.formUnion(fallbackRelays)
         }
 
-        // 5. Rank and limit relays
+        // 5. Filter out blocked relays
+        let filteredRelays = await filterBlockedRelays(sourceRelays)
+        
+        // 6. Rank and limit relays
         let authors = filter.authors ?? []
         let taggedPubkeys = extractPubkeysFromFilter(filter)
         let allRelevantPubkeys = authors + taggedPubkeys + (userPubkey.map { [$0] } ?? [])
 
         let rankedRelays = await ranker.rankRelays(
-            Array(sourceRelays),
+            Array(filteredRelays),
             for: allRelevantPubkeys,
             preferences: config.rankingPreferences
         )
@@ -146,7 +156,7 @@ actor NDKRelaySelector {
         let selectedRelays = Array(rankedRelays.prefix(config.maxRelayCount))
             .map { $0.url }
         
-        let selectionMethod = determineSelectionMethod(sourceRelays)
+        let selectionMethod = determineSelectionMethod(filteredRelays)
 
         return RelaySelectionResult(
             relays: Set(selectedRelays),
@@ -177,8 +187,16 @@ actor NDKRelaySelector {
         // Get relay info for all pubkeys
         let pubkeyRelayInfo = await getAllRelaysForPubkeys(pubkeys, type: type)
 
-        // First pass: Use connected relays
+        // Get blocked relays
+        let blockedRelays = await getBlockedRelays()
+        
+        // First pass: Use connected relays (excluding blocked ones)
         for relay in connectedRelays {
+            let normalizedUrl = URLNormalizer.tryNormalizeRelayUrl(relay.url) ?? relay.url
+            if blockedRelays.contains(normalizedUrl) {
+                continue
+            }
+            
             let pubkeysInRelay = pubkeyRelayInfo.pubkeysToRelays
                 .filter { $0.value.contains(relay.url) }
                 .map { $0.key }
@@ -204,6 +222,10 @@ actor NDKRelaySelector {
             for relayURL in sortedRelays {
                 if currentCount >= config.relaysPerAuthor { break }
                 if !relays.contains(relayURL) { continue }
+                
+                // Skip blocked relays
+                let normalizedUrl = URLNormalizer.tryNormalizeRelayUrl(relayURL) ?? relayURL
+                if blockedRelays.contains(normalizedUrl) { continue }
 
                 var pubkeysInRelay = relayToPubkeys[relayURL, default: []]
                 if !pubkeysInRelay.contains(pubkey) {
@@ -218,6 +240,10 @@ actor NDKRelaySelector {
         let fallbackRelays = await selectFallbackRelays(currentCount: 0, targetCount: 2)
         for pubkey in pubkeyRelayInfo.authorsMissingRelays {
             for relayURL in fallbackRelays.prefix(config.relaysPerAuthor) {
+                // Skip blocked relays
+                let normalizedUrl = URLNormalizer.tryNormalizeRelayUrl(relayURL) ?? relayURL
+                if blockedRelays.contains(normalizedUrl) { continue }
+                
                 var pubkeysInRelay = relayToPubkeys[relayURL, default: []]
                 if !pubkeysInRelay.contains(pubkey) {
                     pubkeysInRelay.append(pubkey)
@@ -230,6 +256,64 @@ actor NDKRelaySelector {
     }
 
     // MARK: - Private Methods
+    
+    /// Get blocked relays for the current user
+    private func getBlockedRelays() async -> Set<String> {
+        // Check cache first
+        if let cached = blockedRelaysCache,
+           let expiry = blockedRelaysCacheExpiry,
+           expiry > Date() {
+            return cached
+        }
+        
+        // Get current user's pubkey
+        guard let signer = ndk.signer,
+              let userPubkey = try? await signer.pubkey else {
+            return []
+        }
+        
+        // Fetch blocked relays list
+        let filter = NDKFilter(
+            authors: [userPubkey],
+            kinds: [EventKind.blockedRelays],
+            limit: 1
+        )
+        
+        let dataSource = NDKDataSource<NDKEvent>(
+            ndk: ndk,
+            filter: filter,
+            maxAge: 300,  // 5 minute cache
+            cachePolicy: .cacheWithNetwork
+        )
+        
+        // Get the first event
+        if let event = await dataSource.first() {
+            let blockedList = NDKList.from(event)
+            let normalizedUrls = blockedList.urls.compactMap { url in
+                URLNormalizer.tryNormalizeRelayUrl(url)
+            }
+            let blockedSet = Set(normalizedUrls)
+            
+            // Cache for 5 minutes
+            blockedRelaysCache = blockedSet
+            blockedRelaysCacheExpiry = Date().addingTimeInterval(300)
+            
+            return blockedSet
+        }
+        
+        return []
+    }
+    
+    /// Filter out blocked relays from a set
+    private func filterBlockedRelays(_ relays: Set<String>) async -> Set<String> {
+        let blockedRelays = await getBlockedRelays()
+        guard !blockedRelays.isEmpty else { return relays }
+        
+        return relays.filter { relay in
+            let normalizedRelay = URLNormalizer.tryNormalizeRelayUrl(relay) ?? relay
+            return !blockedRelays.contains(normalizedRelay)
+        }
+    }
 
     private func extractContextualRelays(
         from event: NDKEvent,

@@ -332,7 +332,9 @@ final class ZapFlowE2ETests: XCTestCase {
             ["amount", "\(amount)"]
         ]
         
-        let receipt = try await NDKEventBuilder()
+        // Need NDK instance for the builder
+        let ndk = NDK()
+        let receipt = try await NDKEventBuilder(ndk: ndk)
             .pubkey(pubkey)
             .createdAt(createdAt)
             .kind(EventKind.zapReceipt)

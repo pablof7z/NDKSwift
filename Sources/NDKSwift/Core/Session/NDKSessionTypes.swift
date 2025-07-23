@@ -5,6 +5,7 @@ public enum SessionData: Hashable {
     case followList
     case webOfTrust(depth: Int = 2)
     case muteList
+    case blockedRelays
     case relayList
 }
 

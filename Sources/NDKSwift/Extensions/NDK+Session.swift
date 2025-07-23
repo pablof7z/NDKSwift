@@ -71,7 +71,10 @@ extension NDK {
                 
                 // Create session data
                 let sessionData = NDKSessionData(pubkey: pubkey, ndk: self)
-                await sessionData.load([.followList])
+                // Load dependencies plus mute list for filtering
+                var requiredData = reactiveFilter.dependencies
+                requiredData.insert(.muteList)  // Always load mute list for filtering
+                await sessionData.load(requiredData)
                 
                 // Build initial filter
                 let filter = reactiveFilter.builder(sessionData)
@@ -90,8 +93,13 @@ extension NDK {
                 // Handle cleanup
                 // Cleanup will be handled by cancellation handler
                 
-                // Stream events with optional WOT filtering
+                // Stream events with mute and optional WOT filtering
                 for await event in dataSource.events {
+                    // Skip muted pubkeys
+                    if sessionData.isMuted(event.pubkey) {
+                        continue
+                    }
+                    
                     // Apply WOT filter if configured
                     if let wotConfig = reactiveFilter.wotConfig {
                         guard sessionData.passesWOTFilter(
@@ -129,7 +137,10 @@ extension NDK {
         
         // Create session data
         let sessionData = NDKSessionData(pubkey: pubkey, ndk: self)
-        await sessionData.load([.followList])
+        // Load dependencies plus mute list for filtering
+        var requiredData = reactiveFilter.dependencies
+        requiredData.insert(.muteList)  // Always load mute list for filtering
+        await sessionData.load(requiredData)
         
         // Build filter with current data
         let filter = reactiveFilter.builder(sessionData)
@@ -145,13 +156,19 @@ extension NDK {
         // Collect events with timeout
         let events = await dataSource.collect(timeout: 5.0)
         
-        // Apply WOT filter if configured
-        if let wotConfig = reactiveFilter.wotConfig {
-            return events.filter { event in
-                sessionData.passesWOTFilter(event.pubkey, config: wotConfig)
+        // Apply mute and WOT filters
+        return events.filter { event in
+            // Skip muted pubkeys
+            if sessionData.isMuted(event.pubkey) {
+                return false
             }
+            
+            // Apply WOT filter if configured
+            if let wotConfig = reactiveFilter.wotConfig {
+                return sessionData.passesWOTFilter(event.pubkey, config: wotConfig)
+            }
+            
+            return true
         }
-        
-        return events
     }
 }

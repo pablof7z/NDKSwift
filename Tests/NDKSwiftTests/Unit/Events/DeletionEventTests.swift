@@ -1,24 +1,6 @@
 import XCTest
 @testable import NDKSwift
 
-// Simple mock relay for testing
-final class MockRelay: RelayProtocol, @unchecked Sendable {
-    let url: String = "wss://test.relay"
-    var connectionState: NDKRelayConnectionState { .connected }
-    var ndk: NDK?
-    var activeSubscriptionIds: [String] { [] }
-    
-    func connect() async {}
-    func disconnect() async {}
-    func send(_ message: String) async throws {}
-    func addSubscriptionId(_ subscriptionId: String) async {}
-    func removeSubscription(byId id: String) async {}
-    func getSignatureStats() async -> NDKRelaySignatureStats { NDKRelaySignatureStats() }
-    func updateSignatureStats(_ updater: @Sendable (inout NDKRelaySignatureStats) -> Void) async {}
-    func observeConnectionState(_ observer: @escaping @Sendable (NDKRelayConnectionState) -> Void) async {}
-    func publish(_ event: NDKEvent) async throws -> (success: Bool, message: String?) { (true, nil) }
-}
-
 final class DeletionEventTests: XCTestCase {
     var ndk: NDK!
     var signer: NDKPrivateKeySigner!

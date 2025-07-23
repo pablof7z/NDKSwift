@@ -72,7 +72,7 @@ final class NDKNutzapTests: XCTestCase {
         let recipient = NDKUser(pubkey: testRecipientPubkey)
         
         // Create a zapped event
-        let zappedEvent = try await NDKEventBuilder()
+        let zappedEvent = try await NDKEventBuilder(ndk: ndk)
             .kind(1)
             .content("This is a great post!")
             .build(signer: mockSigner)

@@ -46,8 +46,9 @@ Session data represents fundamental information needed by most Nostr application
 public enum SessionData: Hashable {
     case followList              // User's follow list (kind:3)
     case webOfTrust(depth: Int)  // Web of trust scoring
-    case muteList               // Muted users (future)
-    case relayList              // Preferred relays (future)
+    case muteList               // Muted users (kind:10000)
+    case blockedRelays          // Blocked relays (kind:10006)
+    case relayList              // Preferred relays (kind:10002)
 }
 ```
 
@@ -246,6 +247,95 @@ let dataSource = NDKDataSource<NDKEvent>(ndk: ndk, filter: initialFilter)
 
 // Later, update the filter
 await dataSource.updateFilter(newFilter)
+```
+
+## Mute Lists and Blocked Relays
+
+### Automatic Mute Filtering
+
+Events from muted pubkeys are automatically filtered out when using reactive filters:
+
+```swift
+// Mute list is loaded automatically with session data
+let sessionData = try await ndk.startSession(
+    signer: signer,
+    config: NDKSessionConfiguration(
+        dataRequirements: [.followList, .muteList]
+    )
+)
+
+// Events from muted pubkeys are automatically filtered
+for await event in ndk.observe(feedFilter) {
+    // This event is guaranteed not to be from a muted pubkey
+}
+```
+
+### Manual Mute Checking
+
+For custom filtering logic:
+
+```swift
+// Check if a pubkey is muted (O(1) lookup)
+if sessionData.isMuted(pubkey) {
+    // Skip this content
+}
+
+// Access the full mute list
+let mutedPubkeys = sessionData.muteList  // Set<String>
+```
+
+### Blocked Relays
+
+Relays in your blocked list are automatically excluded from outbox operations:
+
+```swift
+// Load blocked relays with session
+let sessionData = try await ndk.startSession(
+    signer: signer,
+    config: NDKSessionConfiguration(
+        dataRequirements: [.followList, .blockedRelays]
+    )
+)
+
+// Check if a relay is blocked (O(1) lookup)
+if sessionData.isRelayBlocked("wss://bad-relay.com") {
+    // Skip this relay
+}
+
+// Access the full blocked relay list
+let blockedRelays = sessionData.blockedRelays  // Set<String>
+```
+
+### Combined Example
+
+```swift
+// Load all protective lists
+let sessionData = try await ndk.startSession(
+    signer: signer,
+    config: NDKSessionConfiguration(
+        dataRequirements: [.followList, .muteList, .blockedRelays],
+        preloadStrategy: .progressive
+    )
+)
+
+// Create a filter with automatic mute filtering
+let protectedFeed = ReactiveFilter(
+    dependencies: [.followList],
+    builder: { sessionData in
+        NDKFilter(
+            authors: Array(sessionData.followList),
+            kinds: [EventKind.textNote]
+        )
+    }
+)
+
+// Events are automatically filtered
+for await event in ndk.observe(protectedFeed) {
+    // This event:
+    // - Is from someone you follow
+    // - Is NOT from a muted pubkey
+    // - Was NOT fetched from blocked relays
+}
 ```
 
 ## Web of Trust (WOT)
