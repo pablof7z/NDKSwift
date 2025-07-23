@@ -196,7 +196,7 @@ struct ProfileStatView: View {
     
     var body: some View {
         VStack(spacing: 4) {
-            Text("\(displayValue)")
+            Text(displayValue < 0 ? "N/A" : "\(displayValue)")
                 .font(OlasDesign.Typography.title)
                 .foregroundColor(OlasDesign.Colors.text)
                 .contentTransition(.numericText())
@@ -410,17 +410,19 @@ class ProfileViewModel: ObservableObject {
             }
         }
         
-        // Observe posts with images
+        // Observe picture posts (NIP-68)
         Task {
             let filter = NDKFilter(
                 authors: [pubkey],
-                kinds: [1]
+                kinds: [EventKind.image]
             )
             
             let dataSource = ndk.observe(filter: filter, cachePolicy: .cacheWithNetwork)
             
             for await event in dataSource.events {
-                let imageURLs = extractImageURLs(from: event.content)
+                // Extract image URLs using NDKEvent's built-in imeta support
+                let imageURLs = event.imageURLs
+                
                 if !imageURLs.isEmpty {
                     let post = ProfilePost(event: event, imageURLs: imageURLs)
                     await MainActor.run {
@@ -436,6 +438,9 @@ class ProfileViewModel: ObservableObject {
         
         // Load follower counts
         loadFollowerCounts()
+        
+        // Load replies (NIP-22 comments)
+        loadReplies()
     }
     
     func toggleFollow() {
@@ -485,47 +490,59 @@ class ProfileViewModel: ObservableObject {
     }
     
     private func loadFollowerCounts() {
-        // For now, use placeholder values
-        // In a real implementation, this would query relay for follower events
+        guard let ndk = ndk else { return }
+        
         Task {
+            // Load following count from contact list (kind 3)
+            let contactFilter = NDKFilter(
+                authors: [pubkey],
+                kinds: [3],  // Contact list
+                limit: 1
+            )
+            
+            let dataSource = ndk.observe(filter: contactFilter, cachePolicy: .cacheWithNetwork)
+            let events = await dataSource.collect(timeout: 3.0)
+            if let contactList = events.first {
+                // Count 'p' tags in contact list
+                let followingCount = contactList.tags.filter { $0.count >= 2 && $0[0] == "p" }.count
+                await MainActor.run {
+                    self.followingCount = followingCount
+                }
+            } else {
+                await MainActor.run {
+                    self.followingCount = 0
+                }
+            }
+            
+            // Follower count is complex and resource-intensive to calculate
+            // Set to -1 to indicate N/A in the UI
             await MainActor.run {
-                followersCount = Int.random(in: 100...10000)
-                followingCount = Int.random(in: 50...1000)
+                followersCount = -1  // Will display as N/A
             }
         }
     }
     
-    private func extractImageURLs(from content: String) -> [String] {
-        var urls: [String] = []
-        let urlPattern = #"https?://[^\s<>"{}|\\^\[\]`]+"#
+    private func loadReplies() {
+        guard let ndk = ndk else { return }
         
-        do {
-            let regex = try NSRegularExpression(pattern: urlPattern, options: [])
-            let matches = regex.matches(in: content, options: [], range: NSRange(content.startIndex..., in: content))
+        // Load comments (NIP-22)
+        Task {
+            let filter = NDKFilter(
+                authors: [pubkey],
+                kinds: [EventKind.genericReply]
+            )
             
-            for match in matches {
-                if let range = Range(match.range, in: content) {
-                    let urlString = String(content[range])
-                    
-                    let imageExtensions = [".jpg", ".jpeg", ".png", ".gif", ".webp", ".heic"]
-                    let lowercasedURL = urlString.lowercased()
-                    
-                    if imageExtensions.contains(where: { lowercasedURL.contains($0) }) {
-                        urls.append(urlString)
-                        continue
-                    }
-                    
-                    let imageHosts = ["imgur.com", "i.imgur.com", "nostr.build", "void.cat", "imgprxy.stacker.news"]
-                    if imageHosts.contains(where: { lowercasedURL.contains($0) }) {
-                        urls.append(urlString)
+            let dataSource = ndk.observe(filter: filter, cachePolicy: .cacheWithNetwork)
+            
+            for await event in dataSource.events {
+                await MainActor.run {
+                    if !replies.contains(where: { $0.id == event.id }) {
+                        replies.append(event)
+                        replies.sort { $0.createdAt > $1.createdAt }
                     }
                 }
             }
-        } catch {
-            print("Error extracting URLs: \(error)")
         }
-        
-        return urls
     }
 }
 

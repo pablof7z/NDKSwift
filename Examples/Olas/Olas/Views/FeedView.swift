@@ -355,9 +355,8 @@ class FeedViewModel: ObservableObject {
         feedTask?.cancel()
         
         feedTask = Task {
-            // Subscribe to kind 20 (picture posts) as per Olas spec
-            // Also include kind 1 posts that contain images for compatibility
-            let filter = NDKFilter(kinds: [20, 1], limit: 100)
+            // Subscribe to picture posts - NIP-68
+            let filter = NDKFilter(kinds: [EventKind.image], limit: 100)
             
             // Create data source using observe with reactive pattern
             let dataSource = ndk.observe(
@@ -367,11 +366,8 @@ class FeedViewModel: ObservableObject {
             )
             
             for await event in dataSource.events {
-                // For kind 20, we expect imeta tags or image URLs
-                // For kind 1, check if it contains image URLs
-                let hasImages = event.kind == 20 || containsImageURL(event.content)
-                
-                if hasImages {
+                // For image events, we expect imeta tags
+                if event.kind == EventKind.image {
                     let feedItem = FeedItem(from: event)
                     
                     await MainActor.run {
@@ -479,14 +475,31 @@ class FeedViewModel: ObservableObject {
                 cachePolicy: .cacheWithNetwork
             )
             
-            // Observe replies (kind 1 referencing this event)
+            // Observe comments (NIP-22)
             let repliesFilter = NDKFilter(
-                kinds: [1],
-                events: [eventId]
+                kinds: [EventKind.genericReply],
+                tags: [
+                    "E": Set([eventId]),  // Comments on this as root
+                    "e": Set([eventId])   // Or as parent
+                ]
             )
             
             let repliesDataSource = ndk.observe(
                 filter: repliesFilter,
+                maxAge: 0,
+                cachePolicy: .cacheWithNetwork
+            )
+            
+            // Observe zaps (kind 9735)
+            let zapsFilter = NDKFilter(
+                kinds: [9735],  // NIP-57 zap receipts
+                tags: [
+                    "e": Set([eventId])  // Zaps for this event
+                ]
+            )
+            
+            let zapsDataSource = ndk.observe(
+                filter: zapsFilter,
                 maxAge: 0,
                 cachePolicy: .cacheWithNetwork
             )
@@ -510,11 +523,23 @@ class FeedViewModel: ObservableObject {
                         }
                     }
                 }
+                
+                group.addTask {
+                    for await zapReceipt in zapsDataSource.events {
+                        // Extract zap amount from bolt11 tag
+                        let zapAmount = await self.extractZapAmount(from: zapReceipt)
+                        if zapAmount > 0 {
+                            await MainActor.run {
+                                self.updateEngagement(for: eventId, type: .zap, amount: zapAmount)
+                            }
+                        }
+                    }
+                }
             }
         }
     }
     
-    private func updateEngagement(for eventId: String, type: EngagementType, increment: Bool) {
+    private func updateEngagement(for eventId: String, type: EngagementType, increment: Bool = true, amount: Int = 0) {
         guard let index = items.firstIndex(where: { $0.event.id == eventId }) else { return }
         
         switch type {
@@ -523,13 +548,38 @@ class FeedViewModel: ObservableObject {
         case .reply:
             items[index].replyCount += increment ? 1 : -1
         case .zap:
-            // TODO: Implement zap counting
-            break
+            items[index].zapAmount += amount
         }
     }
     
     enum EngagementType {
         case like, reply, zap
+    }
+    
+    private func extractZapAmount(from zapReceipt: NDKEvent) -> Int {
+        // NIP-57: Zap receipts contain a "bolt11" tag with the invoice
+        // and a "description" tag with the zap request
+        if let bolt11Tag = zapReceipt.tags.first(where: { $0.count >= 2 && $0[0] == "bolt11" }) {
+            let _ = bolt11Tag[1]
+            // Parse the amount from the bolt11 invoice
+            // For now, extract amount from description tag if available
+            if let descriptionTag = zapReceipt.tags.first(where: { $0.count >= 2 && $0[0] == "description" }),
+               let descriptionData = descriptionTag[1].data(using: .utf8),
+               let zapRequest = try? JSONSerialization.jsonObject(with: descriptionData) as? [String: Any],
+               let amountString = zapRequest["amount"] as? String,
+               let amountMsat = Int(amountString) {
+                // Convert millisats to sats
+                return amountMsat / 1000
+            }
+        }
+        
+        // Try to get amount from amount tag (some implementations use this)
+        if let amountTag = zapReceipt.tags.first(where: { $0.count >= 2 && $0[0] == "amount" }),
+           let amount = Int(amountTag[1]) {
+            return amount / 1000  // Convert millisats to sats
+        }
+        
+        return 0
     }
 }
 
@@ -546,14 +596,8 @@ struct FeedItem: Identifiable {
         self.id = event.id
         self.event = event
         
-        // Extract images based on event kind
-        if event.kind == 20 {
-            // Kind 20 should have imeta tags
-            self.imageURLs = FeedItem.extractImagesFromTags(event.tags)
-        } else {
-            // Kind 1 - extract from content
-            self.imageURLs = FeedItem.extractImageURLs(from: event.content)
-        }
+        // Extract images from imeta tags (NIP-68 requires imeta tags)
+        self.imageURLs = event.imageURLs
     }
     
     static func extractImageURLs(from content: String) -> [String] {
@@ -594,35 +638,9 @@ struct FeedItem: Identifiable {
         return urls
     }
     
-    static func extractImagesFromTags(_ tags: [[String]]) -> [String] {
-        var imageURLs: [String] = []
-        
-        // Look for imeta tags (NIP-92)
-        for tag in tags {
-            if tag.count >= 2 && tag[0] == "imeta" {
-                // Parse imeta tag values
-                for i in 1..<tag.count {
-                    let parts = tag[i].components(separatedBy: " ")
-                    for part in parts {
-                        if part.hasPrefix("url=") {
-                            let url = String(part.dropFirst(4))
-                            imageURLs.append(url)
-                        }
-                    }
-                }
-            }
-        }
-        
-        // Fallback: look for regular URL tags
-        if imageURLs.isEmpty {
-            for tag in tags {
-                if tag.count >= 2 && tag[0] == "r" && isImageURL(tag[1]) {
-                    imageURLs.append(tag[1])
-                }
-            }
-        }
-        
-        return imageURLs
+    static func extractImagesFromEvent(_ event: NDKEvent) -> [String] {
+        // Use NDKSwift's built-in imeta support
+        return event.imageURLs
     }
     
     private static func isImageURL(_ url: String) -> Bool {

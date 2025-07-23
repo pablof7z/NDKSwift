@@ -321,7 +321,15 @@ class CameraModel: NSObject, ObservableObject {
         // Add photo output
         if session.canAddOutput(photoOutput) {
             session.addOutput(photoOutput)
-            photoOutput.isHighResolutionCaptureEnabled = true
+            if #available(iOS 16.0, *) {
+                // Use maxPhotoDimensions for iOS 16+
+                if let format = camera.activeFormat.supportedMaxPhotoDimensions.first {
+                    photoOutput.maxPhotoDimensions = format
+                }
+            } else {
+                // Fallback for older iOS versions
+                photoOutput.isHighResolutionCaptureEnabled = true
+            }
         }
         
         session.commitConfiguration()
