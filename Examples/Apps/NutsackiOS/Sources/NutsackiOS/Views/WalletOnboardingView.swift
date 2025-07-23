@@ -428,16 +428,6 @@ struct WalletOnboardingView: View {
             for await mints in discoveryManager.discoverMintsStream() {
                 await MainActor.run {
                     self.discoveredMints = mints
-                    
-                    // Stop discovering after getting a reasonable number of mints
-                    if mints.count >= 5 {
-                        isDiscoveringMints = false
-                    }
-                }
-                
-                // Break after first batch for onboarding
-                if mints.count >= 5 {
-                    break
                 }
             }
             
@@ -599,17 +589,24 @@ struct OnboardingRelayRowView: View {
     var body: some View {
         Button(action: onTap) {
             HStack(spacing: 16) {
-                // Selection indicator
+                // Relay icon
                 ZStack {
                     Circle()
-                        .stroke(isSelected ? Color.orange : Color.white.opacity(0.3), lineWidth: 2)
-                        .frame(width: 24, height: 24)
+                        .fill(
+                            LinearGradient(
+                                gradient: Gradient(colors: [
+                                    Color.orange.opacity(0.2),
+                                    Color.orange.opacity(0.1)
+                                ]),
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
+                        .frame(width: 48, height: 48)
                     
-                    if isSelected {
-                        Circle()
-                            .fill(Color.orange)
-                            .frame(width: 16, height: 16)
-                    }
+                    Image(systemName: "antenna.radiowaves.left.and.right")
+                        .font(.system(size: 22))
+                        .foregroundColor(.orange)
                 }
                 
                 // Relay info
@@ -653,98 +650,398 @@ struct MintSelectionView: View {
     let discoveredMints: [DiscoveredMint]
     let isDiscoveringMints: Bool
     
+    @State private var manualMintURL = ""
+    @State private var showManualInput = false
+    @State private var isAddingMint = false
+    @State private var addMintError: String?
+    @Environment(WalletManager.self) private var walletManager
+    
+    var sortedMints: [DiscoveredMint] {
+        discoveredMints.sorted { first, second in
+            // Sort by presence of icon first (mints with icons come first)
+            if (first.mintInfo?.iconURL != nil) != (second.mintInfo?.iconURL != nil) {
+                return first.mintInfo?.iconURL != nil
+            }
+            // Then by recommendation count
+            if first.recommendedBy.count != second.recommendedBy.count {
+                return first.recommendedBy.count > second.recommendedBy.count
+            }
+            // Then by announcement date
+            let firstDate = first.announcementCreatedAt ?? 0
+            let secondDate = second.announcementCreatedAt ?? 0
+            return firstDate > secondDate
+        }
+    }
+    
     var body: some View {
         VStack(spacing: 20) {
-            // Info card
-            HStack(spacing: 12) {
-                Image(systemName: "info.circle.fill")
+            infoCard
+            mintListContent
+            selectedCountView
+        }
+    }
+    
+    @ViewBuilder
+    private var infoCard: some View {
+        HStack(spacing: 12) {
+            Image(systemName: "info.circle.fill")
+                .font(.system(size: 20))
+                .foregroundColor(.green.opacity(0.8))
+            
+            Text("Mints are custodial services that issue ecash tokens. Select multiple mints to spread risk.")
+                .font(.system(size: 12))
+                .foregroundColor(Color.white.opacity(0.7))
+                .fixedSize(horizontal: false, vertical: true)
+            
+            Spacer()
+        }
+        .padding(16)
+        .background(infoCardBackground)
+    }
+    
+    @ViewBuilder
+    private var infoCardBackground: some View {
+        RoundedRectangle(cornerRadius: 12)
+            .fill(Color.green.opacity(0.1))
+            .overlay(
+                RoundedRectangle(cornerRadius: 12)
+                    .stroke(Color.green.opacity(0.2), lineWidth: 1)
+            )
+    }
+    
+    @ViewBuilder
+    private var mintListContent: some View {
+        if isDiscoveringMints && discoveredMints.isEmpty {
+            discoveringView
+        } else if discoveredMints.isEmpty {
+            emptyStateView
+        } else {
+            mintScrollView
+        }
+    }
+    
+    @ViewBuilder
+    private var discoveringView: some View {
+        VStack(spacing: 16) {
+            ProgressView()
+                .scaleEffect(1.2)
+                .progressViewStyle(CircularProgressViewStyle(tint: .green))
+            
+            Text("Discovering mints...")
+                .font(.system(size: 16, weight: .medium))
+                .foregroundColor(Color.white.opacity(0.7))
+        }
+        .frame(maxHeight: 300)
+        .frame(maxWidth: .infinity)
+    }
+    
+    @ViewBuilder
+    private var emptyStateView: some View {
+        VStack(spacing: 16) {
+            Image(systemName: "exclamationmark.triangle")
+                .font(.system(size: 40))
+                .foregroundColor(.yellow)
+            
+            Text("No mints discovered")
+                .font(.system(size: 16, weight: .medium))
+                .foregroundColor(Color.white.opacity(0.7))
+            
+            Text("Check your internet connection and try again")
+                .font(.system(size: 14))
+                .foregroundColor(Color.white.opacity(0.5))
+                .multilineTextAlignment(.center)
+        }
+        .frame(maxHeight: 300)
+        .frame(maxWidth: .infinity)
+    }
+    
+    @ViewBuilder
+    private var mintScrollView: some View {
+        ScrollView {
+            VStack(spacing: 12) {
+                customMintSection
+                discoveredMintsSection
+                manuallyAddedMintsSection
+            }
+        }
+        .scrollIndicators(.hidden)
+    }
+    
+    @ViewBuilder
+    private var customMintSection: some View {
+        VStack(spacing: 12) {
+            customMintHeader
+            
+            if showManualInput {
+                customMintInputSection
+                    .transition(.opacity.combined(with: .move(edge: .top)))
+            }
+        }
+        .padding(12)
+        .background(sectionBackground)
+    }
+    
+    @ViewBuilder
+    private var customMintHeader: some View {
+        HStack {
+            Text("Add Custom Mint")
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundColor(Color.white.opacity(0.9))
+            
+            Spacer()
+            
+            Button(action: toggleManualInput) {
+                Image(systemName: showManualInput ? "minus.circle.fill" : "plus.circle.fill")
                     .font(.system(size: 20))
-                    .foregroundColor(.green.opacity(0.8))
-                
-                Text("Mints are custodial services that issue ecash tokens. Select multiple mints to spread risk.")
+                    .foregroundColor(.green)
+            }
+        }
+        .padding(.horizontal, 4)
+    }
+    
+    @ViewBuilder
+    private var customMintInputSection: some View {
+        VStack(spacing: 8) {
+            HStack(spacing: 8) {
+                mintURLTextField
+                addMintButton
+            }
+            
+            if let error = addMintError {
+                Text(error)
                     .font(.system(size: 12))
+                    .foregroundColor(.red)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal, 4)
+            }
+        }
+    }
+    
+    @ViewBuilder
+    private var mintURLTextField: some View {
+        TextField("https://mint.example.com", text: $manualMintURL)
+            .textFieldStyle(PlainTextFieldStyle())
+            .font(.system(size: 14, design: .monospaced))
+            .foregroundColor(.white)
+            .padding(12)
+            .background(textFieldBackground)
+            .autocapitalization(.none)
+            .disableAutocorrection(true)
+    }
+    
+    @ViewBuilder
+    private var textFieldBackground: some View {
+        RoundedRectangle(cornerRadius: 10)
+            .fill(Color.white.opacity(0.1))
+            .overlay(
+                RoundedRectangle(cornerRadius: 10)
+                    .stroke(Color.white.opacity(0.2), lineWidth: 1)
+            )
+    }
+    
+    @ViewBuilder
+    private var addMintButton: some View {
+        Button(action: addManualMint) {
+            if isAddingMint {
+                ProgressView()
+                    .scaleEffect(0.8)
+                    .frame(width: 44, height: 44)
+                    .background(Color.green)
+                    .clipShape(RoundedRectangle(cornerRadius: 10))
+            } else {
+                Image(systemName: "plus")
+                    .font(.system(size: 18, weight: .semibold))
+                    .foregroundColor(.white)
+                    .frame(width: 44, height: 44)
+                    .background(manualMintURL.isEmpty ? Color.gray : Color.green)
+                    .clipShape(RoundedRectangle(cornerRadius: 10))
+            }
+        }
+        .disabled(manualMintURL.isEmpty || isAddingMint)
+    }
+    
+    @ViewBuilder
+    private var sectionBackground: some View {
+        RoundedRectangle(cornerRadius: 12)
+            .fill(Color.white.opacity(0.05))
+            .overlay(
+                RoundedRectangle(cornerRadius: 12)
+                    .stroke(Color.white.opacity(0.1), lineWidth: 1)
+            )
+    }
+    
+    @ViewBuilder
+    private var discoveredMintsSection: some View {
+        ForEach(sortedMints, id: \.url) { mint in
+            MintRowView(
+                mint: mint,
+                isSelected: selectedMints.contains(mint.url),
+                onTap: { toggleMintSelection(mint.url) }
+            )
+        }
+    }
+    
+    @ViewBuilder
+    private var manuallyAddedMintsSection: some View {
+        let customMints = selectedMints.subtracting(Set(discoveredMints.map { $0.url }))
+        ForEach(Array(customMints), id: \.self) { mintURL in
+            CustomMintRowView(
+                mintURL: mintURL,
+                isSelected: true,
+                onTap: { removeMint(mintURL) }
+            )
+        }
+    }
+    
+    @ViewBuilder
+    private var selectedCountView: some View {
+        if !selectedMints.isEmpty {
+            HStack {
+                Image(systemName: "checkmark.circle.fill")
+                    .font(.system(size: 16))
+                    .foregroundColor(.green)
+                
+                Text("\(selectedMints.count) mint\(selectedMints.count == 1 ? "" : "s") selected")
+                    .font(.system(size: 14, weight: .medium))
                     .foregroundColor(Color.white.opacity(0.7))
-                    .fixedSize(horizontal: false, vertical: true)
+                
+                Spacer()
+            }
+        }
+    }
+    
+    private func toggleManualInput() {
+        withAnimation(.easeInOut(duration: 0.3)) {
+            showManualInput.toggle()
+            manualMintURL = ""
+            addMintError = nil
+        }
+    }
+    
+    private func toggleMintSelection(_ url: String) {
+        withAnimation(.easeInOut(duration: 0.2)) {
+            if selectedMints.contains(url) {
+                selectedMints.remove(url)
+            } else {
+                selectedMints.insert(url)
+            }
+        }
+    }
+    
+    private func removeMint(_ url: String) {
+        withAnimation(.easeInOut(duration: 0.2)) {
+            selectedMints.remove(url)
+        }
+    }
+    
+    private func addManualMint() {
+        let trimmedURL = manualMintURL.trimmingCharacters(in: .whitespacesAndNewlines)
+        
+        // Validate URL
+        guard !trimmedURL.isEmpty,
+              let url = URL(string: trimmedURL),
+              url.scheme == "https" || url.scheme == "http" else {
+            addMintError = "Please enter a valid mint URL (e.g., https://mint.example.com)"
+            return
+        }
+        
+        // Check if already added
+        if selectedMints.contains(trimmedURL) || discoveredMints.contains(where: { $0.url == trimmedURL }) {
+            addMintError = "This mint has already been added"
+            return
+        }
+        
+        // Add to selected mints
+        withAnimation(.easeInOut(duration: 0.2)) {
+            selectedMints.insert(trimmedURL)
+            manualMintURL = ""
+            showManualInput = false
+            addMintError = nil
+        }
+    }
+}
+
+// MARK: - Custom Mint Row View
+struct CustomMintRowView: View {
+    let mintURL: String
+    let isSelected: Bool
+    let onTap: () -> Void
+    @Environment(WalletManager.self) private var walletManager
+    @State private var mintInfo: NDKMintInfo?
+    
+    var displayName: String {
+        if let name = mintInfo?.name, !name.isEmpty {
+            return name
+        } else if let url = URL(string: mintURL), let host = url.host {
+            return host
+        } else {
+            return "Custom Mint"
+        }
+    }
+    
+    var body: some View {
+        Button(action: onTap) {
+            HStack(spacing: 16) {
+                // Mint icon
+                MintIconView(
+                    mint: DiscoveredMint(url: mintURL, name: displayName),
+                    mintInfo: mintInfo
+                )
+                
+                // Mint info
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(displayName)
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundColor(.white)
+                    
+                    if let description = mintInfo?.description, !description.isEmpty {
+                        Text(description)
+                            .font(.system(size: 14))
+                            .foregroundColor(Color.white.opacity(0.7))
+                            .lineLimit(2)
+                    } else {
+                        Text("Custom mint")
+                            .font(.system(size: 14))
+                            .foregroundColor(Color.white.opacity(0.5))
+                    }
+                    
+                    Text(mintURL)
+                        .font(.system(size: 11, design: .monospaced))
+                        .foregroundColor(Color.white.opacity(0.4))
+                        .lineLimit(1)
+                        .truncationMode(.middle)
+                }
                 
                 Spacer()
             }
             .padding(16)
             .background(
-                RoundedRectangle(cornerRadius: 12)
-                    .fill(Color.green.opacity(0.1))
+                RoundedRectangle(cornerRadius: 16)
+                    .fill(isSelected ? Color.green.opacity(0.15) : Color.white.opacity(0.05))
                     .overlay(
-                        RoundedRectangle(cornerRadius: 12)
-                            .stroke(Color.green.opacity(0.2), lineWidth: 1)
+                        RoundedRectangle(cornerRadius: 16)
+                            .stroke(isSelected ? Color.green.opacity(0.5) : Color.white.opacity(0.1), lineWidth: 1)
                     )
             )
-            
-            // Mint list
-            if isDiscoveringMints && discoveredMints.isEmpty {
-                VStack(spacing: 16) {
-                    ProgressView()
-                        .scaleEffect(1.2)
-                        .progressViewStyle(CircularProgressViewStyle(tint: .green))
-                    
-                    Text("Discovering mints...")
-                        .font(.system(size: 16, weight: .medium))
-                        .foregroundColor(Color.white.opacity(0.7))
-                }
-                .frame(maxHeight: 300)
-                .frame(maxWidth: .infinity)
-            } else if discoveredMints.isEmpty {
-                VStack(spacing: 16) {
-                    Image(systemName: "exclamationmark.triangle")
-                        .font(.system(size: 40))
-                        .foregroundColor(.yellow)
-                    
-                    Text("No mints discovered")
-                        .font(.system(size: 16, weight: .medium))
-                        .foregroundColor(Color.white.opacity(0.7))
-                    
-                    Text("Check your internet connection and try again")
-                        .font(.system(size: 14))
-                        .foregroundColor(Color.white.opacity(0.5))
-                        .multilineTextAlignment(.center)
-                }
-                .frame(maxHeight: 300)
-                .frame(maxWidth: .infinity)
-            } else {
-                ScrollView {
-                    VStack(spacing: 12) {
-                        ForEach(discoveredMints, id: \.url) { mint in
-                            MintRowView(
-                                mint: mint,
-                                isSelected: selectedMints.contains(mint.url),
-                                onTap: {
-                                    withAnimation(.easeInOut(duration: 0.2)) {
-                                        if selectedMints.contains(mint.url) {
-                                            selectedMints.remove(mint.url)
-                                        } else {
-                                            selectedMints.insert(mint.url)
-                                        }
-                                    }
-                                }
-                            )
-                        }
-                    }
-                }
-                .scrollIndicators(.hidden)
+        }
+        .buttonStyle(PlainButtonStyle())
+        .task {
+            await loadMintInfo()
+        }
+    }
+    
+    private func loadMintInfo() async {
+        guard mintInfo == nil,
+              let wallet = walletManager.activeWallet,
+              let url = URL(string: mintURL) else { return }
+        
+        do {
+            let info = try await wallet.mints.getMintInfo(url: url)
+            await MainActor.run {
+                self.mintInfo = info
             }
-            
-            // Selected count
-            if !selectedMints.isEmpty {
-                HStack {
-                    Image(systemName: "checkmark.circle.fill")
-                        .font(.system(size: 16))
-                        .foregroundColor(.green)
-                    
-                    Text("\(selectedMints.count) mint\(selectedMints.count == 1 ? "" : "s") selected")
-                        .font(.system(size: 14, weight: .medium))
-                        .foregroundColor(Color.white.opacity(0.7))
-                    
-                    Spacer()
-                }
-            }
+        } catch {
+            // Silently fail - we'll just use the default icon
         }
     }
 }
@@ -754,42 +1051,15 @@ struct MintRowView: View {
     let mint: DiscoveredMint
     let isSelected: Bool
     let onTap: () -> Void
+    @Environment(WalletManager.self) private var walletManager
+    @State private var mintInfo: NDKMintInfo?
+    @State private var isLoadingIcon = false
     
     var body: some View {
         Button(action: onTap) {
             HStack(spacing: 16) {
-                // Selection indicator
-                ZStack {
-                    Circle()
-                        .stroke(isSelected ? Color.green : Color.white.opacity(0.3), lineWidth: 2)
-                        .frame(width: 24, height: 24)
-                    
-                    if isSelected {
-                        Circle()
-                            .fill(Color.green)
-                            .frame(width: 16, height: 16)
-                    }
-                }
-                
                 // Mint icon
-                ZStack {
-                    RoundedRectangle(cornerRadius: 12)
-                        .fill(
-                            LinearGradient(
-                                gradient: Gradient(colors: [
-                                    Color.green.opacity(0.2),
-                                    Color.green.opacity(0.1)
-                                ]),
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
-                            )
-                        )
-                        .frame(width: 48, height: 48)
-                    
-                    Image(systemName: "building.columns")
-                        .font(.system(size: 22))
-                        .foregroundColor(.green)
-                }
+                MintIconView(mint: mint, mintInfo: mintInfo)
                 
                 // Mint info
                 VStack(alignment: .leading, spacing: 4) {
@@ -797,16 +1067,16 @@ struct MintRowView: View {
                         .font(.system(size: 16, weight: .semibold))
                         .foregroundColor(.white)
                     
-                    if let description = mint.description {
+                    if let description = mint.description, !description.isEmpty {
                         Text(description)
-                            .font(.system(size: 12))
-                            .foregroundColor(Color.white.opacity(0.6))
+                            .font(.system(size: 14))
+                            .foregroundColor(Color.white.opacity(0.7))
                             .lineLimit(2)
-                    } else if !mint.recommendedBy.isEmpty {
-                        Text("Recommended by \(mint.recommendedBy.count) user\(mint.recommendedBy.count == 1 ? "" : "s")")
-                            .font(.system(size: 12))
-                            .foregroundColor(Color.white.opacity(0.6))
-                            .lineLimit(1)
+                    } else if let mintDescription = mintInfo?.description, !mintDescription.isEmpty {
+                        Text(mintDescription)
+                            .font(.system(size: 14))
+                            .foregroundColor(Color.white.opacity(0.7))
+                            .lineLimit(2)
                     }
                     
                     Text(mint.url)
@@ -829,6 +1099,83 @@ struct MintRowView: View {
             )
         }
         .buttonStyle(PlainButtonStyle())
+        .task {
+            await loadMintInfo()
+        }
+    }
+    
+    private func loadMintInfo() async {
+        guard mintInfo == nil,
+              let wallet = walletManager.activeWallet,
+              let url = URL(string: mint.url) else { return }
+        
+        do {
+            let info = try await wallet.mints.getMintInfo(url: url)
+            await MainActor.run {
+                self.mintInfo = info
+            }
+        } catch {
+            // Silently fail - we'll just use the default icon
+        }
+    }
+}
+
+// MARK: - Mint Icon View
+struct MintIconView: View {
+    let mint: DiscoveredMint
+    let mintInfo: NDKMintInfo?
+    @State private var hasError = false
+    
+    var body: some View {
+        ZStack {
+            RoundedRectangle(cornerRadius: 12)
+                .fill(
+                    LinearGradient(
+                        gradient: Gradient(colors: [
+                            Color.green.opacity(0.2),
+                            Color.green.opacity(0.1)
+                        ]),
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                )
+                .frame(width: 48, height: 48)
+            
+            if let iconURL = mintInfo?.iconURL,
+               !iconURL.isEmpty,
+               let url = URL(string: iconURL),
+               !hasError {
+                AsyncImage(url: url) { phase in
+                    switch phase {
+                    case .empty:
+                        ProgressView()
+                            .scaleEffect(0.5)
+                            .frame(width: 48, height: 48)
+                    case .success(let image):
+                        image
+                            .resizable()
+                            .aspectRatio(contentMode: .fit)
+                            .frame(width: 40, height: 40)
+                            .clipShape(RoundedRectangle(cornerRadius: 8))
+                    case .failure(_):
+                        Image(systemName: "building.columns")
+                            .font(.system(size: 22))
+                            .foregroundColor(.green)
+                            .onAppear {
+                                hasError = true
+                            }
+                    @unknown default:
+                        Image(systemName: "building.columns")
+                            .font(.system(size: 22))
+                            .foregroundColor(.green)
+                    }
+                }
+            } else {
+                Image(systemName: "building.columns")
+                    .font(.system(size: 22))
+                    .foregroundColor(.green)
+            }
+        }
     }
 }
 
