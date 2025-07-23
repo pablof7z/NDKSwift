@@ -51,9 +51,12 @@ enum OlasDesign {
         static let textSecondary = Color.white.opacity(0.7)
         static let textTertiary = Color.white.opacity(0.5)
         static let divider = Color.white.opacity(0.1)
+        static let border = Color.white.opacity(0.15)
         static let error = Color(hex: "FF6B6B")
         static let success = Color(hex: "4ECDC4")
+        static let warning = Color(hex: "FFA726")
         static let primary = Color(hex: "667eea") // Default to day color
+        static let secondary = Color(hex: "764ba2")
     }
     
     // MARK: - Typography
@@ -163,6 +166,18 @@ enum OlasDesign {
             // No haptic feedback on macOS
         }
         #endif
+        
+        static func success() {
+            #if os(iOS)
+            notification(.success)
+            #endif
+        }
+        
+        static func error() {
+            #if os(iOS)
+            notification(.error)
+            #endif
+        }
     }
 }
 
