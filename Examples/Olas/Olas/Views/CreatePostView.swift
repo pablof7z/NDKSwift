@@ -430,7 +430,6 @@ struct CreatePostView: View {
             }
             
             // 1. Upload images to Blossom
-            var imageUrls: [String] = []
             var imetaTags: [[String]] = []
             let progressPerImage = 0.8 / Double(selectedImageData.count)
             
@@ -517,31 +516,15 @@ struct CreatePostView: View {
                     imetaTags.append(imetaTag)
                 }
                 
-                if let url = uploadedUrl {
-                    imageUrls.append(url)
-                }
-                
                 uploadProgress += progressPerImage
             }
             
-            // 2. Create event content
-            var content = caption
-            
-            // Add image URLs to content if not already present
-            for url in imageUrls {
-                if !content.contains(url) {
-                    if !content.isEmpty {
-                        content += "\n\n"
-                    }
-                    content += url
-                }
-            }
-            
-            // 3. Create and publish event
+            // 2. Create and publish event
+            // Use kind 20 for picture posts as per Olas spec
             let event = try await ndk.event()
-                .content(content)
-                .kind(1) // kind 1 - text
-                .tags(imetaTags)
+                .content(caption) // Only caption in content for kind 20
+                .kind(20) // kind 20 - picture post
+                .tags(imetaTags) // Image metadata in tags
                 .build(signer: signer)
             
             uploadProgress = 0.9

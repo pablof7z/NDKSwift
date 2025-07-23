@@ -3,14 +3,11 @@ import NDKSwift
 
 struct ExploreView: View {
     @EnvironmentObject var appState: AppState
+    @StateObject private var viewModel = ExploreViewModel()
     @State private var searchText = ""
     @State private var selectedCategory: ExploreCategory = .trending
-    @State private var posts: [NDKEvent] = []
-    @State private var profiles: [String: NDKUserProfile] = [:]
-    @State private var trendingHashtags: [TrendingHashtag] = []
     @State private var showingHashtagView = false
     @State private var selectedHashtag = ""
-    @State private var isLoading = true
     
     private let columns = [
         GridItem(.flexible(), spacing: 1),
@@ -83,13 +80,13 @@ struct ExploreView: View {
                             .padding(.bottom, OlasDesign.Spacing.md)
                         
                         // Trending hashtags (only show for trending category)
-                        if selectedCategory == .trending && !trendingHashtags.isEmpty {
+                        if selectedCategory == .trending && !viewModel.trendingHashtags.isEmpty {
                             trendingHashtagsView
                                 .padding(.bottom, OlasDesign.Spacing.md)
                         }
                         
                         // Content
-                        if isLoading {
+                        if viewModel.isLoading {
                             loadingView
                         } else if filteredPosts.isEmpty {
                             emptyStateView
@@ -104,11 +101,13 @@ struct ExploreView: View {
             .navigationBarTitleDisplayMode(.large)
             #endif
             .task {
-                await loadExploreContent()
+                if let ndk = appState.ndk {
+                    viewModel.startObserving(ndk: ndk, category: selectedCategory)
+                }
             }
-            .onChange(of: selectedCategory) { _, _ in
-                Task {
-                    await loadExploreContent()
+            .onChange(of: selectedCategory) { _, newCategory in
+                if let ndk = appState.ndk {
+                    viewModel.changeCategory(to: newCategory, ndk: ndk)
                 }
             }
             .sheet(isPresented: $showingHashtagView) {
@@ -175,7 +174,7 @@ struct ExploreView: View {
             
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: OlasDesign.Spacing.sm) {
-                    ForEach(trendingHashtags) { hashtag in
+                    ForEach(viewModel.trendingHashtags) { hashtag in
                         TrendingHashtagPill(
                             hashtag: hashtag,
                             action: {
@@ -194,15 +193,12 @@ struct ExploreView: View {
     @ViewBuilder
     private var masonryGrid: some View {
         LazyVGrid(columns: columns, spacing: 1) {
-            ForEach(Array(filteredPosts.enumerated()), id: \.element.id) { index, post in
+            ForEach(Array(filteredPosts.enumerated()), id: \.element.id) { index, item in
                 ExploreGridItem(
-                    post: post,
-                    profile: profiles[post.pubkey],
+                    post: item.event,
+                    profile: item.profile,
                     height: gridHeights[index % gridHeights.count]
                 )
-                .onAppear {
-                    loadProfileIfNeeded(for: post.pubkey)
-                }
             }
         }
         .padding(.horizontal, 1)
@@ -251,12 +247,12 @@ struct ExploreView: View {
     
     // MARK: - Data
     
-    private var filteredPosts: [NDKEvent] {
-        posts.filter { post in
+    private var filteredPosts: [ExploreItem] {
+        viewModel.items.filter { item in
             // Filter by search text
             if !searchText.isEmpty {
                 let searchLower = searchText.lowercased()
-                return post.content.lowercased().contains(searchLower)
+                return item.event.content.lowercased().contains(searchLower)
             }
             return true
         }
@@ -266,77 +262,155 @@ struct ExploreView: View {
     private let gridHeights: [CGFloat] = [
         180, 220, 200, 240, 190, 210, 230, 195, 215, 225
     ]
+}
+
+// MARK: - View Model
+
+@MainActor
+class ExploreViewModel: ObservableObject {
+    @Published var items: [ExploreItem] = []
+    @Published var trendingHashtags: [ExploreView.TrendingHashtag] = []
+    @Published var isLoading = false
     
-    // MARK: - Methods
+    private var exploreTask: Task<Void, Never>?
+    private var profileTasks: [String: Task<Void, Never>] = [:]
     
-    private func loadExploreContent() async {
-        guard let ndk = appState.ndk else { return }
+    func startObserving(ndk: NDK, category: ExploreView.ExploreCategory) {
+        // Cancel existing task
+        exploreTask?.cancel()
         
-        await MainActor.run {
-            isLoading = true
-        }
+        isLoading = true
         
-        // Create filter based on category
-        var filter = NDKFilter(kinds: [EventKind.textNote])
-        
-        if selectedCategory != .trending && !selectedCategory.hashtag.isEmpty {
-            // For specific categories, we'd need to filter by hashtag
-            // This would require parsing content for hashtags
-        }
-        
-        filter.limit = 100
-        
-        // Fetch events
-        Task {
-            let dataSource = ndk.observe(filter: filter)
-            let events = await dataSource.collect(timeout: 5.0)
+        exploreTask = Task {
+            // Create filter based on category
+            var filter: NDKFilter
             
-            // Filter posts with images
-            let loadedPosts = events.filter { event in
-                extractImageUrls(from: event.content).count > 0
+            if category == .trending {
+                // For trending, get both kind 20 (picture posts) and kind 1 with images
+                filter = NDKFilter(kinds: [20, 1], limit: 200)
+            } else {
+                // For specific categories, filter by hashtag
+                filter = NDKFilter(
+                    kinds: [20, 1],
+                    limit: 100,
+                    tags: ["t": Set([category.hashtag])]
+                )
             }
             
-            await MainActor.run {
-                self.posts = Array(loadedPosts.prefix(50))
-                isLoading = false
-            }
+            // Create data source with reactive pattern
+            let dataSource = ndk.observe(
+                filter: filter,
+                maxAge: 0,  // Real-time updates
+                cachePolicy: .cacheWithNetwork
+            )
             
-            // Load trending hashtags for trending category
-            if selectedCategory == .trending {
-                await loadTrendingHashtags()
+            for await event in dataSource.events {
+                // Check if has images
+                let imageUrls: [String]
+                if event.kind == 20 {
+                    imageUrls = ExploreItem.extractImagesFromTags(event.tags)
+                } else {
+                    imageUrls = ExploreItem.extractImageURLs(from: event.content)
+                }
+                
+                if !imageUrls.isEmpty {
+                    let item = ExploreItem(event: event, imageUrls: imageUrls)
+                    
+                    await MainActor.run {
+                        // Insert sorted by timestamp
+                        if let insertIndex = items.firstIndex(where: { $0.event.createdAt < event.createdAt }) {
+                            items.insert(item, at: insertIndex)
+                        } else {
+                            items.append(item)
+                        }
+                        
+                        // Limit items for performance
+                        if items.count > 100 {
+                            items.removeLast(items.count - 100)
+                        }
+                        
+                        isLoading = false
+                    }
+                    
+                    // Load profile reactively
+                    loadProfileReactively(for: event.pubkey, ndk: ndk)
+                }
+            }
+        }
+        
+        // Load trending hashtags for trending category
+        if category == .trending {
+            loadTrendingHashtags()
+        }
+    }
+    
+    func changeCategory(to category: ExploreView.ExploreCategory, ndk: NDK) {
+        // Clear existing items
+        items.removeAll()
+        trendingHashtags.removeAll()
+        
+        // Cancel existing tasks
+        exploreTask?.cancel()
+        profileTasks.values.forEach { $0.cancel() }
+        profileTasks.removeAll()
+        
+        // Start new observation
+        startObserving(ndk: ndk, category: category)
+    }
+    
+    private func loadProfileReactively(for pubkey: String, ndk: NDK) {
+        // Cancel existing task if any
+        profileTasks[pubkey]?.cancel()
+        
+        profileTasks[pubkey] = Task {
+            guard let profileManager = ndk.profileManager else { return }
+            
+            for await profile in await profileManager.observe(for: pubkey, maxAge: 3600) {
+                if let profile = profile {
+                    await MainActor.run {
+                        updateItemsWithProfile(pubkey: pubkey, profile: profile)
+                    }
+                }
             }
         }
     }
     
-    private func loadTrendingHashtags() async {
+    private func updateItemsWithProfile(pubkey: String, profile: NDKUserProfile) {
+        for index in items.indices {
+            if items[index].event.pubkey == pubkey {
+                items[index].profile = profile
+            }
+        }
+    }
+    
+    private func loadTrendingHashtags() {
         // For now, use mock data
         // In a real implementation, this would analyze recent posts
-        await MainActor.run {
-            trendingHashtags = [
-                TrendingHashtag(tag: "photography", count: 1234, velocity: 45.2),
-                TrendingHashtag(tag: "nostr", count: 892, velocity: 38.7),
-                TrendingHashtag(tag: "art", count: 756, velocity: 28.3),
-                TrendingHashtag(tag: "bitcoin", count: 623, velocity: 22.1),
-                TrendingHashtag(tag: "nature", count: 489, velocity: 18.5)
-            ]
-        }
+        trendingHashtags = [
+            ExploreView.TrendingHashtag(tag: "photography", count: 1234, velocity: 45.2),
+            ExploreView.TrendingHashtag(tag: "nostr", count: 892, velocity: 38.7),
+            ExploreView.TrendingHashtag(tag: "art", count: 756, velocity: 28.3),
+            ExploreView.TrendingHashtag(tag: "bitcoin", count: 623, velocity: 22.1),
+            ExploreView.TrendingHashtag(tag: "nature", count: 489, velocity: 18.5)
+        ]
+    }
+}
+
+// MARK: - Data Models
+
+struct ExploreItem: Identifiable {
+    let id: String
+    let event: NDKEvent
+    let imageUrls: [String]
+    var profile: NDKUserProfile?
+    
+    init(event: NDKEvent, imageUrls: [String]) {
+        self.id = event.id
+        self.event = event
+        self.imageUrls = imageUrls
     }
     
-    private func loadProfileIfNeeded(for pubkey: String) {
-        guard profiles[pubkey] == nil,
-              let profileManager = appState.profileManager else { return }
-        
-        Task {
-            for await profile in await profileManager.observe(for: pubkey) {
-                await MainActor.run {
-                    profiles[pubkey] = profile
-                }
-                break // Only need the first profile
-            }
-        }
-    }
-    
-    private func extractImageUrls(from content: String) -> [String] {
+    static func extractImageURLs(from content: String) -> [String] {
         let pattern = "(https?://[^\\s]+\\.(jpg|jpeg|png|gif|webp)[^\\s]*)"
         let regex = try? NSRegularExpression(pattern: pattern, options: .caseInsensitive)
         let matches = regex?.matches(in: content, options: [], range: NSRange(content.startIndex..., in: content)) ?? []
@@ -345,5 +419,50 @@ struct ExploreView: View {
             guard let range = Range(match.range, in: content) else { return nil }
             return String(content[range])
         }
+    }
+    
+    static func extractImagesFromTags(_ tags: [[String]]) -> [String] {
+        var imageURLs: [String] = []
+        
+        // Look for imeta tags (NIP-92)
+        for tag in tags {
+            if tag.count >= 2 && tag[0] == "imeta" {
+                // Parse imeta tag values
+                for i in 1..<tag.count {
+                    let parts = tag[i].components(separatedBy: " ")
+                    for part in parts {
+                        if part.hasPrefix("url=") {
+                            let url = String(part.dropFirst(4))
+                            imageURLs.append(url)
+                        }
+                    }
+                }
+            }
+        }
+        
+        // Fallback: look for regular URL tags
+        if imageURLs.isEmpty {
+            for tag in tags {
+                if tag.count >= 2 && tag[0] == "r" && isImageURL(tag[1]) {
+                    imageURLs.append(tag[1])
+                }
+            }
+        }
+        
+        return imageURLs
+    }
+    
+    private static func isImageURL(_ url: String) -> Bool {
+        let imageExtensions = [".jpg", ".jpeg", ".png", ".gif", ".webp", ".heic"]
+        let lowercasedURL = url.lowercased()
+        
+        // Check for direct image extensions
+        if imageExtensions.contains(where: { lowercasedURL.contains($0) }) {
+            return true
+        }
+        
+        // Check for image hosting services
+        let imageHosts = ["imgur.com", "i.imgur.com", "nostr.build", "void.cat", "imgprxy.stacker.news"]
+        return imageHosts.contains(where: { lowercasedURL.contains($0) })
     }
 }

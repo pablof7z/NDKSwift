@@ -35,9 +35,6 @@ struct FeedItemView: View {
     let item: FeedItem
     @EnvironmentObject var appState: AppState
     @State private var isLiked = false
-    @State private var likeCount = 0
-    @State private var replyCount = 0
-    @State private var zapAmount = 0
     @State private var scale: CGFloat = 1.0
     @State private var isZoomed = false
     @State private var showProfile = false
@@ -144,8 +141,8 @@ struct FeedItemView: View {
                             .scaleEffect(isLiked ? 1.1 : 1.0)
                             .olasTextShadow()
                         
-                        if likeCount > 0 {
-                            Text("\(likeCount)")
+                        if item.likeCount > 0 {
+                            Text("\(item.likeCount)")
                                 .font(OlasDesign.Typography.caption)
                                 .foregroundColor(OlasDesign.Colors.textSecondary)
                                 .olasTextShadow()
@@ -164,8 +161,8 @@ struct FeedItemView: View {
                             .foregroundColor(OlasDesign.Colors.text)
                             .olasTextShadow()
                         
-                        if replyCount > 0 {
-                            Text("\(replyCount)")
+                        if item.replyCount > 0 {
+                            Text("\(item.replyCount)")
                                 .font(OlasDesign.Typography.caption)
                                 .foregroundColor(OlasDesign.Colors.textSecondary)
                                 .olasTextShadow()
@@ -178,11 +175,11 @@ struct FeedItemView: View {
                     HStack(spacing: 4) {
                         Image(systemName: "bolt")
                             .font(.title2)
-                            .foregroundColor(zapAmount > 0 ? OlasDesign.Colors.warning : OlasDesign.Colors.text)
+                            .foregroundColor(item.zapAmount > 0 ? OlasDesign.Colors.warning : OlasDesign.Colors.text)
                             .olasTextShadow()
                         
-                        if zapAmount > 0 {
-                            Text("\(zapAmount)")
+                        if item.zapAmount > 0 {
+                            Text("\(item.zapAmount)")
                                 .font(OlasDesign.Typography.caption)
                                 .foregroundColor(OlasDesign.Colors.textSecondary)
                                 .olasTextShadow()
@@ -254,7 +251,6 @@ struct FeedItemView: View {
         
         withAnimation(OlasDesign.Animation.spring) {
             isLiked.toggle()
-            likeCount += isLiked ? 1 : -1
         }
         
         Task {
@@ -278,7 +274,6 @@ struct FeedItemView: View {
                 // Revert on error
                 withAnimation {
                     isLiked.toggle()
-                    likeCount += isLiked ? 1 : -1
                 }
             }
         }
@@ -315,7 +310,7 @@ struct FeedItemView: View {
     private func loadEngagementCounts() async {
         guard let ndk = appState.ndk else { return }
         
-        // Check if we already liked this
+        // Check if we already liked this - reactive pattern
         let authManager = NDKAuthManager.shared
         if let signer = authManager.activeSigner,
            let myPubkey = try? await signer.pubkey {
@@ -325,36 +320,26 @@ struct FeedItemView: View {
                 events: [item.event.id]
             )
             
-            let likeDataSource = ndk.observe(filter: likeFilter, cachePolicy: .cacheOnly)
-            let likes = await likeDataSource.collect(timeout: 1.0)
-            await MainActor.run {
-                isLiked = !likes.isEmpty
+            // Use reactive observe pattern - check cache first
+            let likeDataSource = ndk.observe(
+                filter: likeFilter,
+                maxAge: 3600, // 1 hour cache
+                cachePolicy: .cacheOnly // Only check cache, don't fetch from network
+            )
+            
+            // Check first event to see if we liked it
+            for await reaction in likeDataSource.events {
+                if reaction.content == "+" || reaction.content == "🤙" {
+                    await MainActor.run {
+                        isLiked = true
+                    }
+                }
+                break // Only need to check if any exist
             }
         }
         
-        // Count total reactions
-        let reactionsFilter = NDKFilter(
-            kinds: [7],
-            events: [item.event.id]
-        )
-        
-        let reactionsDataSource = ndk.observe(filter: reactionsFilter, cachePolicy: .cacheOnly)
-        let reactions = await reactionsDataSource.collect(timeout: 1.0)
-        let positiveReactions = reactions.filter { $0.content == "+" || $0.content == "🤙" }
-        
-        // Count replies
-        let repliesFilter = NDKFilter(
-            kinds: [1],
-            events: [item.event.id]
-        )
-        
-        let repliesDataSource = ndk.observe(filter: repliesFilter, cachePolicy: .cacheOnly)
-        let replies = await repliesDataSource.collect(timeout: 1.0)
-        
-        await MainActor.run {
-            likeCount = positiveReactions.count
-            replyCount = replies.count
-        }
+        // Engagement counts are already being loaded reactively by FeedViewModel
+        // No need to duplicate that logic here
     }
 }
 
@@ -362,26 +347,52 @@ struct FeedItemView: View {
 class FeedViewModel: ObservableObject {
     @Published var items: [FeedItem] = []
     private var profileTasks: [String: Task<Void, Never>] = [:]
+    private var feedTask: Task<Void, Never>?
+    private var engagementTasks: [String: Task<Void, Never>] = [:]
     
     func startFeed(with ndk: NDK) {
-        Task {
-            // Subscribe to kind 1 (text notes) that contain images
-            let filter = NDKFilter(kinds: [1])
+        // Cancel any existing feed task
+        feedTask?.cancel()
+        
+        feedTask = Task {
+            // Subscribe to kind 20 (picture posts) as per Olas spec
+            // Also include kind 1 posts that contain images for compatibility
+            let filter = NDKFilter(kinds: [20, 1], limit: 100)
             
-            // Create data source using observe
-            let dataSource = ndk.observe(filter: filter, cachePolicy: .cacheWithNetwork)
+            // Create data source using observe with reactive pattern
+            let dataSource = ndk.observe(
+                filter: filter,
+                maxAge: 0,  // Real-time updates
+                cachePolicy: .cacheWithNetwork
+            )
             
             for await event in dataSource.events {
-                // Only show posts with image URLs
-                if containsImageURL(event.content) {
+                // For kind 20, we expect imeta tags or image URLs
+                // For kind 1, check if it contains image URLs
+                let hasImages = event.kind == 20 || containsImageURL(event.content)
+                
+                if hasImages {
                     let feedItem = FeedItem(from: event)
                     
                     await MainActor.run {
-                        items.insert(feedItem, at: 0)
+                        // Insert sorted by timestamp
+                        if let insertIndex = items.firstIndex(where: { $0.event.createdAt < event.createdAt }) {
+                            items.insert(feedItem, at: insertIndex)
+                        } else {
+                            items.append(feedItem)
+                        }
+                        
+                        // Limit feed size for performance
+                        if items.count > 200 {
+                            items.removeLast(items.count - 200)
+                        }
                     }
                     
                     // Load profile reactively
                     loadProfileReactively(for: event.pubkey, ndk: ndk)
+                    
+                    // Load engagement counts reactively
+                    loadEngagementReactively(for: event.id, ndk: ndk)
                 }
             }
         }
@@ -441,7 +452,84 @@ class FeedViewModel: ObservableObject {
         await MainActor.run {
             items.removeAll()
         }
-        // Subscription will continue running
+        // Cancel all tasks
+        feedTask?.cancel()
+        profileTasks.values.forEach { $0.cancel() }
+        profileTasks.removeAll()
+        engagementTasks.values.forEach { $0.cancel() }
+        engagementTasks.removeAll()
+        
+        // Restart feed will happen when view calls startFeed again
+    }
+    
+    private func loadEngagementReactively(for eventId: String, ndk: NDK) {
+        // Cancel existing task if any
+        engagementTasks[eventId]?.cancel()
+        
+        engagementTasks[eventId] = Task {
+            // Observe reactions (kind 7)
+            let reactionsFilter = NDKFilter(
+                kinds: [7],
+                events: [eventId]
+            )
+            
+            let reactionsDataSource = ndk.observe(
+                filter: reactionsFilter,
+                maxAge: 0,
+                cachePolicy: .cacheWithNetwork
+            )
+            
+            // Observe replies (kind 1 referencing this event)
+            let repliesFilter = NDKFilter(
+                kinds: [1],
+                events: [eventId]
+            )
+            
+            let repliesDataSource = ndk.observe(
+                filter: repliesFilter,
+                maxAge: 0,
+                cachePolicy: .cacheWithNetwork
+            )
+            
+            // Update engagement counts reactively
+            await withTaskGroup(of: Void.self) { group in
+                group.addTask {
+                    for await reaction in reactionsDataSource.events {
+                        if reaction.content == "+" || reaction.content == "🤙" {
+                            await MainActor.run {
+                                self.updateEngagement(for: eventId, type: .like, increment: true)
+                            }
+                        }
+                    }
+                }
+                
+                group.addTask {
+                    for await _ in repliesDataSource.events {
+                        await MainActor.run {
+                            self.updateEngagement(for: eventId, type: .reply, increment: true)
+                        }
+                    }
+                }
+            }
+        }
+    }
+    
+    private func updateEngagement(for eventId: String, type: EngagementType, increment: Bool) {
+        guard let index = items.firstIndex(where: { $0.event.id == eventId }) else { return }
+        
+        switch type {
+        case .like:
+            items[index].likeCount += increment ? 1 : -1
+        case .reply:
+            items[index].replyCount += increment ? 1 : -1
+        case .zap:
+            // TODO: Implement zap counting
+            break
+        }
+    }
+    
+    enum EngagementType {
+        case like, reply, zap
     }
 }
 
@@ -450,11 +538,22 @@ struct FeedItem: Identifiable {
     let event: NDKEvent
     var profile: NDKUserProfile?
     let imageURLs: [String]
+    var likeCount: Int = 0
+    var replyCount: Int = 0
+    var zapAmount: Int = 0
     
     init(from event: NDKEvent) {
         self.id = event.id
         self.event = event
-        self.imageURLs = FeedItem.extractImageURLs(from: event.content)
+        
+        // Extract images based on event kind
+        if event.kind == 20 {
+            // Kind 20 should have imeta tags
+            self.imageURLs = FeedItem.extractImagesFromTags(event.tags)
+        } else {
+            // Kind 1 - extract from content
+            self.imageURLs = FeedItem.extractImageURLs(from: event.content)
+        }
     }
     
     static func extractImageURLs(from content: String) -> [String] {
@@ -493,5 +592,50 @@ struct FeedItem: Identifiable {
         }
         
         return urls
+    }
+    
+    static func extractImagesFromTags(_ tags: [[String]]) -> [String] {
+        var imageURLs: [String] = []
+        
+        // Look for imeta tags (NIP-92)
+        for tag in tags {
+            if tag.count >= 2 && tag[0] == "imeta" {
+                // Parse imeta tag values
+                for i in 1..<tag.count {
+                    let parts = tag[i].components(separatedBy: " ")
+                    for part in parts {
+                        if part.hasPrefix("url=") {
+                            let url = String(part.dropFirst(4))
+                            imageURLs.append(url)
+                        }
+                    }
+                }
+            }
+        }
+        
+        // Fallback: look for regular URL tags
+        if imageURLs.isEmpty {
+            for tag in tags {
+                if tag.count >= 2 && tag[0] == "r" && isImageURL(tag[1]) {
+                    imageURLs.append(tag[1])
+                }
+            }
+        }
+        
+        return imageURLs
+    }
+    
+    private static func isImageURL(_ url: String) -> Bool {
+        let imageExtensions = [".jpg", ".jpeg", ".png", ".gif", ".webp", ".heic"]
+        let lowercasedURL = url.lowercased()
+        
+        // Check for direct image extensions
+        if imageExtensions.contains(where: { lowercasedURL.contains($0) }) {
+            return true
+        }
+        
+        // Check for image hosting services
+        let imageHosts = ["imgur.com", "i.imgur.com", "nostr.build", "void.cat", "imgprxy.stacker.news"]
+        return imageHosts.contains(where: { lowercasedURL.contains($0) })
     }
 }
