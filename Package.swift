@@ -17,6 +17,10 @@ let package = Package(
             name: "NDKSwift",
             targets: ["NDKSwift"]
         ),
+        .library(
+            name: "NDKSwiftUI",
+            targets: ["NDKSwiftUI"]
+        ),
     ],
     dependencies: [
         .package(url: "https://github.com/anquii/CryptoSwiftWrapper.git", from: "1.4.3"),
@@ -34,6 +38,12 @@ let package = Package(
                 .product(name: "secp256k1", package: "swift-secp256k1"),
                 .product(name: "GRDB", package: "GRDB.swift"),
                 .product(name: "CashuSwift", package: "CashuSwift"),
+            ]
+        ),
+        .target(
+            name: "NDKSwiftUI",
+            dependencies: [
+                "NDKSwift"
             ]
         ),
         .testTarget(
