@@ -50,6 +50,11 @@ class AppState: ObservableObject {
         // Setup profile manager
         self.profileManager = ndkInstance.profileManager
         
+        // Note: Zap manager would be initialized here if wallet support is needed
+        // Example:
+        // let zapManager = NDKZapManager(ndk: ndkInstance)
+        // await zapManager.configureDefaults()
+        
         // Set NDK for auth manager
         authManager.setNDK(ndkInstance)
     }
