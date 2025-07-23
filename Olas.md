@@ -87,6 +87,32 @@ for await event in ndk.subscribe(NDKFilter(kinds: [20])) {
 - **Preloading**: Intelligent direction-based prefetch
 - **Momentum**: Physics-based deceleration
 
+#### Advanced Interactions
+- **Pinch to Zoom**: Seamless zoom on feed images
+  - Smooth gesture recognition without entering full screen
+  - Double-tap to quick zoom/reset
+  - Momentum-based pan when zoomed
+- **3D Touch/Haptic Feedback**:
+  - Peek: Light press for image preview
+  - Pop: Deeper press to enter full view
+  - Haptic menus: Force touch for quick actions
+  - Impact feedback on all interactions
+- **Swipe Gestures**:
+  - Left: Quick share sheet
+  - Right: Save to collection
+  - Up: View user profile
+  - Down: Dismiss if in preview
+- **Pull-to-Create**:
+  - Elastic pull animation on feed top
+  - Camera icon grows as you pull
+  - Haptic trigger at activation threshold
+  - Smooth transition to camera mode
+- **Photo Tagging** (NIP-68 annotate-user):
+  - Tap to add user tags on image coordinates
+  - Tags follow pinch/zoom transformations
+  - Floating name labels with glassmorphism
+  - Profile preview on tag tap
+
 ### 3. Content Creation
 
 #### Camera Integration
@@ -94,6 +120,33 @@ for await event in ndk.subscribe(NDKFilter(kinds: [20])) {
 - **Live Filters**: Real-time Metal shaders for preview
 - **Multi-Select**: Gallery with numbered selection badges
 - **Crop/Rotate**: Gesture-based with snapping guides
+
+#### Advanced Camera Features
+- **Portrait Mode**: Depth-based blur using Core ML for professional bokeh
+  - Real-time depth map visualization
+  - Adjustable blur intensity post-capture
+  - Edge detection refinement
+- **Night Mode**: Enhanced low-light capture with AI
+  - Automatic exposure stacking
+  - Noise reduction without detail loss
+  - Handheld stability compensation
+- **Burst Mode**: Hold shutter for rapid capture
+  - 10fps burst with best shot suggestions
+  - Animated preview scrubber
+  - Smart selection based on sharpness/faces
+- **Timer Options**: 
+  - 3s/10s countdown with full-screen numeric display
+  - Audio countdown in final 3 seconds
+  - Hand gesture detection to start timer
+- **Composition Helpers**:
+  - Rule of thirds grid with golden ratio option
+  - Electronic level for horizon alignment
+  - Leading lines detection overlay
+- **Flash Control**:
+  - Auto: Scene-based intelligent flash
+  - On: Forced flash with intensity slider
+  - Off: Natural light only
+  - Torch: Continuous light for video
 
 #### Filter Collection (12 Total)
 1. **Olas Classic**: Subtle contrast boost with warmth
@@ -121,6 +174,20 @@ for await event in ndk.subscribe(NDKFilter(kinds: [20])) {
 - **Hashtags**: Trending suggestions based on content
 - **Location**: MapKit integration with privacy controls
 - **Drafts**: Local storage with expiration
+
+#### Rich Text Rendering
+- **Embedded Entities**: Support for Nostr's embedded content types
+  - User mentions (@npub, @nprofile) with reactive profile loading
+  - Event references (note1, nevent) with inline previews
+  - Hashtags with tap-to-explore functionality
+  - URLs with automatic link previews
+- **Reactive Loading**: Profile names load as they arrive, never blocking render
+- **Visual Formatting**:
+  - User mentions in accent color with displayName resolution
+  - Hashtags in accent color with tap gesture
+  - Links underlined with preview cards below
+  - Event references with inline preview cards
+- **Performance**: Efficient text component merging for smooth rendering
 
 ### 4. Blossom Integration
 
@@ -170,6 +237,11 @@ let replyEvent = try await replyBuilder.publish()
 - **Expansion**: Smooth accordion with comment tree
 - **Navigation**: Swipe between thread levels
 - **Context**: Parent post stays visible at top
+- **Rich Comments**: Full embedded entity support in replies
+  - User mentions become tappable profiles
+  - Hashtags link to discovery
+  - Quoted events show preview cards
+  - Image URLs render as inline images
 
 ### 6. Profile Experience
 
@@ -205,7 +277,32 @@ let replyEvent = try await replyBuilder.publish()
 - **Related**: Suggested similar tags
 - **Subscribe**: Follow hashtags like users
 
-### 8. Settings & Preferences
+### 8. Gamification & Achievements
+
+#### Achievement System
+- **Visual Badges**: Collectible achievements with unique animations
+  - First Post: "Pioneer" - Animated seedling growing
+  - 100 Followers: "Rising Star" - Constellation formation
+  - Perfect Week: "Consistent Creator" - 7-day streak flame
+  - Viral Post: "Lightning Strike" - Electric surge animation
+  - Early Adopter: "OG" - Holographic shimmer effect
+- **Progress Tracking**:
+  - Circular progress rings for each achievement
+  - Milestone notifications with confetti
+  - Statistics dashboard with charts
+  - Shareable achievement cards
+- **Reward Mechanics**:
+  - Unlock exclusive filters/effects
+  - Special profile badges
+  - Priority in discovery algorithms
+  - Beta feature access
+- **Social Achievements**:
+  - Collaboration badges for joint posts
+  - Community helper for quality replies
+  - Trend setter for starting viral hashtags
+  - Ambassador for bringing new users
+
+### 9. Settings & Preferences
 
 #### Account Management
 - **Key Backup**: Visual QR with animation
@@ -304,6 +401,55 @@ class ProfileObserver: ObservableObject {
         
         for await event in ndk.subscribe(filter) {
             profile = try? await event.decodeMetadata()
+        }
+    }
+}
+```
+
+### Rich Text Components
+```swift
+// Reactive rich text rendering
+struct OlasRichText: View {
+    let content: String
+    let tags: [Tag]
+    @State private var parsedContent: NDKParsedContent?
+    @State private var profileCache: [String: NDKUserProfile] = [:]
+    
+    var body: some View {
+        if let parsed = parsedContent {
+            parsed.components.reduce(Text("")) { result, component in
+                result + renderComponent(component)
+            }
+            .task {
+                // Load profiles reactively as mentions appear
+                for component in parsed.components {
+                    if case .userMention(let pubkey, _) = component {
+                        loadProfile(pubkey)
+                    }
+                }
+            }
+        }
+    }
+    
+    func renderComponent(_ component: NDKParsedContent.Component) -> Text {
+        switch component {
+        case .text(let text):
+            return Text(text)
+        case .userMention(let pubkey, _):
+            let name = profileCache[pubkey]?.displayName ?? "Loading..."
+            return Text("@\(name)")
+                .foregroundStyle(LinearGradient(
+                    colors: [.purple, .pink],
+                    startPoint: .leading,
+                    endPoint: .trailing
+                ))
+                .bold()
+        case .hashtag(let tag):
+            return Text("#\(tag)")
+                .foregroundStyle(.accent)
+                .underline()
+        default:
+            return Text("")
         }
     }
 }
