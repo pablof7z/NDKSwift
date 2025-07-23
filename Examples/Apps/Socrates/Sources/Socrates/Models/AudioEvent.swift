@@ -11,6 +11,11 @@ struct AudioEvent: Identifiable {
     let replyTo: String?
     let webOfTrustScore: Double
     
+    // Reaction tracking (populated separately)
+    var likeCount: Int = 0
+    var zapCount: Int = 0
+    var replyCount: Int = 0
+    
     var sortScore: Double {
         // Combine recency and web of trust
         let recencyScore = 1.0 - (Date().timeIntervalSince(createdAt) / (7 * 24 * 60 * 60)) // Decay over 7 days

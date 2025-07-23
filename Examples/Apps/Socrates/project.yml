@@ -20,6 +20,8 @@ targets:
     dependencies:
       - package: NDKSwift
         product: NDKSwift
+      - package: NDKSwift
+        product: NDKSwiftUI
     settings:
       base:
         PRODUCT_NAME: Socrates

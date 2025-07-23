@@ -462,6 +462,7 @@ struct CreatePostView: View {
                             size: size,
                             mimeType: mimeType,
                             signer: signer,
+                            ndk: appState.ndk!,
                             expiration: Date().addingTimeInterval(60) // 1 minute expiration
                         )
                         

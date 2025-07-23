@@ -20,4 +20,4 @@ Examples/Test*.swift
 Examples/Debug*.swift
 
 # Keep only the NIP60Wallet example
-!Examples/NIP60Wallet.swift
+!Examples/NIP60Wallet.swiftExamples

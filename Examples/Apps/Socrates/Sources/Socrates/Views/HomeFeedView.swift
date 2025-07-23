@@ -30,24 +30,26 @@ struct HomeFeedView: View {
             VStack(spacing: 0) {
                 // Header
                 HeaderView()
-                    .padding(.horizontal)
-                    .padding(.vertical, 10)
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 8)
                 
                 // Feed
                 if audioEvents.isEmpty && !isRefreshing {
                     EmptyFeedView()
                 } else {
                     ScrollView {
-                        LazyVStack(spacing: 16) {
+                        LazyVStack(spacing: 0) {
                             ForEach(sortedEvents) { audioEvent in
                                 AudioEventCard(audioEvent: audioEvent)
                                     .transition(.asymmetric(
                                         insertion: .slide.combined(with: .opacity),
                                         removal: .scale(scale: 0.8).combined(with: .opacity)
                                     ))
+                                
+                                Divider()
+                                    .background(Color.white.opacity(0.1))
                             }
                         }
-                        .padding()
                     }
                     .refreshable {
                         await loadAudioEvents()
@@ -77,8 +79,8 @@ struct HomeFeedView: View {
                         onStartRecording: startRecording,
                         onStopRecording: stopRecording
                     )
-                    .padding(.horizontal, 24)
-                    .padding(.bottom, 30)
+                    .padding(.horizontal, 20)
+                    .padding(.bottom, 20)
                 }
             }
         }
@@ -99,24 +101,28 @@ struct HomeFeedView: View {
         // Create filter for audio events
         let filter = NDKFilter(
             kinds: [1222, 1244],
-            limit: 100
         )
         
+        // Start streaming audio events in real-time
         let dataSource = ndk.observe(filter: filter, maxAge: 0)
-        let events = await dataSource.currentValue() ?? []
         
-        var newAudioEvents: [AudioEvent] = []
-        
-        for event in events {
-            let wotScore = appState.webOfTrust[event.pubkey] ?? 0.1
-            if let audioEvent = AudioEvent.from(event: event, webOfTrustScore: wotScore) {
-                newAudioEvents.append(audioEvent)
+        // NDK automatically sends cached events first, then streams new ones
+        Task {
+            for await event in dataSource.events {
+                let wotScore = await appState.webOfTrust[event.pubkey] ?? 0.1
+                if let audioEvent = AudioEvent.from(event: event, webOfTrustScore: wotScore) {
+                    await MainActor.run {
+                        // Add new event if it doesn't already exist
+                        if !self.audioEvents.contains(where: { $0.id == audioEvent.id }) {
+                            self.audioEvents.append(audioEvent)
+                        }
+                        // Stop loading indicator after first batch
+                        if isRefreshing {
+                            isRefreshing = false
+                        }
+                    }
+                }
             }
-        }
-        
-        await MainActor.run {
-            self.audioEvents = newAudioEvents
-            isRefreshing = false
         }
     }
     
@@ -239,7 +245,7 @@ struct HeaderView: View {
     var body: some View {
         HStack {
             Text("SOCRATES")
-                .font(.system(size: 28, weight: .black))
+                .font(.system(size: 24, weight: .black))
                 .foregroundStyle(
                     LinearGradient(
                         gradient: Gradient(colors: [
@@ -273,11 +279,11 @@ struct HeaderView: View {
                         )
                         .overlay(
                             Text(String(user.pubkey.prefix(2)))
-                                .font(.system(size: 16, weight: .bold))
+                                .font(.system(size: 14, weight: .bold))
                                 .foregroundColor(.white)
                         )
                 }
-                .frame(width: 40, height: 40)
+                .frame(width: 36, height: 36)
                 .clipShape(Circle())
             }
         }
@@ -363,12 +369,12 @@ struct RecordButton: View {
                                 endPoint: .bottomTrailing
                             )
                         )
-                        .frame(width: 64, height: 64)
+                        .frame(width: 56, height: 56)
                         .shadow(color: isRecording ? Color.red.opacity(0.5) : Color.purple.opacity(0.5), 
                                radius: 15, x: 0, y: 5)
                     
                     Image(systemName: isRecording ? "stop.fill" : "mic.fill")
-                        .font(.system(size: 28))
+                        .font(.system(size: 24))
                         .foregroundColor(.white)
                 }
             }

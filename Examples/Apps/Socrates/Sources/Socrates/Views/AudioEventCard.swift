@@ -1,5 +1,6 @@
 import SwiftUI
 import NDKSwift
+import NDKSwiftUI
 import AVFoundation
 
 struct AudioEventCard: View {
@@ -13,143 +14,93 @@ struct AudioEventCard: View {
     @State private var duration: TimeInterval = 0
     @State private var audioPlayer: AVPlayer?
     @State private var timeObserver: Any?
-    @State private var cardScale: CGFloat = 1
     @State private var showingReplyRecorder = false
     
-    @GestureState private var dragOffset = CGSize.zero
-    @State private var swipeOffset = CGSize.zero
+    // Reaction states
+    @State private var hasLiked: Bool = false
     
     var isCurrentlyPlaying: Bool {
         appState.currentlyPlayingId == audioEvent.id && isPlaying
     }
     
     var body: some View {
-        ZStack {
-            // Background glow when playing
-            if isCurrentlyPlaying {
-                RoundedRectangle(cornerRadius: 20)
-                    .fill(
-                        LinearGradient(
-                            gradient: Gradient(colors: [
-                                Color.purple.opacity(0.3),
-                                Color.blue.opacity(0.2)
-                            ]),
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        )
-                    )
-                    .blur(radius: 20)
-                    .scaleEffect(1.1)
-            }
+        HStack(alignment: .top, spacing: 12) {
+            // Author avatar using NDKSwiftUI component
+            NDKProfilePicture(pubkey: audioEvent.author.pubkey, size: 40)
             
-            VStack(spacing: 0) {
-                // Main card content
-                HStack(alignment: .top, spacing: 16) {
-                    // Author avatar
-                    AuthorAvatar(pubkey: audioEvent.author.pubkey, profile: author)
-                        .frame(width: 48, height: 48)
+            VStack(alignment: .leading, spacing: 4) {
+                // Author info
+                HStack(spacing: 4) {
+                    Text(author?.displayName ?? author?.name ?? String(audioEvent.author.pubkey.prefix(8)))
+                        .font(.system(size: 15, weight: .semibold))
+                        .foregroundColor(.white)
+                        .lineLimit(1)
                     
-                    VStack(alignment: .leading, spacing: 8) {
-                        // Author info
-                        HStack {
-                            Text(author?.displayName ?? author?.name ?? String(audioEvent.author.pubkey.prefix(8)))
-                                .font(.system(size: 16, weight: .semibold))
-                                .foregroundColor(.white)
-                            
-                            if audioEvent.webOfTrustScore >= 0.8 {
-                                Image(systemName: "checkmark.seal.fill")
-                                    .font(.system(size: 14))
-                                    .foregroundColor(.purple)
-                            }
-                            
-                            Spacer()
-                            
-                            Text(relativeTime(from: audioEvent.createdAt))
-                                .font(.system(size: 12))
-                                .foregroundColor(Color.white.opacity(0.6))
-                        }
-                        
-                        // Reply indicator
-                        if audioEvent.isReply {
-                            HStack(spacing: 4) {
-                                Image(systemName: "arrowshape.turn.up.left.fill")
-                                    .font(.system(size: 10))
-                                Text("Reply")
-                                    .font(.system(size: 12))
-                            }
-                            .foregroundColor(Color.white.opacity(0.5))
-                        }
-                        
-                        // Audio player
-                        AudioPlayerView(
-                            isPlaying: $isPlaying,
-                            progress: $playbackProgress,
-                            duration: duration,
-                            onPlayPause: togglePlayback,
-                            onSeek: seek
-                        )
-                    }
-                }
-                .padding()
-                
-                // Swipe hint
-                if swipeOffset.width < -20 {
-                    HStack {
-                        Spacer()
-                        Text("Swipe to reply")
-                            .font(.system(size: 12, weight: .medium))
+                    if audioEvent.webOfTrustScore >= 0.8 {
+                        Image(systemName: "checkmark.seal.fill")
+                            .font(.system(size: 12))
                             .foregroundColor(.purple)
-                            .padding(.trailing)
-                            .padding(.bottom, 8)
                     }
-                    .transition(.opacity)
+                    
+                    Text("•")
+                        .font(.system(size: 11))
+                        .foregroundColor(Color.white.opacity(0.4))
+                    
+                    Text(relativeTime(from: audioEvent.createdAt))
+                        .font(.system(size: 12))
+                        .foregroundColor(Color.white.opacity(0.6))
+                    
+                    Spacer()
                 }
+                
+                // Reply indicator
+                if audioEvent.isReply {
+                    HStack(spacing: 4) {
+                        Image(systemName: "arrowshape.turn.up.left.fill")
+                            .font(.system(size: 10))
+                        Text("Reply")
+                            .font(.system(size: 12))
+                    }
+                    .foregroundColor(Color.white.opacity(0.5))
+                }
+                
+                // Audio player
+                AudioPlayerView(
+                    isPlaying: $isPlaying,
+                    progress: $playbackProgress,
+                    duration: duration,
+                    onPlayPause: togglePlayback,
+                    onSeek: seek
+                )
+                
+                // Reactions bar (minimal)
+                HStack(spacing: 16) {
+                    Button(action: handleLike) {
+                        Image(systemName: hasLiked ? "heart.fill" : "heart")
+                            .font(.system(size: 16))
+                            .foregroundColor(hasLiked ? .red : Color.white.opacity(0.5))
+                    }
+                    
+                    Button(action: { showingReplyRecorder = true }) {
+                        Image(systemName: "bubble.left")
+                            .font(.system(size: 16))
+                            .foregroundColor(Color.white.opacity(0.5))
+                    }
+                    
+                    Spacer()
+                }
+                .padding(.top, 4)
             }
-            .background(
-                RoundedRectangle(cornerRadius: 20)
-                    .fill(
-                        LinearGradient(
-                            gradient: Gradient(colors: [
-                                Color.white.opacity(0.08),
-                                Color.white.opacity(0.03)
-                            ]),
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        )
-                    )
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 20)
-                            .stroke(
-                                isCurrentlyPlaying ? Color.purple.opacity(0.5) : Color.white.opacity(0.1),
-                                lineWidth: 1
-                            )
-                    )
-            )
-            .scaleEffect(cardScale)
-            .offset(x: swipeOffset.width + dragOffset.width)
-            .gesture(
-                DragGesture()
-                    .updating($dragOffset) { value, state, _ in
-                        if value.translation.width < 0 {
-                            state = value.translation
-                        }
-                    }
-                    .onEnded { value in
-                        if value.translation.width < -100 {
-                            // Trigger reply recording
-                            withAnimation(.spring()) {
-                                showingReplyRecorder = true
-                            }
-                        }
-                        withAnimation(.spring()) {
-                            swipeOffset = .zero
-                        }
-                    }
-            )
         }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 8)
+        .background(
+            isCurrentlyPlaying ? Color.white.opacity(0.03) : Color.clear
+        )
         .onAppear {
             loadAuthorProfile()
             setupAudioPlayer()
+            loadReactions()
         }
         .onDisappear {
             cleanup()
@@ -273,53 +224,71 @@ struct AudioEventCard: View {
             return "\(days)d"
         }
     }
-}
-
-// MARK: - Author Avatar
-struct AuthorAvatar: View {
-    let pubkey: String
-    let profile: NDKUserProfile?
     
-    var body: some View {
-        if let picture = profile?.picture,
-           let url = URL(string: picture) {
-            AsyncImage(url: url) { image in
-                image
-                    .resizable()
-                    .scaledToFill()
-            } placeholder: {
-                DefaultAvatar(pubkey: pubkey)
-            }
-            .frame(width: 48, height: 48)
-            .clipShape(Circle())
+    private func formattedDuration(_ duration: TimeInterval) -> String {
+        let totalSeconds = Int(duration)
+        if totalSeconds < 60 {
+            return "\(totalSeconds)s"
         } else {
-            DefaultAvatar(pubkey: pubkey)
+            let minutes = totalSeconds / 60
+            let seconds = totalSeconds % 60
+            return String(format: "%d:%02d", minutes, seconds)
         }
     }
-}
-
-struct DefaultAvatar: View {
-    let pubkey: String
     
-    var body: some View {
-        Circle()
-            .fill(
-                LinearGradient(
-                    gradient: Gradient(colors: [
-                        Color.purple,
-                        Color.blue
-                    ]),
-                    startPoint: .topLeading,
-                    endPoint: .bottomTrailing
-                )
+    private func loadReactions() {
+        Task {
+            guard let ndk = nostrManager.ndk else { return }
+            
+            // Check if current user has liked this event
+            let filter = NDKFilter(
+                kinds: [7],
+                events: [audioEvent.id],
+                authors: [appState.currentUser?.pubkey].compactMap { $0 },
+                limit: 1
             )
-            .overlay(
-                Text(String(pubkey.prefix(2)))
-                    .font(.system(size: 18, weight: .bold))
-                    .foregroundColor(.white)
-            )
-            .frame(width: 48, height: 48)
+            
+            let dataSource = ndk.observe(filter: filter, maxAge: 0)
+            
+            for await event in dataSource.events {
+                if event.content == "+" || event.content == "🤙" {
+                    await MainActor.run {
+                        hasLiked = true
+                    }
+                }
+                break // Only need to check if user has liked
+            }
+        }
     }
+    
+    private func handleLike() {
+        guard let ndk = nostrManager.ndk else { return }
+        
+        Task {
+            if hasLiked {
+                // Already liked, don't unlike for now
+                return
+            }
+            
+            do {
+                // Use NDKEventBuilder to create and publish reaction
+                let (event, _) = try await ndk.publish { builder in
+                    builder
+                        .kind(7)  // Reaction event
+                        .content("+")
+                        .tag(["e", audioEvent.id])
+                        .tag(["p", audioEvent.author.pubkey])
+                }
+                
+                await MainActor.run {
+                    hasLiked = true
+                }
+            } catch {
+                print("Failed to publish reaction: \(error)")
+            }
+        }
+    }
+    
 }
 
 // MARK: - Audio Player View
@@ -337,105 +306,77 @@ struct AudioPlayerView: View {
         isDragging ? dragProgress : progress
     }
     
-    var formattedDuration: String {
-        let totalSeconds = Int(duration)
-        let minutes = totalSeconds / 60
-        let seconds = totalSeconds % 60
-        return String(format: "%d:%02d", minutes, seconds)
-    }
-    
-    var formattedCurrentTime: String {
-        let currentSeconds = Int(duration * displayProgress)
-        let minutes = currentSeconds / 60
-        let seconds = currentSeconds % 60
+    var remainingTime: String {
+        let remainingSeconds = Int(duration * (1 - displayProgress))
+        let minutes = remainingSeconds / 60
+        let seconds = remainingSeconds % 60
         return String(format: "%d:%02d", minutes, seconds)
     }
     
     var body: some View {
-        VStack(spacing: 12) {
-            // Waveform or progress bar
-            GeometryReader { geometry in
-                ZStack(alignment: .leading) {
-                    // Background
-                    Capsule()
-                        .fill(Color.white.opacity(0.1))
-                        .frame(height: 40)
-                    
-                    // Progress
-                    Capsule()
-                        .fill(
-                            LinearGradient(
-                                gradient: Gradient(colors: [
-                                    Color.purple.opacity(0.8),
-                                    Color.blue.opacity(0.6)
-                                ]),
-                                startPoint: .leading,
-                                endPoint: .trailing
+        GeometryReader { geometry in
+            ZStack(alignment: .leading) {
+                // Background
+                Capsule()
+                    .fill(Color.white.opacity(0.08))
+                    .frame(height: 36)
+                
+                // Progress
+                Capsule()
+                    .fill(
+                        LinearGradient(
+                            gradient: Gradient(colors: [
+                                Color.purple.opacity(0.7),
+                                Color.blue.opacity(0.5)
+                            ]),
+                            startPoint: .leading,
+                            endPoint: .trailing
+                        )
+                    )
+                    .frame(width: geometry.size.width * displayProgress, height: 36)
+                
+                // Content overlay
+                HStack {
+                    // Play/Pause button integrated
+                    Button(action: onPlayPause) {
+                        Image(systemName: isPlaying ? "pause.fill" : "play.fill")
+                            .font(.system(size: 14))
+                            .foregroundColor(.white)
+                            .frame(width: 28, height: 28)
+                            .background(
+                                Circle()
+                                    .fill(Color.black.opacity(0.3))
                             )
-                        )
-                        .frame(width: geometry.size.width * displayProgress, height: 40)
-                    
-                    // Waveform visualization (simplified)
-                    HStack(spacing: 2) {
-                        ForEach(0..<30) { index in
-                            Capsule()
-                                .fill(Color.white.opacity(0.3))
-                                .frame(width: 2, height: CGFloat.random(in: 10...30))
-                        }
                     }
-                    .padding(.horizontal, 8)
+                    .padding(.leading, 4)
+                    
+                    Spacer()
+                    
+                    // Remaining time
+                    if duration > 0 {
+                        Text(remainingTime)
+                            .font(.system(size: 12, weight: .medium, design: .monospaced))
+                            .foregroundColor(.white)
+                            .padding(.trailing, 12)
+                    }
                 }
-                .gesture(
-                    DragGesture(minimumDistance: 0)
-                        .onChanged { value in
-                            isDragging = true
-                            dragProgress = min(max(0, value.location.x / geometry.size.width), 1)
-                        }
-                        .onEnded { _ in
-                            isDragging = false
-                            onSeek(dragProgress)
-                        }
-                )
             }
-            .frame(height: 40)
-            
-            // Controls
-            HStack {
-                // Play/Pause button
-                Button(action: onPlayPause) {
-                    Image(systemName: isPlaying ? "pause.fill" : "play.fill")
-                        .font(.system(size: 20))
-                        .foregroundColor(.white)
-                        .frame(width: 40, height: 40)
-                        .background(
-                            Circle()
-                                .fill(
-                                    LinearGradient(
-                                        gradient: Gradient(colors: [
-                                            Color.purple,
-                                            Color.blue
-                                        ]),
-                                        startPoint: .topLeading,
-                                        endPoint: .bottomTrailing
-                                    )
-                                )
-                        )
-                }
-                
-                // Time labels
-                Text(formattedCurrentTime)
-                    .font(.system(size: 12, design: .monospaced))
-                    .foregroundColor(Color.white.opacity(0.6))
-                
-                Spacer()
-                
-                Text(formattedDuration)
-                    .font(.system(size: 12, design: .monospaced))
-                    .foregroundColor(Color.white.opacity(0.6))
-            }
+            .gesture(
+                DragGesture(minimumDistance: 0)
+                    .onChanged { value in
+                        isDragging = true
+                        dragProgress = min(max(0, value.location.x / geometry.size.width), 1)
+                    }
+                    .onEnded { _ in
+                        isDragging = false
+                        onSeek(dragProgress)
+                    }
+            )
         }
+        .frame(height: 36)
     }
 }
+
 
 // MARK: - Reply Recording View
 struct ReplyRecordingView: View {
@@ -478,8 +419,7 @@ struct ReplyRecordingView: View {
                     
                     // Mini version of the original card
                     HStack {
-                        AuthorAvatar(pubkey: replyingTo.author.pubkey, profile: nil)
-                            .frame(width: 32, height: 32)
+                        NDKProfilePicture(pubkey: replyingTo.author.pubkey, size: 32)
                         
                         VStack(alignment: .leading) {
                             Text(String(replyingTo.author.pubkey.prefix(8)))

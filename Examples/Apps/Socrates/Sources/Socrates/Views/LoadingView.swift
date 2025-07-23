@@ -215,11 +215,14 @@ struct LoadingView: View {
     private func startSync() {
         Task {
             guard let ndk = nostrManager.ndk,
-                  let session = nostrManager.session else { return }
+                  nostrManager.isAuthenticated,
+                  let signer = ndk.signer else { return }
+            
+            let userPubkey = try await signer.pubkey
             
             // Update current user
             await MainActor.run {
-                appState.currentUser = ndk.getUser(session.pubkey)
+                appState.currentUser = ndk.getUser(userPubkey)
             }
             
             // Fetch user's kind:3 (follow list)
@@ -228,17 +231,18 @@ struct LoadingView: View {
             }
             
             let followFilter = NDKFilter(
-                authors: [session.pubkey],
+                authors: [userPubkey],
                 kinds: [3],
                 limit: 1
             )
             
             let dataSource = ndk.observe(filter: followFilter, maxAge: 300)
-            if let followEvent = try? await dataSource.first() {
+            let cachedEvents = await dataSource.currentValue()
+            if !cachedEvents.isEmpty, let followEvent = cachedEvents.first {
                 let follows = extractFollows(from: followEvent)
                 
                 await MainActor.run {
-                    appState.followLists[session.pubkey] = follows
+                    appState.followLists[userPubkey] = follows
                     followCount = follows.count
                     appState.loadingMessage = "Syncing \(follows.count) connections..."
                 }
@@ -313,19 +317,26 @@ struct LoadingView: View {
     }
     
     private func updateWebOfTrust(for pubkey: String, follows: Set<String>) {
-        guard let userPubkey = nostrManager.session?.pubkey else { return }
+        guard let ndk = nostrManager.ndk,
+              let signer = ndk.signer else { return }
         
-        // Simple web of trust calculation
-        // Direct follows = 1.0
-        // Follows of follows = 0.5
-        // Everyone else = 0.1
-        
-        if appState.followLists[userPubkey]?.contains(pubkey) == true {
-            appState.webOfTrust[pubkey] = 1.0
-        } else if let userFollows = appState.followLists[userPubkey], !userFollows.intersection(follows).isEmpty {
-            appState.webOfTrust[pubkey] = 0.5
-        } else {
-            appState.webOfTrust[pubkey] = 0.1
+        Task {
+            let userPubkey = try await signer.pubkey
+            
+            await MainActor.run {
+                // Simple web of trust calculation
+                // Direct follows = 1.0
+                // Follows of follows = 0.5
+                // Everyone else = 0.1
+                
+                if appState.followLists[userPubkey]?.contains(pubkey) == true {
+                    appState.webOfTrust[pubkey] = 1.0
+                } else if let userFollows = appState.followLists[userPubkey], !userFollows.intersection(follows).isEmpty {
+                    appState.webOfTrust[pubkey] = 0.5
+                } else {
+                    appState.webOfTrust[pubkey] = 0.1
+                }
+            }
         }
     }
 }

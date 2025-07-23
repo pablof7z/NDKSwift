@@ -113,7 +113,7 @@ public struct NDKRichText: View {
             case .text(let text):
                 attributedSegment = AttributedString(text)
                 
-            case .link(let text, let url):
+            case .link(let text, _):
                 attributedSegment = AttributedString(text)
                 attributedSegment.foregroundColor = linkColor
                 attributedSegment.underlineStyle = .single

@@ -7,12 +7,18 @@ struct ContentView: View {
     
     var body: some View {
         ZStack {
-            if nostrManager.session == nil {
+            Color.black.ignoresSafeArea()
+            
+            NDKAuthView(authManager: nostrManager.authManager, ndk: nostrManager.ndk) {
+                // Main app interface - shown when authenticated
+                if appState.isLoading {
+                    LoadingView()
+                } else {
+                    HomeFeedView()
+                }
+            } authenticationContent: {
+                // Authentication screen
                 AuthenticationView()
-            } else if appState.isLoading {
-                LoadingView()
-            } else {
-                HomeFeedView()
             }
         }
         .background(
@@ -27,5 +33,8 @@ struct ContentView: View {
             )
             .ignoresSafeArea()
         )
+        .onAppear {
+            appState.setNostrManager(nostrManager)
+        }
     }
 }

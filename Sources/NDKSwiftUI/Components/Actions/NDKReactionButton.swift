@@ -318,7 +318,7 @@ private class ReactionState: ObservableObject {
             if isReacted {
                 // Remove reaction (delete the reaction event)
                 if let reactionEventId = reactionEventId {
-                    let deleteEvent = try await ndk.event()
+                    let deleteEvent = try await NDKEventBuilder(ndk: ndk)
                         .kind(5) // Deletion event
                         .content("Removing reaction")
                         .tag(["e", reactionEventId])
@@ -328,7 +328,7 @@ private class ReactionState: ObservableObject {
                 }
             } else {
                 // Add reaction
-                let reactionEvent = try await ndk.event()
+                let reactionEvent = try await NDKEventBuilder(ndk: ndk)
                     .kind(7) // Reaction event
                     .content(reaction)
                     .tag(["e", event.id])

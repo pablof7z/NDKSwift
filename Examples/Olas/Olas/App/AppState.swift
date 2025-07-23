@@ -12,7 +12,7 @@ class AppState: ObservableObject {
     private(set) var profileManager: NDKProfileManager?
     
     // Auth management
-    private let authManager = NDKAuthManager.shared
+    let authManager = NDKAuthManager.shared
     
     // Default relays
     private let defaultRelays = [

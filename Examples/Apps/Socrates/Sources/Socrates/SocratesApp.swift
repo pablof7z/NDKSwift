@@ -34,6 +34,18 @@ class AppState: ObservableObject {
     @Published var currentlyPlayingId: String?
     @Published var recordingStartTime: Date?
     
+    // Signer reference for reactions
+    var signer: NDKSigner? {
+        nostrManager?.ndk?.signer
+    }
+    
+    // Lazy reference to NostrManager
+    private weak var nostrManager: NostrManager?
+    
+    func setNostrManager(_ manager: NostrManager) {
+        self.nostrManager = manager
+    }
+    
     func reset() {
         isAuthenticated = false
         isLoading = false
@@ -51,7 +63,8 @@ class AppState: ObservableObject {
 @MainActor
 class NostrManager: ObservableObject {
     @Published var ndk: NDK?
-    @Published var session: NDKSession?
+    
+    private var ndkAuthManager: NDKAuthManager
     
     // Recommended relays for Socrates
     let defaultRelays = [
@@ -63,11 +76,17 @@ class NostrManager: ObservableObject {
     ]
     
     init() {
+        self.ndkAuthManager = NDKAuthManager.shared
         setupNDK()
     }
     
     private func setupNDK() {
         ndk = NDK(relayUrls: defaultRelays)
+        
+        if let ndk = ndk {
+            ndkAuthManager.setNDK(ndk)
+        }
+        
         Task {
             await ndk?.connect()
         }
@@ -76,20 +95,45 @@ class NostrManager: ObservableObject {
     func login(with signer: NDKSigner) async throws {
         guard let ndk = ndk else { throw NostrError.signerRequired }
         
-        let pubkey = try await signer.pubkey
-        _ = NDKUser(pubkey: pubkey)
-        
-        session = NDKSession(
-            pubkey: pubkey,
-            signerType: "privatekey"
-        )
-        
-        ndk.signer = signer
+        // Create or update session with auth manager
+        if let privateSigner = signer as? NDKPrivateKeySigner {
+            let session = try await ndkAuthManager.createSession(
+                with: privateSigner,
+                requiresBiometric: false,
+                isHardwareBacked: false
+            )
+            
+            // Switch to this session
+            try await ndkAuthManager.switchToSession(session)
+        } else {
+            // Fallback for other signer types (shouldn't happen in current app)
+            ndk.signer = signer
+        }
     }
     
     func logout() {
-        session = nil
+        Task {
+            // Clear all sessions from keychain
+            for session in ndkAuthManager.availableSessions {
+                try? await ndkAuthManager.deleteSession(session)
+            }
+        }
+        
+        // Clear active authentication state
+        ndkAuthManager.logout()
+        
+        // Clear NDK signer
         ndk?.signer = nil
+    }
+    
+    // Check if user is authenticated via NDKAuth
+    var isAuthenticated: Bool {
+        ndkAuthManager.isAuthenticated
+    }
+    
+    // Get auth manager for use in UI
+    var authManager: NDKAuthManager {
+        return ndkAuthManager
     }
 }
 
