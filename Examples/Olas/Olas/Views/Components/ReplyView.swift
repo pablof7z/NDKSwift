@@ -149,14 +149,9 @@ struct ReplyView: View {
         
         Task { @MainActor in
             do {
-                // Build reply tags
-                let tags = buildReplyTags(for: parentEvent)
-                
-                // Create reply event using builder
-                let reply = try await ndk.event()
-                    .kind(1)
+                // Use NDK's built-in reply() method which handles NIP-22 automatically
+                let reply = try await ndk.reply(to: parentEvent)
                     .content(replyText)
-                    .tags(tags)
                     .build(signer: signer)
                 
                 _ = try await ndk.publish(reply)
@@ -174,34 +169,6 @@ struct ReplyView: View {
                 }
             }
         }
-    }
-    
-    private func buildReplyTags(for parentEvent: NDKEvent) -> [[String]] {
-        var tags: [[String]] = [
-            ["e", parentEvent.id, "", "reply"],
-            ["p", parentEvent.pubkey]
-        ]
-        
-        // Add root reference if this is a nested reply
-        if let rootTag = parentEvent.tags.first(where: { tag in
-            tag.count >= 4 && tag[0] == "e" && tag[3] == "root"
-        }) {
-            tags.insert(["e", rootTag[1], "", "root"], at: 0)
-        } else if !parentEvent.tags.filter({ tag in
-            tag.count >= 2 && tag[0] == "e"
-        }).isEmpty {
-            // Parent is already a reply, use its parent as root
-            if let parentRef = parentEvent.tags.first(where: { tag in
-                tag.count >= 2 && tag[0] == "e"
-            }) {
-                tags.insert(["e", parentRef[1], "", "root"], at: 0)
-            }
-        } else {
-            // Parent is the root
-            tags.insert(["e", parentEvent.id, "", "root"], at: 0)
-        }
-        
-        return tags
     }
 }
 
@@ -376,20 +343,23 @@ class ReplyViewModel: ObservableObject {
                 }
             }
             
-            // Load replies
+            // Load comments (NIP-22)
             let filter = NDKFilter(
-                kinds: [1],
-                events: [event.id]
+                kinds: [EventKind.genericReply],
+                tags: [
+                    "E": Set([event.id]),  // Comments on this root event
+                    "e": Set([event.id])   // Or direct parent references
+                ]
             )
             
             let dataSource = ndk.observe(filter: filter, cachePolicy: .cacheWithNetwork)
             
             for await replyEvent in dataSource.events {
-                // Check if this is a direct reply to our event
+                // Check if this is a direct reply to our event (NIP-22)
                 let isDirectReply = replyEvent.tags.contains { tag in
-                    tag.count >= 4 && tag[0] == "e" && tag[1] == event.id && tag[3] == "reply"
-                } || replyEvent.tags.contains { tag in
                     tag.count >= 2 && tag[0] == "e" && tag[1] == event.id
+                } && replyEvent.tags.contains { tag in
+                    tag.count >= 2 && tag[0] == "k" && (tag[1] == String(EventKind.image) || tag[1] == String(EventKind.genericReply))
                 }
                 
                 if isDirectReply {
@@ -443,18 +413,21 @@ class ReplyViewModel: ObservableObject {
     
     private func countNestedReplies(for event: NDKEvent, ndk: NDK) {
         Task {
+            // Count nested comments (NIP-22)
             let filter = NDKFilter(
-                kinds: [1],
-                events: [event.id]
+                kinds: [EventKind.genericReply],
+                tags: [
+                    "e": Set([event.id])  // Comments with this as parent
+                ]
             )
             
             let dataSource = ndk.observe(filter: filter, cachePolicy: .cacheOnly)
             let nestedReplies = await dataSource.collect(timeout: 1.0)
             let count = nestedReplies.filter { reply in
                 reply.tags.contains { tag in
-                    tag.count >= 4 && tag[0] == "e" && tag[1] == event.id && tag[3] == "reply"
-                } || reply.tags.contains { tag in
                     tag.count >= 2 && tag[0] == "e" && tag[1] == event.id
+                } && reply.tags.contains { tag in
+                    tag.count >= 2 && tag[0] == "k" && tag[1] == String(EventKind.genericReply)
                 }
             }.count
             
