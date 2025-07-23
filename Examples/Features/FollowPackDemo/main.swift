@@ -31,7 +31,7 @@ try await ndk.connect()
 print("\n📦 Creating a new follow pack...")
 
 // Create and publish a follow pack using the builder pattern
-let followPack = try await ndk.followPack()
+let followPack = try await NDKFollowPackBuilder(ndk: ndk)
     .title("Bitcoin Developers")
     .description("A curated list of Bitcoin Core developers and contributors")
     .identifier("bitcoin-devs-\(Int(Date().timeIntervalSince1970))")
@@ -54,7 +54,7 @@ print("✅ Published with ID: \(followPack.event.id)")
 print("\n🎨 Creating a media follow pack...")
 
 // Create a media-focused follow pack
-let mediaFollowPack = try await ndk.followPack()
+let mediaFollowPack = try await NDKFollowPackBuilder(ndk: ndk)
     .kind(EventKind.mediaFollowPack)  // Kind 39092 for media-focused packs
     .title("Nostr Photography")
     .description("Amazing photographers sharing their work on Nostr")
@@ -162,7 +162,7 @@ print("📦 Reconstructed pack: \(reconstructedPack.title ?? "Untitled")")
 print("\n🎯 Advanced usage examples...")
 
 // Create a follow pack with complex metadata
-let advancedPack = try await ndk.followPack()
+let advancedPack = try await NDKFollowPackBuilder(ndk: ndk)
     .title("Nostr Protocol Developers")
     .description("""
         Core developers and contributors to the Nostr protocol.

@@ -32,7 +32,7 @@ final class NDKFollowPackTests: XCTestCase {
     // MARK: - Kind Handling Tests
     
     func testDefaultKind() async throws {
-        let followPack = try await ndk.followPack().build()
+        let followPack = try await NDKFollowPackBuilder(ndk: ndk).build()
         XCTAssertEqual(followPack.event.kind, EventKind.followPack)
         XCTAssertEqual(followPack.event.kind, 39089)
     }
@@ -44,7 +44,7 @@ final class NDKFollowPackTests: XCTestCase {
     }
     
     func testMediaFollowPackKind() async throws {
-        let followPack = try await ndk.followPack()
+        let followPack = try await NDKFollowPackBuilder(ndk: ndk)
             .kind(EventKind.mediaFollowPack)
             .build()
         XCTAssertEqual(followPack.event.kind, 39092)
@@ -53,7 +53,7 @@ final class NDKFollowPackTests: XCTestCase {
     // MARK: - Property Tests
     
     func testTitleGetterSetter() async throws {
-        let followPack = try await ndk.followPack()
+        let followPack = try await NDKFollowPackBuilder(ndk: ndk)
             .title("Test Title")
             .build()
         
@@ -62,7 +62,7 @@ final class NDKFollowPackTests: XCTestCase {
     }
     
     func testDescriptionGetterSetter() async throws {
-        let followPack = try await ndk.followPack()
+        let followPack = try await NDKFollowPackBuilder(ndk: ndk)
             .description("A follow pack description")
             .build()
         
@@ -71,7 +71,7 @@ final class NDKFollowPackTests: XCTestCase {
     }
     
     func testIdentifierGetterSetter() async throws {
-        let followPack = try await ndk.followPack()
+        let followPack = try await NDKFollowPackBuilder(ndk: ndk)
             .identifier("identifier-123")
             .build()
         
@@ -83,7 +83,7 @@ final class NDKFollowPackTests: XCTestCase {
     
     func testImageWithStringURL() async throws {
         let imageURL = "https://example.com/image.png"
-        let followPack = try await ndk.followPack()
+        let followPack = try await NDKFollowPackBuilder(ndk: ndk)
             .image(imageURL)
             .build()
         
@@ -98,7 +98,7 @@ final class NDKFollowPackTests: XCTestCase {
             dim: "100x100"
         )
         
-        let followPack = try await ndk.followPack()
+        let followPack = try await NDKFollowPackBuilder(ndk: ndk)
             .image(imeta)
             .build()
         
@@ -126,7 +126,7 @@ final class NDKFollowPackTests: XCTestCase {
     
     func testImageRemoval() async throws {
         // Test that we can create a follow pack without an image
-        let followPack = try await ndk.followPack()
+        let followPack = try await NDKFollowPackBuilder(ndk: ndk)
             .title("No Image Pack")
             .build()
         
@@ -139,7 +139,7 @@ final class NDKFollowPackTests: XCTestCase {
     
     func testPubkeysGetterSetter() async throws {
         let pubkeys = ["pk1", "pk2", "pk3"]
-        let followPack = try await ndk.followPack()
+        let followPack = try await NDKFollowPackBuilder(ndk: ndk)
             .pubkeys(pubkeys)
             .build()
         
@@ -148,7 +148,7 @@ final class NDKFollowPackTests: XCTestCase {
     }
     
     func testAddPubkey() async throws {
-        let followPack = try await ndk.followPack()
+        let followPack = try await NDKFollowPackBuilder(ndk: ndk)
             .addPubkey("pk1")
             .addPubkey("pk2")
             .build()
@@ -157,7 +157,7 @@ final class NDKFollowPackTests: XCTestCase {
     }
     
     func testContainsPubkeyFromBuilder() async throws {
-        let followPack = try await ndk.followPack()
+        let followPack = try await NDKFollowPackBuilder(ndk: ndk)
             .pubkeys(["pk1", "pk2", "pk3"])
             .build()
         
@@ -182,7 +182,7 @@ final class NDKFollowPackTests: XCTestCase {
     // MARK: - Conversion Tests
     
     func testBuilderCreatesCorrectEvent() async throws {
-        let followPack = try await ndk.followPack()
+        let followPack = try await NDKFollowPackBuilder(ndk: ndk)
             .kind(EventKind.followPack)
             .title("My Follow Pack")
             .description("A test follow pack")
@@ -245,7 +245,7 @@ final class NDKFollowPackTests: XCTestCase {
     
     func testDuplicateTagRemoval() async throws {
         // Builder handles duplicate removal
-        let builder = ndk.followPack()
+        let builder = NDKFollowPackBuilder(ndk: ndk)
             .title("First")
             .title("Second")  // This should replace the first
         
@@ -264,7 +264,7 @@ final class NDKFollowPackTests: XCTestCase {
         let mockRelay = MockRelay()
         ndk.relayPool.relays[mockRelay.url] = mockRelay
         
-        let followPack = try await ndk.followPack()
+        let followPack = try await NDKFollowPackBuilder(ndk: ndk)
             .title("Published Pack")
             .pubkeys(["pk1"])
             .publish()
