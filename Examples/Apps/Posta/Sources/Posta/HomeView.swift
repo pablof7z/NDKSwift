@@ -3,11 +3,21 @@ import NDKSwift
 
 struct HomeView: View {
     @Environment(NDKAuthManager.self) var authManager
-    @Environment(SubscriptionManager.self) var subscriptionManager
     @Environment(NDKManager.self) var ndkManager
     @State private var selectedProfile: String?
     @State private var selectedThread: NDKEvent?
     @State private var replyTracker: ReplyTracker?
+    
+    // Direct NDK state
+    @State private var notes: [NDKEvent] = []
+    @State private var sessionData: NDKSessionData?
+    @State private var isLoadingFollows: Bool = true
+    @State private var isLoadingNotes: Bool = false
+    @State private var isSyncing: Bool = false
+    @State private var syncStatus: String = ""
+    @State private var error: Error?
+    @State private var newNotesCount: Int = 0
+    @State private var notesSubscription: Task<Void, Never>?
     
     var body: some View {
         NavigationView {
@@ -29,9 +39,9 @@ struct HomeView: View {
                     headerView
                     
                     // Main content
-                    if subscriptionManager.isLoadingFollows {
+                    if isLoadingFollows {
                         loadingFollowsView
-                    } else if subscriptionManager.notes.isEmpty && !subscriptionManager.isLoadingNotes {
+                    } else if notes.isEmpty && !isLoadingNotes {
                         emptyStateView
                     } else {
                         chatListView
@@ -47,12 +57,9 @@ struct HomeView: View {
             ThreadView(rootEvent: event)
         }
         .onAppear {
-            // Initialize reply tracker when NDK is available
-            if let ndk = ndkManager.ndk, replyTracker == nil, let sessionData = subscriptionManager.sessionData {
-                replyTracker = ReplyTracker(ndk: ndk, following: sessionData.followList)
-            }
+            startSession()
         }
-        .onChange(of: subscriptionManager.sessionData?.followList) { _, newFollows in
+        .onChange(of: sessionData?.followList) { _, newFollows in
             // Update reply tracker when follows change
             if let newFollows = newFollows {
                 replyTracker?.updateFollowing(newFollows)
@@ -80,16 +87,14 @@ struct HomeView: View {
                     
                     // Sync button
                     Button(action: {
-                        Task {
-                            await subscriptionManager.triggerSync()
-                        }
+                        triggerSync()
                     }) {
                         ZStack {
                             Circle()
                                 .fill(Color(.quaternarySystemFill))
                                 .frame(width: 36, height: 36)
                             
-                            if subscriptionManager.isSyncing {
+                            if isSyncing {
                                 ProgressView()
                                     .scaleEffect(0.65)
                                     .tint(.secondary)
@@ -100,10 +105,10 @@ struct HomeView: View {
                             }
                         }
                     }
-                    .disabled(subscriptionManager.isSyncing)
-                    .opacity(subscriptionManager.isSyncing ? 1 : 0.9)
-                    .scaleEffect(subscriptionManager.isSyncing ? 1 : 1)
-                    .animation(.easeInOut(duration: 0.15), value: subscriptionManager.isSyncing)
+                    .disabled(isSyncing)
+                    .opacity(isSyncing ? 1 : 0.9)
+                    .scaleEffect(isSyncing ? 1 : 1)
+                    .animation(.easeInOut(duration: 0.15), value: isSyncing)
                     
                     // Profile button
                     Button(action: {
@@ -127,22 +132,22 @@ struct HomeView: View {
                 .padding(.bottom, 10)
                 
                 // Connection status
-                if let error = subscriptionManager.error {
+                if let error = error {
                     ErrorBanner(error: error)
                         .padding(.horizontal, 16)
                         .padding(.bottom, 6)
                 }
                 
                 // Sync status
-                if !subscriptionManager.syncStatus.isEmpty {
-                    Text(subscriptionManager.syncStatus)
+                if !syncStatus.isEmpty {
+                    Text(syncStatus)
                         .font(.caption2)
                         .foregroundColor(.secondary)
                         .padding(.bottom, 6)
                 }
             }
         }
-        .frame(height: subscriptionManager.error != nil ? 90 : 70)
+        .frame(height: error != nil ? 90 : 70)
         .shadow(color: Color.black.opacity(0.03), radius: 3, x: 0, y: 1)
     }
     
@@ -188,12 +193,12 @@ struct HomeView: View {
                             .id("top")
                             .onAppear {
                                 // User is viewing the top of the list
-                                if subscriptionManager.newNotesCount > 0 {
-                                    subscriptionManager.resetNewNotesCount()
+                                if newNotesCount > 0 {
+                                    resetNewNotesCount()
                                 }
                             }
                         
-                        ForEach(subscriptionManager.notes, id: \.id) { event in
+                        ForEach(notes, id: \.id) { event in
                             ChatRowView(
                                 event: event,
                                 replyTracker: replyTracker,
@@ -205,7 +210,7 @@ struct HomeView: View {
                                 }
                             )
                             
-                            if event.id != subscriptionManager.notes.last?.id {
+                            if event.id != notes.last?.id {
                                 Divider()
                                     .padding(.leading, 76)
                             }
@@ -215,19 +220,19 @@ struct HomeView: View {
                 .scrollIndicators(.hidden)
                 
                 // New notes indicator
-                if subscriptionManager.newNotesCount > 0 {
+                if newNotesCount > 0 {
                     Button(action: {
                         // Scroll to top and reset counter
                         withAnimation {
                             proxy.scrollTo("top", anchor: .top)
                         }
-                        subscriptionManager.resetNewNotesCount()
+                        resetNewNotesCount()
                     }) {
                     HStack(spacing: 6) {
                         Image(systemName: "arrow.up")
                             .font(.system(size: 12, weight: .semibold))
                         
-                        Text("\(subscriptionManager.newNotesCount) new")
+                        Text("\(newNotesCount) new")
                             .font(.system(size: 13, weight: .semibold))
                     }
                     .foregroundColor(.white)
@@ -244,10 +249,141 @@ struct HomeView: View {
                     insertion: .scale.combined(with: .opacity),
                     removal: .scale.combined(with: .opacity)
                 ))
-                .animation(.spring(response: 0.3, dampingFraction: 0.8), value: subscriptionManager.newNotesCount)
+                .animation(.spring(response: 0.3, dampingFraction: 0.8), value: newNotesCount)
                 }
             }
         }
+    }
+    
+    // MARK: - Helper Methods
+    
+    private func startSession() {
+        guard let ndk = ndkManager.ndk else { return }
+        
+        Task {
+            do {
+                // Start session and get session data
+                let data = try await ndk.startSession(signer: ndk.signer!)
+                
+                await MainActor.run {
+                    self.sessionData = data
+                    
+                    // Initialize reply tracker
+                    if replyTracker == nil {
+                        replyTracker = ReplyTracker(ndk: ndk, following: data.followList)
+                    }
+                }
+                
+                // Observe session data state changes
+                observeSessionData(data)
+                
+            } catch {
+                await MainActor.run {
+                    self.error = error
+                    self.isLoadingFollows = false
+                }
+            }
+        }
+    }
+    
+    private func observeSessionData(_ data: NDKSessionData) {
+        Task {
+            // Use withObservationTracking to observe changes
+            while !Task.isCancelled {
+                await withObservationTracking {
+                    // This will trigger when followListState changes
+                    let state = data.followListState
+                    
+                    Task { @MainActor in
+                        switch state {
+                        case .loading:
+                            isLoadingFollows = true
+                        case .ready(let follows, _), .updating(let follows, _):
+                            isLoadingFollows = false
+                            if notesSubscription == nil {
+                                startNotesSubscription()
+                            }
+                        case .error(let error):
+                            isLoadingFollows = false
+                            self.error = error
+                        }
+                    }
+                } onChange: {
+                    // Continue observing
+                }
+            }
+        }
+    }
+    
+    private func startNotesSubscription() {
+        guard let ndk = ndkManager.ndk else { return }
+        
+        notesSubscription?.cancel()
+        
+        notesSubscription = Task {
+            isLoadingNotes = true
+            
+            // Create reactive filter for notes from followed users
+            let filter = ReactiveFilter(
+                dependencies: [.followList],
+                builder: { sessionData in
+                    NDKFilter(
+                        authors: Array(sessionData.followList),
+                        kinds: [1],
+                        limit: 100
+                    )
+                }
+            )
+            
+            // Use observe to get a stream of notes
+            let stream = ndk.observe(filter)
+            
+            var seenIds = Set<String>()
+            var notesList: [NDKEvent] = []
+            
+            for await event in stream {
+                if !seenIds.contains(event.id) {
+                    seenIds.insert(event.id)
+                    notesList.append(event)
+                    
+                    // Sort by timestamp descending
+                    notesList.sort { $0.createdAt > $1.createdAt }
+                    
+                    await MainActor.run {
+                        isLoadingNotes = false
+                        
+                        // Update new notes count if we have existing notes
+                        if !notes.isEmpty && event.createdAt > (notes.first?.createdAt ?? 0) {
+                            newNotesCount += 1
+                        }
+                        
+                        notes = notesList
+                    }
+                }
+            }
+        }
+    }
+    
+    private func triggerSync() {
+        // For now, just reload the subscription
+        // In the future, this could trigger negentropy sync
+        isSyncing = true
+        syncStatus = "Syncing..."
+        
+        notesSubscription?.cancel()
+        startNotesSubscription()
+        
+        Task {
+            try? await Task.sleep(nanoseconds: 2_000_000_000) // 2 seconds
+            await MainActor.run {
+                isSyncing = false
+                syncStatus = ""
+            }
+        }
+    }
+    
+    private func resetNewNotesCount() {
+        newNotesCount = 0
     }
 }
 

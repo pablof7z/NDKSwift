@@ -14,7 +14,9 @@ struct ContentView: View {
                 if appState.isLoading {
                     LoadingView()
                 } else {
-                    HomeFeedView()
+                    NavigationView {
+                        HomeFeedView()
+                    }
                 }
             } authenticationContent: {
                 // Authentication screen

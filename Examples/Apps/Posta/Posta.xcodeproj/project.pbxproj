@@ -3,7 +3,7 @@
 	archiveVersion = 1;
 	classes = {
 	};
-	objectVersion = 54;
+	objectVersion = 63;
 	objects = {
 
 /* Begin PBXBuildFile section */
@@ -25,7 +25,6 @@
 		793BF367E112F49D7A3168CD /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 473DF610696C7C8D6BE3D7C9 /* Assets.xcassets */; };
 		7AEB6DC723A42CDE26B77423 /* .repomix-output.txt in Resources */ = {isa = PBXBuildFile; fileRef = 4BEB9DCD6304EF0C9BC783BB /* .repomix-output.txt */; };
 		81A513C4F226861819FD14C8 /* ThemeManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 409933079609CEDCF33B802B /* ThemeManager.swift */; };
-		9726C57DB02F0828075FB854 /* SubscriptionManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1F4E20A070905E5188933E9 /* SubscriptionManager.swift */; };
 		9B0BB37D975DC528DAF44ECF /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 0E1C662710FBEF7F41C5E825 /* LaunchScreen.storyboard */; };
 		A4532FD2AA8BFBDE4B46F4A2 /* RichTextView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C131650403671166D1B2BD44 /* RichTextView.swift */; };
 		A677E223B0C3B07B2A454BD2 /* AppearanceSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0DBD81CB29A5387DD9C8217C /* AppearanceSettingsView.swift */; };
@@ -78,7 +77,6 @@
 		C131650403671166D1B2BD44 /* RichTextView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RichTextView.swift; sourceTree = "<group>"; };
 		CABF96A49CF7DCDEA2A81490 /* PrivacySettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PrivacySettingsView.swift; sourceTree = "<group>"; };
 		DB1F484FFC62DD699207A5BB /* ThreadView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ThreadView.swift; sourceTree = "<group>"; };
-		F1F4E20A070905E5188933E9 /* SubscriptionManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SubscriptionManager.swift; sourceTree = "<group>"; };
 		F262F1D409139EEE06AB75A2 /* AboutView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AboutView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
@@ -165,7 +163,6 @@
 				1FBCB498E0CEBC16BA3A59D6 /* ReplyTracker.swift */,
 				57E4286C68B29F1067E1E5E9 /* SettingsView.swift */,
 				1582DA2D0964FB86FFD22737 /* SplashView.swift */,
-				F1F4E20A070905E5188933E9 /* SubscriptionManager.swift */,
 				409933079609CEDCF33B802B /* ThemeManager.swift */,
 				DB1F484FFC62DD699207A5BB /* ThreadView.swift */,
 				B88397F1C4B9DC130C6BF474 /* VisualEffectBlur.swift */,
@@ -235,7 +232,6 @@
 			packageReferences = (
 				97AD969B8512E9D4488CD991 /* XCLocalSwiftPackageReference "../../.." */,
 			);
-			preferredProjectObjectVersion = 54;
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
@@ -285,7 +281,6 @@
 				A4532FD2AA8BFBDE4B46F4A2 /* RichTextView.swift in Sources */,
 				724D3774AD60E792300AD9A5 /* SettingsView.swift in Sources */,
 				1089942926B933752761F2EF /* SplashView.swift in Sources */,
-				9726C57DB02F0828075FB854 /* SubscriptionManager.swift in Sources */,
 				81A513C4F226861819FD14C8 /* ThemeManager.swift in Sources */,
 				4D6ADD01EECC9EA78723EB06 /* ThreadView.swift in Sources */,
 				3AD0FE7C0FAA4892AD482DC8 /* URLPreviewView.swift in Sources */,

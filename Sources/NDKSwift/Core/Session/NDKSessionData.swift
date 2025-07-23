@@ -109,14 +109,56 @@ public class NDKSessionData {
     private func loadLists(kinds: Set<Int>, needsFollowList: Bool, needsMuteList: Bool, needsBlockedRelays: Bool) async {
         guard let ndk = ndk else { return }
         
-        let filter = NDKFilter(
+        // First, check cache for existing events to optimize the filter
+        var latestTimestamps: [Int: Timestamp] = [:]
+        
+        // Check for each kind we need
+        for kind in kinds {
+            let cacheFilter = NDKFilter(
+                authors: [pubkey],
+                kinds: [kind],
+                limit: 1
+            )
+            
+            // Get the latest event from cache
+            if let cachedEvents = try? await ndk.cache.queryEvents(cacheFilter),
+               let cachedEvent = cachedEvents.first {
+                latestTimestamps[kind] = cachedEvent.createdAt
+                
+                // Process the cached event immediately
+                switch cachedEvent.kind {
+                case EventKind.contacts where needsFollowList:
+                    processFollowListEvent(cachedEvent, fromCache: true)
+                case EventKind.muteList where needsMuteList:
+                    processMuteListEvent(cachedEvent, fromCache: true)
+                case EventKind.blockedRelays where needsBlockedRelays:
+                    processBlockedRelaysEvent(cachedEvent, fromCache: true)
+                default:
+                    break
+                }
+            }
+        }
+        
+        // Find the oldest timestamp among all kinds (or nil if no cached events)
+        let oldestTimestamp = latestTimestamps.values.min()
+        
+        // Create filter with 'since' optimization if we have cached events
+        var filter = NDKFilter(
             authors: [pubkey],
             kinds: Array(kinds),
             limit: kinds.count  // We want the latest of each kind
         )
         
-        // Create data source for continuous updates
-        let dataSource = NDKDataSource<NDKEvent>(ndk: ndk, filter: filter)
+        // If we have cached events, only fetch newer ones
+        if let timestamp = oldestTimestamp {
+            // Add 1 second to avoid re-fetching the same events
+            filter.since = timestamp + 1
+            NDKLogger.log(.debug, category: .subscription, "🎯 Optimizing session data fetch - only fetching events newer than \(timestamp)")
+        }
+        
+        // Create data source for continuous updates with meaningful subscription ID
+        let subscriptionId = "session_lists_\(pubkey.prefix(8))"
+        let dataSource = NDKDataSource<NDKEvent>(ndk: ndk, filter: filter, subscriptionId: subscriptionId)
         self.listsDataSource = dataSource
         
         // Process events as they arrive from the data source
@@ -285,10 +327,12 @@ public class NDKSessionData {
         )
         
         // Use data source to fetch events
+        let subscriptionId = "session_wot_\(pubkey.prefix(8))"
         let dataSource = NDKDataSource<NDKEvent>(
             ndk: ndk,
             filter: filter,
-            maxAge: 300 // 5 minute cache
+            maxAge: 300, // 5 minute cache
+            subscriptionId: subscriptionId
         )
         
         // Collect events  
