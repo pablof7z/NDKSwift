@@ -58,6 +58,8 @@ enum OlasDesign {
         static let primary = Color(hex: "667eea") // Default to day color
         static let secondary = Color(hex: "764ba2")
         static let like = Color(hex: "FF4458") // Heart red
+        static let gradient = [Color(hex: "667eea"), Color(hex: "764ba2")] // Default gradient
+        static let primaryGradient = [Color(hex: "667eea"), Color(hex: "764ba2")] // For compatibility
     }
     
     // MARK: - Typography
@@ -70,6 +72,7 @@ enum OlasDesign {
         static let headline = Font.system(.headline, design: .default, weight: .semibold)
         static let body = Font.custom("Inter", size: 16).weight(.regular)
         static let bodyMedium = Font.custom("Inter", size: 16).weight(.medium)
+        static let bodyBold = Font.custom("Inter", size: 16).weight(.bold)
         static let caption = Font.custom("Inter", size: 14).weight(.regular)
         static let footnote = Font.custom("Inter", size: 13).weight(.regular)
         static let mono = Font.custom("JetBrains Mono", size: 14).weight(.regular)
@@ -388,6 +391,7 @@ struct OlasLoadingView: View {
             .overlay(OlasShimmer())
     }
 }
+
 
 // MARK: - Avatar Component
 

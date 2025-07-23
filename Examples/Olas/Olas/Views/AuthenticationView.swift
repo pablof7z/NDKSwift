@@ -3,89 +3,285 @@ import NDKSwift
 
 struct AuthenticationView: View {
     @EnvironmentObject var appState: AppState
-    @State private var showCreateAccount = false
+    @State private var showOnboarding = false
     @State private var privateKey = ""
+    @State private var showLoginSheet = false
+    @State private var keyboardHeight: CGFloat = 0
+    @State private var animateGradient = false
+    @State private var hasSeenOnboarding = UserDefaults.standard.bool(forKey: "hasSeenOnboarding")
     
     var body: some View {
-        NavigationStack {
-            VStack(spacing: 32) {
-                // Logo/Header
-                VStack(spacing: 8) {
-                    Text("Olas")
-                        .font(.system(size: 72, weight: .bold, design: .rounded))
-                        .foregroundStyle(
+        ZStack {
+            // Animated gradient background
+            TimeBasedGradient()
+                .ignoresSafeArea()
+            
+            if !hasSeenOnboarding || showOnboarding {
+                OnboardingView()
+                    .onDisappear {
+                        UserDefaults.standard.set(true, forKey: "hasSeenOnboarding")
+                        hasSeenOnboarding = true
+                    }
+            } else {
+                mainAuthView
+            }
+        }
+    }
+    
+    var mainAuthView: some View {
+        VStack {
+            Spacer()
+            
+            // Animated Logo
+            VStack(spacing: OlasDesign.Spacing.lg) {
+                ZStack {
+                    // Glow effect
+                    Circle()
+                        .fill(
                             LinearGradient(
-                                colors: [Color(hex: "667eea"), Color(hex: "764ba2")],
+                                colors: OlasDesign.Colors.primaryGradient,
                                 startPoint: .topLeading,
                                 endPoint: .bottomTrailing
                             )
                         )
+                        .frame(width: 120, height: 120)
+                        .blur(radius: 40)
+                        .scaleEffect(animateGradient ? 1.2 : 0.8)
+                        .animation(
+                            .easeInOut(duration: 3).repeatForever(autoreverses: true),
+                            value: animateGradient
+                        )
                     
-                    Text("Picture-First Nostr Experience")
-                        .font(.title3)
-                        .foregroundColor(.secondary)
+                    Text("Olas")
+                        .font(.system(size: 72, weight: .bold, design: .rounded))
+                        .foregroundStyle(.white)
                 }
-                .padding(.top, 60)
                 
-                Spacer()
-                
-                // Login Section
-                VStack(spacing: 16) {
-                    TextField("Enter your private key (nsec or hex)", text: $privateKey)
-                        .textFieldStyle(.roundedBorder)
-                        #if os(iOS)
-                        .autocapitalization(.none)
-                        #endif
-                        .autocorrectionDisabled()
-                    
-                    Button(action: login) {
-                        Text("Login")
-                            .font(.headline)
-                            .foregroundColor(.white)
-                            .frame(maxWidth: .infinity)
-                            .padding()
-                            .background(
-                                LinearGradient(
-                                    colors: [Color(hex: "667eea"), Color(hex: "764ba2")],
-                                    startPoint: .leading,
-                                    endPoint: .trailing
-                                )
-                            )
-                            .cornerRadius(12)
+                Text("Welcome back")
+                    .font(.system(size: 24, weight: .medium, design: .rounded))
+                    .foregroundStyle(.white.opacity(0.9))
+            }
+            
+            Spacer()
+            
+            // Action buttons
+            VStack(spacing: OlasDesign.Spacing.md) {
+                Button {
+                    showOnboarding = true
+                    HapticManager.impact(.medium)
+                } label: {
+                    HStack {
+                        Image(systemName: "sparkles")
+                        Text("I'm New Here")
                     }
-                    .disabled(privateKey.isEmpty)
+                    .font(OlasDesign.Typography.bodyBold)
+                    .foregroundStyle(.white)
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 56)
+                    .background(
+                        LinearGradient(
+                            colors: OlasDesign.Colors.primaryGradient,
+                            startPoint: .leading,
+                            endPoint: .trailing
+                        )
+                    )
+                    .clipShape(RoundedRectangle(cornerRadius: 16))
                 }
-                .padding(.horizontal, 32)
                 
-                // Create Account
-                Button(action: { showCreateAccount = true }) {
-                    Text("Create New Account")
-                        .font(.headline)
-                        .foregroundStyle(
+                Button {
+                    showLoginSheet = true
+                    HapticManager.impact(.light)
+                } label: {
+                    Text("I Have an Account")
+                    .font(OlasDesign.Typography.bodyBold)
+                    .foregroundStyle(.white)
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 56)
+                    .background(
+                        RoundedRectangle(cornerRadius: 16)
+                            .fill(.white.opacity(0.1))
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 16)
+                                    .stroke(.white.opacity(0.2), lineWidth: 1)
+                            )
+                    )
+                }
+            }
+            .padding(.horizontal, OlasDesign.Spacing.xl)
+            .padding(.bottom, OlasDesign.Spacing.xxxl)
+        }
+        .sheet(isPresented: $showLoginSheet) {
+            LoginSheet()
+        }
+        .onAppear {
+            animateGradient = true
+        }
+    }
+    
+}
+
+// MARK: - Login Sheet
+struct LoginSheet: View {
+    @EnvironmentObject var appState: AppState
+    @Environment(\.dismiss) var dismiss
+    @State private var privateKey = ""
+    @State private var showError = false
+    @State private var errorMessage = ""
+    @State private var isLoading = false
+    @FocusState private var isKeyFieldFocused: Bool
+    
+    var body: some View {
+        ZStack {
+            // Gradient background
+            LinearGradient(
+                colors: [Color(hex: "1a1a2e"), Color(hex: "0f0f1e")],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+            .ignoresSafeArea()
+            
+            VStack(spacing: 0) {
+                // Handle bar
+                Capsule()
+                    .fill(.white.opacity(0.3))
+                    .frame(width: 40, height: 4)
+                    .padding(.top, OlasDesign.Spacing.sm)
+                    .padding(.bottom, OlasDesign.Spacing.xl)
+                
+                ScrollView {
+                    VStack(spacing: OlasDesign.Spacing.xl) {
+                        // Header
+                        VStack(spacing: OlasDesign.Spacing.md) {
+                            Image(systemName: "key.fill")
+                                .font(.system(size: 48))
+                                .foregroundStyle(
+                                    LinearGradient(
+                                        colors: OlasDesign.Colors.primaryGradient,
+                                        startPoint: .topLeading,
+                                        endPoint: .bottomTrailing
+                                    )
+                                )
+                            
+                            Text("Welcome Back")
+                                .font(.system(size: 28, weight: .semibold, design: .rounded))
+                                .foregroundStyle(.white)
+                            
+                            Text("Enter your private key to continue")
+                                .font(OlasDesign.Typography.body)
+                                .foregroundStyle(.white.opacity(0.7))
+                        }
+                        .padding(.top, OlasDesign.Spacing.lg)
+                        
+                        // Key input
+                        VStack(alignment: .leading, spacing: OlasDesign.Spacing.sm) {
+                            Text("Private Key")
+                                .font(OlasDesign.Typography.caption)
+                                .foregroundStyle(.white.opacity(0.6))
+                            
+                            SecureField("nsec1... or hex format", text: $privateKey)
+                                .font(OlasDesign.Typography.body)
+                                .foregroundStyle(.white)
+                                .padding()
+                                .background(
+                                    RoundedRectangle(cornerRadius: 12)
+                                        .fill(.white.opacity(0.1))
+                                        .overlay(
+                                            RoundedRectangle(cornerRadius: 12)
+                                                .stroke(.white.opacity(0.2), lineWidth: 1)
+                                        )
+                                )
+                                .focused($isKeyFieldFocused)
+                                #if os(iOS)
+                                .autocapitalization(.none)
+                                #endif
+                                .autocorrectionDisabled()
+                        }
+                        .padding(.horizontal, OlasDesign.Spacing.xl)
+                        
+                        // Login button
+                        Button(action: login) {
+                            if isLoading {
+                                ProgressView()
+                                    .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                            } else {
+                                Text("Login")
+                                    .font(OlasDesign.Typography.bodyBold)
+                            }
+                        }
+                        .foregroundStyle(.white)
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 56)
+                        .background(
                             LinearGradient(
-                                colors: [Color(hex: "667eea"), Color(hex: "764ba2")],
+                                colors: privateKey.isEmpty ? [.gray] : OlasDesign.Colors.primaryGradient,
                                 startPoint: .leading,
                                 endPoint: .trailing
                             )
                         )
+                        .clipShape(RoundedRectangle(cornerRadius: 16))
+                        .disabled(privateKey.isEmpty || isLoading)
+                        .padding(.horizontal, OlasDesign.Spacing.xl)
+                        
+                        // Additional options
+                        VStack(spacing: OlasDesign.Spacing.md) {
+                            Button {
+                                // TODO: Implement NIP-07 login
+                                HapticManager.impact(.light)
+                            } label: {
+                                HStack {
+                                    Image(systemName: "globe")
+                                    Text("Login with Browser Extension")
+                                }
+                                .font(OlasDesign.Typography.body)
+                                .foregroundStyle(.white.opacity(0.8))
+                            }
+                            
+                            Button {
+                                // TODO: Implement key import
+                                HapticManager.impact(.light)
+                            } label: {
+                                HStack {
+                                    Image(systemName: "qrcode")
+                                    Text("Scan QR Code")
+                                }
+                                .font(OlasDesign.Typography.body)
+                                .foregroundStyle(.white.opacity(0.8))
+                            }
+                        }
+                        .padding(.top, OlasDesign.Spacing.lg)
+                    }
+                    .padding(.bottom, OlasDesign.Spacing.xxxl)
                 }
-                .padding(.bottom, 60)
             }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .background(Color.black)
-            .sheet(isPresented: $showCreateAccount) {
-                CreateAccountView()
+        }
+        .alert("Login Failed", isPresented: $showError) {
+            Button("OK") {
+                errorMessage = ""
+            }
+        } message: {
+            Text(errorMessage)
+        }
+        .onAppear {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                isKeyFieldFocused = true
             }
         }
     }
     
     private func login() {
+        isLoading = true
+        HapticManager.impact(.light)
+        
         Task {
             do {
                 try await appState.login(with: privateKey)
+                HapticManager.notification(.success)
+                dismiss()
             } catch {
-                print("Login failed: \(error)")
-                // TODO: Show error alert
+                isLoading = false
+                errorMessage = "Invalid private key. Please check and try again."
+                showError = true
+                HapticManager.notification(.error)
             }
         }
     }
