@@ -16,6 +16,7 @@ actor InternalSubscriptionManager {
         filters: [NDKFilter],
         relays: Set<RelayURL>? = nil
     ) async -> InternalSubscription {
+        NDKLogger.log(.debug, category: .subscription, "📋 [InternalSubManager] createSubscription called - id: \(id), filters: \(filters)")
         
         // Remove any existing subscription with same ID
         if let existing = activeSubscriptions[id] {
@@ -31,9 +32,12 @@ actor InternalSubscriptionManager {
         )
         
         activeSubscriptions[id] = subscription
+        NDKLogger.log(.debug, category: .subscription, "📌 [InternalSubManager] Subscription created and stored in activeSubscriptions")
         
         // Start the subscription
+        NDKLogger.log(.debug, category: .subscription, "🚀 [InternalSubManager] Starting subscription...")
         await subscription.start()
+        NDKLogger.log(.debug, category: .subscription, "✅ [InternalSubManager] Subscription started")
         
         return subscription
     }
@@ -106,8 +110,18 @@ actor InternalSubscription {
     
     /// Start the subscription
     func start() async {
+        NDKLogger.log(.debug, category: .subscription, "🚀 [InternalSub] start() called for subscription: \(id)")
         guard !isActive, let ndk = ndk else {
-            NDKLogger.log(.warning, category: .subscription, "⚠️ Cannot start subscription - isActive: \(isActive), hasNDK: \(ndk != nil)")
+            let reason = isActive ? "already active" : "NDK reference lost"
+            let filterSummary = filters.map { filter in
+                var parts: [String] = []
+                if let kinds = filter.kinds { parts.append("kinds:\(kinds)") }
+                if let authors = filter.authors { parts.append("authors:\(authors.count)") }
+                if let limit = filter.limit { parts.append("limit:\(limit)") }
+                return parts.joined(separator: ",")
+            }.joined(separator: "; ")
+            
+            NDKLogger.log(.warning, category: .subscription, "⚠️ Cannot start subscription '\(id)' - reason: \(reason), filters: [\(filterSummary)]")
             return
         }
         isActive = true
@@ -116,15 +130,20 @@ actor InternalSubscription {
         let targetRelays: [NDKRelay]
         if let specificRelays = relays {
             targetRelays = await ndk.pool.getRelays(for: specificRelays)
+            NDKLogger.log(.debug, category: .subscription, "📡 [InternalSub] Using specific relays: \(specificRelays.joined(separator: ", "))")
         } else {
             targetRelays = await ndk.pool.connectedRelays()
+            NDKLogger.log(.debug, category: .subscription, "📡 [InternalSub] Using all connected relays: \(targetRelays.count)")
         }
+        
+        NDKLogger.log(.debug, category: .subscription, "📤 [InternalSub] Sending REQ to \(targetRelays.count) relays")
         
         // Send REQ message to each relay
         var successCount = 0
         for relay in targetRelays {
             do {
                 let message = createREQMessage()
+                NDKLogger.log(.debug, category: .subscription, "📨 [InternalSub] Sending REQ to \(relay.url): \(message)")
                 try await relay.send(message)
                 
                 // Track subscription on the relay
@@ -135,6 +154,8 @@ actor InternalSubscription {
                 NDKLogger.log(.error, category: .subscription, "❌ Failed to send REQ to \(relay.url): \(error)")
             }
         }
+        
+        NDKLogger.log(.info, category: .subscription, "✅ [InternalSub] REQ sent to \(successCount)/\(targetRelays.count) relays")
     }
     
     /// Close the subscription

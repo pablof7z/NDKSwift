@@ -107,7 +107,15 @@ class NostrManager {
         guard let ndk = ndk else { throw NostrError.ndkNotInitialized }
         
         let signer = try NDKPrivateKeySigner(privateKey: privateKey)
-        ndk.signer = signer
+        
+        // Start session with mute list support
+        let sessionData = try await ndk.startSession(
+            signer: signer,
+            config: NDKSessionConfiguration(
+                dataRequirements: [.followList, .muteList],
+                preloadStrategy: .progressive
+            )
+        )
         
         // Zap manager gets signer from NDK automatically
         
@@ -131,16 +139,22 @@ class NostrManager {
         // Generate new private key
         let signer = try NDKPrivateKeySigner.generate()
         
-        // Create session with auth manager
+        // Start session with mute list support
+        print("🏚️ [NostrManager] Starting session...")
+        let sessionData = try await ndk.startSession(
+            signer: signer,
+            config: NDKSessionConfiguration(
+                dataRequirements: [.followList, .muteList],
+                preloadStrategy: .progressive
+            )
+        )
+        
+        // Create auth session for persistence
         let session = try await ndkAuthManager.createSession(
             with: signer,
             requiresBiometric: false,
             isHardwareBacked: false
         )
-        
-        // Switch to this session
-        print("🏚️ [NostrManager] Switching to new session...")
-        try await ndkAuthManager.switchToSession(session)
         
         // Zap manager gets signer from NDK automatically
         
@@ -223,20 +237,25 @@ class NostrManager {
     /// Create account using existing nsec
     func createAccountFromNsec(_ nsec: String, displayName: String) async throws -> NDKSession {
         print("🏚️ [NostrManager] createAccountFromNsec() called with displayName: \(displayName)")
-        guard ndk != nil else { throw NostrError.ndkNotInitialized }
+        guard let ndk = ndk else { throw NostrError.ndkNotInitialized }
         
         let signer = try NDKPrivateKeySigner(nsec: nsec)
         
-        // Create session with auth manager
+        // Start session with mute list support
+        let sessionData = try await ndk.startSession(
+            signer: signer,
+            config: NDKSessionConfiguration(
+                dataRequirements: [.followList, .muteList],
+                preloadStrategy: .progressive
+            )
+        )
+        
+        // Create auth session for persistence
         let session = try await ndkAuthManager.createSession(
             with: signer,
             requiresBiometric: false,
             isHardwareBacked: false
         )
-        
-        // Switch to this session
-        print("🏚️ [NostrManager] Switching to imported session...")
-        try await ndkAuthManager.switchToSession(session)
         
         // Zap manager gets signer from NDK automatically
         

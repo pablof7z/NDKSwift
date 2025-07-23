@@ -7,6 +7,9 @@ public final class NDK {
     /// Active signer for this NDK instance
     public var signer: NDKSigner?
     
+    /// Active session data for reactive filters
+    public internal(set) var sessionData: NDKSessionData?
+    
     /// Cache for storing events (always present, defaults to in-memory)
     public let cache: NDKCache
     

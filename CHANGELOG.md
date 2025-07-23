@@ -8,6 +8,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- NDKSwiftUI Markdown Renderer
+  - Complete markdown syntax support (headings, bold, italic, code blocks, lists, etc.)
+  - Full Nostr entity parsing (npub, note, nevent, naddr, mentions, hashtags)
+  - Inline image rendering with AsyncImage
+  - Customizable styling with predefined themes (minimal, dark, nostr, compact)
+  - Progressive disclosure with NDKMarkdownPreview component
+  - Action handlers for mentions, hashtags, links, and Nostr entities
+  - Integration with ContentParser for accurate Nostr entity detection
+  - Support for custom markdown configurations
 - Session Data Management System with reactive subscriptions
   - NDKSessionData for managing follow lists, mute lists, blocked relays, and web-of-trust data
   - Observable states for session data readiness
@@ -40,6 +49,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - ReactiveFilterDemo example showing automatic subscription updates
 
 ### Changed
+- Session subscriptions now use meaningful subscription IDs for easier debugging
+  - Session lists: `session_lists_[pubkey_prefix]`
+  - Web of Trust: `session_wot_[pubkey_prefix]`
+  - Reactive filters: `reactive_[dependencies]_[pubkey_prefix]`
+  - Data source subscriptions: descriptive IDs based on filter content (e.g., `metadata_author_12345678_abcd`)
 - **BREAKING**: Removed `ndk.event()` and `ndk.reply()` extension methods to reduce namespace pollution
   - Use `NDKEventBuilder(ndk: ndk)` instead of `ndk.event()`
   - Use `NDKEventBuilder.reply(to: event, ndk: ndk)` instead of `ndk.reply(to: event)`

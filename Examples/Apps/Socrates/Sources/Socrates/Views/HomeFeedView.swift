@@ -241,6 +241,8 @@ struct HomeFeedView: View {
 // MARK: - Header View
 struct HeaderView: View {
     @EnvironmentObject var appState: AppState
+    @EnvironmentObject var nostrManager: NostrManager
+    @State private var showMarkdownDemo = false
     
     var body: some View {
         HStack {
@@ -258,6 +260,16 @@ struct HeaderView: View {
                 )
             
             Spacer()
+            
+            // Markdown demo button
+            NavigationLink(destination: MarkdownDemoView().environmentObject(nostrManager.ndk ?? NDK())) {
+                Image(systemName: "doc.richtext")
+                    .font(.system(size: 20))
+                    .foregroundColor(.white.opacity(0.8))
+                    .padding(8)
+                    .background(Color.white.opacity(0.1))
+                    .clipShape(Circle())
+            }
             
             // Profile button
             if let user = appState.currentUser {

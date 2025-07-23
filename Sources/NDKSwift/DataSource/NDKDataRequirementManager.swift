@@ -43,6 +43,8 @@ actor NDKDataRequirementManager {
         let requirementId = RequirementID()
         let correlationId = requirementId.uuidString.prefix(8)
         
+        NDKLogger.log(.debug, category: .subscription, "📥 [DataReqManager] registerRequirement - filter: \(filter), maxAge: \(maxAge), policy: \(cachePolicy)", correlationId: String(correlationId))
+        
         // IMMEDIATELY register cache observer to deliver existing events
         // This happens before any delay, giving instant cache hits
         var cacheObservationHandle: ObservationHandle?
@@ -98,8 +100,10 @@ actor NDKDataRequirementManager {
         
         // Start or extend grouping timer
         if flushTasks[signature] == nil {
+            NDKLogger.log(.debug, category: .subscription, "⏰ [DataReqManager] Starting grouping timer for \(groupingWindow)s", correlationId: String(correlationId))
             flushTasks[signature] = Task {
                 try? await Task.sleep(nanoseconds: UInt64(groupingWindow * Double(TimeConstants.nanosecondsPerSecond)))
+                NDKLogger.log(.debug, category: .subscription, "⏰ [DataReqManager] Grouping timer expired, flushing...", correlationId: String(correlationId))
                 await flushPendingRequirements(for: signature)
             }
         } else {
@@ -153,6 +157,7 @@ actor NDKDataRequirementManager {
     }
     
     private func flushPendingRequirements(for signature: FilterSignature) async {
+        NDKLogger.log(.debug, category: .subscription, "🔄 [DataReqManager] flushPendingRequirements called for signature: \(signature)")
         flushTasks.removeValue(forKey: signature)
         
         guard let pending = pendingRequirements.removeValue(forKey: signature),
@@ -160,6 +165,8 @@ actor NDKDataRequirementManager {
             NDKLogger.log(.trace, category: .subscription, "No pending requirements to flush")
             return
         }
+        
+        NDKLogger.log(.debug, category: .subscription, "📋 [DataReqManager] Flushing \(pending.count) pending requirements")
         
         
         // Group by maxAge and cachePolicy to handle lifecycle correctly
@@ -248,12 +255,14 @@ actor NDKDataRequirementManager {
                 
                 // Create subscription using internal manager
                 // Use custom subscription ID if provided, otherwise generate one
-                let subscriptionId = lifecycleGroup.compactMap { $0.subscriptionId }.first ?? "ds_\(IDGenerator.randomId(length: 8))"
+                let subscriptionId = lifecycleGroup.compactMap { $0.subscriptionId }.first ?? generateSubscriptionId(for: optimizedFilter)
+                NDKLogger.log(.debug, category: .subscription, "📡 [DataReqManager] Creating internal subscription - id: \(subscriptionId), filter: \(optimizedFilter), relays: \(relays?.joined(separator: ", ") ?? "all")")
                 let internalSubscription = await ndk.internalSubscriptionManager.createSubscription(
                     id: subscriptionId,
                     filters: [optimizedFilter],
                     relays: relays
                 )
+                NDKLogger.log(.debug, category: .subscription, "✅ [DataReqManager] Internal subscription created")
                 
                 // Create data requirement (use original aggregated filter for coverage checks)
                 let requirement = DataRequirement(
@@ -490,6 +499,111 @@ actor NDKDataRequirementManager {
         
         return aggregated
     }
+    
+    /// Generate a meaningful subscription ID based on filter content
+    private func generateSubscriptionId(for filter: NDKFilter) -> String {
+        var parts: [String] = []
+        
+        // Add kind description
+        if let kinds = filter.kinds {
+            let kindDescription = describeKinds(kinds)
+            parts.append(kindDescription)
+        }
+        
+        // Add author info
+        if let authors = filter.authors {
+            if authors.count == 1 {
+                parts.append("author_\(authors[0].prefix(8))")
+            } else if authors.count > 1 {
+                parts.append("authors_\(authors.count)")
+            }
+        }
+        
+        // Add event ID info
+        if let ids = filter.ids {
+            if ids.count == 1 {
+                parts.append("event_\(ids[0].prefix(8))")
+            } else if ids.count > 1 {
+                parts.append("events_\(ids.count)")
+            }
+        }
+        
+        // Add tag info
+        if let tags = filter.tags, !tags.isEmpty {
+            let tagKeys = tags.keys.sorted().joined(separator: "_")
+            parts.append("tags_\(tagKeys)")
+        }
+        
+        // Add time info
+        if filter.since != nil || filter.until != nil {
+            parts.append("timed")
+        }
+        
+        // If no meaningful parts, use generic
+        if parts.isEmpty {
+            parts.append("general")
+        }
+        
+        // Add a short random suffix for uniqueness
+        let suffix = IDGenerator.randomId(length: 4)
+        parts.append(suffix)
+        
+        return parts.joined(separator: "_")
+    }
+    
+    /// Get human-readable description for event kinds
+    private func describeKinds(_ kinds: [Int]) -> String {
+        // Map common kinds to descriptions
+        let kindMap: [Int: String] = [
+            0: "metadata",
+            1: "notes",
+            3: "contacts",
+            4: "dm",
+            5: "deletion",
+            6: "repost",
+            7: "reaction",
+            40: "channel",
+            41: "channel_meta",
+            42: "channel_msg",
+            1984: "report",
+            9734: "zap_req",
+            9735: "zap",
+            10000: "mute_list",
+            10001: "pin_list",
+            10002: "relay_list",
+            10003: "bookmarks",
+            10004: "communities",
+            10005: "public_chats",
+            10006: "blocked_relays",
+            10007: "search_relays",
+            30000: "categorized_people",
+            30001: "categorized_bookmarks",
+            30008: "profile_badges",
+            30009: "badge_definition",
+            30023: "long_form",
+            30024: "draft_long_form",
+            30078: "app_specific_data",
+            30311: "live_event",
+            31989: "handler_recommendation",
+            31990: "handler_information"
+        ]
+        
+        var descriptions: [String] = []
+        for kind in kinds.sorted() {
+            if let desc = kindMap[kind] {
+                descriptions.append(desc)
+            } else {
+                descriptions.append("kind\(kind)")
+            }
+        }
+        
+        // Limit to first 3 kinds to keep ID reasonable length
+        if descriptions.count > 3 {
+            return descriptions.prefix(3).joined(separator: "_") + "_more"
+        }
+        
+        return descriptions.joined(separator: "_")
+    }
 }
 
 // MARK: - Supporting Types
@@ -619,10 +733,15 @@ class DataRequirement {
     }
     
     func startProcessing() async {
+        NDKLogger.log(.debug, category: .subscription, "🎬 [DataRequirement] startProcessing called for subscription: \(subscriptionId)")
         guard let cache = cache else {
             NDKLogger.log(.error, category: .subscription, "❌ Cannot start processing - no cache available!")
             return
         }
+        
+        // Start the subscription first! This sends the REQ
+        NDKLogger.log(.debug, category: .subscription, "🚀 [DataRequirement] Starting internal subscription...")
+        await internalSubscription.start()
         
         // Track received event IDs if this filter is for specific IDs
         let requestedIds = filter.ids

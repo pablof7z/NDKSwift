@@ -95,19 +95,22 @@ class NostrManager: ObservableObject {
     func login(with signer: NDKSigner) async throws {
         guard let ndk = ndk else { throw NostrError.signerRequired }
         
-        // Create or update session with auth manager
+        // Start session with mute list support
+        let sessionData = try await ndk.startSession(
+            signer: signer,
+            config: NDKSessionConfiguration(
+                dataRequirements: [.followList, .muteList],
+                preloadStrategy: .progressive
+            )
+        )
+        
+        // Create or update session with auth manager for persistence
         if let privateSigner = signer as? NDKPrivateKeySigner {
             let session = try await ndkAuthManager.createSession(
                 with: privateSigner,
                 requiresBiometric: false,
                 isHardwareBacked: false
             )
-            
-            // Switch to this session
-            try await ndkAuthManager.switchToSession(session)
-        } else {
-            // Fallback for other signer types (shouldn't happen in current app)
-            ndk.signer = signer
         }
     }
     

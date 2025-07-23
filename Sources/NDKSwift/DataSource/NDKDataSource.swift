@@ -115,6 +115,8 @@ public final class NDKDataSource<T>: ObservableObject, CacheObserver {
         self.correlationId = IDGenerator.randomId(length: 8)
         self.subscriptionId = subscriptionId
         
+        NDKLogger.log(.debug, category: .subscription, "🏗️ NDKDataSource init - filter: \(filter), maxAge: \(maxAge), cachePolicy: \(cachePolicy)", correlationId: correlationId)
+        
         // Set up the AsyncStream for events
         var continuation: AsyncStream<T>.Continuation!
         self.events = AsyncStream { cont in
@@ -148,11 +150,13 @@ public final class NDKDataSource<T>: ObservableObject, CacheObserver {
     }
     
     private func startObserving() async {
+        NDKLogger.log(.debug, category: .subscription, "🔍 NDKDataSource.startObserving() called", correlationId: correlationId)
         isLoading = true
         error = nil
         
         // Use the new data requirement manager if available
         if let requirementManager = ndk.dataRequirementManager {
+            NDKLogger.log(.debug, category: .subscription, "✅ Found dataRequirementManager, registering requirement", correlationId: correlationId)
             requirementHandle = await requirementManager.registerRequirement(
                 filter: filter,
                 observer: self,
@@ -161,6 +165,7 @@ public final class NDKDataSource<T>: ObservableObject, CacheObserver {
                 relays: relays,
                 subscriptionId: subscriptionId
             )
+            NDKLogger.log(.debug, category: .subscription, "✅ Requirement registered with handle: \(String(describing: requirementHandle))", correlationId: correlationId)
         } else {
             // No data requirement manager available
             NDKLogger.log(.error, category: .subscription, "❌ No data requirement manager available! Data source will not receive events", correlationId: correlationId)

@@ -6,7 +6,6 @@ struct PostaApp: App {
     @State private var authManager = NDKAuthManager.shared
     @State private var ndkManager = NDKManager.shared
     @State private var relayManager = RelayManager()
-    @State private var subscriptionManager = SubscriptionManager()
     @StateObject private var themeManager = ThemeManager()
     
     var body: some Scene {
@@ -15,7 +14,6 @@ struct PostaApp: App {
                 .environment(authManager)
                 .environment(ndkManager)
                 .environment(relayManager)
-                .environment(subscriptionManager)
                 .environmentObject(themeManager)
                 .preferredColorScheme(themeManager.currentTheme.colorScheme)
                 .onAppear {
@@ -49,11 +47,6 @@ struct PostaApp: App {
             
             // Connect to relays
             await ndkInstance.connect()
-            
-            // If we have an active session, initialize subscription manager
-            if let activeSession = authManager.activeSession {
-                await subscriptionManager.initialize(ndk: ndkInstance, userPubkey: activeSession.pubkey)
-            }
         }
     }
 }

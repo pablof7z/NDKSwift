@@ -266,41 +266,27 @@ actor NDKRelaySelector {
             return cached
         }
         
-        // Get current user's pubkey
+        // Check if user is signed in
         guard let signer = ndk.signer,
-              let userPubkey = try? await signer.pubkey else {
+              let _ = try? await signer.pubkey else {
             return []
         }
         
-        // Fetch blocked relays list
-        let filter = NDKFilter(
-            authors: [userPubkey],
-            kinds: [EventKind.blockedRelays],
-            limit: 1
-        )
-        
-        let dataSource = NDKDataSource<NDKEvent>(
-            ndk: ndk,
-            filter: filter,
-            maxAge: 300,  // 5 minute cache
-            cachePolicy: .cacheWithNetwork
-        )
-        
-        // Get the first event
-        if let event = await dataSource.first() {
-            let blockedList = NDKList.from(event)
-            let normalizedUrls = blockedList.urls.compactMap { url in
-                URLNormalizer.tryNormalizeRelayUrl(url)
-            }
-            let blockedSet = Set(normalizedUrls)
+        // IMPORTANT: Only use blocked relays from session data
+        // Blocked relays should be loaded during session initialization, not during relay selection
+        if let sessionData = ndk.sessionData {
+            let blockedRelays = sessionData.blockedRelays
             
-            // Cache for 5 minutes
-            blockedRelaysCache = blockedSet
-            blockedRelaysCacheExpiry = Date().addingTimeInterval(300)
+            // Cache the result
+            blockedRelaysCache = blockedRelays
+            blockedRelaysCacheExpiry = Date().addingTimeInterval(300) // 5 minutes
             
-            return blockedSet
+            return blockedRelays
         }
         
+        // If no session data, return empty set
+        // We should NOT try to fetch blocked relays during relay selection
+        // as this would create infinite recursion
         return []
     }
     

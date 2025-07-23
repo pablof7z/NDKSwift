@@ -7,6 +7,7 @@ Welcome to the NDKSwift documentation. This directory contains comprehensive gui
 ### Getting Started
 - [Getting Started Guide](GETTING_STARTED.md) - Installation, setup, and your first Nostr app
 - [API Reference](API_REFERENCE.md) - Complete API documentation for all classes and methods
+- [NDKSwiftUI Reference](NDKSWIFTUI_REFERENCE.md) - SwiftUI components and UI toolkit documentation
 - [Examples](EXAMPLES.md) - Practical code examples for common use cases
 
 ### Architecture & Design
@@ -31,12 +32,14 @@ Located in the [Development](Development/) subdirectory:
 
 - **New to NDKSwift?** Start with the [Getting Started Guide](GETTING_STARTED.md)
 - **Looking for specific APIs?** Check the [API Reference](API_REFERENCE.md)
+- **Building SwiftUI apps?** See the [NDKSwiftUI Reference](NDKSWIFTUI_REFERENCE.md)
 - **Need code examples?** Browse the [Examples](EXAMPLES.md)
 - **Want to understand the internals?** Read the [Architecture Overview](ARCHITECTURE.md)
 
 ## 📝 Version
 
 This documentation is for NDKSwift v0.6.2 and later.
+NDKSwiftUI documentation covers v0.2.0 and later.
 
 ## 🔧 Running Examples
 
