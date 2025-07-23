@@ -48,6 +48,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fixed Posta app relay management to properly use NDKRelayCollection
   - Removed duplicate state management that caused relay status to be incorrect
   - Now directly uses NDK's relay collection for accurate real-time status
+
+### Improved
+- Enhanced filter aggregation logic in NDKDataRequirementManager
+  - Filters with same tag keys but different values are now properly aggregated
+  - Multiple subscriptions to similar resources (e.g., project statuses) now result in fewer network requests
+  - Example: 3 subscriptions to different projects now create 1 aggregated REQ instead of 3 separate ones
   - Fixed relay initialization to use centralized relay list
 
 ## [0.4.1] - 2025-01-22
