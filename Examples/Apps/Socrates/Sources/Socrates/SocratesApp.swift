@@ -69,7 +69,6 @@ class NostrManager: ObservableObject {
     private func setupNDK() {
         ndk = NDK(relayUrls: defaultRelays)
         Task {
-            await ndk?.addRelays(defaultRelays)
             await ndk?.connect()
         }
     }
@@ -78,7 +77,7 @@ class NostrManager: ObservableObject {
         guard let ndk = ndk else { throw NostrError.signerRequired }
         
         let pubkey = try await signer.pubkey
-        let user = NDKUser(pubkey: pubkey)
+        _ = NDKUser(pubkey: pubkey)
         
         session = NDKSession(
             pubkey: pubkey,
