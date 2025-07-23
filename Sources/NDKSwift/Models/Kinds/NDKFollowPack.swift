@@ -76,13 +76,6 @@ public struct NDKFollowPack {
 
 // MARK: - Builder Pattern
 
-extension NDK {
-    /// Create a follow pack builder
-    public func followPack() -> NDKFollowPackBuilder {
-        return NDKFollowPackBuilder(ndk: self)
-    }
-}
-
 /// Builder for creating follow packs
 public class NDKFollowPackBuilder {
     private let ndk: NDK
@@ -91,7 +84,7 @@ public class NDKFollowPackBuilder {
     private var content: String = ""
     private var identifier: String?
     
-    init(ndk: NDK) {
+    public init(ndk: NDK) {
         self.ndk = ndk
     }
     
