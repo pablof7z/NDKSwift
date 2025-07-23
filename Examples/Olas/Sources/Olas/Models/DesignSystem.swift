@@ -131,23 +131,37 @@ enum OlasDesign {
     // MARK: - Haptic Feedback
     
     enum Haptic {
+        #if os(iOS)
         static func impact(_ style: UIImpactFeedbackGenerator.FeedbackStyle) {
             let impactFeedback = UIImpactFeedbackGenerator(style: style)
             impactFeedback.prepare()
             impactFeedback.impactOccurred()
         }
+        #else
+        static func impact(_ style: Int) {
+            // No haptic feedback on macOS
+        }
+        #endif
         
         static func selection() {
+            #if os(iOS)
             let selectionFeedback = UISelectionFeedbackGenerator()
             selectionFeedback.prepare()
             selectionFeedback.selectionChanged()
+            #endif
         }
         
+        #if os(iOS)
         static func notification(_ type: UINotificationFeedbackGenerator.FeedbackType) {
             let notificationFeedback = UINotificationFeedbackGenerator()
             notificationFeedback.prepare()
             notificationFeedback.notificationOccurred(type)
         }
+        #else
+        static func notification(_ type: Int) {
+            // No haptic feedback on macOS
+        }
+        #endif
     }
 }
 
@@ -217,7 +231,11 @@ struct OlasButton: View {
     
     var body: some View {
         Button(action: {
+            #if os(iOS)
             OlasDesign.Haptic.impact(.light)
+            #else
+            OlasDesign.Haptic.impact(0)
+            #endif
             action()
         }) {
             HStack(spacing: OlasDesign.Spacing.sm) {
@@ -293,13 +311,13 @@ struct OlasTextField: View {
         .overlay(
             RoundedRectangle(cornerRadius: OlasDesign.CornerRadius.md)
                 .stroke(
-                    isFocused ? OlasDesign.currentGradient.opacity(0.5) : OlasDesign.Colors.divider,
+                    isFocused ? OlasDesign.Colors.text.opacity(0.5) : OlasDesign.Colors.divider,
                     lineWidth: isFocused ? 2 : 1
                 )
         )
         .clipShape(RoundedRectangle(cornerRadius: OlasDesign.CornerRadius.md))
         .animation(OlasDesign.Animation.spring, value: isFocused)
-        .onChange(of: isFocused) { focused in
+        .onChange(of: isFocused) { _, focused in
             if focused {
                 OlasDesign.Haptic.selection()
             }

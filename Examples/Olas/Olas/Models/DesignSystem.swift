@@ -137,29 +137,29 @@ enum OlasDesign {
             impactFeedback.prepare()
             impactFeedback.impactOccurred()
         }
+        #else
+        static func impact(_ style: Int) {
+            // No haptic feedback on macOS
+        }
+        #endif
         
         static func selection() {
+            #if os(iOS)
             let selectionFeedback = UISelectionFeedbackGenerator()
             selectionFeedback.prepare()
             selectionFeedback.selectionChanged()
+            #endif
         }
         
+        #if os(iOS)
         static func notification(_ type: UINotificationFeedbackGenerator.FeedbackType) {
             let notificationFeedback = UINotificationFeedbackGenerator()
             notificationFeedback.prepare()
             notificationFeedback.notificationOccurred(type)
         }
         #else
-        static func impact(_ style: Any) {
-            // No haptic on macOS
-        }
-        
-        static func selection() {
-            // No haptic on macOS
-        }
-        
-        static func notification(_ type: Any) {
-            // No haptic on macOS
+        static func notification(_ type: Int) {
+            // No haptic feedback on macOS
         }
         #endif
     }
@@ -284,6 +284,8 @@ struct OlasTextField: View {
     var isSecure: Bool = false
     var icon: String? = nil
     
+    @FocusState private var isFocused: Bool
+    
     var body: some View {
         HStack(spacing: OlasDesign.Spacing.md) {
             if let icon = icon {
@@ -292,24 +294,34 @@ struct OlasTextField: View {
                     .font(.system(size: 18))
             }
             
-            if isSecure {
-                SecureField(placeholder, text: $text)
-                    .font(OlasDesign.Typography.body)
-                    .foregroundColor(OlasDesign.Colors.text)
-            } else {
-                TextField(placeholder, text: $text)
-                    .font(OlasDesign.Typography.body)
-                    .foregroundColor(OlasDesign.Colors.text)
+            Group {
+                if isSecure {
+                    SecureField(placeholder, text: $text)
+                } else {
+                    TextField(placeholder, text: $text)
+                }
             }
+            .font(OlasDesign.Typography.body)
+            .foregroundColor(OlasDesign.Colors.text)
+            .focused($isFocused)
         }
         .padding(OlasDesign.Spacing.md)
         .background(OlasDesign.Colors.surface)
         .background(.ultraThinMaterial)
         .overlay(
             RoundedRectangle(cornerRadius: OlasDesign.CornerRadius.md)
-                .stroke(OlasDesign.Colors.divider, lineWidth: 1)
+                .stroke(
+                    isFocused ? OlasDesign.Colors.text.opacity(0.5) : OlasDesign.Colors.divider,
+                    lineWidth: isFocused ? 2 : 1
+                )
         )
         .clipShape(RoundedRectangle(cornerRadius: OlasDesign.CornerRadius.md))
+        .animation(OlasDesign.Animation.spring, value: isFocused)
+        .onChange(of: isFocused) { _, focused in
+            if focused {
+                OlasDesign.Haptic.selection()
+            }
+        }
     }
 }
 

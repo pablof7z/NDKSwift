@@ -1,14 +1,6 @@
 import SwiftUI
 import NDKSwift
 
-// MARK: - Data Extension
-
-extension Data {
-    func hexEncodedString() -> String {
-        return map { String(format: "%02x", $0) }.joined()
-    }
-}
-
 // MARK: - Rich Text Component
 
 struct OlasRichText: View {
@@ -29,7 +21,7 @@ struct OlasRichText: View {
                 parseContent()
                 await loadProfiles()
             }
-            .onChange(of: content) {
+            .onChange(of: content) { _, _ in
                 parseContent()
                 Task {
                     await loadProfiles()
@@ -121,9 +113,10 @@ struct OlasRichText: View {
                     let matches = regex.matches(in: currentText, range: NSRange(currentText.startIndex..., in: currentText))
                     for match in matches {
                         if let range = Range(match.range, in: currentText) {
-                            let npub = String(currentText[range])
-                            if let (_, data) = try? Bech32.decode(npub) {
-                                let decodedPubkey = Data(data).hexEncodedString()
+                            let npubFull = String(currentText[range])
+                            let npub = npubFull.replacingOccurrences(of: "nostr:", with: "")
+                            if let decoded = try? Bech32.decode(npub) {
+                                let decodedPubkey = Data(decoded.data).hexString
                                 if decodedPubkey == pubkey {
                                     replacements.append((range, .mention(pubkey)))
                                 }
@@ -177,9 +170,10 @@ struct OlasRichText: View {
             let matches = regex.matches(in: currentText, range: NSRange(currentText.startIndex..., in: currentText))
             for match in matches {
                 if let range = Range(match.range, in: currentText) {
-                    let note = String(currentText[range])
-                    if let (_, data) = try? Bech32.decode(note) {
-                        let noteId = Data(data).hexEncodedString()
+                    let noteFull = String(currentText[range])
+                    let note = noteFull.replacingOccurrences(of: "nostr:", with: "")
+                    if let decoded = try? Bech32.decode(note) {
+                        let noteId = Data(decoded.data).hexString
                         replacements.append((range, .noteReference(noteId)))
                     }
                 }

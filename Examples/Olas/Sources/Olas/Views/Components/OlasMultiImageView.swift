@@ -168,135 +168,190 @@ struct OlasImageInteractionOverlay: View {
     
     var body: some View {
         ZStack {
-            // Background
-            Color.black
-                .opacity(opacity)
-                .ignoresSafeArea()
-                .onTapGesture {
+            backgroundView
+            imageViewer
+            closeButton
+        }
+    }
+    
+    @ViewBuilder
+    private var backgroundView: some View {
+        Color.black
+            .opacity(opacity)
+            .ignoresSafeArea()
+            .onTapGesture {
+                withAnimation(OlasDesign.Animation.spring) {
+                    isPresented = false
+                }
+            }
+    }
+    
+    @ViewBuilder
+    private var imageViewer: some View {
+        TabView(selection: $currentIndex) {
+            ForEach(imageURLs.indices, id: \.self) { index in
+                imageView(at: index)
+                    .tag(index)
+            }
+        }
+        #if os(iOS)
+        .tabViewStyle(PageTabViewStyle(indexDisplayMode: imageURLs.count > 1 ? .always : .never))
+        #endif
+        .offset(dragOffset)
+    }
+    
+    @ViewBuilder
+    private func imageView(at index: Int) -> some View {
+        AsyncImage(url: URL(string: imageURLs[index])) { phase in
+            switch phase {
+            case .success(let image):
+                zoomableImage(image)
+            case .failure(_):
+                failureView
+            case .empty:
+                loadingView
+            @unknown default:
+                EmptyView()
+            }
+        }
+    }
+    
+    @ViewBuilder
+    private func zoomableImage(_ image: Image) -> some View {
+        image
+            .resizable()
+            .aspectRatio(contentMode: .fit)
+            .scaleEffect(scale)
+            .offset(offset)
+            .gesture(zoomGesture)
+            .onTapGesture(count: 2) {
+                toggleZoom()
+            }
+    }
+    
+    private var zoomGesture: some Gesture {
+        MagnificationGesture()
+            .onChanged { value in
+                scale = lastScale * value
+            }
+            .onEnded { value in
+                handleZoomEnd()
+            }
+            .simultaneously(with: dragGesture)
+    }
+    
+    private var dragGesture: some Gesture {
+        DragGesture()
+            .onChanged { value in
+                handleDrag(value: value)
+            }
+            .onEnded { value in
+                handleDragEnd(value: value)
+            }
+    }
+    
+    private func handleZoomEnd() {
+        lastScale = scale
+        withAnimation(OlasDesign.Animation.spring) {
+            if scale < 1 {
+                scale = 1
+                lastScale = 1
+                offset = .zero
+                lastOffset = .zero
+            } else if scale > 4 {
+                scale = 4
+                lastScale = 4
+            }
+        }
+    }
+    
+    private func handleDrag(value: DragGesture.Value) {
+        if scale > 1 {
+            offset = CGSize(
+                width: lastOffset.width + value.translation.width,
+                height: lastOffset.height + value.translation.height
+            )
+        } else {
+            dragOffset = value.translation
+            let progress = abs(value.translation.height) / 200
+            opacity = 1 - min(progress, 0.5)
+        }
+    }
+    
+    private func handleDragEnd(value: DragGesture.Value) {
+        if scale > 1 {
+            lastOffset = offset
+        } else {
+            if abs(value.translation.height) > 100 {
+                withAnimation(OlasDesign.Animation.spring) {
+                    isPresented = false
+                }
+            } else {
+                withAnimation(OlasDesign.Animation.spring) {
+                    dragOffset = .zero
+                    opacity = 1
+                }
+            }
+        }
+    }
+    
+    private func toggleZoom() {
+        withAnimation(OlasDesign.Animation.spring) {
+            if scale > 1 {
+                scale = 1
+                lastScale = 1
+                offset = .zero
+                lastOffset = .zero
+            } else {
+                scale = 2
+                lastScale = 2
+            }
+        }
+        #if os(iOS)
+        OlasDesign.Haptic.impact(.light)
+        #else
+        OlasDesign.Haptic.impact(0)
+        #endif
+    }
+    
+    @ViewBuilder
+    private var failureView: some View {
+        VStack(spacing: OlasDesign.Spacing.md) {
+            Image(systemName: "exclamationmark.triangle")
+                .font(.system(size: 50))
+                .foregroundColor(OlasDesign.Colors.textTertiary)
+            Text("Failed to load image")
+                .font(OlasDesign.Typography.body)
+                .foregroundColor(OlasDesign.Colors.textTertiary)
+        }
+    }
+    
+    @ViewBuilder
+    private var loadingView: some View {
+        ProgressView()
+            .progressViewStyle(CircularProgressViewStyle(tint: .white))
+            .scaleEffect(1.5)
+    }
+    
+    @ViewBuilder
+    private var closeButton: some View {
+        VStack {
+            HStack {
+                Spacer()
+                Button(action: {
                     withAnimation(OlasDesign.Animation.spring) {
                         isPresented = false
                     }
+                    OlasDesign.Haptic.selection()
+                }) {
+                    Image(systemName: "xmark.circle.fill")
+                        .font(.title)
+                        .foregroundStyle(.white, Color.white.opacity(0.2))
+                        .background(Circle().fill(.ultraThinMaterial))
                 }
-            
-            // Image viewer
-            TabView(selection: $currentIndex) {
-                ForEach(imageURLs.indices, id: \.self) { index in
-                    AsyncImage(url: URL(string: imageURLs[index])) { phase in
-                        switch phase {
-                        case .success(let image):
-                            image
-                                .resizable()
-                                .aspectRatio(contentMode: .fit)
-                                .scaleEffect(scale)
-                                .offset(offset)
-                                .gesture(
-                                    MagnificationGesture()
-                                        .onChanged { value in
-                                            scale = lastScale * value
-                                        }
-                                        .onEnded { value in
-                                            lastScale = scale
-                                            withAnimation(OlasDesign.Animation.spring) {
-                                                if scale < 1 {
-                                                    scale = 1
-                                                    lastScale = 1
-                                                    offset = .zero
-                                                    lastOffset = .zero
-                                                } else if scale > 4 {
-                                                    scale = 4
-                                                    lastScale = 4
-                                                }
-                                            }
-                                        }
-                                        .simultaneously(with: DragGesture()
-                                            .onChanged { value in
-                                                if scale > 1 {
-                                                    offset = CGSize(
-                                                        width: lastOffset.width + value.translation.width,
-                                                        height: lastOffset.height + value.translation.height
-                                                    )
-                                                } else {
-                                                    // Vertical drag to dismiss
-                                                    dragOffset = value.translation
-                                                    let progress = abs(value.translation.height) / 200
-                                                    opacity = 1 - min(progress, 0.5)
-                                                }
-                                            }
-                                            .onEnded { value in
-                                                if scale > 1 {
-                                                    lastOffset = offset
-                                                } else {
-                                                    // Dismiss if dragged enough
-                                                    if abs(value.translation.height) > 100 {
-                                                        withAnimation(OlasDesign.Animation.spring) {
-                                                            isPresented = false
-                                                        }
-                                                    } else {
-                                                        withAnimation(OlasDesign.Animation.spring) {
-                                                            dragOffset = .zero
-                                                            opacity = 1
-                                                        }
-                                                    }
-                                                }
-                                            }
-                                        )
-                                )
-                                .onTapGesture(count: 2) {
-                                    withAnimation(OlasDesign.Animation.spring) {
-                                        if scale > 1 {
-                                            scale = 1
-                                            lastScale = 1
-                                            offset = .zero
-                                            lastOffset = .zero
-                                        } else {
-                                            scale = 2
-                                            lastScale = 2
-                                        }
-                                    }
-                                    OlasDesign.Haptic.impact(.light)
-                                }
-                        case .failure(_):
-                            VStack(spacing: OlasDesign.Spacing.md) {
-                                Image(systemName: "exclamationmark.triangle")
-                                    .font(.system(size: 50))
-                                    .foregroundColor(OlasDesign.Colors.textTertiary)
-                                Text("Failed to load image")
-                                    .font(OlasDesign.Typography.body)
-                                    .foregroundColor(OlasDesign.Colors.textTertiary)
-                            }
-                        case .empty:
-                            ProgressView()
-                                .progressViewStyle(CircularProgressViewStyle(tint: .white))
-                                .scaleEffect(1.5)
-                        @unknown default:
-                            EmptyView()
-                        }
-                    }
-                    .tag(index)
-                }
+                .padding(OlasDesign.Spacing.lg)
             }
-            .tabViewStyle(PageTabViewStyle(indexDisplayMode: imageURLs.count > 1 ? .always : .never))
-            .offset(dragOffset)
-            
-            // Close button
-            VStack {
-                HStack {
-                    Spacer()
-                    Button(action: {
-                        withAnimation(OlasDesign.Animation.spring) {
-                            isPresented = false
-                        }
-                        OlasDesign.Haptic.selection()
-                    }) {
-                        Image(systemName: "xmark.circle.fill")
-                            .font(.title)
-                            .foregroundStyle(.white, Color.white.opacity(0.2))
-                            .background(Circle().fill(.ultraThinMaterial))
-                    }
-                    .padding(OlasDesign.Spacing.lg)
-                }
-                Spacer()
-            }
+            Spacer()
         }
     }
 }
