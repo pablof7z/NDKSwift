@@ -21,7 +21,7 @@ struct OlasRichText: View {
                 parseContent()
                 await loadProfiles()
             }
-            .onChange(of: content) { _ in
+            .onChange(of: content) { _, _ in
                 parseContent()
                 Task {
                     await loadProfiles()
@@ -44,7 +44,11 @@ struct OlasRichText: View {
                 mention.font = OlasDesign.Typography.bodyMedium
                 mention.link = URL(string: "olas://profile/\(pubkey)")
                 mention.underlineStyle = .single
-                mention.underlineColor = .white.opacity(0.3)
+                #if os(iOS)
+                mention.underlineColor = UIColor.white.withAlphaComponent(0.3)
+                #else
+                mention.underlineColor = NSColor.white.withAlphaComponent(0.3)
+                #endif
                 result.append(mention)
                 
             case .hashtag(let tag):
@@ -53,7 +57,11 @@ struct OlasRichText: View {
                 hashtag.font = OlasDesign.Typography.bodyMedium
                 hashtag.link = URL(string: "olas://hashtag/\(tag)")
                 hashtag.underlineStyle = .single
-                hashtag.underlineColor = .white.opacity(0.3)
+                #if os(iOS)
+                hashtag.underlineColor = UIColor.white.withAlphaComponent(0.3)
+                #else
+                hashtag.underlineColor = NSColor.white.withAlphaComponent(0.3)
+                #endif
                 result.append(hashtag)
                 
             case .link(let url):
@@ -62,7 +70,11 @@ struct OlasRichText: View {
                 link.font = OlasDesign.Typography.body
                 link.link = URL(string: url)
                 link.underlineStyle = .single
-                link.underlineColor = .white.opacity(0.3)
+                #if os(iOS)
+                link.underlineColor = UIColor.white.withAlphaComponent(0.3)
+                #else
+                link.underlineColor = NSColor.white.withAlphaComponent(0.3)
+                #endif
                 result.append(link)
                 
             case .noteReference(let noteId):
@@ -71,7 +83,11 @@ struct OlasRichText: View {
                 reference.font = OlasDesign.Typography.body
                 reference.link = URL(string: "olas://note/\(noteId)")
                 reference.underlineStyle = .single
-                reference.underlineColor = .white.opacity(0.3)
+                #if os(iOS)
+                reference.underlineColor = UIColor.white.withAlphaComponent(0.3)
+                #else
+                reference.underlineColor = NSColor.white.withAlphaComponent(0.3)
+                #endif
                 result.append(reference)
             }
         }
@@ -80,8 +96,7 @@ struct OlasRichText: View {
     }
     
     private func parseContent() {
-        var components: [RichTextComponent] = []
-        var currentText = content
+        let currentText = content
         
         // Create a map of replacements with their positions
         var replacements: [(range: Range<String.Index>, component: RichTextComponent)] = []
@@ -98,10 +113,13 @@ struct OlasRichText: View {
                     let matches = regex.matches(in: currentText, range: NSRange(currentText.startIndex..., in: currentText))
                     for match in matches {
                         if let range = Range(match.range, in: currentText) {
-                            let npub = String(currentText[range])
-                            if let decodedPubkey = try? NDKBech32.decode(npub).data.hexEncodedString(),
-                               decodedPubkey == pubkey {
-                                replacements.append((range, .mention(pubkey)))
+                            let npubFull = String(currentText[range])
+                            let npub = npubFull.replacingOccurrences(of: "nostr:", with: "")
+                            if let decoded = try? Bech32.decode(npub) {
+                                let decodedPubkey = Data(decoded.data).hexString
+                                if decodedPubkey == pubkey {
+                                    replacements.append((range, .mention(pubkey)))
+                                }
                             }
                         }
                     }
@@ -152,8 +170,10 @@ struct OlasRichText: View {
             let matches = regex.matches(in: currentText, range: NSRange(currentText.startIndex..., in: currentText))
             for match in matches {
                 if let range = Range(match.range, in: currentText) {
-                    let note = String(currentText[range])
-                    if let noteId = try? NDKBech32.decode(note).data.hexEncodedString() {
+                    let noteFull = String(currentText[range])
+                    let note = noteFull.replacingOccurrences(of: "nostr:", with: "")
+                    if let decoded = try? Bech32.decode(note) {
+                        let noteId = Data(decoded.data).hexString
                         replacements.append((range, .noteReference(noteId)))
                     }
                 }
