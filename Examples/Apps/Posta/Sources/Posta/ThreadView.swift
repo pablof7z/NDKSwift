@@ -404,47 +404,10 @@ struct ThreadReplyView: View {
                     
                         // Sub-thread indicator
                         if !subReplies.isEmpty {
-                            Button(action: onSubThreadTap) {
-                                HStack(spacing: 8) {
-                                    // Avatar stack - show first 3 unique reply authors
-                                    HStack(spacing: -6) {
-                                        ForEach(Array(Set(subReplies.prefix(3).map { $0.pubkey })), id: \.self) { pubkey in
-                                            ProfileLoader(pubkey: pubkey) { profile in
-                                                if let avatarURL = profile?.picture, let url = URL(string: avatarURL) {
-                                                    AsyncImage(url: url) { image in
-                                                        image
-                                                            .resizable()
-                                                            .aspectRatio(contentMode: .fill)
-                                                    } placeholder: {
-                                                        Circle()
-                                                            .fill(Color(.tertiarySystemFill))
-                                                    }
-                                                    .frame(width: 20, height: 20)
-                                                    .clipShape(Circle())
-                                                    .overlay(
-                                                        Circle()
-                                                            .stroke(Color(.systemBackground), lineWidth: 1.5)
-                                                    )
-                                                } else {
-                                                    Circle()
-                                                        .fill(Color(.tertiarySystemFill))
-                                                        .frame(width: 20, height: 20)
-                                                        .overlay(
-                                                            Circle()
-                                                                .stroke(Color(.systemBackground), lineWidth: 1.5)
-                                                        )
-                                                }
-                                            }
-                                        }
-                                    }
-                                    
-                                    Text("\(subReplies.count) \(subReplies.count == 1 ? "reply" : "replies")")
-                                        .font(.caption)
-                                        .foregroundColor(.accentColor)
-                                    
-                                    Spacer()
-                                }
-                            }
+                            SubThreadIndicator(
+                                subReplies: subReplies,
+                                onTap: onSubThreadTap
+                            )
                             .padding(.top, 8)
                         }
                     }
@@ -454,6 +417,92 @@ struct ThreadReplyView: View {
                 .background(isReplyingTo ? Color.accentColor.opacity(0.1) : Color.clear)
                 .contentShape(Rectangle())
                 .onTapGesture(perform: onTap)
+            }
+        }
+    }
+}
+
+// Simplified sub-thread indicator view
+struct SubThreadIndicator: View {
+    let subReplies: [NDKEvent]
+    let onTap: () -> Void
+    
+    var body: some View {
+        Button(action: onTap) {
+            HStack(spacing: 8) {
+                // Avatar stack - show first 3 unique reply authors
+                HStack(spacing: -6) {
+                    ForEach(Array(Set(subReplies.prefix(3).map { $0.pubkey })).prefix(3), id: \.self) { pubkey in
+                        MiniAvatar(pubkey: pubkey)
+                    }
+                }
+                
+                Text("\(subReplies.count) \(subReplies.count == 1 ? "reply" : "replies")")
+                    .font(.caption)
+                    .foregroundColor(.accentColor)
+                
+                Spacer()
+            }
+        }
+    }
+}
+
+// Mini avatar for sub-thread indicator
+struct MiniAvatar: View {
+    let pubkey: String
+    
+    @Environment(NDKManager.self) var ndkManager
+    @State private var profile: NDKUserProfile?
+    @State private var profileTask: Task<Void, Never>?
+    
+    var body: some View {
+        Group {
+            if let avatarURL = profile?.picture, let url = URL(string: avatarURL) {
+                AsyncImage(url: url) { image in
+                    image
+                        .resizable()
+                        .aspectRatio(contentMode: .fill)
+                } placeholder: {
+                    Circle()
+                        .fill(Color(.tertiarySystemFill))
+                }
+                .frame(width: 20, height: 20)
+                .clipShape(Circle())
+                .overlay(
+                    Circle()
+                        .stroke(Color(.systemBackground), lineWidth: 1.5)
+                )
+            } else {
+                Circle()
+                    .fill(Color(.tertiarySystemFill))
+                    .frame(width: 20, height: 20)
+                    .overlay(
+                        Circle()
+                            .stroke(Color(.systemBackground), lineWidth: 1.5)
+                    )
+            }
+        }
+        .onAppear {
+            loadProfile()
+        }
+        .onDisappear {
+            profileTask?.cancel()
+        }
+    }
+    
+    private func loadProfile() {
+        guard let ndk = ndkManager.ndk else { return }
+        
+        profileTask = Task {
+            let profileStream = await ndk.profileManager.observe(for: pubkey)
+            
+            for await profile in profileStream {
+                if let profile = profile {
+                    await MainActor.run {
+                        self.profile = profile
+                    }
+                    break
+                }
             }
         }
     }

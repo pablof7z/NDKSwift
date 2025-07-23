@@ -12,12 +12,12 @@ struct HomeView: View {
     var body: some View {
         NavigationView {
             ZStack {
-                // Sophisticated gradient background
+                // Subtle gradient background
                 LinearGradient(
                     gradient: Gradient(stops: [
                         .init(color: Color(.systemBackground), location: 0),
-                        .init(color: Color(.systemBackground).opacity(0.97), location: 0.1),
-                        .init(color: Color(.secondarySystemBackground).opacity(0.4), location: 1)
+                        .init(color: Color(.systemBackground).opacity(0.98), location: 0.2),
+                        .init(color: Color(.secondarySystemBackground).opacity(0.2), location: 1)
                     ]),
                     startPoint: .top,
                     endPoint: .bottom
@@ -157,20 +157,20 @@ struct HomeView: View {
     }
     
     private var emptyStateView: some View {
-        VStack(spacing: 20) {
+        VStack(spacing: 16) {
             Image(systemName: "bubble.left.and.bubble.right")
-                .font(.system(size: 60))
-                .foregroundColor(.secondary.opacity(0.5))
+                .font(.system(size: 48))
+                .foregroundColor(.secondary.opacity(0.4))
             
             Text("No messages yet")
-                .font(.title3)
+                .font(.headline)
                 .fontWeight(.medium)
             
             Text("Messages from people you follow will appear here")
-                .font(.body)
+                .font(.subheadline)
                 .foregroundColor(.secondary)
                 .multilineTextAlignment(.center)
-                .padding(.horizontal, 40)
+                .padding(.horizontal, 32)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
@@ -205,7 +205,7 @@ struct HomeView: View {
                             
                             if event.id != subscriptionManager.notes.last?.id {
                                 Divider()
-                                    .padding(.leading, 72)
+                                    .padding(.leading, 76)
                             }
                         }
                     }
@@ -221,20 +221,20 @@ struct HomeView: View {
                         }
                         subscriptionManager.resetNewNotesCount()
                     }) {
-                    HStack(spacing: 8) {
+                    HStack(spacing: 6) {
                         Image(systemName: "arrow.up")
-                            .font(.system(size: 14, weight: .medium))
+                            .font(.system(size: 12, weight: .semibold))
                         
-                        Text("\(subscriptionManager.newNotesCount) new \(subscriptionManager.newNotesCount == 1 ? "message" : "messages")")
-                            .font(.system(size: 14, weight: .medium))
+                        Text("\(subscriptionManager.newNotesCount) new")
+                            .font(.system(size: 13, weight: .semibold))
                     }
                     .foregroundColor(.white)
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 10)
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 8)
                     .background(
                         Capsule()
                             .fill(Color.accentColor)
-                            .shadow(color: Color.black.opacity(0.15), radius: 8, x: 0, y: 4)
+                            .shadow(color: Color.accentColor.opacity(0.3), radius: 6, x: 0, y: 3)
                     )
                 }
                 .padding(.top, 8)
@@ -274,17 +274,17 @@ struct ChatRowView: View {
                                 .aspectRatio(contentMode: .fill)
                         } placeholder: {
                             Circle()
-                                .fill(Color(.tertiarySystemFill))
+                                .fill(Color(.quaternarySystemFill))
                         }
                         .frame(width: 48, height: 48)
                         .clipShape(Circle())
                     } else {
                         Circle()
-                            .fill(Color(.tertiarySystemFill))
+                            .fill(Color(.quaternarySystemFill))
                             .frame(width: 48, height: 48)
                             .overlay(
                                 Text(String(profile?.name?.prefix(1) ?? "?").uppercased())
-                                    .font(.system(size: 20, weight: .medium))
+                                    .font(.system(size: 18, weight: .medium))
                                     .foregroundColor(.secondary)
                             )
                     }
@@ -296,14 +296,14 @@ struct ChatRowView: View {
             
             // Content section
             VStack(alignment: .leading, spacing: 2) {
-                HStack(alignment: .firstTextBaseline, spacing: 8) {
+                HStack(alignment: .firstTextBaseline, spacing: 6) {
                     Text(profile?.displayName ?? profile?.name ?? "Unknown")
-                        .font(.system(size: 16, weight: .semibold))
+                        .font(.system(size: 15, weight: .semibold))
                         .lineLimit(1)
                         .layoutPriority(1)
                     
                     Text(event.createdAt.formatted)
-                        .font(.caption)
+                        .font(.system(size: 12))
                         .foregroundColor(.secondary)
                     
                     Spacer(minLength: 0)
@@ -314,9 +314,9 @@ struct ChatRowView: View {
                     tags: event.tags,
                     currentUser: nil
                 )
-                .font(.system(size: 15))
+                .font(.system(size: 14))
                 .lineLimit(2)
-                .foregroundColor(.primary.opacity(0.9))
+                .foregroundColor(.primary.opacity(0.85))
                 
                 // Reply info section
                 if let info = replyInfo, (info.totalCount > 0 || !info.followingRepliers.isEmpty) {
@@ -372,7 +372,7 @@ struct ChatRowView: View {
                 }
             }
             .padding(.trailing, 16)
-            .padding(.vertical, 12)
+            .padding(.vertical, 10)
         }
         .background(
             Color.primary.opacity(isPressed ? 0.05 : 0)
