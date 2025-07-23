@@ -88,6 +88,87 @@ class AppState: ObservableObject {
     
     // MARK: - Authentication Methods
     
+    func createAccount(privateKey: String) async {
+        guard let ndk = ndk else { return }
+        
+        do {
+            // Create signer from hex private key
+            let signer = try NDKPrivateKeySigner(privateKey: privateKey)
+            
+            // Create session with biometric protection
+            let session = try await authManager.createSession(
+                with: signer,
+                requiresBiometric: true,
+                isHardwareBacked: true
+            )
+            
+            // Switch to session
+            try await authManager.switchToSession(session)
+            
+            // Update state
+            let pubkey = try await signer.pubkey
+            await MainActor.run {
+                self.isAuthenticated = true
+                self.currentUser = NDKUser(pubkey: pubkey)
+            }
+            
+            // Try to load existing profile first
+            var profileFound = false
+            if let profileManager = profileManager {
+                // Use collect to get immediate result
+                let filter = NDKFilter(
+                    authors: [pubkey],
+                    kinds: [EventKind.metadata],
+                    limit: 1
+                )
+                
+                let dataSource = NDKDataSource(
+                    ndk: ndk,
+                    filter: filter,
+                    maxAge: 0 // Get fresh data
+                )
+                
+                let events = await dataSource.collect(timeout: 3.0)
+                if let event = events.mostRecent,
+                   let profile = try? JSONDecoder().decode(NDKUserProfile.self, from: event.content.data(using: .utf8) ?? Data()) {
+                    await MainActor.run {
+                        self.currentUserProfile = profile
+                    }
+                    profileFound = true
+                }
+            }
+            
+            if !profileFound {
+                // Create default profile
+                let username = "user\(pubkey.prefix(8))"
+                let profile = NDKUserProfile(
+                    name: username,
+                    displayName: "New Olas User",
+                    about: "Visual storyteller on Nostr 📸",
+                    picture: nil
+                )
+                
+                // Publish profile event
+                let profileData = try JSONEncoder().encode(profile)
+                let metadataEvent = try ndk.event()
+                    .content(String(data: profileData, encoding: .utf8) ?? "{}")
+                    .kind(EventKind.metadata)
+                    .build(signer: signer)
+                
+                _ = try await ndk.publish(metadataEvent)
+                
+                await MainActor.run {
+                    self.currentUserProfile = profile
+                }
+            }
+            
+            // Start observing profile
+            await loadCurrentUserProfile(pubkey: pubkey)
+        } catch {
+            print("Failed to create account: \(error)")
+        }
+    }
+    
     func createAccount(displayName: String) async throws {
         guard let ndk = ndk else { throw OlasError.ndkNotInitialized }
         

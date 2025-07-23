@@ -4,8 +4,14 @@ import SwiftUI
 
 struct OlasMultiImageView: View {
     let imageURLs: [String]
+    let blurhashes: [String]
     @State private var loadedImages: [String: Image] = [:]
     @State private var failedImages: Set<String> = []
+    
+    init(imageURLs: [String], blurhashes: [String] = []) {
+        self.imageURLs = imageURLs
+        self.blurhashes = blurhashes.isEmpty ? Array(repeating: "", count: imageURLs.count) : blurhashes
+    }
     
     var body: some View {
         GeometryReader { geometry in
@@ -95,59 +101,15 @@ struct OlasMultiImageView: View {
     
     @ViewBuilder
     private func imageView(for urlString: String, aspectRatio: CGFloat) -> some View {
-        if let image = loadedImages[urlString] {
-            // Already loaded
-            image
-                .resizable()
-                .aspectRatio(aspectRatio, contentMode: .fill)
-                .clipped()
-        } else if failedImages.contains(urlString) {
-            // Failed to load
-            Rectangle()
-                .fill(OlasDesign.Colors.surface)
-                .aspectRatio(aspectRatio, contentMode: .fill)
-                .overlay(
-                    Image(systemName: "photo")
-                        .font(.system(size: 30))
-                        .foregroundColor(OlasDesign.Colors.textTertiary)
-                )
-        } else {
-            // Loading
-            AsyncImage(url: URL(string: urlString)) { phase in
-                switch phase {
-                case .success(let image):
-                    image
-                        .resizable()
-                        .aspectRatio(aspectRatio, contentMode: .fill)
-                        .clipped()
-                        .onAppear {
-                            loadedImages[urlString] = image
-                        }
-                case .failure(_):
-                    Rectangle()
-                        .fill(OlasDesign.Colors.surface)
-                        .aspectRatio(aspectRatio, contentMode: .fill)
-                        .overlay(
-                            Image(systemName: "photo")
-                                .font(.system(size: 30))
-                                .foregroundColor(OlasDesign.Colors.textTertiary)
-                        )
-                        .onAppear {
-                            failedImages.insert(urlString)
-                        }
-                case .empty:
-                    Rectangle()
-                        .fill(OlasDesign.Colors.surface)
-                        .aspectRatio(aspectRatio, contentMode: .fill)
-                        .overlay(
-                            ProgressView()
-                                .progressViewStyle(CircularProgressViewStyle(tint: .white))
-                                .scaleEffect(0.8)
-                        )
-                @unknown default:
-                    EmptyView()
-                }
-            }
+        if let index = imageURLs.firstIndex(of: urlString) {
+            let blurhash = index < blurhashes.count ? blurhashes[index] : nil
+            
+            OlasProgressiveImage(
+                imageURL: urlString,
+                blurhash: blurhash?.isEmpty == false ? blurhash : nil
+            )
+            .aspectRatio(aspectRatio, contentMode: .fill)
+            .clipped()
         }
     }
 }

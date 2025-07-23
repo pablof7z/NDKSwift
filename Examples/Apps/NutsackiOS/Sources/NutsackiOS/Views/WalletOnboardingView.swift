@@ -26,6 +26,10 @@ struct WalletOnboardingView: View {
     @State private var setupError: String?
     @State private var showError = false
     
+    // Mint discovery
+    @State private var discoveredMints: [DiscoveredMint] = []
+    @State private var isDiscoveringMints = false
+    
     private var currentTitle: String {
         switch currentStep {
         case 0: return "SETUP"
@@ -44,14 +48,6 @@ struct WalletOnboardingView: View {
         RelayInfo(url: "wss://nostr.wine", name: "Nostr Wine", description: "Paid relay with spam protection")
     ]
     
-    // Suggested mints with their metadata
-    let suggestedMints = [
-        (url: "https://mint.minibits.cash/Bitcoin", name: "Minibits", description: "Popular Bitcoin mint with good liquidity"),
-        (url: "https://mint.primal.net", name: "Primal Mint", description: "Integrated with Primal wallet ecosystem"),
-        (url: "https://testnut.cashu.space", name: "Testnut", description: "Test mint for experimenting (testnet)"),
-        (url: "https://8333.space:3338", name: "8333.space", description: "Community-run Bitcoin mint"),
-        (url: "https://legend.lnbits.com/cashu/api/v1/4gr9Xcmz3XEkUNwiBiQGoC", name: "LNbits Legend", description: "Reliable mint with LNbits integration")
-    ]
     
     var body: some View {
         ZStack {
@@ -207,7 +203,8 @@ struct WalletOnboardingView: View {
                     case 2:
                         MintSelectionView(
                             selectedMints: $selectedMints,
-                            suggestedMints: suggestedMints
+                            discoveredMints: discoveredMints,
+                            isDiscoveringMints: isDiscoveringMints
                         )
                         .transition(.asymmetric(
                             insertion: .move(edge: .trailing).combined(with: .opacity),
@@ -260,9 +257,7 @@ struct WalletOnboardingView: View {
                         Button(action: {
                             Task {
                                 await nostrManager.logout()
-                                await MainActor.run {
-                                    dismiss()
-                                }
+                                dismiss()
                             }
                         }) {
                             Text("Logout")
@@ -375,6 +370,7 @@ struct WalletOnboardingView: View {
         }
         .onAppear {
             animateOnboarding()
+            setupMintDiscovery()
         }
         .alert("Setup Error", isPresented: $showError) {
             Button("OK") { }
@@ -416,6 +412,38 @@ struct WalletOnboardingView: View {
         withAnimation(.easeOut(duration: 0.8).delay(0.8)) {
             contentOffset = 0
             contentOpacity = 1
+        }
+    }
+    
+    private func setupMintDiscovery() {
+        guard let ndk = nostrManager.ndk else { return }
+        
+        Task {
+            isDiscoveringMints = true
+            
+            // Use MintDiscoveryManager to get mints
+            let discoveryManager = MintDiscoveryManager(ndk: ndk)
+            
+            // Create an async stream to collect discovered mints
+            for await mints in discoveryManager.discoverMintsStream() {
+                await MainActor.run {
+                    self.discoveredMints = mints
+                    
+                    // Stop discovering after getting a reasonable number of mints
+                    if mints.count >= 5 {
+                        isDiscoveringMints = false
+                    }
+                }
+                
+                // Break after first batch for onboarding
+                if mints.count >= 5 {
+                    break
+                }
+            }
+            
+            await MainActor.run {
+                isDiscoveringMints = false
+            }
         }
     }
     
@@ -622,7 +650,8 @@ struct RelayInfo {
 // MARK: - Mint Selection View
 struct MintSelectionView: View {
     @Binding var selectedMints: Set<String>
-    let suggestedMints: [(url: String, name: String, description: String)]
+    let discoveredMints: [DiscoveredMint]
+    let isDiscoveringMints: Bool
     
     var body: some View {
         VStack(spacing: 20) {
@@ -650,26 +679,57 @@ struct MintSelectionView: View {
             )
             
             // Mint list
-            ScrollView {
-                VStack(spacing: 12) {
-                    ForEach(suggestedMints, id: \.url) { mint in
-                        MintRowView(
-                            mint: mint,
-                            isSelected: selectedMints.contains(mint.url),
-                            onTap: {
-                                withAnimation(.easeInOut(duration: 0.2)) {
-                                    if selectedMints.contains(mint.url) {
-                                        selectedMints.remove(mint.url)
-                                    } else {
-                                        selectedMints.insert(mint.url)
+            if isDiscoveringMints && discoveredMints.isEmpty {
+                VStack(spacing: 16) {
+                    ProgressView()
+                        .scaleEffect(1.2)
+                        .progressViewStyle(CircularProgressViewStyle(tint: .green))
+                    
+                    Text("Discovering mints...")
+                        .font(.system(size: 16, weight: .medium))
+                        .foregroundColor(Color.white.opacity(0.7))
+                }
+                .frame(maxHeight: 300)
+                .frame(maxWidth: .infinity)
+            } else if discoveredMints.isEmpty {
+                VStack(spacing: 16) {
+                    Image(systemName: "exclamationmark.triangle")
+                        .font(.system(size: 40))
+                        .foregroundColor(.yellow)
+                    
+                    Text("No mints discovered")
+                        .font(.system(size: 16, weight: .medium))
+                        .foregroundColor(Color.white.opacity(0.7))
+                    
+                    Text("Check your internet connection and try again")
+                        .font(.system(size: 14))
+                        .foregroundColor(Color.white.opacity(0.5))
+                        .multilineTextAlignment(.center)
+                }
+                .frame(maxHeight: 300)
+                .frame(maxWidth: .infinity)
+            } else {
+                ScrollView {
+                    VStack(spacing: 12) {
+                        ForEach(discoveredMints, id: \.url) { mint in
+                            MintRowView(
+                                mint: mint,
+                                isSelected: selectedMints.contains(mint.url),
+                                onTap: {
+                                    withAnimation(.easeInOut(duration: 0.2)) {
+                                        if selectedMints.contains(mint.url) {
+                                            selectedMints.remove(mint.url)
+                                        } else {
+                                            selectedMints.insert(mint.url)
+                                        }
                                     }
                                 }
-                            }
-                        )
+                            )
+                        }
                     }
                 }
+                .scrollIndicators(.hidden)
             }
-            .scrollIndicators(.hidden)
             
             // Selected count
             if !selectedMints.isEmpty {
@@ -691,7 +751,7 @@ struct MintSelectionView: View {
 
 // MARK: - Mint Row View
 struct MintRowView: View {
-    let mint: (url: String, name: String, description: String)
+    let mint: DiscoveredMint
     let isSelected: Bool
     let onTap: () -> Void
     
@@ -737,10 +797,17 @@ struct MintRowView: View {
                         .font(.system(size: 16, weight: .semibold))
                         .foregroundColor(.white)
                     
-                    Text(mint.description)
-                        .font(.system(size: 12))
-                        .foregroundColor(Color.white.opacity(0.6))
-                        .lineLimit(2)
+                    if let description = mint.description {
+                        Text(description)
+                            .font(.system(size: 12))
+                            .foregroundColor(Color.white.opacity(0.6))
+                            .lineLimit(2)
+                    } else if !mint.recommendedBy.isEmpty {
+                        Text("Recommended by \(mint.recommendedBy.count) user\(mint.recommendedBy.count == 1 ? "" : "s")")
+                            .font(.system(size: 12))
+                            .foregroundColor(Color.white.opacity(0.6))
+                            .lineLimit(1)
+                    }
                     
                     Text(mint.url)
                         .font(.system(size: 11, design: .monospaced))

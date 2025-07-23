@@ -4,28 +4,124 @@ import NDKSwift
 struct FeedView: View {
     @EnvironmentObject var appState: AppState
     @StateObject private var viewModel = FeedViewModel()
+    @State private var hasAppeared = false
+    @Namespace private var animation
     
     var body: some View {
         NavigationStack {
-            ScrollView {
-                LazyVStack(spacing: 1) {
-                    ForEach(viewModel.items) { item in
-                        FeedItemView(item: item)
+            ZStack {
+                // Subtle animated gradient background
+                TimeBasedGradient()
+                    .ignoresSafeArea()
+                    .opacity(0.1)
+                
+                OlasDesign.Colors.background
+                    .ignoresSafeArea()
+                
+                if viewModel.items.isEmpty && viewModel.isLoading {
+                    // Loading state
+                    loadingView
+                } else if viewModel.items.isEmpty {
+                    // Empty state
+                    emptyStateView
+                } else {
+                    // Feed content
+                    ScrollView {
+                        LazyVStack(spacing: 0) {
+                            ForEach(Array(viewModel.items.enumerated()), id: \.element.id) { index, item in
+                                FeedItemView(item: item)
+                                    .id(item.id)
+                                    .transition(.asymmetric(
+                                        insertion: .move(edge: .bottom).combined(with: .opacity),
+                                        removal: .move(edge: .top).combined(with: .opacity)
+                                    ))
+                                    .scaleEffect(hasAppeared ? 1 : 0.95)
+                                    .opacity(hasAppeared ? 1 : 0)
+                                    .animation(
+                                        .spring(response: 0.5, dampingFraction: 0.8)
+                                        .delay(Double(min(index, 10)) * 0.05),
+                                        value: hasAppeared
+                                    )
+                                
+                                if index < viewModel.items.count - 1 {
+                                    Rectangle()
+                                        .fill(OlasDesign.Colors.divider)
+                                        .frame(height: 1)
+                                }
+                            }
+                        }
+                        .padding(.top, OlasDesign.Spacing.sm)
                     }
                 }
             }
-            .background(OlasDesign.Colors.background)
             .navigationTitle("Olas")
             #if os(iOS)
             .navigationBarTitleDisplayMode(.large)
             #endif
+            .toolbar {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button {
+                        HapticManager.impact(.light)
+                        // TODO: Navigate to create post
+                    } label: {
+                        Image(systemName: "camera.fill")
+                            .foregroundStyle(
+                                LinearGradient(
+                                    colors: OlasDesign.Colors.primaryGradient,
+                                    startPoint: .topLeading,
+                                    endPoint: .bottomTrailing
+                                )
+                            )
+                    }
+                }
+            }
             .refreshable {
-                await viewModel.refresh()
+                await handleRefresh()
             }
             .onAppear {
                 if let ndk = appState.ndk {
                     viewModel.startFeed(with: ndk)
                 }
+                
+                // Trigger staggered animations
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                    withAnimation {
+                        hasAppeared = true
+                    }
+                }
+            }
+        }
+    }
+    
+    private var loadingView: some View {
+        VStack(spacing: OlasDesign.Spacing.lg) {
+            ForEach(0..<5) { index in
+                FeedItemSkeletonView()
+                    .opacity(0.7)
+                    .scaleEffect(hasAppeared ? 1 : 0.95)
+                    .animation(
+                        .easeInOut(duration: 0.5)
+                        .delay(Double(index) * 0.1),
+                        value: hasAppeared
+                    )
+            }
+        }
+        .padding(.horizontal, OlasDesign.Spacing.md)
+    }
+    
+    private var emptyStateView: some View {
+        EmptyFeedView(hasAppeared: hasAppeared)
+    }
+    
+    private func handleRefresh() async {
+        HapticManager.impact(.medium)
+        hasAppeared = false
+        await viewModel.refresh()
+        
+        // Re-trigger animations
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+            withAnimation {
+                hasAppeared = true
             }
         }
     }
@@ -92,7 +188,7 @@ struct FeedItemView: View {
             
             // Image display with multi-image support
             if !item.imageURLs.isEmpty {
-                OlasMultiImageView(imageURLs: item.imageURLs)
+                OlasMultiImageView(imageURLs: item.imageURLs, blurhashes: item.blurhashes)
                     .onTapGesture(count: 2) { location in
                         // Double tap to like
                         doubleTapLocation = location
@@ -221,7 +317,7 @@ struct FeedItemView: View {
             // Like animation overlay
             Group {
                 if showingLikeAnimation {
-                    HeartAnimation(location: doubleTapLocation)
+                    LikeAnimationView(location: doubleTapLocation)
                         .onAppear {
                             DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
                                 showingLikeAnimation = false
@@ -358,6 +454,7 @@ struct FeedItemView: View {
 @MainActor
 class FeedViewModel: ObservableObject {
     @Published var items: [FeedItem] = []
+    @Published var isLoading = true
     private var profileTasks: [String: Task<Void, Never>] = [:]
     private var feedTask: Task<Void, Never>?
     private var engagementTasks: [String: Task<Void, Never>] = [:]
@@ -366,7 +463,15 @@ class FeedViewModel: ObservableObject {
         // Cancel any existing feed task
         feedTask?.cancel()
         
+        isLoading = true
+        
         feedTask = Task {
+            // Simulate loading for smooth animation
+            try? await Task.sleep(nanoseconds: 500_000_000) // 0.5 seconds
+            
+            await MainActor.run {
+                self.isLoading = false
+            }
             // Subscribe to picture posts - NIP-68
             let filter = NDKFilter(kinds: [EventKind.image], limit: 100)
             
@@ -586,6 +691,7 @@ struct FeedItem: Identifiable {
     let event: NDKEvent
     var profile: NDKUserProfile?
     let imageURLs: [String]
+    let blurhashes: [String]
     var likeCount: Int = 0
     var replyCount: Int = 0
     var zapAmount: Int = 0
@@ -594,8 +700,34 @@ struct FeedItem: Identifiable {
         self.id = event.id
         self.event = event
         
-        // Extract images from imeta tags (NIP-68 requires imeta tags)
+        // Extract images and blurhashes from imeta tags (NIP-68 requires imeta tags)
         self.imageURLs = event.imageURLs
+        
+        // Extract blurhashes from imeta tags
+        var hashes: [String] = []
+        for tag in event.tags where tag.name == "imeta" {
+            var blurhash: String?
+            
+            // Parse imeta tag values
+            for i in stride(from: 1, to: tag.values.count, by: 2) {
+                if i + 1 < tag.values.count {
+                    let key = tag.values[i]
+                    let value = tag.values[i + 1]
+                    
+                    if key == "blurhash" {
+                        blurhash = value
+                    }
+                }
+            }
+            
+            if let hash = blurhash {
+                hashes.append(hash)
+            } else {
+                hashes.append("") // Empty string for missing blurhash
+            }
+        }
+        
+        self.blurhashes = hashes
     }
     
     static func extractImageURLs(from content: String) -> [String] {
@@ -653,5 +785,291 @@ struct FeedItem: Identifiable {
         // Check for image hosting services
         let imageHosts = ["imgur.com", "i.imgur.com", "nostr.build", "void.cat", "imgprxy.stacker.news"]
         return imageHosts.contains(where: { lowercasedURL.contains($0) })
+    }
+}
+
+// MARK: - Feed Item Skeleton
+struct FeedItemSkeletonView: View {
+    @State private var shimmerAnimation = false
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            // Header skeleton
+            HStack(spacing: OlasDesign.Spacing.md) {
+                Circle()
+                    .fill(OlasDesign.Colors.surface)
+                    .overlay(shimmerGradient)
+                    .frame(width: 40, height: 40)
+                
+                VStack(alignment: .leading, spacing: OlasDesign.Spacing.xs) {
+                    RoundedRectangle(cornerRadius: OlasDesign.CornerRadius.xs)
+                        .fill(OlasDesign.Colors.surface)
+                        .overlay(shimmerGradient)
+                        .frame(width: 120, height: 14)
+                    
+                    RoundedRectangle(cornerRadius: OlasDesign.CornerRadius.xs)
+                        .fill(OlasDesign.Colors.surface)
+                        .overlay(shimmerGradient)
+                        .frame(width: 80, height: 12)
+                }
+                
+                Spacer()
+            }
+            .padding(.horizontal, OlasDesign.Spacing.md)
+            .padding(.vertical, OlasDesign.Spacing.md)
+            
+            // Image skeleton
+            Rectangle()
+                .fill(OlasDesign.Colors.surface)
+                .overlay(shimmerGradient)
+                .aspectRatio(4/5, contentMode: .fit)
+            
+            // Actions skeleton
+            HStack(spacing: OlasDesign.Spacing.xl) {
+                ForEach(0..<4) { _ in
+                    Circle()
+                        .fill(OlasDesign.Colors.surface)
+                        .overlay(shimmerGradient)
+                        .frame(width: 24, height: 24)
+                }
+                Spacer()
+            }
+            .padding(.horizontal, OlasDesign.Spacing.md)
+            .padding(.vertical, OlasDesign.Spacing.md)
+            
+            // Content skeleton
+            VStack(alignment: .leading, spacing: OlasDesign.Spacing.sm) {
+                RoundedRectangle(cornerRadius: OlasDesign.CornerRadius.xs)
+                    .fill(OlasDesign.Colors.surface)
+                    .overlay(shimmerGradient)
+                    .frame(height: 14)
+                
+                RoundedRectangle(cornerRadius: OlasDesign.CornerRadius.xs)
+                    .fill(OlasDesign.Colors.surface)
+                    .overlay(shimmerGradient)
+                    .frame(width: 200, height: 14)
+            }
+            .padding(.horizontal, OlasDesign.Spacing.md)
+            .padding(.bottom, OlasDesign.Spacing.md)
+        }
+        .background(OlasDesign.Colors.background)
+        .onAppear {
+            withAnimation(.linear(duration: 1.5).repeatForever(autoreverses: false)) {
+                shimmerAnimation = true
+            }
+        }
+    }
+    
+    private var shimmerGradient: some View {
+        LinearGradient(
+            colors: [
+                Color.white.opacity(0),
+                Color.white.opacity(0.1),
+                Color.white.opacity(0)
+            ],
+            startPoint: .leading,
+            endPoint: .trailing
+        )
+        .rotationEffect(.degrees(30))
+        .offset(x: shimmerAnimation ? 300 : -300)
+        .transition(.move(edge: .leading))
+    }
+}
+
+// MARK: - Empty Feed View
+struct EmptyFeedView: View {
+    let hasAppeared: Bool
+    @State private var pulseAnimation = false
+    
+    var body: some View {
+        VStack(spacing: OlasDesign.Spacing.xxxl) {
+            Spacer()
+            
+            // Animated illustration
+            ZStack {
+                // Glowing background
+                Circle()
+                    .fill(
+                        LinearGradient(
+                            colors: OlasDesign.Colors.primaryGradient.map { $0.opacity(0.2) },
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+                    .frame(width: 200, height: 200)
+                    .blur(radius: 50)
+                    .scaleEffect(pulseAnimation ? 1.3 : 0.9)
+                    .animation(
+                        .easeInOut(duration: 3).repeatForever(autoreverses: true),
+                        value: pulseAnimation
+                    )
+                
+                // Camera icon
+                Image(systemName: "camera.fill")
+                    .font(.system(size: 80))
+                    .foregroundStyle(
+                        LinearGradient(
+                            colors: OlasDesign.Colors.primaryGradient,
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+                    .rotationEffect(.degrees(pulseAnimation ? 10 : -10))
+                    .animation(
+                        .easeInOut(duration: 2).repeatForever(autoreverses: true),
+                        value: pulseAnimation
+                    )
+            }
+            .scaleEffect(hasAppeared ? 1 : 0.5)
+            .opacity(hasAppeared ? 1 : 0)
+            .animation(.spring(response: 0.6, dampingFraction: 0.8), value: hasAppeared)
+            
+            VStack(spacing: OlasDesign.Spacing.md) {
+                Text("Your Feed is Empty")
+                    .font(.system(size: 28, weight: .semibold, design: .rounded))
+                    .foregroundStyle(.white)
+                
+                Text("Be the first to share a beautiful moment")
+                    .font(OlasDesign.Typography.body)
+                    .foregroundStyle(.white.opacity(0.7))
+                    .multilineTextAlignment(.center)
+            }
+            .opacity(hasAppeared ? 1 : 0)
+            .offset(y: hasAppeared ? 0 : 20)
+            .animation(.easeOut(duration: 0.6).delay(0.2), value: hasAppeared)
+            
+            VStack(spacing: OlasDesign.Spacing.md) {
+                Button {
+                    HapticManager.impact(.medium)
+                    // TODO: Navigate to create post
+                } label: {
+                    HStack {
+                        Image(systemName: "plus.circle.fill")
+                        Text("Create Your First Post")
+                    }
+                    .font(OlasDesign.Typography.bodyBold)
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, OlasDesign.Spacing.xl)
+                    .padding(.vertical, OlasDesign.Spacing.md)
+                    .background(
+                        LinearGradient(
+                            colors: OlasDesign.Colors.primaryGradient,
+                            startPoint: .leading,
+                            endPoint: .trailing
+                        )
+                    )
+                    .clipShape(RoundedRectangle(cornerRadius: OlasDesign.CornerRadius.full))
+                    .shadow(color: OlasDesign.Colors.primaryGradient[0].opacity(0.3), radius: 20, y: 10)
+                }
+                
+                Button {
+                    HapticManager.impact(.light)
+                    // TODO: Navigate to discover
+                } label: {
+                    Text("Discover People to Follow")
+                        .font(OlasDesign.Typography.body)
+                        .foregroundStyle(.white.opacity(0.8))
+                }
+            }
+            .scaleEffect(hasAppeared ? 1 : 0.8)
+            .opacity(hasAppeared ? 1 : 0)
+            .animation(.spring(response: 0.6, dampingFraction: 0.8).delay(0.4), value: hasAppeared)
+            
+            Spacer()
+            Spacer()
+        }
+        .padding(.horizontal, OlasDesign.Spacing.xl)
+        .onAppear {
+            pulseAnimation = true
+        }
+    }
+}
+
+// MARK: - Like Animation View
+struct LikeAnimationView: View {
+    let location: CGPoint
+    @State private var hearts: [HeartParticle] = []
+    @State private var mainHeartScale: CGFloat = 0
+    @State private var mainHeartOpacity: Double = 1
+    
+    struct HeartParticle: Identifiable {
+        let id = UUID()
+        let startPosition: CGPoint
+        let endPosition: CGPoint
+        let rotation: Double
+        let scale: CGFloat
+        let color: Color
+    }
+    
+    var body: some View {
+        ZStack {
+            // Main heart
+            Image(systemName: "heart.fill")
+                .font(.system(size: 100))
+                .foregroundStyle(
+                    LinearGradient(
+                        colors: [OlasDesign.Colors.like, Color.pink],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                )
+                .scaleEffect(mainHeartScale)
+                .opacity(mainHeartOpacity)
+                .position(location)
+            
+            // Particle hearts
+            ForEach(hearts) { heart in
+                Image(systemName: "heart.fill")
+                    .font(.system(size: 20))
+                    .foregroundStyle(heart.color)
+                    .scaleEffect(heart.scale)
+                    .rotationEffect(.degrees(heart.rotation))
+                    .position(heart.startPosition)
+                    .animation(.easeOut(duration: 1.5), value: heart.startPosition)
+            }
+        }
+        .onAppear {
+            // Animate main heart
+            withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) {
+                mainHeartScale = 1.2
+            }
+            
+            withAnimation(.easeOut(duration: 0.8).delay(0.2)) {
+                mainHeartOpacity = 0
+            }
+            
+            // Generate particles
+            generateParticles()
+            
+            // Animate particles after a delay
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                for i in hearts.indices {
+                    withAnimation(.easeOut(duration: 1.5)) {
+                        hearts[i].startPosition = hearts[i].endPosition
+                    }
+                }
+            }
+            
+            // Haptic feedback
+            HapticManager.notification(.success)
+        }
+    }
+    
+    private func generateParticles() {
+        for _ in 0..<12 {
+            let angle = Double.random(in: 0...(2 * .pi))
+            let distance = CGFloat.random(in: 100...200)
+            let endX = location.x + cos(angle) * distance
+            let endY = location.y + sin(angle) * distance - 50 // Bias upward
+            
+            let heart = HeartParticle(
+                startPosition: location,
+                endPosition: CGPoint(x: endX, y: endY),
+                rotation: Double.random(in: -45...45),
+                scale: CGFloat.random(in: 0.5...1.2),
+                color: [OlasDesign.Colors.like, .pink, .red].randomElement()!
+            )
+            hearts.append(heart)
+        }
     }
 }
