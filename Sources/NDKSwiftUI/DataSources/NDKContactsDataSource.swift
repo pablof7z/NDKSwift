@@ -58,8 +58,8 @@ public final class NDKContactsDataSource: ObservableObject {
     /// - Parameters:
     ///   - ndk: The NDK instance to use for data fetching
     ///   - userPubkey: The public key of the user whose contacts to fetch
-    ///   - maxAge: Maximum age of cached data in seconds (default: 3600 = 1 hour)
-    public init(ndk: NDK, userPubkey: String, maxAge: TimeInterval = 3600) {
+    ///   - maxAge: Maximum age of cached data in seconds (default: 1 hour)
+    public init(ndk: NDK, userPubkey: String, maxAge: TimeInterval = TimeConstants.hour) {
         self.ndk = ndk
         self.userPubkey = userPubkey
         
@@ -130,7 +130,7 @@ public final class NDKContactsDataSource: ObservableObject {
                 authors: Array(pubkeys),
                 kinds: [0]
             ),
-            maxAge: 3600, // Cache profiles for 1 hour
+            maxAge: TimeConstants.hour, // Cache profiles for 1 hour
             cachePolicy: .cacheWithNetwork
         )
         

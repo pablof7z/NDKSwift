@@ -341,7 +341,7 @@ public final class NDK {
     ///   - limit: Maximum number of events to retry (nil for all)
     /// - Returns: Array of successfully republished events and their relays
     /// - Throws: NDKError if retry fails
-    public func retryUnpublishedEvents(maxAge: TimeInterval = 3600, limit: Int? = nil) async throws -> [(event: NDKEvent, relays: Set<NDKRelay>)] {
+    public func retryUnpublishedEvents(maxAge: TimeInterval = TimeConstants.hour, limit: Int? = nil) async throws -> [(event: NDKEvent, relays: Set<NDKRelay>)] {
         try await eventManager.retryUnpublishedEvents(maxAge: maxAge, limit: limit)
     }
     
