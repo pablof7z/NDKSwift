@@ -6,11 +6,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.2] - 2025-07-24
+
+### Changed
+- Web of Trust kind:3 fetching now exclusively uses outbox relays during session initialization
+  - This reduces network traffic by only querying the configured `outboxRelays` for contact lists
+  - Previously fetched from all connected relays, creating unnecessary data transfer
+  - Uses `exclusiveRelays: true` to ensure only outbox relays are queried
+
+### Fixed
+- Fixed thread safety crash in `DataRequirement` class by converting it to an actor
+  - Resolved `EXC_BAD_ACCESS` crash when accessing `observerHandles` dictionary from multiple threads
+  - This crash could occur when navigating to user profiles in apps using NDKSwift
+  - All mutable state in `DataRequirement` is now protected by Swift's actor isolation
+
+## [0.1.0] - 2025-07-24
+
 _Note: This release contains breaking changes. NDKAuthView has been removed from the core library._
 
 ### Fixed
 - Fixed authentication state race condition where session creation wouldn't immediately activate the session
 - Fixed `switchToSession` to avoid unnecessary state transitions when switching to a just-created session
+- Fixed Socrates app bypassing authentication in DEBUG mode by removing DebugContentView
+  - App now properly shows AuthenticationView when not logged in
+  - Authentication flow works correctly in both DEBUG and RELEASE builds
 - Custom subscription IDs are now preserved exactly as provided without adding random suffixes
   - When using `NDKDataSource` or `ndk.observe()` with a custom `subscriptionId`, the ID is now used as-is
   - This is particularly important for NIP-60 wallet implementations that rely on specific subscription IDs

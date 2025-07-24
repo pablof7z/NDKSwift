@@ -23,7 +23,7 @@ class NostrManager {
     private var profileObservationTask: Task<Void, Never>?
     
     // Default relays for the app
-    let defaultRelays = [ RelayConstants.primal ]
+    let defaultRelays = [ "wss://relay.primal.net" ]
     
     // Key for storing user-added relays
     private static let userRelaysKey = "UserAddedRelays"
