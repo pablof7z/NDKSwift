@@ -91,7 +91,79 @@ NDKSwift provides a powerful, self-contained authentication system via `NDKAuthM
     try await authManager.switchToSession(session)
     ```
 
-**Architectural Tip:** Create a `NostrManager` as an `@ObservableObject` or `@Environment` object that holds the `ndk` instance and interacts with `NDKAuthManager`. This keeps your views clean. The `NutsackiOS` example app is a perfect reference.
+4.  **Session Management on App Launch:**
+    NDKSwift automatically handles session restoration and biometric authentication on app launch.
+
+    ```swift
+    // In your App or initial view
+    .task {
+        // Start the session - handles biometric auth if needed
+        do {
+            try await authManager.startSession()
+            // Session is now active, user is authenticated
+        } catch {
+            // Handle authentication failure
+            // User will see login screen via NDKAuthView
+        }
+    }
+    ```
+
+    The `startSession()` method:
+    - Automatically selects the most recent session if multiple exist
+    - Prompts for biometric authentication if the session requires it
+    - Validates and activates the session's signer
+    - Handles all error cases gracefully
+
+5.  **Handling Multiple Sessions:**
+    When multiple sessions exist, `startSession()` uses the most recent one by default.
+
+    ```swift
+    // Get all available sessions
+    let sessions = authManager.sessions
+    
+    // Manually switch to a specific session
+    if let targetSession = sessions.first(where: { $0.displayName == "Work Account" }) {
+        try await authManager.switchToSession(targetSession)
+    }
+    
+    // Or let startSession handle it automatically
+    try await authManager.startSession() // Uses most recent session
+    ```
+
+6.  **Biometric Authentication Flow:**
+    Sessions with biometric protection automatically prompt when accessed.
+
+    ```swift
+    // Creating a biometric-protected session
+    let session = try await authManager.createSession(
+        with: signer,
+        displayName: "Secure Account",
+        requiresBiometric: true
+    )
+    
+    // Later, when starting the app
+    do {
+        try await authManager.startSession()
+        // If biometric is required, user is prompted automatically
+    } catch NDKAuthError.biometricAuthenticationFailed {
+        // User failed biometric auth or cancelled
+        print("Biometric authentication failed")
+    } catch {
+        // Other errors (no sessions, keychain issues, etc.)
+    }
+    ```
+
+**Architectural Tips:**
+
+1. **Session Initialization**: Always call `startSession()` early in your app lifecycle (e.g., in your App's `.task` modifier) to ensure the user is authenticated before accessing NDK features.
+
+2. **Error Handling**: The authentication system provides specific error types (`NDKAuthError`) for different failure scenarios. Handle these appropriately in your UI.
+
+3. **NostrManager Pattern**: Create a `NostrManager` as an `@ObservableObject` or `@Environment` object that holds the `ndk` instance and interacts with `NDKAuthManager`. This keeps your views clean and centralizes Nostr operations.
+
+4. **Biometric Security**: Always recommend `requiresBiometric: true` for new sessions to enhance security. The system handles all the complexity of biometric prompts and fallbacks.
+
+The `NutsackiOS` and `Socrates` example apps demonstrate these patterns in production-ready implementations.
 
 ---
 
@@ -922,31 +994,6 @@ class AdaptiveNegentropyManager {
 }
 ```
 
-**Error Handling and Fallbacks:**
-
-Always implement graceful degradation:
-
-```swift
-func robustSync(filter: NDKFilter) async throws -> [NDKEvent] {
-    do {
-        // Attempt Negentropy first
-        let result = try await ndk.syncEvents(filter: filter)
-        return result.receivedEvents
-    } catch NIP77Error.unsupportedByRelay {
-        // Relay doesn't support NIP-77, fall back immediately
-        return try await ndk.fetchEvents(filter)
-    } catch NIP77Error.timeout {
-        // Network issues, try traditional sync with smaller limits
-        var fallbackFilter = filter
-        fallbackFilter.limit = 100 // Reduce load
-        return try await ndk.fetchEvents(fallbackFilter)
-    } catch {
-        // Other errors, attempt traditional sync as last resort
-        return try await ndk.fetchEvents(filter)
-    }
-}
-```
-
 **Mobile-Specific Considerations:**
 
 For iOS apps, think about Negentropy in terms of user experience:
@@ -1067,11 +1114,8 @@ func loadUserProfile() async {
 func showUserFeed() async {
     showLoadingSpinner()
     
-    // Wait to load follow list first
-    let followList = await ndk.fetchFollowList(pubkey: currentUser)
-    
     // Then wait to load all posts from followed users
-    let posts = await ndk.fetchEvents(authors: followList.follows)
+    let posts = await ndk.observe(authors: followList.follows).collect()
     
     hideLoadingSpinner()
     displayPosts(posts)
