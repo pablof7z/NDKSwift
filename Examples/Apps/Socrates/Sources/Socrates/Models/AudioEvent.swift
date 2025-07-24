@@ -24,6 +24,14 @@ struct AudioEvent: Identifiable {
         return (webOfTrustScore * 0.7) + (max(0, recencyScore) * 0.3)
     }
     
+    var hashtags: [String] {
+        // Extract hashtags from 't' tags
+        return event.tags.compactMap { tag in
+            guard tag.count >= 2 && tag[0] == "t" else { return nil }
+            return tag[1]
+        }
+    }
+    
     static func from(event: NDKEvent, webOfTrustScore: Double) -> AudioEvent? {
         guard let audioURL = extractAudioURL(from: event.content) else { return nil }
         

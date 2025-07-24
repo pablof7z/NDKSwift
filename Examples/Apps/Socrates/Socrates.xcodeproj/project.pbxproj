@@ -9,7 +9,6 @@
 /* Begin PBXBuildFile section */
 		1F422151F1F1CC73D565E48D /* UserProfileView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BEE222498AC852F7BE79CAF4 /* UserProfileView.swift */; };
 		242D24A53D59E016845341B0 /* NDKSwift in Frameworks */ = {isa = PBXBuildFile; productRef = BC858B297A1F5C5D5A41FF23 /* NDKSwift */; };
-		2CE5A85B2F4F7A9DD0C738EF /* DebugContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 969808CF0CAA11E0EABD5F00 /* DebugContentView.swift */; };
 		3AB8EE1EE8304575A090EB21 /* NDKSwiftUI in Frameworks */ = {isa = PBXBuildFile; productRef = 6B98B08C3F0FB18DF0197002 /* NDKSwiftUI */; };
 		40C1DD8A6F0890CAA3E5641F /* RelaySelectorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 558465E4F55D567C57A014EC /* RelaySelectorView.swift */; };
 		47D09940D923547B91044E45 /* BlossomSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 31150EC523BF90E43DE8C922 /* BlossomSettingsView.swift */; };
@@ -43,7 +42,6 @@
 		74E368483893E3ABAF5517A0 /* RelayManagementView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RelayManagementView.swift; sourceTree = "<group>"; };
 		8B8F53511A32689EFEF1609F /* AudioEventCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioEventCard.swift; sourceTree = "<group>"; };
 		8D43FF9375FFDAA103800FE9 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
-		969808CF0CAA11E0EABD5F00 /* DebugContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DebugContentView.swift; sourceTree = "<group>"; };
 		B34DE9D6D851E93B36168925 /* HomeFeedView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeFeedView.swift; sourceTree = "<group>"; };
 		BEE222498AC852F7BE79CAF4 /* UserProfileView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UserProfileView.swift; sourceTree = "<group>"; };
 		C6CAD7F4A7FFDCF19160C1E8 /* SocratesApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SocratesApp.swift; sourceTree = "<group>"; };
@@ -84,7 +82,6 @@
 				8B8F53511A32689EFEF1609F /* AudioEventCard.swift */,
 				624E1033520124ED3046A8FB /* AuthenticationView.swift */,
 				31150EC523BF90E43DE8C922 /* BlossomSettingsView.swift */,
-				969808CF0CAA11E0EABD5F00 /* DebugContentView.swift */,
 				B34DE9D6D851E93B36168925 /* HomeFeedView.swift */,
 				74E368483893E3ABAF5517A0 /* RelayManagementView.swift */,
 				558465E4F55D567C57A014EC /* RelaySelectorView.swift */,
@@ -222,7 +219,6 @@
 				FDDE8DE0AD653C4955F37B04 /* BlossomServerManager.swift in Sources */,
 				47D09940D923547B91044E45 /* BlossomSettingsView.swift in Sources */,
 				528BA384039B7EDFCC81AB4E /* ContentView.swift in Sources */,
-				2CE5A85B2F4F7A9DD0C738EF /* DebugContentView.swift in Sources */,
 				903342389D8567E371A22508 /* HomeFeedView.swift in Sources */,
 				9A451131A1EA9D2B9D8C70A2 /* RelayManagementView.swift in Sources */,
 				40C1DD8A6F0890CAA3E5641F /* RelaySelectorView.swift in Sources */,
@@ -306,7 +302,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = com.socrates.app;
+				PRODUCT_BUNDLE_IDENTIFIER = io.f7z.socrates;
 				PRODUCT_NAME = Socrates;
 				SDKROOT = iphoneos;
 				SWIFT_OPTIMIZATION_LEVEL = "-O";
@@ -330,7 +326,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = com.socrates.app;
+				PRODUCT_BUNDLE_IDENTIFIER = io.f7z.socrates;
 				PRODUCT_NAME = Socrates;
 				SDKROOT = iphoneos;
 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;

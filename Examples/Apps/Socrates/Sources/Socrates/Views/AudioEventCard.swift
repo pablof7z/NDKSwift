@@ -86,6 +86,12 @@ struct AudioEventCard: View {
                     onSeek: seek
                 )
                 
+                // Hashtags
+                if !audioEvent.hashtags.isEmpty {
+                    HashtagsView(hashtags: audioEvent.hashtags)
+                        .padding(.top, 8)
+                }
+                
                 // Reactions bar
                 HStack(spacing: 16) {
                     // Reaction button
@@ -750,6 +756,39 @@ struct ReactionsDrawer: View {
     }
 }
 
+// MARK: - Hashtags View
+struct HashtagsView: View {
+    let hashtags: [String]
+    
+    var body: some View {
+        LazyVGrid(columns: [GridItem(.adaptive(minimum: 60), spacing: 8)], alignment: .leading, spacing: 6) {
+            ForEach(hashtags, id: \.self) { hashtag in
+                HashtagPill(hashtag: hashtag)
+            }
+        }
+    }
+}
+
+struct HashtagPill: View {
+    let hashtag: String
+    
+    var body: some View {
+        Text("#\(hashtag)")
+            .font(.system(size: 12, weight: .medium))
+            .foregroundColor(.purple)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 4)
+            .background(
+                Capsule()
+                    .fill(Color.purple.opacity(0.1))
+                    .overlay(
+                        Capsule()
+                            .stroke(Color.purple.opacity(0.3), lineWidth: 0.5)
+                    )
+            )
+    }
+}
+
 // MARK: - String Extension
 extension String {
     var containsEmoji: Bool {
@@ -868,7 +907,14 @@ struct ReplyRecordingView: View {
                     duration: recordingDuration,
                     waveform: recordingWaveform,
                     onCancel: cancelRecording,
-                    onComplete: completeRecording
+                    onComplete: completeRecording,
+                    isUploading: false,
+                    uploadedURL: nil,
+                    onPreview: {},
+                    onPublish: {},
+                    isPlaying: false,
+                    playbackProgress: 0,
+                    playbackWaveformProgress: 0
                 )
             }
         }
