@@ -72,7 +72,7 @@ final class UserProfileE2ETests: XCTestCase {
         
         // Create metadata event (kind 0)
         let profileContent = try JSONCoding.encodeToString(initialProfile)
-        let profileEvent = try await publisherNDK.event()
+        let profileEvent = try await NDKEventBuilder(ndk: publisherNDK)
             .content(profileContent)
             .kind(0) // Metadata kind
             .build()
@@ -131,7 +131,7 @@ final class UserProfileE2ETests: XCTestCase {
         
         // Create updated metadata event
         let updateContent = try JSONCoding.encodeToString(updatedProfile)
-        let updateEvent = try await publisherNDK.event()
+        let updateEvent = try await NDKEventBuilder(ndk: publisherNDK)
             .content(updateContent)
             .kind(0) // Metadata kind
             .build()

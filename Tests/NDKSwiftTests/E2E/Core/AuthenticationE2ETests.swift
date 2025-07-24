@@ -162,7 +162,7 @@ final class AuthenticationE2ETests: XCTestCase {
         await newNDK.connect()
         await newNDK.waitForRelayConnections(minimumRelays: 1, timeout: 10.0)
         
-        let restoredEvent = try await newNDK.event()
+        let restoredEvent = try await NDKEventBuilder(ndk: newNDK)
             .content("Event after session restore at \(Date())")
             .kind(EventKind.textNote)
             .build()

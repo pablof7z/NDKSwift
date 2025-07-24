@@ -8,16 +8,13 @@ struct HomeView: View {
     @State private var selectedThread: NDKEvent?
     @State private var replyTracker: ReplyTracker?
     
-    // Direct NDK state
+    // Simplified state management
     @State private var notes: [NDKEvent] = []
-    @State private var sessionData: NDKSessionData?
-    @State private var isLoadingFollows: Bool = true
-    @State private var isLoadingNotes: Bool = false
     @State private var isSyncing: Bool = false
     @State private var syncStatus: String = ""
     @State private var error: Error?
     @State private var newNotesCount: Int = 0
-    @State private var notesSubscription: Task<Void, Never>?
+    @State private var notesTask: Task<Void, Never>?
     
     var body: some View {
         NavigationView {
@@ -39,9 +36,7 @@ struct HomeView: View {
                     headerView
                     
                     // Main content
-                    if isLoadingFollows {
-                        loadingFollowsView
-                    } else if notes.isEmpty && !isLoadingNotes {
+                    if notes.isEmpty {
                         emptyStateView
                     } else {
                         chatListView
@@ -57,16 +52,10 @@ struct HomeView: View {
             ThreadView(rootEvent: event)
         }
         .onAppear {
-            startSession()
-        }
-        .onChange(of: sessionData?.followList) { _, newFollows in
-            // Update reply tracker when follows change
-            if let newFollows = newFollows {
-                replyTracker?.updateFollowing(newFollows)
-            }
+            startNotesStream()
         }
         .onDisappear {
-            // Clean up all reply tracking when view disappears
+            notesTask?.cancel()
             replyTracker?.stopAllTracking()
         }
     }
@@ -149,18 +138,6 @@ struct HomeView: View {
         }
         .frame(height: error != nil ? 90 : 70)
         .shadow(color: Color.black.opacity(0.03), radius: 3, x: 0, y: 1)
-    }
-    
-    private var loadingFollowsView: some View {
-        VStack(spacing: 20) {
-            ProgressView()
-                .scaleEffect(1.2)
-            
-            Text("Loading your follows...")
-                .font(.headline)
-                .foregroundColor(.secondary)
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
     
     private var emptyStateView: some View {
@@ -257,121 +234,79 @@ struct HomeView: View {
     
     // MARK: - Helper Methods
     
-    private func startSession() {
-        guard let ndk = ndkManager.ndk else { return }
+    private func startNotesStream() {
+        guard let ndk = ndkManager.ndk,
+              let signer = ndk.signer else { return }
         
-        Task {
+        notesTask?.cancel()
+        notesTask = Task {
             do {
-                // Start session and get session data
-                let data = try await ndk.startSession(signer: ndk.signer!)
+                // Start session with explicit configuration
+                let config = NDKSessionConfiguration(
+                    dataRequirements: [.followList, .muteList],
+                    preloadStrategy: .progressive
+                )
+                let sessionData = try await ndk.startSession(signer: signer, config: config)
                 
+                // Initialize reply tracker
                 await MainActor.run {
-                    self.sessionData = data
-                    
-                    // Initialize reply tracker
                     if replyTracker == nil {
-                        replyTracker = ReplyTracker(ndk: ndk, following: data.followList)
+                        replyTracker = ReplyTracker(ndk: ndk, following: sessionData.followList)
                     }
                 }
                 
-                // Observe session data state changes
-                observeSessionData(data)
+                // Create reactive filter for notes from followed users
+                let filter = ReactiveFilter(
+                    dependencies: [.followList],
+                    builder: { sessionData in
+                        NDKFilter(
+                            authors: Array(sessionData.followList),
+                            kinds: [1],
+                            limit: 100  // Add limit to prevent overwhelming the UI
+                        )
+                    }
+                )
                 
+                // Use observe to get a stream of notes - this handles all the complexity
+                let stream = ndk.observe(filter)
+                
+                var seenIds = Set<String>()
+                var notesList: [NDKEvent] = []
+                
+                for await event in stream {
+                    guard !Task.isCancelled else { break }
+                    
+                    if !seenIds.contains(event.id) {
+                        seenIds.insert(event.id)
+                        notesList.append(event)
+                        
+                        // Sort by timestamp descending
+                        notesList.sort { $0.createdAt > $1.createdAt }
+                        
+                        await MainActor.run {
+                            // Update new notes count if we have existing notes
+                            if !notes.isEmpty && event.createdAt > (notes.first?.createdAt ?? 0) {
+                                newNotesCount += 1
+                            }
+                            
+                            notes = notesList
+                        }
+                    }
+                }
             } catch {
                 await MainActor.run {
                     self.error = error
-                    self.isLoadingFollows = false
-                }
-            }
-        }
-    }
-    
-    private func observeSessionData(_ data: NDKSessionData) {
-        Task {
-            // Use withObservationTracking to observe changes
-            while !Task.isCancelled {
-                await withObservationTracking {
-                    // This will trigger when followListState changes
-                    let state = data.followListState
-                    
-                    Task { @MainActor in
-                        switch state {
-                        case .loading:
-                            isLoadingFollows = true
-                        case .ready(let follows, _), .updating(let follows, _):
-                            isLoadingFollows = false
-                            if notesSubscription == nil {
-                                startNotesSubscription()
-                            }
-                        case .error(let error):
-                            isLoadingFollows = false
-                            self.error = error
-                        }
-                    }
-                } onChange: {
-                    // Continue observing
-                }
-            }
-        }
-    }
-    
-    private func startNotesSubscription() {
-        guard let ndk = ndkManager.ndk else { return }
-        
-        notesSubscription?.cancel()
-        
-        notesSubscription = Task {
-            isLoadingNotes = true
-            
-            // Create reactive filter for notes from followed users
-            let filter = ReactiveFilter(
-                dependencies: [.followList],
-                builder: { sessionData in
-                    NDKFilter(
-                        authors: Array(sessionData.followList),
-                        kinds: [1],
-                        limit: 100
-                    )
-                }
-            )
-            
-            // Use observe to get a stream of notes
-            let stream = ndk.observe(filter)
-            
-            var seenIds = Set<String>()
-            var notesList: [NDKEvent] = []
-            
-            for await event in stream {
-                if !seenIds.contains(event.id) {
-                    seenIds.insert(event.id)
-                    notesList.append(event)
-                    
-                    // Sort by timestamp descending
-                    notesList.sort { $0.createdAt > $1.createdAt }
-                    
-                    await MainActor.run {
-                        isLoadingNotes = false
-                        
-                        // Update new notes count if we have existing notes
-                        if !notes.isEmpty && event.createdAt > (notes.first?.createdAt ?? 0) {
-                            newNotesCount += 1
-                        }
-                        
-                        notes = notesList
-                    }
                 }
             }
         }
     }
     
     private func triggerSync() {
-        // For now, just reload the subscription
-        // In the future, this could trigger negentropy sync
+        // Restart the notes stream to get fresh data
         isSyncing = true
         syncStatus = "Syncing..."
         
-        notesSubscription?.cancel()
-        startNotesSubscription()
+        startNotesStream()
         
         Task {
             try? await Task.sleep(nanoseconds: 2_000_000_000) // 2 seconds

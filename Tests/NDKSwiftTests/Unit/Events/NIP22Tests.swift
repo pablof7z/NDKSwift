@@ -241,7 +241,7 @@ final class NIP22Tests: XCTestCase {
             .build()
         
         // Create comment by user 2
-        let comment1 = try await ndk2.reply(to: blogPost)
+        let comment1 = try await NDKEventBuilder.reply(to: blogPost, ndk: ndk2)
             .content("Comment from user 2")
             .build()
         

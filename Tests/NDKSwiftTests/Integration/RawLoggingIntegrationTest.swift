@@ -28,8 +28,16 @@ final class RawLoggingIntegrationTest: XCTestCase {
         print("\n=== Raw Logging Test Output ===")
         print("Creating subscription with \(largeAuthors.count) authors...")
         
-        // Subscribe to trigger the logging
-        let subscription = ndk.subscribe(filter: filter)
+        // Observe to trigger the logging
+        let dataSource = ndk.observe(filter: filter)
+        
+        // Start observing to trigger the subscription
+        let task = Task {
+            for await _ in dataSource.events {
+                // We don't need to process events, just trigger the subscription
+                break
+            }
+        }
         
         // Give it a moment to send the REQ
         try await Task.sleep(nanoseconds: 100_000_000) // 0.1 seconds
@@ -39,8 +47,8 @@ final class RawLoggingIntegrationTest: XCTestCase {
         print("Expected format: RAW: [\"REQ\",\"<sub-id>\",{\"authors\":\"<150-authors>\",\"kinds\":[1,30023],\"limit\":10}]")
         print("=== End of Raw Logging Test ===\n")
         
-        // Cancel subscription
-        subscription.cancel()
+        // Cancel observation
+        task.cancel()
         
         // Disconnect
         await ndk.disconnect()

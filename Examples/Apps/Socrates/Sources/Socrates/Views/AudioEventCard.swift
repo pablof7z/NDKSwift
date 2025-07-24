@@ -18,6 +18,9 @@ struct AudioEventCard: View {
     
     // Reaction states
     @State private var hasLiked: Bool = false
+    @State private var reactionCount: Int = 0
+    @State private var reactions: [NDKEvent] = []
+    @State private var cardScale: CGFloat = 1
     
     var isCurrentlyPlaying: Bool {
         appState.currentlyPlayingId == audioEvent.id && isPlaying
@@ -76,9 +79,16 @@ struct AudioEventCard: View {
                 // Reactions bar (minimal)
                 HStack(spacing: 16) {
                     Button(action: handleLike) {
-                        Image(systemName: hasLiked ? "heart.fill" : "heart")
-                            .font(.system(size: 16))
-                            .foregroundColor(hasLiked ? .red : Color.white.opacity(0.5))
+                        HStack(spacing: 4) {
+                            Image(systemName: hasLiked ? "heart.fill" : "heart")
+                                .font(.system(size: 16))
+                                .foregroundColor(hasLiked ? .red : Color.white.opacity(0.5))
+                            if reactionCount > 0 {
+                                Text("\(reactionCount)")
+                                    .font(.system(size: 14))
+                                    .foregroundColor(Color.white.opacity(0.6))
+                            }
+                        }
                     }
                     
                     Button(action: { showingReplyRecorder = true }) {
@@ -240,23 +250,31 @@ struct AudioEventCard: View {
         Task {
             guard let ndk = nostrManager.ndk else { return }
             
-            // Check if current user has liked this event
+            // Load all reactions for this event
             let filter = NDKFilter(
                 kinds: [7],
-                events: [audioEvent.id],
-                authors: [appState.currentUser?.pubkey].compactMap { $0 },
-                limit: 1
+                events: [audioEvent.id]
             )
             
             let dataSource = ndk.observe(filter: filter, maxAge: 0)
             
             for await event in dataSource.events {
-                if event.content == "+" || event.content == "🤙" {
+                // Only count positive reactions
+                if event.content == "+" || event.content == "🤙" || event.content == "❤️" || event.content == "♥️" {
                     await MainActor.run {
-                        hasLiked = true
+                        // Add to reactions list if not already present
+                        if !self.reactions.contains(where: { $0.id == event.id }) {
+                            self.reactions.append(event)
+                            self.reactionCount = self.reactions.count
+                            
+                            // Check if current user has reacted
+                            if let currentUserPubkey = appState.currentUser?.pubkey,
+                               event.pubkey == currentUserPubkey {
+                                self.hasLiked = true
+                            }
+                        }
                     }
                 }
-                break // Only need to check if user has liked
             }
         }
     }
