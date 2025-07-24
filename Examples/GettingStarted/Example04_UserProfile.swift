@@ -7,7 +7,7 @@ struct Example04_UserProfile {
         print("==================================\n")
         
         // Step 1: Setup NDK
-        let ndk = NDK(relayUrls: ["wss://relay.primal.net", "wss://relay.damus.io"])
+        let ndk = NDK(relayUrls: [RelayConstants.primal, RelayConstants.damus])
         await ndk.connect()
         print("✅ Connected to relays")
         

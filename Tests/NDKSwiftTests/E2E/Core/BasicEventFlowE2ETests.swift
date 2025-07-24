@@ -2,11 +2,7 @@ import XCTest
 @testable import NDKSwift
 
 final class BasicEventFlowE2ETests: XCTestCase {
-    let relayURLs = [
-        "wss://relay.damus.io",
-        "wss://relay.nostr.band",
-        "wss://nos.lol"
-    ]
+    let relayURLs = RelayConstants.testRelays
     
     override func setUp() async throws {
         try await super.setUp()

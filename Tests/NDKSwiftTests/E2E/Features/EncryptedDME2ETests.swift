@@ -4,11 +4,7 @@ import XCTest
 /// End-to-end tests for encrypted direct message exchange
 /// Tests both NIP-04 (deprecated) and NIP-44 encryption standards
 final class EncryptedDME2ETests: XCTestCase {
-    let relayURLs = [
-        "wss://relay.damus.io",
-        "wss://nos.lol",
-        "wss://relay.nostr.band"
-    ]
+    let relayURLs = RelayConstants.testRelays
     
     override func setUp() async throws {
         try await super.setUp()

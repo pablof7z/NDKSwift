@@ -3,6 +3,7 @@ import PackageDescription
 
 let package = Package(
     name: "NDKSwiftExamples",
+    defaultLocalization: "en",
     platforms: [
         .iOS(.v15),
         .macOS(.v14)
@@ -18,7 +19,7 @@ let package = Package(
         .executable(name: "TestNegentropyProtocol", targets: ["TestNegentropyProtocol"]),
         .executable(name: "RealDeclarativeDemo", targets: ["RealDeclarativeDemo"]),
         .executable(name: "OptimisticPublishingDemo", targets: ["OptimisticPublishingDemo"]),
-        .executable(name: "DebugSubscription", targets: ["DebugSubscription"]),
+        // .executable(name: "DebugSubscription", targets: ["DebugSubscription"]),
         .executable(name: "NIP60Wallet", targets: ["NIP60Wallet"]),
         .executable(name: "DebugOutbox", targets: ["DebugOutbox"]),
         .executable(name: "NIP92MediaDemo", targets: ["NIP92MediaDemo"]),
@@ -84,14 +85,14 @@ let package = Package(
             ],
             path: "Features/OptimisticPublishingDemo"
         ),
-        .executableTarget(
-            name: "DebugSubscription",
-            dependencies: [
-                .product(name: "NDKSwift", package: "NDKSwift")
-            ],
-            path: ".",
-            sources: ["DebugSubscription.swift"]
-        ),
+        // .executableTarget(
+        //     name: "DebugSubscription",
+        //     dependencies: [
+        //         .product(name: "NDKSwift", package: "NDKSwift")
+        //     ],
+        //     path: ".",
+        //     sources: ["DebugSubscription.swift"]
+        // ),
         .executableTarget(
             name: "NIP60Wallet",
             dependencies: [
