@@ -755,79 +755,251 @@ extension String {
 struct ReplyRecordingView: View {
     let replyingTo: AudioEvent
     @Environment(\.dismiss) private var dismiss
+    @EnvironmentObject var appState: AppState
+    @EnvironmentObject var nostrManager: NostrManager
+    
+    // Recording states
+    @State private var audioRecorder: AVAudioRecorder?
+    @State private var recordingTimer: Timer?
+    @State private var recordingDuration: TimeInterval = 0
+    @State private var isRecording = false
+    @State private var recordingWaveform: [CGFloat] = []
+    @State private var fullWaveform: [Double] = []
+    @State private var showingRecordingUI = false
     
     var body: some View {
         ZStack {
             Color.black.opacity(0.95)
                 .ignoresSafeArea()
             
-            VStack(spacing: 30) {
-                // Header
-                HStack {
-                    Button("Cancel") {
-                        dismiss()
-                    }
-                    .foregroundColor(.white)
-                    
-                    Spacer()
-                    
-                    Text("Reply")
-                        .font(.system(size: 18, weight: .semibold))
-                        .foregroundColor(.white)
-                    
-                    Spacer()
-                    
-                    Button("Cancel") {
-                        dismiss()
-                    }
-                    .opacity(0)
-                }
-                .padding()
-                
-                // Original message preview
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("Replying to")
-                        .font(.system(size: 14))
-                        .foregroundColor(Color.white.opacity(0.6))
-                    
-                    // Mini version of the original card
+            if !showingRecordingUI {
+                VStack(spacing: 30) {
+                    // Header
                     HStack {
-                        NDKProfilePicture(pubkey: replyingTo.author.pubkey, size: 32)
-                        
-                        VStack(alignment: .leading) {
-                            Text(String(replyingTo.author.pubkey.prefix(8)))
-                                .font(.system(size: 14, weight: .semibold))
-                                .foregroundColor(.white)
-                            
-                            Text("Voice message")
-                                .font(.system(size: 12))
-                                .foregroundColor(Color.white.opacity(0.5))
+                        Button("Cancel") {
+                            dismiss()
                         }
+                        .foregroundColor(.white)
                         
                         Spacer()
+                        
+                        Text("Reply")
+                            .font(.system(size: 18, weight: .semibold))
+                            .foregroundColor(.white)
+                        
+                        Spacer()
+                        
+                        Button("Cancel") {
+                            dismiss()
+                        }
+                        .opacity(0)
                     }
                     .padding()
-                    .background(
-                        RoundedRectangle(cornerRadius: 12)
-                            .fill(Color.white.opacity(0.05))
-                    )
-                }
-                .padding(.horizontal)
-                
-                Spacer()
-                
-                VStack(spacing: 16) {
-                    Image(systemName: "mic.circle.fill")
-                        .font(.system(size: 60))
-                        .foregroundColor(.white.opacity(0.8))
                     
-                    Text("Recording feature not yet implemented")
-                        .foregroundColor(.white.opacity(0.7))
-                        .font(.caption)
+                    // Original message preview
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Replying to")
+                            .font(.system(size: 14))
+                            .foregroundColor(Color.white.opacity(0.6))
+                        
+                        // Mini version of the original card
+                        HStack {
+                            NDKProfilePicture(pubkey: replyingTo.author.pubkey, size: 32)
+                            
+                            VStack(alignment: .leading) {
+                                Text(String(replyingTo.author.pubkey.prefix(8)))
+                                    .font(.system(size: 14, weight: .semibold))
+                                    .foregroundColor(.white)
+                                
+                                Text("Voice message")
+                                    .font(.system(size: 12))
+                                    .foregroundColor(Color.white.opacity(0.5))
+                            }
+                            
+                            Spacer()
+                        }
+                        .padding()
+                        .background(
+                            RoundedRectangle(cornerRadius: 12)
+                                .fill(Color.white.opacity(0.05))
+                        )
+                    }
+                    .padding(.horizontal)
+                    
+                    Spacer()
+                    
+                    // Record button
+                    RecordButton(
+                        isRecording: $isRecording,
+                        onStartRecording: startRecording,
+                        onStopRecording: stopRecording
+                    )
+                    
+                    Spacer()
                 }
-                
-                Spacer()
+            } else {
+                // Recording UI overlay
+                RecordingOverlay(
+                    duration: recordingDuration,
+                    waveform: recordingWaveform,
+                    onCancel: cancelRecording,
+                    onComplete: completeRecording
+                )
             }
         }
+    }
+    
+    private func startRecording() {
+        Task {
+            let granted = await AVAudioApplication.requestRecordPermission()
+            if granted {
+                await MainActor.run {
+                    setupRecording()
+                }
+            }
+        }
+    }
+    
+    private func setupRecording() {
+        let audioSession = AVAudioSession.sharedInstance()
+        
+        do {
+            try audioSession.setCategory(.playAndRecord, mode: .default)
+            try audioSession.setActive(true)
+            
+            let documentsPath = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
+            let audioFilename = documentsPath.appendingPathComponent("reply_\(Date().timeIntervalSince1970).m4a")
+            
+            let settings = [
+                AVFormatIDKey: Int(kAudioFormatMPEG4AAC),
+                AVSampleRateKey: 44100,
+                AVNumberOfChannelsKey: 1,
+                AVEncoderAudioQualityKey: AVAudioQuality.high.rawValue
+            ]
+            
+            audioRecorder = try AVAudioRecorder(url: audioFilename, settings: settings)
+            audioRecorder?.isMeteringEnabled = true
+            audioRecorder?.record()
+            
+            isRecording = true
+            showingRecordingUI = true
+            recordingDuration = 0
+            fullWaveform = []
+            
+            recordingTimer = Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { _ in
+                updateRecording()
+            }
+            
+        } catch {
+            print("Failed to start recording: \(error)")
+        }
+    }
+    
+    private func updateRecording() {
+        guard let recorder = audioRecorder else { return }
+        
+        recorder.updateMeters()
+        
+        recordingDuration += 0.1
+        
+        let normalizedValue = pow(10, recorder.averagePower(forChannel: 0) / 20)
+        recordingWaveform.append(CGFloat(normalizedValue))
+        fullWaveform.append(Double(normalizedValue))
+        
+        if recordingWaveform.count > 50 {
+            recordingWaveform.removeFirst()
+        }
+        
+        if recordingDuration >= 60 {
+            stopRecording()
+        }
+    }
+    
+    private func stopRecording() {
+        recordingTimer?.invalidate()
+        recordingTimer = nil
+        
+        audioRecorder?.stop()
+        isRecording = false
+    }
+    
+    private func cancelRecording() {
+        recordingTimer?.invalidate()
+        recordingTimer = nil
+        
+        audioRecorder?.stop()
+        audioRecorder?.deleteRecording()
+        audioRecorder = nil
+        
+        isRecording = false
+        showingRecordingUI = false
+        recordingWaveform = []
+        fullWaveform = []
+    }
+    
+    private func completeRecording() {
+        guard let recorder = audioRecorder,
+              let ndk = nostrManager.ndk else { return }
+        
+        let _ = recorder.url
+        let finalDuration = recordingDuration
+        
+        let compressedWaveform = compressWaveform(fullWaveform, targetSamples: 50)
+        
+        Task {
+            do {
+                let uploadedURL = "https://example.com/audio/reply_\(Date().timeIntervalSince1970).webm"
+                
+                var imetaComponents = ["imeta"]
+                imetaComponents.append("url \(uploadedURL)")
+                imetaComponents.append("m audio/webm")
+                imetaComponents.append("duration \(Int(finalDuration))")
+                
+                let waveformString = compressedWaveform
+                    .map { String(format: "%.2f", $0) }
+                    .joined(separator: " ")
+                imetaComponents.append("waveform \(waveformString)")
+                
+                // Publish reply audio event
+                _ = try await ndk.publish { builder in
+                    builder
+                        .kind(1222) // Audio event kind
+                        .content(uploadedURL)
+                        .tag(imetaComponents)
+                        .tag(["e", replyingTo.id, "", "reply"]) // Reply to original event
+                        .tag(["p", replyingTo.author.pubkey]) // Mention original author
+                }
+                
+                await MainActor.run {
+                    dismiss()
+                }
+                
+            } catch {
+                print("Failed to publish reply: \(error)")
+                await MainActor.run {
+                    showingRecordingUI = false
+                }
+            }
+        }
+    }
+    
+    private func compressWaveform(_ waveform: [Double], targetSamples: Int) -> [Double] {
+        guard waveform.count > targetSamples else { return waveform }
+        
+        var compressed: [Double] = []
+        let bucketSize = Double(waveform.count) / Double(targetSamples)
+        
+        for i in 0..<targetSamples {
+            let startIndex = Int(Double(i) * bucketSize)
+            let endIndex = min(Int(Double(i + 1) * bucketSize), waveform.count)
+            
+            if startIndex < endIndex {
+                let bucketValues = waveform[startIndex..<endIndex]
+                let average = bucketValues.reduce(0.0, +) / Double(bucketValues.count)
+                compressed.append(average)
+            }
+        }
+        
+        return compressed
     }
 }

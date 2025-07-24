@@ -82,7 +82,7 @@ public actor SubscriptionSwapManager {
         await subscription.dataSource.updateFilter(bridgeFilter)
         
         // Wait a moment for bridge events
-        try? await Task.sleep(nanoseconds: 100_000_000) // 100ms
+        try? await Task.sleep(nanoseconds: 100 * TimeConstants.nanosecondsPerMillisecond) // 100ms
         
         // Update to full filter
         await subscription.dataSource.updateFilter(newFilter)

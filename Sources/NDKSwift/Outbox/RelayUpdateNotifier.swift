@@ -47,7 +47,7 @@ public actor RelayUpdateNotifier {
     
     /// Clean up subscriptions older than 24 hours
     private func cleanupOldSubscriptions() {
-        let cutoffDate = Date().addingTimeInterval(-86400) // 24 hours
+        let cutoffDate = Date().addingTimeInterval(-TimeConstants.day) // 24 hours
         let oldSubscriptions = outboxSubscriptions.filter { $0.value.createdAt < cutoffDate }
         
         if !oldSubscriptions.isEmpty {

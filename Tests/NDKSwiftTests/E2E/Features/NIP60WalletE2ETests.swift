@@ -78,7 +78,7 @@ final class NIP60WalletE2ETests: XCTestCase {
         print("✅ Created nutsack wallet with testnut mint")
         
         // Wait for wallet setup to propagate
-        try await Task.sleep(nanoseconds: 2_000_000_000) // 2 seconds
+        try await Task.sleep(nanoseconds: 2 * TimeConstants.nanosecondsPerSecond) // 2 seconds
         
         // 3. Create a deposit on testnut.cashu.space for a random amount
         let randomAmount = Int64.random(in: 21...100) // Random sats between 21-100
@@ -120,7 +120,7 @@ final class NIP60WalletE2ETests: XCTestCase {
                         received7375Event = event
                         
                         // Give time for event to propagate to other relays
-                        try await Task.sleep(nanoseconds: 3_000_000_000) // 3 seconds
+                        try await Task.sleep(nanoseconds: 3 * TimeConstants.nanosecondsPerSecond) // 3 seconds
                         eventExpectation.fulfill()
                     }
                 }

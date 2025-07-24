@@ -72,7 +72,7 @@ struct DynamicRelayUpdatesExample {
         
         // Periodically show stats
         for i in 1...6 {
-            try? await Task.sleep(nanoseconds: 5_000_000_000) // 5 seconds
+            try? await Task.sleep(nanoseconds: 5 * TimeConstants.nanosecondsPerSecond) // 5 seconds
             
             let stats = await ndk.outbox.getRelayUpdateStats()
             let elapsed = Int(Date().timeIntervalSince(startTime))

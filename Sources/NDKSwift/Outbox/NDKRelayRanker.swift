@@ -98,8 +98,8 @@ actor NDKRelayRanker {
         let successRate = Double(score.successCount) / Double(total)
 
         // Factor in recency (decay older scores)
-        let ageInHours = Date().timeIntervalSince(score.lastUpdated) / 3600
-        let recencyFactor = max(0.5, 1.0 - (ageInHours / 168)) // Decay over a week
+        let ageInHours = Date().timeIntervalSince(score.lastUpdated) / TimeConstants.hour
+        let recencyFactor = max(0.5, 1.0 - (ageInHours / (TimeConstants.week / TimeConstants.hour))) // Decay over a week
 
         return successRate * recencyFactor
     }

@@ -31,7 +31,7 @@ struct DebugOutbox {
         
         // Use a timeout task to prevent hanging forever
         let timeoutTask = Task {
-            try? await Task.sleep(nanoseconds: 10_000_000_000) // 10 seconds
+            try? await Task.sleep(nanoseconds: 10 * TimeConstants.nanosecondsPerSecond) // 10 seconds
             print("🔍 Timeout reached - no events received in 10 seconds")
             exit(1)
         }

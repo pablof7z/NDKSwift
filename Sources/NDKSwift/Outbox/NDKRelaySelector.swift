@@ -279,7 +279,7 @@ actor NDKRelaySelector {
             
             // Cache the result
             blockedRelaysCache = blockedRelays
-            blockedRelaysCacheExpiry = Date().addingTimeInterval(300) // 5 minutes
+            blockedRelaysCacheExpiry = Date().addingTimeInterval(5 * TimeConstants.minute) // 5 minutes
             
             return blockedRelays
         }
