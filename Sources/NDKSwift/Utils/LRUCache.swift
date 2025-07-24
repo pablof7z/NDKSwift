@@ -32,7 +32,7 @@ actor LRUCache<Key: Hashable, Value> {
         // Check if expired
         if Date() > entry.expiresAt {
             cache.removeValue(forKey: key)
-            accessOrder.removeAll { $0 == key }
+            removeFromAccessOrder(key)
             misses += 1
             return nil
         }
@@ -42,7 +42,7 @@ actor LRUCache<Key: Hashable, Value> {
         cache[key] = entry
         
         // Move to end of access order
-        accessOrder.removeAll { $0 == key }
+        removeFromAccessOrder(key)
         accessOrder.append(key)
         
         hits += 1
@@ -62,7 +62,7 @@ actor LRUCache<Key: Hashable, Value> {
         if cache[key] != nil {
             cache[key] = entry
             // Move to end of access order
-            accessOrder.removeAll { $0 == key }
+            removeFromAccessOrder(key)
             accessOrder.append(key)
         } else {
             // New entry
@@ -79,7 +79,7 @@ actor LRUCache<Key: Hashable, Value> {
     /// Delete a value from the cache
     func delete(_ key: Key) {
         cache.removeValue(forKey: key)
-        accessOrder.removeAll { $0 == key }
+        removeFromAccessOrder(key)
     }
     
     /// Clear all values from the cache
@@ -112,11 +112,16 @@ actor LRUCache<Key: Hashable, Value> {
         
         for key in expiredKeys {
             cache.removeValue(forKey: key)
-            accessOrder.removeAll { $0 == key }
+            removeFromAccessOrder(key)
         }
     }
     
     // MARK: - Private
+    
+    /// Remove a key from the access order list
+    private func removeFromAccessOrder(_ key: Key) {
+        accessOrder.removeAll { $0 == key }
+    }
     
     private func evictOldest() {
         guard !accessOrder.isEmpty else { return }
