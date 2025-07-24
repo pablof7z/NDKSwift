@@ -245,27 +245,15 @@ enum HapticType {
     }
 }
 
-// MARK: - Common Utilities
-struct RelativeTimeFormatter {
-    static func relativeTime(from timestamp: Timestamp) -> String {
-        let date = Date(timeIntervalSince1970: TimeInterval(timestamp))
-        let formatter = RelativeDateTimeFormatter()
-        formatter.unitsStyle = .abbreviated
-        return formatter.localizedString(for: date, relativeTo: Date())
-    }
-    
-    static func relativeTime(from date: Date) -> String {
-        let formatter = RelativeDateTimeFormatter()
-        formatter.unitsStyle = .abbreviated
-        return formatter.localizedString(for: date, relativeTo: Date())
-    }
-    
-    static func shortRelativeTime(from timestamp: Timestamp) -> String {
-        let date = Date(timeIntervalSince1970: TimeInterval(timestamp))
-        let formatter = RelativeDateTimeFormatter()
-        formatter.unitsStyle = .short
-        return formatter.localizedString(for: date, relativeTo: Date())
-    }
+// MARK: - Time Constants for Convenience
+
+struct TimeConstants {
+    static let minute: TimeInterval = 60
+    static let hour: TimeInterval = 3600
+    static let day: TimeInterval = 86400
+    static let week: TimeInterval = 604800
+    static let month: TimeInterval = 2_629_746 // Average month
+    static let year: TimeInterval = 31_556_952 // Average year
 }
 
 // MARK: - Card Styles
@@ -763,22 +751,4 @@ struct ModernSectionHeader: View {
     }
 }
 
-// MARK: - Common Formatters
-
-struct PubkeyFormatter {
-    /// Format a pubkey to show first 8 characters with ellipsis
-    static func formatShort(_ pubkey: String) -> String {
-        String(pubkey.prefix(8)) + "..."
-    }
-    
-    /// Format a pubkey to show first 8 characters only
-    static func formatCompact(_ pubkey: String) -> String {
-        String(pubkey.prefix(8))
-    }
-    
-    /// Format a pubkey for avatar display (first character uppercase)
-    static func formatForAvatar(_ pubkey: String) -> String {
-        String(pubkey.prefix(1)).uppercased()
-    }
-}
 
