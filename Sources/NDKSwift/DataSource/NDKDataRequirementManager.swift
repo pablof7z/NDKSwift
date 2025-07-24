@@ -43,7 +43,7 @@ actor NDKDataRequirementManager {
         let requirementId = RequirementID()
         let correlationId = requirementId.uuidString.prefix(8)
         
-        NDKLogger.log(.debug, category: .subscription, "📥 [DataReqManager] registerRequirement - filter: \(filter), maxAge: \(maxAge), policy: \(cachePolicy)", correlationId: String(correlationId))
+        NDKLogger.log(.info, category: .subscription, "📥 [DataReqManager] registerRequirement - filter: \(filter), maxAge: \(maxAge), policy: \(cachePolicy), subscriptionId: \(subscriptionId ?? "auto")", correlationId: String(correlationId))
         
         // IMMEDIATELY register cache observer to deliver existing events
         // This happens before any delay, giving instant cache hits
@@ -157,7 +157,7 @@ actor NDKDataRequirementManager {
     }
     
     private func flushPendingRequirements(for signature: FilterSignature) async {
-        NDKLogger.log(.debug, category: .subscription, "🔄 [DataReqManager] flushPendingRequirements called for signature: \(signature)")
+        NDKLogger.log(.info, category: .subscription, "🔄 [DataReqManager] flushPendingRequirements called for signature: \(signature)")
         flushTasks.removeValue(forKey: signature)
         
         guard let pending = pendingRequirements.removeValue(forKey: signature),
@@ -234,29 +234,109 @@ actor NDKDataRequirementManager {
                 
                 // Use specified relays if provided, otherwise use outbox if enabled
                 var relays: Set<RelayURL>? = lifecycleGroup.first?.relays
-                if relays == nil && ndk.outboxEnabled {
-                    relays = await ndk.outbox.getRecommendedRelaysForSubscription(filters: [optimizedFilter])
+                
+                // Handle outbox model filter decomposition
+                if relays == nil && ndk.outboxEnabled && optimizedFilter.authors != nil {
+                    NDKLogger.log(.info, category: .subscription, "🎯 [DataReqManager] Using outbox strategy for filter")
+                    let outboxStrategy = await ndk.outbox.getOutboxStrategy(for: optimizedFilter)
                     
-                    // Add and connect to any new relays
-                    if let recommendedRelays = relays, !recommendedRelays.isEmpty {
-                        for relayUrl in recommendedRelays {
-                            // This will add the relay if not already in the pool
-                            // Mark as outbox relay since it came from author's relay list
-                            let authorPubkey = optimizedFilter.authors?.first ?? "unknown"
-                            await ndk.pool.addRelayAndConnect(url: relayUrl, origin: .outbox(authorPubkey: authorPubkey))
+                    // Start background discovery if needed
+                    if !outboxStrategy.authorsToDiscover.isEmpty {
+                        NDKLogger.log(.info, category: .subscription, "🔍 [DataReqManager] Triggering background relay discovery for \(outboxStrategy.authorsToDiscover.count) authors")
+                        Task {
+                            await ndk.outbox.discoverRelaysInBackground(for: outboxStrategy.authorsToDiscover)
                         }
                     }
                     
-                    // If outbox returned empty set, fall back to all connected relays
-                    if relays?.isEmpty ?? true {
-                        relays = nil // This will cause the subscription to use all connected relays
+                    // Register subscription for relay updates if there are unknown authors
+                    if !outboxStrategy.unknownAuthors.isEmpty && !closeOnEose {
+                        let mainSubscriptionId = lifecycleGroup.compactMap { $0.subscriptionId }.first ?? generateSubscriptionId(for: optimizedFilter)
+                        await ndk.outbox.registerSubscriptionForUpdates(
+                            id: mainSubscriptionId,
+                            filter: optimizedFilter,
+                            unknownAuthors: outboxStrategy.unknownAuthors
+                        )
+                        NDKLogger.log(.info, category: .subscription, "📡 [DataReqManager] Registered subscription '\(mainSubscriptionId)' for relay updates")
                     }
+                    
+                    // If we have relay-specific filters, create multiple subscriptions
+                    if outboxStrategy.hasRelaySpecificFilters {
+                        NDKLogger.log(.info, category: .subscription, "📊 [DataReqManager] Creating \(outboxStrategy.filtersByRelay.count) relay-specific subscriptions")
+                        
+                        // Track all requirements created for this group
+                        var createdRequirements: [DataRequirement] = []
+                        
+                        // Create a subscription for each relay with its specific filter
+                        for (relay, relaySpecificFilter) in outboxStrategy.filtersByRelay {
+                            let relayHost = URL(string: relay)?.host ?? relay
+                            let subscriptionId = lifecycleGroup.compactMap { $0.subscriptionId }.first.map { "\($0)_\(relayHost)" } ?? "\(generateSubscriptionId(for: relaySpecificFilter))_\(relayHost)"
+                            
+                            NDKLogger.log(.debug, category: .subscription, "📡 [DataReqManager] Creating subscription for \(relay): \(relaySpecificFilter.authors?.count ?? 0) authors")
+                            
+                            let internalSubscription = await ndk.internalSubscriptionManager.createSubscription(
+                                id: subscriptionId,
+                                filters: [relaySpecificFilter],
+                                relays: [relay]
+                            )
+                            
+                            // Create data requirement for this relay
+                            let requirement = DataRequirement(
+                                filter: relaySpecificFilter,
+                                subscriptionId: internalSubscription.id,
+                                internalSubscription: internalSubscription,
+                                cache: ndk.cache,
+                                ndk: ndk,
+                                closeOnEose: closeOnEose
+                            )
+                            
+                            createdRequirements.append(requirement)
+                        }
+                        
+                        // Add observers to all created requirements
+                        for p in lifecycleGroup {
+                            for requirement in createdRequirements {
+                                // Check if this requirement's filter includes any of the observer's authors
+                                if let reqAuthors = requirement.filter.authors,
+                                   let obsAuthors = p.filter.authors {
+                                    let hasOverlap = !Set(reqAuthors).isDisjoint(with: Set(obsAuthors))
+                                    if hasOverlap {
+                                        await requirement.addObserver(p.observer, id: p.id, individualFilter: p.filter)
+                                        if !closeOnEose {
+                                            activeRequirements[p.id] = requirement
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        
+                        // Cancel immediate cache observations since requirements handle their own
+                        for p in lifecycleGroup {
+                            await p.cacheObservationHandle?.cancel()
+                            immediateCacheHandles.removeValue(forKey: p.id)
+                        }
+                        
+                        // Start processing all requirements
+                        for requirement in createdRequirements {
+                            Task {
+                                await requirement.startProcessing()
+                            }
+                        }
+                        
+                        // Record fetch time
+                        await ndk.cache.recordFetchTime(for: aggregatedFilter, timestamp: Date())
+                        
+                        // Skip the normal single subscription creation
+                        continue
+                    }
+                    
+                    // If no relay-specific filters, fall back to using all connected relays
+                    NDKLogger.log(.debug, category: .subscription, "📡 [DataReqManager] No relay-specific filters, using all connected relays")
+                    relays = nil
                 }
                 
-                // Create subscription using internal manager
-                // Use custom subscription ID if provided, otherwise generate one
+                // Create single subscription for non-outbox or non-decomposed cases
                 let subscriptionId = lifecycleGroup.compactMap { $0.subscriptionId }.first ?? generateSubscriptionId(for: optimizedFilter)
-                NDKLogger.log(.debug, category: .subscription, "📡 [DataReqManager] Creating internal subscription - id: \(subscriptionId), filter: \(optimizedFilter), relays: \(relays?.joined(separator: ", ") ?? "all")")
+                NDKLogger.log(.info, category: .subscription, "📡 [DataReqManager] Creating internal subscription - id: \(subscriptionId), filter: \(optimizedFilter), relays: \(relays?.joined(separator: ", ") ?? "all")")
                 let internalSubscription = await ndk.internalSubscriptionManager.createSubscription(
                     id: subscriptionId,
                     filters: [optimizedFilter],
@@ -739,9 +819,8 @@ class DataRequirement {
             return
         }
         
-        // Start the subscription first! This sends the REQ
-        NDKLogger.log(.debug, category: .subscription, "🚀 [DataRequirement] Starting internal subscription...")
-        await internalSubscription.start()
+        // The subscription is already started by InternalSubscriptionManager.createSubscription()
+        NDKLogger.log(.debug, category: .subscription, "📋 [DataRequirement] Processing events from internal subscription...")
         
         // Track received event IDs if this filter is for specific IDs
         let requestedIds = filter.ids

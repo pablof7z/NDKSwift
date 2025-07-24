@@ -236,6 +236,14 @@ public actor NDKPool {
         }
     }
     
+    /// Get connected relay URLs
+    public var connectedRelayURLs: Set<RelayURL> {
+        get async {
+            let connected = await connectedRelays()
+            return Set(connected.map { $0.url })
+        }
+    }
+    
     /// Get explicit relays (added by developer)
     public func explicitRelays() async -> [NDKRelay] {
         relayMap.values.filter { relay in
