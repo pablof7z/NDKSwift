@@ -2,7 +2,7 @@ import Foundation
 import Combine
 
 /// Log prefix constant for bunker signer related logging
-private let logPrefix = "\(logPrefix)"
+private let logPrefix = "[BunkerSigner]"
 
 /// Parser for NIP-46 bunker:// URLs
 /// Extracts connection parameters from bunker URLs for remote signing
@@ -526,7 +526,7 @@ public actor NDKBunkerSigner: NDKSigner, Sendable {
         guard let response = response,
               response.error == nil
         else {
-            throw NDKError.cryptoOperation("get public key", nip: "NIP-46", error: NSError(domain: "BunkerError", code: -1, userInfo: [NSLocalizedDescriptionKey: response?.error ?? "Failed to get public key"]))
+            throw NDKError.cryptoOperation("get public key", nip: "NIP-46", error: NSError(domain: "BunkerError", code: -1, userInfo: [NSLocalizedDescriptionKey: response?.error ?? ErrorMessageConstants.failedTo("get public key")]))
         }
 
         return response.result
@@ -554,12 +554,12 @@ public actor NDKBunkerSigner: NDKSigner, Sendable {
 
     public func encrypt(recipient: NDKUser, value: String, scheme: NDKEncryptionScheme) async throws -> String {
         let method = scheme == .nip04 ? "nip04_encrypt" : "nip44_encrypt"
-        return try await performCrypto(method: method, params: [recipient.pubkey, value], errorMessage: "Failed to encrypt")
+        return try await performCrypto(method: method, params: [recipient.pubkey, value], errorMessage: ErrorMessageConstants.Messages.encryptionFailed)
     }
 
     public func decrypt(sender: NDKUser, value: String, scheme: NDKEncryptionScheme) async throws -> String {
         let method = scheme == .nip04 ? "nip04_decrypt" : "nip44_decrypt"
-        return try await performCrypto(method: method, params: [sender.pubkey, value], errorMessage: "Failed to decrypt")
+        return try await performCrypto(method: method, params: [sender.pubkey, value], errorMessage: ErrorMessageConstants.Messages.decryptionFailed)
     }
 
     public func user() async throws -> NDKUser {
