@@ -249,40 +249,6 @@ struct TimeConstants {
     static let year: TimeInterval = 31_556_952 // Average year
 }
 
-// MARK: - Card Styles
-struct CardStyle {
-    enum Variant {
-        case standard
-        case glass
-        case elevated
-        case compact
-        
-        var cornerRadius: CGFloat {
-            switch self {
-            case .standard, .elevated: return DesignSystem.CornerRadius.large
-            case .glass: return DesignSystem.CornerRadius.medium
-            case .compact: return DesignSystem.CornerRadius.medium
-            }
-        }
-        
-        var padding: CGFloat {
-            switch self {
-            case .standard, .elevated, .glass: return DesignSystem.Spacing.cardPadding
-            case .compact: return DesignSystem.Spacing.base
-            }
-        }
-        
-        var shadow: (color: Color, radius: CGFloat, x: CGFloat, y: CGFloat) {
-            switch self {
-            case .standard: return DesignSystem.Shadow.small
-            case .glass: return (Color.black.opacity(0.1), 8, 0, 4)
-            case .elevated: return DesignSystem.Shadow.medium
-            case .compact: return DesignSystem.Shadow.subtle
-            }
-        }
-    }
-}
-
 // MARK: - View Extensions
 extension View {
     func fadeSlide(isVisible: Bool, delay: Double = 0) -> some View {
@@ -637,21 +603,7 @@ extension View {
         self.modifier(LazyRenderModifier(threshold: threshold))
     }
     
-    func modernCard(noPadding: Bool = false, variant: CardStyle.Variant = .standard) -> some View {
-        self.padding(noPadding ? 0 : variant.padding)
-            .background(
-                RoundedRectangle(cornerRadius: variant.cornerRadius, style: .continuous)
-                    .fill(DesignSystem.Colors.surface)
-                    .shadow(
-                        color: variant.shadow.color,
-                        radius: variant.shadow.radius,
-                        x: variant.shadow.x,
-                        y: variant.shadow.y
-                    )
-            )
-    }
-    
-    // modernListItem and modernPlaceholder are already defined in ModernViewModifiers.swift
+    // modernCard, modernListItem and modernPlaceholder are defined in ModernViewModifiers.swift
 }
 
 // MARK: - Additional View Modifiers for Highlighter
