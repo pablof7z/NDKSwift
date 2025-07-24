@@ -1,27 +1,7 @@
 import SwiftUI
 
-// MARK: - Theme Colors
+// MARK: - Color Hex Extension
 extension Color {
-    // Primary Colors
-    static let highlighterPurple = Color(hex: "6A1B9A")
-    static let highlighterOrange = Color(hex: "FF9500")
-    
-    // Background Colors
-    static let highlighterBackground = Color(hex: "F5F5F5")
-    static let highlighterCardBackground = Color.white
-    static let highlighterDarkBackground = Color(hex: "1C1C1E")
-    static let highlighterDarkCard = Color(hex: "2C2C2E")
-    
-    // Text Colors
-    static let highlighterText = Color.black
-    static let highlighterSecondaryText = Color.gray
-    static let highlighterDarkText = Color.white
-    
-    // Accent Colors
-    static let highlighterSuccess = Color.green
-    static let highlighterWarning = Color.orange
-    static let highlighterError = Color.red
-    
     init(hex: String) {
         let hex = hex.trimmingCharacters(in: CharacterSet.alphanumerics.inverted)
         var int: UInt64 = 0
@@ -46,6 +26,30 @@ extension Color {
             opacity: Double(a) / 255
         )
     }
+}
+
+// MARK: - Theme Colors
+extension Color {
+    // Primary Colors
+    static let highlighterPurple = Color(hex: "6A1B9A")
+    static let highlighterOrange = Color(hex: "FF9500")
+    
+    // Background Colors
+    static let highlighterBackground = Color(hex: "F5F5F5")
+    static let highlighterCardBackground = Color.white
+    static let highlighterDarkBackground = Color(hex: "1C1C1E")
+    static let highlighterDarkCard = Color(hex: "2C2C2E")
+    
+    // Text Colors
+    static let highlighterText = Color.black
+    static let highlighterSecondaryText = Color.gray
+    static let highlighterDarkText = Color.white
+    
+    // Accent Colors
+    static let highlighterSuccess = Color.green
+    static let highlighterWarning = Color.orange
+    static let highlighterError = Color.red
+    
 }
 
 // MARK: - View Modifiers

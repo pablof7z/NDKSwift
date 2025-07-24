@@ -47,9 +47,9 @@ struct ZapButton: View {
         
         var color: Color {
             switch self {
-            case .idle: return .highlighterSecondaryText
-            case .zapping: return .highlighterPurple
-            case .zapped: return .highlighterOrange
+            case .idle: return DesignSystem.Colors.textSecondary
+            case .zapping: return DesignSystem.Colors.primaryDark
+            case .zapped: return DesignSystem.Colors.primary
             case .failed: return .red
             }
         }
@@ -138,7 +138,7 @@ struct ZapAmountSheet: View {
                 // Lightning bolt animation
                 Image(systemName: "bolt.fill")
                     .font(.system(size: 60))
-                    .foregroundColor(.highlighterOrange)
+                    .foregroundColor(DesignSystem.Colors.primary)
                     .scaleEffect(1.1)
                     .animation(
                         Animation.easeInOut(duration: 1.5)
@@ -148,7 +148,7 @@ struct ZapAmountSheet: View {
                     .padding(.top)
                 
                 Text("Choose Amount")
-                    .font(.highlighterHeadline)
+                    .font(DesignSystem.Typography.headline)
                 
                 // Preset amounts grid
                 LazyVGrid(columns: [GridItem(.adaptive(minimum: 80))], spacing: 16) {
@@ -159,14 +159,14 @@ struct ZapAmountSheet: View {
                             customAmount = ""
                         }) {
                             Text("\(amount)")
-                                .font(.highlighterBody)
+                                .font(DesignSystem.Typography.body)
                                 .fontWeight(.medium)
                                 .frame(width: 80, height: 50)
                                 .background(
                                     RoundedRectangle(cornerRadius: 12)
-                                        .fill(zapAmount == amount && !useCustomAmount ? Color.highlighterPurple : Color.highlighterCardBackground)
+                                        .fill(zapAmount == amount && !useCustomAmount ? DesignSystem.Colors.primaryDark : DesignSystem.Colors.surface)
                                 )
-                                .foregroundColor(zapAmount == amount && !useCustomAmount ? .white : .highlighterText)
+                                .foregroundColor(zapAmount == amount && !useCustomAmount ? .white : DesignSystem.Colors.text)
                         }
                     }
                 }
@@ -185,8 +185,8 @@ struct ZapAmountSheet: View {
                         }
                     
                     Text("sats")
-                        .font(.highlighterBody)
-                        .foregroundColor(.highlighterSecondaryText)
+                        .font(DesignSystem.Typography.body)
+                        .foregroundColor(DesignSystem.Colors.textSecondary)
                 }
                 .padding(.horizontal)
                 
@@ -206,7 +206,7 @@ struct ZapAmountSheet: View {
                     .padding()
                     .background(
                         LinearGradient(
-                            colors: [.highlighterOrange, .highlighterPurple],
+                            colors: [DesignSystem.Colors.primary, DesignSystem.Colors.primaryDark],
                             startPoint: .leading,
                             endPoint: .trailing
                         )

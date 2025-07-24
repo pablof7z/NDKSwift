@@ -9,6 +9,7 @@ struct AudioEvent: Identifiable {
     let createdAt: Date
     let isReply: Bool
     let replyTo: String?
+    let replyToPubkey: String?
     let webOfTrustScore: Double
     let waveform: [Double]?
     let duration: TimeInterval?
@@ -37,6 +38,7 @@ struct AudioEvent: Identifiable {
         
         let isReply = event.kind == 1244
         let replyTo = isReply ? extractReplyTo(from: event) : nil
+        let replyToPubkey = isReply ? extractReplyToPubkey(from: event) : nil
         
         // Parse imeta tag for waveform and duration
         let (waveform, duration) = extractMetadata(from: event, audioURL: audioURL)
@@ -49,6 +51,7 @@ struct AudioEvent: Identifiable {
             createdAt: Date(timeIntervalSince1970: TimeInterval(event.createdAt)),
             isReply: isReply,
             replyTo: replyTo,
+            replyToPubkey: replyToPubkey,
             webOfTrustScore: webOfTrustScore,
             waveform: waveform,
             duration: duration
@@ -68,6 +71,16 @@ struct AudioEvent: Identifiable {
         // Look for 'e' tag that marks the reply target
         for tag in event.tags {
             if tag.count >= 2 && tag[0] == "e" {
+                return tag[1]
+            }
+        }
+        return nil
+    }
+    
+    private static func extractReplyToPubkey(from event: NDKEvent) -> String? {
+        // Look for 'p' tag that indicates who we're replying to
+        for tag in event.tags {
+            if tag.count >= 2 && tag[0] == "p" {
                 return tag[1]
             }
         }

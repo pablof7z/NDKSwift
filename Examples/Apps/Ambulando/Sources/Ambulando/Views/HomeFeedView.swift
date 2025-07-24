@@ -86,7 +86,8 @@ struct HomeFeedView: View {
                     onPublish: publishRecording,
                     isPlaying: isPlaying,
                     playbackProgress: playbackProgress,
-                    playbackWaveformProgress: playbackWaveformProgress
+                    playbackWaveformProgress: playbackWaveformProgress,
+                    replyingTo: appState.replyingTo
                 )
                 .transition(.opacity.combined(with: .scale))
             }
@@ -133,6 +134,12 @@ struct HomeFeedView: View {
         .onChange(of: selectedRelay) { _, _ in
             // Restart streaming with new relay filter
             startStreamingAudioEvents()
+        }
+        .onChange(of: appState.replyingTo) { _, newValue in
+            // Start recording when reply context is set
+            if newValue != nil {
+                startRecording()
+            }
         }
         .onDisappear {
             dataSourceTask?.cancel()
@@ -328,6 +335,7 @@ struct HomeFeedView: View {
         stopPlaybackTracking()
         
         appState.isRecording = false
+        appState.replyingTo = nil  // Clear reply context
         showingRecordingUI = false
         recordingWaveform = []
         fullWaveform = []
@@ -522,10 +530,19 @@ struct HomeFeedView: View {
                 
                 // Publish audio event
                 _ = try await ndk.publish { builder in
-                    builder
-                        .kind(1222) // Audio event kind
+                    let eventBuilder = builder
+                        .kind(appState.replyingTo != nil ? 1244 : 1222) // Use 1244 for replies
                         .content(uploadedURL)
                         .tag(imetaComponents)
+                    
+                    // Add reply tags if replying
+                    if let replyingTo = appState.replyingTo {
+                        eventBuilder
+                            .tag(["e", replyingTo.id, "", "reply"]) // Reply to original event
+                            .tag(["p", replyingTo.author.pubkey]) // Mention original author
+                    }
+                    
+                    return eventBuilder
                 }
                 
                 await MainActor.run {
@@ -537,6 +554,7 @@ struct HomeFeedView: View {
                     self.isShowingPreview = false
                     audioPlayer?.stop()
                     audioPlayer = nil
+                    appState.replyingTo = nil  // Clear reply context after publishing
                     
                     // Clean up playback state
                     self.stopPlaybackTracking()
@@ -803,6 +821,7 @@ struct RecordingOverlay: View {
     let isPlaying: Bool
     let playbackProgress: TimeInterval
     let playbackWaveformProgress: Int
+    let replyingTo: AudioEvent?
     
     @State private var rotationAngle: Double = 0
     
@@ -833,6 +852,38 @@ struct RecordingOverlay: View {
                 .ignoresSafeArea()
             
             VStack {
+                // Reply context at the top
+                if let replyingTo = replyingTo {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Replying to")
+                            .font(.system(size: 14))
+                            .foregroundColor(Color.white.opacity(0.6))
+                        
+                        HStack {
+                            NDKProfilePicture(pubkey: replyingTo.author.pubkey, size: 32)
+                            
+                            VStack(alignment: .leading) {
+                                Text(String(replyingTo.author.pubkey.prefix(8)))
+                                    .font(.system(size: 14, weight: .semibold))
+                                    .foregroundColor(.white)
+                                
+                                Text("Voice message")
+                                    .font(.system(size: 12))
+                                    .foregroundColor(Color.white.opacity(0.5))
+                            }
+                            
+                            Spacer()
+                        }
+                        .padding()
+                        .background(
+                            RoundedRectangle(cornerRadius: 12)
+                                .fill(Color.white.opacity(0.05))
+                        )
+                    }
+                    .padding(.horizontal)
+                    .padding(.top, 20)
+                }
+                
                 Spacer()
                 
                 // Waveform visualization

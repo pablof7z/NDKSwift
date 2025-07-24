@@ -10,6 +10,7 @@ struct Article: Identifiable, Equatable {
     let summary: String?
     let content: String
     let image: String?
+    let blurhash: String?
     let publishedAt: Date?
     let tags: [[String]]
     let event: NDKEvent
@@ -33,6 +34,9 @@ struct Article: Identifiable, Equatable {
         
         // Extract image from "image" tag
         self.image = event.tags.first(where: { $0.first == "image" })?[safe: 1]
+        
+        // Extract blurhash from "blurhash" tag
+        self.blurhash = event.tags.first(where: { $0.first == "blurhash" })?[safe: 1]
         
         // Extract published_at from tag
         if let publishedAtString = event.tags.first(where: { $0.first == "published_at" })?[safe: 1],

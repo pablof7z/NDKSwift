@@ -9,12 +9,12 @@ struct AudioEventCard: View {
     @EnvironmentObject var nostrManager: NostrManager
     
     @State private var author: NDKUserProfile?
+    @State private var replyToProfile: NDKUserProfile?
     @State private var isPlaying = false
     @State private var playbackProgress: Double = 0
     @State private var duration: TimeInterval = 0
     @State private var audioPlayer: AVPlayer?
     @State private var timeObserver: Any?
-    @State private var showingReplyRecorder = false
     
     // Reaction states
     @State private var reactionsByEmoji: [String: [NDKEvent]] = [:]
@@ -70,8 +70,17 @@ struct AudioEventCard: View {
                     HStack(spacing: 4) {
                         Image(systemName: "arrowshape.turn.up.left.fill")
                             .font(.system(size: 10))
-                        Text("Reply")
-                            .font(.system(size: 12))
+                        
+                        if let replyToProfile = replyToProfile {
+                            Text("Replying to \(replyToProfile.displayName ?? replyToProfile.name ?? String(audioEvent.replyToPubkey?.prefix(8) ?? ""))")
+                                .font(.system(size: 12))
+                        } else if let replyToPubkey = audioEvent.replyToPubkey {
+                            Text("Replying to \(String(replyToPubkey.prefix(8)))...")
+                                .font(.system(size: 12))
+                        } else {
+                            Text("Reply")
+                                .font(.system(size: 12))
+                        }
                     }
                     .foregroundColor(Color.white.opacity(0.5))
                 }
@@ -122,7 +131,9 @@ struct AudioEventCard: View {
                     }
                     .frame(maxWidth: 200)
                     
-                    Button(action: { showingReplyRecorder = true }) {
+                    Button(action: { 
+                        appState.replyingTo = audioEvent
+                    }) {
                         Image(systemName: "bubble.left")
                             .font(.system(size: 16))
                             .foregroundColor(Color.white.opacity(0.5))
@@ -140,6 +151,9 @@ struct AudioEventCard: View {
         )
         .onAppear {
             loadAuthorProfile()
+            if audioEvent.isReply && audioEvent.replyToPubkey != nil {
+                loadReplyToProfile()
+            }
             setupAudioPlayer()
             loadReactions()
         }
@@ -150,9 +164,6 @@ struct AudioEventCard: View {
             if newId != audioEvent.id && isPlaying {
                 pausePlayback()
             }
-        }
-        .fullScreenCover(isPresented: $showingReplyRecorder) {
-            ReplyRecordingView(replyingTo: audioEvent)
         }
         .sheet(isPresented: $showingUserProfile) {
             NavigationView {
@@ -177,6 +188,20 @@ struct AudioEventCard: View {
             for await profile in await ndk.profileManager.observe(for: audioEvent.author.pubkey, maxAge: TimeConstants.hour) {
                 await MainActor.run {
                     self.author = profile
+                }
+                break // Just get the first result
+            }
+        }
+    }
+    
+    private func loadReplyToProfile() {
+        Task {
+            guard let ndk = nostrManager.ndk,
+                  let replyToPubkey = audioEvent.replyToPubkey else { return }
+            
+            for await profile in await ndk.profileManager.observe(for: replyToPubkey, maxAge: TimeConstants.hour) {
+                await MainActor.run {
+                    self.replyToProfile = profile
                 }
                 break // Just get the first result
             }
@@ -821,269 +846,5 @@ extension String {
             }
         }
         return false
-    }
-}
-
-// MARK: - Reply Recording View
-struct ReplyRecordingView: View {
-    let replyingTo: AudioEvent
-    @Environment(\.dismiss) private var dismiss
-    @EnvironmentObject var appState: AppState
-    @EnvironmentObject var nostrManager: NostrManager
-    
-    // Recording states
-    @State private var audioRecorder: AVAudioRecorder?
-    @State private var recordingTimer: Timer?
-    @State private var recordingDuration: TimeInterval = 0
-    @State private var isRecording = false
-    @State private var recordingWaveform: [CGFloat] = []
-    @State private var fullWaveform: [Double] = []
-    @State private var showingRecordingUI = false
-    
-    var body: some View {
-        ZStack {
-            Color.black.opacity(0.95)
-                .ignoresSafeArea()
-            
-            if !showingRecordingUI {
-                VStack(spacing: 30) {
-                    // Header
-                    HStack {
-                        Button("Cancel") {
-                            dismiss()
-                        }
-                        .foregroundColor(.white)
-                        
-                        Spacer()
-                        
-                        Text("Reply")
-                            .font(.system(size: 18, weight: .semibold))
-                            .foregroundColor(.white)
-                        
-                        Spacer()
-                        
-                        Button("Cancel") {
-                            dismiss()
-                        }
-                        .opacity(0)
-                    }
-                    .padding()
-                    
-                    // Original message preview
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text("Replying to")
-                            .font(.system(size: 14))
-                            .foregroundColor(Color.white.opacity(0.6))
-                        
-                        // Mini version of the original card
-                        HStack {
-                            NDKProfilePicture(pubkey: replyingTo.author.pubkey, size: 32)
-                            
-                            VStack(alignment: .leading) {
-                                Text(String(replyingTo.author.pubkey.prefix(8)))
-                                    .font(.system(size: 14, weight: .semibold))
-                                    .foregroundColor(.white)
-                                
-                                Text("Voice message")
-                                    .font(.system(size: 12))
-                                    .foregroundColor(Color.white.opacity(0.5))
-                            }
-                            
-                            Spacer()
-                        }
-                        .padding()
-                        .background(
-                            RoundedRectangle(cornerRadius: 12)
-                                .fill(Color.white.opacity(0.05))
-                        )
-                    }
-                    .padding(.horizontal)
-                    
-                    Spacer()
-                    
-                    // Record button
-                    RecordButton(
-                        isRecording: $isRecording,
-                        onStartRecording: startRecording,
-                        onStopRecording: stopRecording
-                    )
-                    
-                    Spacer()
-                }
-            } else {
-                // Recording UI overlay
-                RecordingOverlay(
-                    duration: recordingDuration,
-                    waveform: recordingWaveform,
-                    onCancel: cancelRecording,
-                    onComplete: completeRecording,
-                    isUploading: false,
-                    uploadedURL: nil,
-                    onPreview: {},
-                    onPublish: {},
-                    isPlaying: false,
-                    playbackProgress: 0,
-                    playbackWaveformProgress: 0
-                )
-            }
-        }
-    }
-    
-    private func startRecording() {
-        Task {
-            let granted = await AVAudioApplication.requestRecordPermission()
-            if granted {
-                await MainActor.run {
-                    setupRecording()
-                }
-            }
-        }
-    }
-    
-    private func setupRecording() {
-        let audioSession = AVAudioSession.sharedInstance()
-        
-        do {
-            try audioSession.setCategory(.playAndRecord, mode: .default, options: [.allowBluetooth, .defaultToSpeaker])
-            try audioSession.setActive(true)
-            
-            let documentsPath = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
-            let audioFilename = documentsPath.appendingPathComponent("reply_\(Date().timeIntervalSince1970).m4a")
-            
-            let settings = [
-                AVFormatIDKey: Int(kAudioFormatMPEG4AAC),
-                AVSampleRateKey: 44100,
-                AVNumberOfChannelsKey: 1,
-                AVEncoderAudioQualityKey: AVAudioQuality.high.rawValue
-            ]
-            
-            audioRecorder = try AVAudioRecorder(url: audioFilename, settings: settings)
-            audioRecorder?.isMeteringEnabled = true
-            audioRecorder?.record()
-            
-            isRecording = true
-            showingRecordingUI = true
-            recordingDuration = 0
-            fullWaveform = []
-            
-            recordingTimer = Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { _ in
-                updateRecording()
-            }
-            
-        } catch {
-            print("Failed to start recording: \(error)")
-        }
-    }
-    
-    private func updateRecording() {
-        guard let recorder = audioRecorder else { return }
-        
-        recorder.updateMeters()
-        
-        recordingDuration += 0.1
-        
-        // Use peak power for more responsive visualization
-        let peakPower = recorder.peakPower(forChannel: 0)
-        let clampedPower = max(-50, peakPower) // Clamp to -50 dB minimum
-        let normalizedValue = pow(10, clampedPower / 20)
-        
-        recordingWaveform.append(CGFloat(normalizedValue))
-        fullWaveform.append(Double(normalizedValue))
-        
-        if recordingWaveform.count > 50 {
-            recordingWaveform.removeFirst()
-        }
-        
-        if recordingDuration >= 60 {
-            stopRecording()
-        }
-    }
-    
-    private func stopRecording() {
-        recordingTimer?.invalidate()
-        recordingTimer = nil
-        
-        audioRecorder?.stop()
-        isRecording = false
-    }
-    
-    private func cancelRecording() {
-        recordingTimer?.invalidate()
-        recordingTimer = nil
-        
-        audioRecorder?.stop()
-        audioRecorder?.deleteRecording()
-        audioRecorder = nil
-        
-        isRecording = false
-        showingRecordingUI = false
-        recordingWaveform = []
-        fullWaveform = []
-    }
-    
-    private func completeRecording() {
-        guard let recorder = audioRecorder,
-              let ndk = nostrManager.ndk else { return }
-        
-        let _ = recorder.url
-        let finalDuration = recordingDuration
-        
-        let compressedWaveform = compressWaveform(fullWaveform, targetSamples: 50)
-        
-        Task {
-            do {
-                let uploadedURL = "https://example.com/audio/reply_\(Date().timeIntervalSince1970).webm"
-                
-                var imetaComponents = ["imeta"]
-                imetaComponents.append("url \(uploadedURL)")
-                imetaComponents.append("m audio/webm")
-                imetaComponents.append("duration \(Int(finalDuration))")
-                
-                let waveformString = compressedWaveform
-                    .map { String(format: "%.2f", $0) }
-                    .joined(separator: " ")
-                imetaComponents.append("waveform \(waveformString)")
-                
-                // Publish reply audio event
-                _ = try await ndk.publish { builder in
-                    builder
-                        .kind(1222) // Audio event kind
-                        .content(uploadedURL)
-                        .tag(imetaComponents)
-                        .tag(["e", replyingTo.id, "", "reply"]) // Reply to original event
-                        .tag(["p", replyingTo.author.pubkey]) // Mention original author
-                }
-                
-                await MainActor.run {
-                    dismiss()
-                }
-                
-            } catch {
-                print("Failed to publish reply: \(error)")
-                await MainActor.run {
-                    showingRecordingUI = false
-                }
-            }
-        }
-    }
-    
-    private func compressWaveform(_ waveform: [Double], targetSamples: Int) -> [Double] {
-        guard waveform.count > targetSamples else { return waveform }
-        
-        var compressed: [Double] = []
-        let bucketSize = Double(waveform.count) / Double(targetSamples)
-        
-        for i in 0..<targetSamples {
-            let startIndex = Int(Double(i) * bucketSize)
-            let endIndex = min(Int(Double(i + 1) * bucketSize), waveform.count)
-            
-            if startIndex < endIndex {
-                let bucketValues = waveform[startIndex..<endIndex]
-                let average = bucketValues.reduce(0.0, +) / Double(bucketValues.count)
-                compressed.append(average)
-            }
-        }
-        
-        return compressed
     }
 }

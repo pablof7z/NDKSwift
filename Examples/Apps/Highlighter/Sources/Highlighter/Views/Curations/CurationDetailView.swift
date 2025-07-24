@@ -10,6 +10,8 @@ struct CurationDetailView: View {
     @State private var showAddArticle = false
     @State private var curator: NDKUserProfile?
     @State private var currentUserPubkey: String?
+    @State private var loadedArticles: [Article] = []
+    @State private var isLoadingArticles = false
     
     var body: some View {
         NavigationStack {
@@ -138,12 +140,25 @@ struct CurationDetailView: View {
                             .font(.highlighterHeadline)
                             .padding(.horizontal)
                         
-                        if curation.articles.isEmpty {
+                        if isLoadingArticles {
+                            ProgressView()
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 40)
+                        } else if loadedArticles.isEmpty && curation.articles.isEmpty {
                             EmptyArticlesView()
                                 .padding(.horizontal)
                         } else {
-                            ForEach(curation.articles, id: \.url) { article in
-                                ArticleCard(article: article)
+                            // Show loaded articles
+                            ForEach(loadedArticles) { article in
+                                LoadedArticleCard(article: article)
+                                    .padding(.horizontal)
+                            }
+                            
+                            // Show unresolved references (URLs only)
+                            ForEach(curation.articles.filter { ref in 
+                                ref.url != nil && !loadedArticles.contains { $0.event.id == ref.eventId }
+                            }, id: \.url) { reference in
+                                ArticleCard(article: reference)
                                     .padding(.horizontal)
                             }
                         }
@@ -164,6 +179,7 @@ struct CurationDetailView: View {
         }
         .task {
             await loadCurator()
+            await loadArticles()
             
             // Load current user pubkey
             if let signer = appState.activeSigner {
@@ -184,6 +200,83 @@ struct CurationDetailView: View {
                 self.curator = profile
             }
             break
+        }
+    }
+    
+    private func loadArticles() async {
+        guard let ndk = appState.ndk else { return }
+        
+        await MainActor.run {
+            isLoadingArticles = true
+        }
+        
+        // Collect event IDs and addresses to fetch
+        var eventIds: [String] = []
+        var eventAddresses: [(kind: Int, pubkey: String, identifier: String)] = []
+        
+        for reference in curation.articles {
+            if let eventId = reference.eventId {
+                eventIds.append(eventId)
+            } else if let address = reference.eventAddress {
+                // Parse NIP-33 address format: <kind>:<pubkey>:<d-tag>
+                let parts = address.split(separator: ":")
+                if parts.count == 3,
+                   let kind = Int(parts[0]) {
+                    eventAddresses.append((
+                        kind: kind,
+                        pubkey: String(parts[1]),
+                        identifier: String(parts[2])
+                    ))
+                }
+            }
+        }
+        
+        var articles: [Article] = []
+        
+        // Fetch articles by event ID
+        if !eventIds.isEmpty {
+            let filter = NDKFilter(ids: eventIds)
+            let articleSource = ndk.observe(
+                filter: filter,
+                maxAge: 300,
+                cachePolicy: .cacheWithNetwork
+            )
+            
+            for await event in articleSource.events {
+                if event.kind == 30023,
+                   let article = try? Article(from: event) {
+                    articles.append(article)
+                }
+            }
+        }
+        
+        // Fetch articles by address (NIP-33 parameterized replaceable events)
+        for address in eventAddresses {
+            let filter = NDKFilter(
+                kinds: [address.kind],
+                authors: [address.pubkey]
+            )
+            
+            let articleSource = ndk.observe(
+                filter: filter,
+                maxAge: 300,
+                cachePolicy: .cacheWithNetwork
+            )
+            
+            for await event in articleSource.events {
+                // Check if this event has the matching d-tag
+                if let dTag = event.tags.first(where: { $0.first == "d" })?[safe: 1],
+                   dTag == address.identifier,
+                   event.kind == 30023,
+                   let article = try? Article(from: event) {
+                    articles.append(article)
+                }
+            }
+        }
+        
+        await MainActor.run {
+            self.loadedArticles = articles.sorted { $0.createdAt > $1.createdAt }
+            self.isLoadingArticles = false
         }
     }
     
@@ -271,6 +364,104 @@ struct EmptyArticlesView: View {
         .padding(.vertical, 40)
         .background(Color.highlighterCardBackground.opacity(0.5))
         .cornerRadius(12)
+    }
+}
+
+struct LoadedArticleCard: View {
+    let article: Article
+    @State private var showArticleView = false
+    @State private var author: NDKUserProfile?
+    @EnvironmentObject var appState: AppState
+    
+    var body: some View {
+        Button(action: { showArticleView = true }) {
+            VStack(alignment: .leading, spacing: 12) {
+                HStack(alignment: .top, spacing: 12) {
+                    // Article image thumbnail
+                    if let imageUrl = article.image, let url = URL(string: imageUrl) {
+                        AsyncImage(url: url) { image in
+                            image
+                                .resizable()
+                                .aspectRatio(contentMode: .fill)
+                        } placeholder: {
+                            Rectangle()
+                                .fill(Color.highlighterCardBackground)
+                        }
+                        .frame(width: 80, height: 80)
+                        .cornerRadius(8)
+                        .clipped()
+                    }
+                    
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text(article.title)
+                            .font(.highlighterBody)
+                            .fontWeight(.medium)
+                            .foregroundColor(.highlighterText)
+                            .lineLimit(2)
+                            .multilineTextAlignment(.leading)
+                        
+                        if let summary = article.summary {
+                            Text(summary)
+                                .font(.highlighterCaption)
+                                .foregroundColor(.highlighterSecondaryText)
+                                .lineLimit(2)
+                        }
+                        
+                        HStack(spacing: 8) {
+                            if let author = author {
+                                Text(author.name ?? author.displayName ?? "Anonymous")
+                                    .font(.highlighterCaption)
+                                    .foregroundColor(.highlighterPurple)
+                            }
+                            
+                            Text("•")
+                                .foregroundColor(.highlighterSecondaryText)
+                            
+                            Text(relativeTime(from: article.createdAt))
+                                .font(.highlighterCaption)
+                                .foregroundColor(.highlighterSecondaryText)
+                            
+                            Text("•")
+                                .foregroundColor(.highlighterSecondaryText)
+                            
+                            Text("\(article.estimatedReadingTime) min read")
+                                .font(.highlighterCaption)
+                                .foregroundColor(.highlighterSecondaryText)
+                        }
+                    }
+                    
+                    Spacer()
+                }
+                .padding()
+                .background(Color.highlighterCardBackground)
+                .cornerRadius(12)
+            }
+        }
+        .buttonStyle(PlainButtonStyle())
+        .sheet(isPresented: $showArticleView) {
+            ArticleView(article: article)
+                .environmentObject(appState)
+        }
+        .task {
+            await loadAuthor()
+        }
+    }
+    
+    private func loadAuthor() async {
+        guard let ndk = appState.ndk else { return }
+        
+        for await profile in await ndk.profileManager.observe(for: article.author, maxAge: 3600) {
+            await MainActor.run {
+                self.author = profile
+            }
+            break
+        }
+    }
+    
+    private func relativeTime(from date: Date) -> String {
+        let formatter = RelativeDateTimeFormatter()
+        formatter.unitsStyle = .abbreviated
+        return formatter.localizedString(for: date, relativeTo: Date())
     }
 }
 
@@ -369,4 +560,11 @@ struct AddArticleSheet: View {
         )
     )
     .environmentObject(AppState())
+}
+
+// MARK: - Helper for safe array access
+extension Array {
+    subscript(safe index: Index) -> Element? {
+        return indices.contains(index) ? self[index] : nil
+    }
 }

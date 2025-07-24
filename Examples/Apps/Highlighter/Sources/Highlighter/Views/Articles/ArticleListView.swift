@@ -6,13 +6,12 @@ struct ArticleListView: View {
     @State private var articles: [Article] = []
     @State private var featuredArticles: [Article] = []
     @State private var selectedArticle: Article?
-    @State private var isLoading = false
     
     var body: some View {
         NavigationStack {
             ScrollView {
                 VStack(spacing: DesignSystem.Spacing.large) {
-                    if articles.isEmpty && !isLoading {
+                    if articles.isEmpty {
                         emptyState
                     } else {
                         // Featured Articles Section
@@ -72,12 +71,6 @@ struct ArticleListView: View {
             .sheet(item: $selectedArticle) { article in
                 ArticleView(article: article)
             }
-            .overlay {
-                if isLoading && articles.isEmpty {
-                    ProgressView()
-                        .scaleEffect(1.5)
-                }
-            }
         }
         .task {
             await loadArticles()
@@ -106,8 +99,6 @@ struct ArticleListView: View {
     private func loadArticles() async {
         guard let ndk = appState.ndk else { return }
         
-        isLoading = true
-        
         let articleSource = ndk.observe(
             filter: NDKFilter(kinds: [30023], limit: 50),
             maxAge: 300,
@@ -130,8 +121,6 @@ struct ArticleListView: View {
                 }
             }
         }
-        
-        isLoading = false
     }
 }
 

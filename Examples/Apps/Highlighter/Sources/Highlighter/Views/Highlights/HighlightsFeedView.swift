@@ -5,13 +5,16 @@ struct HighlightsFeedView: View {
     @EnvironmentObject var appState: AppState
     @State private var highlights: [HighlightEvent] = []
     @State private var currentIndex = 0
-    @State private var isLoading = true
     @State private var dragOffset: CGSize = .zero
     @State private var isDragging = false
     @Binding var tabBarVisible: Bool
     
     // Author cache
     @State private var authorProfiles: [String: NDKUserProfile] = [:]
+    
+    // Article cache for highlights from articles
+    @State private var articleCache: [String: Article] = [:]
+    @State private var articleImages: [String: UIImage] = []
     
     var body: some View {
         GeometryReader { geometry in
@@ -20,11 +23,7 @@ struct HighlightsFeedView: View {
                 Color.black
                     .ignoresSafeArea()
                 
-                if isLoading {
-                    ProgressView()
-                        .tint(.white)
-                        .scaleEffect(1.5)
-                } else if highlights.isEmpty {
+                if highlights.isEmpty {
                     VStack(spacing: 20) {
                         Image(systemName: "highlighter")
                             .font(.system(size: 60))
@@ -40,6 +39,8 @@ struct HighlightsFeedView: View {
                             HighlightFeedItemView(
                                 highlight: highlight,
                                 author: authorProfiles[highlight.author],
+                                article: articleForHighlight(highlight),
+                                articleImage: articleImageForHighlight(highlight),
                                 onAuthorTap: { showProfile(for: highlight.author) },
                                 onZap: { zapHighlight(highlight) },
                                 onShare: { shareHighlight(highlight) },
@@ -102,36 +103,85 @@ struct HighlightsFeedView: View {
             limit: 50
         )
         
-        do {
-            let events = await ndk.fetchEvents(filter: filter)
-            let highlightEvents = events.compactMap { event -> HighlightEvent? in
-                try? HighlightEvent(from: event)
-            }
-            
-            await MainActor.run {
-                self.highlights = highlightEvents.sorted { $0.createdAt > $1.createdAt }
-                self.isLoading = false
-            }
-            
-            // Load author profiles
-            await loadAuthorProfiles(for: highlightEvents)
-        } catch {
-            print("Failed to load highlights: \(error)")
-            await MainActor.run {
-                self.isLoading = false
+        // Stream highlights as they arrive
+        let dataSource = ndk.observe(
+            filter: filter,
+            maxAge: 300, // Use 5 minute cache
+            cachePolicy: .cacheWithNetwork
+        )
+        
+        // Process each highlight as it arrives
+        for await event in dataSource.events {
+            if let highlightEvent = try? HighlightEvent(from: event) {
+                await MainActor.run {
+                    // Add if not already present
+                    if !highlights.contains(where: { $0.id == highlightEvent.id }) {
+                        highlights.append(highlightEvent)
+                        highlights.sort { $0.createdAt > $1.createdAt }
+                    }
+                }
+                
+                // Load author profile for this highlight
+                Task {
+                    await loadAuthorProfile(for: highlightEvent.author)
+                }
+                
+                // Load referenced article if any
+                if highlightEvent.referencedEvent != nil {
+                    Task {
+                        await loadReferencedArticleForHighlight(highlightEvent)
+                    }
+                }
             }
         }
     }
     
-    private func loadAuthorProfiles(for highlights: [HighlightEvent]) async {
+    private func loadAuthorProfile(for author: String) async {
         guard let ndk = appState.ndk else { return }
         
-        let uniqueAuthors = Set(highlights.map { $0.author })
+        // Don't reload if we already have it
+        if authorProfiles[author] != nil { return }
         
-        for author in uniqueAuthors {
-            for await profile in await ndk.profileManager.observe(for: author, maxAge: 3600) {
+        for await profile in await ndk.profileManager.observe(for: author, maxAge: 3600) {
+            await MainActor.run {
+                self.authorProfiles[author] = profile
+            }
+            break
+        }
+    }
+    
+    private func loadReferencedArticleForHighlight(_ highlight: HighlightEvent) async {
+        guard let ndk = appState.ndk,
+              let ref = highlight.referencedEvent,
+              ref.contains(":") else { return }
+        
+        let parts = ref.split(separator: ":")
+        guard parts.count >= 3,
+              let kind = Int(parts[0]),
+              kind == 30023 else { return }
+        
+        let author = String(parts[1])
+        let identifier = parts[2...].joined(separator: ":")
+        
+        let filter = NDKFilter(
+            kinds: [30023],
+            authors: [author],
+            tags: ["d": [String(identifier)]],
+            limit: 1
+        )
+        
+        let dataSource = ndk.observe(filter: filter, maxAge: 3600)
+        
+        for await event in dataSource.events {
+            if let article = try? Article(from: event) {
                 await MainActor.run {
-                    self.authorProfiles[author] = profile
+                    self.articleCache[ref] = article
+                }
+                
+                // Load article image if available
+                if let imageUrl = article.image,
+                   let url = URL(string: imageUrl) {
+                    await loadArticleImage(url: url, for: ref)
                 }
                 break
             }
@@ -140,8 +190,13 @@ struct HighlightsFeedView: View {
     
     private func refreshFeed() {
         HapticType.light.trigger()
+        // Clear existing data to show fresh content
+        highlights.removeAll()
+        authorProfiles.removeAll()
+        articleCache.removeAll()
+        articleImages.removeAll()
+        
         Task {
-            isLoading = true
             await loadHighlights()
         }
     }
@@ -165,12 +220,83 @@ struct HighlightsFeedView: View {
         // TODO: Implement commenting
         HapticType.light.trigger()
     }
+    
+    private func loadReferencedArticles(for highlights: [HighlightEvent]) async {
+        guard let ndk = appState.ndk else { return }
+        
+        // Collect all referenced events that look like article references
+        let articleReferences = highlights.compactMap { highlight -> String? in
+            guard let ref = highlight.referencedEvent else { return nil }
+            // Check if it's an article reference (contains ":" for replaceable events)
+            return ref.contains(":") ? ref : nil
+        }
+        
+        guard !articleReferences.isEmpty else { return }
+        
+        // Parse article references and create filters
+        for reference in Set(articleReferences) {
+            let parts = reference.split(separator: ":")
+            guard parts.count >= 3,
+                  let kind = Int(parts[0]),
+                  kind == 30023 else { continue }
+            
+            let author = String(parts[1])
+            let identifier = parts[2...].joined(separator: ":")
+            
+            // Create filter for this specific article
+            let filter = NDKFilter(
+                kinds: [30023],
+                authors: [author],
+                tags: ["d": [String(identifier)]],
+                limit: 1
+            )
+            
+            // Fetch the article
+            if let event = await ndk.fetchEvent(filter: filter),
+               let article = try? Article(from: event) {
+                await MainActor.run {
+                    self.articleCache[reference] = article
+                }
+                
+                // Load article image if available
+                if let imageUrl = article.image,
+                   let url = URL(string: imageUrl) {
+                    await loadArticleImage(url: url, for: reference)
+                }
+            }
+        }
+    }
+    
+    private func loadArticleImage(url: URL, for reference: String) async {
+        do {
+            let (data, _) = try await URLSession.shared.data(from: url)
+            if let image = UIImage(data: data) {
+                await MainActor.run {
+                    self.articleImages[reference] = image
+                }
+            }
+        } catch {
+            print("Failed to load article image: \(error)")
+        }
+    }
+    
+    private func articleForHighlight(_ highlight: HighlightEvent) -> Article? {
+        guard let ref = highlight.referencedEvent else { return nil }
+        return articleCache[ref]
+    }
+    
+    private func articleImageForHighlight(_ highlight: HighlightEvent) -> UIImage? {
+        guard let ref = highlight.referencedEvent else { return nil }
+        return articleImages[ref]
+    }
 }
 
 // MARK: - Feed Item View
 struct HighlightFeedItemView: View {
     let highlight: HighlightEvent
     let author: NDKUserProfile?
+    let article: Article?
+    let articleImage: UIImage?
     let onAuthorTap: () -> Void
     let onZap: () -> Void
     let onShare: () -> Void
@@ -178,21 +304,89 @@ struct HighlightFeedItemView: View {
     
     @State private var isZapped = false
     @State private var showingActions = false
+    @State private var imageOpacity = 0.0
     
     var body: some View {
         GeometryReader { geometry in
             ZStack {
-                // Gradient background
-                LinearGradient(
-                    colors: [
-                        DesignSystem.Colors.primary.opacity(0.8),
-                        DesignSystem.Colors.primary.opacity(0.3),
-                        Color.black
-                    ],
-                    startPoint: .topLeading,
-                    endPoint: .bottomTrailing
-                )
-                .ignoresSafeArea()
+                // Background with article image or gradient
+                if let articleImage = articleImage {
+                    // Article image with overlay
+                    Image(uiImage: articleImage)
+                        .resizable()
+                        .aspectRatio(contentMode: .fill)
+                        .frame(width: geometry.size.width, height: geometry.size.height)
+                        .clipped()
+                        .opacity(imageOpacity)
+                        .onAppear {
+                            withAnimation(.easeIn(duration: 0.5)) {
+                                imageOpacity = 1.0
+                            }
+                        }
+                        .overlay(
+                            // Dark gradient overlay for readability
+                            LinearGradient(
+                                stops: [
+                                    .init(color: .black.opacity(0.3), location: 0),
+                                    .init(color: .black.opacity(0.5), location: 0.3),
+                                    .init(color: .black.opacity(0.8), location: 0.8),
+                                    .init(color: .black.opacity(0.9), location: 1)
+                                ],
+                                startPoint: .top,
+                                endPoint: .bottom
+                            )
+                        )
+                } else {
+                    // Sophisticated gradient background
+                    ZStack {
+                        // Base gradient
+                        LinearGradient(
+                            colors: [
+                                Color(hex: "1a1a2e"),
+                                Color(hex: "0f0f1e"),
+                                Color.black
+                            ],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                        
+                        // Accent gradient overlay
+                        RadialGradient(
+                            colors: [
+                                DesignSystem.Colors.primary.opacity(0.3),
+                                DesignSystem.Colors.primary.opacity(0.1),
+                                Color.clear
+                            ],
+                            center: .topTrailing,
+                            startRadius: 100,
+                            endRadius: 400
+                        )
+                        
+                        // Mesh gradient effect
+                        GeometryReader { _ in
+                            ForEach(0..<3) { index in
+                                Circle()
+                                    .fill(
+                                        RadialGradient(
+                                            colors: [
+                                                DesignSystem.Colors.primary.opacity(0.15),
+                                                Color.clear
+                                            ],
+                                            center: .center,
+                                            startRadius: 50,
+                                            endRadius: 200
+                                        )
+                                    )
+                                    .frame(width: 300, height: 300)
+                                    .offset(
+                                        x: CGFloat.random(in: -100...geometry.size.width),
+                                        y: CGFloat.random(in: -100...geometry.size.height)
+                                    )
+                                    .blur(radius: 40)
+                            }
+                        }
+                    }
+                }
                 
                 // Content
                 VStack {
@@ -200,22 +394,55 @@ struct HighlightFeedItemView: View {
                     
                     // Main content area
                     VStack(alignment: .leading, spacing: 20) {
+                        // Article context if available
+                        if let article = article {
+                            VStack(alignment: .leading, spacing: 8) {
+                                Text("From")
+                                    .font(DesignSystem.Typography.caption)
+                                    .foregroundColor(.white.opacity(0.7))
+                                
+                                Text(article.title)
+                                    .font(DesignSystem.Typography.bodyMedium)
+                                    .foregroundColor(.white)
+                                    .lineLimit(2)
+                                
+                                if let summary = article.summary {
+                                    Text(summary)
+                                        .font(DesignSystem.Typography.footnote)
+                                        .foregroundColor(.white.opacity(0.7))
+                                        .lineLimit(2)
+                                }
+                            }
+                            .padding(.horizontal, 24)
+                            .padding(.vertical, 16)
+                            .background(
+                                RoundedRectangle(cornerRadius: 16)
+                                    .fill(Color.white.opacity(0.1))
+                                    .overlay(
+                                        RoundedRectangle(cornerRadius: 16)
+                                            .strokeBorder(Color.white.opacity(0.2), lineWidth: 1)
+                                    )
+                            )
+                            .padding(.horizontal, 24)
+                        }
+                        
                         // Quote
                         VStack(alignment: .leading, spacing: 16) {
                             Image(systemName: "quote.opening")
-                                .font(.system(size: 30))
-                                .foregroundColor(.white.opacity(0.5))
+                                .font(.system(size: 24))
+                                .foregroundColor(.white.opacity(0.6))
                             
                             Text(highlight.content)
-                                .font(.system(size: 24, weight: .medium, design: .serif))
+                                .font(.system(size: article != nil ? 20 : 24, weight: .medium, design: .serif))
                                 .foregroundColor(.white)
-                                .lineSpacing(8)
+                                .lineSpacing(article != nil ? 6 : 8)
                                 .multilineTextAlignment(.leading)
                                 .fixedSize(horizontal: false, vertical: true)
+                                .shadow(color: .black.opacity(0.3), radius: 2, x: 0, y: 1)
                             
                             Image(systemName: "quote.closing")
-                                .font(.system(size: 30))
-                                .foregroundColor(.white.opacity(0.5))
+                                .font(.system(size: 24))
+                                .foregroundColor(.white.opacity(0.6))
                                 .frame(maxWidth: .infinity, alignment: .trailing)
                         }
                         .padding(.horizontal, 24)
@@ -225,17 +452,21 @@ struct HighlightFeedItemView: View {
                             Text(comment)
                                 .font(DesignSystem.Typography.body)
                                 .foregroundColor(.white.opacity(0.9))
-                                .padding(.horizontal, 24)
+                                .padding(.horizontal, 20)
                                 .padding(.vertical, 16)
                                 .background(
                                     RoundedRectangle(cornerRadius: 12)
-                                        .fill(Color.white.opacity(0.1))
+                                        .fill(Color.white.opacity(0.08))
+                                        .overlay(
+                                            RoundedRectangle(cornerRadius: 12)
+                                                .strokeBorder(Color.white.opacity(0.15), lineWidth: 1)
+                                        )
                                 )
                                 .padding(.horizontal, 24)
                         }
                         
                         // Context/Source
-                        if let url = highlight.url {
+                        if let url = highlight.url, article == nil {
                             HStack(spacing: 8) {
                                 Image(systemName: "link.circle.fill")
                                     .font(.system(size: 16))
@@ -249,20 +480,37 @@ struct HighlightFeedItemView: View {
                         // Author info
                         Button(action: onAuthorTap) {
                             HStack(spacing: 12) {
-                                Circle()
-                                    .fill(
-                                        LinearGradient(
-                                            colors: [.white.opacity(0.3), .white.opacity(0.1)],
-                                            startPoint: .topLeading,
-                                            endPoint: .bottomTrailing
+                                // Author avatar with gradient border
+                                ZStack {
+                                    Circle()
+                                        .strokeBorder(
+                                            LinearGradient(
+                                                colors: [
+                                                    DesignSystem.Colors.primary,
+                                                    DesignSystem.Colors.primary.opacity(0.5)
+                                                ],
+                                                startPoint: .topLeading,
+                                                endPoint: .bottomTrailing
+                                            ),
+                                            lineWidth: 2
                                         )
-                                    )
-                                    .frame(width: 44, height: 44)
-                                    .overlay(
-                                        Text((author?.name ?? author?.displayName ?? "U").prefix(1).uppercased())
-                                            .font(DesignSystem.Typography.headline)
-                                            .foregroundColor(.white)
-                                    )
+                                        .frame(width: 48, height: 48)
+                                    
+                                    Circle()
+                                        .fill(
+                                            LinearGradient(
+                                                colors: [.white.opacity(0.2), .white.opacity(0.1)],
+                                                startPoint: .topLeading,
+                                                endPoint: .bottomTrailing
+                                            )
+                                        )
+                                        .frame(width: 44, height: 44)
+                                        .overlay(
+                                            Text((author?.name ?? author?.displayName ?? "U").prefix(1).uppercased())
+                                                .font(DesignSystem.Typography.headline)
+                                                .foregroundColor(.white)
+                                        )
+                                }
                                 
                                 VStack(alignment: .leading, spacing: 2) {
                                     Text(author?.name ?? author?.displayName ?? String(highlight.author.prefix(8)))
@@ -281,11 +529,15 @@ struct HighlightFeedItemView: View {
                                     Text("Follow")
                                         .font(DesignSystem.Typography.footnoteMedium)
                                         .foregroundColor(.white)
-                                        .padding(.horizontal, 16)
-                                        .padding(.vertical, 8)
+                                        .padding(.horizontal, 20)
+                                        .padding(.vertical, 10)
                                         .background(
                                             Capsule()
-                                                .stroke(Color.white.opacity(0.5), lineWidth: 1)
+                                                .fill(Color.white.opacity(0.15))
+                                                .overlay(
+                                                    Capsule()
+                                                        .strokeBorder(Color.white.opacity(0.3), lineWidth: 1)
+                                                )
                                         )
                                 }
                             }
@@ -311,11 +563,17 @@ struct HighlightFeedItemView: View {
                             }
                         }) {
                             VStack(spacing: 4) {
-                                Image(systemName: isZapped ? "bolt.fill" : "bolt")
-                                    .font(.system(size: 28))
-                                    .foregroundColor(isZapped ? .orange : .white)
-                                    .scaleEffect(isZapped ? 1.2 : 1.0)
-                                    .animation(DesignSystem.Animation.springBouncy, value: isZapped)
+                                ZStack {
+                                    Circle()
+                                        .fill(Color.white.opacity(0.1))
+                                        .frame(width: 48, height: 48)
+                                    
+                                    Image(systemName: isZapped ? "bolt.fill" : "bolt")
+                                        .font(.system(size: 24))
+                                        .foregroundColor(isZapped ? .orange : .white)
+                                        .scaleEffect(isZapped ? 1.2 : 1.0)
+                                        .animation(DesignSystem.Animation.springBouncy, value: isZapped)
+                                }
                                 
                                 if isZapped {
                                     Text("21")
@@ -328,9 +586,15 @@ struct HighlightFeedItemView: View {
                         // Comment
                         Button(action: onComment) {
                             VStack(spacing: 4) {
-                                Image(systemName: "bubble.left")
-                                    .font(.system(size: 26))
-                                    .foregroundColor(.white)
+                                ZStack {
+                                    Circle()
+                                        .fill(Color.white.opacity(0.1))
+                                        .frame(width: 48, height: 48)
+                                    
+                                    Image(systemName: "bubble.left")
+                                        .font(.system(size: 22))
+                                        .foregroundColor(.white)
+                                }
                                 
                                 Text("5")
                                     .font(DesignSystem.Typography.caption)
@@ -340,16 +604,28 @@ struct HighlightFeedItemView: View {
                         
                         // Share
                         Button(action: onShare) {
-                            Image(systemName: "square.and.arrow.up")
-                                .font(.system(size: 26))
-                                .foregroundColor(.white)
+                            ZStack {
+                                Circle()
+                                    .fill(Color.white.opacity(0.1))
+                                    .frame(width: 48, height: 48)
+                                
+                                Image(systemName: "square.and.arrow.up")
+                                    .font(.system(size: 22))
+                                    .foregroundColor(.white)
+                            }
                         }
                         
                         // More options
                         Button(action: { showingActions = true }) {
-                            Image(systemName: "ellipsis")
-                                .font(.system(size: 26))
-                                .foregroundColor(.white)
+                            ZStack {
+                                Circle()
+                                    .fill(Color.white.opacity(0.1))
+                                    .frame(width: 48, height: 48)
+                                
+                                Image(systemName: "ellipsis")
+                                    .font(.system(size: 22))
+                                    .foregroundColor(.white)
+                            }
                         }
                     }
                     .padding(.trailing, 16)
@@ -366,6 +642,9 @@ struct HighlightFeedItemView: View {
                         UIPasteboard.general.string = highlight.content
                         HapticType.success.trigger()
                     },
+                    .default(Text("View Article")) {
+                        // Navigate to article
+                    },
                     .default(Text("Report")) {},
                     .cancel()
                 ]
@@ -377,6 +656,34 @@ struct HighlightFeedItemView: View {
         let formatter = RelativeDateTimeFormatter()
         formatter.unitsStyle = .abbreviated
         return formatter.localizedString(for: date, relativeTo: Date())
+    }
+}
+
+// MARK: - Color Extension
+extension Color {
+    init(hex: String) {
+        let hex = hex.trimmingCharacters(in: CharacterSet.alphanumerics.inverted)
+        var int: UInt64 = 0
+        Scanner(string: hex).scanHexInt64(&int)
+        let a, r, g, b: UInt64
+        switch hex.count {
+        case 3: // RGB (12-bit)
+            (a, r, g, b) = (255, (int >> 8) * 17, (int >> 4 & 0xF) * 17, (int & 0xF) * 17)
+        case 6: // RGB (24-bit)
+            (a, r, g, b) = (255, int >> 16, int >> 8 & 0xFF, int & 0xFF)
+        case 8: // ARGB (32-bit)
+            (a, r, g, b) = (int >> 24, int >> 16 & 0xFF, int >> 8 & 0xFF, int & 0xFF)
+        default:
+            (a, r, g, b) = (1, 1, 1, 0)
+        }
+
+        self.init(
+            .sRGB,
+            red: Double(r) / 255,
+            green: Double(g) / 255,
+            blue:  Double(b) / 255,
+            opacity: Double(a) / 255
+        )
     }
 }
 
