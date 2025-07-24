@@ -12,6 +12,9 @@ public enum NWCConnectionStatus: Equatable {
 public actor NDKNWCWallet: NDKPaymentProvider {
     // MARK: - Properties
     
+    /// Log prefix constant for NWC wallet related logging
+    private let logPrefix = "[NWC]"
+    
     public let id = "nwc_wallet"
     public let displayName = "Nostr Wallet Connect"
     
@@ -86,20 +89,20 @@ public actor NDKNWCWallet: NDKPaymentProvider {
         guard _status != .connected else { return }
         
         _status = .connecting
-        NDKLogger.log(.info, category: .wallet, "[NWC] Starting connection...")
+        NDKLogger.log(.info, category: .wallet, "\(logPrefix) Starting connection...")
         
         // Store the connection task
         connectionTask = Task {
             do {
                 // Fetch wallet info to verify connection
-                NDKLogger.log(.debug, category: .wallet, "[NWC] Fetching wallet info...")
+                NDKLogger.log(.debug, category: .wallet, "\(logPrefix) Fetching wallet info...")
                 let info = try await getInfo()
-                NDKLogger.log(.info, category: .wallet, "[NWC] Got wallet info: \(info.methods.count) methods")
+                NDKLogger.log(.info, category: .wallet, "\(logPrefix) Got wallet info: \(info.methods.count) methods")
                 _walletInfo = info
                 _status = .connected
                 connectionTask = nil
             } catch {
-                NDKLogger.log(.error, category: .wallet, "[NWC] Connection error: \(error)")
+                NDKLogger.log(.error, category: .wallet, "\(logPrefix) Connection error: \(error)")
                 _status = .error(error.localizedDescription)
                 connectionTask = nil
                 throw error
@@ -264,12 +267,12 @@ public actor NDKNWCWallet: NDKPaymentProvider {
         
         // Use the new method that subscribes before publishing
         let eventId = event.id
-        NDKLogger.log(.debug, category: .wallet, "[NWC] Executing get_balance request with ID: \(eventId)")
+        NDKLogger.log(.debug, category: .wallet, "\(logPrefix) Executing get_balance request with ID: \(eventId)")
         let response = try await responseHandler.executeRequestAndWaitForResponse(
             event: event,
             responseType: GetBalanceResponse.self
         )
-        NDKLogger.log(.debug, category: .wallet, "[NWC] Received balance response: \(response.balance) msat")
+        NDKLogger.log(.debug, category: .wallet, "\(logPrefix) Received balance response: \(response.balance) msat")
         
         // Update cache
         _cachedBalance = response.balance
@@ -357,13 +360,13 @@ public actor NDKNWCWallet: NDKPaymentProvider {
     }
     
     public func getInfo() async throws -> GetInfoResponse {
-        NDKLogger.log(.trace, category: .wallet, "[NWC] Building get_info request...")
+        NDKLogger.log(.trace, category: .wallet, "\(logPrefix) Building get_info request...")
         let event = try await requestBuilder.buildGetInfoRequest()
         let eventId = event.id
-        NDKLogger.log(.trace, category: .wallet, "[NWC] Request event ID: \(eventId)")
+        NDKLogger.log(.trace, category: .wallet, "\(logPrefix) Request event ID: \(eventId)")
         
         // Use the new method that subscribes before publishing
-        NDKLogger.log(.debug, category: .wallet, "[NWC] Executing get_info request...")
+        NDKLogger.log(.debug, category: .wallet, "\(logPrefix) Executing get_info request...")
         return try await responseHandler.executeRequestAndWaitForResponse(
             event: event,
             responseType: GetInfoResponse.self
