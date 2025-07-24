@@ -205,9 +205,22 @@ struct ArticleListCard: View {
     private func loadAuthor() async {
         guard let ndk = appState.ndk else { return }
         
-        if let profile = try? await ndk.fetchProfile(pubkey: article.author) {
-            await MainActor.run {
-                self.author = profile
+        // Load individual profile using declarative data source
+        let profileDataSource = ndk.observe(
+            filter: NDKFilter(
+                authors: [article.author],
+                kinds: [0]
+            ),
+            maxAge: 3600,
+            cachePolicy: .cacheWithNetwork
+        )
+        
+        for await event in profileDataSource.events {
+            if let fetchedProfile = JSONCoding.safeDecode(NDKUserProfile.self, from: event.content) {
+                await MainActor.run {
+                    self.author = fetchedProfile
+                }
+                break
             }
         }
     }

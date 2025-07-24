@@ -58,8 +58,8 @@ Task {
     }
 }
 
-// Or get current snapshot
-let currentNotes = await textNotesSource.currentValue()
+// Or collect all events (waits for EOSE)
+let currentNotes = await textNotesSource.collect(timeout: 10.0)
 
 // Use in SwiftUI views
 struct NotesView: View {
@@ -97,9 +97,9 @@ let profileSource = ndk.observe(
     }
 )
 
-// Get the profile
-if let profiles = await profileSource.currentValue(),
-   let profile = profiles.first {
+// Get the profile (waits for EOSE or timeout)
+let profiles = await profileSource.collect(timeout: 5.0)
+if let profile = profiles.first {
     print("Name: \(profile.name ?? "Unknown")")
 }
 
@@ -219,8 +219,8 @@ if let user = user {
         maxAge: 3600  // 1 hour cache
     )
     
-    if let events = await profileSource.currentValue(),
-       let profile = try? events.first?.decodeMetadata() {
+    let events = await profileSource.collect(timeout: 5.0)
+    if let profile = try? events.first?.decodeMetadata() {
         print("Name: \(profile.name ?? "Unknown")")
         print("About: \(profile.about ?? "")")
     }
@@ -230,7 +230,8 @@ if let user = user {
         filter: NDKFilter(kinds: [3], authors: [user.pubkey])
     )
     
-    if let contactEvent = await contactsSource.currentValue().first {
+    let contactEvents = await contactsSource.collect(timeout: 5.0)
+    if let contactEvent = contactEvents.first {
         let following = contactEvent.referencedPubkeys()
         print("Following \(following.count) users")
     }
@@ -302,8 +303,8 @@ let eventSource = ndk.observe(
     filter: NDKFilter(ids: ["eventId..."])
 )
 
-if let events = await eventSource.currentValue(),
-   let originalEvent = events.first {
+let events = await eventSource.collect(timeout: 5.0)
+if let originalEvent = events.first {
     // Create a reply using the builder
     let reply = try await NDKEventBuilder.reply(to: originalEvent, ndk: ndk)
         .content("Great post! 👍")
@@ -342,8 +343,8 @@ do {
         // Process events
     }
     
-    // Or for one-shot fetch
-    let events = await dataSource.currentValue()
+    // Or collect all events (waits for EOSE)
+    let events = await dataSource.collect(timeout: 10.0)
     // Process events
 } catch {
     print("Error: \(error)")

@@ -188,7 +188,7 @@ struct AuthenticationView: View {
             }
             .padding(32)
             .glassBackground()
-            .transition(AnyTransition.scale.combined(with: .opacity))
+            .transition(.scale.combined(with: .opacity))
         }
     }
     

@@ -163,7 +163,110 @@ NDKSwift provides a powerful, self-contained authentication system via `NDKAuthM
 
 4. **Biometric Security**: Always recommend `requiresBiometric: true` for new sessions to enhance security. The system handles all the complexity of biometric prompts and fallbacks.
 
+5. **Proper Logout Implementation**: The default `NDKAuthManager.logout()` only marks sessions as inactive in memory but does NOT persist these changes to the keychain. This causes old sessions to be restored on app restart. See section 2.1 for proper logout implementation.
+
 The `NutsackiOS` and `Socrates` example apps demonstrate these patterns in production-ready implementations.
+
+### 2.1. Logout Best Practices: Avoiding Session Persistence Issues
+
+**The Problem:**
+The default `NDKAuthManager.logout()` method has a critical limitation - it only marks sessions as inactive in memory but does NOT persist these changes to the keychain. This causes a frustrating user experience where:
+
+1. User A logs in → session saved with `isActive = true`
+2. User A logs out → session marked inactive **in memory only**
+3. User B logs in → new session created
+4. App restarts → restores sessions from keychain
+5. Finds User A's session still marked as active → restores it instead of User B
+
+**❌ WRONG: Incomplete logout that leaves sessions in keychain:**
+```swift
+// WRONG: This only clears memory state, not keychain
+func logout() {
+    ndkAuthManager.logout()  // Sessions remain in keychain!
+}
+
+// WRONG: This doesn't delete the keychain data
+func logout() {
+    Task {
+        await cache?.clear()  // Only clears cache
+    }
+    ndkAuthManager.logout()  // Sessions still in keychain!
+}
+```
+
+**✅ CORRECT: Complete logout that removes all session data:**
+```swift
+// RIGHT: Delete all sessions from keychain before logout
+func logout() {
+    Task {
+        // 1. Clear cache data (optional but recommended)
+        if let cache = cache {
+            try? await cache.clear()
+        }
+        
+        // 2. Delete ALL sessions from keychain - this is critical!
+        for session in ndkAuthManager.availableSessions {
+            try? await ndkAuthManager.deleteSession(session)
+        }
+    }
+    
+    // 3. Clear memory state
+    ndkAuthManager.logout()
+}
+```
+
+**Alternative: Selective session deletion:**
+```swift
+// Delete only the active session, keep others for quick switching
+func logoutCurrentUser() {
+    Task {
+        if let activeSession = ndkAuthManager.activeSession {
+            try? await ndkAuthManager.deleteSession(activeSession)
+        }
+    }
+    ndkAuthManager.logout()
+}
+
+// Or mark sessions as logged out without deletion
+func softLogout() {
+    Task {
+        // Update session metadata to mark as "logged out"
+        for session in ndkAuthManager.availableSessions {
+            var updatedSession = session
+            updatedSession.markAsInactive()
+            // This would need to be implemented in NDKAuthManager
+            // to persist the inactive state to keychain
+        }
+    }
+    ndkAuthManager.logout()
+}
+```
+
+**Testing Your Logout Implementation:**
+```swift
+// Test that logout properly clears sessions
+func testProperLogout() async {
+    // 1. Create and activate a session
+    let signer = try NDKPrivateKeySigner.generate()
+    let session = try await authManager.createSession(with: signer)
+    try await authManager.switchToSession(session)
+    
+    // 2. Perform logout
+    await performLogout()
+    
+    // 3. Verify no sessions remain
+    await authManager.restoreSessions()
+    XCTAssertTrue(authManager.availableSessions.isEmpty)
+    XCTAssertNil(authManager.activeSession)
+}
+```
+
+**Key Takeaways:**
+- Always delete sessions from keychain on logout
+- The Ambulando example app shows the correct pattern
+- Test your logout flow to ensure sessions don't persist
+- Consider whether you want complete deletion or selective removal
+- Cache clearing is optional but recommended for privacy
 
 ---
 
@@ -173,7 +276,7 @@ NDKSwift provides a modern declarative API for accessing Nostr data with automat
 
 **Key Concepts:**
 
-*   **`NDKDataSource`**: A declarative data source that provides both streaming (`events`) and snapshot (`currentValue()`) access
+*   **`NDKDataSource`**: A declarative data source that provides streaming (`events`) and collection (`collect()`) access
 *   **`maxAge`**: Controls cache freshness - how old cached data can be before fetching fresh
 *   **`CachePolicy`**: Determines how to balance cache vs network (`.cacheWithNetwork`, `.cacheOnly`, `.networkOnly`)
 *   **Automatic Lifecycle**: Data sources manage their subscriptions automatically - no manual closing needed
@@ -197,6 +300,29 @@ let autoSource = ndk.observe(
     maxAge: 0
 )
 ```
+
+**Waiting for EOSE (End of Stored Events):**
+
+When you need to collect all events before proceeding (rather than streaming them), use the `collect()` method:
+
+```swift
+// Collect all events until EOSE or timeout
+let dataSource = ndk.observe(
+    filter: NDKFilter(kinds: [1], limit: 100),
+    maxAge: 0
+)
+
+// Wait for all events (until EOSE or 10 second timeout)
+let allEvents = await dataSource.collect(timeout: 10.0)
+print("Collected \(allEvents.count) events")
+
+// You can also specify a limit
+let limitedEvents = await dataSource.collect(timeout: 10.0, limit: 50)
+```
+
+**When to use `collect()` vs streaming:**
+- Use `collect()` when you need all events before proceeding (e.g., calculating totals, initial data load)
+- Use `for await event in dataSource.events` when you want to process events as they arrive (real-time updates)
 
 **Best Practices:**
 
@@ -225,7 +351,8 @@ let autoSource = ndk.observe(
         maxAge: 3600  // 1 hour cache tolerance
     )
     
-    let profiles = await profileSource.currentValue()
+    // Wait for all events until EOSE or timeout
+    let profiles = await profileSource.collect(timeout: 10.0)
     if let profile = profiles.first {
         // Process profile
     }
@@ -240,7 +367,8 @@ let autoSource = ndk.observe(
         cachePolicy: .cacheOnly
     )
     
-    let offlineNotes = await cachedNotes.currentValue()
+    // Get all cached events immediately
+    let offlineNotes = await cachedNotes.collect(timeout: 0.1)
     ```
 
 4.  **SwiftUI Integration Pattern:**
@@ -1483,7 +1611,8 @@ func loadUserPostsFromFollows() async {
     )
     
     // Wait for first contact list result ONLY
-    if let contactEvent = await contactListSource.currentValue().first {
+    let contactEvents = await contactListSource.collect(timeout: 5.0)
+    if let contactEvent = contactEvents.first {
         let contactList = NDKContactList.fromEvent(contactEvent)
         
         // Now stream posts from followed users

@@ -138,20 +138,8 @@ struct ParallaxEffect: ViewModifier {
 }
 
 extension View {
-    func glassBackground(cornerRadius: CGFloat = 16, shadowRadius: CGFloat = 8) -> some View {
-        modifier(GlassBackground(cornerRadius: cornerRadius, shadowRadius: shadowRadius))
-    }
-    
-    func cardBackground(isSelected: Bool = false) -> some View {
-        modifier(CardBackground(isSelected: isSelected))
-    }
-    
     func shimmer() -> some View {
         modifier(ShimmerEffect())
-    }
-    
-    func pulse() -> some View {
-        modifier(PulseEffect())
     }
     
     func parallax(magnitude: CGFloat = 20) -> some View {
@@ -159,28 +147,6 @@ extension View {
     }
 }
 
-struct AnimatedGradientBackground: View {
-    @State private var animationPhase = 0.0
-    let colors: [Color]
-    
-    init(colors: [Color] = [.yellow.opacity(0.3), .orange.opacity(0.3), .pink.opacity(0.3)]) {
-        self.colors = colors
-    }
-    
-    var body: some View {
-        LinearGradient(
-            colors: colors,
-            startPoint: UnitPoint(x: 0 + animationPhase, y: 0),
-            endPoint: UnitPoint(x: 1 + animationPhase, y: 1)
-        )
-        .ignoresSafeArea()
-        .onAppear {
-            withAnimation(.linear(duration: 5).repeatForever(autoreverses: true)) {
-                animationPhase = 0.5
-            }
-        }
-    }
-}
 
 struct FloatingActionButton: View {
     let icon: String
@@ -213,10 +179,3 @@ struct FloatingActionButton: View {
     }
 }
 
-struct PressButtonStyle: ButtonStyle {
-    func makeBody(configuration: Configuration) -> some View {
-        configuration.label
-            .scaleEffect(configuration.isPressed ? 0.95 : 1.0)
-            .animation(.spring(response: 0.3, dampingFraction: 0.6), value: configuration.isPressed)
-    }
-}

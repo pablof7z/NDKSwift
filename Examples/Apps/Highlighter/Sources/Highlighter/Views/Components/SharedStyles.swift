@@ -174,6 +174,10 @@ extension View {
     }
     
     
+    func pulse() -> some View {
+        modifier(PulseModifier())
+    }
+    
     func rotateAndScale(isActive: Bool) -> some View {
         modifier(RotateAndScaleModifier(isActive: isActive))
     }

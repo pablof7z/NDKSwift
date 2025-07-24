@@ -337,7 +337,7 @@ struct ArticleCardView: View {
     private func loadAuthor() async {
         guard let ndk = appState.ndk else { return }
         
-        for await profile in await ndk.profileManager.observeProfile(for: article.author, maxAge: 3600) {
+        for await profile in await ndk.profileManager.observe(for: article.author, maxAge: 3600) {
             await MainActor.run {
                 self.author = profile
             }
@@ -396,13 +396,15 @@ struct UserDiscoveryView: View {
         
         // Load profiles for these users
         for pubkey in uniquePubkeys.prefix(50) {
-            for await profile in await ndk.profileManager.observeProfile(for: pubkey, maxAge: 3600) {
-                await MainActor.run {
-                    if !users.contains(where: { $0.pubkey == pubkey }) {
-                        users.append((pubkey: pubkey, profile: profile))
+            for await profile in await ndk.profileManager.observe(for: pubkey, maxAge: 3600) {
+                if let profile = profile {
+                    await MainActor.run {
+                        if !users.contains(where: { $0.pubkey == pubkey }) {
+                            users.append((pubkey: pubkey, profile: profile))
+                        }
                     }
+                    break // Only need the first result
                 }
-                break // Only need the first result
             }
         }
     }
@@ -560,7 +562,7 @@ struct DiscoveryHighlightCard: View {
     private func loadAuthor() async {
         guard let ndk = appState.ndk else { return }
         
-        for await profile in await ndk.profileManager.observeProfile(for: highlight.author, maxAge: 3600) {
+        for await profile in await ndk.profileManager.observe(for: highlight.author, maxAge: 3600) {
             await MainActor.run {
                 self.author = profile
             }
@@ -644,7 +646,7 @@ struct CurationCard: View {
     private func loadAuthor() async {
         guard let ndk = appState.ndk else { return }
         
-        for await profile in await ndk.profileManager.observeProfile(for: curation.author, maxAge: 3600) {
+        for await profile in await ndk.profileManager.observe(for: curation.author, maxAge: 3600) {
             await MainActor.run {
                 self.author = profile
             }

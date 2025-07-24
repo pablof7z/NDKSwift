@@ -139,7 +139,7 @@ struct HomeView: View {
             )
             
             for await event in highlightSource.events {
-                if let highlight = try? HighlightEvent(from: event, ndk: ndk) {
+                if let highlight = try? HighlightEvent(from: event) {
                     await MainActor.run {
                         withAnimation(.highlighterEase) {
                             if !highlights.contains(where: { $0.id == highlight.id }) {
@@ -167,7 +167,7 @@ struct HomeView: View {
                     )
                     
                     for await event in oldHighlightSource.events {
-                        if let highlight = try? HighlightEvent(from: event, ndk: ndk) {
+                        if let highlight = try? HighlightEvent(from: event) {
                             await MainActor.run {
                                 withAnimation(.highlighterEase) {
                                     if !oldHighlights.contains(where: { $0.id == highlight.id }) {
@@ -460,7 +460,7 @@ struct QuoteCard: View {
                     .padding(.vertical, 4)
                     .background(
                         Capsule()
-                            .fill(isZapped ? LinearGradient(colors: [Color.highlighterOrange, Color.highlighterPurple], startPoint: .topLeading, endPoint: .bottomTrailing) : Color.clear)
+                            .fill(isZapped ? AnyShapeStyle(LinearGradient(colors: [Color.highlighterOrange, Color.highlighterPurple], startPoint: .topLeading, endPoint: .bottomTrailing)) : AnyShapeStyle(Color.clear))
                             .overlay(
                                 Capsule()
                                     .stroke(Color.highlighterOrange, lineWidth: 1)
@@ -477,7 +477,7 @@ struct QuoteCard: View {
         .overlay(
             RoundedRectangle(cornerRadius: 16)
                 .stroke(
-                    isZapped ? LinearGradient(colors: [Color.highlighterOrange, Color.highlighterPurple], startPoint: .topLeading, endPoint: .bottomTrailing) : Color.clear,
+                    isZapped ? AnyShapeStyle(LinearGradient(colors: [Color.highlighterOrange, Color.highlighterPurple], startPoint: .topLeading, endPoint: .bottomTrailing)) : AnyShapeStyle(Color.clear),
                     lineWidth: 2
                 )
                 .opacity(isZapped ? 1 : 0)
@@ -792,7 +792,7 @@ struct InteractionButton: View {
                         .font(.highlighterCaption)
                 }
             }
-            .foregroundColor(isActive ? Color.highlighterOrange : Color.highlighterOrangeText)
+            .foregroundColor(isActive ? Color.highlighterOrange : Color.highlighterSecondaryText)
             .scaleEffect(isActive ? 1.1 : 1.0)
         }
         .buttonStyle(PlainButtonStyle())

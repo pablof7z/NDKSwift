@@ -174,7 +174,7 @@ struct ArticleView: View {
                     HighlightOptionsSheet(
                         selectedText: text,
                         articleTitle: article.title,
-                        articleUrl: "nostr:\(article.event.bech32NoteID ?? article.id)",
+                        articleUrl: "nostr:\(article.id)",
                         onHighlight: { comment in
                             Task {
                                 await createHighlight(text: text, comment: comment)
@@ -186,7 +186,7 @@ struct ArticleView: View {
             .sheet(isPresented: $showShareSheet) {
                 ArticleShareSheet(items: [
                     "Check out this article: \(article.title)",
-                    "nostr:\(article.event.bech32NoteID ?? article.id)"
+                    "nostr:\(article.id)"
                 ])
             }
         }
@@ -202,9 +202,22 @@ struct ArticleView: View {
     private func loadAuthor() async {
         guard let ndk = appState.ndk else { return }
         
-        if let profile = try? await ndk.fetchProfile(pubkey: article.author) {
-            await MainActor.run {
-                self.author = profile
+        // Load individual profile using declarative data source
+        let profileDataSource = ndk.observe(
+            filter: NDKFilter(
+                authors: [article.author],
+                kinds: [0]
+            ),
+            maxAge: 3600,
+            cachePolicy: .cacheWithNetwork
+        )
+        
+        for await event in profileDataSource.events {
+            if let fetchedProfile = JSONCoding.safeDecode(NDKUserProfile.self, from: event.content) {
+                await MainActor.run {
+                    self.author = fetchedProfile
+                }
+                break
             }
         }
     }
@@ -430,7 +443,7 @@ struct ArticleShareSheet: UIViewControllerRepresentable {
 }
 
 #Preview {
-    ArticleView(article: Article(
+    ArticleView(article: try! Article(
         from: NDKEvent(
             id: "test",
             pubkey: "test",

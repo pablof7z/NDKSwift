@@ -300,9 +300,18 @@ actor NDKDataRequirementManager {
                         // Create a subscription for each relay with its specific filter
                         for (relay, relaySpecificFilter) in outboxStrategy.filtersByRelay {
                             let relayHost = URL(string: relay)?.host ?? relay
+                            // Shorten relay host name to avoid long subscription IDs
+                            let shortRelayHost = relayHost
+                                .replacingOccurrences(of: ".com", with: "")
+                                .replacingOccurrences(of: ".net", with: "")
+                                .replacingOccurrences(of: ".org", with: "")
+                                .replacingOccurrences(of: "relay.", with: "")
+                                .replacingOccurrences(of: "nos.", with: "")
+                                .replacingOccurrences(of: "nostr.", with: "")
+                                .prefix(8)
                             // For relay-specific subscriptions, add relay suffix to custom IDs
                             let baseId = lifecycleGroup.compactMap { $0.subscriptionId }.first ?? generateSubscriptionId(for: relaySpecificFilter)
-                            let subscriptionId = "\(baseId)_\(relayHost)"
+                            let subscriptionId = "\(baseId)_\(shortRelayHost)"
                             
                             NDKLogger.log(.trace, category: .subscription, "📡 [DataReqManager] Creating subscription for \(relay): \(relaySpecificFilter.authors?.count ?? 0) authors")
                             
@@ -630,47 +639,51 @@ actor NDKDataRequirementManager {
     }
     
     /// Generate a meaningful subscription ID based on filter content
-    private func generateSubscriptionId(for filter: NDKFilter) -> String {
+    internal func generateSubscriptionId(for filter: NDKFilter) -> String {
         var parts: [String] = []
         
-        // Add kind description
+        // Add kind description (shortened)
         if let kinds = filter.kinds {
             let kindDescription = describeKinds(kinds)
-            parts.append(kindDescription)
+            // Shorten kind descriptions
+            let shortKind = kindDescription
+                .replacingOccurrences(of: "kind", with: "k")
+                .replacingOccurrences(of: "kinds", with: "ks")
+            parts.append(shortKind)
         }
         
-        // Add author info
+        // Add author info (shortened)
         if let authors = filter.authors {
             if authors.count == 1 {
-                parts.append("author_\(authors[0].prefix(8))")
+                parts.append("a\(authors[0].prefix(4))")
             } else if authors.count > 1 {
-                parts.append("authors_\(authors.count)")
+                parts.append("as\(authors.count)")
             }
         }
         
-        // Add event ID info
+        // Add event ID info (shortened)
         if let ids = filter.ids {
             if ids.count == 1 {
-                parts.append("event_\(ids[0].prefix(8))")
+                parts.append("e\(ids[0].prefix(4))")
             } else if ids.count > 1 {
-                parts.append("events_\(ids.count)")
+                parts.append("es\(ids.count)")
             }
         }
         
-        // Add tag info
+        // Add tag info (shortened)
         if let tags = filter.tags, !tags.isEmpty {
-            let tagKeys = tags.keys.sorted().joined(separator: "_")
-            parts.append("tags_\(tagKeys)")
+            let tagKeys = tags.keys.sorted().prefix(3).joined(separator: "")
+            parts.append("t\(tagKeys)")
         }
         
-        // Add time info
+        // Add time info (shortened)
         if filter.since != nil || filter.until != nil {
-            parts.append("timed")
+            parts.append("tm")
         }
         
         // If no meaningful parts, use generic
         if parts.isEmpty {
-            parts.append("general")
+            parts.append("gen")
         }
         
         // Add a short random suffix for uniqueness
@@ -682,39 +695,39 @@ actor NDKDataRequirementManager {
     
     /// Get human-readable description for event kinds
     private func describeKinds(_ kinds: [Int]) -> String {
-        // Map common kinds to descriptions
+        // Map common kinds to very short descriptions (max 3-4 chars)
         let kindMap: [Int: String] = [
-            EventKind.metadata: "metadata",
-            EventKind.textNote: "notes",
-            EventKind.contacts: "contacts",
+            EventKind.metadata: "meta",
+            EventKind.textNote: "note",
+            EventKind.contacts: "cont",
             EventKind.encryptedDirectMessage: "dm",
-            EventKind.deletion: "deletion",
-            EventKind.repost: "repost",
-            EventKind.reaction: "reaction",
-            EventKind.channel: "channel",
-            EventKind.channelMetadata: "channel_meta",
-            EventKind.channelMessage: "channel_msg",
-            EventKind.report: "report",
-            EventKind.zapRequest: "zap_req",
+            EventKind.deletion: "del",
+            EventKind.repost: "rep",
+            EventKind.reaction: "reac",
+            EventKind.channel: "chan",
+            EventKind.channelMetadata: "chmeta",
+            EventKind.channelMessage: "chmsg",
+            EventKind.report: "rpt",
+            EventKind.zapRequest: "zreq",
             EventKind.zap: "zap",
-            EventKind.muteList: "mute_list",
-            EventKind.pinList: "pin_list",
-            EventKind.relayList: "relay_list",
-            EventKind.bookmarkList: "bookmarks",
-            EventKind.communitiesList: "communities",
-            EventKind.publicChatsList: "public_chats",
-            EventKind.blockedRelays: "blocked_relays",
-            EventKind.searchRelays: "search_relays",
-            EventKind.categorizedPeopleList: "categorized_people",
-            EventKind.categorizedBookmarkList: "categorized_bookmarks",
-            EventKind.profileBadges: "profile_badges",
-            EventKind.badgeDefinition: "badge_definition",
-            EventKind.longFormContent: "long_form",
-            EventKind.draftLongForm: "draft_long_form",
-            EventKind.applicationSpecificData: "app_specific_data",
-            EventKind.liveEvent: "live_event",
-            EventKind.handlerRecommendation: "handler_recommendation",
-            EventKind.handlerInformation: "handler_information"
+            EventKind.muteList: "mute",
+            EventKind.pinList: "pin",
+            EventKind.relayList: "rlay",
+            EventKind.bookmarkList: "book",
+            EventKind.communitiesList: "comm",
+            EventKind.publicChatsList: "chat",
+            EventKind.blockedRelays: "blkr",
+            EventKind.searchRelays: "srcr",
+            EventKind.categorizedPeopleList: "catp",
+            EventKind.categorizedBookmarkList: "catb",
+            EventKind.profileBadges: "badg",
+            EventKind.badgeDefinition: "bdef",
+            EventKind.longFormContent: "long",
+            EventKind.draftLongForm: "drft",
+            EventKind.applicationSpecificData: "app",
+            EventKind.liveEvent: "live",
+            EventKind.handlerRecommendation: "hrec",
+            EventKind.handlerInformation: "hinf"
         ]
         
         var descriptions: [String] = []
@@ -722,16 +735,16 @@ actor NDKDataRequirementManager {
             if let desc = kindMap[kind] {
                 descriptions.append(desc)
             } else {
-                descriptions.append("kind\(kind)")
+                descriptions.append("k\(kind)")
             }
         }
         
-        // Limit to first 3 kinds to keep ID reasonable length
-        if descriptions.count > 3 {
-            return descriptions.prefix(3).joined(separator: "_") + "_more"
+        // Limit to first 2 kinds to keep ID very short
+        if descriptions.count > 2 {
+            return descriptions.prefix(2).joined(separator: "") + "+"
         }
         
-        return descriptions.joined(separator: "_")
+        return descriptions.joined(separator: "")
     }
 }
 
