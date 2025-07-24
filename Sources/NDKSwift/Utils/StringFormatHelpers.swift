@@ -43,23 +43,26 @@ public enum StringFormatHelpers {
     
     // MARK: - JSON Formatting
     
-    /// Pretty print JSON data
-    public static func prettyJSON(from data: Data) -> String? {
-        guard let object = try? JSONSerialization.jsonObject(with: data),
-              let prettyData = try? JSONSerialization.data(withJSONObject: object, options: .prettyPrinted),
-              let prettyString = String(data: prettyData, encoding: .utf8) else {
-            return nil
+    /// Pretty print JSON from various sources (Data, Dictionary, Array, or any JSON-serializable object)
+    public static func prettyJSON(from source: Any) -> String? {
+        let data: Data
+        
+        if let sourceData = source as? Data {
+            // If source is already Data, try to parse it first to ensure it's valid JSON
+            guard let object = try? JSONSerialization.jsonObject(with: sourceData),
+                  let prettyData = try? JSONSerialization.data(withJSONObject: object, options: .prettyPrinted) else {
+                return nil
+            }
+            data = prettyData
+        } else {
+            // For all other types, serialize directly
+            guard let jsonData = try? JSONSerialization.data(withJSONObject: source, options: .prettyPrinted) else {
+                return nil
+            }
+            data = jsonData
         }
-        return prettyString
-    }
-    
-    /// Pretty print JSON dictionary
-    public static func prettyJSON(from dictionary: [String: Any]) -> String? {
-        guard let data = try? JSONSerialization.data(withJSONObject: dictionary, options: .prettyPrinted),
-              let prettyString = String(data: data, encoding: .utf8) else {
-            return nil
-        }
-        return prettyString
+        
+        return String(data: data, encoding: .utf8)
     }
     
     // MARK: - Time Formatting
