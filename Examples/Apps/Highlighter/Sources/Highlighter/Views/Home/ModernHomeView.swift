@@ -143,7 +143,7 @@ struct FeaturedHighlightCard: View {
             }
         }
         .padding(.ds.medium)
-        .background(DesignSystem.Colors.primaryLight.opacity(0.08))
+        .background(Color(DesignSystem.Colors.primaryLight).opacity(0.08))
         .clipShape(RoundedRectangle(cornerRadius: .ds.large, style: .continuous))
         .morphingCard(isExpanded: isExpanded)
         .onTapGesture {

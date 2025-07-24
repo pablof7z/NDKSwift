@@ -299,36 +299,11 @@ extension View {
         .clipped()
     }
     
-    func cardBackground(isSelected: Bool = false, variant: CardStyle.Variant = .standard) -> some View {
-        self.background {
-            RoundedRectangle(cornerRadius: variant.cornerRadius, style: .continuous)
-                .fill(variant == .glass ? AnyShapeStyle(.ultraThinMaterial) : AnyShapeStyle(DesignSystem.Colors.surface))
-                .overlay {
-                    RoundedRectangle(cornerRadius: variant.cornerRadius, style: .continuous)
-                        .stroke(
-                            isSelected ?
-                            LinearGradient(
-                                colors: [DesignSystem.Colors.secondary, DesignSystem.Colors.primary],
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
-                            ) :
-                            LinearGradient(
-                                colors: [DesignSystem.Colors.border, DesignSystem.Colors.border.opacity(0.5)],
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
-                            ),
-                            lineWidth: isSelected ? 2 : 1
-                        )
-                }
-                .shadow(
-                    color: isSelected ? DesignSystem.Colors.secondary.opacity(0.3) : variant.shadow.color,
-                    radius: isSelected ? 12 : variant.shadow.radius,
-                    x: variant.shadow.x,
-                    y: isSelected ? 6 : variant.shadow.y
-                )
-        }
-        .scaleEffect(isSelected ? 1.02 : 1.0)
-        .animation(.spring(response: 0.3, dampingFraction: 0.7), value: isSelected)
+    // This functionality is now provided by CardSystem.swift
+    // Use .modernCard(), .modernCardSelected(), .glassCard(), or .compactCard() instead
+    @available(*, deprecated, message: "Use modernCard() or modernCardSelected() from CardSystem.swift instead")
+    func cardBackground(isSelected: Bool = false) -> some View {
+        self.modernCardSelected(isSelected)
     }
     
     func pulseGently() -> some View {

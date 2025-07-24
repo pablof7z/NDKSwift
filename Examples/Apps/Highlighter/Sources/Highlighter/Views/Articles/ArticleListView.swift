@@ -223,7 +223,7 @@ struct ArticleListCard: View {
             }
         }
         .padding()
-        .cardBackground()
+        .modernCard()
         .task {
             await loadAuthor()
         }
@@ -362,7 +362,7 @@ struct ArticleFeaturedCard: View {
             .padding()
         }
         .frame(width: 280, height: 380)
-        .cardBackground()
+        .modernCard()
         .task {
             await loadAuthor()
         }
@@ -513,7 +513,7 @@ struct ArticleRowCard: View {
         }
         .padding()
         .frame(height: 120)
-        .cardBackground()
+        .modernCard()
         .task {
             await loadAuthor()
         }
