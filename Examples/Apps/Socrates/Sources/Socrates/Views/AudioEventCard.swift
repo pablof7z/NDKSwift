@@ -918,7 +918,11 @@ struct ReplyRecordingView: View {
         
         recordingDuration += 0.1
         
-        let normalizedValue = pow(10, recorder.averagePower(forChannel: 0) / 20)
+        // Use peak power for more responsive visualization
+        let peakPower = recorder.peakPower(forChannel: 0)
+        let clampedPower = max(-50, peakPower) // Clamp to -50 dB minimum
+        let normalizedValue = pow(10, clampedPower / 20)
+        
         recordingWaveform.append(CGFloat(normalizedValue))
         fullWaveform.append(Double(normalizedValue))
         
