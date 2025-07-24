@@ -5,7 +5,7 @@ public extension NDK {
     /// - Throws: NDKError.notConfigured if no signer is available
     func requireSigner() throws -> NDKSigner {
         guard let signer = signer else {
-            throw NDKError.notConfigured("No signer configured")
+            throw NDKError.notConfigured(ErrorMessageConstants.Messages.noSignerConfigured)
         }
         return signer
     }
