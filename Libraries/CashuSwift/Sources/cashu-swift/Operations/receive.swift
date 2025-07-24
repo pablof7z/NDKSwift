@@ -47,8 +47,6 @@ extension CashuSwift {
         
         switch try token.checkAllInputsLocked(to: publicKey) {
         case .match:
-            // TODO: for now we skip failing DLEQ verification alltogether
-            
             let proofsWitness = try inputProofs.map { p in
                 // FIXME: redundant
                 guard let privateKey,

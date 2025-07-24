@@ -15,7 +15,7 @@ extension CashuSwift {
     public protocol Quote: Codable, Sendable {
         var quote:String { get }
         var paid:Bool? { get }          // paid and state are both optional for compatibility
-        var state:QuoteState? { get }   // TODO: use custom decoding to unify
+        var state:QuoteState? { get }   // both fields maintained for protocol version compatibility
         var expiry:Int? { get }
     }
 

@@ -169,20 +169,23 @@ extension CashuSwift {
             first.0.i < second.0.i
         }
         
-        // TODO: repetitive, remove boolean for send/keep, unblind combined
-        let sendPromises = outputsAndPromises.filter({ $0.0.toSend })
-                                             .map({ $0.1 })
-        let keepPromises = outputsAndPromises.filter({ !$0.0.toSend })
-                                             .map({ $0.1 })
+        // Separate send and keep outputs while maintaining order
+        let sendIndices = outputsAndPromises.enumerated().compactMap { $0.element.0.toSend ? $0.offset : nil }
+        let keepIndices = outputsAndPromises.enumerated().compactMap { !$0.element.0.toSend ? $0.offset : nil }
         
-        let sendProofs = try Crypto.unblindPromises(sendPromises,
-                                                    blindingFactors: sendOutputs.blindingFactors,
-                                                    secrets: sendOutputs.secrets,
-                                                    keyset: keyset)
-        let keepProofs = try Crypto.unblindPromises(keepPromises,
-                                                    blindingFactors: keepOutputs.blindingFactors,
-                                                    secrets: keepOutputs.secrets,
-                                                    keyset: keyset)
+        // Unblind all proofs at once then separate
+        let allBlindingFactors = sendOutputs.blindingFactors + keepOutputs.blindingFactors
+        let allSecrets = sendOutputs.secrets + keepOutputs.secrets
+        let allPromises = outputsAndPromises.map({ $0.1 })
+        
+        let allProofs = try Crypto.unblindPromises(allPromises,
+                                                   blindingFactors: allBlindingFactors,
+                                                   secrets: allSecrets,
+                                                   keyset: keyset)
+        
+        // Separate proofs based on original indices
+        let sendProofs = sendIndices.map { allProofs[$0] }
+        let keepProofs = keepIndices.map { allProofs[$0] }
         
         let outputDLEQ = try Crypto.checkDLEQ(for: sendProofs + keepProofs, with: mint)
         
