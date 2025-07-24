@@ -67,8 +67,10 @@ class AppState: ObservableObject {
 @MainActor
 class NostrManager: ObservableObject {
     @Published var ndk: NDK?
+    @Published var authenticationState: NDKAuthManager.AuthenticationState = .unauthenticated
     
     private var ndkAuthManager: NDKAuthManager
+    private var authStateObservation: Task<Void, Never>?
     
     // Recommended relays for Socrates
     let defaultRelays = [
@@ -94,17 +96,60 @@ class NostrManager: ObservableObject {
         if let ndk = ndk {
             ndkAuthManager.setNDK(ndk)
             
-            // Check if there are any existing sessions and restore them
+            // Setup session restoration
             Task {
                 await ndk.connect()
                 
-                // Try to restore existing session if available
-                if !ndkAuthManager.availableSessions.isEmpty {
-                    print("Found existing sessions: \(ndkAuthManager.availableSessions.count)")
-                    // NDKAuthView will handle automatic session restoration
+                // Observe authentication state changes
+                _ = withObservationTracking {
+                    ndkAuthManager.authenticationState
+                } onChange: { [weak self] in
+                    Task { @MainActor in
+                        await self?.handleAuthStateChange()
+                    }
                 }
+                
+                // Handle initial state
+                await handleAuthStateChange()
             }
         }
+    }
+    
+    private func handleAuthStateChange() async {
+        switch ndkAuthManager.authenticationState {
+        case .authenticated:
+            // If authenticated, ensure signer is set on NDK
+            if let activeSigner = ndkAuthManager.activeSigner {
+                ndk?.signer = activeSigner
+                print("Setting active signer on NDK")
+                
+                // Start session if not already started
+                if ndk?.sessionData == nil {
+                    do {
+                        _ = try await ndk?.startSession(
+                            signer: activeSigner,
+                            config: NDKSessionConfiguration(
+                                dataRequirements: [.followList, .muteList, .webOfTrust(depth: 2)],
+                                preloadStrategy: .progressive
+                            )
+                        )
+                        print("Session data loaded successfully")
+                    } catch {
+                        print("Failed to start session: \(error)")
+                    }
+                }
+            }
+            
+        case .unauthenticated:
+            // Clear signer if unauthenticated
+            ndk?.signer = nil
+            
+        default:
+            break
+        }
+        
+        // Trigger UI update
+        objectWillChange.send()
     }
     
     func login(with signer: NDKSigner) async throws -> NDKSessionData {
@@ -148,7 +193,8 @@ class NostrManager: ObservableObject {
     
     // Check if user is authenticated via NDKAuth
     var isAuthenticated: Bool {
-        ndkAuthManager.isAuthenticated
+        // Must have both auth manager authenticated AND signer loaded
+        ndkAuthManager.isAuthenticated && ndk?.signer != nil
     }
     
     // Get auth manager for use in UI

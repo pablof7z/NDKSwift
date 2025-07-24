@@ -116,9 +116,9 @@ public class NDKAuthManager {
     
     // MARK: - Computed Properties
     
-    /// Whether user is currently authenticated
+    /// Whether user is currently authenticated with an active signer
     public var isAuthenticated: Bool {
-        authenticationState == .authenticated && activeSession != nil
+        authenticationState == .authenticated && activeSession != nil && activeSigner != nil
     }
     
     /// Whether authentication is in progress

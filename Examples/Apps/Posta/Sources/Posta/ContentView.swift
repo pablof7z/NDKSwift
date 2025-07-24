@@ -6,13 +6,16 @@ struct ContentView: View {
     @Environment(NDKManager.self) var ndkManager
     
     var body: some View {
-        NDKAuthView(authManager: authManager, ndk: ndkManager.ndk, authenticatedContent: {
-            // Authenticated content
-            MainTabView()
-        }, authenticationContent: {
-            // Authentication content
-            PostaAuthView()
-        })
+        Group {
+            if authManager.isAuthenticated {
+                // Authenticated content
+                MainTabView()
+            } else {
+                // Authentication content
+                PostaAuthView()
+            }
+        }
+        .environment(\.ndk, ndkManager.ndk)
     }
 }
 

@@ -19,10 +19,10 @@ struct ContentView: View {
         ZStack {
             Color(UIColor.systemBackground).ignoresSafeArea()
             
-            NDKAuthView(authManager: nostrManager.authManager, ndk: nostrManager.ndk) {
+            if nostrManager.authManager.isAuthenticated {
                 // Main app interface - shown when authenticated
                 WalletView(urlState: $urlState, showScanner: $showScanner)
-            } authenticationContent: {
+            } else {
                 // Use SplashView as the authentication screen
                 SplashView()
             }

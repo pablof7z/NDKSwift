@@ -11,6 +11,17 @@ struct BlossomServerInfo: Identifiable, Equatable {
     let whitelistMessage: String?
     let paidMessage: String?
     
+    init(url: String, name: String, description: String, isPaid: Bool = false, isWhitelisted: Bool = false, whitelistMessage: String? = nil, paidMessage: String? = nil) {
+        self.id = url
+        self.url = url
+        self.name = name
+        self.description = description
+        self.isPaid = isPaid
+        self.isWhitelisted = isWhitelisted
+        self.whitelistMessage = whitelistMessage
+        self.paidMessage = paidMessage
+    }
+    
     init(from event: NDKEvent) {
         self.id = event.id
         self.description = event.content

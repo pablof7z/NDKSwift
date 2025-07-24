@@ -4,10 +4,7 @@ This guide covers the authentication system in NDKSwift, including session manag
 
 ## Overview
 
-NDKSwift provides a comprehensive authentication system built around two main components:
-
-- **NDKAuthManager**: The core authentication manager that handles session management, secure storage, and biometric authentication
-- **NDKAuthView**: A SwiftUI view that provides a complete authentication flow UI
+NDKSwift provides a comprehensive authentication system through **NDKAuthManager** - the core authentication manager that handles session management, secure storage, and biometric authentication.
 
 ## Key Features
 
@@ -16,7 +13,6 @@ NDKSwift provides a comprehensive authentication system built around two main co
 - 🔑 **Multiple Signer Types**: Support for private key signers and NIP-46 remote signers
 - 📱 **Biometric Authentication**: Face ID/Touch ID protection for sensitive accounts
 - 🔄 **Automatic Session Restoration**: Sessions persist across app launches
-- 🎨 **Customizable UI**: Provide your own authentication UI or use the defaults
 
 ## Quick Start
 
@@ -33,28 +29,27 @@ struct MyApp: App {
     
     var body: some Scene {
         WindowGroup {
-            NDKAuthView(authManager: authManager, ndk: ndk) {
-                // Your authenticated content
-                MainAppView()
-            } authenticationContent: {
-                // Your custom login UI
-                LoginView()
-            }
+            ContentView()
+                .environment(authManager)
+                .environment(\.ndk, ndk)
+                .onAppear {
+                    authManager.setNDK(ndk)
+                }
         }
     }
 }
-```
 
-### Using Default Authentication UI
-
-If you don't need custom authentication UI, NDKAuthView provides a default:
-
-```swift
-NDKAuthView(authManager: authManager, ndk: ndk) {
-    // Your authenticated content
-    MainAppView()
+struct ContentView: View {
+    @Environment(NDKAuthManager.self) private var authManager
+    
+    var body: some View {
+        if authManager.isAuthenticated {
+            MainAppView()
+        } else {
+            LoginView()
+        }
+    }
 }
-// The default UI includes session selection and "Add Account" functionality
 ```
 
 ## NDKAuthManager
@@ -170,46 +165,16 @@ case .sessionExpired:
 }
 ```
 
-## NDKAuthView
-
-NDKAuthView provides a complete authentication flow UI that automatically handles all authentication states.
-
-### Custom Authentication Content
-
-```swift
-struct ContentView: View {
-    @State private var authManager = NDKAuthManager.shared
-    
-    var body: some View {
-        NDKAuthView(authManager: authManager) {
-            // Authenticated content
-            MainAppView()
-        } authenticationContent: {
-            // Your custom login/signup UI
-            CustomLoginView()
-        }
-    }
-}
-```
-
-### Authentication Flow States
-
-NDKAuthView automatically handles these states:
-
-1. **Session Selection**: When multiple accounts exist, shows account picker
-2. **Biometric Prompt**: Requests Face ID/Touch ID when required
-3. **Loading States**: Shows progress during authentication
-4. **Error Handling**: Displays authentication errors with retry options
-5. **Session Expired**: Prompts to re-authenticate
-
 ## Building Custom Authentication UI
 
 Here's an example of building your own authentication UI:
 
 ```swift
-struct CustomLoginView: View {
+struct LoginView: View {
     @Environment(NDKAuthManager.self) private var authManager
     @State private var nsecInput = ""
+    @State private var showError = false
+    @State private var errorMessage = ""
     
     var body: some View {
         VStack(spacing: 20) {
@@ -228,7 +193,8 @@ struct CustomLoginView: View {
                             displayName: "Nostr User"
                         )
                     } catch {
-                        // Handle error
+                        errorMessage = error.localizedDescription
+                        showError = true
                     }
                 }
             }
@@ -242,12 +208,59 @@ struct CustomLoginView: View {
                             displayName: "New User"
                         )
                     } catch {
-                        // Handle error
+                        errorMessage = error.localizedDescription
+                        showError = true
                     }
                 }
             }
         }
         .padding()
+        .alert("Error", isPresented: $showError) {
+            Button("OK") { }
+        } message: {
+            Text(errorMessage)
+        }
+    }
+}
+```
+
+### Multi-Account Session Selection
+
+Here's an example of building a session selection UI:
+
+```swift
+struct SessionSelectionView: View {
+    @Environment(NDKAuthManager.self) private var authManager
+    
+    var body: some View {
+        NavigationView {
+            List(authManager.availableSessions) { session in
+                Button(action: {
+                    Task {
+                        try await authManager.switchToSession(session)
+                    }
+                }) {
+                    HStack {
+                        VStack(alignment: .leading) {
+                            Text(session.displayName ?? session.shortIdentifier)
+                                .font(.headline)
+                            Text(session.shortIdentifier)
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
+                        
+                        Spacer()
+                        
+                        if session.id == authManager.activeSession?.id {
+                            Image(systemName: "checkmark.circle.fill")
+                                .foregroundColor(.blue)
+                        }
+                    }
+                    .padding(.vertical, 4)
+                }
+            }
+            .navigationTitle("Select Account")
+        }
     }
 }
 ```
@@ -281,6 +294,17 @@ if authManager.biometricAuthAvailable {
 }
 ```
 
+### Handling Biometric Authentication
+
+When a session requires biometric authentication:
+
+```swift
+if authManager.authenticationState == .biometricRequired {
+    // The system will automatically prompt for biometric authentication
+    // You can show a custom UI explaining why biometric auth is needed
+}
+```
+
 ## Security Best Practices
 
 1. **Always Enable Biometric Authentication** for accounts with sensitive data
@@ -290,15 +314,6 @@ if authManager.biometricAuthAvailable {
 5. **Handle Session Expiry** gracefully with re-authentication prompts
 
 ## Advanced Usage
-
-### Custom Session Storage
-
-While NDKAuthManager uses Keychain by default, you can implement custom storage:
-
-```swift
-// Future API - not yet available
-authManager.setCustomStorage(MyCustomStorage())
-```
 
 ### Remote Signer Support (NIP-46)
 
@@ -323,6 +338,31 @@ let session = try await authManager.createSession(
 authManager.setNDK(myNDKInstance)
 
 // Auth manager will automatically configure the signer
+```
+
+### Observing Authentication State Changes
+
+```swift
+struct MyView: View {
+    @Environment(NDKAuthManager.self) private var authManager
+    
+    var body: some View {
+        Text("Status: \(authManager.isAuthenticated ? "Logged In" : "Logged Out")")
+            .onChange(of: authManager.authenticationState) { oldState, newState in
+                // React to authentication state changes
+                switch newState {
+                case .authenticated:
+                    // User logged in
+                    loadUserData()
+                case .unauthenticated:
+                    // User logged out
+                    clearUserData()
+                default:
+                    break
+                }
+            }
+    }
+}
 ```
 
 ## Troubleshooting
@@ -376,8 +416,12 @@ struct NostrApp: App {
         WindowGroup {
             ContentView()
                 .environment(authManager)
+                .environment(\.ndk, ndk)
                 .onAppear {
                     authManager.setNDK(ndk)
+                    Task {
+                        await ndk.connect()
+                    }
                 }
         }
     }
@@ -387,12 +431,21 @@ struct ContentView: View {
     @Environment(NDKAuthManager.self) private var authManager
     
     var body: some View {
-        NDKAuthView(authManager: authManager) {
-            // Authenticated content
-            AuthenticatedView()
-        } authenticationContent: {
-            // Custom authentication UI
-            AuthenticationView()
+        Group {
+            switch authManager.authenticationState {
+            case .authenticated:
+                AuthenticatedView()
+            case .authenticating:
+                ProgressView("Authenticating...")
+            case .biometricRequired:
+                BiometricPromptView()
+            case .unauthenticated, .authenticationFailed, .sessionExpired:
+                if authManager.hasSessions {
+                    SessionSelectionView()
+                } else {
+                    AuthenticationView()
+                }
+            }
         }
     }
 }
@@ -453,7 +506,7 @@ struct AuthenticationView: View {
 If you're migrating from a custom authentication system:
 
 1. **Migrate User Data**: Convert existing user data to NDKSession format
-2. **Update UI**: Replace custom auth UI with NDKAuthView
+2. **Update UI**: Build your own authentication UI using NDKAuthManager
 3. **Handle Legacy Sessions**: Provide migration path for old session formats
 4. **Test Thoroughly**: Ensure biometric authentication works as expected
 

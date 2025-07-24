@@ -10,10 +10,10 @@ actor NDKDataRequirementManager {
     private var activeRequirements: [RequirementID: DataRequirement] = [:]
     
     // Pending requirements waiting to be grouped
-    private var pendingRequirements: [FilterSignature: [PendingRequirement]] = [:]
+    private var pendingRequirements: [AggregationSignature: [PendingRequirement]] = [:]
     
     // Timer tasks for flushing pending requirements
-    private var flushTasks: [FilterSignature: Task<Void, Never>] = [:]
+    private var flushTasks: [AggregationSignature: Task<Void, Never>] = [:]
     
     // Track requirements that have immediate cache observations
     private var immediateCacheHandles: [RequirementID: ObservationHandle] = [:]
@@ -98,7 +98,7 @@ actor NDKDataRequirementManager {
         }
         
         // For networkOnly or when cache is stale/empty, proceed with network request
-        let signature = FilterSignature(from: filter)
+        let aggregationSignature = AggregationSignature(from: filter)
         
         // Check if we can reuse an existing requirement (only for live subscriptions)
         if maxAge == 0, let existing = findMatchingRequirement(for: filter) {
@@ -125,15 +125,15 @@ actor NDKDataRequirementManager {
         )
         
         // Add to pending queue
-        pendingRequirements[signature, default: []].append(pending)
+        pendingRequirements[aggregationSignature, default: []].append(pending)
         
         // Start or extend grouping timer
-        if flushTasks[signature] == nil {
+        if flushTasks[aggregationSignature] == nil {
             NDKLogger.log(.debug, category: .subscription, "⏰ [DataReqManager] Starting grouping timer for \(groupingWindow)s", correlationId: String(correlationId))
-            flushTasks[signature] = Task {
+            flushTasks[aggregationSignature] = Task {
                 try? await Task.sleep(nanoseconds: UInt64(groupingWindow * Double(TimeConstants.nanosecondsPerSecond)))
                 NDKLogger.log(.debug, category: .subscription, "⏰ [DataReqManager] Grouping timer expired, flushing...", correlationId: String(correlationId))
-                await flushPendingRequirements(for: signature)
+                await flushPendingRequirements(for: aggregationSignature)
             }
         } else {
             NDKLogger.log(.trace, category: .subscription, "⏲️ Grouping timer already running", correlationId: String(correlationId))
@@ -185,11 +185,11 @@ actor NDKDataRequirementManager {
         return nil
     }
     
-    private func flushPendingRequirements(for signature: FilterSignature) async {
-        NDKLogger.log(.info, category: .subscription, "🔄 [DataReqManager] flushPendingRequirements called for signature: \(signature)")
-        flushTasks.removeValue(forKey: signature)
+    private func flushPendingRequirements(for aggregationSignature: AggregationSignature) async {
+        NDKLogger.log(.info, category: .subscription, "🔄 [DataReqManager] flushPendingRequirements called for aggregation signature: \(aggregationSignature)")
+        flushTasks.removeValue(forKey: aggregationSignature)
         
-        guard let pending = pendingRequirements.removeValue(forKey: signature),
+        guard let pending = pendingRequirements.removeValue(forKey: aggregationSignature),
               !pending.isEmpty else {
             NDKLogger.log(.trace, category: .subscription, "No pending requirements to flush")
             return
@@ -279,7 +279,9 @@ actor NDKDataRequirementManager {
                     
                     // Register subscription for relay updates if there are unknown authors
                     if !outboxStrategy.unknownAuthors.isEmpty && !closeOnEose {
-                        let mainSubscriptionId = lifecycleGroup.compactMap { $0.subscriptionId }.first ?? generateSubscriptionId(for: optimizedFilter)
+                        // Prefer custom subscription IDs, but add relay suffix for outbox queries
+                        let baseSubscriptionId = lifecycleGroup.compactMap { $0.subscriptionId }.first ?? generateSubscriptionId(for: optimizedFilter)
+                        let mainSubscriptionId = baseSubscriptionId
                         await ndk.outbox.registerSubscriptionForUpdates(
                             id: mainSubscriptionId,
                             filter: optimizedFilter,
@@ -298,7 +300,9 @@ actor NDKDataRequirementManager {
                         // Create a subscription for each relay with its specific filter
                         for (relay, relaySpecificFilter) in outboxStrategy.filtersByRelay {
                             let relayHost = URL(string: relay)?.host ?? relay
-                            let subscriptionId = lifecycleGroup.compactMap { $0.subscriptionId }.first.map { "\($0)_\(relayHost)" } ?? "\(generateSubscriptionId(for: relaySpecificFilter))_\(relayHost)"
+                            // For relay-specific subscriptions, add relay suffix to custom IDs
+                            let baseId = lifecycleGroup.compactMap { $0.subscriptionId }.first ?? generateSubscriptionId(for: relaySpecificFilter)
+                            let subscriptionId = "\(baseId)_\(relayHost)"
                             
                             NDKLogger.log(.debug, category: .subscription, "📡 [DataReqManager] Creating subscription for \(relay): \(relaySpecificFilter.authors?.count ?? 0) authors")
                             
@@ -366,7 +370,19 @@ actor NDKDataRequirementManager {
                 }
                 
                 // Create single subscription for non-outbox or non-decomposed cases
-                let subscriptionId = lifecycleGroup.compactMap { $0.subscriptionId }.first ?? generateSubscriptionId(for: optimizedFilter)
+                // Use custom subscription ID if provided, otherwise generate one
+                let customIds = lifecycleGroup.compactMap { $0.subscriptionId }
+                let subscriptionId: String
+                if !customIds.isEmpty {
+                    // Prefer custom IDs - use the first one if multiple
+                    subscriptionId = customIds.first!
+                    if customIds.count > 1 {
+                        NDKLogger.log(.warning, category: .subscription, "⚠️ Multiple custom subscription IDs provided, using: \(subscriptionId)")
+                    }
+                } else {
+                    // Generate ID only if no custom IDs provided
+                    subscriptionId = generateSubscriptionId(for: optimizedFilter)
+                }
                 NDKLogger.log(.info, category: .subscription, "📡 [DataReqManager] Creating internal subscription - id: \(subscriptionId), filter: \(optimizedFilter), relays: \(relays?.joined(separator: ", ") ?? "all")")
                 let internalSubscription = await ndk.internalSubscriptionManager.createSubscription(
                     id: subscriptionId,

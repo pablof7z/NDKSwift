@@ -95,7 +95,6 @@ struct HomeFeedView: View {
                 Color.black.opacity(0.4)
                     .ignoresSafeArea()
                     .onTapGesture {
-                        print("DEBUG: Background tapped, hiding relay selector")
                         showRelaySelector = false
                     }
                     .zIndex(1)
@@ -111,9 +110,6 @@ struct HomeFeedView: View {
         .animation(.easeInOut(duration: 0.2), value: showRelaySelector)
         .onAppear {
             startStreamingAudioEvents()
-        }
-        .onChange(of: showRelaySelector) { _, newValue in
-            print("DEBUG: showRelaySelector changed to: \(newValue)")
         }
         .onChange(of: selectedRelay) { _, _ in
             // Restart streaming with new relay filter
@@ -141,17 +137,20 @@ struct HomeFeedView: View {
         // If a specific relay is selected, use it; otherwise use all relays
         let relayUrls: Set<String>? = selectedRelay != nil ? [selectedRelay!] : nil
         
-        // Stream audio events with cache-first approach
-        // When a specific relay is selected, use exclusiveRelays to only show events from that relay
-        let dataSource: NDKDataSource<NDKEvent>
-        if let relayUrls = relayUrls {
-            dataSource = ndk.observe(filter: filter, maxAge: 0, cachePolicy: .cacheWithNetwork, relays: relayUrls, exclusiveRelays: true)
-        } else {
-            dataSource = ndk.observe(filter: filter, maxAge: 0, cachePolicy: .cacheWithNetwork)
-        }
-        
         // Start streaming task
         dataSourceTask = Task {
+            // Stream audio events
+            // When a specific relay is selected, use networkOnly to ensure we only get events from that relay
+            // (cached events don't store relay information, so exclusiveRelays can't filter them)
+            let dataSource: NDKDataSource<NDKEvent>
+            if let relayUrls = relayUrls {
+                // Use networkOnly to ensure we only get events from the selected relay
+                dataSource = ndk.observe(filter: filter, maxAge: 0, cachePolicy: .networkOnly, relays: relayUrls, exclusiveRelays: true)
+            } else {
+                // For all relays, use cache for better performance
+                dataSource = ndk.observe(filter: filter, maxAge: 0, cachePolicy: .cacheWithNetwork)
+            }
+            
             for await event in dataSource.events {
                 // Check if task was cancelled
                 if Task.isCancelled { break }
@@ -310,7 +309,8 @@ struct HomeFeedView: View {
     
     private func completeRecording() {
         guard let recorder = audioRecorder,
-              let ndk = nostrManager.ndk else { return }
+              let ndk = nostrManager.ndk,
+              let signer = ndk.signer else { return }
         
         let audioUrl = recorder.url
         let finalDuration = recordingDuration
@@ -337,7 +337,7 @@ struct HomeFeedView: View {
                             data: audioData,
                             mimeType: "audio/m4a",
                             to: server,
-                            signer: ndk.signer!,
+                            signer: signer,
                             ndk: ndk
                         )
                         
@@ -465,7 +465,6 @@ struct HeaderView: View {
             }
             .contentShape(Rectangle()) // Make entire area tappable
             .onTapGesture {
-                print("DEBUG: Relay selector tapped, setting showRelaySelector = true")
                 showRelaySelector = true
             }
             

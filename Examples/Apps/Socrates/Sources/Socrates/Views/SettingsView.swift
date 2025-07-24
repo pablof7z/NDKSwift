@@ -27,8 +27,9 @@ struct SettingsView: View {
                 }
                 .foregroundColor(.white)
                 
-                NavigationLink(destination: BlossomSettingsView()) {
+                NavigationLink(destination: BlossomSettingsView(ndk: nostrManager.ndk)) {
                     Label("Blossom Servers", systemImage: "icloud.and.arrow.up")
+                        .foregroundColor(.white)
                 }
                 .foregroundColor(.white)
                 
@@ -92,9 +93,12 @@ struct SettingsView: View {
     private func loadUserData() async {
         guard let ndk = nostrManager.ndk else { return }
         
-        if let pubkey = ndk.sessionData?.pubkey {
+        // Get the current user from the active session
+        if let activeSession = nostrManager.authManager.activeSession {
+            let pubkey = activeSession.pubkey
             currentUser = NDKUser(pubkey: pubkey)
             appState.currentUser = currentUser
+            
             // Fetch profile using NDKProfileManager
             for await profile in await ndk.profileManager.observe(for: pubkey, maxAge: 3600) {
                 userProfile = profile

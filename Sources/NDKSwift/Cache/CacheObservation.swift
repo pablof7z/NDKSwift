@@ -62,3 +62,22 @@ struct FilterSignature: Hashable {
         self.tags = filter.tags?.mapValues { $0.sorted() }
     }
 }
+
+/// Aggregation signature for grouping similar filters
+/// Groups filters by structure (kinds, authors, ids, tag keys) rather than values
+/// to enable aggregation of similar queries with different tag values
+struct AggregationSignature: Hashable {
+    let kinds: [Int]?
+    let authors: [String]?
+    let ids: [String]?
+    let tagKeys: [String]?  // Only tag keys, not values, for grouping
+    
+    init(from filter: NDKFilter) {
+        self.kinds = filter.kinds?.sorted()
+        self.authors = filter.authors?.sorted()
+        self.ids = filter.ids?.sorted()
+        // Only use tag keys for grouping, not values
+        // This allows filters with same structure but different values to be aggregated
+        self.tagKeys = filter.tags?.keys.sorted()
+    }
+}

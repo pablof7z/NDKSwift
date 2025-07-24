@@ -10,7 +10,19 @@ struct ContentView: View {
         ZStack {
             Color.black.ignoresSafeArea()
             
-            AuthContainer()
+            Group {
+                if NDKAuthManager.shared.isAuthenticated {
+                    // Main app interface - shown when authenticated
+                    NavigationView {
+                        HomeFeedView()
+                    }
+                    .environment(\.ndk, nostrManager.ndk)
+                } else {
+                    // For now, just show the authentication screen
+                    // We can add session selection later if needed
+                    AuthenticationView()
+                }
+            }
         }
         .background(
             LinearGradient(
@@ -26,12 +38,27 @@ struct ContentView: View {
         )
         .onAppear {
             appState.setNostrManager(nostrManager)
+            checkAuthentication()
         }
-        .onChange(of: nostrManager.isAuthenticated) { _, isAuthenticated in
+        .environment(\.ndk, nostrManager.ndk)
+        .onChange(of: NDKAuthManager.shared.isAuthenticated) { _, isAuthenticated in
             if isAuthenticated {
                 // Load blossom servers when authenticated
                 blossomServerManager.loadServers()
+                blossomServerManager.loadSuggestedServers()
             }
         }
+    }
+    
+    private func checkAuthentication() {
+        // Update app state based on auth manager state
+        guard let session = NDKAuthManager.shared.activeSession else {
+            appState.isAuthenticated = false
+            appState.currentUser = nil
+            return
+        }
+        
+        appState.isAuthenticated = true
+        appState.currentUser = nostrManager.ndk?.getUser(session.pubkey)
     }
 }

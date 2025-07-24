@@ -21,8 +21,6 @@ Complete API documentation for NDKSwiftUI components and features.
   - [NDKProfileDataSource](#ndkprofiledatasource)
   - [NDKEventDataSource](#ndkeventdatasource)
   - [NDKContactsDataSource](#ndkcontactsdatasource)
-- [Authentication](#authentication)
-  - [NDKAuthView](#ndkauthview)
 - [Utilities](#utilities)
 
 ## Overview
@@ -341,32 +339,6 @@ var body: some View {
     }
 }
 ```
-
-## Authentication
-
-### NDKAuthView
-
-Provides a complete authentication flow UI.
-
-```swift
-NDKAuthView(
-    authManager: NDKAuthManager.shared,
-    ndk: ndk
-) {
-    // Content shown when authenticated
-    MainView()
-} authenticationContent: {
-    // Custom authentication UI (optional)
-    LoginView()
-}
-```
-
-#### Features
-
-- Handles login/logout flow
-- Supports multiple authentication methods
-- Persists authentication state
-- Provides default UI or custom content
 
 ## Utilities
 
