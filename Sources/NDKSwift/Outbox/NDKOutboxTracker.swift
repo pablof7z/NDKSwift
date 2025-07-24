@@ -310,8 +310,7 @@ actor NDKOutboxTracker {
         
         let filter = NDKFilter(
             authors: [pubkey],
-            kinds: [EventKind.relayList],
-            limit: 1
+            kinds: [EventKind.relayList]
         )
         
         // Use configured outbox relays

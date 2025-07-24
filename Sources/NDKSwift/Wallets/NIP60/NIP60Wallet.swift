@@ -1328,9 +1328,7 @@ public actor NIP60Wallet: NDKPaymentProvider {
         
         let backupFilter = NDKFilter(
             authors: [pubkey],
-            kinds: [EventKind.cashuWalletBackup],
-            limit: 1,
-            tags: ["p": Set([pubkey])]
+            kinds: [EventKind.cashuWalletBackup]
         )
         
         let dataSource = NDKDataSource(

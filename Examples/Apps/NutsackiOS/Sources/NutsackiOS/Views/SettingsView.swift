@@ -146,20 +146,6 @@ struct SettingsView: View {
                 }
                 
                 
-                // App Info
-                Section {
-                    LabeledContent("Version", value: "1.0.0")
-                    
-                    Link(destination: URL(string: "https://github.com/yourusername/nutsack")!) {
-                        Label("Source Code", systemImage: "chevron.left.forwardslash.chevron.right")
-                    }
-                    
-                    NavigationLink(destination: AboutView()) {
-                        Label("About", systemImage: "info.circle")
-                    }
-                } header: {
-                    Text("App")
-                }
                 
                 // Debug section
                 #if DEBUG
@@ -185,6 +171,14 @@ struct SettingsView: View {
             #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
             #endif
+            .safeAreaInset(edge: .bottom) {
+                Text("Version 1.0.0")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 8)
+                    .background(Color(UIColor.systemGroupedBackground))
+            }
             .task {
                 currentUser = await nostrManager.currentUser
             }

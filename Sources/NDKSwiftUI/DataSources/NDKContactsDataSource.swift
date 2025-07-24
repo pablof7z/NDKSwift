@@ -67,8 +67,7 @@ public final class NDKContactsDataSource: ObservableObject {
         self.contactListDataSource = ndk.observe(
             filter: NDKFilter(
                 authors: [userPubkey],
-                kinds: [EventKind.contacts],
-                limit: 1
+                kinds: [EventKind.contacts]
             ),
             maxAge: maxAge,
             cachePolicy: .cacheWithNetwork

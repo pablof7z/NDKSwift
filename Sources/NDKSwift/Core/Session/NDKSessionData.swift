@@ -354,12 +354,14 @@ public class NDKSessionData {
             kinds: [EventKind.contacts]
         )
         
-        // Use data source to fetch events
+        // Use data source to fetch events from outbox relays only
         let subscriptionId = "session_wot_\(pubkey.prefix(8))"
         let dataSource = NDKDataSource<NDKEvent>(
             ndk: ndk,
             filter: filter,
             maxAge: 5 * TimeConstants.minute, // 5 minute cache
+            relays: ndk.outboxConfig.outboxRelays,
+            exclusiveRelays: true, // Only use the specified outbox relays
             subscriptionId: subscriptionId
         )
         

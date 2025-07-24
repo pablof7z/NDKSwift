@@ -101,7 +101,7 @@ actor NDKDataRequirementManager {
         let aggregationSignature = AggregationSignature(from: filter)
         
         // Check if we can reuse an existing requirement (only for live subscriptions)
-        if maxAge == 0, let existing = findMatchingRequirement(for: filter) {
+        if maxAge == 0, let existing = await findMatchingRequirement(for: filter) {
             await existing.addObserver(observer, id: requirementId, individualFilter: filter)
             return DataRequirementHandle(
                 id: requirementId,
@@ -164,21 +164,21 @@ actor NDKDataRequirementManager {
         await requirement.removeObserver(id: id)
         
         // If no more observers, close the subscription
-        if requirement.observerCount == 0 {
+        if await requirement.observerCount == 0 {
             NDKLogger.log(.info, category: .subscription, "🛑 No more observers - closing subscription: \(requirement.subscriptionId)", correlationId: String(correlationId))
             await requirement.internalSubscription.close()
             activeRequirements.removeValue(forKey: id)
         } else {
-            NDKLogger.log(.debug, category: .subscription, "👥 Still \(requirement.observerCount) observers remaining", correlationId: String(correlationId))
+            NDKLogger.log(.debug, category: .subscription, "👥 Still \(await requirement.observerCount) observers remaining", correlationId: String(correlationId))
         }
     }
     
     // MARK: - Private Methods
     
-    private func findMatchingRequirement(for filter: NDKFilter) -> DataRequirement? {
+    private func findMatchingRequirement(for filter: NDKFilter) async -> DataRequirement? {
         // Look for exact match or superset that includes this filter
         for (_, requirement) in activeRequirements {
-            if requirement.includesFilter(filter) {
+            if await requirement.includesFilter(filter) {
                 return requirement
             }
         }
@@ -407,7 +407,7 @@ actor NDKDataRequirementManager {
                 var addedObservers = 0
                 for p in lifecycleGroup {
                     // Only add observer if this aggregated filter covers their individual filter
-                    let covers = requirement.includesFilter(p.filter)
+                    let covers = await requirement.includesFilter(p.filter)
                     
                     if covers {
                         // Cancel the immediate cache observation since DataRequirement will set up its own
@@ -753,7 +753,7 @@ struct PendingRequirement {
 }
 
 /// Manages a single data requirement - events flow ONLY through cache
-class DataRequirement {
+actor DataRequirement {
     let filter: NDKFilter
     let subscriptionId: String
     let internalSubscription: InternalSubscription
@@ -885,12 +885,12 @@ class DataRequirement {
             guard let self = self else { return }
             
             // Forward EOSE to all observers as relay updates
-            for (_, observer) in self.observers {
+            for (_, observer) in await self.observers {
                 await observer.handleRelayUpdate(.eose(relay: relay))
             }
             
             // Close subscription if closeOnEose is set OR if we have all requested event IDs
-            let shouldClose = self.closeOnEose || 
+            let shouldClose = await self.closeOnEose || 
                 (requestedIds != nil && receivedIds != nil && Set(requestedIds!) == receivedIds!)
             
             if shouldClose {
@@ -942,7 +942,7 @@ class DataRequirement {
                 }
                 
                 // Also forward as relay update to data sources
-                for (_, observer) in observers {
+                for (_, observer) in await self.observers {
                     await observer.handleRelayUpdate(.event(event, relay: relay))
                 }
             }

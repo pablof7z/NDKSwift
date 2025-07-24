@@ -2,11 +2,15 @@
 .build/
 build/
 DerivedData/
+.swiftpm/
 
 # Ignore large test files
 *.test
 **/test_vectors/
 **/Test Vectors/
+**/*test*.json
+**/*Test*.json
+**/Tests/**
 
 # Ignore documentation that's not essential
 docs/
@@ -21,3 +25,19 @@ Examples/Debug*.swift
 
 # Keep only the NIP60Wallet example
 !Examples/NIP60Wallet.swiftExamples
+
+# Exclude vendor dependencies  
+Libraries/
+Sources/*/checkouts/
+Packages/
+Package.resolved
+
+# Exclude IDE files
+*.xcworkspace/
+*.xcodeproj/
+*.xcuserdata/
+
+# Exclude specific large files that appear in checkouts
+**/p256-nistz-table.h
+**/CCryptoBoringSSL/**
+**/GRDB.swift/SQLiteCustom/**
