@@ -4,38 +4,8 @@ import SwiftUI
 // Clean, sophisticated components without excessive effects
 
 // MARK: - Card Styles
-struct ModernCard: ViewModifier {
-    var noPadding: Bool = false
-    var isInteractive: Bool = false
-    
-    func body(content: Content) -> some View {
-        content
-            .padding(noPadding ? 0 : DesignSystem.Spacing.cardPadding)
-            .background(DesignSystem.Colors.surface)
-            .clipShape(RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.medium, style: .continuous))
-            .shadow(
-                color: DesignSystem.Shadow.small.color,
-                radius: DesignSystem.Shadow.small.radius,
-                x: DesignSystem.Shadow.small.x,
-                y: DesignSystem.Shadow.small.y
-            )
-    }
-}
-
-struct ModernCardSelected: ViewModifier {
-    let isSelected: Bool
-    
-    func body(content: Content) -> some View {
-        content
-            .overlay(
-                RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.medium, style: .continuous)
-                    .stroke(isSelected ? DesignSystem.Colors.primary : Color.clear, lineWidth: 2)
-                    .animation(DesignSystem.Animation.quick, value: isSelected)
-            )
-            .scaleEffect(isSelected ? 1.02 : 1.0)
-            .animation(DesignSystem.Animation.springSnappy, value: isSelected)
-    }
-}
+// Card styles have been consolidated in CardSystem.swift to follow DRY principles
+// Use .modernCard(), .modernCardSelected(), .glassCard(), or .compactCard() modifiers
 
 // MARK: - Button Styles
 // Note: Primary button styles are now defined in ModernButtonStyles.swift to avoid duplication
@@ -143,13 +113,7 @@ struct ModernPlaceholder: ViewModifier {
 
 // MARK: - View Extensions
 extension View {
-    func modernCard(noPadding: Bool = false) -> some View {
-        self.modifier(ModernCard(noPadding: noPadding))
-    }
-    
-    func modernCardSelected(_ isSelected: Bool) -> some View {
-        self.modifier(ModernCardSelected(isSelected: isSelected))
-    }
+    // Card modifiers are now defined in CardSystem.swift
     
     func modernListItem(showDivider: Bool = true) -> some View {
         self.modifier(ModernListItem(showDivider: showDivider))

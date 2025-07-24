@@ -11,6 +11,7 @@
 		218363F8C03885960CF5D248 /* AppState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E06D1E90D26910A32BBA586 /* AppState.swift */; };
 		2207FFA98AB56815A584DDB4 /* FollowPack.swift in Sources */ = {isa = PBXBuildFile; fileRef = 03DEF9DECD6C6F4D9AF8C400 /* FollowPack.swift */; };
 		2629890795B6D0A577BF09D3 /* SelectableMarkdownRenderer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 68EE862B30307430C752F295 /* SelectableMarkdownRenderer.swift */; };
+		31CEBD7F410053E533CDE2BA /* CardSystem.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4E36C3396966D42A6A522C05 /* CardSystem.swift */; };
 		34DF18AC7EC3EE0F46E1A1A3 /* HomeDataManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = F6C338502340BD8BE768794B /* HomeDataManager.swift */; };
 		39ED8F05509F9A4FFF466557 /* LibraryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 552D71BE7E32CED89D35A278 /* LibraryView.swift */; };
 		3A1255EBF3357C89B1E648F6 /* HighlightDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 842FF8B20D37A2852B7A0ED9 /* HighlightDetailView.swift */; };
@@ -31,6 +32,7 @@
 		8B1648772C86AD40FCF6602E /* DesignSystem.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A3025E76E14FBF1C8D93736 /* DesignSystem.swift */; };
 		8D5D97226F6D2C4ABE8631F3 /* ArticleView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 71A83CD10503C7B187BEE747 /* ArticleView.swift */; };
 		8EE197235B1A83A04B155F56 /* VisualEffects.swift in Sources */ = {isa = PBXBuildFile; fileRef = 62A24BA9AAF6CD7CBED4A5EB /* VisualEffects.swift */; };
+		90FB2D8DFBA087C9BDB929A9 /* ModernAnimations.swift in Sources */ = {isa = PBXBuildFile; fileRef = 100AC071EC95CCD73917D434 /* ModernAnimations.swift */; };
 		91774403D5A6E567EB9879C6 /* HighlighterApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = FD69175DE127E1B1E7016D16 /* HighlighterApp.swift */; };
 		981A640F5DAAE1DC2566BE65 /* ModernFormComponents.swift in Sources */ = {isa = PBXBuildFile; fileRef = 96BB1CEB6B1AF8996372B0A9 /* ModernFormComponents.swift */; };
 		9A08FA3600462F3DD3497E16 /* PremiumAnimations.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5B90C3B1B7E66DF0A22C6359 /* PremiumAnimations.swift */; };
@@ -58,12 +60,14 @@
 		01F9CBDB1F581FAFF82499ED /* HapticManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HapticManager.swift; sourceTree = "<group>"; };
 		03DEF9DECD6C6F4D9AF8C400 /* FollowPack.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FollowPack.swift; sourceTree = "<group>"; };
 		0CD20236BF86EF8694B01BCB /* ProfileManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProfileManager.swift; sourceTree = "<group>"; };
+		100AC071EC95CCD73917D434 /* ModernAnimations.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModernAnimations.swift; sourceTree = "<group>"; };
 		1218D531D7715736DC097843 /* Article.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Article.swift; sourceTree = "<group>"; };
 		19C631ECAA0313B22AD50212 /* HighlightCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HighlightCard.swift; sourceTree = "<group>"; };
 		1A3025E76E14FBF1C8D93736 /* DesignSystem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesignSystem.swift; sourceTree = "<group>"; };
 		288947C11C084EEA395DB4F3 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
 		47D8FA7B43386CEE13EB7B18 /* DataStreamManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DataStreamManager.swift; sourceTree = "<group>"; };
 		4CF27270F57B25E33B719EEC /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
+		4E36C3396966D42A6A522C05 /* CardSystem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CardSystem.swift; sourceTree = "<group>"; };
 		552D71BE7E32CED89D35A278 /* LibraryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LibraryView.swift; sourceTree = "<group>"; };
 		5AFA2646020373D085219CD1 /* UnifiedCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UnifiedCard.swift; sourceTree = "<group>"; };
 		5B90C3B1B7E66DF0A22C6359 /* PremiumAnimations.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PremiumAnimations.swift; sourceTree = "<group>"; };
@@ -225,7 +229,9 @@
 			children = (
 				6631658DBFE8C97A69C08F13 /* Animations.swift */,
 				CC9C86787D8110767C109BBB /* ButtonSystem.swift */,
+				4E36C3396966D42A6A522C05 /* CardSystem.swift */,
 				1A3025E76E14FBF1C8D93736 /* DesignSystem.swift */,
+				100AC071EC95CCD73917D434 /* ModernAnimations.swift */,
 				CC98504899CC29F4D15C2A92 /* ModernViewModifiers.swift */,
 				5B90C3B1B7E66DF0A22C6359 /* PremiumAnimations.swift */,
 				62A24BA9AAF6CD7CBED4A5EB /* VisualEffects.swift */,
@@ -415,6 +421,7 @@
 				8D5D97226F6D2C4ABE8631F3 /* ArticleView.swift in Sources */,
 				56884CA05833E2E75660E7E3 /* BlurHashDecoder.swift in Sources */,
 				584216E80F87025A63620635 /* ButtonSystem.swift in Sources */,
+				31CEBD7F410053E533CDE2BA /* CardSystem.swift in Sources */,
 				4F557938220F55296A4E483F /* ContentView.swift in Sources */,
 				73EF0B3EADF9149125478230 /* CreateCurationView.swift in Sources */,
 				D6BF6DEBA828B3B11D10832E /* CurationDetailView.swift in Sources */,
@@ -431,6 +438,7 @@
 				BE7B648769FD679A8E81418A /* HighlightsFeedView.swift in Sources */,
 				34DF18AC7EC3EE0F46E1A1A3 /* HomeDataManager.swift in Sources */,
 				39ED8F05509F9A4FFF466557 /* LibraryView.swift in Sources */,
+				90FB2D8DFBA087C9BDB929A9 /* ModernAnimations.swift in Sources */,
 				9D8D0E11AFFAEBF826CA8C35 /* ModernAuthenticationView.swift in Sources */,
 				C975491F710CDEF803054F4B /* ModernButtonStyles.swift in Sources */,
 				981A640F5DAAE1DC2566BE65 /* ModernFormComponents.swift in Sources */,
