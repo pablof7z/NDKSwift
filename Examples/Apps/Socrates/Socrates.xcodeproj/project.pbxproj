@@ -36,7 +36,7 @@
 		BEE222498AC852F7BE79CAF4 /* UserProfileView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UserProfileView.swift; sourceTree = "<group>"; };
 		C6CAD7F4A7FFDCF19160C1E8 /* SocratesApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SocratesApp.swift; sourceTree = "<group>"; };
 		EADB1B82B858D84DCC0FD38A /* AudioEvent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioEvent.swift; sourceTree = "<group>"; };
-		F411B1B80B8F4CB6D8C2B8F8 /* Socrates.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = Socrates.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		F411B1B80B8F4CB6D8C2B8F8 /* Socrates.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Socrates.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -154,7 +154,6 @@
 				LastUpgradeCheck = 1500;
 				TargetAttributes = {
 					DD6239409F0638F9ACBCFEEE = {
-						DevelopmentTeam = "";
 						ProvisioningStyle = Automatic;
 					};
 				};
@@ -276,14 +275,14 @@
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				CODE_SIGN_STYLE = Automatic;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
-				DEVELOPMENT_TEAM = "";
+				DEVELOPMENT_TEAM = 456SHKPP26;
 				ENABLE_PREVIEWS = YES;
 				INFOPLIST_FILE = Sources/Socrates/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = com.socrates.app;
+				PRODUCT_BUNDLE_IDENTIFIER = io.f7z.socrates;
 				PRODUCT_NAME = Socrates;
 				SDKROOT = iphoneos;
 				SWIFT_OPTIMIZATION_LEVEL = "-O";
@@ -300,14 +299,14 @@
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				CODE_SIGN_STYLE = Automatic;
 				DEBUG_INFORMATION_FORMAT = dwarf;
-				DEVELOPMENT_TEAM = "";
+				DEVELOPMENT_TEAM = 456SHKPP26;
 				ENABLE_PREVIEWS = YES;
 				INFOPLIST_FILE = Sources/Socrates/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = com.socrates.app;
+				PRODUCT_BUNDLE_IDENTIFIER = io.f7z.socrates;
 				PRODUCT_NAME = Socrates;
 				SDKROOT = iphoneos;
 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;

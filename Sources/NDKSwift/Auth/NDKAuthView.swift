@@ -3,8 +3,8 @@ import LocalAuthentication
 
 // MARK: - Constants
 
-/// Icon size for authentication view icons
-private let authIconSize: CGFloat = 60
+/// Icon size for authentication view icons - moved to NDKAuthConstants
+private let authIconSize: CGFloat = NDKAuthConstants.Size.icon
 
 /// SwiftUI view for NDK authentication flow
 ///
@@ -208,7 +208,7 @@ public struct NDKAuthView<AuthenticatedContent: View, AuthenticationContent: Vie
     // MARK: - State Views
     
     private var authenticatingView: some View {
-        VStack(spacing: 20) {
+        VStack(spacing: NDKAuthConstants.Spacing.large) {
             ProgressView()
                 .scaleEffect(1.5)
             
@@ -221,10 +221,10 @@ public struct NDKAuthView<AuthenticatedContent: View, AuthenticationContent: Vie
     }
     
     private var biometricRequiredView: some View {
-        VStack(spacing: 30) {
+        VStack(spacing: NDKAuthConstants.Spacing.extraLarge) {
             biometricIcon
             
-            VStack(spacing: 12) {
+            VStack(spacing: NDKAuthConstants.Spacing.standard) {
                 Text("Authentication Required")
                     .font(.title2)
                     .fontWeight(.semibold)
@@ -241,7 +241,7 @@ public struct NDKAuthView<AuthenticatedContent: View, AuthenticationContent: Vie
                     .padding()
                     .background(.blue)
                     .foregroundStyle(.white)
-                    .cornerRadius(12)
+                    .cornerRadius(NDKAuthConstants.Size.cornerRadius)
             }
             
             Button("Use Different Account") {
@@ -249,24 +249,24 @@ public struct NDKAuthView<AuthenticatedContent: View, AuthenticationContent: Vie
             }
             .foregroundStyle(.secondary)
         }
-        .padding(40)
+        .padding(NDKAuthConstants.Padding.container)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(.regularMaterial)
     }
     
     private var sessionSelectionView: some View {
-        VStack(spacing: 30) {
+        VStack(spacing: NDKAuthConstants.Spacing.extraLarge) {
             sessionSelectionHeader
             sessionsList
             addAccountButton
         }
-        .padding(40)
+        .padding(NDKAuthConstants.Padding.container)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(.regularMaterial)
     }
     
     private var sessionSelectionHeader: some View {
-        VStack(spacing: 16) {
+        VStack(spacing: NDKAuthConstants.Spacing.medium) {
             Image(systemName: "person.2.circle")
                 .font(.system(size: authIconSize))
                 .foregroundStyle(.blue)
@@ -339,7 +339,7 @@ public struct NDKAuthView<AuthenticatedContent: View, AuthenticationContent: Vie
                 .font(.system(size: 50))
                 .foregroundStyle(.orange)
             
-            VStack(spacing: 8) {
+            VStack(spacing: NDKAuthConstants.Spacing.small) {
                 Text(errorInfo.title)
                     .font(.title2)
                     .fontWeight(.semibold)
@@ -362,18 +362,18 @@ public struct NDKAuthView<AuthenticatedContent: View, AuthenticationContent: Vie
                 .buttonStyle(.borderedProminent)
             }
         }
-        .padding(40)
+        .padding(NDKAuthConstants.Padding.container)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(.regularMaterial)
     }
     
     private var sessionExpiredView: some View {
-        VStack(spacing: 20) {
+        VStack(spacing: NDKAuthConstants.Spacing.large) {
             Image(systemName: "clock.badge.exclamationmark")
                 .font(.system(size: 50))
                 .foregroundStyle(.orange)
             
-            VStack(spacing: 8) {
+            VStack(spacing: NDKAuthConstants.Spacing.small) {
                 Text("Session Expired")
                     .font(.title2)
                     .fontWeight(.semibold)
@@ -388,7 +388,7 @@ public struct NDKAuthView<AuthenticatedContent: View, AuthenticationContent: Vie
             }
             .buttonStyle(.borderedProminent)
         }
-        .padding(40)
+        .padding(NDKAuthConstants.Padding.container)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(.regularMaterial)
     }
@@ -480,7 +480,7 @@ private struct SessionRowView: View {
     
     var body: some View {
         Button(action: action) {
-            HStack(spacing: 16) {
+            HStack(spacing: NDKAuthConstants.Spacing.medium) {
                 // Avatar or placeholder
                 AsyncImage(url: session.avatarURL) { image in
                     image
@@ -498,7 +498,7 @@ private struct SessionRowView: View {
                 .frame(width: 50, height: 50)
                 .clipShape(Circle())
                 
-                VStack(alignment: .leading, spacing: 4) {
+                VStack(alignment: .leading, spacing: NDKAuthConstants.Spacing.extraSmall) {
                     Text(session.profileName ?? session.shortIdentifier)
                         .font(.headline)
                         .foregroundStyle(.primary)
@@ -508,7 +508,7 @@ private struct SessionRowView: View {
                         .foregroundStyle(.secondary)
                     
                     if session.requiresBiometric || session.isHardwareBacked {
-                        HStack(spacing: 4) {
+                        HStack(spacing: NDKAuthConstants.Spacing.extraSmall) {
                             if session.isHardwareBacked {
                                 Image(systemName: "checkmark.shield")
                                     .foregroundStyle(.green)
@@ -632,8 +632,8 @@ public struct DefaultAuthenticationView: View {
     public init() {}
     
     public var body: some View {
-        VStack(spacing: 30) {
-            VStack(spacing: 16) {
+        VStack(spacing: NDKAuthConstants.Spacing.extraLarge) {
+            VStack(spacing: NDKAuthConstants.Spacing.medium) {
                 Image(systemName: "key.fill")
                     .font(.system(size: authIconSize))
                     .foregroundStyle(.blue)
@@ -648,7 +648,7 @@ public struct DefaultAuthenticationView: View {
                     .multilineTextAlignment(.center)
             }
             
-            VStack(spacing: 12) {
+            VStack(spacing: NDKAuthConstants.Spacing.standard) {
                 Text("To use NDKAuthView, provide your own authentication content:")
                     .font(.caption)
                     .foregroundStyle(.secondary)
@@ -667,7 +667,7 @@ public struct DefaultAuthenticationView: View {
                 .cornerRadius(8)
             }
         }
-        .padding(40)
+        .padding(NDKAuthConstants.Padding.container)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(.regularMaterial)
     }
