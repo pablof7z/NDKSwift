@@ -7,7 +7,7 @@ NDKSwift is designed with modern Swift principles at its core. You must understa
 1.  **Immutability and State Management:** `NDKEvent` is an immutable struct. All mutable state related to an event's lifecycle (e.g., which relays have seen it, publish status) is managed externally by the `NDKEventTracker`. This ensures thread safety and predictable behavior.
 2.  **Concurrency with Swift Actors:** The library heavily uses actors (`NDKRelayPool`, `RelayStateActor`, `UserStateActor`, `NDKAuthManager`, etc.) to manage state and guarantee thread safety. You should leverage `async/await` for all interactions with the library.
 3.  **Protocol-Oriented Design:** Key components like `NDKSigner` and `NDKCache` are defined by protocols, allowing for custom implementations and easy testing.
-4.  **Fluent, Builder-style APIs:** Creating complex objects like subscriptions is simplified through builders (`NDKSubscriptionBuilder`, `NDKEventBuilder`), leading to more readable and maintainable code.
+4.  **Fluent, Builder-style APIs:** Creating complex objects like events is simplified through builders (`NDKEventBuilder`), and data access is simplified through the declarative `observe()` API, leading to more readable and maintainable code.
 5.  **Performance by Default:** Features like optimistic publishing, subscription management, signature verification sampling, and caching are built-in to ensure a snappy user experience, a common challenge in Nostr clients.
 6.  **NEVER WAIT - ALWAYS STREAM:** This is the most critical principle for Nostr applications. Data in Nostr is unreliable and can arrive slowly or incompletely. Apps must NEVER wait for "complete" data before rendering. Instead, show what you have immediately and update the UI as more data streams in. This creates responsive, native-feeling applications that work well even with poor network conditions.
 
@@ -23,7 +23,7 @@ For a production application, always initialize `NDK` with a persistent cache. `
 
 ```swift
 // In your main App or a singleton manager (e.g., NostrManager)
-let cache = try await NDKSQLiteCache()
+let cache = try await NDKSQLiteCache(path: nil) // Path is optional
 let ndk = NDK(
     relayUrls: ["wss://relay.damus.io", "wss://relay.primal.net"],
     cache: cache,
@@ -96,37 +96,38 @@ NDKSwift provides a powerful, self-contained authentication system via `NDKAuthM
     ```swift
     // In your App or initial view
     .task {
-        // Start the session - handles biometric auth if needed
-        do {
-            try await authManager.startSession()
-            // Session is now active, user is authenticated
-        } catch {
-            // Handle authentication failure
-            // User will see login screen via your authentication UI
+        // Restore sessions from keychain
+        await authManager.restoreSessions()
+        
+        // Use the most recent session if available
+        if let mostRecentSession = authManager.availableSessions.last {
+            try await authManager.switchToSession(mostRecentSession)
         }
     }
     ```
 
-    The `startSession()` method:
-    - Automatically selects the most recent session if multiple exist
-    - Prompts for biometric authentication if the session requires it
-    - Validates and activates the session's signer
-    - Handles all error cases gracefully
+    The session restoration process:
+    - Loads all saved sessions from the keychain
+    - You can manually select which session to activate
+    - Use `switchToSession()` to activate a specific session
+    - Biometric authentication is handled when switching sessions
 
 5.  **Handling Multiple Sessions:**
-    When multiple sessions exist, `startSession()` uses the most recent one by default.
+    When multiple sessions exist, you can access and switch between them.
 
     ```swift
     // Get all available sessions
-    let sessions = authManager.sessions
+    let sessions = authManager.availableSessions
     
     // Manually switch to a specific session
     if let targetSession = sessions.first(where: { $0.displayName == "Work Account" }) {
         try await authManager.switchToSession(targetSession)
     }
     
-    // Or let startSession handle it automatically
-    try await authManager.startSession() // Uses most recent session
+    // Switch to the most recent session
+    if let mostRecentSession = authManager.availableSessions.last {
+        try await authManager.switchToSession(mostRecentSession)
+    }
     ```
 
 6.  **Biometric Authentication Flow:**
@@ -140,9 +141,9 @@ NDKSwift provides a powerful, self-contained authentication system via `NDKAuthM
         requiresBiometric: true
     )
     
-    // Later, when starting the app
+    // Later, when switching to a biometric-protected session
     do {
-        try await authManager.startSession()
+        try await authManager.switchToSession(session)
         // If biometric is required, user is prompted automatically
     } catch NDKAuthError.biometricAuthenticationFailed {
         // User failed biometric auth or cancelled
@@ -154,7 +155,7 @@ NDKSwift provides a powerful, self-contained authentication system via `NDKAuthM
 
 **Architectural Tips:**
 
-1. **Session Initialization**: Always call `startSession()` early in your app lifecycle (e.g., in your App's `.task` modifier) to ensure the user is authenticated before accessing NDK features.
+1. **Session Initialization**: Always call `restoreSessions()` early in your app lifecycle (e.g., in your App's `.task` modifier) to load available sessions, then use `switchToSession()` to activate a specific session.
 
 2. **Error Handling**: The authentication system provides specific error types (`NDKAuthError`) for different failure scenarios. Handle these appropriately in your UI.
 
@@ -178,6 +179,25 @@ NDKSwift provides a modern declarative API for accessing Nostr data with automat
 *   **Automatic Lifecycle**: Data sources manage their subscriptions automatically - no manual closing needed
 *   **Temporal Grouping**: Similar requests within 100ms are automatically batched for efficiency
 
+**Creating Data Sources:**
+
+Use `ndk.observe()` to create data sources with optional custom subscription IDs:
+
+```swift
+// With custom subscription ID (persists across sessions)
+let customSource = ndk.observe(
+    filter: NDKFilter(kinds: [1]),
+    maxAge: 0,
+    subscriptionId: "my-custom-feed"
+)
+
+// Without custom ID (auto-generated)
+let autoSource = ndk.observe(
+    filter: NDKFilter(kinds: [1]),
+    maxAge: 0
+)
+```
+
 **Best Practices:**
 
 1.  **Real-time subscriptions (maxAge: 0):**
@@ -185,7 +205,7 @@ NDKSwift provides a modern declarative API for accessing Nostr data with automat
     ```swift
     // Stream text notes in real-time
     let notesSource = ndk.observe(
-        filter: NDKFilter(kinds: [EventKind.textNote], limit: 100),
+        filter: NDKFilter(kinds: [1], limit: 100),
         maxAge: 0,  // Always fresh
         cachePolicy: .cacheWithNetwork
     )
@@ -201,7 +221,7 @@ NDKSwift provides a modern declarative API for accessing Nostr data with automat
     ```swift
     // Fetch user profile with 1-hour cache
     let profileSource = ndk.observe(
-        filter: NDKFilter(authors: [pubkey], kinds: [EventKind.metadata], limit: 1),
+        filter: NDKFilter(authors: [pubkey], kinds: [0], limit: 1),
         maxAge: 3600  // 1 hour cache tolerance
     )
     
@@ -292,7 +312,7 @@ This is particularly useful for:
 // Using the event builder
 let event = try await NDKEventBuilder()
     .content("Hello from NDKSwift!")
-    .kind(EventKind.textNote)
+    .kind(1) // text note
     .tag(["t", "swift"])
     .build(signer: ndk.signer!)  // Pass the signer explicitly
 
@@ -302,7 +322,7 @@ let publishedRelays = try await ndk.publish(event)
 let signer = authManager.activeSigner!
 let event = try await NDKEventBuilder()
     .content("Hello from NDKSwift!")
-    .kind(EventKind.textNote)
+    .kind(1) // text note
     .tag(["t", "swift"])
     .build(signer: signer)
 ```
@@ -455,7 +475,7 @@ let publicPost = try await NDKEventBuilder()
 // 4. DM (1 p-tag) - Uses outbox model
 let dm = try await NDKEventBuilder()
     .content("Hey, can we chat privately?")
-    .kind(EventKind.encryptedDirectMessage)
+    .kind(4)  // encrypted direct message
     .tag(["p", recipientPubkey])
     .build(signer: ndk.signer!)
 // → Publishes to your write relays + recipient's read relays
@@ -584,13 +604,9 @@ When you call `ndk.publish(event)`:
 **Configuration Options:**
 
 ```swift
-// Default behavior (recommended for most apps)
-ndk.optimisticPublishingConfig.enabled = true
-ndk.optimisticPublishingConfig.cacheUnpublishedEvents = true
-ndk.optimisticPublishingConfig.dispatchToSubscriptions = true
-
-// Disable optimistic publishing for traditional behavior
-ndk.optimisticPublishingConfig = .disabled
+// Optimistic publishing is always enabled for better UX
+// Events are automatically cached and dispatched to local subscriptions
+// Use cache policy .networkOnly if you need to skip optimistic events
 
 // Per-data source control
 let confirmedOnlySource = ndk.observe(
@@ -657,7 +673,7 @@ let confirmedOnlySource = ndk.observe(
             
             let event = try await NDKEventBuilder()
                 .content(content)
-                .kind(EventKind.textNote)
+                .kind(1)  // text note
                 .build(signer: signer)
             
             // Create optimistic UI state
@@ -844,13 +860,13 @@ This optimistic publishing system is fundamental to creating responsive Nostr ap
 
 ---
 
-### 6. Wallet Integration: NWC & Cashu
+### 6. Wallet Integration: NWC & NIP-60
 
 NDKSwift has first-class support for wallets.
 
 #### Nostr Wallet Connect (NWC)
 
-*   **Model:** `NDKNWCWallet` conforms to `NDKNWCWalletProtocol`.
+*   **Model:** `NDKNWCWallet` implements the `NDKPaymentProvider` protocol.
 *   **Setup:** Initialize with a `nostr+walletconnect://` URI.
 
     ```swift
@@ -859,11 +875,11 @@ NDKSwift has first-class support for wallets.
     ```
 *   **Usage:** Call methods like `payInvoice(...)`, `makeInvoice(...)`, `getBalance()`. The library handles the NIP-47 request/response flow, including encryption and event building.
 
-#### Cashu Wallet (Nutsack)
+#### NIP-60 Wallet (Cashu)
 
 This is a more advanced, integrated Cashu ecash wallet.
 
-*   **Model:** `NDKCashuWallet` is a feature-rich wallet actor.
+*   **Model:** `NIP60Wallet` is a feature-rich wallet actor.
 *   **Storage (NIP-60):** The wallet state (mints, proofs as encrypted token events) is backed up to Nostr, allowing for restoration on different devices.
 *   **Nutzaps (NIP-61):** Provides a simple API for sending and receiving zaps using Cashu ecash instead of Lightning.
 *   **Key Operations:**
@@ -874,7 +890,7 @@ This is a more advanced, integrated Cashu ecash wallet.
     *   **Sending Nutzaps:** `wallet.pay(NutzapRequest(...))`
     *   **Receiving Nutzaps:** Run `wallet.startNutzapMonitor()` to listen for incoming nutzaps. The wallet automatically redeems them.
 
-**Architectural Tip:** Encapsulate wallet logic in a `WalletManager` observable object, which holds an instance of `NDKCashuWallet` or `NDKNWCWallet`. This manager can expose simplified methods to your SwiftUI views, as seen in `NutsackiOS`.
+**Architectural Tip:** Encapsulate wallet logic in a `WalletManager` observable object, which holds an instance of `NIP60Wallet` or `NDKNWCWallet`. This manager can expose simplified methods to your SwiftUI views, as seen in the example apps.
 
 ---
 
@@ -962,7 +978,7 @@ NDKSwift includes a comprehensive implementation of Negentropy, a set reconcilia
 **When NOT to Use Negentropy:**
 
 *   **Small Event Sets (< 100 events)**: Traditional sync is simpler and faster
-*   **Real-time Subscriptions**: Use regular `NDKSubscription` for live feeds
+*   **Real-time Subscriptions**: Use `ndk.observe()` with `maxAge: 0` for live feeds
 *   **Unsupported Relays**: Always check relay NIP-77 support first
 
 **Core Implementation Pattern:**
@@ -984,7 +1000,7 @@ func syncUserData(pubkey: String) async throws {
     )
     
     // Perform efficient sync
-    let result = try await ndk.syncEvents(filter: filter)
+    let result = try await ndk.syncEvents(filter: filter, relay: relay)
     print("Synced \(result.receivedEvents.count) events efficiently")
 }
 ```
@@ -1045,7 +1061,7 @@ func performBackgroundSync() async {
     
     // Use short timeout for background operations
     try await withTimeout(15.0) {
-        _ = try await ndk.syncEvents(filter: essentialFilter)
+        _ = try await ndk.syncEvents(filter: essentialFilter, relay: preferredRelay)
     }
 }
 ```
@@ -1088,7 +1104,7 @@ struct SyncMetrics {
 
 // Monitor and log sync performance
 let metrics = try await measureSync {
-    try await ndk.syncEvents(filter: filter)
+    try await ndk.syncEvents(filter: filter, relay: targetRelay)
 }
 
 print("Sync efficiency: \(metrics.efficiency) events/byte")
@@ -1140,7 +1156,7 @@ func showUserFeed() async {
     showLoadingSpinner()
     
     // Then wait to load all posts from followed users
-    let posts = await ndk.observe(authors: followList.follows).collect()
+    let posts = await ndk.observe(authors: contactList.contactPubkeys).collect()
     
     hideLoadingSpinner()
     displayPosts(posts)
@@ -1172,7 +1188,7 @@ struct UserProfileView: View {
 func setupUserProfile(pubkey: String) {
     // Show UI immediately with pubkey - no loading state
     let profileSource = ndk.observe(
-        filter: NDKFilter(authors: [pubkey], kinds: [EventKind.metadata]),
+        filter: NDKFilter(authors: [pubkey], kinds: [0]),  // metadata
         maxAge: 3600  // Use cached data immediately
     )
     
@@ -1189,18 +1205,18 @@ func showUserFeed() {
     // Start showing feed immediately with empty state
     displayFeedUI()
     
-    // Stream follow list as it arrives
+    // Stream contact list as it arrives
     let followSource = ndk.observe(
-        filter: NDKFilter(kinds: [EventKind.followList], authors: [currentUser]),
+        filter: NDKFilter(kinds: [3], authors: [currentUser]),
         maxAge: 300
     )
     
     for await followEvent in followSource.events {
-        let followList = NDKFollowList(event: followEvent)
+        let contactList = NDKContactList.fromEvent(followEvent)
         
-        // As soon as we have ANY follows, start streaming their posts
-        // Don't wait for the "complete" follow list
-        startStreamingPosts(authors: followList.follows)
+        // As soon as we have ANY contacts, start streaming their posts
+        // Don't wait for the "complete" contact list
+        startStreamingPosts(authors: contactList.contactPubkeys)
     }
 }
 ```
@@ -1262,18 +1278,18 @@ The ONLY time you should wait is when a query depends on the results of another 
 // RIGHT: This is the ONLY acceptable waiting pattern
 func loadUserPostsFromFollows() async {
     // Must wait for follow list to know who to fetch posts from
-    let followListSource = ndk.observe(
+    let contactListSource = ndk.observe(
         filter: NDKFilter(kinds: [3], authors: [currentUserPubkey]),
         maxAge: 300
     )
     
-    // Wait for first follow list result ONLY
-    if let followEvent = await followListSource.currentValue().first {
-        let followList = NDKFollowList(event: followEvent)
+    // Wait for first contact list result ONLY
+    if let contactEvent = await contactListSource.currentValue().first {
+        let contactList = NDKContactList.fromEvent(contactEvent)
         
         // Now stream posts from followed users
         let postsSource = ndk.observe(
-            filter: NDKFilter(kinds: [1], authors: Array(followList.follows)),
+            filter: NDKFilter(kinds: [1], authors: contactList.contactPubkeys),
             maxAge: 0
         )
         
@@ -1312,7 +1328,7 @@ Your app must handle all these scenarios gracefully by showing what it has and u
 
 *   **Signature Verification Sampling:** NDKSwift does not verify every single signature by default to save CPU. It uses a sampling strategy defined by `NDKSignatureVerificationConfig`. For most apps, the default is fine. You can configure it to be more or less strict. It also automatically detects and can blacklist "evil relays" that serve events with invalid signatures.
 *   **Caching:** Use `NDKSQLiteCache` to persist events, profiles, and other Nostr data. This dramatically improves launch times and provides a basic offline experience. The `NDKProfileManager` also uses this cache to avoid re-fetching profile metadata.
-*   **Relay Health:** `NDKCashuWallet` includes a relay health system to ensure that a user's wallet state is consistent across their defined relays. It can detect and repair missing or stale events.
+*   **Relay Health:** `NIP60Wallet` includes a relay health system to ensure that a user's wallet state is consistent across their defined relays. It can detect and repair missing or stale events.
 
 #### 10.1. Relay Selection Strategy and Network Courtesy
 

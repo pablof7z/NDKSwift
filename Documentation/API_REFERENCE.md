@@ -115,7 +115,7 @@ public func observe<T>(
 - `cachePolicy`: How to use cache (.cacheWithNetwork, .cacheOnly, .networkOnly)
 - `relays`: Optional specific relays to use
 - `exclusiveRelays`: If true, only process events from the specified relays (default: false)
-- `subscriptionId`: Optional custom subscription ID for debugging
+- `subscriptionId`: Optional custom subscription ID. If provided, this exact ID will be used in REQ messages to relays (useful for debugging and NIP-60 wallets)
 - `transform`: Optional transformation function for the data source
 
 #### User Management

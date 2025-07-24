@@ -6,13 +6,16 @@ struct ContentView: View {
     
     var body: some View {
         if let ndk = appState.ndk {
-            NDKAuthView(authManager: appState.authManager, ndk: ndk) {
-                // Authenticated content
-                MainTabView()
-            } authenticationContent: {
-                // Authentication screen
-                AuthenticationView()
+            Group {
+                if appState.authManager.isAuthenticated {
+                    // Authenticated content
+                    MainTabView()
+                } else {
+                    // Authentication screen
+                    AuthenticationView()
+                }
             }
+            .environment(\.ndk, ndk)
         } else {
             // Show loading or splash screen while NDK initializes
             ProgressView()

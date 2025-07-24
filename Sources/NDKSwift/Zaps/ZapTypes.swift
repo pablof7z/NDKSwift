@@ -111,6 +111,7 @@ public enum ZapError: LocalizedError {
     case noCommonMints(wallet: [String], recipient: [String])
     case endpointDoesNotSupportZaps
     case amountOutOfRange(min: Int64, max: Int64)
+    case signerNotAvailable
     
     public var errorDescription: String? {
         switch self {
@@ -154,6 +155,8 @@ public enum ZapError: LocalizedError {
             return "Endpoint does not support zaps"
         case .amountOutOfRange(let min, let max):
             return "Amount out of range: \(min) - \(max) sats"
+        case .signerNotAvailable:
+            return "No signer available to create zap request"
         }
     }
 }

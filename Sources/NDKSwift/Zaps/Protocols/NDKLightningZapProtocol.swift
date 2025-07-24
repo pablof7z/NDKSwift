@@ -43,6 +43,11 @@ public class NDKLightningZapProtocol: NDKZapProtocol {
         amountSats: Int64,
         comment: String?
     ) async throws -> PreparedZap {
+        // Ensure we have a signer
+        guard let signer = ndk.signer else {
+            throw ZapError.signerNotAvailable
+        }
+        
         // Create NDKUser from recipient info
         let user = NDKUser(pubkey: recipientInfo.pubkey)
         
@@ -73,7 +78,7 @@ public class NDKLightningZapProtocol: NDKZapProtocol {
         // 4. Create zap request event
         let zapRequest = try await NDKZapRequest.create(
             ndk: ndk,
-            signer: ndk.signer!,
+            signer: signer,
             recipient: user,
             amountMillisats: amountMillisats,
             comment: comment,
