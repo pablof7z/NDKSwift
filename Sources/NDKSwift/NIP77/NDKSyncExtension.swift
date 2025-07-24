@@ -161,16 +161,6 @@ extension NDK {
     
     // MARK: - Helper Methods
     
-    private func fetchEvents(ids: [String]) async -> [NDKEvent] {
-        var events: [NDKEvent] = []
-        for id in ids {
-            if let event = await cache.getEvent(id: id) {
-                events.append(event)
-            }
-        }
-        return events
-    }
-    
     private func countLocalEvents(filter: NDKFilter) async throws -> Int {
         let events = try await cache.queryEvents(filter)
         return events.count
