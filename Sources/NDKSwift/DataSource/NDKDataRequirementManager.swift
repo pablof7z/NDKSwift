@@ -20,7 +20,7 @@ actor NDKDataRequirementManager {
     
     init(ndk: NDK) {
         self.ndk = ndk
-        NDKLogger.log(.debug, category: .subscription, "🏗️ NDKDataRequirementManager initialized")
+        NDKLogger.log(.trace, category: .subscription, "🏗️ NDKDataRequirementManager initialized")
         
         // Start periodic cleanup task
         Task {
@@ -129,10 +129,10 @@ actor NDKDataRequirementManager {
         
         // Start or extend grouping timer
         if flushTasks[aggregationSignature] == nil {
-            NDKLogger.log(.debug, category: .subscription, "⏰ [DataReqManager] Starting grouping timer for \(groupingWindow)s", correlationId: String(correlationId))
+            NDKLogger.log(.trace, category: .subscription, "⏰ [DataReqManager] Starting grouping timer for \(groupingWindow)s", correlationId: String(correlationId))
             flushTasks[aggregationSignature] = Task {
                 try? await Task.sleep(nanoseconds: UInt64(groupingWindow * Double(TimeConstants.nanosecondsPerSecond)))
-                NDKLogger.log(.debug, category: .subscription, "⏰ [DataReqManager] Grouping timer expired, flushing...", correlationId: String(correlationId))
+                NDKLogger.log(.trace, category: .subscription, "⏰ [DataReqManager] Grouping timer expired, flushing...", correlationId: String(correlationId))
                 await flushPendingRequirements(for: aggregationSignature)
             }
         } else {
@@ -149,7 +149,7 @@ actor NDKDataRequirementManager {
     /// Release a data requirement
     func releaseRequirement(id: RequirementID) async {
         let correlationId = id.uuidString.prefix(8)
-        NDKLogger.log(.debug, category: .subscription, "🔓 Releasing requirement", correlationId: String(correlationId))
+        NDKLogger.log(.trace, category: .subscription, "🔓 Releasing requirement", correlationId: String(correlationId))
         
         // Clean up any immediate cache handle
         if let handle = immediateCacheHandles.removeValue(forKey: id) {
@@ -169,7 +169,7 @@ actor NDKDataRequirementManager {
             await requirement.internalSubscription.close()
             activeRequirements.removeValue(forKey: id)
         } else {
-            NDKLogger.log(.debug, category: .subscription, "👥 Still \(await requirement.observerCount) observers remaining", correlationId: String(correlationId))
+            NDKLogger.log(.trace, category: .subscription, "👥 Still \(await requirement.observerCount) observers remaining", correlationId: String(correlationId))
         }
     }
     
@@ -195,7 +195,7 @@ actor NDKDataRequirementManager {
             return
         }
         
-        NDKLogger.log(.debug, category: .subscription, "📋 [DataReqManager] Flushing \(pending.count) pending requirements")
+        NDKLogger.log(.trace, category: .subscription, "📋 [DataReqManager] Flushing \(pending.count) pending requirements")
         
         
         // Group by maxAge and cachePolicy to handle lifecycle correctly
@@ -253,7 +253,7 @@ actor NDKDataRequirementManager {
                            (aggregatedFilter.ids != nil && p.filter.ids != nil && 
                             Set(aggregatedFilter.ids ?? []).isSuperset(of: Set(p.filter.ids ?? []))) {
                             // The cache observer will deliver the cached events
-                            NDKLogger.log(.debug, category: .subscription, "📦 Observer will receive cached events for filter: \(p.filter.fingerprint)")
+                            NDKLogger.log(.trace, category: .subscription, "📦 Observer will receive cached events for filter: \(p.filter.fingerprint)")
                             // Remove from immediate handles tracking since they're now owned by the DataRequirementHandle
                             immediateCacheHandles.removeValue(forKey: p.id)
                         }
@@ -304,7 +304,7 @@ actor NDKDataRequirementManager {
                             let baseId = lifecycleGroup.compactMap { $0.subscriptionId }.first ?? generateSubscriptionId(for: relaySpecificFilter)
                             let subscriptionId = "\(baseId)_\(relayHost)"
                             
-                            NDKLogger.log(.debug, category: .subscription, "📡 [DataReqManager] Creating subscription for \(relay): \(relaySpecificFilter.authors?.count ?? 0) authors")
+                            NDKLogger.log(.trace, category: .subscription, "📡 [DataReqManager] Creating subscription for \(relay): \(relaySpecificFilter.authors?.count ?? 0) authors")
                             
                             let internalSubscription = await ndk.internalSubscriptionManager.createSubscription(
                                 id: subscriptionId,
@@ -365,7 +365,7 @@ actor NDKDataRequirementManager {
                     }
                     
                     // If no relay-specific filters, fall back to using all connected relays
-                    NDKLogger.log(.debug, category: .subscription, "📡 [DataReqManager] No relay-specific filters, using all connected relays")
+                    NDKLogger.log(.trace, category: .subscription, "📡 [DataReqManager] No relay-specific filters, using all connected relays")
                     relays = nil
                 }
                 
@@ -389,7 +389,7 @@ actor NDKDataRequirementManager {
                     filters: [optimizedFilter],
                     relays: relays
                 )
-                NDKLogger.log(.debug, category: .subscription, "✅ [DataReqManager] Internal subscription created")
+                NDKLogger.log(.trace, category: .subscription, "✅ [DataReqManager] Internal subscription created")
                 
                 // Create data requirement (use original aggregated filter for coverage checks)
                 let requirement = DataRequirement(
@@ -867,14 +867,14 @@ actor DataRequirement {
     }
     
     func startProcessing() async {
-        NDKLogger.log(.debug, category: .subscription, "🎬 [DataRequirement] startProcessing called for subscription: \(subscriptionId)")
+        NDKLogger.log(.trace, category: .subscription, "🎬 [DataRequirement] startProcessing called for subscription: \(subscriptionId)")
         guard let cache = cache else {
             NDKLogger.log(.error, category: .subscription, "❌ Cannot start processing - no cache available!")
             return
         }
         
         // The subscription is already started by InternalSubscriptionManager.createSubscription()
-        NDKLogger.log(.debug, category: .subscription, "📋 [DataRequirement] Processing events from internal subscription...")
+        NDKLogger.log(.trace, category: .subscription, "📋 [DataRequirement] Processing events from internal subscription...")
         
         // Track received event IDs if this filter is for specific IDs
         let requestedIds = filter.ids

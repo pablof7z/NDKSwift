@@ -40,20 +40,26 @@ public enum NDKLogger {
     /// Current log level
     public static var logLevel: NDKLogLevel = {
         #if DEBUG
-        return .debug
+        return .info
         #else
         return .warning
         #endif
     }()
     
     /// Enable/disable network traffic logging
-    public static var logNetworkTraffic: Bool = true
+    public static var logNetworkTraffic: Bool = false
     
     /// Enable/disable pretty printing for network messages
     public static var prettyPrintNetworkMessages: Bool = true
     
-    /// Categories to log
-    public static var enabledCategories: Set<NDKLogCategory> = Set(NDKLogCategory.allCases)
+    /// Categories to log - default excludes noisiest categories for better experience
+    public static var enabledCategories: Set<NDKLogCategory> = {
+        var categories = Set(NDKLogCategory.allCases)
+        // Remove noisiest categories by default
+        categories.remove(.database)
+        categories.remove(.performance)
+        return categories
+    }()
     
     /// Log a message at the specified level
     public static func log(_ level: NDKLogLevel, category: NDKLogCategory, _ message: String) {
