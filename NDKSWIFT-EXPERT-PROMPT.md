@@ -860,7 +860,206 @@ This optimistic publishing system is fundamental to creating responsive Nostr ap
 
 ---
 
-### 6. Wallet Integration: NWC & NIP-60
+### 6. User Profile Management: Modern Profile APIs
+
+NDKSwift provides sophisticated profile management through multiple abstraction levels, from high-level reactive APIs to low-level event fetching. All APIs follow the "never wait, always stream" philosophy.
+
+#### NDKProfileManager (Recommended for Most Cases)
+
+The `NDKProfileManager` is an actor-based cache that provides intelligent profile fetching with real-time updates:
+
+```swift
+// Reactive profile updates with caching
+for await profile in await ndk.profileManager.observe(for: pubkey, maxAge: TimeConstants.hour) {
+    // Handle profile updates (may be nil if not found)
+    if let profile = profile {
+        print("Name: \(profile.name ?? "Unknown")")
+        print("Display Name: \(profile.displayName ?? "Unknown")")
+    }
+    break // If you only need the current value
+}
+
+// Force fresh data from network
+for await profile in await ndk.profileManager.observe(for: pubkey, maxAge: 0) {
+    // Real-time profile updates, always from network
+}
+```
+
+**Key Benefits:**
+- **Intelligent Caching**: LRU in-memory cache with configurable staleness
+- **Real-time Updates**: AsyncStream provides live profile changes
+- **Thread Safety**: Actor-based design prevents race conditions
+- **Network Efficiency**: Automatic batching of similar requests
+
+#### NDKProfileDataSource (Perfect for SwiftUI)
+
+For SwiftUI applications, use the reactive `NDKProfileDataSource`:
+
+```swift
+struct UserView: View {
+    @StateObject private var profileDataSource = NDKProfileDataSource(
+        ndk: ndk,
+        pubkey: userPubkey,
+        maxAge: TimeConstants.hour
+    )
+    
+    var body: some View {
+        VStack {
+            if let profile = profileDataSource.profile {
+                Text(profileDataSource.displayName)
+                AsyncImage(url: profileDataSource.pictureURL)
+                Text(profileDataSource.about ?? "No bio")
+            } else {
+                Text(userPubkey.prefix(8) + "...") // Show pubkey while loading
+            }
+        }
+    }
+}
+```
+
+**Available Properties:**
+- `profile: NDKUserProfile?` - Full profile object
+- `displayName: String` - Computed display name with fallbacks
+- `pictureURL: URL?` - Profile picture URL
+- `nip05: String?` - NIP-05 identifier
+- `about: String?` - Profile bio
+
+#### SwiftUI Profile Components
+
+NDKSwift includes ready-to-use SwiftUI components:
+
+```swift
+// Profile picture with automatic loading and fallbacks
+NDKProfilePicture(pubkey: user.pubkey, size: 60)
+
+// Display name with intelligent fallback options
+NDKDisplayName(pubkey: user.pubkey, fallbackStyle: .npub)
+
+// Username (prioritizes username over display name)
+NDKUsername(pubkey: user.pubkey)
+```
+
+#### NDKUser Model Methods
+
+The `NDKUser` class provides convenient async properties:
+
+```swift
+let user = NDKUser(pubkey: pubkey)
+user.ndk = ndk
+
+// Async property access
+let profile = await user.profile
+let displayName = await user.displayName
+let name = await user.name
+let nip05 = await user.nip05
+
+// Process metadata events directly
+user.processMetadataEvent(metadataEvent)
+```
+
+#### Contact List Management
+
+For managing contact lists and bulk profile loading:
+
+```swift
+@StateObject private var contactsDataSource = NDKContactsDataSource(
+    ndk: ndk,
+    userPubkey: currentUser.pubkey
+)
+
+// Access contact pubkeys and their profiles
+let contacts = contactsDataSource.contactPubkeys
+let profiles = contactsDataSource.contactProfiles
+```
+
+#### Low-Level Profile Fetching
+
+For custom implementations, use direct event fetching:
+
+```swift
+// Direct profile event fetching
+let profileSource = ndk.observe(
+    filter: NDKFilter(authors: [pubkey], kinds: [EventKind.metadata], limit: 1),
+    maxAge: 3600  // 1 hour cache tolerance
+)
+
+for await profileEvent in profileSource.events {
+    if let profile = try? JSONCoding.decode(NDKUserProfile.self, from: profileEvent.content) {
+        // Handle profile data
+    }
+}
+```
+
+#### Profile Data Structure
+
+Profiles are stored as Kind 0 events with this structure:
+
+```swift
+struct NDKUserProfile {
+    let name: String?           // Username
+    let displayName: String?    // Display name  
+    let about: String?          // Bio/description
+    let picture: String?        // Avatar URL
+    let banner: String?         // Banner image URL
+    let nip05: String?          // NIP-05 identifier
+    let lud16: String?          // Lightning address
+    let website: String?        // Website URL
+}
+```
+
+#### Best Practices for Profile Management
+
+1. **Use NDKProfileManager** for most profile retrieval needs - it handles caching and real-time updates efficiently
+2. **Set appropriate maxAge** values:
+   - **Feed views**: `TimeConstants.hour` for performance
+   - **Profile pages**: `0` for fresh data
+   - **Background updates**: `TimeConstants.day` for rare changes
+3. **Progressive UI Updates**: Always show the pubkey initially, enhance with profile data as it arrives
+4. **Handle Missing Profiles**: Not all users have profile metadata - design graceful fallbacks
+5. **Use SwiftUI Components**: Leverage `NDKProfilePicture` and `NDKDisplayName` for consistency
+
+#### Never Wait for Profiles Pattern
+
+Following NDKSwift's core philosophy, never show loading states for profiles:
+
+```swift
+// ❌ WRONG: Don't wait for profiles
+func loadUserProfile() async {
+    showLoadingSpinner()
+    let profile = await fetchProfile(pubkey)
+    hideLoadingSpinner()
+    updateUI(profile)
+}
+
+// ✅ RIGHT: Stream profiles progressively  
+struct UserProfileView: View {
+    let pubkey: String
+    @State private var profile: NDKUserProfile?
+    
+    var body: some View {
+        VStack {
+            // Show pubkey immediately - never a loading state
+            Text(profile?.displayName ?? pubkey.prefix(8) + "...")
+            
+            // Profile elements appear as they're available
+            if let pictureURL = profile?.picture {
+                AsyncImage(url: URL(string: pictureURL))
+            }
+        }
+        .task {
+            for await profile in await ndk.profileManager.observe(for: pubkey) {
+                self.profile = profile
+            }
+        }
+    }
+}
+```
+
+The profile management system is designed for maximum performance and user experience, with automatic caching, batching, and real-time updates built-in.
+
+---
+
+### 7. Wallet Integration: NWC & NIP-60
 
 NDKSwift has first-class support for wallets.
 
@@ -894,7 +1093,7 @@ This is a more advanced, integrated Cashu ecash wallet.
 
 ---
 
-### 7. Event Relay Tracking
+### 8. Event Relay Tracking
 
 NDKSwift tracks which relays events have been seen on through the `NDKEventTracker` actor. This is crucial for applications that want to show relay information to users.
 
@@ -928,7 +1127,7 @@ ForEach(Array(seenRelays), id: \.self) { relay in
 
 ---
 
-### 8. Cache Observation and NIP-77 Integration
+### 9. Cache Observation and NIP-77 Integration
 
 NDKSwift's cache system integrates seamlessly with both NDKDataSource observers and NIP-77 sync operations, ensuring all data updates are propagated correctly.
 
@@ -963,7 +1162,7 @@ for await profile in profileSource.events {
 
 **Important:** Always use `cache.processEvent()` instead of `cache.saveEvent()` when you want observers to be notified. The NIP-77 implementation has been updated to use `processEvent` to ensure proper observer notification.
 
-### 9. Negentropy Set Reconciliation: Efficient Synchronization
+### 10. Negentropy Set Reconciliation: Efficient Synchronization
 
 NDKSwift includes a comprehensive implementation of Negentropy, a set reconciliation protocol that dramatically improves sync efficiency for large datasets. This is particularly valuable for bandwidth-constrained environments and large-scale synchronization operations.
 
@@ -1132,7 +1331,7 @@ By integrating Negentropy thoughtfully, you can provide users with dramatically 
 
 ---
 
-### 10. Reactive UI Philosophy: Never Wait, Always Stream
+### 11. Reactive UI Philosophy: Never Wait, Always Stream
 
 This section is crucial for understanding how to build proper Nostr applications. The fundamental principle is: **NEVER wait for data to be "complete" before rendering**. In Nostr, data streams in unreliably and can be slow. Apps must be designed to show what they have immediately and update as more arrives.
 
@@ -1324,13 +1523,13 @@ Your app must handle all these scenarios gracefully by showing what it has and u
 
 ---
 
-### 11. Performance & Advanced Topics
+### 12. Performance & Advanced Topics
 
 *   **Signature Verification Sampling:** NDKSwift does not verify every single signature by default to save CPU. It uses a sampling strategy defined by `NDKSignatureVerificationConfig`. For most apps, the default is fine. You can configure it to be more or less strict. It also automatically detects and can blacklist "evil relays" that serve events with invalid signatures.
 *   **Caching:** Use `NDKSQLiteCache` to persist events, profiles, and other Nostr data. This dramatically improves launch times and provides a basic offline experience. The `NDKProfileManager` also uses this cache to avoid re-fetching profile metadata.
 *   **Relay Health:** `NIP60Wallet` includes a relay health system to ensure that a user's wallet state is consistent across their defined relays. It can detect and repair missing or stale events.
 
-#### 10.1. Relay Selection Strategy and Network Courtesy
+#### 12.1. Relay Selection Strategy and Network Courtesy
 
 NDKSwift implements sophisticated relay selection algorithms that balance performance, deliverability, and network courtesy. Understanding these strategies helps you build apps that are both effective and respectful to the Nostr ecosystem.
 
