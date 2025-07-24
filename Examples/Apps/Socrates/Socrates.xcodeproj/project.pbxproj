@@ -3,7 +3,7 @@
 	archiveVersion = 1;
 	classes = {
 	};
-	objectVersion = 54;
+	objectVersion = 63;
 	objects = {
 
 /* Begin PBXBuildFile section */
@@ -48,7 +48,7 @@
 		BEE222498AC852F7BE79CAF4 /* UserProfileView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UserProfileView.swift; sourceTree = "<group>"; };
 		C6CAD7F4A7FFDCF19160C1E8 /* SocratesApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SocratesApp.swift; sourceTree = "<group>"; };
 		EADB1B82B858D84DCC0FD38A /* AudioEvent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioEvent.swift; sourceTree = "<group>"; };
-		F411B1B80B8F4CB6D8C2B8F8 /* Socrates.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = Socrates.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		F411B1B80B8F4CB6D8C2B8F8 /* Socrates.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Socrates.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -172,7 +172,6 @@
 				LastUpgradeCheck = 1500;
 				TargetAttributes = {
 					DD6239409F0638F9ACBCFEEE = {
-						DevelopmentTeam = "";
 						ProvisioningStyle = Automatic;
 					};
 				};
@@ -190,7 +189,6 @@
 			packageReferences = (
 				2C30A4BD0D0F90BA9F16E74B /* XCLocalSwiftPackageReference "../../..//" */,
 			);
-			preferredProjectObjectVersion = 54;
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
@@ -301,7 +299,7 @@
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				CODE_SIGN_STYLE = Automatic;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
-				DEVELOPMENT_TEAM = "";
+				DEVELOPMENT_TEAM = 456SHKPP26;
 				ENABLE_PREVIEWS = YES;
 				INFOPLIST_FILE = Sources/Socrates/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -325,7 +323,7 @@
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				CODE_SIGN_STYLE = Automatic;
 				DEBUG_INFORMATION_FORMAT = dwarf;
-				DEVELOPMENT_TEAM = "";
+				DEVELOPMENT_TEAM = 456SHKPP26;
 				ENABLE_PREVIEWS = YES;
 				INFOPLIST_FILE = Sources/Socrates/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (

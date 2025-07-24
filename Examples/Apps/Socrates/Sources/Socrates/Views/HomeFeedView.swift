@@ -72,19 +72,21 @@ struct HomeFeedView: View {
                 .transition(.opacity.combined(with: .scale))
             }
             
-            // Floating record button
-            VStack {
-                Spacer()
-                HStack {
+            // Floating record button - hide when recording overlay is shown
+            if !showingRecordingUI {
+                VStack {
                     Spacer()
-                    
-                    RecordButton(
-                        isRecording: $appState.isRecording,
-                        onStartRecording: startRecording,
-                        onStopRecording: stopRecording
-                    )
-                    .padding(.horizontal, 20)
-                    .padding(.bottom, 20)
+                    HStack {
+                        Spacer()
+                        
+                        RecordButton(
+                            isRecording: $appState.isRecording,
+                            onStartRecording: startRecording,
+                            onStopRecording: stopRecording
+                        )
+                        .padding(.horizontal, 20)
+                        .padding(.bottom, 20)
+                    }
                 }
             }
             
@@ -658,8 +660,6 @@ struct RecordingOverlay: View {
     let onCancel: () -> Void
     let onComplete: () -> Void
     
-    @State private var showingControls = false
-    
     var formattedDuration: String {
         let minutes = Int(duration) / 60
         let seconds = Int(duration) % 60
@@ -671,13 +671,10 @@ struct RecordingOverlay: View {
             // Background blur
             Color.black.opacity(0.8)
                 .ignoresSafeArea()
-                .onTapGesture {
-                    withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
-                        showingControls.toggle()
-                    }
-                }
             
-            VStack(spacing: 40) {
+            VStack {
+                Spacer()
+                
                 // Waveform visualization
                 HStack(spacing: 2) {
                     ForEach(0..<waveform.count, id: \.self) { index in
@@ -702,34 +699,56 @@ struct RecordingOverlay: View {
                 Text(formattedDuration)
                     .font(.system(size: 48, weight: .bold, design: .monospaced))
                     .foregroundColor(.white)
+                    .padding(.vertical, 30)
                 
-                // Controls
-                if showingControls {
-                    HStack(spacing: 40) {
-                        Button(action: onCancel) {
-                            VStack(spacing: 8) {
-                                Image(systemName: "xmark.circle.fill")
-                                    .font(.system(size: 50))
-                                    .foregroundColor(.red)
-                                Text("Cancel")
-                                    .font(.caption)
-                                    .foregroundColor(.white)
-                            }
-                        }
-                        
-                        Button(action: onComplete) {
-                            VStack(spacing: 8) {
-                                Image(systemName: "checkmark.circle.fill")
-                                    .font(.system(size: 50))
-                                    .foregroundColor(.green)
-                                Text("Publish")
-                                    .font(.caption)
-                                    .foregroundColor(.white)
-                            }
+                Spacer()
+            }
+            
+            // Bottom controls
+            VStack {
+                Spacer()
+                HStack {
+                    // Cancel button (bottom left)
+                    Button(action: onCancel) {
+                        ZStack {
+                            Circle()
+                                .fill(Color.white.opacity(0.15))
+                                .frame(width: 56, height: 56)
+                            
+                            Image(systemName: "xmark")
+                                .font(.system(size: 24))
+                                .foregroundColor(.white)
                         }
                     }
-                    .transition(.scale.combined(with: .opacity))
+                    .padding(.leading, 20)
+                    
+                    Spacer()
+                    
+                    // Send button (bottom right) - same style as record button
+                    Button(action: onComplete) {
+                        ZStack {
+                            Circle()
+                                .fill(
+                                    LinearGradient(
+                                        gradient: Gradient(colors: [
+                                            Color.purple,
+                                            Color(red: 0.5, green: 0.1, blue: 0.9)
+                                        ]),
+                                        startPoint: .topLeading,
+                                        endPoint: .bottomTrailing
+                                    )
+                                )
+                                .frame(width: 56, height: 56)
+                                .shadow(color: Color.purple.opacity(0.5), radius: 15, x: 0, y: 5)
+                            
+                            Image(systemName: "arrow.up")
+                                .font(.system(size: 24))
+                                .foregroundColor(.white)
+                        }
+                    }
+                    .padding(.trailing, 20)
                 }
+                .padding(.bottom, 20)
             }
         }
     }

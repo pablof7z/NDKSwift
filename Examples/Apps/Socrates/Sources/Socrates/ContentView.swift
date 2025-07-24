@@ -10,15 +10,7 @@ struct ContentView: View {
         ZStack {
             Color.black.ignoresSafeArea()
             
-            NDKAuthView(authManager: nostrManager.authManager, ndk: nostrManager.ndk) {
-                // Main app interface - shown when authenticated
-                NavigationView {
-                    HomeFeedView()
-                }
-            } authenticationContent: {
-                // Authentication screen
-                AuthenticationView()
-            }
+            AuthContainer()
         }
         .background(
             LinearGradient(

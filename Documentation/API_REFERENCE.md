@@ -93,6 +93,7 @@ public func observe(
     maxAge: TimeInterval = 0,
     cachePolicy: CachePolicy = .cacheWithNetwork,
     relays: Set<RelayURL>? = nil,
+    exclusiveRelays: Bool = false,
     subscriptionId: String? = nil
 ) -> NDKDataSource<NDKEvent>
 
@@ -102,10 +103,20 @@ public func observe<T>(
     maxAge: TimeInterval = 0,
     cachePolicy: CachePolicy = .cacheWithNetwork,
     relays: Set<RelayURL>? = nil,
+    exclusiveRelays: Bool = false,
     subscriptionId: String? = nil,
     transform: @escaping (NDKEvent) -> T?
 ) -> NDKDataSource<T>
 ```
+
+**Parameters:**
+- `filter`: The filter to apply for events
+- `maxAge`: Maximum age of cached data in seconds. 0 means always fetch fresh
+- `cachePolicy`: How to use cache (.cacheWithNetwork, .cacheOnly, .networkOnly)
+- `relays`: Optional specific relays to use
+- `exclusiveRelays`: If true, only process events from the specified relays (default: false)
+- `subscriptionId`: Optional custom subscription ID for debugging
+- `transform`: Optional transformation function for the data source
 
 #### User Management
 
@@ -248,6 +259,13 @@ let profiles = ndk.observe(
 let cachedEvents = ndk.observe(
     filter: NDKFilter(kinds: [1]),
     cachePolicy: .cacheOnly
+)
+
+// Relay-specific filtering
+let relaySpecificEvents = ndk.observe(
+    filter: NDKFilter(kinds: [1, 6, 7]),
+    relays: Set(["wss://relay.damus.io"]),
+    exclusiveRelays: true  // Only show events from specified relay
 )
 
 // SwiftUI Integration

@@ -260,6 +260,28 @@ NDKSwift provides a modern declarative API for accessing Nostr data with automat
 *   **`3600`** (1 hour): Suitable for user profiles
 *   **`86400`** (1 day): Good for relay lists or rarely changing data
 
+**Relay-Specific Filtering:**
+
+When you need to show events only from specific relays (e.g., for relay-specific views), use the `exclusiveRelays` parameter:
+
+```swift
+// Show only events from selected relays
+let relaySpecificSource = ndk.observe(
+    filter: NDKFilter(kinds: [1, 6, 7]),
+    maxAge: 0,
+    relays: Set(["wss://relay.damus.io"]),
+    exclusiveRelays: true  // Only show events from specified relays
+)
+
+// Without exclusiveRelays (default: false), events from ANY relay are shown
+// With exclusiveRelays: true, ONLY events from the specified relays are shown
+```
+
+This is particularly useful for:
+- Relay-specific views where users want to see content from a particular relay
+- Debugging relay behavior 
+- Implementing relay-specific moderation policies
+- Building relay explorer features
 
 ---
 
