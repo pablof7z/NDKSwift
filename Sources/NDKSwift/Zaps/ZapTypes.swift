@@ -121,7 +121,7 @@ public enum ZapError: LocalizedError {
         case .invalidLNURL(let details):
             return "Invalid LNURL: \(details)"
         case .invoiceFetchFailed(let reason):
-            return "Failed to fetch invoice: \(reason)"
+            return ErrorMessageConstants.operationFailed("fetch invoice", reason: reason)
         case .lnurlProviderError(let message):
             return "LNURL provider error: \(message)"
         case .nutzapPreferencesNotFound:
@@ -141,11 +141,11 @@ public enum ZapError: LocalizedError {
         case .invalidZapReceipt:
             return "Invalid zap receipt"
         case .mintConnectionFailed(let mint, let reason):
-            return "Failed to connect to mint \(mint): \(reason)"
+            return ErrorMessageConstants.operationFailed("connect to mint \(mint)", reason: reason)
         case .mintQuoteFailed(let mint, let reason):
-            return "Failed to get quote from mint \(mint): \(reason)"
+            return ErrorMessageConstants.operationFailed("get quote from mint \(mint)", reason: reason)
         case .mintTokenCreationFailed(let mint, let reason):
-            return "Failed to create tokens at mint \(mint): \(reason)"
+            return ErrorMessageConstants.operationFailed("create tokens at mint \(mint)", reason: reason)
         case .allMintsFailed(let attempts):
             return "All \(attempts) mint(s) failed to process the payment"
         case .noCommonMints(let wallet, let recipient):

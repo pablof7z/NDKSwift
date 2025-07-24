@@ -18,14 +18,14 @@ public enum DepositMintError: LocalizedError {
     public var errorDescription: String? {
         switch self {
         case .requiresUserIntervention(let op, _):
-            return "Failed to mint tokens at \(op.mintURL) after Lightning deposit was confirmed. Quote ID: \(op.quoteId)"
+            return "\(ErrorMessageConstants.failedTo("mint tokens at \(op.mintURL)")) after Lightning deposit was confirmed. Quote ID: \(op.quoteId)"
         }
     }
     
     public var recoverySuggestion: String? {
         switch self {
         case .requiresUserIntervention:
-            return "The mint confirmed receiving your Lightning payment but failed to issue tokens. You can retry minting or contact the mint operator."
+            return "The mint confirmed receiving your Lightning payment but \(ErrorMessageConstants.failedTo("issue tokens").lowercased()). You can retry minting or contact the mint operator."
         }
     }
 }
@@ -287,7 +287,7 @@ public enum CashuDeposit {
         }
         
         guard !proofs.isEmpty else {
-            throw NDKError.paymentFailed(reason: "Failed to mint tokens after deposit was confirmed")
+            throw NDKError.paymentFailed(reason: ErrorMessageConstants.failedTo("mint tokens after deposit was confirmed"))
         }
         
         return proofs
