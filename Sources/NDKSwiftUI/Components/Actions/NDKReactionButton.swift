@@ -338,7 +338,7 @@ private class ReactionState: ObservableObject {
                 _ = try await ndk.publish(reactionEvent)
             }
         } catch {
-            print("Failed to toggle reaction: \(error)")
+            NDKLogger.log(.error, category: .general, "Failed to toggle reaction: \(error)")
         }
     }
 }
