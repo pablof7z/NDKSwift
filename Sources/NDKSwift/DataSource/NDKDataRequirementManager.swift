@@ -21,6 +21,33 @@ actor NDKDataRequirementManager {
     init(ndk: NDK) {
         self.ndk = ndk
         NDKLogger.log(.debug, category: .subscription, "🏗️ NDKDataRequirementManager initialized")
+        
+        // Start periodic cleanup task
+        Task {
+            await startPeriodicCleanup()
+        }
+    }
+    
+    /// Periodic cleanup of stale handles and requirements
+    private func startPeriodicCleanup() async {
+        while !Task.isCancelled {
+            // Wait 1 hour between cleanups
+            try? await Task.sleep(nanoseconds: 3_600_000_000_000)
+            
+            // Clean up orphaned immediate cache handles
+            let activeIds = Set(activeRequirements.keys)
+            let handleIds = Set(immediateCacheHandles.keys)
+            let orphanedIds = handleIds.subtracting(activeIds)
+            
+            if !orphanedIds.isEmpty {
+                NDKLogger.log(.info, category: .subscription, "🧹 Cleaning up \(orphanedIds.count) orphaned cache handles")
+                for id in orphanedIds {
+                    if let handle = immediateCacheHandles.removeValue(forKey: id) {
+                        await handle.cancel()
+                    }
+                }
+            }
+        }
     }
     
     /// Register a new data requirement

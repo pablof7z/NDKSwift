@@ -125,7 +125,7 @@ actor InternalSubscriptionManager {
         
         for subscription in subscriptionsToReplay {
             // Check if this subscription should go to this specific relay
-            if let specificRelays = await subscription.relays {
+            if let specificRelays = subscription.relays {
                 // If subscription specifies relays, only send to those
                 guard specificRelays.contains(relay.url) else {
                     NDKLogger.log(.trace, category: .subscription, "⏭️ Skipping subscription \(subscription.id) - not targeted for this relay")
@@ -140,7 +140,7 @@ actor InternalSubscriptionManager {
                 try await relay.send(message)
                 
                 // Track subscription on the relay
-                await relay.trackSubscription(id: subscription.id, filters: await subscription.filters)
+                await relay.trackSubscription(id: subscription.id, filters: subscription.filters)
                 
                 NDKLogger.log(.info, category: .subscription, "✅ Replayed subscription \(subscription.id) to \(relay.url)")
             } catch {

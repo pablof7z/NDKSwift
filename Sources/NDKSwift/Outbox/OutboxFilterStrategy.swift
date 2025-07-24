@@ -33,7 +33,7 @@ actor RelayListLookupTracker {
     private var recentLookups: [String: Date] = [:]
     private let lookupWindow: TimeInterval
     
-    init(lookupWindow: TimeInterval = 300) { // 5 minutes default
+    init(lookupWindow: TimeInterval = 7200) { // 2 hours default
         self.lookupWindow = lookupWindow
     }
     
@@ -53,5 +53,14 @@ actor RelayListLookupTracker {
         for pubkey in pubkeys {
             recentLookups[pubkey] = now
         }
+        
+        // Clean up old entries periodically
+        cleanupOldEntries()
+    }
+    
+    /// Remove entries older than 2x the lookup window to prevent unbounded growth
+    private func cleanupOldEntries() {
+        let cutoffDate = Date().addingTimeInterval(-lookupWindow * 2)
+        recentLookups = recentLookups.filter { $0.value > cutoffDate }
     }
 }

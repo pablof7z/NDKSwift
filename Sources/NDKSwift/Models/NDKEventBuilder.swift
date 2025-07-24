@@ -1081,7 +1081,7 @@ public final class NDKEventBuilder {
         fallbacks: [String]? = nil,
         userAnnotations: [UserAnnotation]? = nil
     ) async throws -> NDKEventBuilder {
-        var imeta = NDKImetaTag(
+        let imeta = NDKImetaTag(
             url: upload.url,
             blurhash: upload.blurhash,
             dim: upload.dimensionsString,

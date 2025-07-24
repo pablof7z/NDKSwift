@@ -8,6 +8,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Fixed
+- Fixed memory leak in Posta app consuming 85GB+ of RAM
+  - Removed manual session state monitoring that created infinite loops
+  - Fixed duplicate session data subscriptions in NDKSessionData
+  - Simplified HomeView to use reactive filter API as intended
+  - Session data now properly checks if data is already available before creating new subscriptions
+- Fixed duplicate session data loading in reactive filters
+  - NDKSessionData.load() now checks if data is already available before creating subscriptions
+  - Added active data source check to prevent multiple concurrent loads
+  - Reactive filters no longer create duplicate subscriptions for the same data
+
+### Changed
+- Simplified Posta app to properly use reactive filter API
+  - Removed manual state tracking for session data changes
+  - Removed isLoadingFollows, isLoadingNotes, sessionMonitorTask
+  - App now relies on NDK's internal subscription management
+- Updated Socrates app to filter muted users
+  - Audio events from muted users are now filtered out
+  - Simplified refresh logic to avoid duplicate data source creation
+
+### Removed
+- Removed deprecated FeedView implementation in Olas app
+  - Deleted Sources/Olas/Views/Feed/FeedView.swift (used old subscribe() API)
+  - Deleted Sources/Olas/Views/Feed/FeedItemView.swift
+  - App now uses only the modern reactive observer pattern
+
+### Previously Fixed
 - Fixed blocking issue in progressive session loading that prevented reactive filters from working
   - NDKSessionData.loadLists() was blocking on async stream iteration
   - Progressive strategy now properly loads from cache and continues in background
@@ -44,6 +70,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Relay update statistics available via getRelayUpdateStats()
   - Automatic creation of relay-specific subscriptions when relay info becomes available
   - Example: DynamicRelayUpdates.swift demonstrates the feature
+
+### Improved
+- Memory management and cleanup in outbox implementation
+  - Changed relay lookup window from 5 minutes to 2 hours (more reasonable rate limiting)
+  - Added automatic cleanup of old entries in RelayListLookupTracker (removes entries older than 4 hours)
+  - Added periodic cleanup of stale subscriptions in RelayUpdateNotifier (removes after 24 hours)
+  - Limited update subscription IDs to last 10 per subscription to prevent unbounded growth
+  - Added hourly cleanup task in NDKDataRequirementManager for orphaned cache handles
+- Fixed compilation warnings
+  - Removed unnecessary async/await on non-async properties
+  - Fixed unused variable warnings by using proper Swift patterns
 
 ### Fixed
 - Ephemeral events (kinds 20000-29999) are now properly excluded from caching

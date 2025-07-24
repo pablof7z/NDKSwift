@@ -113,6 +113,11 @@ struct HomeFeedView: View {
                 // Check if task was cancelled
                 if Task.isCancelled { break }
                 
+                // Skip muted users if session data is available
+                if let sessionData = ndk.sessionData, sessionData.isMuted(event.pubkey) {
+                    continue
+                }
+                
                 let wotScore = await appState.webOfTrust[event.pubkey] ?? 0.1
                 if let audioEvent = AudioEvent.from(event: event, webOfTrustScore: wotScore) {
                     await MainActor.run {
@@ -131,19 +136,13 @@ struct HomeFeedView: View {
     private func refreshAudioEvents() async {
         guard let ndk = nostrManager.ndk else { return }
         
-        // For refresh, use networkOnly to get fresh data
-        let filter = NDKFilter(
-            kinds: [1222, 1244]
-        )
-        
-        let dataSource = ndk.observe(filter: filter, maxAge: 0, cachePolicy: .networkOnly)
-        
         // Clear existing events for a fresh feed
         await MainActor.run {
             audioEvents.removeAll()
         }
         
         // Re-start the streaming with fresh data
+        // This will fetch from network due to maxAge: 0 in the main stream
         startStreamingAudioEvents()
     }
     

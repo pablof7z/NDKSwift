@@ -54,6 +54,7 @@ public enum ErrorMessageConstants {
         
         /// Connection errors
         public static let notConnected = "Not connected"
+        public static let connectionFailed = "Connection failed"
         public static let connectionLost = "Connection lost"
         public static let notConnectedToRelay = "Not connected to relay"
         public static let connectionClosed = "Connection closed"
@@ -68,12 +69,17 @@ public enum ErrorMessageConstants {
         public static let invalidInput = "Invalid input"
         public static let invalidData = "Invalid data"
         public static let invalidResponse = "Invalid response"
+        public static let invalidRequest = "Invalid request"
+        public static let invalidContent = "Invalid content"
         
         /// Network errors
         public static let networkError = "Network error"
         public static let requestFailed = "Request failed"
         public static let timeout = "Request timed out"
         public static let serverError = "Server error"
+        
+        /// Authentication errors
+        public static let authenticationFailed = "Authentication failed"
         
         /// Crypto errors
         public static let signingFailed = "Signing failed"
@@ -92,6 +98,10 @@ public enum ErrorMessageConstants {
         public static let walletNotConnected = "Wallet not connected"
         public static let paymentFailed = "Payment failed"
         public static let quotaExceeded = "Quota exceeded"
+        
+        /// General errors
+        public static let unknownError = "Unknown error"
+        public static let cancelled = "Operation cancelled"
     }
     
     // MARK: - Error Context Helpers
