@@ -5,7 +5,6 @@ struct ModernAuthenticationView: View {
     @EnvironmentObject var appState: AppState
     @State private var showImportSheet = false
     @State private var privateKey = ""
-    @State private var isCreatingAccount = false
     @State private var viewAppeared = false
     
     var body: some View {
@@ -47,26 +46,18 @@ struct ModernAuthenticationView: View {
                     VStack(spacing: .ds.base) {
                         Button(action: createAccount) {
                             HStack {
-                                if isCreatingAccount {
-                                    ProgressView()
-                                        .progressViewStyle(CircularProgressViewStyle(tint: .white))
-                                        .scaleEffect(0.8)
-                                } else {
-                                    Image(systemName: "sparkles")
-                                    Text("Create Account")
-                                }
+                                Image(systemName: "sparkles")
+                                Text("Create Account")
                             }
                             .frame(maxWidth: .infinity)
                         }
                         .buttonStyle(ModernPrimaryButton())
-                        .disabled(isCreatingAccount)
                         
                         Button(action: { showImportSheet = true }) {
                             Text("I have an account")
                                 .frame(maxWidth: .infinity)
                         }
                         .buttonStyle(ModernSecondaryButton())
-                        .disabled(isCreatingAccount)
                     }
                     .padding(.horizontal, .ds.xxl)
                     .opacity(viewAppeared ? 1 : 0)
@@ -89,24 +80,14 @@ struct ModernAuthenticationView: View {
     }
     
     private func createAccount() {
-        guard !isCreatingAccount else { return }
-        
-        isCreatingAccount = true
         HapticType.medium.trigger()
         
         Task {
             do {
                 try await appState.createAccount()
-                
-                await MainActor.run {
-                    HapticType.success.trigger()
-                    isCreatingAccount = false
-                }
+                HapticType.success.trigger()
             } catch {
-                await MainActor.run {
-                    HapticType.error.trigger()
-                    isCreatingAccount = false
-                }
+                HapticType.error.trigger()
             }
         }
     }

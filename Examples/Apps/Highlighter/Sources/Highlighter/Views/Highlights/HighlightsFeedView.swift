@@ -14,7 +14,7 @@ struct HighlightsFeedView: View {
     
     // Article cache for highlights from articles
     @State private var articleCache: [String: Article] = [:]
-    @State private var articleImages: [String: UIImage] = []
+    @State private var articleImages: [String: UIImage] = [:]
     
     var body: some View {
         GeometryReader { geometry in
@@ -164,8 +164,8 @@ struct HighlightsFeedView: View {
         let identifier = parts[2...].joined(separator: ":")
         
         let filter = NDKFilter(
-            kinds: [30023],
             authors: [author],
+            kinds: [30023],
             tags: ["d": [String(identifier)]],
             limit: 1
         )
@@ -245,23 +245,27 @@ struct HighlightsFeedView: View {
             
             // Create filter for this specific article
             let filter = NDKFilter(
-                kinds: [30023],
                 authors: [author],
+                kinds: [30023],
                 tags: ["d": [String(identifier)]],
                 limit: 1
             )
             
             // Fetch the article
-            if let event = await ndk.fetchEvent(filter: filter),
-               let article = try? Article(from: event) {
-                await MainActor.run {
-                    self.articleCache[reference] = article
-                }
-                
-                // Load article image if available
-                if let imageUrl = article.image,
-                   let url = URL(string: imageUrl) {
-                    await loadArticleImage(url: url, for: reference)
+            let dataSource = ndk.observe(filter: filter, maxAge: 3600, cachePolicy: .cacheWithNetwork)
+            
+            for await event in dataSource.events {
+                if let article = try? Article(from: event) {
+                    await MainActor.run {
+                        self.articleCache[reference] = article
+                    }
+                    
+                    // Load article image if available
+                    if let imageUrl = article.image,
+                       let url = URL(string: imageUrl) {
+                        await loadArticleImage(url: url, for: reference)
+                    }
+                    break
                 }
             }
         }
@@ -305,37 +309,58 @@ struct HighlightFeedItemView: View {
     @State private var isZapped = false
     @State private var showingActions = false
     @State private var imageOpacity = 0.0
+    @State private var showBlurHash = true
     
     var body: some View {
         GeometryReader { geometry in
             ZStack {
                 // Background with article image or gradient
-                if let articleImage = articleImage {
-                    // Article image with overlay
-                    Image(uiImage: articleImage)
-                        .resizable()
-                        .aspectRatio(contentMode: .fill)
-                        .frame(width: geometry.size.width, height: geometry.size.height)
-                        .clipped()
-                        .opacity(imageOpacity)
-                        .onAppear {
-                            withAnimation(.easeIn(duration: 0.5)) {
-                                imageOpacity = 1.0
-                            }
-                        }
-                        .overlay(
-                            // Dark gradient overlay for readability
+                if article != nil {
+                    ZStack {
+                        // Default gradient background (shows while image loads)
+                        if showBlurHash {
                             LinearGradient(
-                                stops: [
-                                    .init(color: .black.opacity(0.3), location: 0),
-                                    .init(color: .black.opacity(0.5), location: 0.3),
-                                    .init(color: .black.opacity(0.8), location: 0.8),
-                                    .init(color: .black.opacity(0.9), location: 1)
+                                colors: [
+                                    Color.highlighterPurple.opacity(0.3),
+                                    Color.highlighterOrange.opacity(0.3)
                                 ],
-                                startPoint: .top,
-                                endPoint: .bottom
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
                             )
+                            .ignoresSafeArea()
+                        }
+                        
+                        // Article image with overlay
+                        if let articleImage = articleImage {
+                            Image(uiImage: articleImage)
+                                .resizable()
+                                .aspectRatio(contentMode: .fill)
+                                .frame(width: geometry.size.width, height: geometry.size.height)
+                                .clipped()
+                                .opacity(imageOpacity)
+                                .onAppear {
+                                    withAnimation(.easeIn(duration: 0.5)) {
+                                        imageOpacity = 1.0
+                                        // Hide blurhash after image loads
+                                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                                            showBlurHash = false
+                                        }
+                                    }
+                                }
+                        }
+                        
+                        // Dark gradient overlay for readability
+                        LinearGradient(
+                            stops: [
+                                .init(color: .black.opacity(0.3), location: 0),
+                                .init(color: .black.opacity(0.5), location: 0.3),
+                                .init(color: .black.opacity(0.8), location: 0.8),
+                                .init(color: .black.opacity(0.9), location: 1)
+                            ],
+                            startPoint: .top,
+                            endPoint: .bottom
                         )
+                    }
                 } else {
                     // Sophisticated gradient background
                     ZStack {
@@ -659,33 +684,7 @@ struct HighlightFeedItemView: View {
     }
 }
 
-// MARK: - Color Extension
-extension Color {
-    init(hex: String) {
-        let hex = hex.trimmingCharacters(in: CharacterSet.alphanumerics.inverted)
-        var int: UInt64 = 0
-        Scanner(string: hex).scanHexInt64(&int)
-        let a, r, g, b: UInt64
-        switch hex.count {
-        case 3: // RGB (12-bit)
-            (a, r, g, b) = (255, (int >> 8) * 17, (int >> 4 & 0xF) * 17, (int & 0xF) * 17)
-        case 6: // RGB (24-bit)
-            (a, r, g, b) = (255, int >> 16, int >> 8 & 0xFF, int & 0xFF)
-        case 8: // ARGB (32-bit)
-            (a, r, g, b) = (int >> 24, int >> 16 & 0xFF, int >> 8 & 0xFF, int & 0xFF)
-        default:
-            (a, r, g, b) = (1, 1, 1, 0)
-        }
-
-        self.init(
-            .sRGB,
-            red: Double(r) / 255,
-            green: Double(g) / 255,
-            blue:  Double(b) / 255,
-            opacity: Double(a) / 255
-        )
-    }
-}
+// Color extension removed - using the one from SharedStyles.swift
 
 #Preview {
     HighlightsFeedView(tabBarVisible: .constant(false))

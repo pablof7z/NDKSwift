@@ -11,7 +11,6 @@ struct CurationDetailView: View {
     @State private var curator: NDKUserProfile?
     @State private var currentUserPubkey: String?
     @State private var loadedArticles: [Article] = []
-    @State private var isLoadingArticles = false
     
     var body: some View {
         NavigationStack {
@@ -140,11 +139,7 @@ struct CurationDetailView: View {
                             .font(.highlighterHeadline)
                             .padding(.horizontal)
                         
-                        if isLoadingArticles {
-                            ProgressView()
-                                .frame(maxWidth: .infinity)
-                                .padding(.vertical, 40)
-                        } else if loadedArticles.isEmpty && curation.articles.isEmpty {
+                        if loadedArticles.isEmpty && curation.articles.isEmpty {
                             EmptyArticlesView()
                                 .padding(.horizontal)
                         } else {
@@ -206,10 +201,6 @@ struct CurationDetailView: View {
     private func loadArticles() async {
         guard let ndk = appState.ndk else { return }
         
-        await MainActor.run {
-            isLoadingArticles = true
-        }
-        
         // Collect event IDs and addresses to fetch
         var eventIds: [String] = []
         var eventAddresses: [(kind: Int, pubkey: String, identifier: String)] = []
@@ -231,52 +222,59 @@ struct CurationDetailView: View {
             }
         }
         
-        var articles: [Article] = []
-        
-        // Fetch articles by event ID
+        // Stream articles by event ID
         if !eventIds.isEmpty {
-            let filter = NDKFilter(ids: eventIds)
-            let articleSource = ndk.observe(
-                filter: filter,
-                maxAge: 300,
-                cachePolicy: .cacheWithNetwork
-            )
-            
-            for await event in articleSource.events {
-                if event.kind == 30023,
-                   let article = try? Article(from: event) {
-                    articles.append(article)
+            Task {
+                let filter = NDKFilter(ids: eventIds)
+                let articleSource = ndk.observe(
+                    filter: filter,
+                    maxAge: 300,
+                    cachePolicy: .cacheWithNetwork
+                )
+                
+                for await event in articleSource.events {
+                    if event.kind == 30023,
+                       let article = try? Article(from: event) {
+                        await MainActor.run {
+                            if !loadedArticles.contains(where: { $0.id == article.id }) {
+                                loadedArticles.append(article)
+                                loadedArticles.sort { $0.createdAt > $1.createdAt }
+                            }
+                        }
+                    }
                 }
             }
         }
         
-        // Fetch articles by address (NIP-33 parameterized replaceable events)
+        // Stream articles by address (NIP-33 parameterized replaceable events)
         for address in eventAddresses {
-            let filter = NDKFilter(
-                kinds: [address.kind],
-                authors: [address.pubkey]
-            )
-            
-            let articleSource = ndk.observe(
-                filter: filter,
-                maxAge: 300,
-                cachePolicy: .cacheWithNetwork
-            )
-            
-            for await event in articleSource.events {
-                // Check if this event has the matching d-tag
-                if let dTag = event.tags.first(where: { $0.first == "d" })?[safe: 1],
-                   dTag == address.identifier,
-                   event.kind == 30023,
-                   let article = try? Article(from: event) {
-                    articles.append(article)
+            Task {
+                let filter = NDKFilter(
+                    kinds: [address.kind],
+                    authors: [address.pubkey]
+                )
+                
+                let articleSource = ndk.observe(
+                    filter: filter,
+                    maxAge: 300,
+                    cachePolicy: .cacheWithNetwork
+                )
+                
+                for await event in articleSource.events {
+                    // Check if this event has the matching d-tag
+                    if let dTag = event.tags.first(where: { $0.first == "d" })?[safe: 1],
+                       dTag == address.identifier,
+                       event.kind == 30023,
+                       let article = try? Article(from: event) {
+                        await MainActor.run {
+                            if !loadedArticles.contains(where: { $0.id == article.id }) {
+                                loadedArticles.append(article)
+                                loadedArticles.sort { $0.createdAt > $1.createdAt }
+                            }
+                        }
+                    }
                 }
             }
-        }
-        
-        await MainActor.run {
-            self.loadedArticles = articles.sorted { $0.createdAt > $1.createdAt }
-            self.isLoadingArticles = false
         }
     }
     
@@ -471,7 +469,6 @@ struct AddArticleSheet: View {
     @Environment(\.dismiss) var dismiss
     
     @State private var articleUrl = ""
-    @State private var isAdding = false
     @State private var showError = false
     @State private var errorMessage = ""
     
@@ -492,14 +489,8 @@ struct AddArticleSheet: View {
                 
                 Button(action: addArticle) {
                     HStack {
-                        if isAdding {
-                            ProgressView()
-                                .progressViewStyle(CircularProgressViewStyle(tint: .white))
-                                .scaleEffect(0.8)
-                        } else {
-                            Image(systemName: "plus.circle")
-                            Text("Add Article")
-                        }
+                        Image(systemName: "plus.circle")
+                        Text("Add Article")
                     }
                     .frame(maxWidth: .infinity)
                     .padding()
@@ -507,7 +498,7 @@ struct AddArticleSheet: View {
                     .foregroundColor(.white)
                     .cornerRadius(12)
                 }
-                .disabled(articleUrl.isEmpty || isAdding)
+                .disabled(articleUrl.isEmpty)
                 
                 Spacer()
             }
@@ -531,13 +522,11 @@ struct AddArticleSheet: View {
     private func addArticle() {
         guard !articleUrl.isEmpty else { return }
         
-        isAdding = true
         HapticType.light.trigger()
         
         Task {
             // TODO: Implement adding article to curation
             await MainActor.run {
-                isAdding = false
                 dismiss()
             }
         }
