@@ -63,8 +63,8 @@ actor WalletEventProcessor {
         // Parse token data
         guard let tokenData = decryptedContent.data(using: .utf8),
               let nip60Token = JSONCoding.safeDecode(NIP60TokenEvent.self, from: tokenData) else {
-            NDKLogger.log(.error, category: .wallet, "Failed to parse NIP-60 token event data from decrypted content")
-            throw NDKError.invalidContent("Failed to parse NIP-60 token event data")
+            NDKLogger.log(.error, category: .wallet, ErrorMessageConstants.failedTo("parse NIP-60 token event data from decrypted content"))
+            throw NDKError.invalidContent(ErrorMessageConstants.failedTo("parse NIP-60 token event data"))
         }
         
         // Add proofs to state FIRST before processing deletions
@@ -124,7 +124,7 @@ actor WalletEventProcessor {
         // Parse quote data
         guard let quoteData = decryptedContent.data(using: .utf8),
               let quote = JSONCoding.safeDecode(CashuMintQuote.self, from: quoteData) else {
-            throw NDKError.invalidContent("Failed to parse quote event data")
+            throw NDKError.invalidContent(ErrorMessageConstants.failedTo("parse quote event data"))
         }
         
         NDKLogger.log(.debug, category: .wallet, "Loaded quote: \(quote.quoteId) for \(quote.amount) sats")
