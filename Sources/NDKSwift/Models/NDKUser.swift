@@ -185,7 +185,7 @@ public final class NDKUser: Equatable, Hashable, Sendable {
         let dataSource = NDKDataSource(
             ndk: ndk,
             filter: filter,
-            maxAge: 600 // 10 minutes - contact lists don't change frequently
+            maxAge: 10 * TimeConstants.minute // 10 minutes - contact lists don't change frequently
         )
         
         // Collect all contact list events and use the most recent
@@ -301,7 +301,7 @@ public final class NDKUser: Equatable, Hashable, Sendable {
         )
         
         // Collect all profile events
-        let events = await dataSource.collect(timeout: 5.0)
+        let events = await dataSource.collect(timeout: NetworkConstants.timeoutDataCollectionLong)
         
         for event in events {
             switch event.kind {
