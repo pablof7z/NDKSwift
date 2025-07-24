@@ -8,8 +8,11 @@ import NDKSwift
 @main
 struct TestReactiveFilter {
     static func main() async {
+        // Enable debug logging
+        NDKLogger.shared.minimumSeverity = .trace
+        
         print("🔍 Testing Reactive Filter Subscriptions")
-        print("=" * 50)
+        print(String(repeating: "=", count: 50))
         
         // Initialize NDK
         let ndk = NDK(
@@ -19,8 +22,16 @@ struct TestReactiveFilter {
             ]
         )
         
-        // Create a test signer
-        let signer = NDKPrivateKeySigner.generate()
+        // Create a test signer with a known key that has follows
+        let signer: NDKSigner
+        if let privateKey = ProcessInfo.processInfo.environment["NOSTR_PRIVATE_KEY"] {
+            signer = try! NDKPrivateKeySigner(privateKey: privateKey)
+            print("✅ Using provided private key")
+        } else {
+            // Use a test account with known follows
+            signer = try! NDKPrivateKeySigner(privateKey: "1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef")
+            print("🔑 Using test private key")
+        }
         
         // Connect to relays
         await ndk.connect()
@@ -50,8 +61,11 @@ struct TestReactiveFilter {
                 dependencies: [.followList],
                 builder: { sessionData in
                     print("🔨 Building filter with \(sessionData.followList.count) follows")
+                    let authors = sessionData.followList.isEmpty ? 
+                        ["82341f882b6eabcd2ba7f1ef90aad961cf074af15b9ef44a09f9d2a8fbfbe6a2"] : // jack
+                        Array(sessionData.followList.prefix(10))
                     return NDKFilter(
-                        authors: Array(sessionData.followList.prefix(10)), // Limit to 10 for testing
+                        authors: authors,
                         kinds: [EventKind.textNote],
                         limit: 5
                     )
@@ -88,12 +102,5 @@ struct TestReactiveFilter {
         }
         
         print("\n✨ Test completed!")
-    }
-}
-
-// Helper extension
-extension String {
-    static func *(lhs: String, rhs: Int) -> String {
-        String(repeating: lhs, count: rhs)
     }
 }
