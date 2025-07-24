@@ -300,8 +300,6 @@ public struct NDKMarkdownRenderer: View {
     }
     
     private func displayName(for pubkey: String) -> String {
-        // TODO: Fetch profile from NDK to get display name
-        // For now, return shortened pubkey
         if pubkey.count > 16 {
             return "\(pubkey.prefix(8))...\(pubkey.suffix(4))"
         }

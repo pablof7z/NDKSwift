@@ -272,9 +272,6 @@ public struct NDKEventInteractionBar: View {
             
             Spacer()
         }
-        .onAppear {
-            loadReactionCounts()
-        }
     }
     
     // MARK: - Style Properties
@@ -285,13 +282,6 @@ public struct NDKEventInteractionBar: View {
         case .standard: return 20
         case .detailed: return 24
         }
-    }
-    
-    // MARK: - Private Methods
-    
-    private func loadReactionCounts() {
-        // TODO: Implement reaction count loading
-        // This would involve querying for reactions to this event
     }
     
     // MARK: - Modifiers
