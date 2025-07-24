@@ -115,7 +115,7 @@ struct WalletSettingsView: View {
                     } else {
                         ForEach(relays, id: \.self) { relay in
                             RelaySettingsRow(relayURL: relay) {
-                                relays.removeAll { $0 == relay }
+                                relays.removeAll(value: relay)
                             }
                         }
                     }

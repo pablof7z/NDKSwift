@@ -556,7 +556,7 @@ public actor WalletTransactionHistory {
             paymentHashIndex.removeValue(forKey: paymentHash)
         }
         if let recipient = transaction.lookupKeys.recipientPubkey {
-            recipientIndex[recipient]?.removeAll { $0 == transaction.id }
+            recipientIndex[recipient]?.removeAll(value: transaction.id)
         }
         
         // Remove from event indices

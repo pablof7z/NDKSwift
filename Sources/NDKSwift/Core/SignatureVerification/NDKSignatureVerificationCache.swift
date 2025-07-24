@@ -35,7 +35,7 @@ actor NDKSignatureVerificationCache {
         // Check if already cached
         if verifiedSignatures[eventId] != nil {
             // Move to end of insertion order
-            insertionOrder.removeAll { $0 == eventId }
+            insertionOrder.removeAll(value: eventId)
             insertionOrder.append(eventId)
             return
         }
