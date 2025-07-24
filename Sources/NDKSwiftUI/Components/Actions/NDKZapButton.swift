@@ -118,7 +118,7 @@ public struct NDKZapButton: View {
         }
         .buttonStyle(PlainButtonStyle())
         .disabled(zapState.isLoading || ndk?.signer == nil)
-        .opacity(zapState.isLoading ? 0.6 : 1.0)
+        .opacity(zapState.isLoading ? OpacityConstants.strong : 1.0)
         .contextMenu {
             if !amounts.isEmpty {
                 ForEach(amounts, id: \.self) { amount in
@@ -268,7 +268,7 @@ public struct NDKZapButton: View {
     private var backgroundColor: Color {
         switch style {
         case .standard:
-            return zapState.hasZapped ? zapColor.opacity(0.1) : Color.ndkTertiaryBackground
+            return zapState.hasZapped ? zapColor.opacity(OpacityConstants.light) : Color.ndkTertiaryBackground
         case .compact:
             return zapState.hasZapped ? zapColor.opacity(0.1) : Color.clear
         case .minimal:
@@ -280,7 +280,7 @@ public struct NDKZapButton: View {
         Group {
             if style == .standard {
                 RoundedRectangle(cornerRadius: cornerRadius)
-                    .stroke(zapState.hasZapped ? zapColor.opacity(0.3) : Color.ndkSeparator.opacity(0.3), lineWidth: 1)
+                    .stroke(zapState.hasZapped ? zapColor.opacity(OpacityConstants.semiOpaque) : Color.ndkSeparator.opacity(OpacityConstants.semiOpaque), lineWidth: 1)
             }
         }
     }

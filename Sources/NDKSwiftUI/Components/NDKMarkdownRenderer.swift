@@ -382,7 +382,7 @@ public struct MarkdownConfiguration {
     public var headingColor = Color.primary
     public var linkColor = Color.blue
     public var codeColor = Color.primary
-    public var codeBackgroundColor = Color.gray.opacity(0.1)
+    public var codeBackgroundColor = Color.gray.opacity(OpacityConstants.light)
     public var codeLanguageColor = Color.secondary
     public var blockquoteColor = Color.secondary
     public var blockquoteBorderColor = Color.gray
@@ -391,7 +391,7 @@ public struct MarkdownConfiguration {
     public var nostrEntityColor = Color.orange
     public var listBulletColor = Color.secondary
     public var inlineCodeColor = Color.primary
-    public var inlineCodeBackgroundColor = Color.gray.opacity(0.1)
+    public var inlineCodeBackgroundColor = Color.gray.opacity(OpacityConstants.light)
     
     // Fonts
     public var bodyFont = Font.body
