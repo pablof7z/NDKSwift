@@ -18,10 +18,11 @@ struct ModernHomeView: View {
             ScrollViewReader { proxy in
                 ScrollView(showsIndicators: false) {
                     VStack(spacing: .ds.sectionSpacing) {
-                        // Minimal header
+                        // Minimal header with parallax effect
                         headerView
                             .padding(.top, .ds.small)
                             .padding(.horizontal, .ds.screenPadding)
+                            .parallax(offset: scrollOffset, multiplier: 0.5)
                         
                         // Recently Highlighted Articles Section
                         RecentlyHighlightedArticlesSection(articles: dataManager.highlightedArticles)
@@ -30,6 +31,7 @@ struct ModernHomeView: View {
                         if !dataManager.userHighlights.isEmpty {
                             FeaturedHighlightCard(highlight: dataManager.userHighlights.first!)
                                 .padding(.horizontal, .ds.screenPadding)
+                                .premiumEntrance(delay: 0.2)
                         }
                         
                         // Active discussions
@@ -57,7 +59,14 @@ struct ModernHomeView: View {
                     await dataManager.refresh()
                 }
             }
-            .background(DesignSystem.Colors.background)
+            .background(
+                ZStack {
+                    DesignSystem.Colors.background
+                    MeshGradientBackground()
+                        .opacity(0.3)
+                        .ignoresSafeArea()
+                }
+            )
             .navigationBarHidden(true)
         }
         .onAppear {
@@ -91,6 +100,7 @@ struct ModernHomeView: View {
                     .background(DesignSystem.Colors.surfaceSecondary)
                     .clipShape(Circle())
             }
+            .magneticHover()
         }
     }
     
@@ -108,6 +118,7 @@ struct ModernHomeView: View {
 
 struct FeaturedHighlightCard: View {
     let highlight: HighlightEvent
+    @State private var isExpanded = false
     
     var body: some View {
         VStack(alignment: .leading, spacing: .ds.base) {
@@ -134,6 +145,13 @@ struct FeaturedHighlightCard: View {
         .padding(.ds.medium)
         .background(DesignSystem.Colors.primaryLight.opacity(0.08))
         .clipShape(RoundedRectangle(cornerRadius: .ds.large, style: .continuous))
+        .morphingCard(isExpanded: isExpanded)
+        .onTapGesture {
+            withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
+                isExpanded.toggle()
+            }
+            HapticManager.shared.impact(.medium)
+        }
     }
 }
 
