@@ -15,7 +15,7 @@ public enum Bech32 {
         let combined = values + checksum
 
         let encoded = combined.map { charset[charset.index(charset.startIndex, offsetBy: Int($0))] }
-        return hrp + "1" + String(encoded)
+        return "\(hrp)1\(String(encoded))"
     }
 
     /// Decode bech32 string

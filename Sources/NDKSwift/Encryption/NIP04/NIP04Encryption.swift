@@ -84,7 +84,7 @@ public enum NIP04 {
         let encrypted = try encryptAES(message: message, key: sharedSecret, iv: iv)
         
         // Return in NIP-04 format: base64(ciphertext)?iv=base64(iv)
-        return encrypted.base64EncodedString() + "?iv=" + iv.base64EncodedString()
+        return "\(encrypted.base64EncodedString())?iv=\(iv.base64EncodedString())"
     }
 
     /// Decrypt a message using NIP-04
