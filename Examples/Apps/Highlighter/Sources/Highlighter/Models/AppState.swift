@@ -61,13 +61,8 @@ class AppState: ObservableObject {
             // Set NDK instance in auth manager
             authManager.setNDK(ndk!)
             
-            // Restore sessions from keychain
-            await authManager.restoreSessions()
-            
-            // Use the most recent session if available
-            if let mostRecentSession = authManager.availableSessions.last {
-                try? await authManager.switchToSession(mostRecentSession)
-            }
+            // Restore session from keychain (handles automatic session switching)
+            authManager.restoreSession()
             
             // Start NIP-77 sync in background
             Task {
