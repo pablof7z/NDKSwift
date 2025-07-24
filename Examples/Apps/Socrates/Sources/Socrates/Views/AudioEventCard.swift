@@ -239,27 +239,27 @@ struct AudioEventCard: View {
     private func relativeTime(from date: Date) -> String {
         let interval = Date().timeIntervalSince(date)
         
-        if interval < 60 {
+        if interval < TimeConstants.minute {
             return "now"
-        } else if interval < 3600 {
-            let minutes = Int(interval / 60)
+        } else if interval < TimeConstants.hour {
+            let minutes = Int(interval / TimeConstants.minute)
             return "\(minutes)m"
-        } else if interval < 86400 {
-            let hours = Int(interval / 3600)
+        } else if interval < TimeConstants.day {
+            let hours = Int(interval / TimeConstants.hour)
             return "\(hours)h"
         } else {
-            let days = Int(interval / 86400)
+            let days = Int(interval / TimeConstants.day)
             return "\(days)d"
         }
     }
     
     private func formattedDuration(_ duration: TimeInterval) -> String {
         let totalSeconds = Int(duration)
-        if totalSeconds < 60 {
+        if totalSeconds < Int(TimeConstants.minute) {
             return "\(totalSeconds)s"
         } else {
-            let minutes = totalSeconds / 60
-            let seconds = totalSeconds % 60
+            let minutes = totalSeconds / Int(TimeConstants.minute)
+            let seconds = totalSeconds % Int(TimeConstants.minute)
             return String(format: "%d:%02d", minutes, seconds)
         }
     }

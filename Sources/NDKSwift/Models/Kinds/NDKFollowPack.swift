@@ -32,12 +32,12 @@ public struct NDKFollowPack {
     
     /// Get the title from tags
     public var title: String? {
-        return event.tags.first { $0.count > 1 && $0[0] == "title" }?[1]
+        return getTagValue("title")
     }
     
     /// Get the description from tags
     public var description: String? {
-        return event.tags.first { $0.count > 1 && $0[0] == "description" }?[1]
+        return getTagValue("description")
     }
     
     /// Get the image
@@ -50,13 +50,20 @@ public struct NDKFollowPack {
             return url
         }
         // Fallback to "image" tag
-        return event.tags.first { $0.count > 1 && $0[0] == "image" }?[1]
+        return getTagValue("image")
     }
     
     
     /// Get the identifier (d tag) for parameterized replaceable events
     public var identifier: String? {
-        return event.tags.first { $0.count > 1 && $0[0] == "d" }?[1]
+        return getTagValue("d")
+    }
+    
+    // MARK: - Private Methods
+    
+    /// Helper to get tag value by name
+    private func getTagValue(_ tagName: String) -> String? {
+        return event.tags.first { $0.count > 1 && $0[0] == tagName }?[1]
     }
     
     /// Get all pubkeys from p tags
