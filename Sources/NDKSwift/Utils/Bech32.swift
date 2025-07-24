@@ -164,7 +164,7 @@ public extension Bech32 {
         do {
             data = try HexValidator.validate32ByteHex(pubkey)
         } catch {
-            throw NDKError.validationError("Invalid bech32 data")
+            throw NDKError.validationError(ErrorMessageConstants.invalid("bech32 data"))
         }
         return try encode(hrp: Bech32HRP.npub, data: Array(data))
     }
@@ -184,7 +184,7 @@ public extension Bech32 {
         do {
             data = try HexValidator.validate32ByteHex(privateKey)
         } catch {
-            throw NDKError.validationError("Invalid private key format: \(error.localizedDescription)")
+            throw NDKError.validationError(ErrorMessageConstants.withContext(ErrorMessageConstants.invalid("private key format"), context: error.localizedDescription))
         }
 
         return try encode(hrp: Bech32HRP.nsec, data: Array(data))
@@ -205,7 +205,7 @@ public extension Bech32 {
         do {
             data = try HexValidator.validate32ByteHex(eventId)
         } catch {
-            throw NDKError.validationError("Invalid bech32 data")
+            throw NDKError.validationError(ErrorMessageConstants.invalid("bech32 data"))
         }
         return try encode(hrp: Bech32HRP.note, data: Array(data))
     }
@@ -230,7 +230,7 @@ public extension Bech32 {
         do {
             eventData = try HexValidator.validate32ByteHex(eventId)
         } catch {
-            throw NDKError.validationError("Invalid bech32 data")
+            throw NDKError.validationError(ErrorMessageConstants.invalid("bech32 data"))
         }
 
         var tlvData: [UInt8] = []
@@ -279,7 +279,7 @@ public extension Bech32 {
         do {
             authorData = try HexValidator.validate32ByteHex(author)
         } catch {
-            throw NDKError.validationError("Invalid bech32 data")
+            throw NDKError.validationError(ErrorMessageConstants.invalid("bech32 data"))
         }
 
         var tlvData: [UInt8] = []
