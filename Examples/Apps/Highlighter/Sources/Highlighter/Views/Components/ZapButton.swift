@@ -57,17 +57,31 @@ struct ZapButton: View {
     
     var body: some View {
         Button(action: handleZap) {
-            HStack(spacing: 4) {
+            HStack(spacing: 6) {
                 Image(systemName: zapState.iconName)
-                    .font(.system(size: size.iconSize))
-                    .foregroundColor(zapState.color)
-                    .scaleEffect(zapState == .zapping ? 1.2 : 1.0)
-                    .animation(.easeInOut(duration: 0.3), value: zapState)
+                    .font(.system(size: size.iconSize, weight: .medium))
+                    .foregroundColor(.white)
+                    .scaleEffect(zapState == .zapping ? 1.3 : 1.0)
+                    .rotationEffect(zapState == .zapping ? .degrees(15) : .degrees(0))
+                    .animation(
+                        .spring(response: 0.3, dampingFraction: 0.6),
+                        value: zapState
+                    )
                 
+                if zapState == .zapped {
+                    Text("\(zapAmount)")
+                        .font(.system(size: size.iconSize * 0.8, weight: .semibold, design: .rounded))
+                        .foregroundColor(.white)
+                        .transition(.scale.combined(with: .opacity))
+                }
             }
-            .padding(size.padding)
+            .padding(.horizontal, size.padding)
+            .padding(.vertical, size.padding * 0.75)
         }
+        .enhancedZapButton()
+        .contextualFeedback(isActive: zapState == .zapping)
         .disabled(zapState == .zapping)
+        .opacity(zapState == .failed ? 0.6 : 1.0)
         .sheet(isPresented: $showZapSheet) {
             ZapAmountSheet(
                 event: event,
@@ -98,19 +112,41 @@ struct ZapButton: View {
         
         Task {
             do {
+                // Add realistic delay for better UX feedback
+                try await Task.sleep(nanoseconds: 800_000_000) // 0.8 seconds
+                
                 // TODO: Implement actual zapping once NDK supports it
                 // This would create a zap event (kind 9735) and send payment
                 // For now, just show success immediately
                 
                 await MainActor.run {
-                    zapState = .zapped
+                    zapAmount = amount
+                    withAnimation(.spring(response: 0.5, dampingFraction: 0.7)) {
+                        zapState = .zapped
+                    }
+                    
+                    // Multiple haptic feedback for success
                     HapticType.success.trigger()
+                    
+                    // Add a subtle second feedback after delay
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                        HapticType.light.trigger()
+                    }
                 }
             } catch {
                 await MainActor.run {
-                    zapState = .failed
+                    withAnimation(.easeInOut(duration: 0.3)) {
+                        zapState = .failed
+                    }
                     HapticType.error.trigger()
                     print("Zap failed: \(error)")
+                    
+                    // Auto-reset failed state after 2 seconds
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
+                        withAnimation(.easeOut(duration: 0.3)) {
+                            zapState = .idle
+                        }
+                    }
                 }
             }
         }
@@ -130,20 +166,55 @@ struct ZapAmountSheet: View {
     var body: some View {
         NavigationStack {
             VStack(spacing: 24) {
-                // Lightning bolt animation
-                Image(systemName: "bolt.fill")
-                    .font(.system(size: 60))
-                    .foregroundColor(DesignSystem.Colors.primary)
-                    .scaleEffect(1.1)
-                    .animation(
-                        Animation.easeInOut(duration: 1.5)
-                            .repeatForever(autoreverses: true),
-                        value: true
-                    )
-                    .padding(.top)
+                // Enhanced lightning bolt animation
+                ZStack {
+                    // Background glow effect
+                    Circle()
+                        .fill(
+                            RadialGradient(
+                                colors: [
+                                    DesignSystem.Colors.secondary.opacity(0.3),
+                                    DesignSystem.Colors.secondary.opacity(0.1),
+                                    Color.clear
+                                ],
+                                center: .center,
+                                startRadius: 10,
+                                endRadius: 50
+                            )
+                        )
+                        .frame(width: 100, height: 100)
+                        .pulseGently()
+                    
+                    // Main lightning bolt
+                    Image(systemName: "bolt.fill")
+                        .font(.system(size: 60, weight: .medium))
+                        .foregroundStyle(
+                            LinearGradient(
+                                colors: [
+                                    DesignSystem.Colors.secondary,
+                                    DesignSystem.Colors.secondaryDark
+                                ],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
+                        .shadow(
+                            color: DesignSystem.Colors.secondary.opacity(0.4),
+                            radius: 8,
+                            x: 0,
+                            y: 4
+                        )
+                }
+                .padding(.top)
                 
-                Text("Choose Amount")
-                    .font(DesignSystem.Typography.headline)
+                VStack(spacing: 8) {
+                    Text("Choose Amount")
+                        .font(.system(size: 24, weight: .semibold))
+                    
+                    Text("Send sats to show appreciation")
+                        .font(.system(size: 16))
+                        .foregroundColor(DesignSystem.Colors.textSecondary)
+                }
                 
                 // Preset amounts grid
                 LazyVGrid(columns: [GridItem(.adaptive(minimum: 80))], spacing: 16) {
