@@ -7,25 +7,40 @@ import NDKSwift
 // MARK: - Pubkey Formatting
 
 struct PubkeyFormatter {
-    /// Format a pubkey to show first 8 characters with ellipsis
-    static func formatShort(_ pubkey: String) -> String {
-        String(pubkey.prefix(8)) + "..."
+    /// Format pubkey for display with customizable length
+    /// - Parameters:
+    ///   - pubkey: The public key to format
+    ///   - prefixLength: Number of characters from the start (default: 8)
+    ///   - suffixLength: Number of characters from the end (default: 4)
+    /// - Returns: Formatted string like "npub1abc...xyz"
+    static func format(_ pubkey: String, prefixLength: Int = 8, suffixLength: Int = 4) -> String {
+        guard pubkey.count > prefixLength + suffixLength else {
+            return pubkey
+        }
+        
+        let prefix = String(pubkey.prefix(prefixLength))
+        let suffix = String(pubkey.suffix(suffixLength))
+        return "\(prefix)...\(suffix)"
     }
     
-    /// Format a pubkey to show first 8 characters only
+    /// Compact format for tight spaces (6 + 3 characters)
     static func formatCompact(_ pubkey: String) -> String {
-        String(pubkey.prefix(8))
+        format(pubkey, prefixLength: 6, suffixLength: 3)
     }
     
-    /// Format a pubkey for avatar display (first character uppercase)
+    /// Short format for lists and cards (8 + 4 characters)
+    static func formatShort(_ pubkey: String) -> String {
+        format(pubkey, prefixLength: 8, suffixLength: 4)
+    }
+    
+    /// Long format for profile pages (12 + 6 characters)
+    static func formatLong(_ pubkey: String) -> String {
+        format(pubkey, prefixLength: 12, suffixLength: 6)
+    }
+    
+    /// Format for avatar initials (first 2 characters)
     static func formatForAvatar(_ pubkey: String) -> String {
-        String(pubkey.prefix(1)).uppercased()
-    }
-    
-    /// Format a pubkey with custom length
-    static func format(_ pubkey: String, length: Int) -> String {
-        guard pubkey.count > length else { return pubkey }
-        return String(pubkey.prefix(length)) + "..."
+        String(pubkey.prefix(2)).uppercased()
     }
     
     /// Format for display name with fallback options
@@ -38,53 +53,188 @@ struct PubkeyFormatter {
             return formatShort(pubkey)
         }
     }
+    
+    /// Check if a string is a valid pubkey format
+    static func isValidPubkey(_ pubkey: String) -> Bool {
+        pubkey.count == 64 && pubkey.allSatisfy { $0.isHexDigit }
+    }
+    
+    /// Convert hex pubkey to npub format (if needed in the future)
+    static func toNpub(_ hexPubkey: String) -> String {
+        // For now, just return the hex format as specified in the NDK guidance
+        // "All public keys are hex encoded (not npub)"
+        return hexPubkey
+    }
+}
+
+private extension Character {
+    var isHexDigit: Bool {
+        return self.isNumber || ("a"..."f").contains(self.lowercased()) || ("A"..."F").contains(self)
+    }
 }
 
 // MARK: - Time Formatting
 
 struct RelativeTimeFormatter {
-    /// Standard relative time formatting
+    /// Format timestamp as relative time (e.g., "2 hours ago", "just now")
+    /// - Parameter timestamp: NDK timestamp to format
+    /// - Returns: Human-readable relative time string
     static func relativeTime(from timestamp: Timestamp) -> String {
         let date = Date(timeIntervalSince1970: TimeInterval(timestamp))
-        let formatter = RelativeDateTimeFormatter()
-        formatter.unitsStyle = .abbreviated
-        return formatter.localizedString(for: date, relativeTo: Date())
+        return relativeTime(from: date)
     }
     
-    /// Relative time from Date
+    /// Format Date as relative time
+    /// - Parameter date: Date to format
+    /// - Returns: Human-readable relative time string
     static func relativeTime(from date: Date) -> String {
-        let formatter = RelativeDateTimeFormatter()
-        formatter.unitsStyle = .abbreviated
-        return formatter.localizedString(for: date, relativeTo: Date())
+        let now = Date()
+        let interval = now.timeIntervalSince(date)
+        
+        // Future dates
+        if interval < 0 {
+            return "in the future"
+        }
+        
+        // Just now (under 30 seconds)
+        if interval < 30 {
+            return "just now"
+        }
+        
+        // Minutes
+        if interval < 3600 {
+            let minutes = Int(interval / 60)
+            return "\(minutes) minute\(minutes == 1 ? "" : "s") ago"
+        }
+        
+        // Hours (under 24 hours)
+        if interval < 86400 {
+            let hours = Int(interval / 3600)
+            return "\(hours) hour\(hours == 1 ? "" : "s") ago"
+        }
+        
+        // Days (under 7 days)
+        if interval < 604800 {
+            let days = Int(interval / 86400)
+            return "\(days) day\(days == 1 ? "" : "s") ago"
+        }
+        
+        // Weeks (under 30 days)
+        if interval < 2592000 {
+            let weeks = Int(interval / 604800)
+            return "\(weeks) week\(weeks == 1 ? "" : "s") ago"
+        }
+        
+        // Months (under 365 days)
+        if interval < 31536000 {
+            let months = Int(interval / 2592000)
+            return "\(months) month\(months == 1 ? "" : "s") ago"
+        }
+        
+        // Years
+        let years = Int(interval / 31536000)
+        return "\(years) year\(years == 1 ? "" : "s") ago"
     }
     
-    /// Short relative time formatting
+    /// Short relative time format for compact display (e.g., "2h", "3d", "1y")
+    /// - Parameter timestamp: NDK timestamp to format
+    /// - Returns: Short relative time string
     static func shortRelativeTime(from timestamp: Timestamp) -> String {
         let date = Date(timeIntervalSince1970: TimeInterval(timestamp))
-        let formatter = RelativeDateTimeFormatter()
-        formatter.unitsStyle = .short
-        return formatter.localizedString(for: date, relativeTo: Date())
+        return shortRelativeTime(from: date)
     }
     
-    /// Ultra-compact time formatting for cards
-    static func compactTime(from timestamp: Timestamp) -> String {
+    /// Short relative time format for compact display
+    /// - Parameter date: Date to format
+    /// - Returns: Short relative time string
+    static func shortRelativeTime(from date: Date) -> String {
+        let now = Date()
+        let interval = now.timeIntervalSince(date)
+        
+        // Future dates
+        if interval < 0 {
+            return "future"
+        }
+        
+        // Just now (under 30 seconds)
+        if interval < 30 {
+            return "now"
+        }
+        
+        // Minutes
+        if interval < 3600 {
+            let minutes = Int(interval / 60)
+            return "\(minutes)m"
+        }
+        
+        // Hours (under 24 hours)
+        if interval < 86400 {
+            let hours = Int(interval / 3600)
+            return "\(hours)h"
+        }
+        
+        // Days (under 7 days)
+        if interval < 604800 {
+            let days = Int(interval / 86400)
+            return "\(days)d"
+        }
+        
+        // Weeks (under 30 days)
+        if interval < 2592000 {
+            let weeks = Int(interval / 604800)
+            return "\(weeks)w"
+        }
+        
+        // Months (under 365 days)
+        if interval < 31536000 {
+            let months = Int(interval / 2592000)
+            return "\(months)mo"
+        }
+        
+        // Years
+        let years = Int(interval / 31536000)
+        return "\(years)y"
+    }
+    
+    /// Format timestamp as exact time when needed (e.g., "Mar 15, 2024 at 3:45 PM")
+    /// - Parameter timestamp: NDK timestamp to format
+    /// - Returns: Formatted date and time string
+    static func exactTime(from timestamp: Timestamp) -> String {
+        let date = Date(timeIntervalSince1970: TimeInterval(timestamp))
+        return exactTime(from: date)
+    }
+    
+    /// Format Date as exact time
+    /// - Parameter date: Date to format
+    /// - Returns: Formatted date and time string
+    static func exactTime(from date: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.dateStyle = .medium
+        formatter.timeStyle = .short
+        return formatter.string(from: date)
+    }
+    
+    /// Smart formatting that switches between relative and exact based on age
+    /// Recent items show relative time, older items show exact date
+    /// - Parameter timestamp: NDK timestamp to format
+    /// - Returns: Contextually appropriate time string
+    static func smartFormat(from timestamp: Timestamp) -> String {
         let date = Date(timeIntervalSince1970: TimeInterval(timestamp))
         let now = Date()
-        let timeInterval = now.timeIntervalSince(date)
+        let interval = now.timeIntervalSince(date)
         
-        if timeInterval < 60 {
-            return "now"
-        } else if timeInterval < 3600 {
-            return "\(Int(timeInterval / 60))m"
-        } else if timeInterval < 86400 {
-            return "\(Int(timeInterval / 3600))h"
-        } else if timeInterval < 604800 {
-            return "\(Int(timeInterval / 86400))d"
-        } else {
-            let formatter = DateFormatter()
-            formatter.dateFormat = "MMM d"
-            return formatter.string(from: date)
+        // Use relative time for recent items (under 7 days)
+        if interval < 604800 {
+            return relativeTime(from: date)
         }
+        
+        // Use exact date for older items
+        return exactTime(from: date)
+    }
+    
+    /// Ultra-compact time formatting for cards (legacy compatibility)
+    static func compactTime(from timestamp: Timestamp) -> String {
+        return shortRelativeTime(from: timestamp)
     }
 }
 
