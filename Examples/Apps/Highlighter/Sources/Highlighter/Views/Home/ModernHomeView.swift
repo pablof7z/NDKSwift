@@ -423,7 +423,7 @@ struct CompactHighlightCard: View {
     }
     
     private func formatAuthor(_ pubkey: String) -> String {
-        String(pubkey.prefix(8)) + "..."
+        PubkeyFormatter.formatShort(pubkey)
     }
 }
 
@@ -436,7 +436,7 @@ struct DiscussionRow: View {
                 .fill(DesignSystem.Colors.surfaceSecondary)
                 .frame(width: 36, height: 36)
                 .overlay(
-                    Text(String(event.pubkey.prefix(1)).uppercased())
+                    Text(PubkeyFormatter.formatForAvatar(event.pubkey))
                         .font(.ds.captionMedium)
                         .foregroundColor(.ds.textSecondary)
                 )
@@ -466,14 +466,11 @@ struct DiscussionRow: View {
     }
     
     private func formatPubkey(_ pubkey: String) -> String {
-        String(pubkey.prefix(8))
+        PubkeyFormatter.formatCompact(pubkey)
     }
     
     private func relativeTime(from timestamp: Timestamp) -> String {
-        let date = Date(timeIntervalSince1970: TimeInterval(timestamp))
-        let formatter = RelativeDateTimeFormatter()
-        formatter.unitsStyle = .abbreviated
-        return formatter.localizedString(for: date, relativeTo: Date())
+        RelativeTimeFormatter.relativeTime(from: timestamp)
     }
 }
 
@@ -509,10 +506,7 @@ struct TrendingItemCard: View {
     }
     
     private func relativeTime(from timestamp: Timestamp) -> String {
-        let date = Date(timeIntervalSince1970: TimeInterval(timestamp))
-        let formatter = RelativeDateTimeFormatter()
-        formatter.unitsStyle = .short
-        return formatter.localizedString(for: date, relativeTo: Date())
+        RelativeTimeFormatter.shortRelativeTime(from: timestamp)
     }
 }
 
@@ -620,13 +614,10 @@ struct HighlightedArticleCard: View {
     }
     
     private func formatAuthor(_ pubkey: String) -> String {
-        String(pubkey.prefix(8)) + "..."
+        PubkeyFormatter.formatShort(pubkey)
     }
     
     private func relativeTime(from timestamp: Timestamp) -> String {
-        let date = Date(timeIntervalSince1970: TimeInterval(timestamp))
-        let formatter = RelativeDateTimeFormatter()
-        formatter.unitsStyle = .abbreviated
-        return formatter.localizedString(for: date, relativeTo: Date())
+        RelativeTimeFormatter.relativeTime(from: timestamp)
     }
 }

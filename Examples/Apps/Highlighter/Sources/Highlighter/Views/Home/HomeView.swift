@@ -466,7 +466,7 @@ struct QuoteCard: View {
     }
     
     private func formatAuthor(_ pubkey: String) -> String {
-        String(pubkey.prefix(8)) + "..."
+        PubkeyFormatter.formatShort(pubkey)
     }
 }
 
@@ -545,7 +545,7 @@ struct CommunityZapCard: View {
                 )
             
             VStack(alignment: .leading, spacing: 4) {
-                Text("\(zapEvent.pubkey.prefix(8))... zapped")
+                Text("\(PubkeyFormatter.formatShort(zapEvent.pubkey)) zapped")
                     .font(DesignSystem.Typography.caption)
                     .foregroundColor(DesignSystem.Colors.textSecondary)
                 
@@ -672,12 +672,12 @@ struct DiscussionCard: View {
                     .fill(LinearGradient(colors: [Color.gray.opacity(0.1), Color.gray.opacity(0.05)], startPoint: .top, endPoint: .bottom))
                     .frame(width: 24, height: 24)
                     .overlay(
-                        Text(String(event.pubkey.prefix(1)).uppercased())
+                        Text(PubkeyFormatter.formatForAvatar(event.pubkey))
                             .font(.system(size: 12, weight: .semibold))
                             .foregroundColor(DesignSystem.Colors.text)
                     )
                 
-                Text(event.pubkey.prefix(8) + "...")
+                Text(PubkeyFormatter.formatShort(event.pubkey))
                     .font(DesignSystem.Typography.caption)
                     .fontWeight(.medium)
                 
