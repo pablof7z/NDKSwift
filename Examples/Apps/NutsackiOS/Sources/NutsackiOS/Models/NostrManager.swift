@@ -473,7 +473,7 @@ class NostrManager {
     /// Remove a user relay and persist the change
     func removeUserRelay(_ relayURL: String) {
         var userRelays = getUserAddedRelays()
-        userRelays.removeAll { $0 == relayURL }
+        userRelays.removeAll(value: relayURL)
         UserDefaults.standard.set(userRelays, forKey: Self.userRelaysKey)
         print("NostrManager - Removed user relay: \(relayURL)")
         print("NostrManager - User relays now: \(userRelays)")

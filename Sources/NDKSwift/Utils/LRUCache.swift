@@ -120,7 +120,7 @@ actor LRUCache<Key: Hashable, Value> {
     
     /// Remove a key from the access order list
     private func removeFromAccessOrder(_ key: Key) {
-        accessOrder.removeAll { $0 == key }
+        accessOrder.removeAll(value: key)
     }
     
     private func evictOldest() {

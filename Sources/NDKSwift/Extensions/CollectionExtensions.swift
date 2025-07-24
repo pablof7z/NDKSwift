@@ -70,6 +70,14 @@ public extension Array {
     }
 }
 
+public extension Array where Element: Equatable {
+    /// Remove all occurrences of the specified value
+    /// - Parameter value: The value to remove from the array
+    mutating func removeAll(value: Element) {
+        removeAll { $0 == value }
+    }
+}
+
 // MARK: - String Extensions for Common Operations
 
 public extension String {

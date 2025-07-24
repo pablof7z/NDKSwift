@@ -163,7 +163,7 @@ public actor NDKProfileManager {
         if entry.isStale(after: maxAge) {
             // Remove stale entry
             profileCache.removeValue(forKey: pubkey)
-            cacheOrder.removeAll { $0 == pubkey }
+            cacheOrder.removeAll(value: pubkey)
             return nil
         }
         
@@ -176,7 +176,7 @@ public actor NDKProfileManager {
     private func updateCache(pubkey: PublicKey, profile: NDKUserProfile) {
         // Remove old entry if exists
         if profileCache[pubkey] != nil {
-            cacheOrder.removeAll { $0 == pubkey }
+            cacheOrder.removeAll(value: pubkey)
         }
         
         // Add new entry
@@ -194,7 +194,7 @@ public actor NDKProfileManager {
     
     private func updateCacheOrder(for pubkey: PublicKey) {
         // Move to end (most recently used)
-        cacheOrder.removeAll { $0 == pubkey }
+        cacheOrder.removeAll(value: pubkey)
         cacheOrder.append(pubkey)
     }
     
