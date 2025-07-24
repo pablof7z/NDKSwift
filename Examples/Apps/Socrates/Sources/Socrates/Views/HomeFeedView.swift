@@ -13,6 +13,8 @@ struct HomeFeedView: View {
     @State private var dragOffset = CGSize.zero
     @State private var isDragging = false
     @State private var dataSourceTask: Task<Void, Never>?
+    @State private var selectedRelay: String? = nil
+    @State private var showRelaySelector = false
     
     // Recording states
     @State private var audioRecorder: AVAudioRecorder?
@@ -29,7 +31,7 @@ struct HomeFeedView: View {
         ZStack {
             VStack(spacing: 0) {
                 // Header
-                HeaderView()
+                HeaderView(selectedRelay: $selectedRelay, showRelaySelector: $showRelaySelector)
                     .padding(.horizontal, 16)
                     .padding(.vertical, 8)
                 
@@ -83,8 +85,28 @@ struct HomeFeedView: View {
                     .padding(.bottom, 20)
                 }
             }
+            
+            // Relay selector modal
+            if showRelaySelector {
+                Color.black.opacity(0.4)
+                    .ignoresSafeArea()
+                    .onTapGesture {
+                        showRelaySelector = false
+                    }
+                
+                RelaySelectorView(
+                    selectedRelay: $selectedRelay,
+                    isPresented: $showRelaySelector
+                )
+                .transition(.opacity.combined(with: .scale(scale: 0.95)))
+            }
         }
+        .animation(.easeInOut(duration: 0.2), value: showRelaySelector)
         .onAppear {
+            startStreamingAudioEvents()
+        }
+        .onChange(of: selectedRelay) { _, _ in
+            // Restart streaming with new relay filter
             startStreamingAudioEvents()
         }
         .onDisappear {
@@ -262,21 +284,43 @@ struct HomeFeedView: View {
 struct HeaderView: View {
     @EnvironmentObject var appState: AppState
     @EnvironmentObject var nostrManager: NostrManager
+    @Binding var selectedRelay: String?
+    @Binding var showRelaySelector: Bool
     
     var body: some View {
         HStack {
-            Text("SOCRATES")
-                .font(.system(size: 24, weight: .black))
-                .foregroundStyle(
-                    LinearGradient(
-                        gradient: Gradient(colors: [
-                            Color.white,
-                            Color.white.opacity(0.8)
-                        ]),
-                        startPoint: .top,
-                        endPoint: .bottom
+            VStack(alignment: .leading, spacing: 2) {
+                Text("SOCRATES")
+                    .font(.system(size: 24, weight: .black))
+                    .foregroundStyle(
+                        LinearGradient(
+                            gradient: Gradient(colors: [
+                                Color.white,
+                                Color.white.opacity(0.8)
+                            ]),
+                            startPoint: .top,
+                            endPoint: .bottom
+                        )
                     )
-                )
+                
+                // Relay indicator
+                HStack(spacing: 4) {
+                    Circle()
+                        .fill(Color.green)
+                        .frame(width: 6, height: 6)
+                    
+                    Text(selectedRelay != nil ? formatRelayForDisplay(selectedRelay!) : "All relays")
+                        .font(.system(size: 11))
+                        .foregroundColor(Color.white.opacity(0.7))
+                    
+                    Image(systemName: "chevron.down")
+                        .font(.system(size: 9))
+                        .foregroundColor(Color.white.opacity(0.5))
+                }
+            }
+            .onTapGesture {
+                showRelaySelector = true
+            }
             
             Spacer()
             
@@ -308,6 +352,23 @@ struct HeaderView: View {
                 .clipShape(Circle())
             }
         }
+    }
+    
+    private func formatRelayForDisplay(_ url: String) -> String {
+        var formatted = url
+        if formatted.hasPrefix("wss://") {
+            formatted = String(formatted.dropFirst(6))
+        } else if formatted.hasPrefix("ws://") {
+            formatted = String(formatted.dropFirst(5))
+        }
+        if formatted.hasSuffix("/") {
+            formatted = String(formatted.dropLast())
+        }
+        // Truncate long URLs
+        if formatted.count > 20 {
+            return String(formatted.prefix(17)) + "..."
+        }
+        return formatted
     }
 }
 

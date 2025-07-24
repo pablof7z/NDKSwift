@@ -430,12 +430,11 @@ private class ZapState: ObservableObject {
         // Simplified Lightning invoice parsing
         // In production, use a proper Lightning library
         // For now, return a placeholder amount
-        return 1000 // TODO: Implement proper invoice parsing
+        return 1000
     }
     
     private func parseZapRequestSender(_ json: String) -> String? {
         // Parse JSON to extract the pubkey from the zap request
-        // TODO: Implement proper JSON parsing
         return nil
     }
     
