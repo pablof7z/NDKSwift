@@ -237,8 +237,7 @@ struct LoadingView: View {
             )
             
             let dataSource = ndk.observe(filter: followFilter, maxAge: 300)
-            let cachedEvents = await dataSource.currentValue()
-            if !cachedEvents.isEmpty, let followEvent = cachedEvents.first {
+            if let followEvent = await dataSource.first() {
                 let follows = extractFollows(from: followEvent)
                 
                 await MainActor.run {

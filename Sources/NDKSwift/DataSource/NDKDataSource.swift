@@ -225,14 +225,6 @@ public final class NDKDataSource<T>: ObservableObject, CacheObserver {
         await startObserving()
     }
     
-    /// Get the current data snapshot
-    /// ⚠️ WARNING: This method returns immediately and may return empty array if no events have arrived yet.
-    /// Consider using `first()`, `collect()`, or iterating the `events` AsyncStream instead.
-    @available(*, deprecated, message: "RACE CONDITION: Returns empty if called too soon. Use first() to wait for one event, collect() to wait for all events, or iterate events AsyncStream")
-    public func currentValue() async -> [T] {
-        return data
-    }
-    
     // MARK: - Event-Driven Methods
     
     /// Wait for the first event to arrive
