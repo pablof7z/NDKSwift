@@ -17,7 +17,7 @@ extension Tag {
             // Addressable event references: kind:pubkey:d-tag
             guard count >= 2 else { return false }
             let parts = self[1].split(separator: ":")
-            return parts.count >= 3 && Int(parts[0]) != nil && parts[1].count == 64
+            return parts.count >= 3 && Int(parts[0]) != nil && HexValidator.isValid32ByteHex(String(parts[1]))
         case "d", "t", "r":
             // Identifier, hashtag, and URL tags just need a value
             return count >= 2

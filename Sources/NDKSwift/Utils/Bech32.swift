@@ -180,16 +180,11 @@ public extension Bech32 {
 
     /// Encode a private key to nsec format
     static func nsec(from privateKey: PrivateKey) throws -> String {
-        guard privateKey.count == 64 else {
-            throw NDKError.validationError("Invalid bech32 data")
-        }
-
-        guard let data = Data(hexString: privateKey) else {
-            throw NDKError.validationError("Invalid bech32 data")
-        }
-
-        guard data.count == 32 else {
-            throw NDKError.validationError("Invalid bech32 data")
+        let data: Data
+        do {
+            data = try HexValidator.validate32ByteHex(privateKey)
+        } catch {
+            throw NDKError.validationError("Invalid private key format: \(error.localizedDescription)")
         }
 
         return try encode(hrp: Bech32HRP.nsec, data: Array(data))
