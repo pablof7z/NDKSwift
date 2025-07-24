@@ -52,6 +52,11 @@ struct HomeView: View {
             ThreadView(rootEvent: event)
         }
         .onAppear {
+            print("📦 [HomeView] onAppear called")
+            print("📦 [HomeView] ndkManager.ndk = \(ndkManager.ndk != nil ? "Available" : "NIL")")
+            if let ndk = ndkManager.ndk {
+                print("📦 [HomeView] ndk.signer = \(ndk.signer != nil ? "Available" : "NIL")")
+            }
             startNotesStream()
         }
         .onDisappear {
@@ -236,47 +241,92 @@ struct HomeView: View {
     
     private func startNotesStream() {
         guard let ndk = ndkManager.ndk,
-              let signer = ndk.signer else { return }
+              let signer = ndk.signer else { 
+            print("❌ [HomeView] No NDK or signer available")
+            return 
+        }
         
-        notesTask?.cancel()
+        if let existingTask = notesTask {
+            NDKLogger.log(.info, category: .subscription, "🚫 [HomeView] Cancelling existing notesTask")
+            existingTask.cancel()
+        }
         notesTask = Task {
+            NDKLogger.log(.info, category: .subscription, "🎬 [HomeView] Task started - isCancelled: \(Task.isCancelled)")
             do {
+                print("🚀 [HomeView] Starting notes stream...")
+                
                 // Start session with explicit configuration
                 let config = NDKSessionConfiguration(
                     dataRequirements: [.followList, .muteList],
                     preloadStrategy: .progressive
                 )
-                let sessionData = try await ndk.startSession(signer: signer, config: config)
+                print("📋 [HomeView] Calling startSession with config: \(config)")
+                
+                let sessionData: NDKSessionData
+                do {
+                    NDKLogger.log(.info, category: .subscription, "🎯 [HomeView] About to call startSession... Task.isCancelled: \(Task.isCancelled)")
+                    sessionData = try await ndk.startSession(signer: signer, config: config)
+                    NDKLogger.log(.info, category: .subscription, "✅ [HomeView] Session started successfully - Task.isCancelled: \(Task.isCancelled)")
+                } catch {
+                    NDKLogger.log(.error, category: .subscription, "❌ [HomeView] Failed to start session: \(error)")
+                    throw error
+                }
+                
+                NDKLogger.log(.info, category: .subscription, "📦 [HomeView] SessionData received - pubkey: \(sessionData.pubkey.prefix(8))...")
+                NDKLogger.log(.info, category: .subscription, "📦 [HomeView] Follow list count: \(sessionData.followList.count)")
+                NDKLogger.log(.info, category: .subscription, "📦 [HomeView] First 3 follows: \(Array(sessionData.followList.prefix(3)).map { $0.prefix(8) })")
+                
+                // Check if we actually have follows
+                if sessionData.followList.isEmpty {
+                    NDKLogger.log(.warning, category: .subscription, "⚠️ [HomeView] No follows found! Cannot create reactive filter.")
+                    return
+                }
                 
                 // Initialize reply tracker
                 await MainActor.run {
                     if replyTracker == nil {
                         replyTracker = ReplyTracker(ndk: ndk, following: sessionData.followList)
+                        print("📝 [HomeView] Reply tracker initialized")
                     }
                 }
                 
+                NDKLogger.log(.info, category: .subscription, "🔍 [HomeView] Creating reactive filter for notes...")
                 // Create reactive filter for notes from followed users
                 let filter = ReactiveFilter(
                     dependencies: [.followList],
                     builder: { sessionData in
-                        NDKFilter(
+                        NDKLogger.log(.info, category: .subscription, "🏗️ [HomeView] ReactiveFilter builder called - follows: \(sessionData.followList.count)")
+                        let filter = NDKFilter(
                             authors: Array(sessionData.followList),
                             kinds: [1],
                             limit: 100  // Add limit to prevent overwhelming the UI
                         )
+                        print("📋 [HomeView] Built filter: authors=\(filter.authors?.count ?? 0), kinds=\(filter.kinds ?? [])")
+                        return filter
                     }
                 )
                 
+                print("🎯 [HomeView] Calling ndk.observe with reactive filter...")
                 // Use observe to get a stream of notes - this handles all the complexity
                 let stream = ndk.observe(filter)
+                print("📡 [HomeView] Got stream, starting to iterate...")
                 
                 var seenIds = Set<String>()
                 var notesList: [NDKEvent] = []
+                var iterationStarted = false
                 
                 for await event in stream {
-                    guard !Task.isCancelled else { break }
+                    if !iterationStarted {
+                        print("🎳 [HomeView] First iteration of stream - events are flowing!")
+                        iterationStarted = true
+                    }
+                    guard !Task.isCancelled else { 
+                        print("⚠️ [HomeView] Task cancelled, breaking from stream")
+                        break 
+                    }
                     
                     if !seenIds.contains(event.id) {
+                        print("📨 [HomeView] New event received: \(event.id) from \(event.pubkey.prefix(8))")
                         seenIds.insert(event.id)
                         notesList.append(event)
                         
@@ -293,12 +343,20 @@ struct HomeView: View {
                         }
                     }
                 }
+                print("🔚 [HomeView] Stream ended - iterationStarted: \(iterationStarted)")
+                if !iterationStarted {
+                    print("⚠️ [HomeView] Stream ended without any events!")
+                }
             } catch {
+                print("❌ [HomeView] Error in startNotesStream: \(error)")
+                print("🔥 [HomeView] Error type: \(type(of: error))")
+                print("🔥 [HomeView] Error description: \(String(describing: error))")
                 await MainActor.run {
                     self.error = error
                 }
             }
         }
+        print("🎯 [HomeView] notesTask created and started")
     }
     
     private func triggerSync() {

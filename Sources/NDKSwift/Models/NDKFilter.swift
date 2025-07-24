@@ -327,9 +327,9 @@ public struct NDKFilter: Codable, Equatable, Sendable {
             merged.kinds = kinds ?? other.kinds
         }
         
-        // For timestamps, use the most inclusive range
-        merged.since = min(since ?? 0, other.since ?? 0)
-        merged.until = max(until ?? .max, other.until ?? .max)
+        // For timestamps, both filters must have the same values (enforced by canMergeUnion)
+        merged.since = since
+        merged.until = until
         
         // For limit, sum them up (capped at some reasonable max)
         if let selfLimit = limit, let otherLimit = other.limit {
@@ -361,6 +361,11 @@ public struct NDKFilter: Codable, Equatable, Sendable {
         if !tagFilters.isEmpty || !other.tagFilters.isEmpty ||
            events != nil || other.events != nil ||
            pubkeys != nil || other.pubkeys != nil {
+            return false
+        }
+        
+        // Don't merge if filters have different until or since timestamps
+        if until != other.until || since != other.since {
             return false
         }
         

@@ -5,9 +5,20 @@ import Foundation
 actor InternalSubscriptionManager {
     private let ndk: NDK
     private var activeSubscriptions: [String: InternalSubscription] = [:]
+    private var relayMonitorTask: Task<Void, Never>?
     
     init(ndk: NDK) {
         self.ndk = ndk
+        // Start monitoring in a task to avoid accessing pool before it's ready
+        Task {
+            await startRelayMonitoring()
+        }
+    }
+    
+    /// Start relay monitoring if not already started
+    private func ensureRelayMonitoring() async {
+        guard relayMonitorTask == nil else { return }
+        await startRelayMonitoring()
     }
     
     /// Create an internal subscription
@@ -17,6 +28,9 @@ actor InternalSubscriptionManager {
         relays: Set<RelayURL>? = nil
     ) async -> InternalSubscription {
         NDKLogger.log(.debug, category: .subscription, "📋 [InternalSubManager] createSubscription called - id: \(id), filters: \(filters)")
+        
+        // Ensure relay monitoring is started when first subscription is created
+        await ensureRelayMonitoring()
         
         // Remove any existing subscription with same ID
         if let existing = activeSubscriptions[id] {
@@ -69,6 +83,74 @@ actor InternalSubscriptionManager {
             return
         }
         await subscription.handleEOSE(from: relay)
+    }
+    
+    // MARK: - Relay Monitoring
+    
+    /// Start monitoring relay connection events
+    private func startRelayMonitoring() async {
+        // Ensure pool is available before starting monitoring
+        guard let pool = ndk.pool else {
+            NDKLogger.log(.warning, category: .subscription, "⚠️ [InternalSubManager] Pool not available, skipping relay monitoring")
+            return
+        }
+        
+        relayMonitorTask = Task {
+            NDKLogger.log(.info, category: .subscription, "🔍 [InternalSubManager] Starting relay connection monitoring")
+            
+            for await event in await pool.relayChanges {
+                guard !Task.isCancelled else { break }
+                
+                switch event {
+                case .relayConnected(let relay):
+                    NDKLogger.log(.info, category: .subscription, "🔌 [InternalSubManager] Relay connected: \(relay.url) - replaying subscriptions")
+                    await replaySubscriptionsForRelay(relay)
+                default:
+                    break // We only care about connections
+                }
+            }
+        }
+    }
+    
+    /// Replay active subscriptions for a newly connected relay
+    private func replaySubscriptionsForRelay(_ relay: NDKRelay) async {
+        let subscriptionsToReplay = activeSubscriptions.values
+        
+        guard !subscriptionsToReplay.isEmpty else {
+            NDKLogger.log(.debug, category: .subscription, "📭 No active subscriptions to replay")
+            return
+        }
+        
+        NDKLogger.log(.info, category: .subscription, "🔄 Replaying \(subscriptionsToReplay.count) subscriptions to \(relay.url)")
+        
+        for subscription in subscriptionsToReplay {
+            // Check if this subscription should go to this specific relay
+            if let specificRelays = await subscription.relays {
+                // If subscription specifies relays, only send to those
+                guard specificRelays.contains(relay.url) else {
+                    NDKLogger.log(.trace, category: .subscription, "⏭️ Skipping subscription \(subscription.id) - not targeted for this relay")
+                    continue
+                }
+            }
+            // If no specific relays, subscription goes to all connected relays
+            
+            do {
+                let message = await subscription.createREQMessage()
+                NDKLogger.log(.debug, category: .subscription, "📨 Replaying subscription \(subscription.id) to \(relay.url)")
+                try await relay.send(message)
+                
+                // Track subscription on the relay
+                await relay.trackSubscription(id: subscription.id, filters: await subscription.filters)
+                
+                NDKLogger.log(.info, category: .subscription, "✅ Replayed subscription \(subscription.id) to \(relay.url)")
+            } catch {
+                NDKLogger.log(.error, category: .subscription, "❌ Failed to replay subscription \(subscription.id) to \(relay.url): \(error)")
+            }
+        }
+    }
+    
+    deinit {
+        relayMonitorTask?.cancel()
     }
 }
 
@@ -143,7 +225,6 @@ actor InternalSubscription {
         for relay in targetRelays {
             do {
                 let message = createREQMessage()
-                NDKLogger.log(.debug, category: .subscription, "📨 [InternalSub] Sending REQ to \(relay.url): \(message)")
                 try await relay.send(message)
                 
                 // Track subscription on the relay
@@ -241,7 +322,7 @@ actor InternalSubscription {
     }
     
     /// Create REQ message
-    private func createREQMessage() -> String {
+    internal func createREQMessage() -> String {
         var message: [Any] = ["REQ", id]
         
         for filter in filters {

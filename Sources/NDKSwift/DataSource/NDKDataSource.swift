@@ -150,13 +150,13 @@ public final class NDKDataSource<T>: ObservableObject, CacheObserver {
     }
     
     private func startObserving() async {
-        NDKLogger.log(.debug, category: .subscription, "🔍 NDKDataSource.startObserving() called", correlationId: correlationId)
+        NDKLogger.log(.info, category: .subscription, "🔍 NDKDataSource.startObserving() called - filter: \(filter), subscriptionId: \(subscriptionId ?? "auto")", correlationId: correlationId)
         isLoading = true
         error = nil
         
         // Use the new data requirement manager if available
         if let requirementManager = ndk.dataRequirementManager {
-            NDKLogger.log(.debug, category: .subscription, "✅ Found dataRequirementManager, registering requirement", correlationId: correlationId)
+            NDKLogger.log(.info, category: .subscription, "✅ Found dataRequirementManager, registering requirement", correlationId: correlationId)
             requirementHandle = await requirementManager.registerRequirement(
                 filter: filter,
                 observer: self,

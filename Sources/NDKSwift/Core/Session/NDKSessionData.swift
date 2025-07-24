@@ -72,19 +72,30 @@ public class NDKSessionData {
         for requirement in requirements {
             switch requirement {
             case .followList:
-                kinds.insert(EventKind.contacts)
-                needsFollowList = true
+                // Only load if not already available
+                if !followListState.isAvailable {
+                    kinds.insert(EventKind.contacts)
+                    needsFollowList = true
+                }
             case .muteList:
-                kinds.insert(EventKind.muteList)
-                needsMuteList = true
+                // Only load if not already available
+                if !muteListState.isAvailable {
+                    kinds.insert(EventKind.muteList)
+                    needsMuteList = true
+                }
             case .blockedRelays:
-                kinds.insert(EventKind.blockedRelays)
-                needsBlockedRelays = true
+                // Only load if not already available
+                if !blockedRelaysState.isAvailable {
+                    kinds.insert(EventKind.blockedRelays)
+                    needsBlockedRelays = true
+                }
             case .webOfTrust:
                 // WOT is lazy-loaded on first access
                 // But we need follow list first
-                kinds.insert(EventKind.contacts)
-                needsFollowList = true
+                if !followListState.isAvailable {
+                    kinds.insert(EventKind.contacts)
+                    needsFollowList = true
+                }
             case .relayList:
                 kinds.insert(EventKind.relayList)
             }
@@ -109,6 +120,12 @@ public class NDKSessionData {
     private func loadLists(kinds: Set<Int>, needsFollowList: Bool, needsMuteList: Bool, needsBlockedRelays: Bool) async {
         guard let ndk = ndk else { return }
         
+        // If we already have an active data source loading lists, skip
+        if listsDataSource != nil {
+            NDKLogger.log(.debug, category: .subscription, "⏭️ Lists data source already active, skipping duplicate creation")
+            return
+        }
+        
         // First, check cache for existing events to optimize the filter
         var latestTimestamps: [Int: Timestamp] = [:]
         
@@ -128,10 +145,13 @@ public class NDKSessionData {
                 // Process the cached event immediately
                 switch cachedEvent.kind {
                 case EventKind.contacts where needsFollowList:
+                    NDKLogger.log(.info, category: .subscription, "📦 Processing cached follow list event - id: \(cachedEvent.id), timestamp: \(cachedEvent.createdAt)")
                     processFollowListEvent(cachedEvent, fromCache: true)
                 case EventKind.muteList where needsMuteList:
+                    NDKLogger.log(.info, category: .subscription, "📦 Processing cached mute list event - id: \(cachedEvent.id), timestamp: \(cachedEvent.createdAt)")
                     processMuteListEvent(cachedEvent, fromCache: true)
                 case EventKind.blockedRelays where needsBlockedRelays:
+                    NDKLogger.log(.info, category: .subscription, "📦 Processing cached blocked relays event - id: \(cachedEvent.id), timestamp: \(cachedEvent.createdAt)")
                     processBlockedRelaysEvent(cachedEvent, fromCache: true)
                 default:
                     break
@@ -139,8 +159,8 @@ public class NDKSessionData {
             }
         }
         
-        // Find the oldest timestamp among all kinds (or nil if no cached events)
-        let oldestTimestamp = latestTimestamps.values.min()
+        // Find the newest timestamp among all kinds (or nil if no cached events)
+        let newestTimestamp = latestTimestamps.values.max()
         
         // Create filter with 'since' optimization if we have cached events
         var filter = NDKFilter(
@@ -150,7 +170,7 @@ public class NDKSessionData {
         )
         
         // If we have cached events, only fetch newer ones
-        if let timestamp = oldestTimestamp {
+        if let timestamp = newestTimestamp {
             // Add 1 second to avoid re-fetching the same events
             filter.since = timestamp + 1
             NDKLogger.log(.debug, category: .subscription, "🎯 Optimizing session data fetch - only fetching events newer than \(timestamp)")
@@ -161,32 +181,40 @@ public class NDKSessionData {
         let dataSource = NDKDataSource<NDKEvent>(ndk: ndk, filter: filter, subscriptionId: subscriptionId)
         self.listsDataSource = dataSource
         
-        // Process events as they arrive from the data source
-        for await event in dataSource.events {
-            switch event.kind {
-            case EventKind.contacts where needsFollowList:
-                processFollowListEvent(event, fromCache: false)
-            case EventKind.muteList where needsMuteList:
-                processMuteListEvent(event, fromCache: false)
-            case EventKind.blockedRelays where needsBlockedRelays:
-                processBlockedRelaysEvent(event, fromCache: false)
-            default:
-                break
+        // Start processing events in background - don't block
+        Task {
+            // Process events as they arrive from the data source
+            for await event in dataSource.events {
+                switch event.kind {
+                case EventKind.contacts where needsFollowList:
+                    processFollowListEvent(event, fromCache: false)
+                case EventKind.muteList where needsMuteList:
+                    processMuteListEvent(event, fromCache: false)
+                case EventKind.blockedRelays where needsBlockedRelays:
+                    processBlockedRelaysEvent(event, fromCache: false)
+                default:
+                    break
+                }
             }
         }
     }
     
     private func processFollowListEvent(_ event: NDKEvent, fromCache: Bool) {
         // Check for delta by event ID
-        guard event.id != latestFollowListEventId else { return }
+        guard event.id != latestFollowListEventId else {
+            NDKLogger.log(.debug, category: .subscription, "⏭️ Skipping duplicate follow list event - id: \(event.id)")
+            return
+        }
         
         let follows = extractFollows(from: event)
         
         // Update state based on whether this is initial load or update
         if latestFollowListEventId == nil {
+            NDKLogger.log(.info, category: .subscription, "✅ Follow list loaded - \(follows.count) follows, fromCache: \(fromCache)")
             followListState = .ready(follows, fromCache: fromCache)
         } else {
             if case .ready(let current, _) = followListState {
+                NDKLogger.log(.info, category: .subscription, "🔄 Follow list updating - from \(current.count) to \(follows.count) follows")
                 followListState = .updating(current: current, changes: follows)
             }
         }

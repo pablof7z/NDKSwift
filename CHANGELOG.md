@@ -8,6 +8,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Fixed
+- Fixed blocking issue in progressive session loading that prevented reactive filters from working
+  - NDKSessionData.loadLists() was blocking on async stream iteration
+  - Progressive strategy now properly loads from cache and continues in background
+  - HomeView reactive filters now work correctly in Posta app
+- Fixed fatal crash when accessing relay pool before initialization
+  - InternalSubscriptionManager now delays relay monitoring until pool is available
+  - Relay monitoring starts on first subscription creation instead of init
+  - Prevents "Fatal error: Unexpectedly found nil while unwrapping Optional" crash
+- Fixed subscription replay when relays reconnect
+  - Implemented relay connection monitoring in InternalSubscriptionManager
+  - Active subscriptions are now properly replayed to newly connected relays
+  - Ensures events are delivered even when subscriptions are created before relay connections
+- Fixed progressive preload strategy race condition
+  - Progressive strategy now properly waits for cache load before returning
+  - Prevents reactive filters from seeing empty follow lists when data exists in cache
 - Outbox relay selection no longer blocks subscription creation
   - Fixed critical bug where getRecommendedRelaysForSubscription would hang waiting for relay lists
   - Subscriptions now start immediately with cached relay info or default relays
@@ -20,6 +35,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Authors without known relays use app's connected relays immediately
   - Background relay discovery updates subscriptions progressively
   - Filters are decomposed to send author-specific queries to each relay
+
+### Added
+- Dynamic subscription relay updates for outbox model
+  - New RelayUpdateNotifier system that monitors relay discovery
+  - Subscriptions automatically update when relay lists (kind:10002) are discovered
+  - Public API for monitoring relay updates via ndk.outbox.relayUpdates AsyncStream
+  - Relay update statistics available via getRelayUpdateStats()
+  - Automatic creation of relay-specific subscriptions when relay info becomes available
+  - Example: DynamicRelayUpdates.swift demonstrates the feature
 
 ### Fixed
 - Ephemeral events (kinds 20000-29999) are now properly excluded from caching

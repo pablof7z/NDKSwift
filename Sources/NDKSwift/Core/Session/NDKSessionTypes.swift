@@ -85,7 +85,7 @@ public struct WOTConfiguration {
 }
 
 /// State of session data
-public enum DataState<T> {
+public enum DataState<T>: Equatable where T: Equatable {
     case loading
     case ready(T, fromCache: Bool)
     case updating(current: T, changes: T)
@@ -110,6 +110,21 @@ public enum DataState<T> {
             return current
         case .loading, .error:
             return nil
+        }
+    }
+    
+    public static func == (lhs: DataState<T>, rhs: DataState<T>) -> Bool {
+        switch (lhs, rhs) {
+        case (.loading, .loading):
+            return true
+        case let (.ready(lData, lFromCache), .ready(rData, rFromCache)):
+            return lData == rData && lFromCache == rFromCache
+        case let (.updating(lCurrent, lChanges), .updating(rCurrent, rChanges)):
+            return lCurrent == rCurrent && lChanges == rChanges
+        case let (.error(lError), .error(rError)):
+            return (lError as NSError) == (rError as NSError)
+        default:
+            return false
         }
     }
 }
