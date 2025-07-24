@@ -35,7 +35,7 @@ public struct NDKBlockedMintsEvent {
         signer: NDKSigner
     ) async throws -> NDKBlockedMintsEvent {
         let builder = NDKEventBuilder(ndk: ndk)
-            .kind(10020)  // NIP-60 blocked mints kind
+            .kind(EventKind.blockedMints)  // NIP-60 blocked mints kind
         
         // Add blocked mint tags
         for mintURL in blockedMints {

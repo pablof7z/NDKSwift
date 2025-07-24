@@ -108,7 +108,7 @@ public actor NIP60Wallet: NDKPaymentProvider {
                 await startWalletEventSubscription()
             }
             
-        case 10020:  // Blocked mints
+        case EventKind.blockedMints:  // Blocked mints
             await processBlockedMintsUpdate(event)
             
         default:
@@ -846,10 +846,10 @@ public actor NIP60Wallet: NDKPaymentProvider {
             // Create filter for configuration events (17375 and 10020)
             let configFilter = NDKFilter(
                 authors: [userPubkey],
-                kinds: [EventKind.cashuWalletConfig, 10020]
+                kinds: [EventKind.cashuWalletConfig, EventKind.blockedMints]
             )
             
-            NDKLogger.log(.info, category: .wallet, "Starting wallet configuration subscription for kinds [17375, 10020]")
+            NDKLogger.log(.info, category: .wallet, "Starting wallet configuration subscription for kinds [17375, \(EventKind.blockedMints)]")
             
             // Create NDKDataSource for configuration events
             let dataSource = NDKDataSource(
