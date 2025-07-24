@@ -35,4 +35,16 @@ public enum StringConstants {
         public static let tryAgainLater = "Try again later"
         public static let badGateway = "Bad gateway"
     }
+    
+    /// Display formatting constants
+    public enum DisplayFormatting {
+        /// Standard length for truncated hex identifiers (pubkeys, event IDs, etc.)
+        public static let hexPrefixLength = 8
+        
+        /// Standard length for truncated npub/nsec identifiers
+        public static let bech32PrefixLength = 16
+        
+        /// Maximum characters to show in debug log content previews
+        public static let debugLogPreviewLength = 100
+    }
 }

@@ -302,7 +302,7 @@ public actor NIP60Wallet: NDKPaymentProvider {
             
             // Process P2PK private key
             if let privkey = try await walletEvent.privateKey(signer: signer) {
-                NDKLogger.log(.debug, category: .wallet, "🔑 Found P2PK private key in wallet config: \(privkey.prefix(8))...")
+                NDKLogger.log(.debug, category: .wallet, "🔑 Found P2PK private key in wallet config: \(privkey.prefix(StringConstants.DisplayFormatting.hexPrefixLength))...")
                 try? await p2pkManager.restoreFromPrivateKey(privkey)
             } else {
                 NDKLogger.log(.debug, category: .wallet, "🔑 No P2PK private key found in wallet config")
