@@ -1,183 +1,205 @@
 import SwiftUI
 
-// MARK: - Legacy Color Extensions (for backward compatibility)
-// These are deprecated - use DesignSystem.Colors instead
-extension Color {
-    // Primary Colors - mapped to DesignSystem
-    static let highlighterPurple = DesignSystem.Colors.primary
-    static let highlighterOrange = DesignSystem.Colors.secondary
-    
-    // Background Colors - mapped to DesignSystem  
-    static let highlighterBackground = DesignSystem.Colors.background
-    static let highlighterCardBackground = DesignSystem.Colors.surface
-    static let highlighterDarkBackground = DesignSystem.Colors.darkBackground
-    static let highlighterDarkCard = DesignSystem.Colors.darkSurface
-    
-    // Text Colors - mapped to DesignSystem
-    static let highlighterText = DesignSystem.Colors.text
-    static let highlighterSecondaryText = DesignSystem.Colors.textSecondary
-    static let highlighterDarkText = DesignSystem.Colors.darkText
-    
-    // Accent Colors - mapped to DesignSystem
-    static let highlighterSuccess = DesignSystem.Colors.success
-    static let highlighterWarning = DesignSystem.Colors.warning
-    static let highlighterError = DesignSystem.Colors.error
-}
+// MARK: - Enhanced Components
+// Additional components that extend the DesignSystem
 
-// MARK: - View Modifiers
+// MARK: - Specialized Button Styles (complement ModernViewModifiers)
 
-struct CardStyle: ViewModifier {
-    @Environment(\.colorScheme) var colorScheme
+// Enhanced Zap Button with haptic feedback and visual effects
+struct EnhancedZapButton: ButtonStyle {
+    @State private var isAnimating = false
     
-    func body(content: Content) -> some View {
-        content
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .font(.ds.callout)
+            .fontWeight(.medium)
+            .foregroundColor(.white)
+            .padding(.horizontal, .ds.medium)
+            .padding(.vertical, .ds.small)
             .background(
-                colorScheme == .dark ? 
-                DesignSystem.Colors.darkSurface : 
-                DesignSystem.Colors.surface
+                Capsule()
+                    .fill(
+                        LinearGradient(
+                            colors: [
+                                DesignSystem.Colors.secondary,
+                                DesignSystem.Colors.secondaryDark
+                            ],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+                    .overlay(
+                        Capsule()
+                            .stroke(
+                                LinearGradient(
+                                    colors: [
+                                        Color.white.opacity(0.3),
+                                        Color.clear
+                                    ],
+                                    startPoint: .top,
+                                    endPoint: .bottom
+                                ),
+                                lineWidth: 1
+                            )
+                    )
             )
-            .clipShape(RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.large, style: .continuous))
+            .scaleEffect(configuration.isPressed ? 0.95 : (isAnimating ? 1.05 : 1.0))
             .shadow(
-                color: DesignSystem.Shadow.small.color,
-                radius: DesignSystem.Shadow.small.radius,
-                x: DesignSystem.Shadow.small.x,
-                y: DesignSystem.Shadow.small.y
+                color: DesignSystem.Colors.secondary.opacity(0.4),
+                radius: configuration.isPressed ? 2 : 4,
+                x: 0,
+                y: configuration.isPressed ? 1 : 2
             )
+            .animation(.spring(response: 0.3, dampingFraction: 0.7), value: configuration.isPressed)
+            .animation(.easeInOut(duration: 2).repeatForever(autoreverses: true), value: isAnimating)
+            .onAppear {
+                isAnimating = true
+            }
+            .onChange(of: configuration.isPressed) { _, newValue in
+                if newValue {
+                    HapticType.medium.trigger()
+                }
+            }
     }
 }
 
-struct HighlightCardStyle: ViewModifier {
+// Enhanced Card Style with better visual hierarchy
+struct EnhancedHighlightCard: ViewModifier {
     let isSelected: Bool
+    let isHighlighted: Bool
     
     func body(content: Content) -> some View {
         content
-            .padding(DesignSystem.Spacing.cardPadding)
+            .padding(.ds.cardPadding)
             .background(
-                RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.large, style: .continuous)
+                RoundedRectangle(cornerRadius: .ds.large, style: .continuous)
                     .fill(DesignSystem.Colors.surface)
                     .overlay(
-                        RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.large, style: .continuous)
+                        RoundedRectangle(cornerRadius: .ds.large, style: .continuous)
                             .stroke(
-                                isSelected ? DesignSystem.Colors.secondary : Color.clear, 
-                                lineWidth: 2
+                                strokeGradient,
+                                lineWidth: strokeWidth
                             )
                     )
             )
             .shadow(
-                color: isSelected ? DesignSystem.Colors.secondary.opacity(0.3) : DesignSystem.Shadow.small.color,
-                radius: isSelected ? 12 : DesignSystem.Shadow.small.radius,
+                color: shadowColor,
+                radius: shadowRadius,
                 x: 0,
-                y: isSelected ? 4 : DesignSystem.Shadow.small.y
+                y: shadowY
             )
             .scaleEffect(isSelected ? 1.02 : 1.0)
-            .animation(DesignSystem.Animation.springSnappy, value: isSelected)
+            .opacity(isSelected ? 1.0 : 0.95)
+            .animation(.spring(response: 0.3, dampingFraction: 0.7), value: isSelected)
     }
-}
-
-struct PrimaryButtonStyle: ButtonStyle {
-    func makeBody(configuration: Configuration) -> some View {
-        configuration.label
-            .font(DesignSystem.Typography.headline)
-            .foregroundColor(.white)
-            .padding(.horizontal, DesignSystem.Spacing.xl)
-            .padding(.vertical, DesignSystem.Spacing.medium)
-            .background(
-                RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.medium, style: .continuous)
-                    .fill(DesignSystem.Colors.primary)
+    
+    private var strokeGradient: LinearGradient {
+        if isSelected {
+            return LinearGradient(
+                colors: [DesignSystem.Colors.secondary, DesignSystem.Colors.primary],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
             )
-            .scaleEffect(configuration.isPressed ? 0.95 : 1.0)
-            .animation(DesignSystem.Animation.interactive, value: configuration.isPressed)
-    }
-}
-
-struct SecondaryButtonStyle: ButtonStyle {
-    func makeBody(configuration: Configuration) -> some View {
-        configuration.label
-            .font(DesignSystem.Typography.bodyMedium)
-            .foregroundColor(DesignSystem.Colors.primary)
-            .padding(.horizontal, DesignSystem.Spacing.xl)
-            .padding(.vertical, DesignSystem.Spacing.medium)
-            .background(
-                RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.medium, style: .continuous)
-                    .stroke(DesignSystem.Colors.primary, lineWidth: 2)
+        } else if isHighlighted {
+            return LinearGradient(
+                colors: [DesignSystem.Colors.secondary.opacity(0.3), Color.clear],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
             )
-            .scaleEffect(configuration.isPressed ? 0.95 : 1.0)
-            .animation(DesignSystem.Animation.interactive, value: configuration.isPressed)
-    }
-}
-
-struct ZapButtonStyle: ButtonStyle {
-    func makeBody(configuration: Configuration) -> some View {
-        configuration.label
-            .font(DesignSystem.Typography.callout)
-            .fontWeight(.medium)
-            .foregroundColor(.white)
-            .padding(.horizontal, DesignSystem.Spacing.medium)
-            .padding(.vertical, DesignSystem.Spacing.small)
-            .background(
-                Capsule()
-                    .fill(DesignSystem.Colors.secondary)
+        } else {
+            return LinearGradient(
+                colors: [DesignSystem.Colors.border, DesignSystem.Colors.border],
+                startPoint: .top,
+                endPoint: .bottom
             )
-            .scaleEffect(configuration.isPressed ? 0.9 : 1.0)
-            .animation(DesignSystem.Animation.interactive, value: configuration.isPressed)
+        }
+    }
+    
+    private var strokeWidth: CGFloat {
+        isSelected ? 2 : (isHighlighted ? 1.5 : 1)
+    }
+    
+    private var shadowColor: Color {
+        if isSelected {
+            return DesignSystem.Colors.secondary.opacity(0.3)
+        } else {
+            return Color.black.opacity(0.08)
+        }
+    }
+    
+    private var shadowRadius: CGFloat {
+        isSelected ? 12 : 8
+    }
+    
+    private var shadowY: CGFloat {
+        isSelected ? 6 : 4
     }
 }
 
-// MARK: - Extensions
+// MARK: - View Extensions
 
 extension View {
-    func cardStyle() -> some View {
-        modifier(CardStyle())
+    func enhancedZapButton() -> some View {
+        self.buttonStyle(EnhancedZapButton())
     }
     
-    func highlightCard(isSelected: Bool = false) -> some View {
-        modifier(HighlightCardStyle(isSelected: isSelected))
+    func enhancedHighlightCard(isSelected: Bool = false, isHighlighted: Bool = false) -> some View {
+        self.modifier(EnhancedHighlightCard(isSelected: isSelected, isHighlighted: isHighlighted))
     }
     
-    func pulse() -> some View {
-        modifier(PulseModifier())
+    func pulseGently() -> some View {
+        self.modifier(GentlePulseModifier())
     }
     
-    func rotateAndScale(isActive: Bool) -> some View {
-        modifier(RotateAndScaleModifier(isActive: isActive))
+    func contextualFeedback(isActive: Bool) -> some View {
+        self.modifier(ContextualFeedbackModifier(isActive: isActive))
     }
 }
 
-// MARK: - Haptic Feedback (Deprecated - use HapticType from DesignSystem)
-// HapticType is now defined in DesignSystem.swift
-
-// MARK: - Typography (Legacy - use DesignSystem.Typography instead)
+// MARK: - Specialized Typography
 extension Font {
-    static let highlighterTitle = DesignSystem.Typography.title
-    static let highlighterHeadline = DesignSystem.Typography.headline  
-    static let highlighterBody = DesignSystem.Typography.body
-    static let highlighterCaption = DesignSystem.Typography.caption
+    // Specialized quote font for highlighted text
     static let highlighterQuote = Font.custom("Georgia", size: 18).italic()
-}
-
-// MARK: - Animations (Legacy - use DesignSystem.Animation instead) 
-extension Animation {
-    static let highlighterSpring = DesignSystem.Animation.springSnappy
-    static let highlighterEase = DesignSystem.Animation.standard
-}
-
-// MARK: - Additional Components
-
-struct PressButtonStyle: ButtonStyle {
-    func makeBody(configuration: Configuration) -> some View {
-        configuration.label
-            .scaleEffect(configuration.isPressed ? 0.95 : 1.0)
-            .animation(.spring(response: 0.3, dampingFraction: 0.6), value: configuration.isPressed)
+    
+    // Dynamic quote sizing based on content length
+    static func dynamicQuote(for length: Int) -> Font {
+        let size: CGFloat = length > 100 ? 16 : (length > 50 ? 17 : 18)
+        return Font.custom("Georgia", size: size).italic()
     }
 }
 
-// MARK: - Legacy Components (Cleaned up following YAGNI principles)
-// Removed unused components: LoadingDots, AnimatedGradientBackground, CustomTabBar, TabBarItem
-// Consolidated duplicate design systems into single DesignSystem.swift
+// MARK: - Contextual Components
 
-// MARK: - Additional Modifiers
+// Subtle feedback for interactive elements
+struct ContextualFeedbackModifier: ViewModifier {
+    let isActive: Bool
+    @State private var feedbackScale: CGFloat = 1.0
+    
+    func body(content: Content) -> some View {
+        content
+            .scaleEffect(feedbackScale)
+            .onChange(of: isActive) { _, newValue in
+                if newValue {
+                    withAnimation(.spring(response: 0.15, dampingFraction: 0.8)) {
+                        feedbackScale = 1.02
+                    }
+                    
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                        withAnimation(.spring(response: 0.2, dampingFraction: 0.7)) {
+                            feedbackScale = 1.0
+                        }
+                    }
+                    
+                    HapticType.selection.trigger()
+                }
+            }
+    }
+}
 
-struct PulseModifier: ViewModifier {
+// MARK: - Refined Animation Modifiers
+
+// Gentle pulse for attention without being distracting
+struct GentlePulseModifier: ViewModifier {
     @State private var scale: CGFloat = 1
     @State private var opacity: Double = 1
     
@@ -186,44 +208,82 @@ struct PulseModifier: ViewModifier {
             .scaleEffect(scale)
             .opacity(opacity)
             .onAppear {
-                withAnimation(.easeInOut(duration: 1).repeatForever(autoreverses: true)) {
-                    scale = 1.05
-                    opacity = 0.8
+                withAnimation(
+                    .easeInOut(duration: 2.5)
+                    .repeatForever(autoreverses: true)
+                ) {
+                    scale = 1.02
+                    opacity = 0.9
                 }
             }
     }
 }
 
-struct RotateAndScaleModifier: ViewModifier {
-    @State private var rotation: Double = 0
-    @State private var scale: CGFloat = 1
-    let isActive: Bool
+// Refined highlight effect for text selections
+struct HighlightTextEffect: ViewModifier {
+    let isHighlighted: Bool
+    let highlightColor: Color
+    
+    init(isHighlighted: Bool, highlightColor: Color = DesignSystem.Colors.secondary) {
+        self.isHighlighted = isHighlighted
+        self.highlightColor = highlightColor
+    }
     
     func body(content: Content) -> some View {
         content
-            .rotationEffect(.degrees(isActive ? rotation : 0))
-            .scaleEffect(isActive ? scale : 1)
-            .onChange(of: isActive) { oldValue, newValue in
-                if newValue {
-                    withAnimation(.spring(response: 0.5, dampingFraction: 0.5)) {
-                        rotation = 360
-                        scale = 1.2
-                    }
-                    withAnimation(.spring(response: 0.3, dampingFraction: 0.6).delay(0.3)) {
-                        scale = 1.0
-                    }
-                } else {
-                    rotation = 0
+            .background(
+                RoundedRectangle(cornerRadius: 4, style: .continuous)
+                    .fill(
+                        isHighlighted ? 
+                        highlightColor.opacity(0.15) : 
+                        Color.clear
+                    )
+                    .animation(.easeInOut(duration: 0.2), value: isHighlighted)
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 4, style: .continuous)
+                    .stroke(
+                        isHighlighted ? 
+                        highlightColor.opacity(0.3) : 
+                        Color.clear,
+                        lineWidth: 1
+                    )
+                    .animation(.easeInOut(duration: 0.2), value: isHighlighted)
+            )
+    }
+}
+
+extension View {
+    func highlightText(_ isHighlighted: Bool, color: Color = DesignSystem.Colors.secondary) -> some View {
+        self.modifier(HighlightTextEffect(isHighlighted: isHighlighted, highlightColor: color))
+    }
+}
+
+// MARK: - Performance Optimizations
+
+// Lazy loading modifier for better scroll performance
+struct LazyRenderModifier: ViewModifier {
+    let threshold: CGFloat
+    @State private var isVisible = false
+    
+    init(threshold: CGFloat = 100) {
+        self.threshold = threshold
+        self.isVisible = false
+    }
+    
+    func body(content: Content) -> some View {
+        content
+            .opacity(isVisible ? 1 : 0)
+            .onAppear {
+                withAnimation(.easeIn(duration: 0.2)) {
+                    isVisible = true
                 }
             }
     }
 }
 
-// MARK: - Enhanced Card Modifier (Deprecated - use cardBackground() from DesignSystem)
-struct EnhancedCardModifier: ViewModifier {
-    let isSelected: Bool
-    
-    func body(content: Content) -> some View {
-        content.cardBackground(isSelected: isSelected)
+extension View {
+    func lazyRender(threshold: CGFloat = 100) -> some View {
+        self.modifier(LazyRenderModifier(threshold: threshold))
     }
 }

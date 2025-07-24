@@ -2,7 +2,7 @@ import SwiftUI
 
 struct ModernTabBar: View {
     @Binding var selectedTab: ContentView.Tab
-    @State private var hapticFeedback = UIImpactFeedbackGenerator(style: .light)
+    // Using consolidated HapticType from DesignSystem
     
     var body: some View {
         VStack(spacing: 0) {
@@ -16,7 +16,7 @@ struct ModernTabBar: View {
                         isSelected: selectedTab == tab,
                         action: {
                             if selectedTab != tab {
-                                hapticFeedback.impactOccurred()
+                                HapticType.light.trigger()
                                 withAnimation(DesignSystem.Animation.quick) {
                                     selectedTab = tab
                                 }
@@ -33,9 +33,7 @@ struct ModernTabBar: View {
             DesignSystem.Colors.surface
                 .ignoresSafeArea()
         )
-        .onAppear {
-            hapticFeedback.prepare()
-        }
+        // Haptic feedback is now handled by HapticType system
     }
 }
 
@@ -65,32 +63,10 @@ struct TabBarButton: View {
     }
     
     private var iconName: String {
-        switch tab {
-        case .home:
-            return isSelected ? "house.fill" : "house"
-        case .feed:
-            return isSelected ? "play.rectangle.fill" : "play.rectangle"
-        case .discover:
-            return isSelected ? "magnifyingglass.circle.fill" : "magnifyingglass.circle"
-        case .library:
-            return isSelected ? "books.vertical.fill" : "books.vertical"
-        case .profile:
-            return isSelected ? "person.crop.circle.fill" : "person.crop.circle"
-        }
+        isSelected ? tab.filledIcon : tab.icon
     }
     
     private var title: String {
-        switch tab {
-        case .home:
-            return "Home"
-        case .feed:
-            return "Feed"
-        case .discover:
-            return "Discover"
-        case .library:
-            return "Library"
-        case .profile:
-            return "Profile"
-        }
+        tab.title
     }
 }

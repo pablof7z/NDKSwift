@@ -13,10 +13,10 @@
 		2629890795B6D0A577BF09D3 /* SelectableMarkdownRenderer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 68EE862B30307430C752F295 /* SelectableMarkdownRenderer.swift */; };
 		39ED8F05509F9A4FFF466557 /* LibraryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 552D71BE7E32CED89D35A278 /* LibraryView.swift */; };
 		3A1255EBF3357C89B1E648F6 /* HighlightDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 842FF8B20D37A2852B7A0ED9 /* HighlightDetailView.swift */; };
-		3BFE783796F94211BC0A287C /* Theme.swift in Sources */ = {isa = PBXBuildFile; fileRef = B3B166C0A47A7FB1AC77B253 /* Theme.swift */; };
 		3DDAE1A8FD5B8746688B9D12 /* ArticleCuration.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2CDAC5B2099CFF6ED8BE9AE /* ArticleCuration.swift */; };
 		4B32ABBE29543BA6FCA0605B /* ModernHomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F0F357DAE1A92819205EE9FF /* ModernHomeView.swift */; };
 		4F557938220F55296A4E483F /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 288947C11C084EEA395DB4F3 /* ContentView.swift */; };
+		56884CA05833E2E75660E7E3 /* BlurHashDecoder.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5C9A8C38CB54B7E5605AF14A /* BlurHashDecoder.swift */; };
 		6462DC934F3BCE00CEEE8BF8 /* HighlightCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 19C631ECAA0313B22AD50212 /* HighlightCard.swift */; };
 		6CEF6A285D58E580B24574B1 /* Animations.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6631658DBFE8C97A69C08F13 /* Animations.swift */; };
 		73EF0B3EADF9149125478230 /* CreateCurationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9FE479875030C79E23CEC371 /* CreateCurationView.swift */; };
@@ -55,6 +55,7 @@
 		4CF27270F57B25E33B719EEC /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		552D71BE7E32CED89D35A278 /* LibraryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LibraryView.swift; sourceTree = "<group>"; };
 		5C5A696D9CC2601B91DA0191 /* ZapButton.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ZapButton.swift; sourceTree = "<group>"; };
+		5C9A8C38CB54B7E5605AF14A /* BlurHashDecoder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BlurHashDecoder.swift; sourceTree = "<group>"; };
 		5E06D1E90D26910A32BBA586 /* AppState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppState.swift; sourceTree = "<group>"; };
 		62A24BA9AAF6CD7CBED4A5EB /* VisualEffects.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VisualEffects.swift; sourceTree = "<group>"; };
 		6631658DBFE8C97A69C08F13 /* Animations.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Animations.swift; sourceTree = "<group>"; };
@@ -68,7 +69,6 @@
 		A0D6F1E556E98D164B99B869 /* FollowPackDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FollowPackDetailView.swift; sourceTree = "<group>"; };
 		A2CDAC5B2099CFF6ED8BE9AE /* ArticleCuration.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ArticleCuration.swift; sourceTree = "<group>"; };
 		A89145FF0C6BCD85C2ADB6B0 /* ArticleListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ArticleListView.swift; sourceTree = "<group>"; };
-		B3B166C0A47A7FB1AC77B253 /* Theme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Theme.swift; sourceTree = "<group>"; };
 		C3CDA726BB07F1F8F89ABF1C /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		C698E368C385A545D9B0F4C2 /* ModernAuthenticationView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModernAuthenticationView.swift; sourceTree = "<group>"; };
 		CC98504899CC29F4D15C2A92 /* ModernViewModifiers.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModernViewModifiers.swift; sourceTree = "<group>"; };
@@ -158,9 +158,7 @@
 				5CF1AED8601BA4581B6B85AA /* App */,
 				8EFCBA92733165A7AE1A2405 /* Design */,
 				D6A97FFD17E8ADA86E5A981C /* Models */,
-				F7E48321CF585FC04732E331 /* Services */,
 				F815E3C9708A3F35B589736E /* Utilities */,
-				69CBE0E3411F43111C3DA5D0 /* Utils */,
 				8EC0E41A5D74B7C0C65A4FFC /* Views */,
 			);
 			path = Highlighter;
@@ -181,13 +179,6 @@
 				D48EA35CD61779F2D9DC5964 /* ProfileView.swift */,
 			);
 			path = Profile;
-			sourceTree = "<group>";
-		};
-		69CBE0E3411F43111C3DA5D0 /* Utils */ = {
-			isa = PBXGroup;
-			children = (
-			);
-			path = Utils;
 			sourceTree = "<group>";
 		};
 		8EC0E41A5D74B7C0C65A4FFC /* Views */ = {
@@ -214,7 +205,6 @@
 				6631658DBFE8C97A69C08F13 /* Animations.swift */,
 				1A3025E76E14FBF1C8D93736 /* DesignSystem.swift */,
 				CC98504899CC29F4D15C2A92 /* ModernViewModifiers.swift */,
-				B3B166C0A47A7FB1AC77B253 /* Theme.swift */,
 				62A24BA9AAF6CD7CBED4A5EB /* VisualEffects.swift */,
 			);
 			path = Design;
@@ -296,16 +286,10 @@
 			path = Models;
 			sourceTree = "<group>";
 		};
-		F7E48321CF585FC04732E331 /* Services */ = {
-			isa = PBXGroup;
-			children = (
-			);
-			path = Services;
-			sourceTree = "<group>";
-		};
 		F815E3C9708A3F35B589736E /* Utilities */ = {
 			isa = PBXGroup;
 			children = (
+				5C9A8C38CB54B7E5605AF14A /* BlurHashDecoder.swift */,
 				01F9CBDB1F581FAFF82499ED /* HapticManager.swift */,
 			);
 			path = Utilities;
@@ -358,11 +342,9 @@
 				en,
 			);
 			mainGroup = A041F7C169CA548DDDDDFE27;
-			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
-				E2A19ADCA3C16B878073A1A5 /* XCLocalSwiftPackageReference "../../..//" */,
+				4A29E36A25DD1F8D4105EE84 /* XCLocalSwiftPackageReference "../../../" */,
 			);
-			preferredProjectObjectVersion = 54;
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
@@ -393,6 +375,7 @@
 				3DDAE1A8FD5B8746688B9D12 /* ArticleCuration.swift in Sources */,
 				1B99932C8DCDEBA4FB239749 /* ArticleListView.swift in Sources */,
 				8D5D97226F6D2C4ABE8631F3 /* ArticleView.swift in Sources */,
+				56884CA05833E2E75660E7E3 /* BlurHashDecoder.swift in Sources */,
 				4F557938220F55296A4E483F /* ContentView.swift in Sources */,
 				73EF0B3EADF9149125478230 /* CreateCurationView.swift in Sources */,
 				D6BF6DEBA828B3B11D10832E /* CurationDetailView.swift in Sources */,
@@ -415,7 +398,6 @@
 				F3882617AB54096ECD0A9CB3 /* SearchView.swift in Sources */,
 				2629890795B6D0A577BF09D3 /* SelectableMarkdownRenderer.swift in Sources */,
 				D3BD7A0160EE2E26A8529370 /* SharedStyles.swift in Sources */,
-				3BFE783796F94211BC0A287C /* Theme.swift in Sources */,
 				8EE197235B1A83A04B155F56 /* VisualEffects.swift in Sources */,
 				B5E8FDE244E748C0EBA0335C /* ZapButton.swift in Sources */,
 			);
@@ -634,9 +616,9 @@
 /* End XCConfigurationList section */
 
 /* Begin XCLocalSwiftPackageReference section */
-		E2A19ADCA3C16B878073A1A5 /* XCLocalSwiftPackageReference "../../..//" */ = {
+		4A29E36A25DD1F8D4105EE84 /* XCLocalSwiftPackageReference "../../../" */ = {
 			isa = XCLocalSwiftPackageReference;
-			relativePath = "../../..//";
+			relativePath = ../../../;
 		};
 /* End XCLocalSwiftPackageReference section */
 
