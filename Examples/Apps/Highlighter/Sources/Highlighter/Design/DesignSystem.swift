@@ -146,25 +146,8 @@ struct DesignSystem {
         )
     }
     
-    // MARK: - Animation (Snappy and responsive)
-    enum Animation {
-        static let instant = SwiftUI.Animation.easeOut(duration: 0.15)
-        static let quick = SwiftUI.Animation.easeOut(duration: 0.2)
-        static let standard = SwiftUI.Animation.easeOut(duration: 0.25)
-        static let smooth = SwiftUI.Animation.easeOut(duration: 0.35)
-        
-        // Spring animations
-        static let springSnappy = SwiftUI.Animation.spring(response: 0.3, dampingFraction: 0.8)
-        static let springSmooth = SwiftUI.Animation.spring(response: 0.4, dampingFraction: 0.75)
-        static let springBouncy = SwiftUI.Animation.spring(response: 0.5, dampingFraction: 0.6)
-        
-        // Legacy animation names for compatibility
-        static let highlighterSpring = springSnappy
-        static let highlighterEase = standard
-        
-        // Interactive animations
-        static let interactive = SwiftUI.Animation.interactiveSpring(response: 0.15, dampingFraction: 0.86, blendDuration: 0.25)
-    }
+    // MARK: - Animation (Uses AnimationSystem.Curves)
+    typealias Animation = AnimationSystem.Curves
     
     // MARK: - Layout
     enum Layout {
@@ -329,9 +312,7 @@ extension View {
             .animation(.spring(response: 0.3, dampingFraction: 0.6), value: isActive)
     }
     
-    func pulse() -> some View {
-        self.modifier(PulseModifier())
-    }
+    // pulse() function moved to AnimationSystem.swift
 }
 
 // MARK: - View Modifiers
@@ -486,18 +467,7 @@ struct EnhancedHighlightCard: ViewModifier {
     }
 }
 
-struct PulseModifier: ViewModifier {
-    @State private var isPulsing = false
-    
-    func body(content: Content) -> some View {
-        content
-            .scaleEffect(isPulsing ? 1.05 : 1.0)
-            .animation(.easeInOut(duration: 1.0).repeatForever(autoreverses: true), value: isPulsing)
-            .onAppear {
-                isPulsing = true
-            }
-    }
-}
+// PulseModifier moved to AnimationSystem.swift
 
 // MARK: - Button Styles
 

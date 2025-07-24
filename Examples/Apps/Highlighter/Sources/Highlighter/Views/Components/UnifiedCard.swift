@@ -51,7 +51,7 @@ struct UnifiedCard<Content: View>: View {
             )
             .scaleEffect(isSelected ? 1.02 : 1.0)
             .opacity(isSelected ? 1.0 : 0.95)
-            .animation(PremiumAnimations.premiumSpring, value: isSelected)
+            .animation(AnimationSystem.Curves.premiumSpring, value: isSelected)
             .premiumCardInteraction()
             .premiumEntrance(delay: 0.1)
     }
