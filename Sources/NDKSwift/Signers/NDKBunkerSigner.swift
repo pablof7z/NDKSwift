@@ -406,7 +406,7 @@ public actor NDKBunkerSigner: NDKSigner, Sendable {
             NDKLogger.log(.info, category: .auth, "[BunkerSigner] Successfully connected. User pubkey: \(pubkey)")
             return user
         } else {
-            let error = NDKError.networkError(for: "bunker", operation: "connect", error: NSError(domain: "BunkerError", code: -1, userInfo: [NSLocalizedDescriptionKey: response.error ?? StringConstants.ErrorMessages.connectionFailed]))
+            let error = NDKError.networkError(for: "bunker", operation: "connect", error: NSError(domain: "BunkerError", code: -1, userInfo: [NSLocalizedDescriptionKey: response.error ?? ErrorMessageConstants.Messages.connectionFailed]))
             throw error
         }
     }
@@ -511,7 +511,7 @@ public actor NDKBunkerSigner: NDKSigner, Sendable {
         }
 
         guard let bunkerPubkey = bunkerPubkey else {
-            throw NDKError.connectionLost(relay: "bunker", message: StringConstants.ErrorMessages.notConnected)
+            throw NDKError.connectionLost(relay: "bunker", message: ErrorMessageConstants.Messages.notConnected)
         }
 
         let response = try await rpcClient?.sendRequest(
@@ -531,7 +531,7 @@ public actor NDKBunkerSigner: NDKSigner, Sendable {
 
     private func performCrypto(method: String, params: [String], errorMessage: String) async throws -> String {
         guard let bunkerPubkey = bunkerPubkey else {
-            throw NDKError.connectionLost(relay: "bunker", message: StringConstants.ErrorMessages.notConnected)
+            throw NDKError.connectionLost(relay: "bunker", message: ErrorMessageConstants.Messages.notConnected)
         }
 
         let response = try await rpcClient?.sendRequest(

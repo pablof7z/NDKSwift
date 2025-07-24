@@ -40,6 +40,22 @@ public actor RelayUpdateNotifier {
     func unregisterSubscription(id: String) {
         outboxSubscriptions.removeValue(forKey: id)
         NDKLogger.log(.debug, category: .outbox, "🗑️ Unregistered subscription '\(id)' from relay updates")
+        
+        // Periodic cleanup of old subscriptions
+        cleanupOldSubscriptions()
+    }
+    
+    /// Clean up subscriptions older than 24 hours
+    private func cleanupOldSubscriptions() {
+        let cutoffDate = Date().addingTimeInterval(-86400) // 24 hours
+        let oldSubscriptions = outboxSubscriptions.filter { $0.value.createdAt < cutoffDate }
+        
+        if !oldSubscriptions.isEmpty {
+            NDKLogger.log(.info, category: .outbox, "🧹 Cleaning up \(oldSubscriptions.count) old subscriptions")
+            for (id, _) in oldSubscriptions {
+                outboxSubscriptions.removeValue(forKey: id)
+            }
+        }
     }
     
     /// Notify about newly discovered relay information
@@ -102,7 +118,7 @@ public actor RelayUpdateNotifier {
         NDKLogger.log(.debug, category: .outbox, "📡 Creating update subscription '\(updateSubscriptionId)' for \(targetRelays.count) relays")
         
         // Create the subscription through internal manager
-        let internalSubscription = await ndk.internalSubscriptionManager.createSubscription(
+        _ = await ndk.internalSubscriptionManager.createSubscription(
             id: updateSubscriptionId,
             filters: [authorFilter],
             relays: targetRelays
@@ -112,6 +128,14 @@ public actor RelayUpdateNotifier {
         var updatedInfo = subscriptionInfo
         updatedInfo.unknownAuthors.remove(pubkey)
         updatedInfo.updateSubscriptionIds.insert(updateSubscriptionId)
+        
+        // Clean up old update subscription IDs (keep last 10)
+        if updatedInfo.updateSubscriptionIds.count > 10 {
+            let sortedIds = updatedInfo.updateSubscriptionIds.sorted()
+            let idsToRemove = sortedIds.prefix(updatedInfo.updateSubscriptionIds.count - 10)
+            updatedInfo.updateSubscriptionIds.subtract(idsToRemove)
+        }
+        
         outboxSubscriptions[subscriptionId] = updatedInfo
         
         NDKLogger.log(.info, category: .outbox, "✅ Subscription update complete - remaining unknown authors: \(updatedInfo.unknownAuthors.count)")

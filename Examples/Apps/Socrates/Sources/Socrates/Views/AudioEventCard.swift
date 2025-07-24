@@ -250,10 +250,10 @@ struct AudioEventCard: View {
         Task {
             guard let ndk = nostrManager.ndk else { return }
             
-            // Load all reactions for this event
+            // Load reactions specifically for this event using #e tag
             let filter = NDKFilter(
                 kinds: [7],
-                events: [audioEvent.id]
+                tags: ["e": [audioEvent.id]]
             )
             
             let dataSource = ndk.observe(filter: filter, maxAge: 0)

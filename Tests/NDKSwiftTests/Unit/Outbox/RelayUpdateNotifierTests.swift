@@ -34,11 +34,6 @@ final class RelayUpdateNotifierTests: XCTestCase {
         try? await Task.sleep(nanoseconds: 10_000_000) // 10ms
         
         // Simulate relay discovery for author1
-        let relayInfo = RelayDiscoveryInfo(
-            readRelays: ["wss://relay1.com", "wss://relay2.com"],
-            writeRelays: ["wss://relay3.com"]
-        )
-        
         // Trigger the relay discovery notification
         await ndk.outbox.processRelayListEvent(
             NDKEvent(
@@ -151,7 +146,7 @@ final class RelayUpdateNotifierTests: XCTestCase {
             unknownAuthors: Set(["author1"])
         )
         
-        var initialStats = await ndk.outbox.getRelayUpdateStats()
+        let initialStats = await ndk.outbox.getRelayUpdateStats()
         XCTAssertEqual(initialStats.activeSubscriptions, 1)
         
         await ndk.outbox.unregisterSubscriptionFromUpdates(id: subscriptionId)
