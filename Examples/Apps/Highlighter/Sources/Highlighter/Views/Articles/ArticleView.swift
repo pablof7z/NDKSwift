@@ -139,7 +139,7 @@ struct ArticleView: View {
                                     selectedText = text
                                     highlightRange = range
                                     showHighlightOptions = true
-                                    HapticType.selection.trigger()
+                                    HapticManager.shared.triggerSelection()
                                 }
                             )
                             .markdownStyle(articleMarkdownStyle())
@@ -169,7 +169,7 @@ struct ArticleView: View {
                     HStack(spacing: .ds.medium) {
                         Button(action: { 
                             isBookmarked.toggle()
-                            HapticType.light.trigger()
+                            HapticManager.shared.impact(.light)
                         }) {
                             Image(systemName: isBookmarked ? "bookmark.fill" : "bookmark")
                                 .foregroundColor(.highlighterPurple)
@@ -266,11 +266,11 @@ struct ArticleView: View {
             await MainActor.run {
                 showHighlightOptions = false
                 selectedText = nil
-                HapticType.success.trigger()
+                HapticManager.shared.notification(.success)
             }
         } catch {
             print("Failed to create highlight: \(error)")
-            HapticType.error.trigger()
+            HapticManager.shared.notification(.error)
         }
     }
     

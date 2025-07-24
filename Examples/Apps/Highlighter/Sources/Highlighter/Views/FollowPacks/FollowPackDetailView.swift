@@ -175,7 +175,7 @@ struct FollowPackDetailView: View {
     }
     
     private func importFollowPack() {
-        HapticType.medium.trigger()
+        HapticManager.shared.impact(.medium)
         
         Task {
             // TODO: Implement actual follow list update
@@ -184,7 +184,7 @@ struct FollowPackDetailView: View {
             
             await MainActor.run {
                 showSuccess = true
-                HapticType.success.trigger()
+                HapticManager.shared.notification(.success)
                 
                 // Reset after delay
                 Task {

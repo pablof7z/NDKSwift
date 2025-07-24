@@ -234,12 +234,12 @@ struct HighlightDetailView: View {
     
     private func toggleZap() {
         isZapped.toggle()
-        HapticType.light.trigger()
+        HapticManager.shared.impact(.light)
         // TODO: Implement actual zapping
     }
     
     private func followAuthor() {
-        HapticType.light.trigger()
+        HapticManager.shared.impact(.light)
         // TODO: Implement follow functionality
     }
     
@@ -316,7 +316,7 @@ struct ReplyComposerView: View {
     
     private func sendReply() {
         isPublishing = true
-        HapticType.light.trigger()
+        HapticManager.shared.impact(.light)
         // TODO: Implement reply functionality
         dismiss()
     }

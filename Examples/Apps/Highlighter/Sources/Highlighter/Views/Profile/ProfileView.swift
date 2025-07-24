@@ -71,12 +71,12 @@ struct ProfileView: View {
         .confirmationDialog("Logout", isPresented: $showLogoutConfirmation) {
             Button("Logout", role: .destructive) {
                 Task {
-                    HapticType.light.trigger()
+                    HapticManager.shared.impact(.light)
                     await appState.logout()
                 }
             }
             Button("Cancel", role: .cancel) {
-                HapticType.light.trigger()
+                HapticManager.shared.impact(.light)
             }
         } message: {
             Text("Are you sure you want to logout? This will clear your session.")

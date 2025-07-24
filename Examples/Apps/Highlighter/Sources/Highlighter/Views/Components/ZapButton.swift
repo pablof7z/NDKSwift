@@ -93,7 +93,7 @@ struct ZapButton: View {
     }
     
     private func handleZap() {
-        HapticType.light.trigger()
+        HapticManager.shared.impact(.light)
         
         // If already zapped, show amount picker to zap again
         if zapState == .zapped {
@@ -108,7 +108,7 @@ struct ZapButton: View {
         guard let ndk = appState.ndk else { return }
         
         zapState = .zapping
-        HapticType.medium.trigger()
+        HapticManager.shared.impact(.medium)
         
         Task {
             do {
@@ -126,11 +126,11 @@ struct ZapButton: View {
                     }
                     
                     // Multiple haptic feedback for success
-                    HapticType.success.trigger()
+                    HapticManager.shared.notification(.success)
                     
                     // Add a subtle second feedback after delay
                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                        HapticType.light.trigger()
+                        HapticManager.shared.impact(.light)
                     }
                 }
             } catch {
@@ -138,7 +138,7 @@ struct ZapButton: View {
                     withAnimation(.easeInOut(duration: 0.3)) {
                         zapState = .failed
                     }
-                    HapticType.error.trigger()
+                    HapticManager.shared.notification(.error)
                     print("Zap failed: \(error)")
                     
                     // Auto-reset failed state after 2 seconds

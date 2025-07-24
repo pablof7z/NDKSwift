@@ -343,7 +343,15 @@ struct TrendingSection: View {
     }
 }
 
-// ScrollOffsetPreferenceKey is already defined in HomeView.swift
+// MARK: - Preference Keys
+
+struct ScrollOffsetPreferenceKey: PreferenceKey {
+    static var defaultValue: CGFloat = 0
+    
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
+        value = nextValue()
+    }
+}
 
 struct HighlightedArticleCard: View {
     let article: Article
@@ -423,7 +431,7 @@ struct HighlightedArticleCard: View {
                         Text("·")
                             .foregroundColor(.ds.textTertiary)
                         
-                        Text(relativeTime(from: Timestamp(article.createdAt.timeIntervalSince1970)))
+                        Text(RelativeTimeFormatter.relativeTime(from: article.createdAt))
                             .font(.ds.caption)
                             .foregroundColor(.ds.textTertiary)
                         
@@ -448,9 +456,5 @@ struct HighlightedArticleCard: View {
     
     private func formatAuthor(_ pubkey: String) -> String {
         PubkeyFormatter.formatShort(pubkey)
-    }
-    
-    private func relativeTime(from timestamp: Timestamp) -> String {
-        RelativeTimeFormatter.relativeTime(from: timestamp)
     }
 }

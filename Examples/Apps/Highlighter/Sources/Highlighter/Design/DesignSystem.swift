@@ -233,34 +233,10 @@ extension CGFloat {
 }
 
 // MARK: - Haptic Feedback
-enum HapticType {
-    case light
-    case medium
-    case heavy
-    case selection
-    case success
-    case warning
-    case error
-    
-    func trigger() {
-        switch self {
-        case .light:
-            UIImpactFeedbackGenerator(style: .light).impactOccurred()
-        case .medium:
-            UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-        case .heavy:
-            UIImpactFeedbackGenerator(style: .heavy).impactOccurred()
-        case .selection:
-            UISelectionFeedbackGenerator().selectionChanged()
-        case .success:
-            UINotificationFeedbackGenerator().notificationOccurred(.success)
-        case .warning:
-            UINotificationFeedbackGenerator().notificationOccurred(.warning)
-        case .error:
-            UINotificationFeedbackGenerator().notificationOccurred(.error)
-        }
-    }
-}
+// Haptic feedback is handled by HapticManager.shared
+// Usage: HapticManager.shared.impact(.light)
+//        HapticManager.shared.notification(.success)
+//        HapticManager.shared.triggerSelection()
 
 // MARK: - Time Constants for Convenience
 
@@ -458,7 +434,7 @@ struct ContextualFeedbackModifier: ViewModifier {
                         }
                     }
                     
-                    HapticType.selection.trigger()
+                    HapticManager.shared.triggerSelection()
                 }
             }
     }
@@ -644,7 +620,7 @@ struct EnhancedZapButtonStyle: ButtonStyle {
             }
             .onChange(of: configuration.isPressed) { _, newValue in
                 if newValue {
-                    HapticType.medium.trigger()
+                    HapticManager.shared.impact(.medium)
                 }
             }
     }
