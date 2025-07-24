@@ -28,6 +28,12 @@ public actor MemoryCache: NDKCache {
     // MARK: - Event Operations
     
     public func saveEvent(_ event: NDKEvent) async throws {
+        // Skip ephemeral events (20000-29999)
+        if EventKind.isEphemeral(event.kind) {
+            NDKLogger.log(.trace, category: .cache, "MemoryCache: Skipping ephemeral event (kind: \(event.kind)): \(event.id)")
+            return
+        }
+        
         let eventId = event.id
         let isNew = events[eventId] == nil
         events[eventId] = event
@@ -375,6 +381,12 @@ public actor MemoryCache: NDKCache {
         from relay: String,
         subscriptionId: String
     ) async throws {
+        // Skip ephemeral events (20000-29999)
+        if EventKind.isEphemeral(event.kind) {
+            NDKLogger.log(.trace, category: .cache, "MemoryCache: Skipping ephemeral event in processEvent (kind: \(event.kind)): \(event.id)")
+            return
+        }
+        
         // Check if event was tombstoned by a deletion event
         if deletionTombstones[event.id] != nil {
             // Event was deleted before it arrived, don't save it
