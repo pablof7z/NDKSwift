@@ -64,7 +64,7 @@ public actor NDKNostrRPC {
         guard let data = decryptedContent.data(using: .utf8),
               let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
         else {
-            throw NDKError.invalidMessage("Failed to parse RPC content")
+            throw NDKError.invalidMessage(ErrorMessageConstants.failedTo("parse RPC content"))
         }
 
         let id = json["id"] as? String ?? ""
