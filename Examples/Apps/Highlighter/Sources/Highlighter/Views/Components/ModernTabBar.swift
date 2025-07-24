@@ -17,7 +17,7 @@ struct ModernTabBar: View {
                         action: {
                             if selectedTab != tab {
                                 hapticFeedback.impactOccurred()
-                                withAnimation(.ds.quick) {
+                                withAnimation(DesignSystem.Animation.quick) {
                                     selectedTab = tab
                                 }
                             }
@@ -25,9 +25,9 @@ struct ModernTabBar: View {
                     )
                 }
             }
-            .padding(.horizontal, .ds.mini)
-            .padding(.top, .ds.small)
-            .padding(.bottom, .ds.base)
+            .padding(.horizontal, DesignSystem.Spacing.mini)
+            .padding(.top, DesignSystem.Spacing.small)
+            .padding(.bottom, DesignSystem.Spacing.base)
         }
         .background(
             DesignSystem.Colors.surface
@@ -55,11 +55,11 @@ struct TabBarButton: View {
                     .animation(DesignSystem.Animation.springSnappy, value: isSelected)
                 
                 Text(title)
-                    .font(.ds.micro)
+                    .font(DesignSystem.Typography.micro)
                     .foregroundColor(isSelected ? DesignSystem.Colors.primary : DesignSystem.Colors.textTertiary)
             }
             .frame(maxWidth: .infinity)
-            .padding(.vertical, .ds.micro)
+            .padding(.vertical, DesignSystem.Spacing.micro)
         }
         .buttonStyle(PlainButtonStyle())
     }
@@ -72,8 +72,6 @@ struct TabBarButton: View {
             return isSelected ? "play.rectangle.fill" : "play.rectangle"
         case .discover:
             return isSelected ? "magnifyingglass.circle.fill" : "magnifyingglass.circle"
-        case .create:
-            return isSelected ? "plus.circle.fill" : "plus.circle"
         case .library:
             return isSelected ? "books.vertical.fill" : "books.vertical"
         case .profile:
@@ -89,8 +87,6 @@ struct TabBarButton: View {
             return "Feed"
         case .discover:
             return "Discover"
-        case .create:
-            return "Create"
         case .library:
             return "Library"
         case .profile:

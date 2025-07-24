@@ -4,12 +4,19 @@ import NDKSwift
 struct ModernHomeView: View {
     @EnvironmentObject var appState: AppState
     @State private var highlights: [HighlightEvent] = []
+    @State private var highlightedArticles: [HighlightedArticle] = []
     @State private var discussions: [NDKEvent] = []
     @State private var zappedArticles: [NDKEvent] = []
     @State private var userHighlights: [HighlightEvent] = []
     @State private var refreshing = false
     @Binding var tabBarVisible: Bool
     @State private var scrollOffset: CGFloat = 0
+    
+    struct HighlightedArticle {
+        let article: Article
+        let highlights: [HighlightEvent]
+        let lastHighlightTime: Date
+    }
     
     var body: some View {
         NavigationStack {
@@ -21,48 +28,46 @@ struct ModernHomeView: View {
                             .padding(.top, .ds.small)
                             .padding(.horizontal, .ds.screenPadding)
                         
-                        // Featured highlight - if user has recent highlights
-                        if !userHighlights.isEmpty {
-                            FeaturedHighlightCard(highlight: userHighlights.first!)
-                                .padding(.horizontal, .ds.screenPadding)
-                        }
-                        
-                        // Recent highlights section
-                        if !highlights.isEmpty {
+                        // Recently Highlighted Articles Section
+                        if !highlightedArticles.isEmpty {
                             VStack(spacing: .ds.itemSpacing) {
                                 ModernSectionHeader(
-                                    title: "Recent Highlights",
+                                    title: "Recently Highlighted Articles",
                                     action: {},
                                     actionTitle: "See All"
                                 )
                                 
-                                ScrollView(.horizontal, showsIndicators: false) {
-                                    HStack(spacing: .ds.base) {
-                                        ForEach(highlights.prefix(10)) { highlight in
-                                            CompactHighlightCard(highlight: highlight)
-                                                .frame(width: 260)
-                                        }
+                                VStack(spacing: .ds.base) {
+                                    ForEach(highlightedArticles.prefix(10), id: \.article.id) { highlightedArticle in
+                                        HighlightedArticleCard(
+                                            article: highlightedArticle.article,
+                                            highlights: highlightedArticle.highlights
+                                        )
                                     }
-                                    .padding(.horizontal, .ds.screenPadding)
                                 }
+                                .padding(.horizontal, .ds.screenPadding)
                             }
                         } else {
-                            // Loading placeholders
+                            // Loading placeholders for articles
                             VStack(spacing: .ds.itemSpacing) {
-                                ModernSectionHeader(title: "Recent Highlights")
+                                ModernSectionHeader(title: "Recently Highlighted Articles")
                                 
-                                ScrollView(.horizontal, showsIndicators: false) {
-                                    HStack(spacing: .ds.base) {
-                                        ForEach(0..<3, id: \.self) { _ in
-                                            RoundedRectangle(cornerRadius: .ds.medium)
-                                                .fill(DesignSystem.Colors.surfaceSecondary)
-                                                .frame(width: 260, height: 120)
-                                                .modernPlaceholder()
-                                        }
+                                VStack(spacing: .ds.base) {
+                                    ForEach(0..<3, id: \.self) { _ in
+                                        RoundedRectangle(cornerRadius: .ds.large)
+                                            .fill(DesignSystem.Colors.surfaceSecondary)
+                                            .frame(height: 200)
+                                            .modernPlaceholder()
                                     }
-                                    .padding(.horizontal, .ds.screenPadding)
                                 }
+                                .padding(.horizontal, .ds.screenPadding)
                             }
+                        }
+                        
+                        // Featured highlight - if user has recent highlights
+                        if !userHighlights.isEmpty {
+                            FeaturedHighlightCard(highlight: userHighlights.first!)
+                                .padding(.horizontal, .ds.screenPadding)
                         }
                         
                         // Active discussions
@@ -71,7 +76,7 @@ struct ModernHomeView: View {
                                 ModernSectionHeader(title: "Active Discussions")
                                 
                                 VStack(spacing: 0) {
-                                    ForEach(discussions.prefix(5)) { event in
+                                    ForEach(discussions.prefix(5), id: \.id) { event in
                                         DiscussionRow(event: event)
                                             .modernListItem(showDivider: event.id != discussions.prefix(5).last?.id)
                                     }
@@ -87,7 +92,7 @@ struct ModernHomeView: View {
                                 ModernSectionHeader(title: "Trending")
                                 
                                 VStack(spacing: .ds.base) {
-                                    ForEach(zappedArticles.prefix(3)) { event in
+                                    ForEach(zappedArticles.prefix(3), id: \.id) { event in
                                         TrendingItemCard(event: event)
                                     }
                                 }
@@ -106,7 +111,7 @@ struct ModernHomeView: View {
                 .coordinateSpace(name: "scroll")
                 .onPreferenceChange(ScrollOffsetPreferenceKey.self) { value in
                     scrollOffset = value
-                    withAnimation(.ds.quick) {
+                    withAnimation(DesignSystem.Animation.quick) {
                         tabBarVisible = value > -50
                     }
                 }
@@ -162,7 +167,7 @@ struct ModernHomeView: View {
     
     private func refreshContent() async {
         refreshing = true
-        HapticManager.shared.light()
+        HapticManager.shared.impact(.light)
         
         highlights.removeAll()
         discussions.removeAll()
@@ -170,32 +175,50 @@ struct ModernHomeView: View {
         
         await streamContent()
         
-        HapticManager.shared.success()
+        HapticManager.shared.notification(.success)
         refreshing = false
     }
     
     private func streamContent() async {
         guard let ndk = appState.ndk else { return }
         
-        // Stream highlights
+        // Stream highlights and build article relationships
         Task {
             let highlightSource = ndk.observe(
-                filter: NDKFilter(kinds: [9802], limit: 20),
+                filter: NDKFilter(kinds: [9802], limit: 50),
                 maxAge: 300,
                 cachePolicy: .cacheWithNetwork
             )
             
+            var articleReferences: Set<String> = []
+            var highlightsByArticle: [String: [HighlightEvent]] = [:]
+            
             for await event in highlightSource.events {
                 if let highlight = try? HighlightEvent(from: event) {
                     await MainActor.run {
-                        withAnimation(.ds.quick) {
+                        withAnimation(DesignSystem.Animation.quick) {
                             if !highlights.contains(where: { $0.id == highlight.id }) {
                                 highlights.append(highlight)
                                 highlights.sort { $0.createdAt > $1.createdAt }
+                                
+                                // Track article references
+                                if let ref = highlight.referencedEvent {
+                                    articleReferences.insert(ref)
+                                    if highlightsByArticle[ref] != nil {
+                                        highlightsByArticle[ref]?.append(highlight)
+                                    } else {
+                                        highlightsByArticle[ref] = [highlight]
+                                    }
+                                }
                             }
                         }
                     }
                 }
+            }
+            
+            // Fetch referenced articles
+            if !articleReferences.isEmpty {
+                await fetchHighlightedArticles(references: Array(articleReferences), highlightsByArticle: highlightsByArticle)
             }
         }
         
@@ -215,7 +238,7 @@ struct ModernHomeView: View {
                     for await event in userHighlightSource.events {
                         if let highlight = try? HighlightEvent(from: event) {
                             await MainActor.run {
-                                withAnimation(.ds.quick) {
+                                withAnimation(DesignSystem.Animation.quick) {
                                     if !userHighlights.contains(where: { $0.id == highlight.id }) {
                                         userHighlights.append(highlight)
                                         userHighlights.sort { $0.createdAt > $1.createdAt }
@@ -238,7 +261,7 @@ struct ModernHomeView: View {
             
             for await event in discussionSource.events {
                 await MainActor.run {
-                    withAnimation(.ds.quick) {
+                    withAnimation(DesignSystem.Animation.quick) {
                         if !discussions.contains(where: { $0.id == event.id }) {
                             discussions.append(event)
                             discussions.sort { $0.createdAt > $1.createdAt }
@@ -258,9 +281,62 @@ struct ModernHomeView: View {
             
             for await event in zapSource.events {
                 await MainActor.run {
-                    withAnimation(.ds.quick) {
+                    withAnimation(DesignSystem.Animation.quick) {
                         if !zappedArticles.contains(where: { $0.id == event.id }) {
                             zappedArticles.append(event)
+                        }
+                    }
+                }
+            }
+        }
+    }
+    
+    private func fetchHighlightedArticles(references: [String], highlightsByArticle: [String: [HighlightEvent]]) async {
+        guard let ndk = appState.ndk else { return }
+        
+        // Parse references to extract article IDs
+        var articleFilters: [NDKFilter] = []
+        
+        for reference in references {
+            if reference.contains(":") {
+                // This is an "a" tag reference (kind:pubkey:d-tag)
+                let parts = reference.split(separator: ":")
+                if parts.count >= 3,
+                   let kind = Int32(parts[0]) {
+                    articleFilters.append(NDKFilter(
+                        kinds: [kind],
+                        authors: [String(parts[1])],
+                        tags: ["d": Set([String(parts[2])])]
+                    ))
+                }
+            } else {
+                // This is an "e" tag reference (event ID)
+                articleFilters.append(NDKFilter(ids: [reference]))
+            }
+        }
+        
+        // Fetch articles
+        for filter in articleFilters {
+            let events = await ndk.fetchEvents(filter)
+            for event in events {
+                if event.kind == 30023,
+                   let article = try? Article(from: event),
+                   let highlights = highlightsByArticle[event.id] ?? highlightsByArticle["\(event.kind):\(event.pubkey):\(article.identifier ?? "")"] {
+                    
+                    let lastHighlight = highlights.max(by: { $0.createdAt < $1.createdAt })
+                    
+                    await MainActor.run {
+                        withAnimation(DesignSystem.Animation.quick) {
+                            let highlightedArticle = HighlightedArticle(
+                                article: article,
+                                highlights: highlights,
+                                lastHighlightTime: lastHighlight?.createdAt ?? Date()
+                            )
+                            
+                            if !highlightedArticles.contains(where: { $0.article.id == article.id }) {
+                                highlightedArticles.append(highlightedArticle)
+                                highlightedArticles.sort { $0.lastHighlightTime > $1.lastHighlightTime }
+                            }
                         }
                     }
                 }
@@ -325,7 +401,7 @@ struct CompactHighlightCard: View {
                 
                 Button(action: {
                     isLiked.toggle()
-                    HapticManager.shared.light()
+                    HapticManager.shared.impact(.light)
                 }) {
                     Image(systemName: isLiked ? "heart.fill" : "heart")
                         .font(.system(size: 14))

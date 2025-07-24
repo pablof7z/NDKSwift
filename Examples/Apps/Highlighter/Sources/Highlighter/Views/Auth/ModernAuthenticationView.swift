@@ -92,21 +92,19 @@ struct ModernAuthenticationView: View {
         guard !isCreatingAccount else { return }
         
         isCreatingAccount = true
-        HapticManager.shared.medium()
+        HapticType.medium.trigger()
         
         Task {
             do {
-                let privateKey = NDKPrivateKey()
-                let signer = NDKPrivateKeySigner(privateKey: privateKey)
-                await appState.setSigner(signer)
+                try await appState.createAccount()
                 
                 await MainActor.run {
-                    HapticManager.shared.success()
+                    HapticType.success.trigger()
                     isCreatingAccount = false
                 }
             } catch {
                 await MainActor.run {
-                    HapticManager.shared.error()
+                    HapticType.error.trigger()
                     isCreatingAccount = false
                 }
             }
@@ -116,22 +114,20 @@ struct ModernAuthenticationView: View {
     private func importAccount() {
         guard !privateKey.isEmpty else { return }
         
-        HapticManager.shared.medium()
+        HapticType.medium.trigger()
         
         Task {
             do {
-                let key = try NDKPrivateKey(nsec: privateKey)
-                let signer = NDKPrivateKeySigner(privateKey: key)
-                await appState.setSigner(signer)
+                try await appState.importAccount(nsec: privateKey)
                 
                 await MainActor.run {
                     showImportSheet = false
                     privateKey = ""
-                    HapticManager.shared.success()
+                    HapticType.success.trigger()
                 }
             } catch {
                 await MainActor.run {
-                    HapticManager.shared.error()
+                    HapticType.error.trigger()
                 }
             }
         }

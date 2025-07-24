@@ -8,7 +8,7 @@ struct ContentView: View {
     @State private var tabBarVisible = true
     
     enum Tab: CaseIterable {
-        case home, feed, discover, create, library, profile
+        case home, feed, discover, library, profile
     }
     
     var body: some View {
@@ -22,8 +22,6 @@ struct ContentView: View {
                         HighlightsFeedView(tabBarVisible: $tabBarVisible)
                     case .discover:
                         SearchView()
-                    case .create:
-                        CreateHighlightView()
                     case .library:
                         LibraryView()
                     case .profile:
@@ -54,7 +52,6 @@ extension ContentView.Tab {
         case .home: return "house"
         case .feed: return "play.rectangle"
         case .discover: return "magnifyingglass"
-        case .create: return "highlighter"
         case .library: return "books.vertical"
         case .profile: return "person"
         }
@@ -65,7 +62,6 @@ extension ContentView.Tab {
         case .home: return "house.fill"
         case .feed: return "play.rectangle.fill"
         case .discover: return "magnifyingglass"
-        case .create: return "highlighter"
         case .library: return "books.vertical.fill"
         case .profile: return "person.fill"
         }
@@ -76,7 +72,6 @@ extension ContentView.Tab {
         case .home: return "Home"
         case .feed: return "Feed"
         case .discover: return "Discover"
-        case .create: return "Create"
         case .library: return "Library"
         case .profile: return "Profile"
         }

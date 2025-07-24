@@ -36,6 +36,9 @@ class AppState: ObservableObject {
     @Published var currentlyPlayingId: String?
     @Published var recordingStartTime: Date?
     
+    // Reply context
+    @Published var replyingTo: AudioEvent?
+    
     // Signer reference for reactions
     var signer: NDKSigner? {
         nostrManager?.ndk?.signer
@@ -53,6 +56,7 @@ class AppState: ObservableObject {
         currentUser = nil
         isRecording = false
         currentlyPlayingId = nil
+        replyingTo = nil
     }
 }
 
@@ -87,6 +91,12 @@ class NostrManager: ObservableObject {
         ndk = NDK(relayUrls: allRelays)
         
         if let ndk = ndk {
+            // Configure client tag
+            ndk.clientTagConfig = NDKClientTagConfig(
+                name: "Ambulando",
+                autoTag: true
+            )
+            
             ndkAuthManager.setNDK(ndk)
             
             // Setup session restoration
@@ -147,11 +157,6 @@ class NostrManager: ObservableObject {
         // For bunker signers, the signer should already be set on NDK
         // and connected before calling this method
         if signer is NDKBunkerSigner {
-            // Ensure the signer is set
-            if ndk.signer !== signer {
-                ndk.signer = signer
-            }
-            
             // Start session with the bunker signer
             let sessionData = try await ndk.startSession(
                 signer: signer,
