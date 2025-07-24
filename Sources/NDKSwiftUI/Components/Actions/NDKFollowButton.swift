@@ -108,7 +108,7 @@ public struct NDKFollowButton: View {
         }
         .buttonStyle(PlainButtonStyle())
         .disabled(followState.isLoading || ndk?.signer == nil)
-        .opacity(followState.isLoading ? 0.6 : 1.0)
+        .opacity(followState.isLoading ? OpacityConstants.overlay : 1.0)
         .confirmationDialog(
             "Unfollow User",
             isPresented: $showUnfollowConfirmation,
@@ -217,7 +217,7 @@ public struct NDKFollowButton: View {
         case .standard:
             return followState.isFollowing ? Color.ndkSecondaryBackground : Color.accentColor
         case .compact:
-            return followState.isFollowing ? Color.ndkSecondaryBackground : Color.accentColor.opacity(0.1)
+            return followState.isFollowing ? Color.ndkSecondaryBackground : Color.accentColor.opacity(OpacityConstants.subtle)
         case .minimal:
             return Color.clear
         }

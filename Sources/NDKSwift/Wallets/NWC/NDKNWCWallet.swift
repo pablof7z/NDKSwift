@@ -351,7 +351,7 @@ public actor NDKNWCWallet: NDKPaymentProvider {
     /// Returns balance in satoshis (converts from millisatoshis)
     public func getBalance() async throws -> Int64? {
         let response = try await fetchBalance()
-        return response.balance / 1000  // Convert msat to sats
+        return PaymentConstants.millisatsToSats(response.balance)
     }
     
     /// NWC-specific getBalance that returns full response with millisatoshi precision

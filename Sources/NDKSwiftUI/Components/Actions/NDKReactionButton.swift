@@ -109,7 +109,7 @@ public struct NDKReactionButton: View {
         }
         .buttonStyle(PlainButtonStyle())
         .disabled(reactionState.isLoading)
-        .opacity(reactionState.isLoading ? 0.6 : 1.0)
+        .opacity(reactionState.isLoading ? OpacityConstants.overlay : 1.0)
         .onAppear {
             setupReactionObservation()
         }
@@ -176,9 +176,9 @@ public struct NDKReactionButton: View {
     private var backgroundColor: Color {
         switch style {
         case .standard: 
-            return reactionState.isReacted ? activeColor.opacity(0.1) : Color.ndkTertiaryBackground
+            return reactionState.isReacted ? activeColor.opacity(OpacityConstants.subtle) : Color.ndkTertiaryBackground
         case .compact:
-            return reactionState.isReacted ? activeColor.opacity(0.1) : Color.clear
+            return reactionState.isReacted ? activeColor.opacity(OpacityConstants.subtle) : Color.clear
         case .minimal:
             return Color.clear
         }
@@ -188,7 +188,7 @@ public struct NDKReactionButton: View {
         Group {
             if style == .standard {
                 RoundedRectangle(cornerRadius: cornerRadius)
-                    .stroke(reactionState.isReacted ? activeColor.opacity(0.3) : Color.ndkSeparator.opacity(0.3), lineWidth: 1)
+                    .stroke(reactionState.isReacted ? activeColor.opacity(OpacityConstants.border) : Color.ndkSeparator.opacity(OpacityConstants.border), lineWidth: 1)
             }
         }
     }
@@ -397,7 +397,7 @@ struct NDKReactionButton_Previews: PreviewProvider {
     private static let mockEvent = NDKEvent(
         id: "mock_id",
         pubkey: "mock_pubkey", 
-        createdAt: Timestamp(Date().timeIntervalSince1970),
+        createdAt: Date.currentNostrTimestamp,
         kind: 1,
         tags: [],
         content: "Mock event content",

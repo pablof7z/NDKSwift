@@ -58,12 +58,12 @@ public class NDKLightningZapProtocol: NDKZapProtocol {
         }
         
         // 2. Validate amount
-        let amountMillisats = amountSats * 1000
+        let amountMillisats = PaymentConstants.satsToMillisats(amountSats)
         guard amountMillisats >= endpoint.minSendable,
               amountMillisats <= endpoint.maxSendable else {
             throw ZapError.amountOutOfRange(
-                min: endpoint.minSendable / 1000,
-                max: endpoint.maxSendable / 1000
+                min: PaymentConstants.millisatsToSats(endpoint.minSendable),
+                max: PaymentConstants.millisatsToSats(endpoint.maxSendable)
             )
         }
         
@@ -130,7 +130,7 @@ public class NDKLightningZapProtocol: NDKZapProtocol {
             zappedEvent: prepared.zappedEvent,
             zapRequestId: zapRequest.event.id,
             providerPubkey: endpoint.nostrPubkey,
-            timeout: 30 // seconds
+            timeout: PaymentConstants.zapReceiptTimeout
         )
         
         // Return result with the actual receipt

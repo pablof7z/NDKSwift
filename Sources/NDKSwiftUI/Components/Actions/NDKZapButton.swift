@@ -118,7 +118,7 @@ public struct NDKZapButton: View {
         }
         .buttonStyle(PlainButtonStyle())
         .disabled(zapState.isLoading || ndk?.signer == nil)
-        .opacity(zapState.isLoading ? OpacityConstants.strong : 1.0)
+        .opacity(zapState.isLoading ? OpacityConstants.secondary : 1.0)
         .contextMenu {
             if !amounts.isEmpty {
                 ForEach(amounts, id: \.self) { amount in
@@ -268,9 +268,9 @@ public struct NDKZapButton: View {
     private var backgroundColor: Color {
         switch style {
         case .standard:
-            return zapState.hasZapped ? zapColor.opacity(OpacityConstants.light) : Color.ndkTertiaryBackground
+            return zapState.hasZapped ? zapColor.opacity(OpacityConstants.subtle) : Color.ndkTertiaryBackground
         case .compact:
-            return zapState.hasZapped ? zapColor.opacity(0.1) : Color.clear
+            return zapState.hasZapped ? zapColor.opacity(OpacityConstants.subtle) : Color.clear
         case .minimal:
             return Color.clear
         }
@@ -280,7 +280,7 @@ public struct NDKZapButton: View {
         Group {
             if style == .standard {
                 RoundedRectangle(cornerRadius: cornerRadius)
-                    .stroke(zapState.hasZapped ? zapColor.opacity(OpacityConstants.semiOpaque) : Color.ndkSeparator.opacity(OpacityConstants.semiOpaque), lineWidth: 1)
+                    .stroke(zapState.hasZapped ? zapColor.opacity(OpacityConstants.border) : Color.ndkSeparator.opacity(OpacityConstants.border), lineWidth: 1)
             }
         }
     }
@@ -631,7 +631,7 @@ struct NDKZapButton_Previews: PreviewProvider {
     private static let mockEvent = NDKEvent(
         id: "mock_id",
         pubkey: "mock_pubkey",
-        createdAt: Timestamp(Date().timeIntervalSince1970),
+        createdAt: Date.currentNostrTimestamp,
         kind: 1,
         tags: [],
         content: "Mock event content",

@@ -140,7 +140,7 @@ public class NDKNutzapProtocol: NDKZapProtocol {
                 mint: mint,
                 amount: amount,
                 invoice: mintQuote.request,  // The Lightning invoice to pay
-                expiry: Date(timeIntervalSince1970: TimeInterval(mintQuote.expiry ?? 0))
+                expiry: Date(nostrTimestamp: Timestamp(mintQuote.expiry ?? 0))
             )
         } catch {
             throw ZapError.mintQuoteFailed(mint: mint.host ?? mint.absoluteString, reason: error.localizedDescription)

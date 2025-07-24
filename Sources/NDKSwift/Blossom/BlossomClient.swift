@@ -204,7 +204,7 @@ public actor BlossomClient {
                         url: "\(serverURL)/\(item.sha256)",
                         size: item.size,
                         type: item.type,
-                        uploaded: Date(timeIntervalSince1970: TimeInterval(item.uploaded))
+                        uploaded: Date(nostrTimestamp: Timestamp(item.uploaded))
                     )
                 }
 

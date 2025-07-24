@@ -9,8 +9,8 @@ public extension MarkdownConfiguration {
         var config = MarkdownConfiguration()
         config.headingColor = .primary
         config.linkColor = .accentColor
-        config.codeBackgroundColor = Color.gray.opacity(0.08)
-        config.blockquoteBorderColor = Color.gray.opacity(0.3)
+        config.codeBackgroundColor = Color.gray.opacity(OpacityConstants.tertiary)
+        config.blockquoteBorderColor = Color.gray.opacity(OpacityConstants.border)
         config.mentionColor = .accentColor
         config.hashtagColor = .purple
         config.nostrEntityColor = .orange
@@ -24,8 +24,8 @@ public extension MarkdownConfiguration {
         config.headingColor = .white
         config.linkColor = Color.blue
         config.codeColor = Color.gray
-        config.codeBackgroundColor = Color.black.opacity(0.3)
-        config.blockquoteColor = Color.gray.opacity(0.7)
+        config.codeBackgroundColor = Color.black.opacity(OpacityConstants.border)
+        config.blockquoteColor = Color.gray.opacity(OpacityConstants.secondary)
         config.blockquoteBorderColor = Color.gray
         config.mentionColor = Color.blue
         config.hashtagColor = Color.purple

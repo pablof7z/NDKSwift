@@ -452,7 +452,7 @@ public actor NDKZapManager {
                                 sender: event.pubkey,
                                 recipient: nutzap.recipientPubkey ?? "",
                                 comment: nutzap.comment,
-                                timestamp: Date(timeIntervalSince1970: TimeInterval(event.createdAt)),
+                                timestamp: Date(nostrTimestamp: event.createdAt),
                                 event: event
                             )
                             continuation.yield(zapInfo)
@@ -522,7 +522,7 @@ public actor NDKZapManager {
                     sender: eventPubkey,
                     recipient: recipientPubkey ?? "",
                     comment: comment,
-                    timestamp: Date(timeIntervalSince1970: TimeInterval(createdAt)),
+                    timestamp: Date(nostrTimestamp: createdAt),
                     event: event
                 ))
             }
@@ -645,7 +645,7 @@ public actor NDKZapManager {
             sender: senderPubkey,
             recipient: recipientPubkey,
             comment: comment,
-            timestamp: Date(timeIntervalSince1970: TimeInterval(createdAt)),
+            timestamp: Date(nostrTimestamp: createdAt),
             event: receipt.event
         )
     }

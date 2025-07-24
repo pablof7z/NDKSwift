@@ -434,7 +434,7 @@ public struct NDKCashuTokenView: View {
             .cornerRadius(12)
             .overlay(
                 RoundedRectangle(cornerRadius: 12)
-                    .stroke(Color.orange.opacity(0.3), lineWidth: 1)
+                    .stroke(Color.orange.opacity(OpacityConstants.border), lineWidth: 1)
             )
         }
         .padding(.horizontal, 16)
@@ -596,7 +596,7 @@ private struct PictureGrid: View {
         if count > 0 {
             return AnyView(
                 Rectangle()
-                    .fill(Color.black.opacity(0.6))
+                    .fill(Color.black.opacity(OpacityConstants.overlay))
                     .frame(width: 60, height: 40)
                     .clipShape(RoundedRectangle(cornerRadius: 8))
                     .overlay(
