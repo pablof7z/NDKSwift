@@ -28,7 +28,7 @@ struct ArticleListView: View {
                                             ArticleFeaturedCard(article: article)
                                                 .onTapGesture {
                                                     selectedArticle = article
-                                                    HapticType.light.trigger()
+                                                    HapticManager.shared.impact(.light)
                                                 }
                                         }
                                     }
@@ -53,7 +53,7 @@ struct ArticleListView: View {
                                     ArticleRowCard(article: article)
                                         .onTapGesture {
                                             selectedArticle = article
-                                            HapticType.light.trigger()
+                                            HapticManager.shared.impact(.light)
                                         }
                                 }
                             }

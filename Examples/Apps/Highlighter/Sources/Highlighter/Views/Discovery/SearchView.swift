@@ -37,7 +37,7 @@ struct SearchView: View {
                                 withAnimation(DesignSystem.Animation.highlighterSpring) {
                                     selectedTab = tab
                                 }
-                                HapticType.selection.trigger()
+                                HapticManager.shared.triggerSelection()
                             }
                         }
                     }
@@ -479,7 +479,7 @@ struct UserCard: View {
     
     private func toggleFollow() {
         isFollowing.toggle()
-        HapticType.light.trigger()
+        HapticManager.shared.impact(.light)
     }
 }
 

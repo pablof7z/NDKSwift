@@ -168,7 +168,7 @@ struct CreateCurationView: View {
     private func createCuration() {
         guard !curationName.isEmpty, !curationTitle.isEmpty else { return }
         
-        HapticType.light.trigger()
+        HapticManager.shared.impact(.light)
         
         Task {
             do {
@@ -180,14 +180,14 @@ struct CreateCurationView: View {
                 )
                 
                 await MainActor.run {
-                    HapticType.success.trigger()
+                    HapticManager.shared.notification(.success)
                     dismiss()
                 }
             } catch {
                 await MainActor.run {
                     errorMessage = error.localizedDescription
                     showError = true
-                    HapticType.error.trigger()
+                    HapticManager.shared.notification(.error)
                 }
             }
         }

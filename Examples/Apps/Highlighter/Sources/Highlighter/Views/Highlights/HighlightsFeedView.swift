@@ -189,7 +189,7 @@ struct HighlightsFeedView: View {
     }
     
     private func refreshFeed() {
-        HapticType.light.trigger()
+        HapticManager.shared.impact(.light)
         // Clear existing data to show fresh content
         highlights.removeAll()
         authorProfiles.removeAll()
@@ -203,22 +203,22 @@ struct HighlightsFeedView: View {
     
     private func showProfile(for pubkey: String) {
         // TODO: Navigate to profile
-        HapticType.light.trigger()
+        HapticManager.shared.impact(.light)
     }
     
     private func zapHighlight(_ highlight: HighlightEvent) {
         // TODO: Implement zapping
-        HapticType.medium.trigger()
+        HapticManager.shared.impact(.medium)
     }
     
     private func shareHighlight(_ highlight: HighlightEvent) {
         // TODO: Implement sharing
-        HapticType.light.trigger()
+        HapticManager.shared.impact(.light)
     }
     
     private func commentOnHighlight(_ highlight: HighlightEvent) {
         // TODO: Implement commenting
-        HapticType.light.trigger()
+        HapticManager.shared.impact(.light)
     }
     
     private func loadReferencedArticles(for highlights: [HighlightEvent]) async {
@@ -665,7 +665,7 @@ struct HighlightFeedItemView: View {
                     .default(Text("Save to Library")) {},
                     .default(Text("Copy Text")) {
                         UIPasteboard.general.string = highlight.content
-                        HapticType.success.trigger()
+                        HapticManager.shared.notification(.success)
                     },
                     .default(Text("View Article")) {
                         // Navigate to article

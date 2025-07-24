@@ -100,11 +100,11 @@ struct PremiumHoverModifier: ViewModifier {
 /// Adds premium press animation with haptic feedback
 struct PremiumPressModifier: ViewModifier {
     @State private var isPressed = false
-    let hapticType: HapticType
+    let hapticStyle: HapticManager.ImpactStyle
     let scale: CGFloat
     
-    init(hapticType: HapticType = .light, scale: CGFloat = 0.96) {
-        self.hapticType = hapticType
+    init(hapticStyle: HapticManager.ImpactStyle = .light, scale: CGFloat = 0.96) {
+        self.hapticStyle = hapticStyle
         self.scale = scale
     }
     
@@ -119,7 +119,7 @@ struct PremiumPressModifier: ViewModifier {
                 pressing: { pressing in
                     isPressed = pressing
                     if pressing {
-                        hapticType.trigger()
+                        HapticManager.shared.impact(hapticStyle)
                     }
                 },
                 perform: {}
@@ -240,10 +240,10 @@ extension View {
     
     /// Apply premium press animation with haptic feedback
     func premiumPress(
-        hapticType: HapticType = .light,
+        hapticStyle: HapticManager.ImpactStyle = .light,
         scale: CGFloat = 0.96
     ) -> some View {
-        self.modifier(PremiumPressModifier(hapticType: hapticType, scale: scale))
+        self.modifier(PremiumPressModifier(hapticStyle: hapticStyle, scale: scale))
     }
     
     /// Apply premium floating animation

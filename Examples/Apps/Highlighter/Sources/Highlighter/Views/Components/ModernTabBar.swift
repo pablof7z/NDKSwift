@@ -24,7 +24,7 @@ struct ModernTabBar: View {
                         isSelected: selectedTab == tab,
                         action: {
                             if selectedTab != tab {
-                                HapticType.selection.trigger()
+                                HapticManager.shared.triggerSelection()
                                 withAnimation(DesignSystem.Animation.springSnappy) {
                                     selectedTab = tab
                                     selectedIndex = index
@@ -133,7 +133,7 @@ struct TabBarButton: View {
                     isPressed = pressing
                 }
                 if pressing {
-                    HapticType.light.trigger()
+                    HapticManager.shared.impact(.light)
                 }
             },
             perform: {}

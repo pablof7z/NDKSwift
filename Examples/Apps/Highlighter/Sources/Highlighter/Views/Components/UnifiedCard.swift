@@ -304,7 +304,7 @@ struct ModernHighlightCard: View {
     
     private func zapHighlight() {
         isZapped.toggle()
-        HapticType.light.trigger()
+        HapticManager.shared.impact(.light)
         // TODO: Implement actual zapping
     }
 }

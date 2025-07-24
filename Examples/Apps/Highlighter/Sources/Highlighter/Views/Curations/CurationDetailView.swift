@@ -280,12 +280,12 @@ struct CurationDetailView: View {
     
     private func toggleFollow() {
         isFollowing.toggle()
-        HapticType.light.trigger()
+        HapticManager.shared.impact(.light)
         // TODO: Implement follow functionality
     }
     
     private func shareCuration() {
-        HapticType.light.trigger()
+        HapticManager.shared.impact(.light)
         // TODO: Implement share functionality
     }
     
@@ -522,7 +522,7 @@ struct AddArticleSheet: View {
     private func addArticle() {
         guard !articleUrl.isEmpty else { return }
         
-        HapticType.light.trigger()
+        HapticManager.shared.impact(.light)
         
         Task {
             // TODO: Implement adding article to curation

@@ -80,14 +80,14 @@ struct ModernAuthenticationView: View {
     }
     
     private func createAccount() {
-        HapticType.medium.trigger()
+        HapticManager.shared.impact(.medium)
         
         Task {
             do {
                 try await appState.createAccount()
-                HapticType.success.trigger()
+                HapticManager.shared.notification(.success)
             } catch {
-                HapticType.error.trigger()
+                HapticManager.shared.notification(.error)
             }
         }
     }
@@ -95,7 +95,7 @@ struct ModernAuthenticationView: View {
     private func importAccount() {
         guard !privateKey.isEmpty else { return }
         
-        HapticType.medium.trigger()
+        HapticManager.shared.impact(.medium)
         
         Task {
             do {
@@ -104,11 +104,11 @@ struct ModernAuthenticationView: View {
                 await MainActor.run {
                     showImportSheet = false
                     privateKey = ""
-                    HapticType.success.trigger()
+                    HapticManager.shared.notification(.success)
                 }
             } catch {
                 await MainActor.run {
-                    HapticType.error.trigger()
+                    HapticManager.shared.notification(.error)
                 }
             }
         }

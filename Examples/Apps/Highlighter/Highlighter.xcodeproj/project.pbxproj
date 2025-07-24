@@ -20,6 +20,7 @@
 		4B32ABBE29543BA6FCA0605B /* ModernHomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F0F357DAE1A92819205EE9FF /* ModernHomeView.swift */; };
 		4F557938220F55296A4E483F /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 288947C11C084EEA395DB4F3 /* ContentView.swift */; };
 		56884CA05833E2E75660E7E3 /* BlurHashDecoder.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5C9A8C38CB54B7E5605AF14A /* BlurHashDecoder.swift */; };
+		584216E80F87025A63620635 /* ButtonSystem.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC9C86787D8110767C109BBB /* ButtonSystem.swift */; };
 		5D62AE907A0A91BECED7DCD4 /* DataStreamManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 47D8FA7B43386CEE13EB7B18 /* DataStreamManager.swift */; };
 		6462DC934F3BCE00CEEE8BF8 /* HighlightCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 19C631ECAA0313B22AD50212 /* HighlightCard.swift */; };
 		6B3A6908C6C27D35E9C37F28 /* FormattingUtilities.swift in Sources */ = {isa = PBXBuildFile; fileRef = D01FA9F607102E7402D96CA8 /* FormattingUtilities.swift */; };
@@ -33,7 +34,6 @@
 		91774403D5A6E567EB9879C6 /* HighlighterApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = FD69175DE127E1B1E7016D16 /* HighlighterApp.swift */; };
 		981A640F5DAAE1DC2566BE65 /* ModernFormComponents.swift in Sources */ = {isa = PBXBuildFile; fileRef = 96BB1CEB6B1AF8996372B0A9 /* ModernFormComponents.swift */; };
 		9A08FA3600462F3DD3497E16 /* PremiumAnimations.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5B90C3B1B7E66DF0A22C6359 /* PremiumAnimations.swift */; };
-		9D137AE96CA292DC17789894 /* HomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2F2BD1089584EFD4A63CE8B1 /* HomeView.swift */; };
 		9D8D0E11AFFAEBF826CA8C35 /* ModernAuthenticationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C698E368C385A545D9B0F4C2 /* ModernAuthenticationView.swift */; };
 		A06F95F603A679D35B71830C /* UnifiedCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5AFA2646020373D085219CD1 /* UnifiedCard.swift */; };
 		A14D87798BCA853B8ADB1094 /* ProfileManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0CD20236BF86EF8694B01BCB /* ProfileManager.swift */; };
@@ -62,7 +62,6 @@
 		19C631ECAA0313B22AD50212 /* HighlightCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HighlightCard.swift; sourceTree = "<group>"; };
 		1A3025E76E14FBF1C8D93736 /* DesignSystem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesignSystem.swift; sourceTree = "<group>"; };
 		288947C11C084EEA395DB4F3 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
-		2F2BD1089584EFD4A63CE8B1 /* HomeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeView.swift; sourceTree = "<group>"; };
 		47D8FA7B43386CEE13EB7B18 /* DataStreamManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DataStreamManager.swift; sourceTree = "<group>"; };
 		4CF27270F57B25E33B719EEC /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		552D71BE7E32CED89D35A278 /* LibraryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LibraryView.swift; sourceTree = "<group>"; };
@@ -89,6 +88,7 @@
 		C3CDA726BB07F1F8F89ABF1C /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		C698E368C385A545D9B0F4C2 /* ModernAuthenticationView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModernAuthenticationView.swift; sourceTree = "<group>"; };
 		CC98504899CC29F4D15C2A92 /* ModernViewModifiers.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModernViewModifiers.swift; sourceTree = "<group>"; };
+		CC9C86787D8110767C109BBB /* ButtonSystem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ButtonSystem.swift; sourceTree = "<group>"; };
 		D01FA9F607102E7402D96CA8 /* FormattingUtilities.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FormattingUtilities.swift; sourceTree = "<group>"; };
 		D48EA35CD61779F2D9DC5964 /* ProfileView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProfileView.swift; sourceTree = "<group>"; };
 		D715EDA3BA34145E7508D03E /* SharedStyles.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SharedStyles.swift; sourceTree = "<group>"; };
@@ -224,6 +224,7 @@
 			isa = PBXGroup;
 			children = (
 				6631658DBFE8C97A69C08F13 /* Animations.swift */,
+				CC9C86787D8110767C109BBB /* ButtonSystem.swift */,
 				1A3025E76E14FBF1C8D93736 /* DesignSystem.swift */,
 				CC98504899CC29F4D15C2A92 /* ModernViewModifiers.swift */,
 				5B90C3B1B7E66DF0A22C6359 /* PremiumAnimations.swift */,
@@ -295,7 +296,6 @@
 			isa = PBXGroup;
 			children = (
 				F6C338502340BD8BE768794B /* HomeDataManager.swift */,
-				2F2BD1089584EFD4A63CE8B1 /* HomeView.swift */,
 				F0F357DAE1A92819205EE9FF /* ModernHomeView.swift */,
 			);
 			path = Home;
@@ -414,6 +414,7 @@
 				1B99932C8DCDEBA4FB239749 /* ArticleListView.swift in Sources */,
 				8D5D97226F6D2C4ABE8631F3 /* ArticleView.swift in Sources */,
 				56884CA05833E2E75660E7E3 /* BlurHashDecoder.swift in Sources */,
+				584216E80F87025A63620635 /* ButtonSystem.swift in Sources */,
 				4F557938220F55296A4E483F /* ContentView.swift in Sources */,
 				73EF0B3EADF9149125478230 /* CreateCurationView.swift in Sources */,
 				D6BF6DEBA828B3B11D10832E /* CurationDetailView.swift in Sources */,
@@ -429,7 +430,6 @@
 				91774403D5A6E567EB9879C6 /* HighlighterApp.swift in Sources */,
 				BE7B648769FD679A8E81418A /* HighlightsFeedView.swift in Sources */,
 				34DF18AC7EC3EE0F46E1A1A3 /* HomeDataManager.swift in Sources */,
-				9D137AE96CA292DC17789894 /* HomeView.swift in Sources */,
 				39ED8F05509F9A4FFF466557 /* LibraryView.swift in Sources */,
 				9D8D0E11AFFAEBF826CA8C35 /* ModernAuthenticationView.swift in Sources */,
 				C975491F710CDEF803054F4B /* ModernButtonStyles.swift in Sources */,
