@@ -64,11 +64,6 @@ struct ZapButton: View {
                     .scaleEffect(zapState == .zapping ? 1.2 : 1.0)
                     .animation(.easeInOut(duration: 0.3), value: zapState)
                 
-                if zapState == .zapping {
-                    ProgressView()
-                        .progressViewStyle(CircularProgressViewStyle(tint: zapState.color))
-                        .scaleEffect(0.6)
-                }
             }
             .padding(size.padding)
         }
@@ -104,8 +99,8 @@ struct ZapButton: View {
         Task {
             do {
                 // TODO: Implement actual zapping once NDK supports it
-                // For now, simulate a zap
-                try? await Task.sleep(nanoseconds: 1_000_000_000)
+                // This would create a zap event (kind 9735) and send payment
+                // For now, just show success immediately
                 
                 await MainActor.run {
                     zapState = .zapped

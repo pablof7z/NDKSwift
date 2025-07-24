@@ -250,8 +250,8 @@ struct CurationDetailView: View {
         for address in eventAddresses {
             Task {
                 let filter = NDKFilter(
-                    kinds: [address.kind],
-                    authors: [address.pubkey]
+                    authors: [address.pubkey],
+                    kinds: [address.kind]
                 )
                 
                 let articleSource = ndk.observe(

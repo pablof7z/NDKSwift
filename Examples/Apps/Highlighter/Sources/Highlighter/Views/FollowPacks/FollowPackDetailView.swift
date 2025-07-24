@@ -7,7 +7,6 @@ struct FollowPackDetailView: View {
     @Environment(\.dismiss) var dismiss
     
     @State private var profiles: [String: NDKUserProfile] = [:]
-    @State private var isImporting = false
     @State private var showSuccess = false
     @State private var creator: NDKUserProfile?
     
@@ -111,15 +110,9 @@ struct FollowPackDetailView: View {
     private var importSection: some View {
         Button(action: importFollowPack) {
             HStack {
-                if isImporting {
-                    ProgressView()
-                        .progressViewStyle(CircularProgressViewStyle(tint: .white))
-                        .scaleEffect(0.8)
-                } else {
-                    Image(systemName: showSuccess ? "checkmark.circle.fill" : "plus.circle.fill")
-                    Text(showSuccess ? "Imported!" : "Import Follow Pack")
-                        .fontWeight(.semibold)
-                }
+                Image(systemName: showSuccess ? "checkmark.circle.fill" : "plus.circle.fill")
+                Text(showSuccess ? "Imported!" : "Import Follow Pack")
+                    .fontWeight(.semibold)
             }
             .frame(maxWidth: .infinity)
             .padding()
@@ -138,9 +131,7 @@ struct FollowPackDetailView: View {
             )
             .foregroundColor(.white)
             .cornerRadius(12)
-            .disabled(isImporting || showSuccess)
-            .scaleEffect(isImporting ? 0.95 : 1)
-            .animation(.easeInOut(duration: 0.2), value: isImporting)
+            .disabled(showSuccess)
         }
         .padding(.horizontal)
     }
@@ -184,15 +175,14 @@ struct FollowPackDetailView: View {
     }
     
     private func importFollowPack() {
-        isImporting = true
         HapticType.medium.trigger()
         
         Task {
             // TODO: Implement actual follow list update
-            try? await Task.sleep(nanoseconds: 1_500_000_000) // Simulate network delay
+            // This would create/update the user's contact list event (kind 3)
+            // For now, just show success immediately
             
             await MainActor.run {
-                isImporting = false
                 showSuccess = true
                 HapticType.success.trigger()
                 
