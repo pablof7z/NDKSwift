@@ -236,6 +236,56 @@ enum HapticType {
     }
 }
 
+// MARK: - Common Utilities
+struct RelativeTimeFormatter {
+    static func relativeTime(from timestamp: Timestamp) -> String {
+        let date = Date(timeIntervalSince1970: TimeInterval(timestamp))
+        let formatter = RelativeDateTimeFormatter()
+        formatter.unitsStyle = .abbreviated
+        return formatter.localizedString(for: date, relativeTo: Date())
+    }
+    
+    static func relativeTime(from date: Date) -> String {
+        let formatter = RelativeDateTimeFormatter()
+        formatter.unitsStyle = .abbreviated
+        return formatter.localizedString(for: date, relativeTo: Date())
+    }
+}
+
+// MARK: - Card Styles
+struct CardStyle {
+    enum Variant {
+        case standard
+        case glass
+        case elevated
+        case compact
+        
+        var cornerRadius: CGFloat {
+            switch self {
+            case .standard, .elevated: return DesignSystem.CornerRadius.large
+            case .glass: return DesignSystem.CornerRadius.medium
+            case .compact: return DesignSystem.CornerRadius.medium
+            }
+        }
+        
+        var padding: CGFloat {
+            switch self {
+            case .standard, .elevated, .glass: return DesignSystem.Spacing.cardPadding
+            case .compact: return DesignSystem.Spacing.base
+            }
+        }
+        
+        var shadow: (color: Color, radius: CGFloat, x: CGFloat, y: CGFloat) {
+            switch self {
+            case .standard: return DesignSystem.Shadow.small
+            case .glass: return (Color.black.opacity(0.1), 8, 0, 4)
+            case .elevated: return DesignSystem.Shadow.medium
+            case .compact: return DesignSystem.Shadow.subtle
+            }
+        }
+    }
+}
+
 // MARK: - View Extensions
 extension View {
     func fadeSlide(isVisible: Bool, delay: Double = 0) -> some View {
@@ -286,12 +336,12 @@ extension View {
         .clipped()
     }
     
-    func cardBackground(isSelected: Bool = false) -> some View {
+    func cardBackground(isSelected: Bool = false, variant: CardStyle.Variant = .standard) -> some View {
         self.background {
-            RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.large, style: .continuous)
-                .fill(DesignSystem.Colors.surface)
+            RoundedRectangle(cornerRadius: variant.cornerRadius, style: .continuous)
+                .fill(variant == .glass ? AnyShapeStyle(.ultraThinMaterial) : AnyShapeStyle(DesignSystem.Colors.surface))
                 .overlay {
-                    RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.large, style: .continuous)
+                    RoundedRectangle(cornerRadius: variant.cornerRadius, style: .continuous)
                         .stroke(
                             isSelected ?
                             LinearGradient(
@@ -300,7 +350,7 @@ extension View {
                                 endPoint: .bottomTrailing
                             ) :
                             LinearGradient(
-                                colors: [Color.gray.opacity(0.2), Color.gray.opacity(0.1)],
+                                colors: [DesignSystem.Colors.border, DesignSystem.Colors.border.opacity(0.5)],
                                 startPoint: .topLeading,
                                 endPoint: .bottomTrailing
                             ),
@@ -308,14 +358,216 @@ extension View {
                         )
                 }
                 .shadow(
-                    color: isSelected ? DesignSystem.Colors.secondary.opacity(0.3) : Color.black.opacity(0.08),
-                    radius: isSelected ? 12 : 8,
-                    x: 0,
-                    y: isSelected ? 6 : 4
+                    color: isSelected ? DesignSystem.Colors.secondary.opacity(0.3) : variant.shadow.color,
+                    radius: isSelected ? 12 : variant.shadow.radius,
+                    x: variant.shadow.x,
+                    y: isSelected ? 6 : variant.shadow.y
                 )
         }
         .scaleEffect(isSelected ? 1.02 : 1.0)
         .animation(.spring(response: 0.3, dampingFraction: 0.7), value: isSelected)
+    }
+    
+    func pulseGently() -> some View {
+        self.modifier(GentlePulseModifier())
+    }
+    
+    func contextualFeedback(isActive: Bool) -> some View {
+        self.modifier(ContextualFeedbackModifier(isActive: isActive))
+    }
+    
+    func highlightText(_ isHighlighted: Bool, color: Color = DesignSystem.Colors.secondary) -> some View {
+        self.modifier(HighlightTextEffect(isHighlighted: isHighlighted, highlightColor: color))
+    }
+    
+    func enhancedHighlightCard(isSelected: Bool = false, isHighlighted: Bool = false) -> some View {
+        self.modifier(EnhancedHighlightCard(isSelected: isSelected, isHighlighted: isHighlighted))
+    }
+    
+    func rotateAndScale(isActive: Bool) -> some View {
+        self
+            .scaleEffect(isActive ? 1.2 : 1.0)
+            .rotationEffect(isActive ? .degrees(15) : .degrees(0))
+            .animation(.spring(response: 0.3, dampingFraction: 0.6), value: isActive)
+    }
+    
+    func pulse() -> some View {
+        self.modifier(PulseModifier())
+    }
+}
+
+// MARK: - View Modifiers
+
+struct GentlePulseModifier: ViewModifier {
+    @State private var scale: CGFloat = 1
+    @State private var opacity: Double = 1
+    
+    func body(content: Content) -> some View {
+        content
+            .scaleEffect(scale)
+            .opacity(opacity)
+            .onAppear {
+                withAnimation(
+                    .easeInOut(duration: 2.5)
+                    .repeatForever(autoreverses: true)
+                ) {
+                    scale = 1.02
+                    opacity = 0.9
+                }
+            }
+    }
+}
+
+struct ContextualFeedbackModifier: ViewModifier {
+    let isActive: Bool
+    @State private var feedbackScale: CGFloat = 1.0
+    
+    func body(content: Content) -> some View {
+        content
+            .scaleEffect(feedbackScale)
+            .onChange(of: isActive) { _, newValue in
+                if newValue {
+                    withAnimation(.spring(response: 0.15, dampingFraction: 0.8)) {
+                        feedbackScale = 1.02
+                    }
+                    
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                        withAnimation(.spring(response: 0.2, dampingFraction: 0.7)) {
+                            feedbackScale = 1.0
+                        }
+                    }
+                    
+                    HapticType.selection.trigger()
+                }
+            }
+    }
+}
+
+struct HighlightTextEffect: ViewModifier {
+    let isHighlighted: Bool
+    let highlightColor: Color
+    
+    init(isHighlighted: Bool, highlightColor: Color = DesignSystem.Colors.secondary) {
+        self.isHighlighted = isHighlighted
+        self.highlightColor = highlightColor
+    }
+    
+    func body(content: Content) -> some View {
+        content
+            .background(
+                RoundedRectangle(cornerRadius: 4, style: .continuous)
+                    .fill(
+                        isHighlighted ? 
+                        highlightColor.opacity(0.15) : 
+                        Color.clear
+                    )
+                    .animation(.easeInOut(duration: 0.2), value: isHighlighted)
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 4, style: .continuous)
+                    .stroke(
+                        isHighlighted ? 
+                        highlightColor.opacity(0.3) : 
+                        Color.clear,
+                        lineWidth: 1
+                    )
+                    .animation(.easeInOut(duration: 0.2), value: isHighlighted)
+            )
+    }
+}
+
+struct EnhancedHighlightCard: ViewModifier {
+    let isSelected: Bool
+    let isHighlighted: Bool
+    
+    func body(content: Content) -> some View {
+        content
+            .padding(.ds.cardPadding)
+            .background(
+                RoundedRectangle(cornerRadius: .ds.large, style: .continuous)
+                    .fill(DesignSystem.Colors.surface)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: .ds.large, style: .continuous)
+                            .stroke(
+                                strokeGradient,
+                                lineWidth: strokeWidth
+                            )
+                    )
+            )
+            .shadow(
+                color: shadowColor,
+                radius: shadowRadius,
+                x: 0,
+                y: shadowY
+            )
+            .scaleEffect(isSelected ? 1.02 : 1.0)
+            .opacity(isSelected ? 1.0 : 0.95)
+            .animation(.spring(response: 0.3, dampingFraction: 0.7), value: isSelected)
+    }
+    
+    private var strokeGradient: LinearGradient {
+        if isSelected {
+            return LinearGradient(
+                colors: [DesignSystem.Colors.secondary, DesignSystem.Colors.primary],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+        } else if isHighlighted {
+            return LinearGradient(
+                colors: [DesignSystem.Colors.secondary.opacity(0.3), Color.clear],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+        } else {
+            return LinearGradient(
+                colors: [DesignSystem.Colors.border, DesignSystem.Colors.border],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+        }
+    }
+    
+    private var strokeWidth: CGFloat {
+        isSelected ? 2 : (isHighlighted ? 1.5 : 1)
+    }
+    
+    private var shadowColor: Color {
+        if isSelected {
+            return DesignSystem.Colors.secondary.opacity(0.3)
+        } else {
+            return Color.black.opacity(0.08)
+        }
+    }
+    
+    private var shadowRadius: CGFloat {
+        isSelected ? 12 : 8
+    }
+    
+    private var shadowY: CGFloat {
+        isSelected ? 6 : 4
+    }
+}
+
+struct PulseModifier: ViewModifier {
+    @State private var isPulsing = false
+    
+    func body(content: Content) -> some View {
+        content
+            .scaleEffect(isPulsing ? 1.05 : 1.0)
+            .animation(.easeInOut(duration: 1.0).repeatForever(autoreverses: true), value: isPulsing)
+            .onAppear {
+                isPulsing = true
+            }
+    }
+}
+
+// MARK: - Button Styles
+
+struct PressButtonStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .scaleEffect(configuration.isPressed ? 0.95 : 1.0)
+            .animation(.easeInOut(duration: 0.1), value: configuration.isPressed)
     }
 }
 

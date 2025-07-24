@@ -266,26 +266,7 @@ struct PersonalizedRecapSection: View {
 
 struct RecapCardPlaceholder: View {
     var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            HStack {
-                RoundedRectangle(cornerRadius: 4)
-                    .fill(Color.gray.opacity(0.2))
-                    .frame(width: 120, height: 14)
-                
-                Spacer()
-            }
-            
-            VStack(spacing: 8) {
-                ForEach(0..<3) { _ in
-                    RoundedRectangle(cornerRadius: 4)
-                        .fill(Color.gray.opacity(0.15))
-                        .frame(height: 16)
-                }
-            }
-        }
-        .padding(DesignSystem.Spacing.cardPadding)
-        .glassBackground()
-        .shimmer()
+        PlaceholderCard(lines: 4)
     }
 }
 
@@ -376,28 +357,28 @@ struct TrendingQuotesSection: View {
 
 struct QuoteCardPlaceholder: View {
     var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            VStack(spacing: 8) {
-                ForEach(0..<4) { _ in
-                    RoundedRectangle(cornerRadius: 4)
-                        .fill(Color.gray.opacity(0.15))
-                        .frame(height: 16)
+        UnifiedCard(variant: .glass) {
+            VStack(alignment: .leading, spacing: 16) {
+                VStack(spacing: 8) {
+                    ForEach(0..<4) { _ in
+                        RoundedRectangle(cornerRadius: 4)
+                            .fill(Color.gray.opacity(0.15))
+                            .frame(height: 16)
+                    }
                 }
-            }
-            
-            Spacer()
-            
-            HStack {
-                RoundedRectangle(cornerRadius: 4)
-                    .fill(Color.gray.opacity(0.2))
-                    .frame(width: 80, height: 14)
                 
                 Spacer()
+                
+                HStack {
+                    RoundedRectangle(cornerRadius: 4)
+                        .fill(Color.gray.opacity(0.2))
+                        .frame(width: 80, height: 14)
+                    
+                    Spacer()
+                }
             }
+            .frame(height: 120)
         }
-        .frame(height: 160)
-        .padding(DesignSystem.Spacing.cardPadding)
-        .glassBackground()
         .shimmer()
     }
 }
@@ -526,25 +507,25 @@ struct CommunityZapsSection: View {
 
 struct CommunityZapCardPlaceholder: View {
     var body: some View {
-        HStack(alignment: .top, spacing: 16) {
-            Circle()
-                .fill(Color.gray.opacity(0.2))
-                .frame(width: 40, height: 40)
-            
-            VStack(alignment: .leading, spacing: 4) {
-                RoundedRectangle(cornerRadius: 4)
+        UnifiedCard(variant: .glass) {
+            HStack(alignment: .top, spacing: 16) {
+                Circle()
                     .fill(Color.gray.opacity(0.2))
-                    .frame(width: 120, height: 14)
+                    .frame(width: 40, height: 40)
                 
-                RoundedRectangle(cornerRadius: 4)
-                    .fill(Color.gray.opacity(0.15))
-                    .frame(width: 180, height: 18)
+                VStack(alignment: .leading, spacing: 4) {
+                    RoundedRectangle(cornerRadius: 4)
+                        .fill(Color.gray.opacity(0.2))
+                        .frame(width: 120, height: 14)
+                    
+                    RoundedRectangle(cornerRadius: 4)
+                        .fill(Color.gray.opacity(0.15))
+                        .frame(width: 180, height: 18)
+                }
+                
+                Spacer()
             }
-            
-            Spacer()
         }
-        .padding(DesignSystem.Spacing.cardPadding)
-        .glassBackground()
         .shimmer()
     }
 }
@@ -586,10 +567,7 @@ struct CommunityZapCard: View {
     }
     
     private func relativeTime(from timestamp: Timestamp) -> String {
-        let date = Date(timeIntervalSince1970: TimeInterval(timestamp))
-        let formatter = RelativeDateTimeFormatter()
-        formatter.unitsStyle = .abbreviated
-        return formatter.localizedString(for: date, relativeTo: Date())
+        return RelativeTimeFormatter.relativeTime(from: timestamp)
     }
 }
 
@@ -753,10 +731,7 @@ struct DiscussionCard: View {
     }
     
     private func relativeTime(from timestamp: Timestamp) -> String {
-        let date = Date(timeIntervalSince1970: TimeInterval(timestamp))
-        let formatter = RelativeDateTimeFormatter()
-        formatter.unitsStyle = .abbreviated
-        return formatter.localizedString(for: date, relativeTo: Date())
+        return RelativeTimeFormatter.relativeTime(from: timestamp)
     }
 }
 
