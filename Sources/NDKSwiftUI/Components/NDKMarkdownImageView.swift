@@ -68,14 +68,14 @@ struct NDKMarkdownImageView: View {
                                 .foregroundColor(.secondary)
                                 .frame(height: 100)
                                 .frame(maxWidth: .infinity)
-                                .background(Color.gray.opacity(0.1))
+                                .background(Color.gray.opacity(OpacityConstants.subtle))
                                 .cornerRadius(configuration.codeBlockCornerRadius)
                             
                         case .empty:
                             ProgressView()
                                 .frame(height: 100)
                                 .frame(maxWidth: .infinity)
-                                .background(Color.gray.opacity(0.1))
+                                .background(Color.gray.opacity(OpacityConstants.subtle))
                                 .cornerRadius(configuration.codeBlockCornerRadius)
                             
                         @unknown default:

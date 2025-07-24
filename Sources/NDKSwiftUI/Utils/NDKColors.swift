@@ -4,32 +4,6 @@ import SwiftUI
 import UIKit
 #endif
 
-// MARK: - Opacity Constants
-
-/// Common opacity values used throughout NDKSwiftUI components
-public enum OpacityConstants {
-    /// Ultra light opacity (5%)
-    public static let ultraLight = 0.05
-    
-    /// Light opacity (10%)
-    public static let light = 0.1
-    
-    /// Medium opacity (20%)
-    public static let medium = 0.2
-    
-    /// Semi-opaque (30%)
-    public static let semiOpaque = 0.3
-    
-    /// Half opacity (50%)
-    public static let half = 0.5
-    
-    /// Strong opacity (60%)
-    public static let strong = 0.6
-    
-    /// Heavy opacity (70%)
-    public static let heavy = 0.7
-}
-
 // MARK: - NDK Color Constants
 
 /// Centralized color definitions for NDKSwiftUI components

@@ -1391,7 +1391,7 @@ public actor NDKSQLiteCache: NDKCache {
                     SELECT last_fetch FROM fetch_timestamps WHERE filter_fingerprint = ?
                 """, arguments: [fingerprint]) {
                     let timestamp = row["last_fetch"] as Int64
-                    return Date(timeIntervalSince1970: TimeInterval(timestamp))
+                    return Date(nostrTimestamp: timestamp)
                 }
                 return nil
             }
@@ -1625,7 +1625,7 @@ public actor NDKSQLiteCache: NDKCache {
                 // Check age of last verification
                 let lastCheck = row["last_check_at"] as? Int64 ?? row["verified_at"] as? Int64
                 if let lastCheck = lastCheck {
-                    let lastCheckDate = Date(timeIntervalSince1970: TimeInterval(lastCheck))
+                    let lastCheckDate = Date(nostrTimestamp: lastCheck)
                     return Date().timeIntervalSince(lastCheckDate) > maxAge
                 }
                 
@@ -1745,9 +1745,9 @@ public actor NDKSQLiteCache: NDKCache {
             pubkey: pubkey,
             status: status,
             nip46Relays: nip46Relays,
-            claimedAt: Date(timeIntervalSince1970: TimeInterval(claimedAtInt)),
-            verifiedAt: (row["verified_at"] as? Int64).map { Date(timeIntervalSince1970: TimeInterval($0)) },
-            lastCheckAt: (row["last_check_at"] as? Int64).map { Date(timeIntervalSince1970: TimeInterval($0)) },
+            claimedAt: Date(nostrTimestamp: claimedAtInt),
+            verifiedAt: (row["verified_at"] as? Int64).map { Date(nostrTimestamp: $0) },
+            lastCheckAt: (row["last_check_at"] as? Int64).map { Date(nostrTimestamp: $0) },
             errorMessage: row["error_message"] as? String,
             httpStatusCode: row["http_status_code"] as? Int
         )
@@ -1840,8 +1840,8 @@ public actor NDKSQLiteCache: NDKCache {
                 return (
                     writeRelays: writeRelays,
                     readRelays: readRelays,
-                    fetchedAt: Date(timeIntervalSince1970: TimeInterval(fetchedAtInt)),
-                    expiresAt: Date(timeIntervalSince1970: TimeInterval(expiresAtInt)),
+                    fetchedAt: Date(nostrTimestamp: fetchedAtInt),
+                    expiresAt: Date(nostrTimestamp: expiresAtInt),
                     checkedRelays: checkedRelays
                 )
             }

@@ -69,7 +69,7 @@ public struct NDKZapReceipt {
     
     /// Amount in satoshis
     public var amountSats: Int64? {
-        return amountMillisats.map { $0 / 1000 }
+        return amountMillisats.map { PaymentConstants.millisatsToSats($0) }
     }
     
     /// The comment from the original zap request
@@ -154,7 +154,7 @@ public struct NDKZapReceipt {
             .content("")
             .kind(EventKind.zap)
             .tags(tags)
-            .createdAt(Timestamp(paidAt.timeIntervalSince1970))
+            .createdAt(paidAt.nostrTimestamp)
             .build(signer: signer)
         
         return NDKZapReceipt(event: event)
@@ -189,14 +189,14 @@ private func parseBolt11Amount(_ bolt11: String) -> Int64? {
             let multiplier = String(bolt11[range])
             switch multiplier {
             case "m": return amount // millisats
-            case "u": return amount * 1000 // microsats to millisats
-            case "n": return amount * 1_000_000 // nanosats to millisats
-            case "p": return amount * 1_000_000_000 // picosats to millisats
-            default: return amount * 100_000_000_000 // BTC to millisats
+            case "u": return amount * PaymentConstants.InvoiceMultiplier.microsatsToMillisats
+            case "n": return amount * PaymentConstants.InvoiceMultiplier.nanosatsToMillisats
+            case "p": return amount * PaymentConstants.InvoiceMultiplier.picosatsToMillisats
+            default: return amount * PaymentConstants.InvoiceMultiplier.bitcoinToMillisats
             }
         }
     }
     
     // Default: amount is in BTC
-    return amount * 100_000_000_000
+    return amount * PaymentConstants.InvoiceMultiplier.bitcoinToMillisats
 }

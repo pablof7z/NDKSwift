@@ -252,10 +252,10 @@ public enum NDKLogger {
                     print("       LIMIT: \(limit)")
                 }
                 if let since = filter.since {
-                    print("       SINCE: \(Date(timeIntervalSince1970: TimeInterval(since)))")
+                    print("       SINCE: \(Date(nostrTimestamp: since))")
                 }
                 if let until = filter.until {
-                    print("       UNTIL: \(Date(timeIntervalSince1970: TimeInterval(until)))")
+                    print("       UNTIL: \(Date(nostrTimestamp: until))")
                 }
             }
             

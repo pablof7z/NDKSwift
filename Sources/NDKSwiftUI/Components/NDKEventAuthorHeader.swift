@@ -326,7 +326,7 @@ private struct InteractionButton: View {
             HStack(spacing: 4) {
                 Image(systemName: icon)
                     .font(iconFont)
-                    .foregroundStyle(color.opacity(0.7))
+                    .foregroundStyle(color.opacity(OpacityConstants.secondary))
                 
                 if style != .minimal && count > 0 {
                     Text("\(count)")

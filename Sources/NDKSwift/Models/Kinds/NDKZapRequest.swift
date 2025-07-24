@@ -67,7 +67,7 @@ public struct NDKZapRequest {
     
     /// Amount in satoshis
     public var amountSats: Int64? {
-        return amountMillisats.map { $0 / 1000 }
+        return amountMillisats.map { PaymentConstants.millisatsToSats($0) }
     }
     
     /// Optional comment
