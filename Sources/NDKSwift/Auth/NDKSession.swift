@@ -169,7 +169,7 @@ public struct NDKSession: Codable, Identifiable, Sendable {
         }
         
         // Validate signer type
-        guard !signerType.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+        guard ValidationHelpers.hasContent(signerType) else {
             throw NDKSessionError.invalidSignerType(signerType)
         }
         

@@ -39,7 +39,7 @@ public actor NIP05Manager {
         forceVerify: Bool = false,
         maxAge: TimeInterval = defaultTTL
     ) async throws -> NDKUser? {
-        let normalizedIdentifier = identifier.lowercased().trimmingCharacters(in: .whitespacesAndNewlines)
+        let normalizedIdentifier = ValidationHelpers.normalize(identifier)
         
         // Check if there's already an in-flight request
         if let existingTask = inFlightRequests[normalizedIdentifier] {

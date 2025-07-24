@@ -9,14 +9,21 @@ public enum ValidationHelpers {
     /// - Parameter string: The string to validate
     /// - Returns: true if the string has content
     public static func hasContent(_ string: String) -> Bool {
-        !string.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        !trim(string).isEmpty
+    }
+    
+    /// Trim whitespace and newlines from a string
+    /// - Parameter string: The string to trim
+    /// - Returns: The trimmed string
+    public static func trim(_ string: String) -> String {
+        string.trimmingCharacters(in: .whitespacesAndNewlines)
     }
     
     /// Normalize a string by trimming whitespace and converting to lowercase
     /// - Parameter string: The string to normalize
     /// - Returns: The normalized string
     public static func normalize(_ string: String) -> String {
-        string.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        trim(string).lowercased()
     }
     
     /// Check if a string has a specific length
