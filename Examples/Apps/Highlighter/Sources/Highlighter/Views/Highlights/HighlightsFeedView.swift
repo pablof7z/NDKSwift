@@ -321,8 +321,8 @@ struct HighlightFeedItemView: View {
                         if showBlurHash {
                             LinearGradient(
                                 colors: [
-                                    Color.highlighterPurple.opacity(0.3),
-                                    Color.highlighterOrange.opacity(0.3)
+                                    DesignSystem.Colors.primary.opacity(0.3),
+                                    DesignSystem.Colors.secondary.opacity(0.3)
                                 ],
                                 startPoint: .topLeading,
                                 endPoint: .bottomTrailing
