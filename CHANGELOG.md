@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- Refactored codebase to improve maintainability (DRY/YAGNI/KISS/SRP principles)
+  - Consolidated error constants: merged StringConstants.ErrorMessages into ErrorMessageConstants
+  - Removed deprecated methods: NDKDataSource.currentValue() and NDKOutboxManager.getRecommendedRelaysForSubscription()
+  - Removed TODO comments from production code per project policy
+  - Updated LoadingView.swift to use first() instead of deprecated currentValue()
+
 ### Fixed
 - Fixed memory leak in Posta app consuming 85GB+ of RAM
   - Removed manual session state monitoring that created infinite loops
