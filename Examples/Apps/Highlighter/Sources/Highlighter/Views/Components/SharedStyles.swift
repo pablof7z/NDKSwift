@@ -1,11 +1,8 @@
 import SwiftUI
 
-// MARK: - Enhanced Components
-// Additional components that extend the DesignSystem
+// MARK: - Enhanced Zap Button Style
+// Specialized button style for zap actions with enhanced visual effects
 
-// MARK: - Specialized Button Styles (complement ModernViewModifiers)
-
-// Enhanced Zap Button with haptic feedback and visual effects
 struct EnhancedZapButton: ButtonStyle {
     @State private var isAnimating = false
     
@@ -63,99 +60,6 @@ struct EnhancedZapButton: ButtonStyle {
     }
 }
 
-// Enhanced Card Style with better visual hierarchy
-struct EnhancedHighlightCard: ViewModifier {
-    let isSelected: Bool
-    let isHighlighted: Bool
-    
-    func body(content: Content) -> some View {
-        content
-            .padding(.ds.cardPadding)
-            .background(
-                RoundedRectangle(cornerRadius: .ds.large, style: .continuous)
-                    .fill(DesignSystem.Colors.surface)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: .ds.large, style: .continuous)
-                            .stroke(
-                                strokeGradient,
-                                lineWidth: strokeWidth
-                            )
-                    )
-            )
-            .shadow(
-                color: shadowColor,
-                radius: shadowRadius,
-                x: 0,
-                y: shadowY
-            )
-            .scaleEffect(isSelected ? 1.02 : 1.0)
-            .opacity(isSelected ? 1.0 : 0.95)
-            .animation(.spring(response: 0.3, dampingFraction: 0.7), value: isSelected)
-    }
-    
-    private var strokeGradient: LinearGradient {
-        if isSelected {
-            return LinearGradient(
-                colors: [DesignSystem.Colors.secondary, DesignSystem.Colors.primary],
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            )
-        } else if isHighlighted {
-            return LinearGradient(
-                colors: [DesignSystem.Colors.secondary.opacity(0.3), Color.clear],
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            )
-        } else {
-            return LinearGradient(
-                colors: [DesignSystem.Colors.border, DesignSystem.Colors.border],
-                startPoint: .top,
-                endPoint: .bottom
-            )
-        }
-    }
-    
-    private var strokeWidth: CGFloat {
-        isSelected ? 2 : (isHighlighted ? 1.5 : 1)
-    }
-    
-    private var shadowColor: Color {
-        if isSelected {
-            return DesignSystem.Colors.secondary.opacity(0.3)
-        } else {
-            return Color.black.opacity(0.08)
-        }
-    }
-    
-    private var shadowRadius: CGFloat {
-        isSelected ? 12 : 8
-    }
-    
-    private var shadowY: CGFloat {
-        isSelected ? 6 : 4
-    }
-}
-
-// MARK: - View Extensions
-
-extension View {
-    func enhancedZapButton() -> some View {
-        self.buttonStyle(EnhancedZapButton())
-    }
-    
-    func enhancedHighlightCard(isSelected: Bool = false, isHighlighted: Bool = false) -> some View {
-        self.modifier(EnhancedHighlightCard(isSelected: isSelected, isHighlighted: isHighlighted))
-    }
-    
-    func pulseGently() -> some View {
-        self.modifier(GentlePulseModifier())
-    }
-    
-    func contextualFeedback(isActive: Bool) -> some View {
-        self.modifier(ContextualFeedbackModifier(isActive: isActive))
-    }
-}
-
 // MARK: - Specialized Typography
 extension Font {
     // Specialized quote font for highlighted text
@@ -168,94 +72,14 @@ extension Font {
     }
 }
 
-// MARK: - Contextual Components
-
-// Subtle feedback for interactive elements
-struct ContextualFeedbackModifier: ViewModifier {
-    let isActive: Bool
-    @State private var feedbackScale: CGFloat = 1.0
-    
-    func body(content: Content) -> some View {
-        content
-            .scaleEffect(feedbackScale)
-            .onChange(of: isActive) { _, newValue in
-                if newValue {
-                    withAnimation(.spring(response: 0.15, dampingFraction: 0.8)) {
-                        feedbackScale = 1.02
-                    }
-                    
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                        withAnimation(.spring(response: 0.2, dampingFraction: 0.7)) {
-                            feedbackScale = 1.0
-                        }
-                    }
-                    
-                    HapticType.selection.trigger()
-                }
-            }
-    }
-}
-
-// MARK: - Refined Animation Modifiers
-
-// Gentle pulse for attention without being distracting
-struct GentlePulseModifier: ViewModifier {
-    @State private var scale: CGFloat = 1
-    @State private var opacity: Double = 1
-    
-    func body(content: Content) -> some View {
-        content
-            .scaleEffect(scale)
-            .opacity(opacity)
-            .onAppear {
-                withAnimation(
-                    .easeInOut(duration: 2.5)
-                    .repeatForever(autoreverses: true)
-                ) {
-                    scale = 1.02
-                    opacity = 0.9
-                }
-            }
-    }
-}
-
-// Refined highlight effect for text selections
-struct HighlightTextEffect: ViewModifier {
-    let isHighlighted: Bool
-    let highlightColor: Color
-    
-    init(isHighlighted: Bool, highlightColor: Color = DesignSystem.Colors.secondary) {
-        self.isHighlighted = isHighlighted
-        self.highlightColor = highlightColor
-    }
-    
-    func body(content: Content) -> some View {
-        content
-            .background(
-                RoundedRectangle(cornerRadius: 4, style: .continuous)
-                    .fill(
-                        isHighlighted ? 
-                        highlightColor.opacity(0.15) : 
-                        Color.clear
-                    )
-                    .animation(.easeInOut(duration: 0.2), value: isHighlighted)
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: 4, style: .continuous)
-                    .stroke(
-                        isHighlighted ? 
-                        highlightColor.opacity(0.3) : 
-                        Color.clear,
-                        lineWidth: 1
-                    )
-                    .animation(.easeInOut(duration: 0.2), value: isHighlighted)
-            )
-    }
-}
-
+// MARK: - Enhanced View Extensions
 extension View {
-    func highlightText(_ isHighlighted: Bool, color: Color = DesignSystem.Colors.secondary) -> some View {
-        self.modifier(HighlightTextEffect(isHighlighted: isHighlighted, highlightColor: color))
+    func enhancedZapButton() -> some View {
+        self.buttonStyle(EnhancedZapButton())
+    }
+    
+    func lazyRender(threshold: CGFloat = 100) -> some View {
+        self.modifier(LazyRenderModifier(threshold: threshold))
     }
 }
 
@@ -279,11 +103,5 @@ struct LazyRenderModifier: ViewModifier {
                     isVisible = true
                 }
             }
-    }
-}
-
-extension View {
-    func lazyRender(threshold: CGFloat = 100) -> some View {
-        self.modifier(LazyRenderModifier(threshold: threshold))
     }
 }

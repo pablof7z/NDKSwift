@@ -127,9 +127,7 @@ struct HighlightCard: View {
     }
     
     private func relativeTime(from date: Date) -> String {
-        let formatter = RelativeDateTimeFormatter()
-        formatter.unitsStyle = .abbreviated
-        return formatter.localizedString(for: date, relativeTo: Date())
+        return RelativeTimeFormatter.relativeTime(from: date)
     }
 }
 

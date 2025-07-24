@@ -117,10 +117,7 @@ class AppState: ObservableObject {
     
     func logout() async {
         // Cancel all streaming tasks first
-        for task in streamingTasks {
-            task.cancel()
-        }
-        streamingTasks.removeAll()
+        stopAllStreams()
         
         // Clear state
         highlights = []
@@ -197,12 +194,25 @@ class AppState: ObservableObject {
         guard let ndk = ndk else { return }
         
         // Cancel existing tasks
+        stopAllStreams()
+        
+        // Start all streams concurrently for better performance
+        async let highlightStream = startHighlightStream(ndk: ndk)
+        async let curationStream = startCurationStream(ndk: ndk)
+        async let followPackStream = startFollowPackStream(ndk: ndk)
+        
+        // Await all streams
+        _ = await (highlightStream, curationStream, followPackStream)
+    }
+    
+    private func stopAllStreams() {
         for task in streamingTasks {
             task.cancel()
         }
         streamingTasks.removeAll()
-        
-        // Stream highlights - using cache for immediate display
+    }
+    
+    private func startHighlightStream(ndk: NDK) async {
         let highlightFilter = NDKFilter(kinds: [9802], limit: 100)
         highlightDataSource = ndk.observe(
             filter: highlightFilter,
@@ -210,22 +220,18 @@ class AppState: ObservableObject {
             cachePolicy: .cacheWithNetwork
         )
         
-        let highlightTask = Task {
+        let task = Task {
             guard let source = highlightDataSource else { return }
             for await event in source.events {
                 if let highlight = try? HighlightEvent(from: event) {
-                    await MainActor.run {
-                        if !highlights.contains(where: { $0.id == highlight.id }) {
-                            highlights.append(highlight)
-                            highlights.sort { $0.createdAt > $1.createdAt }
-                        }
-                    }
+                    await addHighlight(highlight)
                 }
             }
         }
-        streamingTasks.append(highlightTask)
-        
-        // Stream curations
+        streamingTasks.append(task)
+    }
+    
+    private func startCurationStream(ndk: NDK) async {
         let curationFilter = NDKFilter(kinds: [30004], limit: 50)
         curationDataSource = ndk.observe(
             filter: curationFilter,
@@ -233,22 +239,18 @@ class AppState: ObservableObject {
             cachePolicy: .cacheWithNetwork
         )
         
-        let curationTask = Task {
+        let task = Task {
             guard let source = curationDataSource else { return }
             for await event in source.events {
                 if let curation = try? ArticleCuration(from: event) {
-                    await MainActor.run {
-                        if !curations.contains(where: { $0.id == curation.id }) {
-                            curations.append(curation)
-                            curations.sort { $0.updatedAt > $1.updatedAt }
-                        }
-                    }
+                    await addCuration(curation)
                 }
             }
         }
-        streamingTasks.append(curationTask)
-        
-        // Stream follow packs
+        streamingTasks.append(task)
+    }
+    
+    private func startFollowPackStream(ndk: NDK) async {
         let followPackFilter = NDKFilter(kinds: [39089], limit: 20)
         followPackDataSource = ndk.observe(
             filter: followPackFilter,
@@ -256,19 +258,38 @@ class AppState: ObservableObject {
             cachePolicy: .cacheWithNetwork
         )
         
-        let followPackTask = Task {
+        let task = Task {
             guard let source = followPackDataSource else { return }
             for await event in source.events {
                 if let pack = try? FollowPack(from: event) {
-                    await MainActor.run {
-                        if !followPacks.contains(where: { $0.id == pack.id }) {
-                            followPacks.append(pack)
-                        }
-                    }
+                    await addFollowPack(pack)
                 }
             }
         }
-        streamingTasks.append(followPackTask)
+        streamingTasks.append(task)
+    }
+    
+    @MainActor
+    private func addHighlight(_ highlight: HighlightEvent) {
+        if !highlights.contains(where: { $0.id == highlight.id }) {
+            highlights.append(highlight)
+            highlights.sort { $0.createdAt > $1.createdAt }
+        }
+    }
+    
+    @MainActor
+    private func addCuration(_ curation: ArticleCuration) {
+        if !curations.contains(where: { $0.id == curation.id }) {
+            curations.append(curation)
+            curations.sort { $0.updatedAt > $1.updatedAt }
+        }
+    }
+    
+    @MainActor
+    private func addFollowPack(_ pack: FollowPack) {
+        if !followPacks.contains(where: { $0.id == pack.id }) {
+            followPacks.append(pack)
+        }
     }
     
     private func loadUserProfile() async {
