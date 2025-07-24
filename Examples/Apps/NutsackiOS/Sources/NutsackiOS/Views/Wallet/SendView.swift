@@ -39,7 +39,7 @@ struct SendView: View {
     @FocusState private var amountFieldFocused: Bool
     
     // Common amounts to suggest
-    private let commonAmounts: [Int64] = [100, 500, 1000, 5000, 10000, 50000, 100000]
+    private let commonAmounts: [Int64] = AmountPresets.extendedAmounts.map { Int64($0) }
     
     var availableBalanceForMint: Int {
         return availableBalance

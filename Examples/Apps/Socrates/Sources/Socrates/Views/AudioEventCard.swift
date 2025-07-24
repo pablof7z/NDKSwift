@@ -168,7 +168,7 @@ struct AudioEventCard: View {
         Task {
             guard let ndk = nostrManager.ndk else { return }
             
-            for await profile in ndk.profileManager.observe(for: audioEvent.author.pubkey, maxAge: 3600) {
+            for await profile in await ndk.profileManager.observe(for: audioEvent.author.pubkey, maxAge: TimeConstants.hour) {
                 await MainActor.run {
                     self.author = profile
                 }
@@ -713,7 +713,7 @@ struct ReactionsDrawer: View {
             guard let ndk = nostrManager.ndk else { return }
             
             for reaction in reactions {
-                for await profile in ndk.profileManager.observe(for: reaction.pubkey, maxAge: 3600) {
+                for await profile in await ndk.profileManager.observe(for: reaction.pubkey, maxAge: TimeConstants.hour) {
                     await MainActor.run {
                         profiles[reaction.pubkey] = profile
                     }

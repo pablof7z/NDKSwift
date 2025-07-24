@@ -5,6 +5,7 @@ import AVFoundation
 struct HomeFeedView: View {
     @EnvironmentObject var nostrManager: NostrManager
     @EnvironmentObject var appState: AppState
+    @EnvironmentObject var blossomServerManager: BlossomServerManager
     
     @State private var audioEvents: [AudioEvent] = []
     @State private var showRecordingHint = true
@@ -92,19 +93,25 @@ struct HomeFeedView: View {
                 Color.black.opacity(0.4)
                     .ignoresSafeArea()
                     .onTapGesture {
+                        print("DEBUG: Background tapped, hiding relay selector")
                         showRelaySelector = false
                     }
+                    .zIndex(1)
                 
                 RelaySelectorView(
                     selectedRelay: $selectedRelay,
                     isPresented: $showRelaySelector
                 )
                 .transition(.opacity.combined(with: .scale(scale: 0.95)))
+                .zIndex(2)
             }
         }
         .animation(.easeInOut(duration: 0.2), value: showRelaySelector)
         .onAppear {
             startStreamingAudioEvents()
+        }
+        .onChange(of: showRelaySelector) { _, newValue in
+            print("DEBUG: showRelaySelector changed to: \(newValue)")
         }
         .onChange(of: selectedRelay) { _, _ in
             // Restart streaming with new relay filter
@@ -133,12 +140,12 @@ struct HomeFeedView: View {
         let relayUrls: Set<String>? = selectedRelay != nil ? [selectedRelay!] : nil
         
         // Stream audio events with cache-first approach
-        // maxAge: 300 means show cached data up to 5 minutes old immediately
+        // When a specific relay is selected, use exclusiveRelays to only show events from that relay
         let dataSource: NDKDataSource<NDKEvent>
         if let relayUrls = relayUrls {
-            dataSource = ndk.observe(filter: filter, maxAge: 300, cachePolicy: .cacheWithNetwork, relays: relayUrls)
+            dataSource = ndk.observe(filter: filter, maxAge: 0, cachePolicy: .cacheWithNetwork, relays: relayUrls, exclusiveRelays: true)
         } else {
-            dataSource = ndk.observe(filter: filter, maxAge: 300, cachePolicy: .cacheWithNetwork)
+            dataSource = ndk.observe(filter: filter, maxAge: 0, cachePolicy: .cacheWithNetwork)
         }
         
         // Start streaming task
@@ -246,8 +253,16 @@ struct HomeFeedView: View {
         
         recordingDuration = Date().timeIntervalSince(startTime)
         
-        // Update waveform
-        let normalizedValue = pow(10, recorder.averagePower(forChannel: 0) / 20)
+        // Update waveform using peak power for more responsive visualization
+        // Peak power gives instantaneous levels, average power is too smoothed
+        let peakPower = recorder.peakPower(forChannel: 0)
+        
+        // Convert from decibels to linear scale (0-1 range)
+        // Peak power range is typically -160 (silence) to 0 (max)
+        // Clamp to reasonable range for better visualization
+        let clampedPower = max(-50, peakPower) // Clamp to -50 dB minimum
+        let normalizedValue = pow(10, clampedPower / 20)
+        
         recordingWaveform.append(CGFloat(normalizedValue))
         
         // Store normalized amplitude value for imeta (0-1 range)
@@ -295,7 +310,7 @@ struct HomeFeedView: View {
         guard let recorder = audioRecorder,
               let ndk = nostrManager.ndk else { return }
         
-        let _ = recorder.url
+        let audioUrl = recorder.url
         let finalDuration = recordingDuration
         
         // Compress waveform to less than 100 values as recommended
@@ -303,14 +318,46 @@ struct HomeFeedView: View {
         
         Task {
             do {
-                // Generate placeholder URL for demo purposes
-                // In production, this would upload to a file hosting service
-                let uploadedURL = "https://example.com/audio/\(Date().timeIntervalSince1970).webm"
+                // Read audio file data
+                let audioData = try Data(contentsOf: audioUrl)
+                
+                // Upload to Blossom servers with fallback
+                var uploadedURL: String? = nil
+                var uploadError: Error? = nil
+                
+                for server in blossomServerManager.allServers {
+                    do {
+                        // Create blossom client and upload
+                        let blossomClient = BlossomClient()
+                        
+                        // Upload audio file with auth
+                        let uploadResult = try await blossomClient.uploadWithAuth(
+                            data: audioData,
+                            mimeType: "audio/m4a",
+                            to: server,
+                            signer: ndk.signer!,
+                            ndk: ndk
+                        )
+                        
+                        uploadedURL = uploadResult.url
+                        print("Successfully uploaded audio to \(server)")
+                        break // Success, no need to try other servers
+                        
+                    } catch {
+                        print("Failed to upload to \(server): \(error)")
+                        uploadError = error
+                        continue // Try next server
+                    }
+                }
+                
+                guard let finalUploadedURL = uploadedURL else {
+                    throw uploadError ?? BlossomError.uploadFailed
+                }
                 
                 // Create imeta tag with waveform and duration
                 var imetaComponents = ["imeta"]
-                imetaComponents.append("url \(uploadedURL)")
-                imetaComponents.append("m audio/webm")
+                imetaComponents.append("url \(finalUploadedURL)")
+                imetaComponents.append("m audio/m4a")
                 imetaComponents.append("duration \(Int(finalDuration))")
                 
                 // Add waveform data as space-separated values
@@ -323,7 +370,7 @@ struct HomeFeedView: View {
                 _ = try await ndk.publish { builder in
                     builder
                         .kind(1222) // Audio event kind
-                        .content(uploadedURL)
+                        .content(finalUploadedURL)
                         .tag(imetaComponents)
                 }
                 
@@ -334,10 +381,14 @@ struct HomeFeedView: View {
                     audioRecorder = nil
                 }
                 
+                // Clean up local file
+                try? FileManager.default.removeItem(at: audioUrl)
+                
             } catch {
                 print("Failed to publish audio event: \(error)")
                 await MainActor.run {
                     showingRecordingUI = false
+                    // TODO: Show error to user
                 }
             }
         }
@@ -372,10 +423,28 @@ struct HeaderView: View {
     @Binding var selectedRelay: String?
     @Binding var showRelaySelector: Bool
     
+    @State private var selectedRelayInfo: NDKRelayInformation?
+    
     var body: some View {
         HStack {
-            VStack(alignment: .leading, spacing: 2) {
-                Text("SOCRATES")
+            HStack(spacing: 8) {
+                // Relay icon if available
+                if let icon = selectedRelayInfo?.icon,
+                   let iconURL = URL(string: icon) {
+                    AsyncImage(url: iconURL) { image in
+                        image
+                            .resizable()
+                            .scaledToFill()
+                    } placeholder: {
+                        ProgressView()
+                            .scaleEffect(0.5)
+                    }
+                    .frame(width: 24, height: 24)
+                    .clipShape(Circle())
+                }
+                
+                // Title - Shows relay name or SOCRATES
+                Text(displayTitle)
                     .font(.system(size: 24, weight: .black))
                     .foregroundStyle(
                         LinearGradient(
@@ -388,22 +457,13 @@ struct HeaderView: View {
                         )
                     )
                 
-                // Relay indicator
-                HStack(spacing: 4) {
-                    Circle()
-                        .fill(Color.green)
-                        .frame(width: 6, height: 6)
-                    
-                    Text(selectedRelay != nil ? formatRelayForDisplay(selectedRelay!) : "All relays")
-                        .font(.system(size: 11))
-                        .foregroundColor(Color.white.opacity(0.7))
-                    
-                    Image(systemName: "chevron.down")
-                        .font(.system(size: 9))
-                        .foregroundColor(Color.white.opacity(0.5))
-                }
+                Image(systemName: "chevron.down")
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundColor(Color.white.opacity(0.8))
             }
+            .contentShape(Rectangle()) // Make entire area tappable
             .onTapGesture {
+                print("DEBUG: Relay selector tapped, setting showRelaySelector = true")
                 showRelaySelector = true
             }
             
@@ -419,6 +479,43 @@ struct HeaderView: View {
                         Circle()
                             .fill(Color.white.opacity(0.1))
                     )
+            }
+        }
+        .task {
+            await loadRelayInfo()
+        }
+        .onChange(of: selectedRelay) { _, _ in
+            Task {
+                await loadRelayInfo()
+            }
+        }
+    }
+    
+    private var displayTitle: String {
+        if selectedRelay == nil {
+            return "SOCRATES"
+        } else if let name = selectedRelayInfo?.name, !name.isEmpty {
+            return name.uppercased()
+        } else if let relay = selectedRelay {
+            return formatRelayForDisplay(relay).uppercased()
+        } else {
+            return "SOCRATES"
+        }
+    }
+    
+    private func loadRelayInfo() async {
+        guard let selectedRelay = selectedRelay,
+              let ndk = nostrManager.ndk else {
+            selectedRelayInfo = nil
+            return
+        }
+        
+        // Find the relay in the pool
+        let relays = await ndk.relays
+        for relay in relays {
+            if relay.url == selectedRelay {
+                selectedRelayInfo = await relay.info
+                break
             }
         }
     }

@@ -141,7 +141,7 @@ struct NutzapView: View {
             
             // Quick amount buttons
             HStack(spacing: 12) {
-                ForEach([1000, 5000, 10000, 50000], id: \.self) { preset in
+                ForEach(AmountPresets.nutzapAmounts, id: \.self) { preset in
                     Button(action: { setAmount(preset) }) {
                         Text("\(preset / 1000)k")
                             .font(.system(size: 14, weight: .medium, design: .rounded))

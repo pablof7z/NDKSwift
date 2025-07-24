@@ -65,6 +65,7 @@ actor NDKDataRequirementManager {
         maxAge: TimeInterval = 0,
         cachePolicy: CachePolicy = .cacheWithNetwork,
         relays: Set<RelayURL>? = nil,
+        exclusiveRelays: Bool = false,
         subscriptionId: String? = nil
     ) async -> DataRequirementHandle {
         let requirementId = RequirementID()
@@ -118,6 +119,7 @@ actor NDKDataRequirementManager {
             maxAge: maxAge,
             cachePolicy: cachePolicy,
             relays: relays,
+            exclusiveRelays: exclusiveRelays,
             subscriptionId: subscriptionId,
             cacheObservationHandle: cacheObservationHandle
         )
@@ -313,6 +315,8 @@ actor NDKDataRequirementManager {
                                 internalSubscription: internalSubscription,
                                 cache: ndk.cache,
                                 ndk: ndk,
+                                relays: Set([relay]),
+                                exclusiveRelays: lifecycleGroup.first?.exclusiveRelays ?? false,
                                 closeOnEose: closeOnEose
                             )
                             
@@ -378,6 +382,8 @@ actor NDKDataRequirementManager {
                     internalSubscription: internalSubscription,
                     cache: ndk.cache,
                     ndk: ndk,
+                    relays: relays,
+                    exclusiveRelays: lifecycleGroup.first?.exclusiveRelays ?? false,
                     closeOnEose: closeOnEose
                 )
                 
@@ -725,6 +731,7 @@ struct PendingRequirement {
     let maxAge: TimeInterval
     let cachePolicy: CachePolicy
     let relays: Set<RelayURL>?
+    let exclusiveRelays: Bool
     let subscriptionId: String?
     let cacheObservationHandle: ObservationHandle?
 }
@@ -739,15 +746,19 @@ class DataRequirement {
     private let closeOnEose: Bool
     private var observerHandles: [RequirementID: ObservationHandle] = [:]
     private var observers: [RequirementID: CacheObserver] = [:]  // Track observers for relay updates
+    private let relays: Set<RelayURL>?
+    private let exclusiveRelays: Bool
     
     var observerCount: Int { observerHandles.count }
     
-    init(filter: NDKFilter, subscriptionId: String, internalSubscription: InternalSubscription, cache: NDKCache?, ndk: NDK, closeOnEose: Bool = false) {
+    init(filter: NDKFilter, subscriptionId: String, internalSubscription: InternalSubscription, cache: NDKCache?, ndk: NDK, relays: Set<RelayURL>? = nil, exclusiveRelays: Bool = false, closeOnEose: Bool = false) {
         self.filter = filter
         self.subscriptionId = subscriptionId
         self.internalSubscription = internalSubscription
         self.cache = cache
         self.ndk = ndk
+        self.relays = relays
+        self.exclusiveRelays = exclusiveRelays
         self.closeOnEose = closeOnEose
     }
     
@@ -880,6 +891,14 @@ class DataRequirement {
             for await (event, relay) in await internalSubscription.events {
                 eventCount += 1
                 NDKLogger.log(.trace, category: .subscription, "📨 Event #\(eventCount) received - id: \(event.id), kind: \(event.kind), from: \(relay)")
+                
+                // Apply exclusive relay filtering if enabled
+                if exclusiveRelays, let relayFilter = relays {
+                    guard relayFilter.contains(relay) else {
+                        NDKLogger.log(.trace, category: .subscription, "⏭️ Skipping event from non-exclusive relay: \(relay)")
+                        continue
+                    }
+                }
                 
                 // Track received event IDs
                 if receivedIds != nil {

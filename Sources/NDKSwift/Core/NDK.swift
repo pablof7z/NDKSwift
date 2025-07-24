@@ -415,6 +415,8 @@ public final class NDK {
     ///             >0 = use cache if fresh enough, otherwise fetch and close after EOSE
     ///   - cachePolicy: Defines how the cache should be used for this request
     ///   - relays: Optional set of specific relay URLs to query
+    ///   - exclusiveRelays: If true, only process events from the specified relays (default: false).
+    ///                      When false, events from any relay are processed.
     ///   - subscriptionId: Optional custom subscription ID for debugging/tracing.
     ///                     This ID will be used in REQ messages sent to relays.
     ///   - transform: Optional transform function to convert NDKEvent to custom type
@@ -424,6 +426,7 @@ public final class NDK {
         maxAge: TimeInterval = 0,
         cachePolicy: CachePolicy = .cacheWithNetwork,
         relays: Set<RelayURL>? = nil,
+        exclusiveRelays: Bool = false,
         subscriptionId: String? = nil
     ) -> NDKDataSource<NDKEvent> {
         return NDKDataSource(
@@ -432,6 +435,7 @@ public final class NDK {
             maxAge: maxAge,
             cachePolicy: cachePolicy,
             relays: relays,
+            exclusiveRelays: exclusiveRelays,
             subscriptionId: subscriptionId
         )
     }
@@ -441,6 +445,7 @@ public final class NDK {
         maxAge: TimeInterval = 0,
         cachePolicy: CachePolicy = .cacheWithNetwork,
         relays: Set<RelayURL>? = nil,
+        exclusiveRelays: Bool = false,
         subscriptionId: String? = nil,
         transform: @escaping (NDKEvent) -> T?
     ) -> NDKDataSource<T> {
@@ -450,6 +455,7 @@ public final class NDK {
             maxAge: maxAge,
             cachePolicy: cachePolicy,
             relays: relays,
+            exclusiveRelays: exclusiveRelays,
             subscriptionId: subscriptionId,
             transform: transform
         )

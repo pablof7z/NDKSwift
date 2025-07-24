@@ -152,7 +152,7 @@ struct BlossomE2ERunner {
             limit: 1
         )
         
-        let dataSource = ndk.observe(filter: filter, maxAge: 3600)
+        let dataSource = ndk.observe(filter: filter, maxAge: TimeConstants.hour)
         let fetchedEvents = await dataSource.collect(timeout: 5.0)
         guard fetchedEvents.count == 1 else {
             throw TestError.eventNotFound
@@ -189,13 +189,13 @@ struct BlossomE2ERunner {
         do {
             let listAuth = try await BlossomAuth.createListAuth(
                 signer: signer,
-                since: Date().addingTimeInterval(-3600)
+                since: Date().addingTimeInterval(-TimeConstants.hour)
             )
             
             let blobs = try await blossomClient.list(
                 from: "https://blossom.primal.net",
                 auth: listAuth,
-                since: Date().addingTimeInterval(-3600)
+                since: Date().addingTimeInterval(-TimeConstants.hour)
             )
             NDKLogger.log(.info, category: .general, "Found \(blobs.count) blobs")
         } catch {
