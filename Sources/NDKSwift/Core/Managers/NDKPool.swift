@@ -264,6 +264,34 @@ public actor NDKPool {
         return relayMap[normalizedUrl]
     }
     
+    /// Get current user's relays from their relay list
+    /// Returns URLs from the user's relay list (kind 10002) if available
+    public func getCurrentUserRelayUrls() async -> Set<String> {
+        guard let ndk = ndk,
+              let signer = ndk.signer else {
+            return []
+        }
+        
+        do {
+            let userPubkey = try await signer.pubkey
+            
+            // Try to get the user's relay list from outbox tracker
+            if let relayItem = await ndk.outboxTracker.getRelaysSyncFor(pubkey: userPubkey, type: .both) {
+                var userRelays = Set<String>()
+                
+                // Add both read and write relays
+                userRelays.formUnion(relayItem.readRelays.map { $0.url })
+                userRelays.formUnion(relayItem.writeRelays.map { $0.url })
+                
+                return userRelays
+            }
+        } catch {
+            NDKLogger.log(.debug, category: .general, "Failed to get current user pubkey: \(error)")
+        }
+        
+        return []
+    }
+    
     /// Get a snapshot of all relay states for quick status checks
     /// Returns a dictionary mapping relay URLs to their current connection states
     public func getRelayStateSnapshot() async -> [RelayURL: NDKRelayConnectionState] {

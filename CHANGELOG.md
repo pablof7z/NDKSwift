@@ -6,6 +6,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- Outbox relays from `NDKOutboxConfig` are now automatically connected during `NDK.connect()`
+  - Previously, outbox relays like `purplepag.es` were configured but never connected
+  - These relays are now marked with `.outboxConfig` origin for proper tracking
+- Improved fallback relay selection to enhance privacy and reduce network spam
+  - Fallback now only uses explicit relays + current user's relays
+  - Previously used ALL connected relays as fallback, which could expose data to unintended relays
+  - This change ensures broadcasts only go to user-intended relays when specific relay selection fails
+
+### Added  
+- New `NDKRelayOrigin.outboxConfig` case to track relays added from outbox configuration
+- `NDKPool.getCurrentUserRelayUrls()` method to retrieve current user's relay list for fallback selection
+
 ## [0.1.2] - 2025-07-24
 
 ### Changed

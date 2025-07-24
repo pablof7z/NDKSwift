@@ -1529,7 +1529,105 @@ Your app must handle all these scenarios gracefully by showing what it has and u
 *   **Caching:** Use `NDKSQLiteCache` to persist events, profiles, and other Nostr data. This dramatically improves launch times and provides a basic offline experience. The `NDKProfileManager` also uses this cache to avoid re-fetching profile metadata.
 *   **Relay Health:** `NIP60Wallet` includes a relay health system to ensure that a user's wallet state is consistent across their defined relays. It can detect and repair missing or stale events.
 
-#### 12.1. Relay Selection Strategy and Network Courtesy
+#### 12.1. Logging and Debugging
+
+NDKSwift provides comprehensive logging capabilities through `NDKLogger` to help debug network traffic, relay interactions, and application behavior.
+
+**Basic Configuration:**
+
+```swift
+// Enable network traffic logging
+NDKLogger.logNetworkTraffic = true
+
+// Set overall log level
+NDKLogger.logLevel = .trace  // Most verbose (.off, .error, .warning, .info, .debug, .trace)
+
+// Control pretty printing of network messages
+NDKLogger.prettyPrintNetworkMessages = true  // Default: true
+```
+
+**Log Categories:**
+
+Enable or disable specific logging categories:
+
+```swift
+// Enable only specific categories
+NDKLogger.enabledCategories = [.network, .relay, .subscription]
+
+// Or disable noisy categories
+NDKLogger.enabledCategories.remove(.database)
+NDKLogger.enabledCategories.remove(.performance)
+
+// Available categories:
+// .network - WebSocket traffic
+// .relay - Relay connection lifecycle
+// .subscription - Subscription management
+// .event - Event processing
+// .cache - Cache operations
+// .auth - Authentication flows
+// .wallet - Wallet operations
+// .connection - WebSocket lifecycle details
+// .outbox - NIP-65 relay selection
+// .signer - Signing operations
+// .sync - Negentropy sync
+// .performance - Timing metrics
+// .security - Encryption/key management
+// .database - SQL operations
+```
+
+**Network Traffic Logging:**
+
+When `logNetworkTraffic` is enabled, you'll see:
+- 📤 **SENDING TO** messages for outgoing traffic
+- 📥 **RECEIVED FROM** messages for incoming traffic
+- Automatic truncation of large arrays (>100 items) in filters
+- Parse errors if messages can't be decoded
+
+```swift
+// Example output:
+// 📤 SENDING TO relay.damus.io:
+//    RAW: ["REQ","sub123",{"kinds":[1],"limit":50}]
+// 
+// 📥 RECEIVED FROM relay.damus.io:
+//    RAW: ["EVENT","sub123",{...event data...}]
+```
+
+**Structured Logging:**
+
+```swift
+// Log structured data for easier parsing
+NDKLogger.logStructured(.info, category: .relay, [
+    "event": "connection_established",
+    "relay": "wss://relay.damus.io",
+    "latency_ms": 145
+])
+
+// Log with correlation IDs for tracking
+let correlationId = UUID().uuidString
+NDKLogger.log(.debug, category: .subscription, "Creating subscription", correlationId: correlationId)
+NDKLogger.log(.debug, category: .subscription, "Received EOSE", correlationId: correlationId)
+```
+
+**Performance Timing:**
+
+```swift
+// Automatically log operation timing
+let events = try await NDKLogger.logTiming(.info, category: .performance, operation: "Fetch user posts") {
+    try await ndk.fetchEvents(filter: filter)
+}
+// Logs: ⏱️ Fetch user posts completed in 234.56ms
+```
+
+**Debugging Best Practices:**
+
+1. **Development**: Use `.debug` or `.trace` log levels with network traffic enabled
+2. **Testing**: Enable specific categories relevant to your test scenarios
+3. **Production**: Use `.warning` or `.error` levels, disable network traffic logging
+4. **Performance Issues**: Enable `.performance` category to identify bottlenecks
+5. **Relay Issues**: Enable `.relay` and `.connection` categories
+6. **Sync Problems**: Enable `.sync` category for Negentropy debugging
+
+#### 12.2. Relay Selection Strategy and Network Courtesy
 
 NDKSwift implements sophisticated relay selection algorithms that balance performance, deliverability, and network courtesy. Understanding these strategies helps you build apps that are both effective and respectful to the Nostr ecosystem.
 
