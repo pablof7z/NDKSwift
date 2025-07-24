@@ -67,7 +67,7 @@ public final class NDKContactsDataSource: ObservableObject {
         self.contactListDataSource = ndk.observe(
             filter: NDKFilter(
                 authors: [userPubkey],
-                kinds: [3],
+                kinds: [EventKind.contacts],
                 limit: 1
             ),
             maxAge: maxAge,
@@ -128,7 +128,7 @@ public final class NDKContactsDataSource: ObservableObject {
         profilesDataSource = ndk.observe(
             filter: NDKFilter(
                 authors: Array(pubkeys),
-                kinds: [0]
+                kinds: [EventKind.metadata]
             ),
             maxAge: TimeConstants.hour, // Cache profiles for 1 hour
             cachePolicy: .cacheWithNetwork

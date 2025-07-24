@@ -67,7 +67,7 @@ public final class NDKProfileDataSource: ObservableObject {
         self.dataSource = ndk.observe(
             filter: NDKFilter(
                 authors: [pubkey],
-                kinds: [0]
+                kinds: [EventKind.metadata]
             ),
             maxAge: maxAge,
             cachePolicy: .cacheWithNetwork
