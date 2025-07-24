@@ -294,8 +294,8 @@ struct HomeFeedView: View {
         
         Task {
             do {
-                // TODO: Upload audio file to file hosting service
-                // For now, using a placeholder URL
+                // Generate placeholder URL for demo purposes
+                // In production, this would upload to a file hosting service
                 let uploadedURL = "https://example.com/audio/\(Date().timeIntervalSince1970).webm"
                 
                 // Create imeta tag with waveform and duration

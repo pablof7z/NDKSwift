@@ -516,9 +516,15 @@ struct ReplyRecordingView: View {
                 
                 Spacer()
                 
-                // TODO: Add recording UI here
-                Text("Recording UI Coming Soon")
-                    .foregroundColor(.white)
+                VStack(spacing: 16) {
+                    Image(systemName: "mic.circle.fill")
+                        .font(.system(size: 60))
+                        .foregroundColor(.white.opacity(0.8))
+                    
+                    Text("Recording feature not yet implemented")
+                        .foregroundColor(.white.opacity(0.7))
+                        .font(.caption)
+                }
                 
                 Spacer()
             }

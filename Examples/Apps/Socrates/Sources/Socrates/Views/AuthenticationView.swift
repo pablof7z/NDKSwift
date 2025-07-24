@@ -27,6 +27,7 @@ struct AuthenticationView: View {
     @State private var isLoggingIn = false
     @State private var errorMessage = ""
     @State private var showError = false
+    @State private var showingFeatureNotImplemented = false
     
     var body: some View {
         ZStack {
@@ -169,7 +170,9 @@ struct AuthenticationView: View {
                             .shadow(color: Color.purple.opacity(0.3), radius: 10, x: 0, y: 4)
                         }
                         
-                        Button(action: { /* TODO: NIP-46 login */ }) {
+                        Button(action: { 
+                            showingFeatureNotImplemented = true
+                        }) {
                             HStack {
                                 Image(systemName: "link")
                                     .font(.system(size: 20))
@@ -214,6 +217,11 @@ struct AuthenticationView: View {
             Button("OK") { }
         } message: {
             Text(errorMessage)
+        }
+        .alert("Feature Not Implemented", isPresented: $showingFeatureNotImplemented) {
+            Button("OK") { }
+        } message: {
+            Text("Nostr Connect login is not yet implemented in this demo app.")
         }
         .onAppear {
             animateIntro()
