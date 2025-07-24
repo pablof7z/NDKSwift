@@ -52,6 +52,17 @@ struct SettingsView: View {
             }
             .listRowBackground(Color.white.opacity(0.05))
             
+            // Debug section (only in debug builds)
+            #if DEBUG
+            Section(header: Text("Debug").foregroundColor(Color.white.opacity(0.8))) {
+                NavigationLink(destination: DebugMenuView()) {
+                    Label("Debug Tools", systemImage: "hammer.fill")
+                }
+                .foregroundColor(.white)
+            }
+            .listRowBackground(Color.white.opacity(0.05))
+            #endif
+            
             // Danger zone
             Section {
                 Button(role: .destructive, action: logout) {

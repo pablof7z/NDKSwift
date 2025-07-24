@@ -98,6 +98,24 @@ actor NDKOutboxTracker {
               let item = cached.item else { return nil }
         return filterByType(item, type: type)
     }
+    
+    /// Get all cached outbox items
+    /// - Returns: Array of all valid cached items (excludes negative cache entries)
+    func getAllCachedItems() async -> [NDKOutboxItem] {
+        var items: [NDKOutboxItem] = []
+        
+        // Get all items from memory cache
+        let allKeys = await memoryCache.getAllKeys()
+        for key in allKeys {
+            if let cached = await memoryCache.get(key),
+               let item = cached.item,
+               Date() <= cached.expiresAt {
+                items.append(item)
+            }
+        }
+        
+        return items
+    }
 
     /// Track a user's relay information
     func track(

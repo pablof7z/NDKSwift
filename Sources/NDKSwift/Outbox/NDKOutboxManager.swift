@@ -142,6 +142,12 @@ public actor NDKOutboxManager {
         return await selector.selectRelays(for: pubkey, count: count)
     }
     
+    /// Get all tracked outbox items from cache
+    /// - Returns: Array of all cached outbox items
+    public func getAllTrackedItems() async -> [NDKOutboxItem] {
+        return await tracker.getAllCachedItems()
+    }
+    
     /// Get outbox strategy for a filter, breaking it down by relay with proper author mapping
     /// - Parameter filter: The filter to analyze
     /// - Returns: Strategy with filters broken down by relay
