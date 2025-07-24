@@ -100,7 +100,7 @@ public struct NDKEventView: View {
                     showAuthor: showAuthor,
                     showTimestamp: showTimestamp
                 )
-            case 30023:
+            case EventKind.longFormContent:
                 NDKLongFormArticleView(
                     event: event,
                     style: style,
