@@ -211,6 +211,8 @@ struct AudioEventCard: View {
             // Check if playback ended
             if currentTime >= totalTime - 0.1 {
                 pausePlayback()
+                // Reset progress to 1 to indicate playback has completed
+                playbackProgress = 1.0
             }
         }
     }
@@ -226,6 +228,20 @@ struct AudioEventCard: View {
     private func startPlayback() {
         // Stop any other playing audio
         appState.currentlyPlayingId = audioEvent.id
+        
+        // Seek to beginning if playback has ended or progress is near the end
+        if let duration = audioPlayer?.currentItem?.duration {
+            let currentTime = audioPlayer?.currentTime() ?? CMTime.zero
+            let totalTime = duration.seconds
+            let currentSeconds = currentTime.seconds
+            
+            // If we're at the end (within last 0.5 seconds) or past the end, seek to beginning
+            if currentSeconds >= totalTime - 0.5 || playbackProgress >= 0.99 {
+                audioPlayer?.seek(to: CMTime.zero) { _ in
+                    self.playbackProgress = 0
+                }
+            }
+        }
         
         audioPlayer?.play()
         isPlaying = true

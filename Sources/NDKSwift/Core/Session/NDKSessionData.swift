@@ -331,7 +331,7 @@ public class NDKSessionData {
         
         // Schedule periodic updates (24 hours)
         wotTimer?.invalidate()
-        wotTimer = Timer.scheduledTimer(withTimeInterval: 86400, repeats: true) { _ in
+        wotTimer = Timer.scheduledTimer(withTimeInterval: TimeConstants.day, repeats: true) { _ in
             Task {
                 await self.syncWebOfTrust()
             }

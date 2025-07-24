@@ -96,7 +96,7 @@ public actor NDKPool {
                 // This will return cached data immediately if available, then fetch updates
                 let dataSource = ndk.observe(
                     filter: filter, 
-                    maxAge: 86400 // 24 hours
+                    maxAge: TimeConstants.day // 24 hours
                 )
                 
                 var latestEvent: NDKEvent?

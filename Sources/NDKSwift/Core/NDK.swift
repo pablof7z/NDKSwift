@@ -667,7 +667,7 @@ public final class NDK {
     ///   - user: The user whose NIP-05 to verify
     ///   - maxAge: Maximum age before re-verification is needed (default: 24 hours)
     /// - Returns: True if the NIP-05 is verified and belongs to this user
-    public func verifyNIP05(for user: NDKUser, maxAge: TimeInterval = 86400) async throws -> Bool {
+    public func verifyNIP05(for user: NDKUser, maxAge: TimeInterval = TimeConstants.day) async throws -> Bool {
         guard let nip05 = await user.nip05 else { return false }
         return try await nip05Manager.verify(identifier: nip05, expectedPubkey: user.pubkey, maxAge: maxAge)
     }
