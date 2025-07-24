@@ -7,6 +7,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- Outbox relay selection no longer blocks subscription creation
+  - Fixed critical bug where getRecommendedRelaysForSubscription would hang waiting for relay lists
+  - Subscriptions now start immediately with cached relay info or default relays
+  - Relay discovery happens in background without blocking event delivery
+  - Proper filter decomposition by relay for efficient querying
+
+### Changed
+- Outbox model now uses non-blocking relay resolution
+  - getRecommendedRelaysForSubscription deprecated in favor of getOutboxStrategy
+  - Authors without known relays use app's connected relays immediately
+  - Background relay discovery updates subscriptions progressively
+  - Filters are decomposed to send author-specific queries to each relay
+
+### Fixed
+- Ephemeral events (kinds 20000-29999) are now properly excluded from caching
+  - SQLite cache skips saving ephemeral events in saveEvent and processEvent
+  - Query operations automatically filter out ephemeral events
+  - Memory cache also excludes ephemeral events
+  - Added comprehensive tests for ephemeral event filtering
+
 ### Added
 - NDKSwiftUI Markdown Renderer
   - Complete markdown syntax support (headings, bold, italic, code blocks, lists, etc.)
@@ -54,6 +75,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Web of Trust: `session_wot_[pubkey_prefix]`
   - Reactive filters: `reactive_[dependencies]_[pubkey_prefix]`
   - Data source subscriptions: descriptive IDs based on filter content (e.g., `metadata_author_12345678_abcd`)
+
+### Fixed
+- Posta app now properly displays cached follow lists immediately instead of showing "Loading your follows..."
+- Session data state is checked immediately after session start to avoid missing initial cached state
 - **BREAKING**: Removed `ndk.event()` and `ndk.reply()` extension methods to reduce namespace pollution
   - Use `NDKEventBuilder(ndk: ndk)` instead of `ndk.event()`
   - Use `NDKEventBuilder.reply(to: event, ndk: ndk)` instead of `ndk.reply(to: event)`

@@ -208,6 +208,7 @@ final class BlossomE2ETests: XCTestCase {
             // Create list auth
             let listAuth = try await BlossomAuth.createListAuth(
                 signer: signer,
+                ndk: ndk,
                 since: Date().addingTimeInterval(-3600) // Last hour
             )
             
@@ -240,6 +241,7 @@ final class BlossomE2ETests: XCTestCase {
             let deleteAuth = try await BlossomAuth.createDeleteAuth(
                 sha256: sha256,
                 signer: signer,
+                ndk: ndk,
                 reason: "E2E test cleanup"
             )
             

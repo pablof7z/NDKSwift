@@ -7,12 +7,12 @@ struct HomeFeedView: View {
     @EnvironmentObject var appState: AppState
     
     @State private var audioEvents: [AudioEvent] = []
-    @State private var isRefreshing = false
     @State private var showRecordingHint = true
     @State private var recordingScale: CGFloat = 1
     @State private var recordingOpacity: Double = 1
     @State private var dragOffset = CGSize.zero
     @State private var isDragging = false
+    @State private var dataSourceTask: Task<Void, Never>?
     
     // Recording states
     @State private var audioRecorder: AVAudioRecorder?
@@ -33,8 +33,8 @@ struct HomeFeedView: View {
                     .padding(.horizontal, 16)
                     .padding(.vertical, 8)
                 
-                // Feed
-                if audioEvents.isEmpty && !isRefreshing {
+                // Feed - Always show UI immediately, no loading states
+                if audioEvents.isEmpty {
                     EmptyFeedView()
                 } else {
                     ScrollView {
@@ -52,7 +52,7 @@ struct HomeFeedView: View {
                         }
                     }
                     .refreshable {
-                        await loadAudioEvents()
+                        await refreshAudioEvents()
                     }
                 }
             }
@@ -85,45 +85,66 @@ struct HomeFeedView: View {
             }
         }
         .onAppear {
-            Task {
-                await loadAudioEvents()
-            }
+            startStreamingAudioEvents()
+        }
+        .onDisappear {
+            dataSourceTask?.cancel()
         }
     }
     
-    private func loadAudioEvents() async {
+    private func startStreamingAudioEvents() {
         guard let ndk = nostrManager.ndk else { return }
         
-        await MainActor.run {
-            isRefreshing = true
-        }
+        // Cancel any existing task
+        dataSourceTask?.cancel()
         
         // Create filter for audio events
         let filter = NDKFilter(
-            kinds: [1222, 1244],
+            kinds: [1222, 1244]
         )
         
-        // Start streaming audio events in real-time
-        let dataSource = ndk.observe(filter: filter, maxAge: 0)
+        // Stream audio events with cache-first approach
+        // maxAge: 300 means show cached data up to 5 minutes old immediately
+        let dataSource = ndk.observe(filter: filter, maxAge: 300, cachePolicy: .cacheWithNetwork)
         
-        // NDK automatically sends cached events first, then streams new ones
-        Task {
+        // Start streaming task
+        dataSourceTask = Task {
             for await event in dataSource.events {
+                // Check if task was cancelled
+                if Task.isCancelled { break }
+                
                 let wotScore = await appState.webOfTrust[event.pubkey] ?? 0.1
                 if let audioEvent = AudioEvent.from(event: event, webOfTrustScore: wotScore) {
                     await MainActor.run {
                         // Add new event if it doesn't already exist
                         if !self.audioEvents.contains(where: { $0.id == audioEvent.id }) {
-                            self.audioEvents.append(audioEvent)
-                        }
-                        // Stop loading indicator after first batch
-                        if isRefreshing {
-                            isRefreshing = false
+                            withAnimation(.easeOut(duration: 0.3)) {
+                                self.audioEvents.append(audioEvent)
+                            }
                         }
                     }
                 }
             }
         }
+    }
+    
+    private func refreshAudioEvents() async {
+        guard let ndk = nostrManager.ndk else { return }
+        
+        // For refresh, use networkOnly to get fresh data
+        let filter = NDKFilter(
+            kinds: [1222, 1244]
+        )
+        
+        let dataSource = ndk.observe(filter: filter, maxAge: 0, cachePolicy: .networkOnly)
+        
+        // Clear existing events for a fresh feed
+        await MainActor.run {
+            audioEvents.removeAll()
+        }
+        
+        // Re-start the streaming with fresh data
+        startStreamingAudioEvents()
     }
     
     private func startRecording() {
@@ -242,7 +263,6 @@ struct HomeFeedView: View {
 struct HeaderView: View {
     @EnvironmentObject var appState: AppState
     @EnvironmentObject var nostrManager: NostrManager
-    @State private var showMarkdownDemo = false
     
     var body: some View {
         HStack {
@@ -260,16 +280,6 @@ struct HeaderView: View {
                 )
             
             Spacer()
-            
-            // Markdown demo button
-            NavigationLink(destination: MarkdownDemoView().environmentObject(nostrManager.ndk ?? NDK())) {
-                Image(systemName: "doc.richtext")
-                    .font(.system(size: 20))
-                    .foregroundColor(.white.opacity(0.8))
-                    .padding(8)
-                    .background(Color.white.opacity(0.1))
-                    .clipShape(Circle())
-            }
             
             // Profile button
             if let user = appState.currentUser {

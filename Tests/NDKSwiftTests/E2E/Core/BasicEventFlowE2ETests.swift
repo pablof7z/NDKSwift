@@ -61,7 +61,7 @@ final class BasicEventFlowE2ETests: XCTestCase {
         // Step 1: Create a simple text note event
         print("[\(timestamp())] Creating text note event...")
         let content = "Hello from NDKSwift E2E test at \(Date())"
-        let event = try await publisherNDK.event()
+        let event = try await NDKEventBuilder(ndk: publisherNDK)
             .content(content)
             .kind(EventKind.textNote)
             .build()
