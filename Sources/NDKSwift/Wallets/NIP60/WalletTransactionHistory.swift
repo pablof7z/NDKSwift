@@ -639,7 +639,7 @@ public actor WalletTransactionHistory {
                 )
                 
                 // Collect all nutzap events and use the first one (there should only be one per ID)
-                let events = await dataSource.collect(timeout: 2.0)
+                let events = await dataSource.collect(timeout: NetworkConstants.timeoutDataCollectionShort)
                 if let nutzapEvent = events.first {
                     nutzapData = NutzapData(
                         senderPubkey: nutzapEvent.pubkey,

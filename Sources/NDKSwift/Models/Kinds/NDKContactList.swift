@@ -301,7 +301,7 @@ public extension NDK {
         let dataSource = NDKDataSource(
             ndk: self,
             filter: filter,
-            maxAge: 600 // 10 minutes - contact lists don't change frequently
+            maxAge: 10 * TimeConstants.minute // 10 minutes - contact lists don't change frequently
         )
         
         // Collect all contact list events and use the most recent

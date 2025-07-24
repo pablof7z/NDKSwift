@@ -359,12 +359,12 @@ public class NDKSessionData {
         let dataSource = NDKDataSource<NDKEvent>(
             ndk: ndk,
             filter: filter,
-            maxAge: 300, // 5 minute cache
+            maxAge: 5 * TimeConstants.minute, // 5 minute cache
             subscriptionId: subscriptionId
         )
         
         // Collect events  
-        let events = await dataSource.collect(timeout: 5.0)
+        let events = await dataSource.collect(timeout: NetworkConstants.timeoutDataCollectionLong)
         if !events.isEmpty {
             for event in events {
                 let followsOfFollow = extractFollows(from: event)
