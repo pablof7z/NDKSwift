@@ -1,6 +1,11 @@
 import SwiftUI
 import LocalAuthentication
 
+// MARK: - Constants
+
+/// Icon size for authentication view icons
+private let authIconSize: CGFloat = 60
+
 /// SwiftUI view for NDK authentication flow
 ///
 /// Provides a declarative interface for authentication that automatically handles
@@ -263,7 +268,7 @@ public struct NDKAuthView<AuthenticatedContent: View, AuthenticationContent: Vie
     private var sessionSelectionHeader: some View {
         VStack(spacing: 16) {
             Image(systemName: "person.2.circle")
-                .font(.system(size: 60))
+                .font(.system(size: authIconSize))
                 .foregroundStyle(.blue)
             
             Text("Welcome Back")
@@ -630,7 +635,7 @@ public struct DefaultAuthenticationView: View {
         VStack(spacing: 30) {
             VStack(spacing: 16) {
                 Image(systemName: "key.fill")
-                    .font(.system(size: 60))
+                    .font(.system(size: authIconSize))
                     .foregroundStyle(.blue)
                 
                 Text("Authentication Required")
