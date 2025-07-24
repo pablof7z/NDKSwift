@@ -152,7 +152,7 @@ public actor MemoryCache: NDKCache {
         return eventConfirmations[eventId]
     }
     
-    public func getUnpublishedEvents(maxAge: TimeInterval = 3600, limit: Int? = nil) async -> [(event: NDKEvent, targetRelays: Set<String>)] {
+    public func getUnpublishedEvents(maxAge: TimeInterval = TimeConstants.hour, limit: Int? = nil) async -> [(event: NDKEvent, targetRelays: Set<String>)] {
         let cutoffTime = Date().addingTimeInterval(-maxAge)
         var results: [(event: NDKEvent, targetRelays: Set<String>)] = []
         

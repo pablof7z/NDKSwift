@@ -58,8 +58,8 @@ public final class NDKProfileDataSource: ObservableObject {
     /// - Parameters:
     ///   - ndk: The NDK instance to use for data fetching
     ///   - pubkey: The public key of the user to fetch profile for
-    ///   - maxAge: Maximum age of cached data in seconds (default: 3600 = 1 hour)
-    public init(ndk: NDK, pubkey: String, maxAge: TimeInterval = 3600) {
+    ///   - maxAge: Maximum age of cached data in seconds (default: 1 hour)
+    public init(ndk: NDK, pubkey: String, maxAge: TimeInterval = TimeConstants.hour) {
         self.ndk = ndk
         self.pubkey = pubkey
         
