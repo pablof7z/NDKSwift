@@ -12,6 +12,8 @@ struct UserProfileView: View {
     @State private var isFollowing = false
     @State private var followersCount = 0
     @State private var followingCount = 0
+    @State private var audioEvents: [AudioEvent] = []
+    @State private var audioEventsTask: Task<Void, Never>?
     
     var body: some View {
         ScrollView {
@@ -96,6 +98,39 @@ struct UserProfileView: View {
                     .padding(.horizontal)
                 }
                 
+                // Audio events section
+                VStack(alignment: .leading, spacing: 12) {
+                    Text("Audio Posts")
+                        .font(.system(size: 18, weight: .semibold))
+                        .foregroundColor(.white)
+                        .padding(.horizontal)
+                    
+                    if audioEvents.isEmpty {
+                        VStack(spacing: 12) {
+                            Image(systemName: "waveform.circle")
+                                .font(.system(size: 40))
+                                .foregroundColor(Color.white.opacity(0.3))
+                            
+                            Text("No audio posts yet")
+                                .font(.system(size: 14))
+                                .foregroundColor(Color.white.opacity(0.5))
+                        }
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 40)
+                    } else {
+                        // Display audio events
+                        LazyVStack(spacing: 0) {
+                            ForEach(audioEvents.sorted { $0.createdAt > $1.createdAt }) { audioEvent in
+                                AudioEventCard(audioEvent: audioEvent)
+                                
+                                Divider()
+                                    .background(Color.white.opacity(0.1))
+                            }
+                        }
+                    }
+                }
+                .padding(.top, 16)
+                
                 Spacer(minLength: 40)
             }
         }
@@ -112,6 +147,10 @@ struct UserProfileView: View {
         .onAppear {
             loadProfile()
             checkFollowStatus()
+            loadAudioEvents()
+        }
+        .onDisappear {
+            audioEventsTask?.cancel()
         }
     }
     
@@ -129,14 +168,59 @@ struct UserProfileView: View {
     }
     
     private func checkFollowStatus() {
-        guard let currentUser = appState.currentUser,
-              let followList = appState.followLists[currentUser.pubkey] else { return }
+        guard let ndk = nostrManager.ndk,
+              let sessionData = ndk.sessionData else { return }
         
-        isFollowing = followList.contains(pubkey)
+        isFollowing = sessionData.followList.contains(pubkey)
     }
     
     private func toggleFollow() {
         // TODO: Implement follow/unfollow functionality
         isFollowing.toggle()
+    }
+    
+    private func loadAudioEvents() {
+        guard let ndk = nostrManager.ndk else { return }
+        
+        // Cancel any existing task
+        audioEventsTask?.cancel()
+        
+        // Clear existing events
+        audioEvents.removeAll()
+        
+        // Create filter for audio events by this user
+        let filter = NDKFilter(
+            authors: [pubkey],
+            kinds: [1222, 1244]
+        )
+        
+        // Stream audio events
+        let dataSource = ndk.observe(filter: filter, maxAge: 300, cachePolicy: .cacheWithNetwork)
+        
+        audioEventsTask = Task {
+            for await event in dataSource.events {
+                // Check if task was cancelled
+                if Task.isCancelled { break }
+                
+                // Get WOT score from session data
+                let wotScore: Double
+                if let sessionData = ndk.sessionData {
+                    let score = sessionData.webOfTrust[event.pubkey] ?? 0
+                    // Normalize score (direct follows have Int.max)
+                    wotScore = score == Int.max ? 1.0 : min(Double(score) / 10.0, 1.0)
+                } else {
+                    wotScore = 0.1
+                }
+                
+                if let audioEvent = AudioEvent.from(event: event, webOfTrustScore: wotScore) {
+                    await MainActor.run {
+                        // Add new event if it doesn't already exist
+                        if !self.audioEvents.contains(where: { $0.id == audioEvent.id }) {
+                            self.audioEvents.append(audioEvent)
+                        }
+                    }
+                }
+            }
+        }
     }
 }

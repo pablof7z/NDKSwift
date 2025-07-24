@@ -17,9 +17,11 @@ struct AudioEventCard: View {
     @State private var showingReplyRecorder = false
     
     // Reaction states
-    @State private var hasLiked: Bool = false
-    @State private var reactionCount: Int = 0
-    @State private var reactions: [NDKEvent] = []
+    @State private var reactionsByEmoji: [String: [NDKEvent]] = [:]
+    @State private var userReactions: Set<String> = []
+    @State private var showingReactionPopover = false
+    @State private var showingReactionsDrawer = false
+    @State private var selectedReactionEmoji: String?
     @State private var cardScale: CGFloat = 1
     @State private var showingUserProfile = false
     
@@ -84,20 +86,35 @@ struct AudioEventCard: View {
                     onSeek: seek
                 )
                 
-                // Reactions bar (minimal)
+                // Reactions bar
                 HStack(spacing: 16) {
-                    Button(action: handleLike) {
-                        HStack(spacing: 4) {
-                            Image(systemName: hasLiked ? "heart.fill" : "heart")
-                                .font(.system(size: 16))
-                                .foregroundColor(hasLiked ? .red : Color.white.opacity(0.5))
-                            if reactionCount > 0 {
-                                Text("\(reactionCount)")
-                                    .font(.system(size: 14))
-                                    .foregroundColor(Color.white.opacity(0.6))
+                    // Reaction button
+                    Button(action: { showingReactionPopover = true }) {
+                        Image(systemName: userReactions.isEmpty ? "face.smiling" : "face.smiling.fill")
+                            .font(.system(size: 16))
+                            .foregroundColor(userReactions.isEmpty ? Color.white.opacity(0.5) : .yellow)
+                    }
+                    .popover(isPresented: $showingReactionPopover) {
+                        ReactionPopover(onReaction: handleReaction)
+                    }
+                    
+                    // Reaction pills
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: 8) {
+                            ForEach(reactionsByEmoji.keys.sorted(), id: \.self) { emoji in
+                                ReactionPill(
+                                    emoji: emoji,
+                                    count: reactionsByEmoji[emoji]?.count ?? 0,
+                                    isSelected: userReactions.contains(emoji),
+                                    onTap: {
+                                        selectedReactionEmoji = emoji
+                                        showingReactionsDrawer = true
+                                    }
+                                )
                             }
                         }
                     }
+                    .frame(maxWidth: 200)
                     
                     Button(action: { showingReplyRecorder = true }) {
                         Image(systemName: "bubble.left")
@@ -134,6 +151,15 @@ struct AudioEventCard: View {
         .sheet(isPresented: $showingUserProfile) {
             NavigationView {
                 UserProfileView(pubkey: audioEvent.author.pubkey)
+            }
+        }
+        .sheet(isPresented: $showingReactionsDrawer) {
+            if let emoji = selectedReactionEmoji {
+                ReactionsDrawer(
+                    emoji: emoji,
+                    reactions: reactionsByEmoji[emoji] ?? [],
+                    nostrManager: nostrManager
+                )
             }
         }
     }
@@ -277,18 +303,23 @@ struct AudioEventCard: View {
             let dataSource = ndk.observe(filter: filter, maxAge: 0)
             
             for await event in dataSource.events {
-                // Only count positive reactions
-                if event.content == "+" || event.content == "🤙" || event.content == "❤️" || event.content == "♥️" {
+                // Process all emoji reactions
+                let emoji = normalizeReactionEmoji(event.content)
+                if isValidReactionEmoji(emoji) {
                     await MainActor.run {
-                        // Add to reactions list if not already present
-                        if !self.reactions.contains(where: { $0.id == event.id }) {
-                            self.reactions.append(event)
-                            self.reactionCount = self.reactions.count
+                        // Group reactions by emoji
+                        if reactionsByEmoji[emoji] == nil {
+                            reactionsByEmoji[emoji] = []
+                        }
+                        
+                        // Add if not already present
+                        if !reactionsByEmoji[emoji]!.contains(where: { $0.id == event.id }) {
+                            reactionsByEmoji[emoji]!.append(event)
                             
-                            // Check if current user has reacted
+                            // Check if current user has reacted with this emoji
                             if let currentUserPubkey = appState.currentUser?.pubkey,
                                event.pubkey == currentUserPubkey {
-                                self.hasLiked = true
+                                userReactions.insert(emoji)
                             }
                         }
                     }
@@ -297,27 +328,50 @@ struct AudioEventCard: View {
         }
     }
     
-    private func handleLike() {
+    private func normalizeReactionEmoji(_ content: String) -> String {
+        // Map common variations to standard emojis
+        switch content {
+        case "+", "👍": return "👍"
+        case "❤️", "♥️": return "❤️"
+        case "🤙": return "🤙"
+        default: return content
+        }
+    }
+    
+    private func isValidReactionEmoji(_ emoji: String) -> Bool {
+        // Only allow single emoji characters or + symbol
+        if emoji == "+" || emoji == "👍" { return true }
+        
+        // Check if it's a single emoji
+        let scalars = emoji.unicodeScalars
+        guard scalars.count >= 1 else { return false }
+        
+        // Simple emoji validation
+        return emoji.count <= 4 && emoji.containsEmoji
+    }
+    
+    private func handleReaction(_ emoji: String) {
         guard let ndk = nostrManager.ndk else { return }
         
         Task {
-            if hasLiked {
-                // Already liked, don't unlike for now
+            if userReactions.contains(emoji) {
+                // Already reacted with this emoji
                 return
             }
             
             do {
                 // Use NDKEventBuilder to create and publish reaction
-                let (event, _) = try await ndk.publish { builder in
+                let (_, _) = try await ndk.publish { builder in
                     builder
                         .kind(7)  // Reaction event
-                        .content("+")
+                        .content(emoji)
                         .tag(["e", audioEvent.id])
                         .tag(["p", audioEvent.author.pubkey])
                 }
                 
                 await MainActor.run {
-                    hasLiked = true
+                    userReactions.insert(emoji)
+                    showingReactionPopover = false
                 }
             } catch {
                 print("Failed to publish reaction: \(error)")
@@ -450,6 +504,232 @@ struct AudioPlayerView: View {
     }
 }
 
+
+// MARK: - Reaction Components
+struct ReactionPopover: View {
+    let onReaction: (String) -> Void
+    @Environment(\.dismiss) private var dismiss
+    
+    let reactionEmojis = ["👍", "❤️", "😂", "🔥", "🤙", "⚡️", "💜", "🤔", "😍", "💯"]
+    
+    var body: some View {
+        VStack(spacing: 0) {
+            Text("React")
+                .font(.system(size: 14, weight: .medium))
+                .foregroundColor(.white.opacity(0.7))
+                .padding(.top, 12)
+                .padding(.bottom, 8)
+            
+            LazyVGrid(columns: [GridItem(.adaptive(minimum: 44))], spacing: 8) {
+                ForEach(reactionEmojis, id: \.self) { emoji in
+                    Button(action: {
+                        onReaction(emoji)
+                        dismiss()
+                    }) {
+                        Text(emoji)
+                            .font(.system(size: 28))
+                            .frame(width: 44, height: 44)
+                            .background(
+                                Circle()
+                                    .fill(Color.white.opacity(0.08))
+                            )
+                    }
+                    .buttonStyle(PlainButtonStyle())
+                }
+            }
+            .padding(.horizontal, 12)
+            .padding(.bottom, 12)
+        }
+        .frame(width: 240)
+        .background(
+            RoundedRectangle(cornerRadius: 16)
+                .fill(Color(UIColor.systemGray6))
+        )
+        .preferredColorScheme(.dark)
+    }
+}
+
+struct ReactionPill: View {
+    let emoji: String
+    let count: Int
+    let isSelected: Bool
+    let onTap: () -> Void
+    
+    var body: some View {
+        Button(action: onTap) {
+            HStack(spacing: 4) {
+                Text(emoji)
+                    .font(.system(size: 14))
+                Text("\(count)")
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundColor(isSelected ? .white : .white.opacity(0.7))
+            }
+            .padding(.horizontal, 10)
+            .padding(.vertical, 4)
+            .background(
+                Capsule()
+                    .fill(isSelected ? 
+                        LinearGradient(
+                            gradient: Gradient(colors: [Color.purple.opacity(0.6), Color.blue.opacity(0.4)]),
+                            startPoint: .leading,
+                            endPoint: .trailing
+                        ) : 
+                        LinearGradient(
+                            gradient: Gradient(colors: [Color.white.opacity(0.08), Color.white.opacity(0.05)]),
+                            startPoint: .leading,
+                            endPoint: .trailing
+                        )
+                    )
+            )
+        }
+        .buttonStyle(PlainButtonStyle())
+    }
+}
+
+struct ReactionsDrawer: View {
+    let emoji: String
+    let reactions: [NDKEvent]
+    let nostrManager: NostrManager
+    @Environment(\.dismiss) private var dismiss
+    
+    @State private var profiles: [String: NDKUserProfile] = [:]
+    
+    var body: some View {
+        NavigationView {
+            ZStack {
+                Color.black.ignoresSafeArea()
+                
+                ScrollView {
+                    VStack(spacing: 0) {
+                        // Emoji header
+                        Text(emoji)
+                            .font(.system(size: 60))
+                            .padding(.top, 20)
+                            .padding(.bottom, 8)
+                        
+                        Text("\(reactions.count) reaction\(reactions.count == 1 ? "" : "s")")
+                            .font(.system(size: 16))
+                            .foregroundColor(.white.opacity(0.6))
+                            .padding(.bottom, 20)
+                        
+                        Divider()
+                            .background(Color.white.opacity(0.1))
+                        
+                        // List of users who reacted
+                        LazyVStack(spacing: 0) {
+                            ForEach(reactions, id: \.id) { reaction in
+                                HStack(spacing: 12) {
+                                    NDKProfilePicture(pubkey: reaction.pubkey, size: 40)
+                                    
+                                    VStack(alignment: .leading, spacing: 2) {
+                                        if let profile = profiles[reaction.pubkey] {
+                                            Text(profile.displayName ?? profile.name ?? String(reaction.pubkey.prefix(8)))
+                                                .font(.system(size: 15, weight: .semibold))
+                                                .foregroundColor(.white)
+                                                .lineLimit(1)
+                                            
+                                            if let name = profile.name, profile.displayName != nil {
+                                                Text("@\(name)")
+                                                    .font(.system(size: 13))
+                                                    .foregroundColor(.white.opacity(0.5))
+                                                    .lineLimit(1)
+                                            }
+                                        } else {
+                                            Text(String(reaction.pubkey.prefix(8)) + "...")
+                                                .font(.system(size: 15, weight: .semibold))
+                                                .foregroundColor(.white)
+                                        }
+                                    }
+                                    
+                                    Spacer()
+                                    
+                                    Text(relativeTime(from: reaction.createdAt))
+                                        .font(.system(size: 12))
+                                        .foregroundColor(.white.opacity(0.4))
+                                }
+                                .padding(.horizontal, 16)
+                                .padding(.vertical, 12)
+                                
+                                Divider()
+                                    .background(Color.white.opacity(0.1))
+                            }
+                        }
+                    }
+                }
+            }
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button("Done") {
+                        dismiss()
+                    }
+                    .foregroundColor(.white)
+                }
+            }
+        }
+        .onAppear {
+            loadProfiles()
+        }
+    }
+    
+    private func loadProfiles() {
+        Task {
+            guard let ndk = nostrManager.ndk else { return }
+            
+            for reaction in reactions {
+                for await profile in ndk.profileManager.observe(for: reaction.pubkey, maxAge: 3600) {
+                    await MainActor.run {
+                        profiles[reaction.pubkey] = profile
+                    }
+                    break
+                }
+            }
+        }
+    }
+    
+    private func relativeTime(from date: Date) -> String {
+        let interval = Date().timeIntervalSince(date)
+        
+        if interval < TimeConstants.minute {
+            return "now"
+        } else if interval < TimeConstants.hour {
+            let minutes = Int(interval / TimeConstants.minute)
+            return "\(minutes)m"
+        } else if interval < TimeConstants.day {
+            let hours = Int(interval / TimeConstants.hour)
+            return "\(hours)h"
+        } else {
+            let days = Int(interval / TimeConstants.day)
+            return "\(days)d"
+        }
+    }
+}
+
+// MARK: - String Extension
+extension String {
+    var containsEmoji: Bool {
+        for scalar in unicodeScalars {
+            switch scalar.value {
+            case 0x1F600...0x1F64F, // Emoticons
+                 0x1F300...0x1F5FF, // Misc Symbols and Pictographs
+                 0x1F680...0x1F6FF, // Transport and Map
+                 0x1F700...0x1F77F, // Alchemical Symbols
+                 0x1F780...0x1F7FF, // Geometric Shapes Extended
+                 0x1F800...0x1F8FF, // Supplemental Arrows-C
+                 0x2600...0x26FF,   // Misc symbols
+                 0x2700...0x27BF,   // Dingbats
+                 0xFE00...0xFE0F,   // Variation Selectors
+                 0x1F900...0x1F9FF, // Supplemental Symbols and Pictographs
+                 0x1FA00...0x1FA6F, // Chess Symbols
+                 0x1FA70...0x1FAFF: // Symbols and Pictographs Extended-A
+                return true
+            default:
+                continue
+            }
+        }
+        return false
+    }
+}
 
 // MARK: - Reply Recording View
 struct ReplyRecordingView: View {

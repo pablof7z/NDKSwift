@@ -2,7 +2,7 @@ import Foundation
 import NDKSwift
 
 // Enable debug mode
-let ndk = NDK(relayUrls: ["wss://relay.primal.net", "wss://relay.damus.io"])
+let ndk = NDK(relayUrls: [RelayConstants.primal, RelayConstants.damus])
 ndk.debugMode = true
 
 // Set up logger to see what's happening

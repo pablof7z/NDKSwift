@@ -9,7 +9,7 @@ class RelayManager {
     var userAddedRelays: Set<String> = []
     
     private let defaultRelays = [
-        "wss://relay.primal.net"
+        RelayConstants.primal
     ]
     
     private let userRelaysKey = "user_added_relays"

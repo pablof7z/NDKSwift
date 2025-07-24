@@ -99,7 +99,7 @@ struct BlossomE2ERunner {
         ndk.signer = signer
         
         // Add relays
-        let testRelays = ["wss://relay.damus.io", "wss://relay.nostr.band", "wss://nos.lol"]
+        let testRelays = [RelayConstants.damus, RelayConstants.nostrBand, RelayConstants.nosLol]
         for relay in testRelays {
             await ndk.addRelay(relay)
         }

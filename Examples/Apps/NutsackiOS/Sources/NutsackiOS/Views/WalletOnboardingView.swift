@@ -41,11 +41,11 @@ struct WalletOnboardingView: View {
     
     // Default relay suggestions
     let suggestedRelays = [
-        RelayInfo(url: "wss://relay.primal.net", name: "Primal", description: "Fast and reliable public relay"),
-        RelayInfo(url: "wss://relay.damus.io", name: "Damus", description: "Popular iOS-friendly relay"),
-        RelayInfo(url: "wss://nos.lol", name: "nos.lol", description: "High-performance relay"),
-        RelayInfo(url: "wss://relay.nostr.band", name: "Nostr Band", description: "Analytics and search relay"),
-        RelayInfo(url: "wss://nostr.wine", name: "Nostr Wine", description: "Paid relay with spam protection")
+        RelayInfo(url: RelayConstants.primal, name: "Primal", description: "Fast and reliable public relay"),
+        RelayInfo(url: RelayConstants.damus, name: "Damus", description: "Popular iOS-friendly relay"),
+        RelayInfo(url: RelayConstants.nosLol, name: "nos.lol", description: "High-performance relay"),
+        RelayInfo(url: RelayConstants.nostrBand, name: "Nostr Band", description: "Analytics and search relay"),
+        RelayInfo(url: RelayConstants.nostrWine, name: "Nostr Wine", description: "Paid relay with spam protection")
     ]
     
     

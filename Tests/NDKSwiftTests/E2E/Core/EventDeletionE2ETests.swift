@@ -4,7 +4,7 @@ import XCTest
 final class EventDeletionE2ETests: XCTestCase {
     
     // Real relays for E2E testing
-    let testRelays = ["wss://relay.damus.io", "wss://relay.nostr.band", "wss://nos.lol"]
+    let testRelays = [RelayConstants.damus, RelayConstants.nostrBand, RelayConstants.nosLol]
     let timeout: TimeInterval = 30.0
     
     override func setUp() async throws {

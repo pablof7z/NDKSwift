@@ -26,7 +26,7 @@ let TEST_MINT_URL = "https://nofees.testnut.cashu.space"
 let TEST_AMOUNT_SATS: Int64 = 10_000
 let NUTZAP_AMOUNT_SATS: Int64 = 10  // Small nutzap amount to test with pre-funded wallet
 // Using only relay.primal.net since others are rejecting events (pow required, rate limiting)
-let TEST_RELAYS = ["wss://relay.primal.net"]
+let TEST_RELAYS = [RelayConstants.primal]
 let TIMEOUT_SECONDS = 120.0 // 2 minutes - deposit can take time
 
 // MARK: - Console UI Configuration

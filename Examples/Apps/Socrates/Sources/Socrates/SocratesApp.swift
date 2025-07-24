@@ -21,12 +21,6 @@ struct SocratesApp: App {
 @MainActor
 class AppState: ObservableObject {
     @Published var isAuthenticated = false
-    @Published var isLoading = false
-    @Published var loadingProgress: Double = 0
-    @Published var loadingMessage = "Getting things ready..."
-    @Published var webOfTrust: [String: Double] = [:]
-    @Published var followLists: [String: Set<String>] = [:]
-    @Published var syncProgress: Double = 0
     @Published var currentUser: NDKUser?
     
     // Audio state
@@ -48,11 +42,6 @@ class AppState: ObservableObject {
     
     func reset() {
         isAuthenticated = false
-        isLoading = false
-        loadingProgress = 0
-        webOfTrust = [:]
-        followLists = [:]
-        syncProgress = 0
         currentUser = nil
         isRecording = false
         currentlyPlayingId = nil
@@ -68,11 +57,11 @@ class NostrManager: ObservableObject {
     
     // Recommended relays for Socrates
     let defaultRelays = [
-        "wss://relay.primal.net",
-        "wss://relay.damus.io",
-        "wss://nos.lol",
-        "wss://relay.nostr.band",
-        "wss://nostr.wine"
+        RelayConstants.primal,
+        RelayConstants.damus,
+        RelayConstants.nosLol,
+        RelayConstants.nostrBand,
+        RelayConstants.nostrWine
     ]
     
     // Key for storing user-added relays
@@ -89,33 +78,42 @@ class NostrManager: ObservableObject {
         
         if let ndk = ndk {
             ndkAuthManager.setNDK(ndk)
-        }
-        
-        Task {
-            await ndk?.connect()
+            
+            // Check if there are any existing sessions and restore them
+            Task {
+                await ndk.connect()
+                
+                // Try to restore existing session if available
+                if !ndkAuthManager.availableSessions.isEmpty {
+                    print("Found existing sessions: \(ndkAuthManager.availableSessions.count)")
+                    // NDKAuthView will handle automatic session restoration
+                }
+            }
         }
     }
     
-    func login(with signer: NDKSigner) async throws {
+    func login(with signer: NDKSigner) async throws -> NDKSessionData {
         guard let ndk = ndk else { throw NostrError.signerRequired }
         
-        // Start session with mute list support
+        // Start session with web of trust and mute list support
         let sessionData = try await ndk.startSession(
             signer: signer,
             config: NDKSessionConfiguration(
-                dataRequirements: [.followList, .muteList],
+                dataRequirements: [.followList, .muteList, .webOfTrust(depth: 2)],
                 preloadStrategy: .progressive
             )
         )
         
         // Create or update session with auth manager for persistence
         if let privateSigner = signer as? NDKPrivateKeySigner {
-            let session = try await ndkAuthManager.createSession(
+            _ = try await ndkAuthManager.createSession(
                 with: privateSigner,
                 requiresBiometric: false,
                 isHardwareBacked: false
             )
         }
+        
+        return sessionData
     }
     
     func logout() {

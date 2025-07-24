@@ -17,8 +17,8 @@ struct TestReactiveFilter {
         // Initialize NDK
         let ndk = NDK(
             relayUrls: [
-                "wss://relay.primal.net",
-                "wss://relay.damus.io"
+                RelayConstants.primal,
+                RelayConstants.damus
             ]
         )
         
