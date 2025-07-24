@@ -38,57 +38,7 @@ struct ModernCardSelected: ViewModifier {
 }
 
 // MARK: - Button Styles
-struct ModernPrimaryButton: ButtonStyle {
-    func makeBody(configuration: Configuration) -> some View {
-        configuration.label
-            .font(.ds.bodyMedium)
-            .foregroundColor(.white)
-            .padding(.horizontal, .ds.large)
-            .padding(.vertical, .ds.base)
-            .background(
-                RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.medium, style: .continuous)
-                    .fill(DesignSystem.Colors.primary)
-            )
-            .scaleEffect(configuration.isPressed ? 0.97 : 1.0)
-            .opacity(configuration.isPressed ? 0.9 : 1.0)
-            .animation(DesignSystem.Animation.instant, value: configuration.isPressed)
-    }
-}
-
-struct ModernSecondaryButton: ButtonStyle {
-    func makeBody(configuration: Configuration) -> some View {
-        configuration.label
-            .font(.ds.bodyMedium)
-            .foregroundColor(DesignSystem.Colors.primary)
-            .padding(.horizontal, .ds.large)
-            .padding(.vertical, .ds.base)
-            .background(
-                RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.medium, style: .continuous)
-                    .fill(DesignSystem.Colors.primaryLight.opacity(0.1))
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.medium, style: .continuous)
-                    .stroke(DesignSystem.Colors.primary.opacity(0.2), lineWidth: 1)
-            )
-            .scaleEffect(configuration.isPressed ? 0.97 : 1.0)
-            .animation(DesignSystem.Animation.instant, value: configuration.isPressed)
-    }
-}
-
-struct ModernGhostButton: ButtonStyle {
-    func makeBody(configuration: Configuration) -> some View {
-        configuration.label
-            .font(.ds.bodyMedium)
-            .foregroundColor(DesignSystem.Colors.primary)
-            .padding(.horizontal, .ds.medium)
-            .padding(.vertical, .ds.small)
-            .background(
-                RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.small, style: .continuous)
-                    .fill(configuration.isPressed ? DesignSystem.Colors.primary.opacity(0.05) : Color.clear)
-            )
-            .animation(DesignSystem.Animation.instant, value: configuration.isPressed)
-    }
-}
+// Note: Primary button styles are now defined in ModernButtonStyles.swift to avoid duplication
 
 // MARK: - List Item Style
 struct ModernListItem: ViewModifier {
@@ -110,18 +60,7 @@ struct ModernListItem: ViewModifier {
 }
 
 // MARK: - Input Styles
-struct ModernTextField: ViewModifier {
-    func body(content: Content) -> some View {
-        content
-            .padding(.ds.base)
-            .background(DesignSystem.Colors.surfaceSecondary)
-            .clipShape(RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.small, style: .continuous))
-            .overlay(
-                RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.small, style: .continuous)
-                    .stroke(DesignSystem.Colors.border, lineWidth: 1)
-            )
-    }
-}
+// Note: ModernTextField is now defined in ModernFormComponents.swift to avoid duplication
 
 // MARK: - Modern Tab Bar Item
 struct ModernTabItem: View {
@@ -216,9 +155,7 @@ extension View {
         self.modifier(ModernListItem(showDivider: showDivider))
     }
     
-    func modernTextField() -> some View {
-        self.modifier(ModernTextField())
-    }
+    // modernTextField() extension is now in ModernFormComponents.swift
     
     func modernHighlight(_ isHighlighted: Bool) -> some View {
         self.modifier(ModernHighlight(isHighlighted: isHighlighted))
