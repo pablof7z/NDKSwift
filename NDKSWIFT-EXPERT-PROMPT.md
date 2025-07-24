@@ -44,11 +44,10 @@ NDKSwift provides a powerful, self-contained authentication system via `NDKAuthM
 *   **`NDKSession`**: Represents a single user login. It stores public metadata (profile info, pubkey) and security settings.
 *   **`NDKKeychainManager`**: Securely stores sensitive signer data in the iOS Keychain, handling biometric protection. This is used internally by the `AuthManager`.
 *   **`NDKSigner` Protocol**: An abstraction for signing events. `NDKPrivateKeySigner` is the primary implementation for local private keys.
-*   **`NDKAuthView`**: A SwiftUI view that handles the entire authentication flow based on the `NDKAuthManager`'s state, including session selection, biometric prompts, and showing login/authenticated content.
 
 **Implementation Flow:**
 
-1.  **Integrate `NDKAuthView` in your root view:**
+1.  **Build your own authentication UI:**
 
     ```swift
     // In your ContentView.swift
@@ -56,10 +55,10 @@ NDKSwift provides a powerful, self-contained authentication system via `NDKAuthM
         @State private var authManager = NDKAuthManager.shared
 
         var body: some View {
-            NDKAuthView(authManager: authManager) {
+            if authManager.isAuthenticated {
                 // This is your main app view, shown when authenticated
                 MainAppView()
-            } authenticationView: {
+            } else {
                 // This will be shown when no sessions exist
                 YourLoginOrCreateAccountView()
             }
@@ -103,7 +102,7 @@ NDKSwift provides a powerful, self-contained authentication system via `NDKAuthM
             // Session is now active, user is authenticated
         } catch {
             // Handle authentication failure
-            // User will see login screen via NDKAuthView
+            // User will see login screen via your authentication UI
         }
     }
     ```
@@ -290,12 +289,12 @@ This is particularly useful for:
 **The Flow:** Use `NDKEventBuilder` to construct an event, then call `build(signer:)` to create a signed, immutable `NDKEvent`. Finally, publish it.
 
 ```swift
-// Using the NDK's event builder (recommended)
-let event = try await ndk.event()
+// Using the event builder
+let event = try await NDKEventBuilder()
     .content("Hello from NDKSwift!")
     .kind(EventKind.textNote)
     .tag(["t", "swift"])
-    .build()  // Uses ndk.signer automatically
+    .build(signer: ndk.signer!)  // Pass the signer explicitly
 
 let publishedRelays = try await ndk.publish(event)
 
@@ -342,11 +341,11 @@ NDKSwift implements the NIP-65 outbox model with intelligent p-tag handling that
 
 ```swift
 // Events with < 10 p-tags: Full outbox model applied
-let replyEvent = try await ndk.event()
+let replyEvent = try await NDKEventBuilder()
     .content("Thanks @alice and @bob for the feedback!")
     .tag(["p", alicePubkey])
     .tag(["p", bobPubkey])
-    .build()
+    .build(signer: ndk.signer!)
 
 let publishedRelays = try await ndk.publish(replyEvent)
 // → Publishes to:
@@ -355,10 +354,10 @@ let publishedRelays = try await ndk.publish(replyEvent)
 //   - Bob's read relays (so Bob sees the mention)
 
 // Events with ≥ 10 p-tags: Only uses author's relays
-let massReplyEvent = try await ndk.event()
+let massReplyEvent = try await NDKEventBuilder()
     .content("Thanks everyone for the great discussion!")
     // ... 15 p-tags ...
-    .build()
+    .build(signer: ndk.signer!)
 
 let publishedRelays = try await ndk.publish(massReplyEvent)
 // → Publishes only to your write relays
@@ -376,10 +375,10 @@ NDKSwift follows NIP-65 specifications precisely:
 // - Fallback: If no read relays, uses write relays
 
 // Example: Alice mentions Bob
-let event = try await ndk.event()
+let event = try await NDKEventBuilder()
     .content("Hey @bob, check this out!")
     .tag(["p", bobPubkey])
-    .build()
+    .build(signer: ndk.signer!)
 
 // Result:
 // ✅ Published to Alice's write relays (alice_write_1.com, alice_write_2.com)
@@ -433,32 +432,32 @@ if let relays = userRelays {
 
 ```swift
 // 1. Simple reply (2 p-tags) - Uses outbox model
-let reply = try await ndk.event()
+let reply = try await NDKEventBuilder()
     .content("Great point @alice! @bob what do you think?")
     .tag(["p", alicePubkey])
     .tag(["p", bobPubkey])
-    .build()
+    .build(signer: ndk.signer!)
 // → Publishes to your write relays + alice's read relays + bob's read relays
 
 // 2. Mass mention (15 p-tags) - Skips outbox model
-let massEvent = try await ndk.event()
+let massEvent = try await NDKEventBuilder()
     .content("Thanks everyone who joined the discussion!")
     .tag(["p", user1]) .tag(["p", user2]) /* ... 15 total ... */
-    .build()
+    .build(signer: ndk.signer!)
 // → Publishes ONLY to your write relays (network courtesy)
 
 // 3. Public post (no p-tags) - Author's relays only
-let publicPost = try await ndk.event()
+let publicPost = try await NDKEventBuilder()
     .content("Good morning, Nostr!")
-    .build()
+    .build(signer: ndk.signer!)
 // → Publishes to your write relays
 
 // 4. DM (1 p-tag) - Uses outbox model
-let dm = try await ndk.event()
+let dm = try await NDKEventBuilder()
     .content("Hey, can we chat privately?")
     .kind(EventKind.encryptedDirectMessage)
     .tag(["p", recipientPubkey])
-    .build()
+    .build(signer: ndk.signer!)
 // → Publishes to your write relays + recipient's read relays
 ```
 
@@ -487,11 +486,11 @@ func testOutboxModelBehavior() async throws {
     await setupTestRelayLists()
     
     // Test < 10 p-tags: should use outbox model
-    let event = try await ndk.event()
+    let event = try await NDKEventBuilder()
         .content("Hello @alice and @bob!")
         .tag(["p", "alice_pubkey"])
         .tag(["p", "bob_pubkey"])
-        .build()
+        .build(signer: ndk.signer!)
     
     let selection = await ndk.relaySelector.selectRelaysForPublishing(event: event)
     
@@ -505,11 +504,11 @@ func testOutboxModelBehavior() async throws {
     XCTAssertFalse(selection.relays.contains("wss://bob-write1.com"))
     
     // Test ≥ 10 p-tags: should skip outbox model
-    var massEvent = ndk.event().content("Thanks everyone!")
+    var massEvent = NDKEventBuilder().content("Thanks everyone!")
     for i in 1...11 {
         massEvent = massEvent.tag(["p", "user\(i)_pubkey"])
     }
-    let massEventBuilt = try await massEvent.build()
+    let massEventBuilt = try await massEvent.build(signer: ndk.signer!)
     
     let massSelection = await ndk.relaySelector.selectRelaysForPublishing(event: massEventBuilt)
     // Should not include alice or bob's relays when 10+ p-tags
@@ -652,10 +651,14 @@ let confirmedOnlySource = ndk.observe(
         let ndk: NDK
         
         func publishNote(content: String) async throws {
+            guard let signer = ndk.signer else {
+                throw NSError(domain: "NDK", code: 1, userInfo: [NSLocalizedDescriptionKey: "No signer available"])
+            }
+            
             let event = try await NDKEventBuilder()
                 .content(content)
                 .kind(EventKind.textNote)
-                .build(signer: ndk.signer!)
+                .build(signer: signer)
             
             // Create optimistic UI state
             let noteVM = NoteViewModel(
