@@ -144,25 +144,48 @@ class NostrManager: ObservableObject {
     func login(with signer: NDKSigner) async throws -> NDKSessionData {
         guard let ndk = ndk else { throw NostrError.signerRequired }
         
-        // Start session with web of trust and mute list support
-        let sessionData = try await ndk.startSession(
-            signer: signer,
-            config: NDKSessionConfiguration(
-                dataRequirements: [.followList, .muteList, .webOfTrust(depth: 2)],
-                preloadStrategy: .progressive
+        // For bunker signers, the signer should already be set on NDK
+        // and connected before calling this method
+        if signer is NDKBunkerSigner {
+            // Ensure the signer is set
+            if ndk.signer !== signer {
+                ndk.signer = signer
+            }
+            
+            // Start session with the bunker signer
+            let sessionData = try await ndk.startSession(
+                signer: signer,
+                config: NDKSessionConfiguration(
+                    dataRequirements: [.followList, .muteList, .webOfTrust(depth: 2)],
+                    preloadStrategy: .progressive
+                )
             )
-        )
-        
-        // Create or update session with auth manager for persistence
-        if let privateSigner = signer as? NDKPrivateKeySigner {
-            _ = try await ndkAuthManager.createSession(
-                with: privateSigner,
-                requiresBiometric: false,
-                isHardwareBacked: false
+            
+            // Note: We don't persist bunker signers to keychain
+            // The connection token should be saved separately if needed
+            
+            return sessionData
+        } else {
+            // For private key signers, start session normally
+            let sessionData = try await ndk.startSession(
+                signer: signer,
+                config: NDKSessionConfiguration(
+                    dataRequirements: [.followList, .muteList, .webOfTrust(depth: 2)],
+                    preloadStrategy: .progressive
+                )
             )
+            
+            // Create or update session with auth manager for persistence
+            if let privateSigner = signer as? NDKPrivateKeySigner {
+                _ = try await ndkAuthManager.createSession(
+                    with: privateSigner,
+                    requiresBiometric: false,
+                    isHardwareBacked: false
+                )
+            }
+            
+            return sessionData
         }
-        
-        return sessionData
     }
     
     func logout() {

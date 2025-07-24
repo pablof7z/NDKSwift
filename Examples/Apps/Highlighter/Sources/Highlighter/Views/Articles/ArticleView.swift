@@ -1,5 +1,6 @@
 import SwiftUI
 import NDKSwift
+import NDKSwiftUI
 
 struct ArticleView: View {
     let article: Article
@@ -129,18 +130,30 @@ struct ArticleView: View {
                         Divider()
                             .padding(.vertical, .spacingL)
                         
-                        // Article Content with highlight support
-                        MarkdownView(
-                            content: article.content,
-                            onTextSelected: { text, range in
-                                selectedText = text
-                                highlightRange = range
-                                showHighlightOptions = true
-                                HapticType.selection.trigger()
+                        // Article Content with markdown rendering and text selection
+                        if let ndk = appState.ndk {
+                            SelectableMarkdownRenderer(
+                                content: article.content,
+                                ndk: ndk,
+                                onTextSelected: { text, range in
+                                    selectedText = text
+                                    highlightRange = range
+                                    showHighlightOptions = true
+                                    HapticType.selection.trigger()
+                                }
+                            )
+                            .markdownStyle(articleMarkdownStyle())
+                            .onNostrEntityTap { entity in
+                                handleNostrEntityTap(entity)
                             }
-                        )
-                        .padding(.horizontal, .spacingL)
-                        .padding(.bottom, .spacingXL)
+                            .onHashtagTap { tag in
+                                handleHashtagTap(tag)
+                            }
+                            .onLinkTap { url in
+                                handleLinkTap(url)
+                            }
+                            .padding(.bottom, .spacingXL)
+                        }
                     }
                 }
             }
@@ -260,108 +273,61 @@ struct ArticleView: View {
             HapticType.error.trigger()
         }
     }
-}
-
-// MARK: - Markdown View
-
-struct MarkdownView: UIViewRepresentable {
-    let content: String
-    let onTextSelected: (String, NSRange) -> Void
     
-    func makeUIView(context: Context) -> UITextView {
-        let textView = UITextView()
-        textView.isEditable = false
-        textView.isSelectable = true
-        textView.backgroundColor = .clear
-        textView.delegate = context.coordinator
+    // MARK: - Markdown Configuration
+    
+    private func articleMarkdownStyle() -> MarkdownConfiguration {
+        var config = MarkdownConfiguration()
         
-        // Configure text styling
-        let style = NSMutableParagraphStyle()
-        style.lineSpacing = 8
-        style.paragraphSpacing = 16
+        // Colors
+        config.textColor = .highlighterText
+        config.headingColor = .highlighterText
+        config.linkColor = .highlighterPurple
+        config.codeBackgroundColor = Color.gray.opacity(0.1)
+        config.blockquoteColor = .highlighterSecondaryText
+        config.blockquoteBorderColor = .highlighterPurple
+        config.mentionColor = .highlighterPurple
+        config.hashtagColor = .highlighterOrange
+        config.nostrEntityColor = .highlighterPurple
         
-        let attributes: [NSAttributedString.Key: Any] = [
-            .font: UIFont.systemFont(ofSize: 17),
-            .foregroundColor: UIColor.label,
-            .paragraphStyle: style
-        ]
+        // Fonts
+        config.bodyFont = .highlighterBody
+        config.h1Font = .largeTitle
+        config.h2Font = .title
+        config.h3Font = .title2
         
-        // Simple markdown parsing (basic implementation)
-        let attributedText = parseMarkdown(content, baseAttributes: attributes)
-        textView.attributedText = attributedText
+        // No content padding since we handle it ourselves
+        config.contentPadding = EdgeInsets(top: 0, leading: .spacingL, bottom: 0, trailing: .spacingL)
         
-        return textView
+        return config
     }
     
-    func updateUIView(_ uiView: UITextView, context: Context) {
-        // Update if needed
+    // MARK: - Event Handlers
+    
+    private func handleNostrEntityTap(_ entity: ContentEntity) {
+        switch entity {
+        case .npub(let pubkey), .nprofile(let pubkey), .userMention(let pubkey, _):
+            // Navigate to profile view
+            print("Navigate to profile: \(pubkey)")
+        case .note(let eventId), .nevent(let eventId), .eventMention(let eventId):
+            // Navigate to event/note view
+            print("Navigate to event: \(eventId)")
+        case .naddr(let identifier):
+            // Navigate to parameterized replaceable event
+            print("Navigate to naddr: \(identifier)")
+        default:
+            break
+        }
     }
     
-    func makeCoordinator() -> Coordinator {
-        Coordinator(onTextSelected: onTextSelected)
+    private func handleHashtagTap(_ tag: String) {
+        // Navigate to hashtag search
+        print("Search for hashtag: #\(tag)")
     }
     
-    private func parseMarkdown(_ text: String, baseAttributes: [NSAttributedString.Key: Any]) -> NSAttributedString {
-        let result = NSMutableAttributedString(string: text, attributes: baseAttributes)
-        
-        // Bold text
-        let boldPattern = "\\*\\*(.*?)\\*\\*"
-        if let boldRegex = try? NSRegularExpression(pattern: boldPattern) {
-            let matches = boldRegex.matches(in: text, range: NSRange(location: 0, length: text.count))
-            for match in matches.reversed() {
-                if let range = Range(match.range(at: 1), in: text) {
-                    let boldText = String(text[range])
-                    result.replaceCharacters(
-                        in: match.range,
-                        with: NSAttributedString(
-                            string: boldText,
-                            attributes: baseAttributes.merging([.font: UIFont.boldSystemFont(ofSize: 17)]) { $1 }
-                        )
-                    )
-                }
-            }
-        }
-        
-        // Italic text
-        let italicPattern = "\\*(.*?)\\*"
-        if let italicRegex = try? NSRegularExpression(pattern: italicPattern) {
-            let matches = italicRegex.matches(in: result.string, range: NSRange(location: 0, length: result.string.count))
-            for match in matches.reversed() {
-                if let range = Range(match.range(at: 1), in: result.string) {
-                    let italicText = String(result.string[range])
-                    result.replaceCharacters(
-                        in: match.range,
-                        with: NSAttributedString(
-                            string: italicText,
-                            attributes: baseAttributes.merging([.font: UIFont.italicSystemFont(ofSize: 17)]) { $1 }
-                        )
-                    )
-                }
-            }
-        }
-        
-        return result
-    }
-    
-    class Coordinator: NSObject, UITextViewDelegate {
-        let onTextSelected: (String, NSRange) -> Void
-        
-        init(onTextSelected: @escaping (String, NSRange) -> Void) {
-            self.onTextSelected = onTextSelected
-        }
-        
-        func textViewDidChangeSelection(_ textView: UITextView) {
-            guard let selectedRange = textView.selectedTextRange,
-                  !selectedRange.isEmpty,
-                  let selectedText = textView.text(in: selectedRange),
-                  !selectedText.isEmpty else { return }
-            
-            let location = textView.offset(from: textView.beginningOfDocument, to: selectedRange.start)
-            let length = textView.offset(from: selectedRange.start, to: selectedRange.end)
-            let range = NSRange(location: location, length: length)
-            
-            onTextSelected(selectedText, range)
-        }
+    private func handleLinkTap(_ url: URL) {
+        // Open URL in browser or in-app
+        print("Open URL: \(url)")
     }
 }
 

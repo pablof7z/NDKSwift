@@ -7,6 +7,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Changed
+- Updated Highlighter app to use NDKSwiftUI's comprehensive markdown renderer for article content
+  - Replaced basic markdown parsing with full-featured NDKMarkdownRenderer
+  - Added support for all markdown elements: headings, lists, code blocks, blockquotes, tables
+  - Added Nostr entity parsing and rendering (npub, note, nevent, naddr)
+  - Added hashtag and mention support with tap handlers
+  - Integrated custom styling to match Highlighter's theme
+  - Created SelectableMarkdownRenderer wrapper to preserve text selection for highlights
+  - Maintained original highlighting functionality with improved markdown rendering
+- Enhanced Highlighter app article list with dual layout system
+  - Featured articles now display as portrait cards in a horizontal scroll view
+  - Regular articles display as horizontal row cards with compact layout
+  - Featured section highlights first 3 articles with images
+  - Improved visual hierarchy and content discovery
+
+## [0.1.3] - 2025-07-24
+
+### Fixed
+- Fixed subscription ID length issue that caused errors with some relays (e.g., purplepag.es)
+  - Subscription IDs are now significantly shortened to prevent "subscription id too long" errors
+  - Kind descriptions use abbreviated forms (e.g., "kind31933" → "k31933", "metadata" → "meta")
+  - Author prefixes reduced from 8 to 4 characters
+  - Relay host names are shortened by removing common prefixes and TLDs
+  - This ensures compatibility with all Nostr relays regardless of their ID length limits
+
+### Changed
 - Outbox relays from `NDKOutboxConfig` are now automatically connected during `NDK.connect()`
   - Previously, outbox relays like `purplepag.es` were configured but never connected
   - These relays are now marked with `.outboxConfig` origin for proper tracking

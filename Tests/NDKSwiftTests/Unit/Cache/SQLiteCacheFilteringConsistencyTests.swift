@@ -108,7 +108,7 @@ final class SQLiteCacheFilteringConsistencyTests: XCTestCase {
     /// Test that observers receive the same events as direct queries
     func testObserverNotificationConsistency() async throws {
         // Create test observer
-        let observer = MockCacheObserver()
+        let observer = MockSQLCacheObserver()
         
         // Set up filter
         let filter = NDKFilter(authors: ["testauthor"], kinds: [1])
@@ -189,8 +189,8 @@ final class SQLiteCacheFilteringConsistencyTests: XCTestCase {
     }
 }
 
-// Mock observer for testing
-actor MockCacheObserver: CacheObserver {
+// Mock observer for testing SQL cache filtering
+actor MockSQLCacheObserver: CacheObserver {
     private var receivedEvents: [NDKEvent] = []
     
     func handleEvent(_ event: NDKEvent) async {

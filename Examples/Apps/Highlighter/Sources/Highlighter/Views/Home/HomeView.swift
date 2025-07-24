@@ -15,7 +15,7 @@ struct HomeView: View {
         NavigationStack {
             ScrollViewReader { proxy in
                 ScrollView {
-                    VStack(alignment: .leading, spacing: 32) {
+                    VStack(alignment: .leading, spacing: DesignSystem.Spacing.sectionSpacing) {
                         // Header with gradient
                         headerSection
                             .id("top")
@@ -36,7 +36,7 @@ struct HomeView: View {
                         BookstrDiscussionsSection(discussions: discussions)
                             .fadeSlide(isVisible: true, delay: 0.4)
                     }
-                    .padding(.vertical)
+                    .padding(.vertical, DesignSystem.Spacing.medium)
                     .background(GeometryReader { geo in
                         Color.clear.preference(
                             key: ScrollOffsetPreferenceKey.self,
@@ -55,7 +55,7 @@ struct HomeView: View {
                     await refreshContent()
                 }
             }
-            .background(Color.highlighterBackground)
+            .background(DesignSystem.Colors.background)
             .navigationTitle("Highlighter")
             .navigationBarTitleDisplayMode(.large)
             .toolbar {
@@ -63,7 +63,7 @@ struct HomeView: View {
                     Button(action: {}) {
                         Image(systemName: "bell")
                             .font(.system(size: 18))
-                            .foregroundColor(.highlighterText)
+                            .foregroundColor(DesignSystem.Colors.text)
                     }
                 }
             }
@@ -75,32 +75,17 @@ struct HomeView: View {
     
     @ViewBuilder
     private var headerSection: some View {
-        ZStack(alignment: .bottomLeading) {
-            LinearGradient(
-                colors: [
-                    Color.highlighterOrange.opacity(0.3),
-                    Color.highlighterPurple.opacity(0.2),
-                    Color.clear
-                ],
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            )
-            .frame(height: 150)
-            .blur(radius: 20)
-            .offset(y: -50)
+        VStack(alignment: .leading, spacing: DesignSystem.Spacing.micro) {
+            Text(greetingText)
+                .font(DesignSystem.Typography.title)
+                .foregroundColor(DesignSystem.Colors.text)
             
-            VStack(alignment: .leading, spacing: 8) {
-                Text(greetingText)
-                    .font(.system(size: 22, weight: .semibold, design: .rounded))
-                    .foregroundColor(.highlighterText)
-                
-                Text("Discover today's best ideas")
-                    .font(.system(size: 15, weight: .regular))
-                    .foregroundColor(.highlighterSecondaryText)
-            }
-            .padding(.horizontal, 24)
-            .padding(.bottom, 16)
+            Text("Discover today's best ideas")
+                .font(DesignSystem.Typography.body)
+                .foregroundColor(DesignSystem.Colors.textSecondary)
         }
+        .padding(.horizontal, DesignSystem.Spacing.screenPadding)
+        .padding(.vertical, DesignSystem.Spacing.base)
     }
     
     private var greetingText: String {
@@ -141,7 +126,7 @@ struct HomeView: View {
             for await event in highlightSource.events {
                 if let highlight = try? HighlightEvent(from: event) {
                     await MainActor.run {
-                        withAnimation(.highlighterEase) {
+                        withAnimation(DesignSystem.Animation.standard) {
                             if !highlights.contains(where: { $0.id == highlight.id }) {
                                 highlights.append(highlight)
                                 highlights.sort { $0.createdAt > $1.createdAt }
@@ -169,7 +154,7 @@ struct HomeView: View {
                     for await event in oldHighlightSource.events {
                         if let highlight = try? HighlightEvent(from: event) {
                             await MainActor.run {
-                                withAnimation(.highlighterEase) {
+                                withAnimation(DesignSystem.Animation.standard) {
                                     if !oldHighlights.contains(where: { $0.id == highlight.id }) {
                                         oldHighlights.append(highlight)
                                     }
@@ -191,7 +176,7 @@ struct HomeView: View {
             
             for await event in discussionSource.events {
                 await MainActor.run {
-                    withAnimation(.highlighterEase) {
+                    withAnimation(DesignSystem.Animation.standard) {
                         if !discussions.contains(where: { $0.id == event.id }) {
                             discussions.append(event)
                             discussions.sort { $0.createdAt > $1.createdAt }
@@ -211,7 +196,7 @@ struct HomeView: View {
             
             for await event in zapSource.events {
                 await MainActor.run {
-                    withAnimation(.highlighterEase) {
+                    withAnimation(DesignSystem.Animation.standard) {
                         if !zappedArticles.contains(where: { $0.id == event.id }) {
                             zappedArticles.append(event)
                         }
@@ -232,17 +217,17 @@ struct PersonalizedRecapSection: View {
         VStack(alignment: .leading, spacing: 16) {
             HStack {
                 Text("Your Recap")
-                    .font(.system(size: 20, weight: .semibold, design: .rounded))
+                    .font(DesignSystem.Typography.title2)
                 
                 Spacer()
                 
                 if !highlights.isEmpty {
                     Image(systemName: "clock.arrow.circlepath")
                         .font(.system(size: 16))
-                        .foregroundColor(Color.highlighterOrange)
+                        .foregroundColor(DesignSystem.Colors.primary)
                 }
             }
-            .padding(.horizontal, 24)
+            .padding(.horizontal, DesignSystem.Spacing.screenPadding)
             
             if highlights.isEmpty {
                 // Show placeholder while loading
@@ -253,7 +238,7 @@ struct PersonalizedRecapSection: View {
                                 .fadeSlide(isVisible: true, delay: Double(index) * 0.1)
                         }
                     }
-                    .padding(.horizontal, 24)
+                    .padding(.horizontal, DesignSystem.Spacing.screenPadding)
                 }
             } else {
                 ScrollView(.vertical, showsIndicators: false) {
@@ -272,7 +257,7 @@ struct PersonalizedRecapSection: View {
                             .fadeSlide(isVisible: true, delay: Double(index) * 0.1)
                         }
                     }
-                    .padding(.horizontal, 24)
+                    .padding(.horizontal, DesignSystem.Spacing.screenPadding)
                 }
             }
         }
@@ -298,7 +283,7 @@ struct RecapCardPlaceholder: View {
                 }
             }
         }
-        .padding(24)
+        .padding(DesignSystem.Spacing.cardPadding)
         .glassBackground()
         .shimmer()
     }
@@ -313,18 +298,18 @@ struct RecapCard: View {
             HStack {
                 Image(systemName: "clock.arrow.circlepath")
                     .font(.system(size: 14))
-                    .foregroundColor(Color.highlighterOrange)
+                    .foregroundColor(DesignSystem.Colors.primary)
                 
                 Text("You highlighted this last week")
-                    .font(.highlighterCaption)
-                    .foregroundColor(Color.highlighterSecondaryText)
+                    .font(DesignSystem.Typography.caption)
+                    .foregroundColor(DesignSystem.Colors.textSecondary)
                 
                 Spacer()
             }
             
             Text("\"\(highlight.content)\"")
-                .font(.highlighterBody)
-                .foregroundColor(.highlighterText)
+                .font(DesignSystem.Typography.body)
+                .foregroundColor(DesignSystem.Colors.text)
                 .multilineTextAlignment(.leading)
                 .lineLimit(isSelected ? nil : 3)
             
@@ -332,18 +317,18 @@ struct RecapCard: View {
                 if let url = highlight.url {
                     Link(destination: URL(string: url)!) {
                         Label("Source", systemImage: "link")
-                            .font(.highlighterCaption)
-                            .foregroundColor(Color.highlighterOrange)
+                            .font(DesignSystem.Typography.caption)
+                            .foregroundColor(DesignSystem.Colors.primary)
                     }
                 } else {
                     Label("Nostr", systemImage: "bolt.circle.fill")
-                        .font(.highlighterCaption)
-                        .foregroundColor(Color.highlighterOrange)
+                        .font(DesignSystem.Typography.caption)
+                        .foregroundColor(DesignSystem.Colors.primary)
                 }
                 Spacer()
             }
         }
-        .padding(24)
+        .padding(DesignSystem.Spacing.cardPadding)
         .cardBackground(isSelected: isSelected)
     }
 }
@@ -355,16 +340,16 @@ struct TrendingQuotesSection: View {
         VStack(alignment: .leading, spacing: 16) {
             HStack {
                 Text("Trending Quotes")
-                    .font(.system(size: 20, weight: .semibold, design: .rounded))
+                    .font(DesignSystem.Typography.title2)
                 
                 Spacer()
                 
                 Image(systemName: "chart.line.uptrend.xyaxis")
                     .font(.system(size: 16))
-                    .foregroundColor(Color.highlighterOrange)
+                    .foregroundColor(DesignSystem.Colors.primary)
                     .pulse()
             }
-            .padding(.horizontal, 24)
+            .padding(.horizontal, DesignSystem.Spacing.screenPadding)
             
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 16) {
@@ -383,7 +368,7 @@ struct TrendingQuotesSection: View {
                         }
                     }
                 }
-                .padding(.horizontal, 24)
+                .padding(.horizontal, DesignSystem.Spacing.screenPadding)
             }
         }
     }
@@ -411,7 +396,7 @@ struct QuoteCardPlaceholder: View {
             }
         }
         .frame(height: 160)
-        .padding(24)
+        .padding(DesignSystem.Spacing.cardPadding)
         .glassBackground()
         .shimmer()
     }
@@ -426,7 +411,7 @@ struct QuoteCard: View {
         VStack(alignment: .leading, spacing: 16) {
             Text("\"\(highlight.content)\"")
                 .font(.system(size: 16, weight: .regular))
-                .foregroundColor(.highlighterText)
+                .foregroundColor(DesignSystem.Colors.text)
                 .lineLimit(4)
                 .multilineTextAlignment(.leading)
             
@@ -434,8 +419,8 @@ struct QuoteCard: View {
             
             HStack {
                 Text(formatAuthor(highlight.author))
-                    .font(.highlighterCaption)
-                    .foregroundColor(Color.highlighterSecondaryText)
+                    .font(DesignSystem.Typography.caption)
+                    .foregroundColor(DesignSystem.Colors.textSecondary)
                 
                 Spacer()
                 
@@ -454,16 +439,16 @@ struct QuoteCard: View {
                                 .transition(.scale.combined(with: .opacity))
                         }
                     }
-                    .font(.highlighterCaption)
-                    .foregroundColor(isZapped ? .white : Color.highlighterOrange)
+                    .font(DesignSystem.Typography.caption)
+                    .foregroundColor(isZapped ? .white : DesignSystem.Colors.primary)
                     .padding(.horizontal, 8)
                     .padding(.vertical, 4)
                     .background(
                         Capsule()
-                            .fill(isZapped ? AnyShapeStyle(LinearGradient(colors: [Color.highlighterOrange, Color.highlighterPurple], startPoint: .topLeading, endPoint: .bottomTrailing)) : AnyShapeStyle(Color.clear))
+                            .fill(isZapped ? AnyShapeStyle(LinearGradient(colors: [DesignSystem.Colors.primary, DesignSystem.Colors.primaryDark], startPoint: .topLeading, endPoint: .bottomTrailing)) : AnyShapeStyle(Color.clear))
                             .overlay(
                                 Capsule()
-                                    .stroke(Color.highlighterOrange, lineWidth: 1)
+                                    .stroke(DesignSystem.Colors.primary, lineWidth: 1)
                                     .opacity(isZapped ? 0 : 1)
                             )
                     )
@@ -472,12 +457,12 @@ struct QuoteCard: View {
             }
         }
         .frame(height: 160)
-        .padding(24)
+        .padding(DesignSystem.Spacing.cardPadding)
         .glassBackground()
         .overlay(
             RoundedRectangle(cornerRadius: 16)
                 .stroke(
-                    isZapped ? AnyShapeStyle(LinearGradient(colors: [Color.highlighterOrange, Color.highlighterPurple], startPoint: .topLeading, endPoint: .bottomTrailing)) : AnyShapeStyle(Color.clear),
+                    isZapped ? AnyShapeStyle(LinearGradient(colors: [DesignSystem.Colors.primary, DesignSystem.Colors.primaryDark], startPoint: .topLeading, endPoint: .bottomTrailing)) : AnyShapeStyle(Color.clear),
                     lineWidth: 2
                 )
                 .opacity(isZapped ? 1 : 0)
@@ -511,15 +496,15 @@ struct CommunityZapsSection: View {
         VStack(alignment: .leading, spacing: 16) {
             HStack {
                 Text("Community Zaps")
-                    .font(.system(size: 20, weight: .semibold, design: .rounded))
+                    .font(DesignSystem.Typography.title2)
                 
                 Spacer()
                 
                 Image(systemName: "bolt.circle.fill")
                     .font(.system(size: 16))
-                    .foregroundStyle(LinearGradient(colors: [Color.highlighterOrange, Color.highlighterPurple], startPoint: .topLeading, endPoint: .bottomTrailing))
+                    .foregroundStyle(LinearGradient(colors: [DesignSystem.Colors.primary, DesignSystem.Colors.primaryDark], startPoint: .topLeading, endPoint: .bottomTrailing))
             }
-            .padding(.horizontal, 24)
+            .padding(.horizontal, DesignSystem.Spacing.screenPadding)
             
             VStack(spacing: 16) {
                 if zappedArticles.isEmpty {
@@ -534,7 +519,7 @@ struct CommunityZapsSection: View {
                     }
                 }
             }
-            .padding(.horizontal, 24)
+            .padding(.horizontal, DesignSystem.Spacing.screenPadding)
         }
     }
 }
@@ -558,7 +543,7 @@ struct CommunityZapCardPlaceholder: View {
             
             Spacer()
         }
-        .padding(24)
+        .padding(DesignSystem.Spacing.cardPadding)
         .glassBackground()
         .shimmer()
     }
@@ -570,7 +555,7 @@ struct CommunityZapCard: View {
     var body: some View {
         HStack(alignment: .top, spacing: 16) {
             Circle()
-                .fill(LinearGradient(colors: [Color.highlighterOrange, Color.highlighterPurple], startPoint: .topLeading, endPoint: .bottomTrailing))
+                .fill(LinearGradient(colors: [DesignSystem.Colors.primary, DesignSystem.Colors.primaryDark], startPoint: .topLeading, endPoint: .bottomTrailing))
                 .frame(width: 40, height: 40)
                 .overlay(
                     Image(systemName: "bolt.fill")
@@ -580,8 +565,8 @@ struct CommunityZapCard: View {
             
             VStack(alignment: .leading, spacing: 4) {
                 Text("\(zapEvent.pubkey.prefix(8))... zapped")
-                    .font(.highlighterCaption)
-                    .foregroundColor(Color.highlighterSecondaryText)
+                    .font(DesignSystem.Typography.caption)
+                    .foregroundColor(DesignSystem.Colors.textSecondary)
                 
                 Text("Content")
                     .font(.system(size: 16, weight: .regular))
@@ -596,7 +581,7 @@ struct CommunityZapCard: View {
             
             ZapAmountBadge()
         }
-        .padding(24)
+        .padding(DesignSystem.Spacing.cardPadding)
         .glassBackground()
     }
     
@@ -614,15 +599,15 @@ struct ZapAmountBadge: View {
             Image(systemName: "bolt.fill")
                 .font(.system(size: 10))
             Text("1k")
-                .font(.highlighterCaption)
+                .font(DesignSystem.Typography.caption)
                 .fontWeight(.semibold)
         }
-        .foregroundColor(Color.highlighterOrange)
+        .foregroundColor(DesignSystem.Colors.primary)
         .padding(.horizontal, 8)
         .padding(.vertical, 4)
         .background(
             Capsule()
-                .fill(Color.highlighterOrange.opacity(0.15))
+                .fill(DesignSystem.Colors.primary.opacity(0.15))
         )
     }
 }
@@ -634,15 +619,15 @@ struct BookstrDiscussionsSection: View {
         VStack(alignment: .leading, spacing: 16) {
             HStack {
                 Text("#bookstr Discussions")
-                    .font(.system(size: 20, weight: .semibold, design: .rounded))
+                    .font(DesignSystem.Typography.title2)
                 
                 Spacer()
                 
                 Image(systemName: "bubble.left.and.bubble.right")
                     .font(.system(size: 16))
-                    .foregroundColor(Color.highlighterOrange)
+                    .foregroundColor(DesignSystem.Colors.primary)
             }
-            .padding(.horizontal, 24)
+            .padding(.horizontal, DesignSystem.Spacing.screenPadding)
             
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 16) {
@@ -660,7 +645,7 @@ struct BookstrDiscussionsSection: View {
                         }
                     }
                 }
-                .padding(.horizontal, 24)
+                .padding(.horizontal, DesignSystem.Spacing.screenPadding)
             }
         }
     }
@@ -692,7 +677,7 @@ struct DiscussionCardPlaceholder: View {
             Spacer()
         }
         .frame(height: 140)
-        .padding(24)
+        .padding(DesignSystem.Spacing.cardPadding)
         .glassBackground()
         .shimmer()
     }
@@ -711,11 +696,11 @@ struct DiscussionCard: View {
                     .overlay(
                         Text(String(event.pubkey.prefix(1)).uppercased())
                             .font(.system(size: 12, weight: .semibold))
-                            .foregroundColor(.highlighterText)
+                            .foregroundColor(DesignSystem.Colors.text)
                     )
                 
                 Text(event.pubkey.prefix(8) + "...")
-                    .font(.highlighterCaption)
+                    .font(DesignSystem.Typography.caption)
                     .fontWeight(.medium)
                 
                 Spacer()
@@ -763,7 +748,7 @@ struct DiscussionCard: View {
             }
         }
         .frame(height: 140)
-        .padding(24)
+        .padding(DesignSystem.Spacing.cardPadding)
         .glassBackground()
     }
     
@@ -789,10 +774,10 @@ struct InteractionButton: View {
                 
                 if count > 0 {
                     Text("\(count)")
-                        .font(.highlighterCaption)
+                        .font(DesignSystem.Typography.caption)
                 }
             }
-            .foregroundColor(isActive ? Color.highlighterOrange : Color.highlighterSecondaryText)
+            .foregroundColor(isActive ? DesignSystem.Colors.primary : DesignSystem.Colors.textSecondary)
             .scaleEffect(isActive ? 1.1 : 1.0)
         }
         .buttonStyle(PlainButtonStyle())

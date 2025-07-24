@@ -232,7 +232,7 @@ struct HomeFeedView: View {
         let audioSession = AVAudioSession.sharedInstance()
         
         do {
-            try audioSession.setCategory(.playAndRecord, mode: .default)
+            try audioSession.setCategory(.playAndRecord, mode: .default, options: [.allowBluetooth, .defaultToSpeaker])
             try audioSession.setActive(true)
             
             let documentsPath = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
@@ -444,9 +444,9 @@ struct HomeFeedView: View {
                 
                 await MainActor.run {
                     do {
-                        // Configure audio session for playback
+                        // Configure audio session for playback with Bluetooth support
                         let audioSession = AVAudioSession.sharedInstance()
-                        try audioSession.setCategory(.playback, mode: .default)
+                        try audioSession.setCategory(.playback, mode: .default, options: [.allowBluetooth, .allowAirPlay])
                         try audioSession.setActive(true)
                         
                         self.audioPlayer = try AVAudioPlayer(data: data)
@@ -583,7 +583,7 @@ struct HeaderView: View {
                     .clipShape(Circle())
                 }
                 
-                // Title - Shows relay name or SOCRATES
+                // Title - Shows relay name or AMBULANDO
                 Text(displayTitle)
                     .font(.system(size: 24, weight: .black))
                     .foregroundStyle(
@@ -632,13 +632,13 @@ struct HeaderView: View {
     
     private var displayTitle: String {
         if selectedRelay == nil {
-            return "SOCRATES"
+            return "AMBULANDO"
         } else if let name = selectedRelayInfo?.name, !name.isEmpty {
             return name.uppercased()
         } else if let relay = selectedRelay {
             return formatRelayForDisplay(relay).uppercased()
         } else {
-            return "SOCRATES"
+            return "AMBULANDO"
         }
     }
     
