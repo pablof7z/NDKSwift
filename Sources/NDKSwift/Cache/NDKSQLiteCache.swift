@@ -123,6 +123,12 @@ public actor NDKSQLiteCache: NDKCache {
     // MARK: - Event Operations (NDKCache protocol)
     
     public func saveEvent(_ event: NDKEvent) async throws {
+        // Skip ephemeral events (20000-29999)
+        if EventKind.isEphemeral(event.kind) {
+            NDKLogger.log(.trace, category: .cache, "Skipping ephemeral event (kind: \(event.kind)): \(event.id)")
+            return
+        }
+        
         let eventId = event.id
         let pubkey = event.pubkey
         let createdAt = event.createdAt
@@ -819,6 +825,12 @@ public actor NDKSQLiteCache: NDKCache {
         from relay: String,
         subscriptionId: String
     ) async throws {
+        // Skip ephemeral events (20000-29999)
+        if EventKind.isEphemeral(event.kind) {
+            NDKLogger.log(.trace, category: .cache, "Skipping ephemeral event in processEvent (kind: \(event.kind)): \(event.id)")
+            return
+        }
+        
         // Track relay source in memory
         relaySourceTracking[event.id, default: []].insert(relay)
         
