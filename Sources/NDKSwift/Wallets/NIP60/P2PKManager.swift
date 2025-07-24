@@ -5,13 +5,13 @@ import secp256k1
 public actor P2PKManager {
     // MARK: - Properties
     
-    private var currentKeypair: (privateKey: String, publicKey: String)?
+    private var currentKeypair: (privateKey: String, pubkey: String)?
     private var keyCreatedAt: Date?
     
     // MARK: - Key Management
     
     /// Get or create P2PK keypair
-    func getOrCreateKeypair() async throws -> (privateKey: String, publicKey: String) {
+    func getOrCreateKeypair() async throws -> (privateKey: String, pubkey: String) {
         if let existing = currentKeypair {
             return existing
         }
@@ -22,7 +22,7 @@ public actor P2PKManager {
         
         let keypair = (
             privateKey: privateKey.dataRepresentation.hexString,
-            publicKey: publicKey.dataRepresentation.hexString
+            pubkey: publicKey.dataRepresentation.hexString
         )
         
         currentKeypair = keypair
@@ -66,13 +66,13 @@ public actor P2PKManager {
     }
     
     /// Set keypair (for restoration from backup)
-    func setKeypair(privateKey: String, publicKey: String) throws {
+    func setKeypair(privateKey: String, pubkey: String) throws {
         // Validate keys
         _ = try HexValidator.validate32ByteHex(privateKey)
         
-        _ = try HexValidator.validate32ByteHex(publicKey)
+        _ = try HexValidator.validate32ByteHex(pubkey)
         
-        currentKeypair = (privateKey, publicKey)
+        currentKeypair = (privateKey, pubkey)
         keyCreatedAt = Date()
     }
     
@@ -86,7 +86,7 @@ public actor P2PKManager {
         
         currentKeypair = (
             privateKey: privateKeyHex,
-            publicKey: publicKey.dataRepresentation.hexString
+            pubkey: publicKey.dataRepresentation.hexString
         )
         keyCreatedAt = Date()
     }

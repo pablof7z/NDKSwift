@@ -12,17 +12,17 @@ public protocol NDKEncryption {
     /// - Parameters:
     ///   - message: The plaintext message to encrypt
     ///   - privateKey: Sender's private key (hex)
-    ///   - publicKey: Recipient's public key (hex)
+    ///   - pubkey: Recipient's public key (hex)
     /// - Returns: Encrypted message string
-    func encrypt(message: String, privateKey: PrivateKey, publicKey: PublicKey) throws -> String
+    func encrypt(message: String, privateKey: PrivateKey, pubkey: PublicKey) throws -> String
     
     /// Decrypt a message
     /// - Parameters:
     ///   - encrypted: The encrypted message
     ///   - privateKey: Recipient's private key (hex)
-    ///   - publicKey: Sender's public key (hex)
+    ///   - pubkey: Sender's public key (hex)
     /// - Returns: Decrypted plaintext message
-    func decrypt(encrypted: String, privateKey: PrivateKey, publicKey: PublicKey) throws -> String
+    func decrypt(encrypted: String, privateKey: PrivateKey, pubkey: PublicKey) throws -> String
 }
 
 /// Encryption errors
@@ -50,12 +50,12 @@ public enum NDKEncryptionError: LocalizedError {
 public struct NIP04Encryption: NDKEncryption {
     public init() {}
     
-    public func encrypt(message: String, privateKey: PrivateKey, publicKey: PublicKey) throws -> String {
-        return try Crypto.nip04Encrypt(message: message, privateKey: privateKey, publicKey: publicKey)
+    public func encrypt(message: String, privateKey: PrivateKey, pubkey: PublicKey) throws -> String {
+        return try Crypto.nip04Encrypt(message: message, privateKey: privateKey, pubkey: pubkey)
     }
     
-    public func decrypt(encrypted: String, privateKey: PrivateKey, publicKey: PublicKey) throws -> String {
-        return try Crypto.nip04Decrypt(encrypted: encrypted, privateKey: privateKey, publicKey: publicKey)
+    public func decrypt(encrypted: String, privateKey: PrivateKey, pubkey: PublicKey) throws -> String {
+        return try Crypto.nip04Decrypt(encrypted: encrypted, privateKey: privateKey, pubkey: pubkey)
     }
 }
 
@@ -63,12 +63,12 @@ public struct NIP04Encryption: NDKEncryption {
 public struct NIP44Encryption: NDKEncryption {
     public init() {}
     
-    public func encrypt(message: String, privateKey: PrivateKey, publicKey: PublicKey) throws -> String {
-        return try Crypto.nip44Encrypt(message: message, privateKey: privateKey, publicKey: publicKey)
+    public func encrypt(message: String, privateKey: PrivateKey, pubkey: PublicKey) throws -> String {
+        return try Crypto.nip44Encrypt(message: message, privateKey: privateKey, pubkey: pubkey)
     }
     
-    public func decrypt(encrypted: String, privateKey: PrivateKey, publicKey: PublicKey) throws -> String {
-        return try Crypto.nip44Decrypt(encrypted: encrypted, privateKey: privateKey, publicKey: publicKey)
+    public func decrypt(encrypted: String, privateKey: PrivateKey, pubkey: PublicKey) throws -> String {
+        return try Crypto.nip44Decrypt(encrypted: encrypted, privateKey: privateKey, pubkey: pubkey)
     }
 }
 

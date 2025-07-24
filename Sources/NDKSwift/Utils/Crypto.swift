@@ -83,7 +83,7 @@ public enum Crypto {
     }
 
     /// Verify a signature using Schnorr verification
-    public static func verify(signature: Signature, message: Data, publicKey: PublicKey) throws -> Bool {
+    public static func verify(signature: Signature, message: Data, pubkey: PublicKey) throws -> Bool {
         let sigData: Data
         do {
             sigData = try HexValidator.validate64ByteHex(signature)
@@ -91,14 +91,14 @@ public enum Crypto {
             throw CryptoError.invalidSignatureLength
         }
 
-        let pubKeyData: Data
+        let pubkeyData: Data
         do {
-            pubKeyData = try HexValidator.validate32ByteHex(publicKey)
+            pubkeyData = try HexValidator.validate32ByteHex(pubkey)
         } catch {
             throw CryptoError.invalidKeyLength
         }
 
-        let xonlyKey = secp256k1.Schnorr.XonlyKey(dataRepresentation: pubKeyData)
+        let xonlyKey = secp256k1.Schnorr.XonlyKey(dataRepresentation: pubkeyData)
         let schnorrSig = try secp256k1.Schnorr.SchnorrSignature(dataRepresentation: sigData)
 
         var messageBytes = Array(message)
@@ -127,13 +127,13 @@ public enum Crypto {
     // MARK: - NIP-44 Encryption
     
     /// Encrypt a message using NIP-44
-    static func nip44Encrypt(message: String, privateKey: PrivateKey, publicKey: PublicKey) throws -> String {
-        return try NIP44.encrypt(message: message, privateKey: privateKey, publicKey: publicKey)
+    static func nip44Encrypt(message: String, privateKey: PrivateKey, pubkey: PublicKey) throws -> String {
+        return try NIP44.encrypt(message: message, privateKey: privateKey, pubkey: pubkey)
     }
     
     /// Decrypt a message using NIP-44
-    static func nip44Decrypt(encrypted: String, privateKey: PrivateKey, publicKey: PublicKey) throws -> String {
-        return try NIP44.decrypt(encrypted: encrypted, privateKey: privateKey, publicKey: publicKey)
+    static func nip44Decrypt(encrypted: String, privateKey: PrivateKey, pubkey: PublicKey) throws -> String {
+        return try NIP44.decrypt(encrypted: encrypted, privateKey: privateKey, pubkey: pubkey)
     }
     
     typealias NIP44Error = NIP44.NIP44Error

@@ -177,7 +177,7 @@ public actor NDKSignatureVerificationSampler {
 
             // Verify the signature
             let messageData = Data(hexString: eventId) ?? Data()
-            return try Crypto.verify(signature: signature, message: messageData, publicKey: event.pubkey)
+            return try Crypto.verify(signature: signature, message: messageData, pubkey: event.pubkey)
         } catch {
             return false
         }
