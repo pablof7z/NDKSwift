@@ -21,33 +21,33 @@ public enum Bech32 {
     /// Decode bech32 string
     public static func decode(_ bech32: String) throws -> (hrp: String, data: [UInt8]) {
         guard let separatorIndex = bech32.lastIndex(of: "1") else {
-            throw NDKError.validationError("Invalid bech32: no separator found")
+            throw NDKError.validationError(ErrorMessageConstants.invalid("bech32: no separator found"))
         }
 
         let hrp = String(bech32[..<separatorIndex]).lowercased()
         let dataString = String(bech32[bech32.index(after: separatorIndex)...]).lowercased()
 
         guard !hrp.isEmpty, !dataString.isEmpty else {
-            throw NDKError.validationError("Invalid bech32: invalid length")
+            throw NDKError.validationError(ErrorMessageConstants.invalid("bech32: invalid length"))
         }
 
         var values: [UInt8] = []
         for char in dataString {
             guard let position = charset.firstIndex(of: char) else {
-                throw NDKError.validationError("Invalid bech32 character: \(char)")
+                throw NDKError.validationError(ErrorMessageConstants.invalid("bech32 character: \(char)"))
             }
             values.append(UInt8(charset.distance(from: charset.startIndex, to: position)))
         }
 
         guard values.count >= 6 else {
-            throw NDKError.validationError("Invalid bech32: invalid length")
+            throw NDKError.validationError(ErrorMessageConstants.invalid("bech32: invalid length"))
         }
 
         let checksumLength = 6
         let dataValues = Array(values.dropLast(checksumLength))
 
         guard verifyChecksum(hrp: hrp, values: values) else {
-            throw NDKError.validationError("Invalid bech32 checksum")
+            throw NDKError.validationError(ErrorMessageConstants.invalid("bech32 checksum"))
         }
 
         let data = try convertBits(data: dataValues, fromBits: 5, toBits: 8, pad: false)
@@ -64,7 +64,7 @@ public enum Bech32 {
 
         for value in data {
             if Int(value) >= (1 << fromBits) {
-                throw NDKError.validationError("Invalid bech32 data")
+                throw NDKError.validationError(ErrorMessageConstants.invalid("bech32 data"))
             }
             acc = ((acc << fromBits) | Int(value)) & maxAcc
             bits += fromBits
@@ -79,7 +79,7 @@ public enum Bech32 {
                 result.append(UInt8((acc << (toBits - bits)) & maxv))
             }
         } else if bits >= fromBits || ((acc << (toBits - bits)) & maxv) != 0 {
-            throw NDKError.validationError("Invalid bech32 padding")
+            throw NDKError.validationError(ErrorMessageConstants.invalid("bech32 padding"))
         }
 
         return result
@@ -173,7 +173,7 @@ public extension Bech32 {
     static func pubkey(from npub: String) throws -> PublicKey {
         let (hrp, data) = try decode(npub)
         guard hrp == Bech32HRP.npub else {
-            throw NDKError.validationError("Invalid bech32: no separator found")
+            throw NDKError.validationError(ErrorMessageConstants.invalid("bech32: no separator found"))
         }
         return Data(data).hexString
     }
@@ -194,7 +194,7 @@ public extension Bech32 {
     static func privateKey(from nsec: String) throws -> PrivateKey {
         let (hrp, data) = try decode(nsec)
         guard hrp == Bech32HRP.nsec else {
-            throw NDKError.validationError("Invalid bech32: no separator found")
+            throw NDKError.validationError(ErrorMessageConstants.invalid("bech32: no separator found"))
         }
         return Data(data).hexString
     }
@@ -214,7 +214,7 @@ public extension Bech32 {
     static func eventId(from note: String) throws -> EventID {
         let (hrp, data) = try decode(note)
         guard hrp == Bech32HRP.note else {
-            throw NDKError.validationError("Invalid bech32: no separator found")
+            throw NDKError.validationError(ErrorMessageConstants.invalid("bech32: no separator found"))
         }
         return Data(data).hexString
     }
