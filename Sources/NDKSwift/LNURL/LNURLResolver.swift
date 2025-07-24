@@ -76,7 +76,7 @@ public class LNURLResolver: LNURLResolving {
         let domain = String(parts[1])
         
         // Construct the well-known URL
-        let urlString = "https://\(domain)/.well-known/lnurlp/\(username)"
+        let urlString = "https://\(domain)\(WellKnownPath.lnurlp)\(username)"
         
         guard let url = URL(string: urlString) else {
             throw LNURLError.invalidFormat("Failed to construct URL from LUD16")
@@ -98,7 +98,7 @@ public class LNURLResolver: LNURLResolving {
             let (data, response) = try await dataFetcher.data(from: url)
             
             guard let httpResponse = response as? HTTPURLResponse,
-                  httpResponse.statusCode == 200 else {
+                  httpResponse.statusCode == HTTPStatusCode.ok else {
                 throw LNURLError.invalidResponse("HTTP request failed")
             }
             

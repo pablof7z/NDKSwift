@@ -121,7 +121,7 @@ private func encodeLNURL(_ input: String) throws -> String {
         }
         let username = String(parts[0])
         let domain = String(parts[1])
-        let url = "https://\(domain)/.well-known/lnurlp/\(username)"
+        let url = "https://\(domain)\(WellKnownPath.lnurlp)\(username)"
         
         // Encode to bech32
         guard let data = url.data(using: .utf8) else {

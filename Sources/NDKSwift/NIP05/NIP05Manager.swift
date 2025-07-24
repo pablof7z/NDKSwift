@@ -303,7 +303,7 @@ public actor NIP05Manager {
         
         // Construct URL
         let normalizedName = name == "_" ? "" : name
-        let urlString = "https://\(domain)/.well-known/nostr.json?name=\(normalizedName)"
+        let urlString = "https://\(domain)\(WellKnownPath.nostrJson)?name=\(normalizedName)"
         guard let url = URL(string: urlString) else {
             throw NDKError.invalidDataFormat("NIP-05 identifier", details: "Expected format: name@domain")
         }
@@ -325,7 +325,7 @@ public actor NIP05Manager {
         // Check HTTP status
         let httpResponse = response as? HTTPURLResponse
         let statusCode = httpResponse?.statusCode ?? 0
-        guard statusCode == 200 else {
+        guard statusCode == HTTPStatusCode.ok else {
             // Cache failed attempt
             let failedEntry = NIP05CacheEntry(
                 identifier: identifier,
@@ -377,7 +377,7 @@ public actor NIP05Manager {
             claimedAt: Date(),
             verifiedAt: Date(),
             lastCheckAt: Date(),
-            httpStatusCode: 200
+            httpStatusCode: HTTPStatusCode.ok
         )
         
         // Save to both caches
