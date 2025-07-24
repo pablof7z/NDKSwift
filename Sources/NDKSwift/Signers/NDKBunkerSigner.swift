@@ -473,7 +473,7 @@ public actor NDKBunkerSigner: NDKSigner, Sendable {
         guard let response = response,
               response.error == nil
         else {
-            throw NDKError.cryptoOperation("get public key", nip: "NIP-46", error: NSError(domain: "BunkerError", code: -1, userInfo: [NSLocalizedDescriptionKey: response?.error ?? ErrorMessageConstants.failedTo("get public key")]))
+            throw NDKError.cryptoOperation("get public key", nip: CryptoConstants.NIP.nip46, error: NSError(domain: "BunkerError", code: -1, userInfo: [NSLocalizedDescriptionKey: response?.error ?? ErrorMessageConstants.failedTo("get public key")]))
         }
 
         return response.result
@@ -493,7 +493,7 @@ public actor NDKBunkerSigner: NDKSigner, Sendable {
         guard let response = response,
               response.error == nil
         else {
-            throw NDKError.cryptoOperation(method, nip: "NIP-46", error: NSError(domain: "BunkerError", code: -1, userInfo: [NSLocalizedDescriptionKey: response?.error ?? errorMessage]))
+            throw NDKError.cryptoOperation(method, nip: CryptoConstants.NIP.nip46, error: NSError(domain: "BunkerError", code: -1, userInfo: [NSLocalizedDescriptionKey: response?.error ?? errorMessage]))
         }
 
         return response.result
