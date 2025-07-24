@@ -122,7 +122,7 @@ struct HighlightCard: View {
     
     private func zapHighlight() {
         isZapped.toggle()
-        HapticManager.shared.impact(.light)
+        HapticManager.shared.impact(HapticManager.ImpactStyle.light)
         // TODO: Implement actual zapping
     }
     

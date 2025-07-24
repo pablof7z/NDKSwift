@@ -99,7 +99,7 @@ struct ArticleListView: View {
     private func loadArticles() async {
         guard let ndk = appState.ndk else { return }
         
-        let articleSource = ndk.observe(
+        let articleSource = await ndk.outbox.observe(
             filter: NDKFilter(kinds: [30023], limit: 50),
             maxAge: 300,
             cachePolicy: .cacheWithNetwork
@@ -223,7 +223,7 @@ struct ArticleListCard: View {
             }
         }
         .padding()
-        .cardStyle()
+        .cardBackground()
         .task {
             await loadAuthor()
         }
@@ -237,7 +237,7 @@ struct ArticleListCard: View {
         guard let ndk = appState.ndk else { return }
         
         // Load individual profile using declarative data source
-        let profileDataSource = ndk.observe(
+        let profileDataSource = await ndk.outbox.observe(
             filter: NDKFilter(
                 authors: [article.author],
                 kinds: [0]
@@ -362,7 +362,7 @@ struct ArticleFeaturedCard: View {
             .padding()
         }
         .frame(width: 280, height: 380)
-        .cardStyle()
+        .cardBackground()
         .task {
             await loadAuthor()
         }
@@ -375,7 +375,7 @@ struct ArticleFeaturedCard: View {
     private func loadAuthor() async {
         guard let ndk = appState.ndk else { return }
         
-        let profileDataSource = ndk.observe(
+        let profileDataSource = await ndk.outbox.observe(
             filter: NDKFilter(
                 authors: [article.author],
                 kinds: [0]
@@ -513,7 +513,7 @@ struct ArticleRowCard: View {
         }
         .padding()
         .frame(height: 120)
-        .cardStyle()
+        .cardBackground()
         .task {
             await loadAuthor()
         }
@@ -526,7 +526,7 @@ struct ArticleRowCard: View {
     private func loadAuthor() async {
         guard let ndk = appState.ndk else { return }
         
-        let profileDataSource = ndk.observe(
+        let profileDataSource = await ndk.outbox.observe(
             filter: NDKFilter(
                 authors: [article.author],
                 kinds: [0]

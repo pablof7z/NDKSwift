@@ -34,7 +34,7 @@ struct SearchView: View {
                                 icon: tab.icon,
                                 isSelected: selectedTab == tab
                             ) {
-                                withAnimation(.highlighterSpring) {
+                                withAnimation(DesignSystem.Animation.highlighterSpring) {
                                     selectedTab = tab
                                 }
                                 HapticType.selection.trigger()
@@ -138,7 +138,7 @@ struct HighlightDiscoveryView: View {
         guard let ndk = appState.ndk else { return }
         
         
-        let highlightSource = ndk.observe(
+        let highlightSource = await ndk.outbox.observe(
             filter: NDKFilter(kinds: [9802], limit: 100),
             maxAge: 300,
             cachePolicy: .cacheWithNetwork
@@ -191,7 +191,7 @@ struct CurationDiscoveryView: View {
     private func loadCurations() async {
         guard let ndk = appState.ndk else { return }
         
-        let curationSource = ndk.observe(
+        let curationSource = await ndk.outbox.observe(
             filter: NDKFilter(kinds: [30004], limit: 50),
             maxAge: 300,
             cachePolicy: .cacheWithNetwork
@@ -247,7 +247,7 @@ struct ArticleDiscoveryView: View {
     private func loadArticles() async {
         guard let ndk = appState.ndk else { return }
         
-        let articleSource = ndk.observe(
+        let articleSource = await ndk.outbox.observe(
             filter: NDKFilter(kinds: [30023], limit: 50),
             maxAge: 300,
             cachePolicy: .cacheWithNetwork
@@ -320,7 +320,7 @@ struct ArticleCardView: View {
             }
         }
         .padding()
-        .cardStyle()
+        .modernCard()
         .task {
             await loadAuthor()
         }
@@ -378,7 +378,7 @@ struct UserDiscoveryView: View {
         guard let ndk = appState.ndk else { return }
         
         // Load users who have created highlights
-        let highlightSource = ndk.observe(
+        let highlightSource = await ndk.outbox.observe(
             filter: NDKFilter(kinds: [9802], limit: 100),
             maxAge: 3600,
             cachePolicy: .networkOnly
@@ -470,7 +470,7 @@ struct UserCard: View {
             }
         }
         .padding()
-        .cardStyle()
+        .modernCard()
     }
     
     private func formatPubkey(_ pubkey: String) -> String {
@@ -545,7 +545,7 @@ struct DiscoveryHighlightCard: View {
             }
         }
         .padding()
-        .cardStyle()
+        .modernCard()
         .task {
             await loadAuthor()
         }
@@ -629,7 +629,7 @@ struct CurationCard: View {
             }
         }
         .padding()
-        .cardStyle()
+        .modernCard()
         .task {
             await loadAuthor()
         }

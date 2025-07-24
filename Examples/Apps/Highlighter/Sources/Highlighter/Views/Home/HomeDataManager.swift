@@ -49,7 +49,7 @@ class HomeDataManager: ObservableObject {
     /// Refresh all content by clearing and re-streaming
     func refresh() async {
         isRefreshing = true
-        HapticManager.shared.impact(.light)
+        HapticManager.shared.impact(HapticManager.ImpactStyle.light)
         
         // Clear all data
         highlights.removeAll()
@@ -77,7 +77,7 @@ class HomeDataManager: ObservableObject {
     
     private func streamHighlights(ndk: NDK) async {
         let task = Task {
-            let highlightSource = ndk.observe(
+            let highlightSource = await ndk.outbox.observe(
                 filter: NDKFilter(kinds: [9802], limit: 50),
                 maxAge: CachePolicies.shortTerm,
                 cachePolicy: .cacheWithNetwork
@@ -127,7 +127,7 @@ class HomeDataManager: ObservableObject {
         let task = Task {
             do {
                 let userPubkey = try await signer.pubkey
-                let userHighlightSource = ndk.observe(
+                let userHighlightSource = await ndk.outbox.observe(
                     filter: NDKFilter(
                         authors: [userPubkey],
                         kinds: [9802],
@@ -157,7 +157,7 @@ class HomeDataManager: ObservableObject {
     
     private func streamDiscussions(ndk: NDK) async {
         let task = Task {
-            let discussionSource = ndk.observe(
+            let discussionSource = await ndk.outbox.observe(
                 filter: NDKFilter(kinds: [1], limit: 10, tags: ["t": Set(["bookstr"])]),
                 maxAge: CachePolicies.shortTerm,
                 cachePolicy: .cacheWithNetwork
@@ -179,7 +179,7 @@ class HomeDataManager: ObservableObject {
     
     private func streamZappedArticles(ndk: NDK) async {
         let task = Task {
-            let zapSource = ndk.observe(
+            let zapSource = await ndk.outbox.observe(
                 filter: NDKFilter(kinds: [9735], limit: 10),
                 maxAge: CachePolicies.shortTerm,
                 cachePolicy: .cacheWithNetwork
@@ -227,7 +227,7 @@ class HomeDataManager: ObservableObject {
         // Stream articles
         for filter in articleFilters {
             let task = Task {
-                let dataSource = ndk.observe(
+                let dataSource = await ndk.outbox.observe(
                     filter: filter,
                     maxAge: CachePolicies.shortTerm,
                     cachePolicy: .cacheWithNetwork
@@ -263,6 +263,8 @@ class HomeDataManager: ObservableObject {
     
     // MARK: - Cleanup
     deinit {
-        stopAllStreams()
+        Task { @MainActor in
+            stopAllStreams()
+        }
     }
 }

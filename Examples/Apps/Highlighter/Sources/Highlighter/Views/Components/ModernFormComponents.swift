@@ -113,7 +113,7 @@ struct ModernCheckbox: View {
             withAnimation(DesignSystem.Animation.quick) {
                 isChecked.toggle()
             }
-            HapticManager.shared.selection()
+            HapticManager.shared.triggerSelection()
         } label: {
             HStack(alignment: .top, spacing: DesignSystem.Spacing.base) {
                 // Checkbox
@@ -202,7 +202,7 @@ struct ModernToggleStyle: ToggleStyle {
             withAnimation(DesignSystem.Animation.springSnappy) {
                 configuration.isOn.toggle()
             }
-            HapticManager.shared.selection()
+            HapticManager.shared.triggerSelection()
         } label: {
             RoundedRectangle(cornerRadius: 16, style: .continuous)
                 .fill(
@@ -295,7 +295,7 @@ struct ModernStepper: View {
                         withAnimation(DesignSystem.Animation.quick) {
                             value -= 1
                         }
-                        HapticManager.shared.impact(.light)
+                        HapticManager.shared.impact(HapticManager.ImpactStyle.light)
                     }
                 } label: {
                     Image(systemName: "minus")
@@ -324,7 +324,7 @@ struct ModernStepper: View {
                         withAnimation(DesignSystem.Animation.quick) {
                             value += 1
                         }
-                        HapticManager.shared.impact(.light)
+                        HapticManager.shared.impact(HapticManager.ImpactStyle.light)
                     }
                 } label: {
                     Image(systemName: "plus")

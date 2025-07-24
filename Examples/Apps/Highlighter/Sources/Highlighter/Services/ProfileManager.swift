@@ -122,6 +122,6 @@ class ProfileManager: ObservableObject {
     
     // MARK: - Cleanup
     deinit {
-        stopAllTasks()
+        // Tasks will be automatically cancelled when the instance is deallocated
     }
 }

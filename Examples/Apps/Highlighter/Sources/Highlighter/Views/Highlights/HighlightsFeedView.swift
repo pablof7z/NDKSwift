@@ -104,7 +104,7 @@ struct HighlightsFeedView: View {
         )
         
         // Stream highlights as they arrive
-        let dataSource = ndk.observe(
+        let dataSource = await ndk.outbox.observe(
             filter: filter,
             maxAge: 300, // Use 5 minute cache
             cachePolicy: .cacheWithNetwork
@@ -170,7 +170,7 @@ struct HighlightsFeedView: View {
             tags: ["d": [String(identifier)]]
         )
         
-        let dataSource = ndk.observe(filter: filter, maxAge: 3600)
+        let dataSource = await ndk.outbox.observe(filter: filter, maxAge: 3600)
         
         for await event in dataSource.events {
             if let article = try? Article(from: event) {
@@ -252,7 +252,7 @@ struct HighlightsFeedView: View {
             )
             
             // Fetch the article
-            let dataSource = ndk.observe(filter: filter, maxAge: 3600, cachePolicy: .cacheWithNetwork)
+            let dataSource = await ndk.outbox.observe(filter: filter, maxAge: 3600, cachePolicy: .cacheWithNetwork)
             
             for await event in dataSource.events {
                 if let article = try? Article(from: event) {

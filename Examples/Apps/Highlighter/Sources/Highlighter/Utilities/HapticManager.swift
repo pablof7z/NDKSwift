@@ -55,13 +55,13 @@ class HapticManager {
         guard isEnabled else { return }
         switch style {
         case .light:
-            impact(.light)
+            impact(ImpactStyle.light)
         case .medium:
-            impact(.medium)
+            impact(ImpactStyle.medium)
         case .heavy:
-            impact(.heavy)
+            impact(ImpactStyle.heavy)
         @unknown default:
-            impact(.light)
+            impact(ImpactStyle.light)
         }
     }
     
@@ -87,18 +87,18 @@ class HapticManager {
     // MARK: - Contextual Haptic Methods for Highlighter App
     
     /// Haptic for highlighting text (medium impact)
-    func highlight() { impact(.medium) }
+    func highlight() { impact(ImpactStyle.medium) }
     
     /// Haptic for zap actions (heavy impact + success notification)
     func zap() {
-        impact(.heavy)
+        impact(ImpactStyle.heavy)
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
             self.notification(.success)
         }
     }
     
     /// Haptic for bookmark/save actions (light impact)
-    func bookmark() { impact(.light) }
+    func bookmark() { impact(ImpactStyle.light) }
     
     /// Haptic for successful actions (e.g., publish highlight)
     func success() { notification(.success) }
@@ -116,35 +116,35 @@ class HapticManager {
     func buttonPress(style: ImpactStyle = .light) { impact(style) }
     
     /// Haptic for card interactions (light impact)
-    func cardTap() { impact(.light) }
+    func cardTap() { impact(ImpactStyle.light) }
     
     /// Haptic for swipe actions
-    func swipe() { impact(.light) }
+    func swipe() { impact(ImpactStyle.light) }
     
     /// Haptic for long press gestures
-    func longPress() { impact(.heavy) }
+    func longPress() { impact(ImpactStyle.heavy) }
     
     /// Subtle haptic for hover/selection preview
-    func preview() { impact(.light) }
+    func preview() { impact(ImpactStyle.light) }
     
     // MARK: - Complex Haptic Patterns
     
     /// Haptic pattern for publishing content (sequence of impacts)
     func publish() {
-        impact(.medium)
+        impact(ImpactStyle.medium)
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
             self.notification(.success)
         }
     }
     
     /// Haptic pattern for loading completion
-    func loadComplete() { impact(.light) }
+    func loadComplete() { impact(ImpactStyle.light) }
     
     /// Haptic pattern for pull-to-refresh
     func refresh() {
-        impact(.light)
+        impact(ImpactStyle.light)
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-            self.impact(.light)
+            self.impact(ImpactStyle.light)
         }
     }
 }
