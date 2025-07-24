@@ -95,16 +95,11 @@ struct ModernHomeView: View {
     }
     
     private var greetingText: String {
-        let hour = Calendar.current.component(.hour, from: Date())
-        switch hour {
-        case 0..<12: return "Good morning"
-        case 12..<17: return "Good afternoon"
-        default: return "Good evening"
-        }
+        GreetingFormatter.timeBasedGreeting()
     }
     
     private var formattedDate: String {
-        Date().formatted(.dateTime.weekday(.wide).month(.wide).day())
+        GreetingFormatter.formattedDate()
     }
     
 }

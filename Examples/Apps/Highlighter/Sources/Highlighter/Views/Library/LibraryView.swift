@@ -102,7 +102,7 @@ struct SavedHighlightCard: View {
     var body: some View {
         Button(action: { showDetail = true }) {
             VStack(alignment: .leading, spacing: 8) {
-                Text("\"\(highlight.content)\"")
+                Text(ContentFormatter.formatHighlight(highlight.content))
                     .font(DesignSystem.Typography.body)
                     .foregroundColor(DesignSystem.Colors.text)
                     .lineLimit(3)
@@ -112,13 +112,13 @@ struct SavedHighlightCard: View {
                     HStack(spacing: 4) {
                         Image(systemName: "link")
                             .font(.system(size: 12))
-                        Text(URL(string: url)?.host ?? "Source")
+                        Text(ContentFormatter.extractDomain(from: url))
                             .font(DesignSystem.Typography.caption)
                     }
                     .foregroundColor(DesignSystem.Colors.primary)
                 }
                 
-                Text(relativeTime(from: highlight.createdAt))
+                Text(RelativeTimeFormatter.relativeTime(from: highlight.createdAt))
                     .font(DesignSystem.Typography.caption)
                     .foregroundColor(DesignSystem.Colors.textSecondary)
             }
@@ -132,11 +132,6 @@ struct SavedHighlightCard: View {
         }
     }
     
-    private func relativeTime(from date: Date) -> String {
-        let formatter = RelativeDateTimeFormatter()
-        formatter.unitsStyle = .abbreviated
-        return formatter.localizedString(for: date, relativeTo: Date())
-    }
 }
 
 struct YourCurationsSection: View {

@@ -12,7 +12,7 @@ struct HighlightCard: View {
         Button(action: { showDetail = true }) {
             VStack(alignment: .leading, spacing: 12) {
                 // Quote
-                Text("\"\(highlight.content)\"")
+                Text(ContentFormatter.formatHighlight(highlight.content))
                     .font(.ds.title3)
                     .fontWeight(.medium)
                     .foregroundColor(.ds.text)
@@ -37,7 +37,7 @@ struct HighlightCard: View {
                             .font(.system(size: 20))
                             .foregroundColor(.ds.primary)
                         
-                        Text(author?.name ?? author?.displayName ?? String(highlight.author.prefix(8)))
+                        Text(PubkeyFormatter.displayName(from: author, pubkey: highlight.author))
                             .font(.ds.caption)
                             .fontWeight(.medium)
                             .foregroundColor(.ds.text)
@@ -56,7 +56,7 @@ struct HighlightCard: View {
                         .buttonStyle(PlainButtonStyle())
                         
                         // Time
-                        Text(relativeTime(from: highlight.createdAt))
+                        Text(RelativeTimeFormatter.relativeTime(from: highlight.createdAt))
                             .font(.ds.caption)
                             .foregroundColor(.ds.textSecondary)
                     }
@@ -67,7 +67,7 @@ struct HighlightCard: View {
                     HStack(spacing: .ds.micro) {
                         Image(systemName: "link")
                             .font(.system(size: 12))
-                        Text(URL(string: url)?.host ?? "Source")
+                        Text(ContentFormatter.extractDomain(from: url))
                             .font(.ds.caption)
                     }
                     .foregroundColor(.ds.primary)
@@ -126,9 +126,6 @@ struct HighlightCard: View {
         // TODO: Implement actual zapping
     }
     
-    private func relativeTime(from date: Date) -> String {
-        return RelativeTimeFormatter.relativeTime(from: date)
-    }
 }
 
 // Compact version for horizontal scrolls
@@ -139,7 +136,7 @@ struct CompactHighlightCardView: View {
     var body: some View {
         Button(action: { showDetail = true }) {
             VStack(alignment: .leading, spacing: .ds.small) {
-                Text("\"\(highlight.content)\"")
+                Text(ContentFormatter.formatHighlight(highlight.content))
                     .font(.ds.body)
                     .fontWeight(.medium)
                     .foregroundColor(.ds.text)
@@ -152,7 +149,7 @@ struct CompactHighlightCardView: View {
                         .font(.system(size: 16))
                         .foregroundColor(.ds.primary)
                     
-                    Text(String(highlight.author.prefix(8)))
+                    Text(PubkeyFormatter.formatShort(highlight.author))
                         .font(.ds.caption)
                         .foregroundColor(.ds.textSecondary)
                     
