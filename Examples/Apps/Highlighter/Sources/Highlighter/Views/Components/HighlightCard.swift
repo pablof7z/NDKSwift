@@ -128,7 +128,7 @@ struct HighlightCard: View {
 }
 
 // Compact version for horizontal scrolls
-struct CompactHighlightCard: View {
+struct CompactHighlightCardView: View {
     let highlight: HighlightEvent
     @State private var showDetail = false
     
@@ -193,9 +193,9 @@ struct CompactHighlightCard: View {
         .environmentObject(AppState())
         .padding()
         
-        ScrollView(.horizontal) {
+        ScrollView(.horizontal, showsIndicators: false) {
             HStack {
-                CompactHighlightCard(
+                CompactHighlightCardView(
                     highlight: HighlightEvent(
                         id: "2",
                         event: NDKEvent(id: "", pubkey: "", createdAt: 0, kind: 9802, tags: [], content: "", sig: ""),

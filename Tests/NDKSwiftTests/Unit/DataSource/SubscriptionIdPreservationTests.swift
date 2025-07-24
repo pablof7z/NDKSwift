@@ -9,11 +9,11 @@ final class SubscriptionIdPreservationTests: XCTestCase {
         
         // Test the subscription ID generation
         let filter = NDKFilter(kinds: [1111])
-        let generatedId = manager.generateSubscriptionIdForTesting(for: filter)
+        let generatedId = await manager.generateSubscriptionIdForTesting(for: filter)
         
-        // Generated IDs should have the format: kind1111_<4-char-suffix>
-        XCTAssertTrue(generatedId.starts(with: "kind1111_"))
-        XCTAssertEqual(generatedId.count, "kind1111_".count + 4) // 4-char suffix
+        // Generated IDs should have the format: k1111_<4-char-suffix>
+        XCTAssertTrue(generatedId.starts(with: "k1111_"))
+        XCTAssertEqual(generatedId.count, "k1111_".count + 4) // 4-char suffix
         
         // Verify custom IDs would be preserved (this tests the logic without full integration)
         let customId = "my-wallet-subscription"
@@ -21,7 +21,7 @@ final class SubscriptionIdPreservationTests: XCTestCase {
             PendingRequirement(
                 id: UUID(),
                 filter: filter,
-                observer: MockCacheObserver(),
+                observer: MockSubIdCacheObserver(),
                 registeredAt: Date(),
                 maxAge: 0,
                 cachePolicy: .cacheWithNetwork,
@@ -58,7 +58,7 @@ final class SubscriptionIdPreservationTests: XCTestCase {
             PendingRequirement(
                 id: UUID(),
                 filter: NDKFilter(kinds: [EventKind.cashuToken]),
-                observer: MockCacheObserver(),
+                observer: MockSubIdCacheObserver(),
                 registeredAt: Date(),
                 maxAge: 0,
                 cachePolicy: .cacheWithNetwork,
@@ -69,8 +69,8 @@ final class SubscriptionIdPreservationTests: XCTestCase {
             ),
             PendingRequirement(
                 id: UUID(),
-                filter: NDKFilter(kinds: [EventKind.userMetadata]),
-                observer: MockCacheObserver(),
+                filter: NDKFilter(kinds: [EventKind.metadata]),
+                observer: MockSubIdCacheObserver(),
                 registeredAt: Date(),
                 maxAge: 0,
                 cachePolicy: .cacheWithNetwork,
@@ -95,24 +95,32 @@ final class SubscriptionIdPreservationTests: XCTestCase {
         let customId = "nip60-wallet"
         let relayHost = "relay.damus.io"
         
-        // Simulate the relay-specific ID generation
+        // Simulate the relay-specific ID generation with shortened relay host
         let baseId = customId
-        let relaySpecificId = "\(baseId)_\(relayHost)"
+        let shortRelayHost = relayHost
+            .replacingOccurrences(of: ".com", with: "")
+            .replacingOccurrences(of: ".net", with: "")
+            .replacingOccurrences(of: ".org", with: "")
+            .replacingOccurrences(of: "relay.", with: "")
+            .replacingOccurrences(of: "nos.", with: "")
+            .replacingOccurrences(of: "nostr.", with: "")
+            .prefix(8)
+        let relaySpecificId = "\(baseId)_\(shortRelayHost)"
         
-        XCTAssertEqual(relaySpecificId, "nip60-wallet_relay.damus.io")
+        XCTAssertEqual(relaySpecificId, "nip60-wallet_damus.io")
         XCTAssertTrue(relaySpecificId.starts(with: customId))
-        XCTAssertTrue(relaySpecificId.hasSuffix("_\(relayHost)"))
+        XCTAssertTrue(relaySpecificId.hasSuffix("_\(shortRelayHost)"))
     }
 }
 
-// Mock cache observer for testing
-class MockCacheObserver: CacheObserver {
+// Mock cache observer for testing subscription ID preservation
+class MockSubIdCacheObserver: CacheObserver {
     func handleEvent(_ event: NDKEvent) async {}
 }
 
-// Extension to expose private method for testing
+// Extension to expose internal method for testing
 extension NDKDataRequirementManager {
-    func generateSubscriptionIdForTesting(for filter: NDKFilter) -> String {
+    func generateSubscriptionIdForTesting(for filter: NDKFilter) async -> String {
         return generateSubscriptionId(for: filter)
     }
 }

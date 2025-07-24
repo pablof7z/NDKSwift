@@ -71,7 +71,7 @@ final class RelayOriginTests: XCTestCase {
     func testFallbackRelaySelection() async throws {
         // Set up a user relay list for current user
         let userPubkey = try await signer.pubkey
-        await setupMockRelayList(
+        try await setupMockRelayList(
             for: userPubkey,
             readRelays: ["wss://user-read1.com", "wss://user-read2.com"],
             writeRelays: ["wss://user-write1.com"]
@@ -110,7 +110,7 @@ final class RelayOriginTests: XCTestCase {
     func testGetCurrentUserRelayUrls() async throws {
         // Set up relay list for current user
         let userPubkey = try await signer.pubkey
-        await setupMockRelayList(
+        try await setupMockRelayList(
             for: userPubkey,
             readRelays: ["wss://user-read1.com", "wss://user-read2.com"],
             writeRelays: ["wss://user-write1.com", "wss://user-write2.com"]
@@ -137,7 +137,7 @@ final class RelayOriginTests: XCTestCase {
     
     // MARK: - Helper Methods
     
-    private func setupMockRelayList(for pubkey: String, readRelays: [String], writeRelays: [String]) async {
+    private func setupMockRelayList(for pubkey: String, readRelays: [String], writeRelays: [String]) async throws {
         // Create relay info items
         var relayInfos: [NDKRelayInfo] = []
         
@@ -165,7 +165,7 @@ final class RelayOriginTests: XCTestCase {
             .build(signer: signer)
         
         // Cache the event
-        await cache.saveEvent(relayListEvent)
+        try await cache.saveEvent(relayListEvent)
         
         // The outbox tracker will automatically pick up the cached event
         // when it queries for the user's relay list

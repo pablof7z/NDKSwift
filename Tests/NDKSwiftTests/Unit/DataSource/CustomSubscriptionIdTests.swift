@@ -73,7 +73,7 @@ final class CustomSubscriptionIdTests: XCTestCase {
         
         let dataSource2 = NDKDataSource<NDKEvent>(
             ndk: ndk,
-            filter: NDKFilter(kinds: [EventKind.userMetadata]),
+            filter: NDKFilter(kinds: [EventKind.metadata]),
             subscriptionId: customId2
         )
         

@@ -483,7 +483,27 @@ struct AuthenticationView: View {
                         throw NDKError.invalidInput(message: "Invalid login format. Use nsec, bunker://, nostrconnect://, or NIP-05")
                     }
                     
-                    try await bunkerSigner.connect()
+                    // Set the bunker signer on NDK before connecting (critical for NIP-46)
+                    ndk.signer = bunkerSigner
+                    
+                    // Listen for auth URL in case user needs to approve
+                    let authUrlTask = Task {
+                        for await authUrl in await bunkerSigner.authUrlPublisher.values {
+                            await MainActor.run {
+                                // Show alert with auth URL
+                                errorMessage = "Authorization required! Open this URL in your signer app:\n\n\(authUrl)"
+                                showError = true
+                            }
+                        }
+                    }
+                    
+                    // Connect to the bunker
+                    let user = try await bunkerSigner.connect()
+                    
+                    // Cancel auth URL listener
+                    authUrlTask.cancel()
+                    
+                    // Start session
                     let sessionData = try await nostrManager.login(with: bunkerSigner)
                     
                     await MainActor.run {
