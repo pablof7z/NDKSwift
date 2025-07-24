@@ -115,7 +115,7 @@ actor NDKPublishingStrategy {
     }
 
     /// Clean up completed items older than specified age
-    func cleanupCompleted(olderThan age: TimeInterval = 3600) async {
+    func cleanupCompleted(olderThan age: TimeInterval = TimeConstants.hour) async {
         let cutoffDate = Date().addingTimeInterval(-age)
 
         var itemsToKeep: [String: OutboxItem] = [:]

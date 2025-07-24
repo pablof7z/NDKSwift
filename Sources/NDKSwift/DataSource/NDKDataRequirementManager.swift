@@ -32,7 +32,7 @@ actor NDKDataRequirementManager {
     private func startPeriodicCleanup() async {
         while !Task.isCancelled {
             // Wait 1 hour between cleanups
-            try? await Task.sleep(nanoseconds: 3_600_000_000_000)
+            try? await Task.sleep(nanoseconds: UInt64(TimeConstants.hour * Double(TimeConstants.nanosecondsPerSecond)))
             
             // Clean up orphaned immediate cache handles
             let activeIds = Set(activeRequirements.keys)

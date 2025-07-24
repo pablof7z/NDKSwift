@@ -33,7 +33,7 @@ actor RelayListLookupTracker {
     private var recentLookups: [String: Date] = [:]
     private let lookupWindow: TimeInterval
     
-    init(lookupWindow: TimeInterval = 7200) { // 2 hours default
+    init(lookupWindow: TimeInterval = 2 * TimeConstants.hour) { // 2 hours default
         self.lookupWindow = lookupWindow
     }
     

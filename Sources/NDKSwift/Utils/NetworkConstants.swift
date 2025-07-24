@@ -14,9 +14,9 @@ public enum NetworkConstants {
     /// Subscription timeout for receiving initial data - short to detect dead subscriptions
     public static let timeoutSubscription: TimeInterval = 5
     /// Large resources (images, files) need extended timeout for slow connections
-    public static let timeoutResource: TimeInterval = 300  // 5 minutes
+    public static let timeoutResource: TimeInterval = 5 * TimeConstants.minute  // 5 minutes
     /// Wallet deposits may involve multiple chain confirmations
-    public static let timeoutWalletDeposit: TimeInterval = 600  // 10 minutes
+    public static let timeoutWalletDeposit: TimeInterval = 10 * TimeConstants.minute  // 10 minutes
     
     // Data Collection Timeouts (for collect() operations)
     public static let timeoutDataCollectionShort: TimeInterval = 2.0  // For wallet operations
@@ -39,9 +39,9 @@ public enum NetworkConstants {
     
     // Cache Parameters
     /// TTL for tombstones (deletion markers) - prevents re-adding deleted items too soon
-    public static let tombstoneTTL: TimeInterval = 600 // 10 minutes
+    public static let tombstoneTTL: TimeInterval = 10 * TimeConstants.minute // 10 minutes
     /// Interval for cache cleanup tasks - balances performance vs memory usage
-    public static let cleanupInterval: TimeInterval = 300 // 5 minutes
+    public static let cleanupInterval: TimeInterval = 5 * TimeConstants.minute // 5 minutes
     /// Default capacity for general-purpose caches - prevents unbounded memory growth
     public static let defaultCacheCapacity = 1000
     /// Profile cache size - based on typical social graph sizes
@@ -61,7 +61,7 @@ public enum NetworkConstants {
     
     // NIP-05 Configuration
     /// Minimum time between NIP-05 verifications for same address - prevents abuse
-    public static let nip05RateLimit: TimeInterval = 360 // 6 minutes between requests
+    public static let nip05RateLimit: TimeInterval = 6 * TimeConstants.minute // 6 minutes between requests
     /// Maximum allowed response size for NIP-05 queries - prevents DoS via large responses
     public static let maxNIP05ResponseSize = 1_048_576 // 1MB
     
@@ -72,6 +72,6 @@ public enum NetworkConstants {
     public static let dataGroupingWindow: TimeInterval = 0.1 // 100ms
     
     // Deposit Monitoring
-    public static let depositCheckBaseInterval: TimeInterval = 120.0 // 2 minutes
-    public static let depositCheckMaxInterval: TimeInterval = 7200.0 // 2 hours
+    public static let depositCheckBaseInterval: TimeInterval = 2 * TimeConstants.minute // 2 minutes
+    public static let depositCheckMaxInterval: TimeInterval = 2 * TimeConstants.hour // 2 hours
 }
