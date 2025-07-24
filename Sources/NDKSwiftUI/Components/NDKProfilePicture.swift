@@ -124,7 +124,7 @@ public struct NDKProfilePicture: View {
         .accessibilityLabel("Profile picture for \(profileDataSource.displayName)")
         .onAppear {
             // Update the data source with the environment NDK
-            if let environmentNDK = ndk {
+            if ndk != nil {
                 // We need to recreate the data source with the correct NDK
                 // This is a limitation of the current approach - in a real implementation,
                 // we might want to use a different pattern

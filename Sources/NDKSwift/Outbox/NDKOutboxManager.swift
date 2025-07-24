@@ -142,22 +142,6 @@ public actor NDKOutboxManager {
         return await selector.selectRelays(for: pubkey, count: count)
     }
     
-    /// Get recommended relays for a subscription based on filters
-    /// Use this to create outbox-aware subscriptions
-    /// - Parameters:
-    ///   - filters: The filters to analyze for relay selection
-    /// - Returns: Set of relay URLs recommended for this subscription
-    @available(*, deprecated, message: "Use getOutboxStrategy(for:) instead")
-    public func getRecommendedRelaysForSubscription(filters: [NDKFilter]) async -> Set<String> {
-        // For backward compatibility, collect all relays from the strategy
-        var allRelays = Set<String>()
-        for filter in filters {
-            let strategy = await getOutboxStrategy(for: filter)
-            allRelays.formUnion(strategy.filtersByRelay.keys)
-        }
-        return allRelays
-    }
-    
     /// Get outbox strategy for a filter, breaking it down by relay with proper author mapping
     /// - Parameter filter: The filter to analyze
     /// - Returns: Strategy with filters broken down by relay
