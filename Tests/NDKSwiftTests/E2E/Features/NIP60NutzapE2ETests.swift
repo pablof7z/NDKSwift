@@ -52,13 +52,13 @@ final class NIP60NutzapE2ETests: XCTestCase {
         ndk2.signer = signer2
         
         // Add test relays to both NDK instances
-        let relay1_1 = await ndk1.pool.addRelay("wss://relay.damus.io")
-        let relay1_2 = await ndk1.pool.addRelay("wss://relay.primal.net")
-        let relay1_3 = await ndk1.pool.addRelay("wss://relay.nostr.band")
+        let relay1_1 = await ndk1.pool.addRelay(RelayConstants.damus)
+        let relay1_2 = await ndk1.pool.addRelay(RelayConstants.primal)
+        let relay1_3 = await ndk1.pool.addRelay(RelayConstants.nostrBand)
         
-        let relay2_1 = await ndk2.pool.addRelay("wss://relay.damus.io")
-        let relay2_2 = await ndk2.pool.addRelay("wss://relay.primal.net")
-        let relay2_3 = await ndk2.pool.addRelay("wss://relay.nostr.band")
+        let relay2_1 = await ndk2.pool.addRelay(RelayConstants.damus)
+        let relay2_2 = await ndk2.pool.addRelay(RelayConstants.primal)
+        let relay2_3 = await ndk2.pool.addRelay(RelayConstants.nostrBand)
         
         // Connect to relays explicitly
         print("🔌 Connecting relays for NDK1...")
@@ -103,7 +103,7 @@ final class NIP60NutzapE2ETests: XCTestCase {
         print("✅ Wallets created")
         
         let testMint = "https://testnut.cashu.space"
-        let relays = ["wss://relay.damus.io", "wss://relay.primal.net"]
+        let relays = [RelayConstants.damus, RelayConstants.primal]
         
         // Setup wallets - both publish mint list for nutzap compatibility
         print("\n🔧 Setting up wallet1...")

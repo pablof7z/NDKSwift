@@ -398,11 +398,11 @@ struct AuthenticationView: View {
         Task {
             do {
                 let signer = try NDKPrivateKeySigner(nsec: nsecInput)
-                try await nostrManager.login(with: signer)
+                let sessionData = try await nostrManager.login(with: signer)
                 
                 await MainActor.run {
                     appState.isAuthenticated = true
-                    appState.isLoading = true
+                    appState.currentUser = nostrManager.ndk?.getUser(sessionData.pubkey)
                 }
             } catch {
                 await MainActor.run {

@@ -516,11 +516,11 @@ struct AddRelayView: View {
     
     // Common relays
     let suggestedRelays = [
-        "wss://relay.damus.io",
-        "wss://relay.nostr.band",
+        RelayConstants.damus,
+        RelayConstants.nostrBand,
         "wss://relayable.org",
-        "wss://relay.primal.net",
-        "wss://nostr.wine"
+        RelayConstants.primal,
+        RelayConstants.nostrWine
     ]
     
     var body: some View {

@@ -152,7 +152,16 @@ struct HomeFeedView: View {
                     continue
                 }
                 
-                let wotScore = appState.webOfTrust[event.pubkey] ?? 0.1
+                // Get WOT score from session data
+                let wotScore: Double
+                if let sessionData = ndk.sessionData {
+                    let score = sessionData.webOfTrust[event.pubkey] ?? 0
+                    // Normalize score (direct follows have Int.max)
+                    wotScore = score == Int.max ? 1.0 : min(Double(score) / 10.0, 1.0)
+                } else {
+                    wotScore = 0.1
+                }
+                
                 if let audioEvent = AudioEvent.from(event: event, webOfTrustScore: wotScore) {
                     await MainActor.run {
                         // Add new event if it doesn't already exist

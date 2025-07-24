@@ -11,7 +11,7 @@ struct TestWalletBalance {
         let pubkey = try await signer.pubkey
         print("Pubkey: \(pubkey)")
         
-        let ndk = NDK(relayUrls: ["wss://relay.primal.net"])
+        let ndk = NDK(relayUrls: [RelayConstants.primal])
         ndk.signer = signer
         await ndk.connect()
         

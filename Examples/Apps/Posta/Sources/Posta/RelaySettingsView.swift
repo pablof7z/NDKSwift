@@ -408,12 +408,12 @@ struct AddRelayView: View {
     @State private var isAdding = false
     
     let suggestedRelays = [
-        "wss://relay.damus.io",
-        "wss://relay.nostr.band",
+        RelayConstants.damus,
+        RelayConstants.nostrBand,
         "wss://relayable.org", 
-        "wss://nos.lol",
-        "wss://relay.snort.social",
-        "wss://nostr.wine"
+        RelayConstants.nosLol,
+        RelayConstants.snortSocial,
+        RelayConstants.nostrWine
     ]
     
     var body: some View {

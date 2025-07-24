@@ -11,14 +11,10 @@ struct ContentView: View {
             
             NDKAuthView(authManager: nostrManager.authManager, ndk: nostrManager.ndk) {
                 // Main app interface - shown when authenticated
-                if appState.isLoading {
-                    LoadingView()
-                } else {
-                    NavigationView {
-                        HomeFeedView()
-                    }
-                    .environment(\.ndk, nostrManager.ndk)
+                NavigationView {
+                    HomeFeedView()
                 }
+                .environment(\.ndk, nostrManager.ndk)
             } authenticationContent: {
                 // Authentication screen
                 AuthenticationView()

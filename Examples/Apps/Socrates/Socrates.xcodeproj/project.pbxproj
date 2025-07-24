@@ -3,7 +3,7 @@
 	archiveVersion = 1;
 	classes = {
 	};
-	objectVersion = 54;
+	objectVersion = 63;
 	objects = {
 
 /* Begin PBXBuildFile section */
@@ -18,13 +18,11 @@
 		6A1EC79596B1BC84867C4B0D /* AuthenticationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 624E1033520124ED3046A8FB /* AuthenticationView.swift */; };
 		903342389D8567E371A22508 /* HomeFeedView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B34DE9D6D851E93B36168925 /* HomeFeedView.swift */; };
 		9A451131A1EA9D2B9D8C70A2 /* RelayManagementView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 74E368483893E3ABAF5517A0 /* RelayManagementView.swift */; };
-		B563B954DB73F03CB111C6CC /* LoadingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 02E7FB115000B8B003A26F9A /* LoadingView.swift */; };
 		EA6502F90E837099D4DA88A5 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6B60F979A61DE300148519B2 /* SettingsView.swift */; };
 		ED4EB5652AF4127BD55CD911 /* SocratesApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = C6CAD7F4A7FFDCF19160C1E8 /* SocratesApp.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
-		02E7FB115000B8B003A26F9A /* LoadingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LoadingView.swift; sourceTree = "<group>"; };
 		08DDF10E5B3980BDA92AB6FE /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
 		2DA6D01B074A1B3A914D864A /* NDKSwift */ = {isa = PBXFileReference; lastKnownFileType = folder; name = NDKSwift; path = ../../..; sourceTree = SOURCE_ROOT; };
 		440D3F1E85605D9F3B50FF30 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
@@ -73,7 +71,6 @@
 				8B8F53511A32689EFEF1609F /* AudioEventCard.swift */,
 				624E1033520124ED3046A8FB /* AuthenticationView.swift */,
 				B34DE9D6D851E93B36168925 /* HomeFeedView.swift */,
-				02E7FB115000B8B003A26F9A /* LoadingView.swift */,
 				74E368483893E3ABAF5517A0 /* RelayManagementView.swift */,
 				558465E4F55D567C57A014EC /* RelaySelectorView.swift */,
 				6B60F979A61DE300148519B2 /* SettingsView.swift */,
@@ -175,7 +172,6 @@
 			packageReferences = (
 				2C30A4BD0D0F90BA9F16E74B /* XCLocalSwiftPackageReference "../../..//" */,
 			);
-			preferredProjectObjectVersion = 54;
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
@@ -205,7 +201,6 @@
 				6A1EC79596B1BC84867C4B0D /* AuthenticationView.swift in Sources */,
 				528BA384039B7EDFCC81AB4E /* ContentView.swift in Sources */,
 				903342389D8567E371A22508 /* HomeFeedView.swift in Sources */,
-				B563B954DB73F03CB111C6CC /* LoadingView.swift in Sources */,
 				9A451131A1EA9D2B9D8C70A2 /* RelayManagementView.swift in Sources */,
 				40C1DD8A6F0890CAA3E5641F /* RelaySelectorView.swift in Sources */,
 				EA6502F90E837099D4DA88A5 /* SettingsView.swift in Sources */,

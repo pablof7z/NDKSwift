@@ -14,9 +14,9 @@ final class NIP60WalletE2ETests: XCTestCase {
         ndk = NDK(cache: cache)
         
         // Add test relays
-        _ = await ndk.pool.addRelay("wss://relay.damus.io")
-        _ = await ndk.pool.addRelay("wss://relay.primal.net")
-        _ = await ndk.pool.addRelay("wss://relay.nostr.band")
+        _ = await ndk.pool.addRelay(RelayConstants.damus)
+        _ = await ndk.pool.addRelay(RelayConstants.primal)
+        _ = await ndk.pool.addRelay(RelayConstants.nostrBand)
         
         // Connect to relays using proper async monitoring
         print("🔌 Connecting to relays...")
@@ -65,7 +65,7 @@ final class NIP60WalletE2ETests: XCTestCase {
         
         // Setup wallet with testnut mint
         let testMint = "https://testnut.cashu.space"
-        let relays = ["wss://relay.damus.io", "wss://relay.primal.net"]
+        let relays = [RelayConstants.damus, RelayConstants.primal]
         
         // Track wallet setup publishing
         print("\n📤 Setting up wallet...")
