@@ -138,9 +138,7 @@ struct ParallaxEffect: ViewModifier {
 }
 
 extension View {
-    func shimmer() -> some View {
-        modifier(ShimmerEffect())
-    }
+    // shimmer() method moved to DesignSystem.swift to avoid duplication
     
     func parallax(magnitude: CGFloat = 20) -> some View {
         modifier(ParallaxEffect(magnitude: magnitude))
