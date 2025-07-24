@@ -61,8 +61,13 @@ class AppState: ObservableObject {
             // Set NDK instance in auth manager
             authManager.setNDK(ndk!)
             
-            // Restore session from keychain
-            await authManager.restoreSession()
+            // Restore sessions from keychain
+            await authManager.restoreSessions()
+            
+            // Use the most recent session if available
+            if let mostRecentSession = authManager.availableSessions.last {
+                try? await authManager.switchToSession(mostRecentSession)
+            }
             
             // Start NIP-77 sync in background
             Task {
@@ -116,7 +121,7 @@ class AppState: ObservableObject {
     }
     
     func logout() async {
-        // Cancel all streaming tasks
+        // Cancel all streaming tasks first
         for task in streamingTasks {
             task.cancel()
         }
@@ -129,7 +134,20 @@ class AppState: ObservableObject {
         following = []
         currentUserProfile = nil
         
-        // Logout
+        // Proper logout implementation - clear cache and delete sessions from keychain
+        Task {
+            // Clear cache data
+            if let cache = ndk?.cache {
+                try? await cache.clear()
+            }
+            
+            // Delete ALL sessions from keychain - this is critical!
+            for session in authManager.availableSessions {
+                try? await authManager.deleteSession(session)
+            }
+        }
+        
+        // Clear memory state
         authManager.logout()
     }
     
