@@ -88,3 +88,29 @@ public extension Array where Element == NDKEvent {
     }
 }
 
+// MARK: - Array Mutation Extensions
+
+public extension Array {
+    /// Remove all elements matching the predicate and return the removed elements
+    @discardableResult
+    mutating func removeAll(where predicate: (Element) throws -> Bool) rethrows -> [Element] {
+        var removed: [Element] = []
+        self = try filter { element in
+            let shouldRemove = try predicate(element)
+            if shouldRemove {
+                removed.append(element)
+            }
+            return !shouldRemove
+        }
+        return removed
+    }
+}
+
+public extension Array where Element: Equatable {
+    /// Remove all occurrences of the specified value
+    /// - Parameter value: The value to remove from the array
+    mutating func removeAll(value: Element) {
+        removeAll { $0 == value }
+    }
+}
+
