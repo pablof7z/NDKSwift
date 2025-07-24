@@ -110,7 +110,6 @@ struct HighlightDiscoveryView: View {
     let searchText: String
     @EnvironmentObject var appState: AppState
     @State private var highlights: [HighlightEvent] = []
-    @State private var isLoading = false
     
     var filteredHighlights: [HighlightEvent] {
         if searchText.isEmpty {
@@ -138,7 +137,6 @@ struct HighlightDiscoveryView: View {
     private func loadHighlights() async {
         guard let ndk = appState.ndk else { return }
         
-        isLoading = true
         
         let highlightSource = ndk.observe(
             filter: NDKFilter(kinds: [9802], limit: 100),
@@ -156,8 +154,6 @@ struct HighlightDiscoveryView: View {
                 }
             }
         }
-        
-        isLoading = false
     }
 }
 

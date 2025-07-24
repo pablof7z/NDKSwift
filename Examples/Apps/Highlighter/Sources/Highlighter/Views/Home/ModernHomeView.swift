@@ -170,8 +170,10 @@ struct ModernHomeView: View {
         HapticManager.shared.impact(.light)
         
         highlights.removeAll()
+        highlightedArticles.removeAll()
         discussions.removeAll()
         zappedArticles.removeAll()
+        userHighlights.removeAll()
         
         await streamContent()
         
@@ -302,10 +304,10 @@ struct ModernHomeView: View {
                 // This is an "a" tag reference (kind:pubkey:d-tag)
                 let parts = reference.split(separator: ":")
                 if parts.count >= 3,
-                   let kind = Int32(parts[0]) {
+                   let kind = Int(parts[0]) {
                     articleFilters.append(NDKFilter(
-                        kinds: [kind],
                         authors: [String(parts[1])],
+                        kinds: [kind],
                         tags: ["d": Set([String(parts[2])])]
                     ))
                 }
@@ -315,27 +317,34 @@ struct ModernHomeView: View {
             }
         }
         
-        // Fetch articles
+        // Stream articles
         for filter in articleFilters {
-            let events = await ndk.fetchEvents(filter)
-            for event in events {
-                if event.kind == 30023,
-                   let article = try? Article(from: event),
-                   let highlights = highlightsByArticle[event.id] ?? highlightsByArticle["\(event.kind):\(event.pubkey):\(article.identifier ?? "")"] {
-                    
-                    let lastHighlight = highlights.max(by: { $0.createdAt < $1.createdAt })
-                    
-                    await MainActor.run {
-                        withAnimation(DesignSystem.Animation.quick) {
-                            let highlightedArticle = HighlightedArticle(
-                                article: article,
-                                highlights: highlights,
-                                lastHighlightTime: lastHighlight?.createdAt ?? Date()
-                            )
-                            
-                            if !highlightedArticles.contains(where: { $0.article.id == article.id }) {
-                                highlightedArticles.append(highlightedArticle)
-                                highlightedArticles.sort { $0.lastHighlightTime > $1.lastHighlightTime }
+            Task {
+                let dataSource = ndk.observe(
+                    filter: filter,
+                    maxAge: 300,
+                    cachePolicy: .cacheWithNetwork
+                )
+                
+                for await event in dataSource.events {
+                    if event.kind == 30023,
+                       let article = try? Article(from: event),
+                       let highlights = highlightsByArticle[event.id] ?? highlightsByArticle["\(event.kind):\(event.pubkey):\(article.identifier ?? "")"] {
+                        
+                        let lastHighlight = highlights.max(by: { $0.createdAt < $1.createdAt })
+                        
+                        await MainActor.run {
+                            withAnimation(DesignSystem.Animation.quick) {
+                                let highlightedArticle = HighlightedArticle(
+                                    article: article,
+                                    highlights: highlights,
+                                    lastHighlightTime: lastHighlight?.createdAt ?? Date()
+                                )
+                                
+                                if !highlightedArticles.contains(where: { $0.article.id == article.id }) {
+                                    highlightedArticles.append(highlightedArticle)
+                                    highlightedArticles.sort { $0.lastHighlightTime > $1.lastHighlightTime }
+                                }
                             }
                         }
                     }
@@ -503,6 +512,127 @@ struct TrendingItemCard: View {
         let date = Date(timeIntervalSince1970: TimeInterval(timestamp))
         let formatter = RelativeDateTimeFormatter()
         formatter.unitsStyle = .short
+        return formatter.localizedString(for: date, relativeTo: Date())
+    }
+}
+
+// MARK: - Preference Key
+struct ScrollOffsetPreferenceKey: PreferenceKey {
+    static var defaultValue: CGFloat = 0
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
+        value = nextValue()
+    }
+}
+
+struct HighlightedArticleCard: View {
+    let article: Article
+    let highlights: [HighlightEvent]
+    @State private var isBookmarked = false
+    
+    var body: some View {
+        NavigationLink(destination: ArticleView(article: article)) {
+            VStack(alignment: .leading, spacing: .ds.base) {
+                // Article header with image
+                if let imageUrl = article.image {
+                    AsyncImage(url: URL(string: imageUrl)) { phase in
+                        switch phase {
+                        case .success(let image):
+                            image
+                                .resizable()
+                                .aspectRatio(contentMode: .fill)
+                                .frame(height: 120)
+                                .clipped()
+                                .clipShape(RoundedRectangle(cornerRadius: .ds.medium, style: .continuous))
+                        case .empty, .failure:
+                            RoundedRectangle(cornerRadius: .ds.medium, style: .continuous)
+                                .fill(DesignSystem.Colors.surfaceSecondary)
+                                .frame(height: 120)
+                                .overlay(
+                                    Image(systemName: "photo")
+                                        .font(.system(size: 24))
+                                        .foregroundColor(.ds.textTertiary)
+                                )
+                        @unknown default:
+                            EmptyView()
+                        }
+                    }
+                }
+                
+                // Article title and metadata
+                VStack(alignment: .leading, spacing: .ds.small) {
+                    Text(article.title)
+                        .font(.ds.headline)
+                        .foregroundColor(.ds.text)
+                        .lineLimit(2)
+                        .multilineTextAlignment(.leading)
+                    
+                    if let summary = article.summary {
+                        Text(summary)
+                            .font(.ds.callout)
+                            .foregroundColor(.ds.textSecondary)
+                            .lineLimit(2)
+                            .multilineTextAlignment(.leading)
+                    }
+                    
+                    // Highlight count and recent highlight preview
+                    VStack(alignment: .leading, spacing: .ds.micro) {
+                        Label("\(highlights.count) highlight\(highlights.count == 1 ? "" : "s")", systemImage: "highlighter")
+                            .font(.ds.footnoteMedium)
+                            .foregroundColor(.ds.primary)
+                        
+                        if let recentHighlight = highlights.first {
+                            Text("\"\(recentHighlight.content)\"")
+                                .font(.ds.footnote)
+                                .foregroundColor(.ds.textSecondary)
+                                .italic()
+                                .lineLimit(2)
+                                .padding(.vertical, .ds.micro)
+                                .padding(.horizontal, .ds.small)
+                                .background(DesignSystem.Colors.highlightSubtle)
+                                .clipShape(RoundedRectangle(cornerRadius: .ds.small, style: .continuous))
+                        }
+                    }
+                    
+                    // Footer with author and actions
+                    HStack {
+                        Text(formatAuthor(article.author))
+                            .font(.ds.caption)
+                            .foregroundColor(.ds.textTertiary)
+                        
+                        Text("·")
+                            .foregroundColor(.ds.textTertiary)
+                        
+                        Text(relativeTime(from: Timestamp(article.createdAt.timeIntervalSince1970)))
+                            .font(.ds.caption)
+                            .foregroundColor(.ds.textTertiary)
+                        
+                        Spacer()
+                        
+                        Button(action: {
+                            isBookmarked.toggle()
+                            HapticManager.shared.impact(.light)
+                        }) {
+                            Image(systemName: isBookmarked ? "bookmark.fill" : "bookmark")
+                                .font(.system(size: 14))
+                                .foregroundColor(isBookmarked ? .ds.primary : .ds.textTertiary)
+                        }
+                    }
+                }
+                .padding(.horizontal, .ds.base)
+                .padding(.bottom, .ds.base)
+            }
+        }
+        .modernCard(noPadding: true)
+    }
+    
+    private func formatAuthor(_ pubkey: String) -> String {
+        String(pubkey.prefix(8)) + "..."
+    }
+    
+    private func relativeTime(from timestamp: Timestamp) -> String {
+        let date = Date(timeIntervalSince1970: TimeInterval(timestamp))
+        let formatter = RelativeDateTimeFormatter()
+        formatter.unitsStyle = .abbreviated
         return formatter.localizedString(for: date, relativeTo: Date())
     }
 }

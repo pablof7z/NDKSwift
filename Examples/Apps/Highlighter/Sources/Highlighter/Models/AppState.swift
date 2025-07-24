@@ -21,7 +21,6 @@ class AppState: ObservableObject {
     
     // UI State
     @Published var selectedTab = 0
-    @Published var isLoading = false
     @Published var errorMessage: String?
     
     // Data Sources
@@ -41,9 +40,6 @@ class AppState: ObservableObject {
     init() {}
     
     func initialize() async {
-        isLoading = true
-        defer { isLoading = false }
-        
         do {
             // Setup NDK with cache
             let cache = try await NDKSQLiteCache(path: nil)
@@ -56,7 +52,11 @@ class AppState: ObservableObject {
                 ],
                 cache: cache
             )
-            await ndk?.connect()
+            
+            // Connect to relays asynchronously
+            Task {
+                await ndk?.connect()
+            }
             
             // Set NDK instance in auth manager
             authManager.setNDK(ndk!)
@@ -64,16 +64,20 @@ class AppState: ObservableObject {
             // Restore session from keychain
             await authManager.restoreSession()
             
-            // Perform NIP-77 sync for highlights from relay.damus.io
-            await syncHighlights()
+            // Start NIP-77 sync in background
+            Task {
+                await syncHighlights()
+            }
             
-            // If authenticated after restore, start streaming
+            // If authenticated after restore, start streaming immediately
             if authManager.isAuthenticated {
                 // Start streaming data
                 await startDataStreams()
                 
-                // Load user profile
-                await loadUserProfile()
+                // Load user profile in background
+                Task {
+                    await loadUserProfile()
+                }
             }
         } catch {
             errorMessage = "Failed to initialize: \(error.localizedDescription)"
