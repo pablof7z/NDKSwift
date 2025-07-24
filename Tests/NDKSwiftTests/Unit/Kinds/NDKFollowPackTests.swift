@@ -268,23 +268,16 @@ final class NDKFollowPackTests: XCTestCase {
     // MARK: - Observation Tests
     
     func testObserveFollowPacks() async throws {
-        // Create test events
-        let event1 = createTestEvent(
-            kind: EventKind.followPack,
-            tags: [["title", "Pack 1"], ["p", "pk1"]]
-        )
-        let event2 = createTestEvent(
-            kind: EventKind.mediaFollowPack,
-            tags: [["title", "Media Pack"], ["p", "pk2"]]
-        )
-        
         // Use observe to get follow packs
         let filter = NDKFilter(kinds: NDKFollowPack.supportedKinds)
         let observer = ndk.observe(filter: filter)
         
-        // In a real test, you'd mock the relay to return these events
-        // For now, just verify the pattern works
+        // Verify the observer pattern works
         XCTAssertNotNil(observer)
+        
+        // Note: In a real test, you'd mock the relay to return test events
+        // with appropriate kind values (EventKind.followPack, EventKind.mediaFollowPack)
+        // and verify the observer properly filters and returns them
     }
     
 }

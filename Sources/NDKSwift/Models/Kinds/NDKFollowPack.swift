@@ -179,7 +179,7 @@ public class NDKFollowPackBuilder {
     /// Build, sign, and publish the follow pack
     public func publish() async throws -> NDKFollowPack {
         let followPack = try await build()
-        try await ndk.publish(followPack.event)
+        _ = try await ndk.publish(followPack.event)
         return followPack
     }
 }
