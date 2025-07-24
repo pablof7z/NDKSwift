@@ -42,6 +42,7 @@ public final class NDKDataSource<T>: ObservableObject, CacheObserver {
     private let maxAge: TimeInterval
     private let cachePolicy: CachePolicy
     private let relays: Set<RelayURL>?
+    private let exclusiveRelays: Bool
     private var requirementHandle: DataRequirementHandle?
     private var task: Task<Void, Never>?
     private let correlationId: String
@@ -73,6 +74,7 @@ public final class NDKDataSource<T>: ObservableObject, CacheObserver {
         maxAge: TimeInterval = 0,
         cachePolicy: CachePolicy = .cacheWithNetwork,
         relays: Set<RelayURL>? = nil,
+        exclusiveRelays: Bool = false,
         subscriptionId: String? = nil
     ) where T == NDKEvent {
         self.init(
@@ -81,6 +83,7 @@ public final class NDKDataSource<T>: ObservableObject, CacheObserver {
             maxAge: maxAge,
             cachePolicy: cachePolicy,
             relays: relays,
+            exclusiveRelays: exclusiveRelays,
             subscriptionId: subscriptionId,
             transform: { $0 }
         )
@@ -103,6 +106,7 @@ public final class NDKDataSource<T>: ObservableObject, CacheObserver {
         maxAge: TimeInterval = 0,
         cachePolicy: CachePolicy = .cacheWithNetwork,
         relays: Set<RelayURL>? = nil,
+        exclusiveRelays: Bool = false,
         subscriptionId: String? = nil,
         transform: @escaping (NDKEvent) -> T?
     ) {
@@ -112,6 +116,7 @@ public final class NDKDataSource<T>: ObservableObject, CacheObserver {
         self.maxAge = maxAge
         self.cachePolicy = cachePolicy
         self.relays = relays
+        self.exclusiveRelays = exclusiveRelays
         self.correlationId = IDGenerator.randomId(length: 8)
         self.subscriptionId = subscriptionId
         
@@ -163,6 +168,7 @@ public final class NDKDataSource<T>: ObservableObject, CacheObserver {
                 maxAge: maxAge,
                 cachePolicy: cachePolicy,
                 relays: relays,
+                exclusiveRelays: exclusiveRelays,
                 subscriptionId: subscriptionId
             )
             NDKLogger.log(.debug, category: .subscription, "✅ Requirement registered with handle: \(String(describing: requirementHandle))", correlationId: correlationId)

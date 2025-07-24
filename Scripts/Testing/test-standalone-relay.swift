@@ -29,7 +29,7 @@ do {
     // Create a simple filter - just get recent text notes
     let filter = NDKFilter(
         kinds: [1],
-        since: Timestamp.now - 3600, // Last hour
+        since: Timestamp.now - Int64(TimeConstants.hour), // Last hour
         limit: 10
     )
     

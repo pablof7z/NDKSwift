@@ -166,6 +166,29 @@ public enum EventKind {
     public static let mediaFollowPack = 39092  // NIP-51 media follow pack
 }
 
+// MARK: - Common Amount Presets
+
+/// Common amounts used for zaps and payments (in sats)
+public enum AmountPresets {
+    /// Small preset amounts for zaps
+    public static let smallZapAmounts = [21, 100, 1000]
+    
+    /// Standard preset amounts for zaps and nutzaps
+    public static let standardAmounts = [100, 500, 1000, 5000, 10000, 50000]
+    
+    /// Extended preset amounts including larger values
+    public static let extendedAmounts = [100, 500, 1000, 5000, 10000, 50000, 100000]
+    
+    /// Common nutzap preset amounts
+    public static let nutzapAmounts = [1000, 5000, 10000, 50000]
+    
+    /// Default zap amount
+    public static let defaultZapAmount = 21
+    
+    /// Minimum zap amount
+    public static let minimumZapAmount = 1
+}
+
 // MARK: - Event Kind Ranges
 
 public extension EventKind {

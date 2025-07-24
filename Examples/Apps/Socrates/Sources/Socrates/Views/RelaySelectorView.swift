@@ -14,6 +14,7 @@ struct RelaySelectorView: View {
         let id = UUID()
         let url: String
         let isConnected: Bool
+        let info: NDKRelayInformation?
     }
     
     var body: some View {
@@ -43,7 +44,8 @@ struct RelaySelectorView: View {
                 title: "All Relays",
                 subtitle: "\(relayStates.filter { $0.isConnected }.count) connected",
                 isSelected: selectedRelay == nil,
-                isConnected: true
+                isConnected: true,
+                iconURL: nil
             ) {
                 selectedRelay = nil
                 isPresented = false
@@ -57,10 +59,11 @@ struct RelaySelectorView: View {
                 VStack(spacing: 0) {
                     ForEach(relayStates) { relay in
                         RelaySelectorRowView(
-                            title: formatRelayUrl(relay.url),
+                            title: relay.info?.name ?? formatRelayUrl(relay.url),
                             subtitle: relay.isConnected ? "Connected" : "Disconnected",
                             isSelected: selectedRelay == relay.url,
-                            isConnected: relay.isConnected
+                            isConnected: relay.isConnected,
+                            iconURL: relay.info?.icon
                         ) {
                             selectedRelay = relay.url
                             isPresented = false
@@ -114,7 +117,8 @@ struct RelaySelectorView: View {
             for relay in relays {
                 let connectionState = await relay.connectionState
                 let isConnected = connectionState == .connected
-                states.append(RelayInfo(url: relay.url, isConnected: isConnected))
+                let info = await relay.info
+                states.append(RelayInfo(url: relay.url, isConnected: isConnected, info: info))
             }
             
             await MainActor.run {
@@ -127,9 +131,10 @@ struct RelaySelectorView: View {
                 switch change {
                 case .relayAdded(let relay):
                     let isConnected = await relay.connectionState == .connected
+                    let info = await relay.info
                     await MainActor.run {
                         if !self.relayStates.contains(where: { $0.url == relay.url }) {
-                            self.relayStates.append(RelayInfo(url: relay.url, isConnected: isConnected))
+                            self.relayStates.append(RelayInfo(url: relay.url, isConnected: isConnected, info: info))
                             self.relayStates.sort { $0.url < $1.url }
                         }
                     }
@@ -140,16 +145,18 @@ struct RelaySelectorView: View {
                     }
                     
                 case .relayConnected(let relay):
+                    let info = await relay.info
                     await MainActor.run {
                         if let index = self.relayStates.firstIndex(where: { $0.url == relay.url }) {
-                            self.relayStates[index] = RelayInfo(url: relay.url, isConnected: true)
+                            self.relayStates[index] = RelayInfo(url: relay.url, isConnected: true, info: info)
                         }
                     }
                     
                 case .relayDisconnected(let relay):
+                    let info = await relay.info
                     await MainActor.run {
                         if let index = self.relayStates.firstIndex(where: { $0.url == relay.url }) {
-                            self.relayStates[index] = RelayInfo(url: relay.url, isConnected: false)
+                            self.relayStates[index] = RelayInfo(url: relay.url, isConnected: false, info: info)
                         }
                     }
                 }
@@ -163,24 +170,55 @@ struct RelaySelectorRowView: View {
     let subtitle: String
     let isSelected: Bool
     let isConnected: Bool
+    let iconURL: String?
     let action: () -> Void
     
     var body: some View {
         Button(action: action) {
             HStack(spacing: 12) {
-                // Connection indicator
-                Circle()
-                    .fill(isConnected ? Color.green : Color.red.opacity(0.6))
-                    .frame(width: 8, height: 8)
+                // Relay icon if available
+                if let iconURL = iconURL, let url = URL(string: iconURL) {
+                    AsyncImage(url: url) { image in
+                        image
+                            .resizable()
+                            .scaledToFill()
+                    } placeholder: {
+                        Circle()
+                            .fill(Color.white.opacity(0.1))
+                            .overlay(
+                                ProgressView()
+                                    .scaleEffect(0.5)
+                            )
+                    }
+                    .frame(width: 32, height: 32)
+                    .clipShape(Circle())
+                } else {
+                    // Default icon for relays without custom icon
+                    Circle()
+                        .fill(Color.white.opacity(0.1))
+                        .frame(width: 32, height: 32)
+                        .overlay(
+                            Image(systemName: "network")
+                                .font(.system(size: 16))
+                                .foregroundColor(Color.white.opacity(0.5))
+                        )
+                }
                 
                 VStack(alignment: .leading, spacing: 2) {
                     Text(title)
                         .font(.system(size: 15, weight: .medium))
                         .foregroundColor(.white)
+                        .lineLimit(1)
                     
-                    Text(subtitle)
-                        .font(.system(size: 12))
-                        .foregroundColor(Color.white.opacity(0.6))
+                    HStack(spacing: 4) {
+                        Circle()
+                            .fill(isConnected ? Color.green : Color.red.opacity(0.6))
+                            .frame(width: 6, height: 6)
+                        
+                        Text(subtitle)
+                            .font(.system(size: 12))
+                            .foregroundColor(Color.white.opacity(0.6))
+                    }
                 }
                 
                 Spacer()

@@ -212,6 +212,11 @@ public class NDKAuthManager {
     /// Restore a specific session as the active session
     /// - Parameter session: The session to restore
     private func restoreActiveSession(_ session: NDKSession) async throws {
+        // If this session is already active and authenticated, skip restoration
+        if activeSession?.id == session.id && authenticationState == .authenticated {
+            return
+        }
+        
         do {
             // Check if biometric authentication is required
             if session.requiresBiometric {
@@ -313,12 +318,16 @@ public class NDKAuthManager {
         let pubkey = try await signer.pubkey
         
         // Create session
-        let session = NDKSession(
+        var session = NDKSession(
             pubkey: pubkey,
             signerType: type(of: signer).signerType,
             requiresBiometric: requiresBiometric,
             isHardwareBacked: isHardwareBacked
         )
+        
+        // Mark as active and update last used
+        session.markAsActive()
+        session.updateLastUsed()
         
         // Validate session
         try session.validate()
@@ -340,6 +349,14 @@ public class NDKAuthManager {
         // Add to available sessions
         availableSessions.append(session)
         
+        // Immediately activate this session to prevent flash of "Welcome Back"
+        activeSession = session
+        activeSigner = signer
+        authenticationState = .authenticated
+        
+        // Set signer on NDK if available
+        ndk?.signer = signer
+        
         return session
     }
     
@@ -351,12 +368,15 @@ public class NDKAuthManager {
             throw NDKAuthError.sessionNotFound
         }
         
-        // Set to authenticating first to prevent UI flicker
-        authenticationState = .authenticating
-        
-        // Clear current active state
-        activeSigner = nil
-        ndk?.signer = nil
+        // Only set to authenticating if we're not already authenticated with this session
+        // This prevents UI flicker when switching to a just-created session
+        if activeSession?.id != session.id {
+            authenticationState = .authenticating
+            
+            // Clear current active state
+            activeSigner = nil
+            ndk?.signer = nil
+        }
         
         // Restore the selected session
         try await restoreActiveSession(session)

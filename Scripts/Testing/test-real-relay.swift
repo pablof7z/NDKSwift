@@ -92,7 +92,7 @@ struct TestRealRelay {
             
             let syncFilter = NDKFilter(
                 kinds: [1],
-                since: Timestamp.now - 3600, // Last hour
+                since: Timestamp.now - Int64(TimeConstants.hour), // Last hour
                 limit: 10
             )
             

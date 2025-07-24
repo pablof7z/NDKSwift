@@ -195,7 +195,7 @@ struct UserProfileView: View {
         )
         
         // Stream audio events
-        let dataSource = ndk.observe(filter: filter, maxAge: 300, cachePolicy: .cacheWithNetwork)
+        let dataSource = ndk.observe(filter: filter, maxAge: 0, cachePolicy: .cacheWithNetwork)
         
         audioEventsTask = Task {
             for await event in dataSource.events {

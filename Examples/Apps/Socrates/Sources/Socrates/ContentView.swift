@@ -4,6 +4,7 @@ import NDKSwift
 struct ContentView: View {
     @EnvironmentObject var nostrManager: NostrManager
     @EnvironmentObject var appState: AppState
+    @EnvironmentObject var blossomServerManager: BlossomServerManager
     
     var body: some View {
         ZStack {
@@ -14,7 +15,6 @@ struct ContentView: View {
                 NavigationView {
                     HomeFeedView()
                 }
-                .environment(\.ndk, nostrManager.ndk)
             } authenticationContent: {
                 // Authentication screen
                 AuthenticationView()
@@ -35,6 +35,11 @@ struct ContentView: View {
         .onAppear {
             appState.setNostrManager(nostrManager)
         }
-        .environment(\.ndk, nostrManager.ndk)
+        .onChange(of: nostrManager.isAuthenticated) { _, isAuthenticated in
+            if isAuthenticated {
+                // Load blossom servers when authenticated
+                blossomServerManager.loadServers()
+            }
+        }
     }
 }

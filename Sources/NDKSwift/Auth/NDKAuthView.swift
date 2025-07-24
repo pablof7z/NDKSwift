@@ -143,9 +143,9 @@ public struct NDKAuthView<AuthenticatedContent: View, AuthenticationContent: Vie
                 biometricRequiredView
                 
             case .unauthenticated:
-                // Only show session selection if we have sessions AND we're not in the process of authenticating
-                // This prevents the "Welcome Back" screen from appearing during login/signup flow
-                if authManager.hasSessions && !isActivelyAuthenticating() {
+                // Show session selection if we have sessions but no active session
+                // If we have an active session, we shouldn't be in unauthenticated state
+                if authManager.hasSessions && authManager.activeSession == nil {
                     sessionSelectionView
                 } else {
                     authenticationContent()
@@ -438,18 +438,6 @@ public struct NDKAuthView<AuthenticatedContent: View, AuthenticationContent: Vie
         if let ndk = ndk {
             authManager.setNDK(ndk)
         }
-    }
-    
-    /// Check if we're actively in an authentication flow
-    /// This helps prevent showing session selection during login/signup
-    private func isActivelyAuthenticating() -> Bool {
-        // If we have an active session that was just created (within last 2 seconds)
-        // we're likely in the middle of an auth flow
-        if let activeSession = authManager.activeSession,
-           Date().timeIntervalSince(activeSession.lastUsed) < 2.0 {
-            return true
-        }
-        return false
     }
     
     private func retryBiometricAuth() {

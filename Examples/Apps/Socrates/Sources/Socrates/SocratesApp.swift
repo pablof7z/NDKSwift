@@ -5,14 +5,29 @@ import NDKSwift
 struct SocratesApp: App {
     @StateObject private var nostrManager = NostrManager()
     @StateObject private var appState = AppState()
+    @StateObject private var blossomServerManager: BlossomServerManager
+    
+    init() {
+        let manager = NostrManager()
+        self._nostrManager = StateObject(wrappedValue: manager)
+        self._blossomServerManager = StateObject(wrappedValue: BlossomServerManager(ndk: manager.ndk))
+    }
     
     var body: some Scene {
         WindowGroup {
-            ContentView()
-                .environment(\.colorScheme, .dark)
-                .preferredColorScheme(.dark)
-                .environmentObject(nostrManager)
-                .environmentObject(appState)
+            Group {
+                #if DEBUG
+                // Use debug view that bypasses authentication for testing
+                DebugContentView()
+                #else
+                ContentView()
+                #endif
+            }
+            .environment(\.colorScheme, .dark)
+            .preferredColorScheme(.dark)
+            .environmentObject(nostrManager)
+            .environmentObject(appState)
+            .environmentObject(blossomServerManager)
         }
     }
 }
