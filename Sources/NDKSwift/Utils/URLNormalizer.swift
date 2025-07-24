@@ -18,74 +18,116 @@ public enum URLNormalizer {
     /// - Returns: A normalized URL string
     /// - Throws: URLNormalizationError if the URL cannot be normalized
     public static func normalizeRelayUrl(_ url: String) throws -> String {
-        var normalized = ValidationHelpers.trim(url)
-
-        // Check for obviously invalid URLs
-        if normalized.contains(" ") || normalized.isEmpty || normalized.hasPrefix("://") {
+        // Step 1: Clean and validate input
+        let cleanedURL = ValidationHelpers.trim(url)
+        try validateURLString(cleanedURL)
+        
+        // Step 2: Ensure WebSocket scheme
+        let urlWithScheme = ensureWebSocketScheme(cleanedURL)
+        
+        // Step 3: Parse and validate components
+        var urlComponents = try parseURLComponents(urlWithScheme)
+        
+        // Step 4: Normalize components
+        normalizeComponents(&urlComponents)
+        
+        // Step 5: Build final URL with trailing slash
+        return try buildNormalizedURL(from: urlComponents)
+    }
+    
+    // MARK: - Private Helper Methods
+    
+    /// Validates that the URL string meets basic requirements
+    private static func validateURLString(_ url: String) throws {
+        if url.contains(" ") || url.isEmpty || url.hasPrefix("://") {
             throw URLNormalizationError.invalidURL(url)
         }
-
-        // Ensure proper protocol
-        if !RelayConstants.WebSocketScheme.isWebSocketURL(normalized) {
-            // Default to wss:// for security
-            normalized = "\(RelayConstants.WebSocketScheme.secure)\(normalized)"
+    }
+    
+    /// Ensures the URL has a WebSocket scheme (ws:// or wss://)
+    private static func ensureWebSocketScheme(_ url: String) -> String {
+        if RelayConstants.WebSocketScheme.isWebSocketURL(url) {
+            return url
         }
-
-        // Parse URL to ensure validity and perform normalization
-        guard var urlComponents = URLComponents(string: normalized),
+        // Default to wss:// for security
+        return "\(RelayConstants.WebSocketScheme.secure)\(url)"
+    }
+    
+    /// Parses URL string into components and validates structure
+    private static func parseURLComponents(_ url: String) throws -> URLComponents {
+        guard let urlComponents = URLComponents(string: url),
               let host = urlComponents.host,
-              !host.isEmpty
-        else {
+              !host.isEmpty else {
             throw URLNormalizationError.invalidURL(url)
         }
-
-        // Convert scheme and host to lowercase
-        urlComponents.scheme = urlComponents.scheme?.lowercased()
-        urlComponents.host = urlComponents.host?.lowercased()
-
-        // Remove authentication (username/password)
-        urlComponents.user = nil
-        urlComponents.password = nil
-
-        // Remove fragment (hash)
-        urlComponents.fragment = nil
-
-        // Remove www. prefix from hostname if present
-        if let host = urlComponents.host, host.hasPrefix("www.") {
-            urlComponents.host = String(host.dropFirst(4))
-        }
-
+        return urlComponents
+    }
+    
+    /// Normalizes URL components in place
+    private static func normalizeComponents(_ components: inout URLComponents) {
+        // Convert to lowercase
+        components.scheme = components.scheme?.lowercased()
+        components.host = components.host?.lowercased()
+        
+        // Remove authentication
+        components.user = nil
+        components.password = nil
+        
+        // Remove fragment
+        components.fragment = nil
+        
+        // Remove www. prefix
+        removeWWWPrefix(&components)
+        
         // Remove default ports
-        if let port = urlComponents.port {
-            if (urlComponents.scheme == "ws" && port == 80) ||
-                (urlComponents.scheme == "wss" && port == 443) {
-                urlComponents.port = nil
+        removeDefaultPorts(&components)
+    }
+    
+    /// Removes www. prefix from hostname if present
+    private static func removeWWWPrefix(_ components: inout URLComponents) {
+        if let host = components.host, host.hasPrefix("www.") {
+            components.host = String(host.dropFirst(4))
+        }
+    }
+    
+    /// Removes default ports (80 for ws, 443 for wss)
+    private static func removeDefaultPorts(_ components: inout URLComponents) {
+        if let port = components.port {
+            if (components.scheme == "ws" && port == 80) ||
+                (components.scheme == "wss" && port == 443) {
+                components.port = nil
             }
         }
-
-        // Reconstruct the URL ensuring proper formatting
-        guard let normalizedComponents = urlComponents.url else {
-            throw URLNormalizationError.invalidURL(url)
+    }
+    
+    /// Builds the final normalized URL with proper trailing slash
+    private static func buildNormalizedURL(from components: URLComponents) throws -> String {
+        guard let url = components.url else {
+            throw URLNormalizationError.invalidURL("")
         }
-
-        var normalizedURL = normalizedComponents.absoluteString
-
-        // Handle query parameters - ensure the slash comes before the query
-        if let queryRange = normalizedURL.range(of: "?") {
-            let beforeQuery = String(normalizedURL[..<queryRange.lowerBound])
-            let queryAndAfter = String(normalizedURL[queryRange.lowerBound...])
-
-            if !beforeQuery.hasSuffix("/") {
-                normalizedURL = beforeQuery + "/" + queryAndAfter
-            }
-        } else {
-            // No query parameters, just ensure trailing slash
-            if !normalizedURL.hasSuffix("/") {
-                normalizedURL = normalizedURL + "/"
-            }
-        }
-
+        
+        var normalizedURL = url.absoluteString
+        
+        // Ensure trailing slash, handling query parameters correctly
+        normalizedURL = ensureTrailingSlash(normalizedURL)
+        
         return normalizedURL
+    }
+    
+    /// Ensures the URL has a trailing slash, properly handling query parameters
+    private static func ensureTrailingSlash(_ url: String) -> String {
+        if let queryRange = url.range(of: "?") {
+            let beforeQuery = String(url[..<queryRange.lowerBound])
+            let queryAndAfter = String(url[queryRange.lowerBound...])
+            
+            if !beforeQuery.hasSuffix("/") {
+                return beforeQuery + "/" + queryAndAfter
+            }
+        } else if !url.hasSuffix("/") {
+            return url + "/"
+        }
+        
+        return url
     }
 
     /// Normalizes an array of relay URLs, removing duplicates
