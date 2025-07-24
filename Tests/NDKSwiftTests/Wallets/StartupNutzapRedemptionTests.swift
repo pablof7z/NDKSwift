@@ -32,21 +32,14 @@ final class StartupNutzapRedemptionTests: XCTestCase {
     }
     
     func testStartupRedemptionWaitsForBothEOSE() async throws {
-        // TODO: Fix this test after API changes
-        // The test needs to be updated to work with the current API:
-        // - onCompletion property access needs actor isolation
-        // - MockRelay integration needs to be updated
-        
-        throw XCTSkip("Test needs to be updated for current API")
+        throw XCTSkip("Test needs to be updated for current API: onCompletion property access needs actor isolation, MockRelay integration needs to be updated")
     }
     
     func testStartupRedemptionHandlesMultipleNutzaps() async throws {
-        // TODO: Fix this test after API changes
         throw XCTSkip("Test needs to be updated for current API")
     }
     
     func testStartupRedemptionClearsAfterCompletion() async throws {
-        // TODO: Fix this test after API changes
         throw XCTSkip("Test needs to be updated for current API")
     }
     
