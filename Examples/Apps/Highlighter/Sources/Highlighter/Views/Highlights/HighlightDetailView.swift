@@ -19,14 +19,15 @@ struct HighlightDetailView: View {
                     // Highlight content
                     VStack(alignment: .leading, spacing: 16) {
                         Text("\"\(highlight.content)\"")
-                            .font(.highlighterQuote)
-                            .foregroundColor(.highlighterText)
+                            .font(DesignSystem.Typography.body)
+                            .fontWeight(.medium)
+                            .foregroundColor(DesignSystem.Colors.text)
                             .padding()
                             .background(
                                 LinearGradient(
                                     colors: [
-                                        Color.highlighterPurple.opacity(0.1),
-                                        Color.highlighterOrange.opacity(0.1)
+                                        DesignSystem.Colors.primary.opacity(0.1),
+                                        DesignSystem.Colors.secondary.opacity(0.1)
                                     ],
                                     startPoint: .topLeading,
                                     endPoint: .bottomTrailing
@@ -37,8 +38,8 @@ struct HighlightDetailView: View {
                         // Context if available
                         if let context = highlight.context {
                             Text(context)
-                                .font(.highlighterBody)
-                                .foregroundColor(.highlighterSecondaryText)
+                                .font(DesignSystem.Typography.body)
+                                .foregroundColor(DesignSystem.Colors.textSecondary)
                                 .padding(.horizontal)
                         }
                         
@@ -46,15 +47,15 @@ struct HighlightDetailView: View {
                         if let comment = highlight.comment {
                             VStack(alignment: .leading, spacing: 8) {
                                 Label("Author's Note", systemImage: "bubble.left.fill")
-                                    .font(.highlighterCaption)
-                                    .foregroundColor(.highlighterPurple)
+                                    .font(DesignSystem.Typography.caption)
+                                    .foregroundColor(DesignSystem.Colors.primary)
                                 
                                 Text(comment)
-                                    .font(.highlighterBody)
-                                    .foregroundColor(.highlighterText)
+                                    .font(DesignSystem.Typography.body)
+                                    .foregroundColor(DesignSystem.Colors.text)
                             }
                             .padding()
-                            .background(Color.highlighterCardBackground)
+                            .background(DesignSystem.Colors.surface)
                             .cornerRadius(12)
                         }
                     }
@@ -64,16 +65,16 @@ struct HighlightDetailView: View {
                     HStack {
                         Image(systemName: "person.circle.fill")
                             .font(.system(size: 40))
-                            .foregroundColor(.highlighterPurple)
+                            .foregroundColor(DesignSystem.Colors.primary)
                         
                         VStack(alignment: .leading, spacing: 4) {
                             Text(author?.name ?? author?.displayName ?? "Anonymous")
-                                .font(.highlighterBody)
+                                .font(DesignSystem.Typography.body)
                                 .fontWeight(.medium)
                             
                             Text(relativeTime(from: highlight.createdAt))
-                                .font(.highlighterCaption)
-                                .foregroundColor(.highlighterSecondaryText)
+                                .font(DesignSystem.Typography.caption)
+                                .foregroundColor(DesignSystem.Colors.textSecondary)
                         }
                         
                         Spacer()
@@ -81,11 +82,11 @@ struct HighlightDetailView: View {
                         // Follow button
                         Button(action: followAuthor) {
                             Text("Follow")
-                                .font(.highlighterCaption)
+                                .font(DesignSystem.Typography.caption)
                                 .fontWeight(.medium)
                                 .padding(.horizontal, 16)
                                 .padding(.vertical, 8)
-                                .background(Color.highlighterPurple)
+                                .background(DesignSystem.Colors.primary)
                                 .foregroundColor(.white)
                                 .cornerRadius(20)
                         }
@@ -98,26 +99,26 @@ struct HighlightDetailView: View {
                             HStack {
                                 Image(systemName: "link.circle.fill")
                                     .font(.title2)
-                                    .foregroundColor(.highlighterPurple)
+                                    .foregroundColor(DesignSystem.Colors.primary)
                                 
                                 VStack(alignment: .leading, spacing: 4) {
                                     Text("View Source")
-                                        .font(.highlighterBody)
+                                        .font(DesignSystem.Typography.body)
                                         .fontWeight(.medium)
                                     
                                     Text(url)
-                                        .font(.highlighterCaption)
-                                        .foregroundColor(.highlighterSecondaryText)
+                                        .font(DesignSystem.Typography.caption)
+                                        .foregroundColor(DesignSystem.Colors.textSecondary)
                                         .lineLimit(1)
                                 }
                                 
                                 Spacer()
                                 
                                 Image(systemName: "arrow.up.right")
-                                    .foregroundColor(.highlighterSecondaryText)
+                                    .foregroundColor(DesignSystem.Colors.textSecondary)
                             }
                             .padding()
-                            .background(Color.highlighterCardBackground)
+                            .background(DesignSystem.Colors.surface)
                             .cornerRadius(12)
                         }
                         .padding(.horizontal)
@@ -129,15 +130,15 @@ struct HighlightDetailView: View {
                             VStack(spacing: 4) {
                                 Image(systemName: isZapped ? "bolt.fill" : "bolt")
                                     .font(.title2)
-                                    .foregroundColor(isZapped ? .highlighterOrange : .highlighterSecondaryText)
+                                    .foregroundColor(isZapped ? DesignSystem.Colors.secondary : DesignSystem.Colors.textSecondary)
                                 
                                 Text("Zap")
-                                    .font(.highlighterCaption)
-                                    .foregroundColor(isZapped ? .highlighterOrange : .highlighterSecondaryText)
+                                    .font(DesignSystem.Typography.caption)
+                                    .foregroundColor(isZapped ? DesignSystem.Colors.secondary : DesignSystem.Colors.textSecondary)
                             }
                             .frame(maxWidth: .infinity)
                             .padding(.vertical, 12)
-                            .background(Color.highlighterCardBackground)
+                            .background(DesignSystem.Colors.surface)
                             .cornerRadius(12)
                         }
                         
@@ -145,15 +146,15 @@ struct HighlightDetailView: View {
                             VStack(spacing: 4) {
                                 Image(systemName: "bubble.left")
                                     .font(.title2)
-                                    .foregroundColor(.highlighterSecondaryText)
+                                    .foregroundColor(DesignSystem.Colors.textSecondary)
                                 
                                 Text("Reply")
-                                    .font(.highlighterCaption)
-                                    .foregroundColor(.highlighterSecondaryText)
+                                    .font(DesignSystem.Typography.caption)
+                                    .foregroundColor(DesignSystem.Colors.textSecondary)
                             }
                             .frame(maxWidth: .infinity)
                             .padding(.vertical, 12)
-                            .background(Color.highlighterCardBackground)
+                            .background(DesignSystem.Colors.surface)
                             .cornerRadius(12)
                         }
                         
@@ -161,15 +162,15 @@ struct HighlightDetailView: View {
                             VStack(spacing: 4) {
                                 Image(systemName: "square.and.arrow.up")
                                     .font(.title2)
-                                    .foregroundColor(.highlighterSecondaryText)
+                                    .foregroundColor(DesignSystem.Colors.textSecondary)
                                 
                                 Text("Share")
-                                    .font(.highlighterCaption)
-                                    .foregroundColor(.highlighterSecondaryText)
+                                    .font(DesignSystem.Typography.caption)
+                                    .foregroundColor(DesignSystem.Colors.textSecondary)
                             }
                             .frame(maxWidth: .infinity)
                             .padding(.vertical, 12)
-                            .background(Color.highlighterCardBackground)
+                            .background(DesignSystem.Colors.surface)
                             .cornerRadius(12)
                         }
                     }
@@ -178,7 +179,7 @@ struct HighlightDetailView: View {
                     // Related highlights section
                     VStack(alignment: .leading, spacing: 16) {
                         Text("Related Highlights")
-                            .font(.highlighterHeadline)
+                            .font(DesignSystem.Typography.headline)
                             .padding(.horizontal)
                         
                         // Placeholder for related highlights
@@ -196,7 +197,7 @@ struct HighlightDetailView: View {
                 }
                 .padding(.vertical)
             }
-            .background(Color.highlighterBackground)
+            .background(DesignSystem.Colors.background)
             .navigationTitle("Highlight")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -204,7 +205,7 @@ struct HighlightDetailView: View {
                     Button("Done") {
                         dismiss()
                     }
-                    .foregroundColor(.highlighterPurple)
+                    .foregroundColor(DesignSystem.Colors.primary)
                 }
             }
         }
@@ -279,19 +280,19 @@ struct ReplyComposerView: View {
             VStack(spacing: 16) {
                 // Quote preview
                 Text("\"\(String(highlight.content.prefix(100)))...\"")
-                    .font(.highlighterCaption)
-                    .foregroundColor(.highlighterSecondaryText)
+                    .font(DesignSystem.Typography.caption)
+                    .foregroundColor(DesignSystem.Colors.textSecondary)
                     .padding()
                     .frame(maxWidth: .infinity, alignment: .leading)
-                    .background(Color.highlighterCardBackground)
+                    .background(DesignSystem.Colors.surface)
                     .cornerRadius(8)
                     .padding(.horizontal)
                 
                 // Reply input
                 TextEditor(text: $replyText)
-                    .font(.highlighterBody)
+                    .font(DesignSystem.Typography.body)
                     .padding(8)
-                    .background(Color.highlighterCardBackground)
+                    .background(DesignSystem.Colors.surface)
                     .cornerRadius(8)
                     .padding(.horizontal)
                 
