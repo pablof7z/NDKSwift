@@ -18,13 +18,14 @@ extension NDKSQLiteCache {
             try db.create(index: "idx_fetch_timestamps_last_fetch", on: "fetch_timestamps", columns: ["last_fetch"])
             
             // Create cleanup trigger to remove old entries (older than 30 days)
+            let cleanupThresholdSeconds = Int(TimeConstants.day * 30) // 30 days
             try db.execute(sql: """
                 CREATE TRIGGER cleanup_old_fetch_timestamps
                 AFTER INSERT ON fetch_timestamps
                 FOR EACH ROW
                 BEGIN
                     DELETE FROM fetch_timestamps 
-                    WHERE last_fetch < (CAST(strftime('%s', 'now') AS INTEGER) - 2592000);
+                    WHERE last_fetch < (CAST(strftime('%s', 'now') AS INTEGER) - \(cleanupThresholdSeconds));
                 END;
             """)
         }

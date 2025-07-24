@@ -11,8 +11,7 @@ struct SettingsView: View {
     @State private var copiedNpub = false
     
     var body: some View {
-        NavigationView {
-            List {
+        List {
                 // Account section
                 Section {
                     if let currentUser = currentUser {
@@ -159,7 +158,6 @@ struct SettingsView: View {
             .task {
                 await loadUserData()
             }
-        }
         .preferredColorScheme(.dark)
     }
     

@@ -15,6 +15,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Updated LoadingView.swift to use first() instead of deprecated currentValue()
   - Moved magic number (batch size 100) to SQLiteConstants.queryBatchSize constant
   - Removed unused Foundation imports from NDK+Helpers.swift and NostrJSONConstants.swift
+  - Extracted common tag finding pattern in NDKFollowPack with private getTagValue() helper method
+  - Replaced magic time numbers with TimeConstants in AudioEventCard and Migration_v7_FetchTimestamps
 
 ### Fixed
 - Fixed memory leak in Posta app consuming 85GB+ of RAM
