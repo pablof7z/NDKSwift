@@ -414,25 +414,29 @@ actor NDKRelaySelector {
         let neededCount = targetCount - currentCount
         guard neededCount > 0 else { return [] }
 
-        // Prioritize explicit relays for fallback
+        var fallbackRelays = Set<String>()
+        var candidateRelays: [String] = []
+        
+        // 1. First priority: Explicit relays (user explicitly added)
         let explicitRelays = await ndk.pool.explicitRelays()
         let availableExplicitRelays = explicitRelays
             .filter { !excludeRelays.contains($0.url) }
-            .prefix(neededCount)
             .map { $0.url }
-
-        var fallbackRelays = Set(availableExplicitRelays)
+        candidateRelays.append(contentsOf: availableExplicitRelays)
         
-        // If we still need more relays, use any from the pool
-        if fallbackRelays.count < neededCount {
-            let remainingNeeded = neededCount - fallbackRelays.count
-            let poolRelays = (await ndk.pool.relays)
-                .filter { !excludeRelays.contains($0.url) && !fallbackRelays.contains($0.url) }
-                .prefix(remainingNeeded)
-                .map { $0.url }
-            fallbackRelays.formUnion(poolRelays)
+        // 2. Second priority: Current user's relays (from their relay list)
+        let currentUserRelays = await ndk.pool.getCurrentUserRelayUrls()
+        let availableUserRelays = currentUserRelays
+            .filter { !excludeRelays.contains($0) && !candidateRelays.contains($0) }
+        candidateRelays.append(contentsOf: availableUserRelays)
+        
+        // Take only what we need from the combined candidate list
+        fallbackRelays = Set(candidateRelays.prefix(neededCount))
+        
+        if !fallbackRelays.isEmpty {
+            NDKLogger.log(.debug, category: .outbox, "📍 Selected \(fallbackRelays.count) fallback relays from explicit+user relays")
         }
-
+        
         return fallbackRelays
     }
 

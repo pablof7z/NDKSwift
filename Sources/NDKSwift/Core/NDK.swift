@@ -298,6 +298,12 @@ public final class NDK {
         if !initialRelayUrls.isEmpty {
             await initializeRelays()
         }
+        
+        // Add outbox relays from config
+        for relayUrl in outboxConfig.outboxRelays {
+            await pool.addRelay(relayUrl, origin: .outboxConfig)
+        }
+        
         await pool.connectAll()
     }
     

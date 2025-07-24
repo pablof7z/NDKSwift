@@ -1,0 +1,372 @@
+import SwiftUI
+import NDKSwift
+
+struct CurationDetailView: View {
+    let curation: ArticleCuration
+    @EnvironmentObject var appState: AppState
+    @Environment(\.dismiss) var dismiss
+    
+    @State private var isFollowing = false
+    @State private var showAddArticle = false
+    @State private var curator: NDKUserProfile?
+    @State private var currentUserPubkey: String?
+    
+    var body: some View {
+        NavigationStack {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 24) {
+                    // Header
+                    ZStack(alignment: .bottomLeading) {
+                        // Cover image
+                        if let imageUrl = curation.image, let url = URL(string: imageUrl) {
+                            AsyncImage(url: url) { image in
+                                image
+                                    .resizable()
+                                    .aspectRatio(contentMode: .fill)
+                            } placeholder: {
+                                Rectangle()
+                                    .fill(
+                                        LinearGradient(
+                                            colors: [
+                                                Color.highlighterPurple.opacity(0.3),
+                                                Color.highlighterOrange.opacity(0.3)
+                                            ],
+                                            startPoint: .topLeading,
+                                            endPoint: .bottomTrailing
+                                        )
+                                    )
+                            }
+                            .frame(height: 250)
+                            .clipped()
+                        } else {
+                            Rectangle()
+                                .fill(
+                                    LinearGradient(
+                                        colors: [
+                                            Color.highlighterPurple.opacity(0.5),
+                                            Color.highlighterOrange.opacity(0.5)
+                                        ],
+                                        startPoint: .topLeading,
+                                        endPoint: .bottomTrailing
+                                    )
+                                )
+                                .frame(height: 250)
+                        }
+                        
+                        // Gradient overlay
+                        LinearGradient(
+                            colors: [Color.clear, Color.black.opacity(0.7)],
+                            startPoint: .center,
+                            endPoint: .bottom
+                        )
+                        
+                        // Title overlay
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text(curation.title)
+                                .font(.highlighterTitle)
+                                .foregroundColor(.white)
+                            
+                            if let description = curation.description {
+                                Text(description)
+                                    .font(.highlighterBody)
+                                    .foregroundColor(.white.opacity(0.9))
+                                    .lineLimit(2)
+                            }
+                        }
+                        .padding()
+                    }
+                    
+                    // Curator info
+                    HStack {
+                        Image(systemName: "person.circle.fill")
+                            .font(.system(size: 44))
+                            .foregroundColor(.highlighterPurple)
+                        
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text(curator?.name ?? curator?.displayName ?? "Curator")
+                                .font(.highlighterBody)
+                                .fontWeight(.medium)
+                            
+                            Text("\(curation.articles.count) articles • Updated \(relativeTime(from: curation.updatedAt))")
+                                .font(.highlighterCaption)
+                                .foregroundColor(.highlighterSecondaryText)
+                        }
+                        
+                        Spacer()
+                        
+                        Button(action: toggleFollow) {
+                            Text(isFollowing ? "Following" : "Follow")
+                                .font(.highlighterCaption)
+                                .fontWeight(.medium)
+                                .padding(.horizontal, 20)
+                                .padding(.vertical, 10)
+                                .background(isFollowing ? Color.gray : Color.highlighterPurple)
+                                .foregroundColor(.white)
+                                .cornerRadius(20)
+                        }
+                    }
+                    .padding(.horizontal)
+                    
+                    // Action buttons
+                    HStack(spacing: 12) {
+                        Button(action: shareCuration) {
+                            Label("Share", systemImage: "square.and.arrow.up")
+                                .font(.highlighterCaption)
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 12)
+                                .background(Color.highlighterCardBackground)
+                                .cornerRadius(12)
+                        }
+                        
+                        if let userPubkey = currentUserPubkey, curation.author == userPubkey {
+                            Button(action: { showAddArticle = true }) {
+                                Label("Add Article", systemImage: "plus.circle")
+                                    .font(.highlighterCaption)
+                                    .frame(maxWidth: .infinity)
+                                    .padding(.vertical, 12)
+                                    .background(Color.highlighterPurple)
+                                    .foregroundColor(.white)
+                                    .cornerRadius(12)
+                            }
+                        }
+                    }
+                    .padding(.horizontal)
+                    
+                    // Articles
+                    VStack(alignment: .leading, spacing: 16) {
+                        Text("Articles")
+                            .font(.highlighterHeadline)
+                            .padding(.horizontal)
+                        
+                        if curation.articles.isEmpty {
+                            EmptyArticlesView()
+                                .padding(.horizontal)
+                        } else {
+                            ForEach(curation.articles, id: \.url) { article in
+                                ArticleCard(article: article)
+                                    .padding(.horizontal)
+                            }
+                        }
+                    }
+                }
+                .padding(.bottom)
+            }
+            .background(Color.highlighterBackground)
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button("Done") {
+                        dismiss()
+                    }
+                    .foregroundColor(.highlighterPurple)
+                }
+            }
+        }
+        .task {
+            await loadCurator()
+            
+            // Load current user pubkey
+            if let signer = appState.activeSigner {
+                currentUserPubkey = try? await signer.pubkey
+            }
+        }
+        .sheet(isPresented: $showAddArticle) {
+            AddArticleSheet(curation: curation)
+                .environmentObject(appState)
+        }
+    }
+    
+    private func loadCurator() async {
+        guard let ndk = appState.ndk else { return }
+        
+        for await profile in await ndk.profileManager.observe(for: curation.author, maxAge: 3600) {
+            await MainActor.run {
+                self.curator = profile
+            }
+            break
+        }
+    }
+    
+    private func toggleFollow() {
+        isFollowing.toggle()
+        HapticType.light.trigger()
+        // TODO: Implement follow functionality
+    }
+    
+    private func shareCuration() {
+        HapticType.light.trigger()
+        // TODO: Implement share functionality
+    }
+    
+    private func relativeTime(from date: Date) -> String {
+        let formatter = RelativeDateTimeFormatter()
+        formatter.unitsStyle = .abbreviated
+        return formatter.localizedString(for: date, relativeTo: Date())
+    }
+}
+
+struct ArticleCard: View {
+    let article: ArticleCuration.ArticleReference
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            if let url = article.url {
+                HStack {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text(URL(string: url)?.host ?? "Article")
+                            .font(.highlighterCaption)
+                            .foregroundColor(.highlighterPurple)
+                        
+                        Text(url)
+                            .font(.highlighterBody)
+                            .lineLimit(2)
+                            .foregroundColor(.highlighterText)
+                        
+                        Text("Added \(relativeTime(from: article.addedAt))")
+                            .font(.highlighterCaption)
+                            .foregroundColor(.highlighterSecondaryText)
+                    }
+                    
+                    Spacer()
+                    
+                    Image(systemName: "arrow.up.right")
+                        .foregroundColor(.highlighterSecondaryText)
+                }
+                .padding()
+                .background(Color.highlighterCardBackground)
+                .cornerRadius(12)
+                .onTapGesture {
+                    if let url = URL(string: url) {
+                        UIApplication.shared.open(url)
+                    }
+                }
+            }
+        }
+    }
+    
+    private func relativeTime(from date: Date) -> String {
+        let formatter = RelativeDateTimeFormatter()
+        formatter.unitsStyle = .abbreviated
+        return formatter.localizedString(for: date, relativeTo: Date())
+    }
+}
+
+struct EmptyArticlesView: View {
+    var body: some View {
+        VStack(spacing: 16) {
+            Image(systemName: "doc.text.magnifyingglass")
+                .font(.system(size: 48))
+                .foregroundColor(.highlighterPurple.opacity(0.5))
+            
+            Text("No articles yet")
+                .font(.highlighterBody)
+                .foregroundColor(.highlighterSecondaryText)
+            
+            Text("Articles added to this curation will appear here")
+                .font(.highlighterCaption)
+                .foregroundColor(.highlighterSecondaryText)
+                .multilineTextAlignment(.center)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 40)
+        .background(Color.highlighterCardBackground.opacity(0.5))
+        .cornerRadius(12)
+    }
+}
+
+struct AddArticleSheet: View {
+    let curation: ArticleCuration
+    @EnvironmentObject var appState: AppState
+    @Environment(\.dismiss) var dismiss
+    
+    @State private var articleUrl = ""
+    @State private var isAdding = false
+    @State private var showError = false
+    @State private var errorMessage = ""
+    
+    var body: some View {
+        NavigationStack {
+            VStack(alignment: .leading, spacing: 24) {
+                Text("Add Article")
+                    .font(.highlighterHeadline)
+                
+                Text("Add an article URL to your curation")
+                    .font(.highlighterBody)
+                    .foregroundColor(.highlighterSecondaryText)
+                
+                TextField("https://...", text: $articleUrl)
+                    .textFieldStyle(RoundedBorderTextFieldStyle())
+                    .textInputAutocapitalization(.never)
+                    .autocorrectionDisabled()
+                
+                Button(action: addArticle) {
+                    HStack {
+                        if isAdding {
+                            ProgressView()
+                                .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                                .scaleEffect(0.8)
+                        } else {
+                            Image(systemName: "plus.circle")
+                            Text("Add Article")
+                        }
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding()
+                    .background(Color.highlighterPurple)
+                    .foregroundColor(.white)
+                    .cornerRadius(12)
+                }
+                .disabled(articleUrl.isEmpty || isAdding)
+                
+                Spacer()
+            }
+            .padding()
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button("Cancel") {
+                        dismiss()
+                    }
+                }
+            }
+        }
+        .alert("Error", isPresented: $showError) {
+            Button("OK") { }
+        } message: {
+            Text(errorMessage)
+        }
+    }
+    
+    private func addArticle() {
+        guard !articleUrl.isEmpty else { return }
+        
+        isAdding = true
+        HapticType.light.trigger()
+        
+        Task {
+            // TODO: Implement adding article to curation
+            await MainActor.run {
+                isAdding = false
+                dismiss()
+            }
+        }
+    }
+}
+
+#Preview {
+    CurationDetailView(
+        curation: ArticleCuration(
+            id: "1",
+            event: NDKEvent(id: "", pubkey: "", createdAt: 0, kind: 30004, tags: [], content: "", sig: ""),
+            name: "best-reads-2024",
+            title: "Best Reads of 2024",
+            description: "A collection of the most insightful articles I've read this year",
+            image: nil,
+            author: "test",
+            createdAt: Date(),
+            updatedAt: Date(),
+            articles: []
+        )
+    )
+    .environmentObject(AppState())
+}
