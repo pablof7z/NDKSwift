@@ -29,7 +29,7 @@ struct LibraryView: View {
                 }
                 .padding(.vertical)
             }
-            .background(Color.highlighterBackground)
+            .background(DesignSystem.Colors.background)
             .navigationTitle("Library")
         }
         .sheet(isPresented: $showCreateCuration) {
@@ -53,7 +53,7 @@ struct SavedHighlightsSection: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
             Text("Your Highlights")
-                .font(.highlighterHeadline)
+                .font(DesignSystem.Typography.headline)
                 .padding(.horizontal)
             
             if appState.highlights.isEmpty {
@@ -78,19 +78,19 @@ struct EmptyHighlightsPlaceholder: View {
         VStack(spacing: 16) {
             Image(systemName: "highlighter")
                 .font(.system(size: 48))
-                .foregroundColor(.highlighterPurple.opacity(0.5))
+                .foregroundColor(DesignSystem.Colors.primary.opacity(0.5))
             
             Text("No highlights yet")
-                .font(.highlighterBody)
-                .foregroundColor(.highlighterSecondaryText)
+                .font(DesignSystem.Typography.body)
+                .foregroundColor(DesignSystem.Colors.textSecondary)
             
             Text("Start highlighting to build your collection")
-                .font(.highlighterCaption)
-                .foregroundColor(.highlighterSecondaryText)
+                .font(DesignSystem.Typography.caption)
+                .foregroundColor(DesignSystem.Colors.textSecondary)
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 40)
-        .background(Color.highlighterCardBackground.opacity(0.5))
+        .background(DesignSystem.Colors.surface.opacity(0.5))
         .cornerRadius(12)
     }
 }
@@ -103,8 +103,8 @@ struct SavedHighlightCard: View {
         Button(action: { showDetail = true }) {
             VStack(alignment: .leading, spacing: 8) {
                 Text("\"\(highlight.content)\"")
-                    .font(.highlighterBody)
-                    .foregroundColor(.highlighterText)
+                    .font(DesignSystem.Typography.body)
+                    .foregroundColor(DesignSystem.Colors.text)
                     .lineLimit(3)
                     .multilineTextAlignment(.leading)
                 
@@ -113,18 +113,18 @@ struct SavedHighlightCard: View {
                         Image(systemName: "link")
                             .font(.system(size: 12))
                         Text(URL(string: url)?.host ?? "Source")
-                            .font(.highlighterCaption)
+                            .font(DesignSystem.Typography.caption)
                     }
-                    .foregroundColor(.highlighterPurple)
+                    .foregroundColor(DesignSystem.Colors.primary)
                 }
                 
                 Text(relativeTime(from: highlight.createdAt))
-                    .font(.highlighterCaption)
-                    .foregroundColor(.highlighterSecondaryText)
+                    .font(DesignSystem.Typography.caption)
+                    .foregroundColor(DesignSystem.Colors.textSecondary)
             }
             .padding()
             .frame(width: 250, alignment: .leading)
-            .cardStyle()
+            .modernCard()
         }
         .buttonStyle(PlainButtonStyle())
         .sheet(isPresented: $showDetail) {
@@ -148,14 +148,14 @@ struct YourCurationsSection: View {
         VStack(alignment: .leading, spacing: 16) {
             HStack {
                 Text("Your Curations")
-                    .font(.highlighterHeadline)
+                    .font(DesignSystem.Typography.headline)
                 
                 Spacer()
                 
                 Button(action: { showCreateCuration = true }) {
                     Image(systemName: "plus.circle.fill")
                         .font(.title2)
-                        .foregroundColor(.highlighterPurple)
+                        .foregroundColor(DesignSystem.Colors.primary)
                 }
             }
             .padding(.horizontal)
@@ -185,26 +185,26 @@ struct EmptyCurationsPlaceholder: View {
         VStack(spacing: 16) {
             Image(systemName: "folder.badge.plus")
                 .font(.system(size: 48))
-                .foregroundColor(.highlighterPurple.opacity(0.5))
+                .foregroundColor(DesignSystem.Colors.primary.opacity(0.5))
             
             Text("No curations yet")
-                .font(.highlighterBody)
-                .foregroundColor(.highlighterSecondaryText)
+                .font(DesignSystem.Typography.body)
+                .foregroundColor(DesignSystem.Colors.textSecondary)
             
             Button(action: { showCreateCuration = true }) {
                 Text("Create Your First Curation")
-                    .font(.highlighterCaption)
+                    .font(DesignSystem.Typography.caption)
                     .fontWeight(.medium)
                     .padding(.horizontal, 20)
                     .padding(.vertical, 10)
-                    .background(Color.highlighterPurple)
+                    .background(DesignSystem.Colors.primary)
                     .foregroundColor(.white)
                     .cornerRadius(20)
             }
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 40)
-        .background(Color.highlighterCardBackground.opacity(0.5))
+        .background(DesignSystem.Colors.surface.opacity(0.5))
         .cornerRadius(12)
     }
 }
@@ -223,7 +223,7 @@ struct LibraryCurationCard: View {
                     Rectangle()
                         .fill(
                             LinearGradient(
-                                colors: [.highlighterPurple.opacity(0.3), .highlighterOrange.opacity(0.3)],
+                                colors: [DesignSystem.Colors.primary.opacity(0.3), DesignSystem.Colors.secondary.opacity(0.3)],
                                 startPoint: .topLeading,
                                 endPoint: .bottomTrailing
                             )
@@ -236,7 +236,7 @@ struct LibraryCurationCard: View {
                 RoundedRectangle(cornerRadius: 8)
                     .fill(
                         LinearGradient(
-                            colors: [.highlighterPurple, .highlighterOrange],
+                            colors: [DesignSystem.Colors.primary, DesignSystem.Colors.secondary],
                             startPoint: .topLeading,
                             endPoint: .bottomTrailing
                         )
@@ -245,15 +245,15 @@ struct LibraryCurationCard: View {
             }
             
             Text(curation.title)
-                .font(.highlighterBody)
+                .font(DesignSystem.Typography.body)
                 .fontWeight(.medium)
                 .lineLimit(1)
             
             Text("\(curation.articles.count) articles")
-                .font(.highlighterCaption)
-                .foregroundColor(.highlighterSecondaryText)
+                .font(DesignSystem.Typography.caption)
+                .foregroundColor(DesignSystem.Colors.textSecondary)
         }
-        .cardStyle()
+        .modernCard()
     }
 }
 
@@ -264,7 +264,7 @@ struct FollowPacksSection: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
             Text("Follow Packs")
-                .font(.highlighterHeadline)
+                .font(DesignSystem.Typography.headline)
                 .padding(.horizontal)
             
             if followPacks.isEmpty {
@@ -290,20 +290,20 @@ struct EmptyFollowPacksPlaceholder: View {
         VStack(spacing: 16) {
             Image(systemName: "person.3")
                 .font(.system(size: 48))
-                .foregroundColor(.highlighterPurple.opacity(0.5))
+                .foregroundColor(DesignSystem.Colors.primary.opacity(0.5))
             
             Text("No follow packs discovered yet")
-                .font(.highlighterBody)
-                .foregroundColor(.highlighterSecondaryText)
+                .font(DesignSystem.Typography.body)
+                .foregroundColor(DesignSystem.Colors.textSecondary)
             
             Text("Follow packs will appear here as they're discovered")
-                .font(.highlighterCaption)
-                .foregroundColor(.highlighterSecondaryText)
+                .font(DesignSystem.Typography.caption)
+                .foregroundColor(DesignSystem.Colors.textSecondary)
                 .multilineTextAlignment(.center)
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 40)
-        .background(Color.highlighterCardBackground.opacity(0.5))
+        .background(DesignSystem.Colors.surface.opacity(0.5))
         .cornerRadius(12)
     }
 }
@@ -315,25 +315,25 @@ struct FollowPackRow: View {
         HStack {
             Image(systemName: "person.3.fill")
                 .font(.title2)
-                .foregroundColor(.highlighterPurple)
+                .foregroundColor(DesignSystem.Colors.primary)
             
             VStack(alignment: .leading, spacing: 4) {
                 Text(followPack.title)
-                    .font(.highlighterBody)
+                    .font(DesignSystem.Typography.body)
                     .fontWeight(.medium)
                 
                 Text("\(followPack.profiles.count) people")
-                    .font(.highlighterCaption)
-                    .foregroundColor(.highlighterSecondaryText)
+                    .font(DesignSystem.Typography.caption)
+                    .foregroundColor(DesignSystem.Colors.textSecondary)
             }
             
             Spacer()
             
             Image(systemName: "chevron.right")
-                .foregroundColor(.highlighterSecondaryText)
+                .foregroundColor(DesignSystem.Colors.textSecondary)
         }
         .padding()
-        .cardStyle()
+        .modernCard()
     }
 }
 

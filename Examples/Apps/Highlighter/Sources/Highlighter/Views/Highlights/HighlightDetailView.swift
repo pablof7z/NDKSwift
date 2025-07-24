@@ -264,7 +264,8 @@ struct RelatedHighlightPlaceholder: View {
                 .shimmer()
         }
         .padding()
-        .cardStyle()
+        .background(DesignSystem.Colors.surface)
+        .cornerRadius(DesignSystem.CornerRadius.medium)
     }
 }
 

@@ -93,8 +93,8 @@ struct ProfileView: View {
             
             // Load user's highlights
             let highlightFilter = NDKFilter(
-                kinds: [9802],
                 authors: [pubkey],
+                kinds: [9802],
                 limit: 100
             )
             
@@ -106,8 +106,8 @@ struct ProfileView: View {
             
             // Load user's curations
             let curationFilter = NDKFilter(
-                kinds: [30004],
                 authors: [pubkey],
+                kinds: [30004],
                 limit: 50
             )
             
@@ -419,41 +419,7 @@ struct EmptyStateView: View {
     }
 }
 
-// Placeholder card components that should be implemented later
-struct CurationCard: View {
-    let curation: ArticleCuration
-    
-    var body: some View {
-        VStack(alignment: .leading, spacing: DesignSystem.Spacing.small) {
-            Text(curation.title)
-                .font(DesignSystem.Typography.body)
-                .fontWeight(.medium)
-                .foregroundColor(DesignSystem.Colors.text)
-            
-            if let description = curation.description {
-                Text(description)
-                    .font(DesignSystem.Typography.caption)
-                    .foregroundColor(DesignSystem.Colors.textSecondary)
-                    .lineLimit(2)
-            }
-            
-            HStack {
-                Text("\(curation.articles.count) articles")
-                    .font(DesignSystem.Typography.micro)
-                    .foregroundColor(DesignSystem.Colors.textTertiary)
-                
-                Spacer()
-                
-                Text(RelativeDateTimeFormatter().localizedString(for: curation.createdAt, relativeTo: Date()))
-                    .font(DesignSystem.Typography.micro)
-                    .foregroundColor(DesignSystem.Colors.textTertiary)
-            }
-        }
-        .padding()
-        .background(DesignSystem.Colors.surface)
-        .cornerRadius(12)
-    }
-}
+// CurationCard is now defined in SearchView.swift to avoid duplication
 
 #Preview {
     ProfileView()
