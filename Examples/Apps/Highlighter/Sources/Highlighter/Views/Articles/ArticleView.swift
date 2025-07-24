@@ -209,7 +209,7 @@ struct ArticleView: View {
     }
     
     private func formatPubkey(_ pubkey: String) -> String {
-        String(pubkey.prefix(8)) + "..."
+        PubkeyFormatter.formatShort(pubkey)
     }
     
     private func loadAuthor() async {

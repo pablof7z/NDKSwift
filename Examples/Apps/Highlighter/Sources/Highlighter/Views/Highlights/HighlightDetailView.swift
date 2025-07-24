@@ -72,7 +72,7 @@ struct HighlightDetailView: View {
                                 .font(DesignSystem.Typography.body)
                                 .fontWeight(.medium)
                             
-                            Text(relativeTime(from: highlight.createdAt))
+                            Text(RelativeTimeFormatter.relativeTime(from: highlight.createdAt))
                                 .font(DesignSystem.Typography.caption)
                                 .foregroundColor(DesignSystem.Colors.textSecondary)
                         }
@@ -243,11 +243,6 @@ struct HighlightDetailView: View {
         // TODO: Implement follow functionality
     }
     
-    private func relativeTime(from date: Date) -> String {
-        let formatter = RelativeDateTimeFormatter()
-        formatter.unitsStyle = .abbreviated
-        return formatter.localizedString(for: date, relativeTo: Date())
-    }
 }
 
 struct RelatedHighlightPlaceholder: View {

@@ -353,3 +353,22 @@ enum RelativeTimeStyle {
     case short
     case compact
 }
+
+// MARK: - Greeting Utilities
+
+struct GreetingFormatter {
+    /// Generate time-based greeting text
+    static func timeBasedGreeting() -> String {
+        let hour = Calendar.current.component(.hour, from: Date())
+        switch hour {
+        case 0..<12: return "Good morning"
+        case 12..<17: return "Good afternoon"
+        default: return "Good evening"
+        }
+    }
+    
+    /// Format current date for display
+    static func formattedDate() -> String {
+        Date().formatted(.dateTime.weekday(.wide).month(.wide).day())
+    }
+}
