@@ -3,19 +3,14 @@ import NDKSwift
 
 struct ModernHomeView: View {
     @EnvironmentObject var appState: AppState
-    @State private var highlights: [HighlightEvent] = []
-    @State private var highlightedArticles: [HighlightedArticle] = []
-    @State private var discussions: [NDKEvent] = []
-    @State private var zappedArticles: [NDKEvent] = []
-    @State private var userHighlights: [HighlightEvent] = []
-    @State private var refreshing = false
+    @StateObject private var dataManager: HomeDataManager
     @Binding var tabBarVisible: Bool
     @State private var scrollOffset: CGFloat = 0
     
-    struct HighlightedArticle {
-        let article: Article
-        let highlights: [HighlightEvent]
-        let lastHighlightTime: Date
+    init(tabBarVisible: Binding<Bool>) {
+        self._tabBarVisible = tabBarVisible
+        // Initialize with placeholder - will be set properly in .onAppear
+        self._dataManager = StateObject(wrappedValue: HomeDataManager(appState: AppState()))
     }
     
     var body: some View {
@@ -29,76 +24,19 @@ struct ModernHomeView: View {
                             .padding(.horizontal, .ds.screenPadding)
                         
                         // Recently Highlighted Articles Section
-                        if !highlightedArticles.isEmpty {
-                            VStack(spacing: .ds.itemSpacing) {
-                                ModernSectionHeader(
-                                    title: "Recently Highlighted Articles",
-                                    action: {},
-                                    actionTitle: "See All"
-                                )
-                                
-                                VStack(spacing: .ds.base) {
-                                    ForEach(highlightedArticles.prefix(10), id: \.article.id) { highlightedArticle in
-                                        HighlightedArticleCard(
-                                            article: highlightedArticle.article,
-                                            highlights: highlightedArticle.highlights
-                                        )
-                                    }
-                                }
-                                .padding(.horizontal, .ds.screenPadding)
-                            }
-                        } else {
-                            // Loading placeholders for articles
-                            VStack(spacing: .ds.itemSpacing) {
-                                ModernSectionHeader(title: "Recently Highlighted Articles")
-                                
-                                VStack(spacing: .ds.base) {
-                                    ForEach(0..<3, id: \.self) { _ in
-                                        RoundedRectangle(cornerRadius: .ds.large)
-                                            .fill(DesignSystem.Colors.surfaceSecondary)
-                                            .frame(height: 200)
-                                            .modernPlaceholder()
-                                    }
-                                }
-                                .padding(.horizontal, .ds.screenPadding)
-                            }
-                        }
+                        RecentlyHighlightedArticlesSection(articles: dataManager.highlightedArticles)
                         
                         // Featured highlight - if user has recent highlights
-                        if !userHighlights.isEmpty {
-                            FeaturedHighlightCard(highlight: userHighlights.first!)
+                        if !dataManager.userHighlights.isEmpty {
+                            FeaturedHighlightCard(highlight: dataManager.userHighlights.first!)
                                 .padding(.horizontal, .ds.screenPadding)
                         }
                         
                         // Active discussions
-                        if !discussions.isEmpty {
-                            VStack(spacing: .ds.itemSpacing) {
-                                ModernSectionHeader(title: "Active Discussions")
-                                
-                                VStack(spacing: 0) {
-                                    ForEach(discussions.prefix(5), id: \.id) { event in
-                                        DiscussionRow(event: event)
-                                            .modernListItem(showDivider: event.id != discussions.prefix(5).last?.id)
-                                    }
-                                }
-                                .modernCard(noPadding: true)
-                                .padding(.horizontal, .ds.screenPadding)
-                            }
-                        }
+                        ActiveDiscussionsSection(discussions: dataManager.discussions)
                         
                         // Community activity
-                        if !zappedArticles.isEmpty {
-                            VStack(spacing: .ds.itemSpacing) {
-                                ModernSectionHeader(title: "Trending")
-                                
-                                VStack(spacing: .ds.base) {
-                                    ForEach(zappedArticles.prefix(3), id: \.id) { event in
-                                        TrendingItemCard(event: event)
-                                    }
-                                }
-                                .padding(.horizontal, .ds.screenPadding)
-                            }
-                        }
+                        TrendingSection(zappedArticles: dataManager.zappedArticles)
                     }
                     .padding(.bottom, 100) // Space for tab bar
                     .background(GeometryReader { geo in
@@ -116,14 +54,18 @@ struct ModernHomeView: View {
                     }
                 }
                 .refreshable {
-                    await refreshContent()
+                    await dataManager.refresh()
                 }
             }
             .background(DesignSystem.Colors.background)
             .navigationBarHidden(true)
         }
+        .onAppear {
+            // Properly initialize data manager with the current app state
+            dataManager.appState = appState
+        }
         .task {
-            await streamContent()
+            await dataManager.startStreaming()
         }
     }
     
@@ -165,193 +107,6 @@ struct ModernHomeView: View {
         Date().formatted(.dateTime.weekday(.wide).month(.wide).day())
     }
     
-    private func refreshContent() async {
-        refreshing = true
-        HapticManager.shared.impact(.light)
-        
-        highlights.removeAll()
-        highlightedArticles.removeAll()
-        discussions.removeAll()
-        zappedArticles.removeAll()
-        userHighlights.removeAll()
-        
-        await streamContent()
-        
-        HapticManager.shared.notification(.success)
-        refreshing = false
-    }
-    
-    private func streamContent() async {
-        guard let ndk = appState.ndk else { return }
-        
-        // Stream highlights and build article relationships
-        Task {
-            let highlightSource = ndk.observe(
-                filter: NDKFilter(kinds: [9802], limit: 50),
-                maxAge: 300,
-                cachePolicy: .cacheWithNetwork
-            )
-            
-            var articleReferences: Set<String> = []
-            var highlightsByArticle: [String: [HighlightEvent]] = [:]
-            
-            for await event in highlightSource.events {
-                if let highlight = try? HighlightEvent(from: event) {
-                    await MainActor.run {
-                        withAnimation(DesignSystem.Animation.quick) {
-                            if !highlights.contains(where: { $0.id == highlight.id }) {
-                                highlights.append(highlight)
-                                highlights.sort { $0.createdAt > $1.createdAt }
-                                
-                                // Track article references
-                                if let ref = highlight.referencedEvent {
-                                    articleReferences.insert(ref)
-                                    if highlightsByArticle[ref] != nil {
-                                        highlightsByArticle[ref]?.append(highlight)
-                                    } else {
-                                        highlightsByArticle[ref] = [highlight]
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-            
-            // Fetch referenced articles
-            if !articleReferences.isEmpty {
-                await fetchHighlightedArticles(references: Array(articleReferences), highlightsByArticle: highlightsByArticle)
-            }
-        }
-        
-        // Stream user's highlights
-        if let signer = appState.activeSigner {
-            Task {
-                if let userPubkey = try? await signer.pubkey {
-                    let userHighlightSource = ndk.observe(
-                        filter: NDKFilter(
-                            authors: [userPubkey],
-                            kinds: [9802],
-                            limit: 5
-                        ),
-                        maxAge: 3600
-                    )
-                    
-                    for await event in userHighlightSource.events {
-                        if let highlight = try? HighlightEvent(from: event) {
-                            await MainActor.run {
-                                withAnimation(DesignSystem.Animation.quick) {
-                                    if !userHighlights.contains(where: { $0.id == highlight.id }) {
-                                        userHighlights.append(highlight)
-                                        userHighlights.sort { $0.createdAt > $1.createdAt }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-        
-        // Stream discussions
-        Task {
-            let discussionSource = ndk.observe(
-                filter: NDKFilter(kinds: [1], limit: 10, tags: ["t": Set(["bookstr"])]),
-                maxAge: 300,
-                cachePolicy: .cacheWithNetwork
-            )
-            
-            for await event in discussionSource.events {
-                await MainActor.run {
-                    withAnimation(DesignSystem.Animation.quick) {
-                        if !discussions.contains(where: { $0.id == event.id }) {
-                            discussions.append(event)
-                            discussions.sort { $0.createdAt > $1.createdAt }
-                        }
-                    }
-                }
-            }
-        }
-        
-        // Stream zap activity
-        Task {
-            let zapSource = ndk.observe(
-                filter: NDKFilter(kinds: [9735], limit: 10),
-                maxAge: 300,
-                cachePolicy: .cacheWithNetwork
-            )
-            
-            for await event in zapSource.events {
-                await MainActor.run {
-                    withAnimation(DesignSystem.Animation.quick) {
-                        if !zappedArticles.contains(where: { $0.id == event.id }) {
-                            zappedArticles.append(event)
-                        }
-                    }
-                }
-            }
-        }
-    }
-    
-    private func fetchHighlightedArticles(references: [String], highlightsByArticle: [String: [HighlightEvent]]) async {
-        guard let ndk = appState.ndk else { return }
-        
-        // Parse references to extract article IDs
-        var articleFilters: [NDKFilter] = []
-        
-        for reference in references {
-            if reference.contains(":") {
-                // This is an "a" tag reference (kind:pubkey:d-tag)
-                let parts = reference.split(separator: ":")
-                if parts.count >= 3,
-                   let kind = Int(parts[0]) {
-                    articleFilters.append(NDKFilter(
-                        authors: [String(parts[1])],
-                        kinds: [kind],
-                        tags: ["d": Set([String(parts[2])])]
-                    ))
-                }
-            } else {
-                // This is an "e" tag reference (event ID)
-                articleFilters.append(NDKFilter(ids: [reference]))
-            }
-        }
-        
-        // Stream articles
-        for filter in articleFilters {
-            Task {
-                let dataSource = ndk.observe(
-                    filter: filter,
-                    maxAge: 300,
-                    cachePolicy: .cacheWithNetwork
-                )
-                
-                for await event in dataSource.events {
-                    if event.kind == 30023,
-                       let article = try? Article(from: event),
-                       let highlights = highlightsByArticle[event.id] ?? highlightsByArticle["\(event.kind):\(event.pubkey):\(article.identifier ?? "")"] {
-                        
-                        let lastHighlight = highlights.max(by: { $0.createdAt < $1.createdAt })
-                        
-                        await MainActor.run {
-                            withAnimation(DesignSystem.Animation.quick) {
-                                let highlightedArticle = HighlightedArticle(
-                                    article: article,
-                                    highlights: highlights,
-                                    lastHighlightTime: lastHighlight?.createdAt ?? Date()
-                                )
-                                
-                                if !highlightedArticles.contains(where: { $0.article.id == article.id }) {
-                                    highlightedArticles.append(highlightedArticle)
-                                    highlightedArticles.sort { $0.lastHighlightTime > $1.lastHighlightTime }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
 }
 
 // MARK: - Components
@@ -507,6 +262,89 @@ struct TrendingItemCard: View {
     
     private func relativeTime(from timestamp: Timestamp) -> String {
         RelativeTimeFormatter.shortRelativeTime(from: timestamp)
+    }
+}
+
+// MARK: - Extracted Section Components
+
+struct RecentlyHighlightedArticlesSection: View {
+    let articles: [HomeDataManager.HighlightedArticle]
+    
+    var body: some View {
+        if !articles.isEmpty {
+            VStack(spacing: .ds.itemSpacing) {
+                ModernSectionHeader(
+                    title: "Recently Highlighted Articles",
+                    action: {},
+                    actionTitle: "See All"
+                )
+                
+                VStack(spacing: .ds.base) {
+                    ForEach(articles.prefix(10), id: \.article.id) { highlightedArticle in
+                        HighlightedArticleCard(
+                            article: highlightedArticle.article,
+                            highlights: highlightedArticle.highlights
+                        )
+                    }
+                }
+                .padding(.horizontal, .ds.screenPadding)
+            }
+        } else {
+            // Loading placeholders for articles
+            VStack(spacing: .ds.itemSpacing) {
+                ModernSectionHeader(title: "Recently Highlighted Articles")
+                
+                VStack(spacing: .ds.base) {
+                    ForEach(0..<3, id: \.self) { _ in
+                        RoundedRectangle(cornerRadius: .ds.large)
+                            .fill(DesignSystem.Colors.surfaceSecondary)
+                            .frame(height: 200)
+                            .modernPlaceholder()
+                    }
+                }
+                .padding(.horizontal, .ds.screenPadding)
+            }
+        }
+    }
+}
+
+struct ActiveDiscussionsSection: View {
+    let discussions: [NDKEvent]
+    
+    var body: some View {
+        if !discussions.isEmpty {
+            VStack(spacing: .ds.itemSpacing) {
+                ModernSectionHeader(title: "Active Discussions")
+                
+                VStack(spacing: 0) {
+                    ForEach(discussions.prefix(5), id: \.id) { event in
+                        DiscussionRow(event: event)
+                            .modernListItem(showDivider: event.id != discussions.prefix(5).last?.id)
+                    }
+                }
+                .modernCard(noPadding: true)
+                .padding(.horizontal, .ds.screenPadding)
+            }
+        }
+    }
+}
+
+struct TrendingSection: View {
+    let zappedArticles: [NDKEvent]
+    
+    var body: some View {
+        if !zappedArticles.isEmpty {
+            VStack(spacing: .ds.itemSpacing) {
+                ModernSectionHeader(title: "Trending")
+                
+                VStack(spacing: .ds.base) {
+                    ForEach(zappedArticles.prefix(3), id: \.id) { event in
+                        TrendingItemCard(event: event)
+                    }
+                }
+                .padding(.horizontal, .ds.screenPadding)
+            }
+        }
     }
 }
 
