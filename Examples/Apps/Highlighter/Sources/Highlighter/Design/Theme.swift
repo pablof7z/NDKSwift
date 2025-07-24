@@ -1,5 +1,20 @@
 import SwiftUI
 
+// MARK: - Spacing Constants
+extension CGFloat {
+    static let spacingXS: CGFloat = 4
+    static let spacingS: CGFloat = 8
+    static let spacingM: CGFloat = 16
+    static let spacingL: CGFloat = 24
+    static let spacingXL: CGFloat = 32
+    static let spacingXXL: CGFloat = 48
+}
+
+// MARK: - Font Extensions
+extension Font {
+    static let highlighterCaption2 = Font.system(size: 11, weight: .regular, design: .default)
+}
+
 struct Theme {
     enum Colors {
         static let highlight = Color.yellow

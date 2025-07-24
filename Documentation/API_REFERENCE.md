@@ -212,8 +212,8 @@ let profiles = ndk.observe(
 // Stream events as they arrive (AsyncSequence)
 var events: AsyncStream<T> { get }
 
-// Get current snapshot of all events
-func currentValue() async -> [T]
+// Collect all events until EOSE or timeout
+func collect(timeout: TimeInterval = 10.0, limit: Int? = nil) async -> [T]
 
 // Fetch data once (convenience method)
 func fetch() async -> [T]
@@ -223,8 +223,8 @@ for await event in dataSource.events {
     print("New event: \(event)")
 }
 
-// Example: One-shot fetch
-let currentEvents = await dataSource.currentValue()
+// Example: Collect all events (waits for EOSE)
+let allEvents = await dataSource.collect(timeout: 10.0)
 
 // Example: Convenience fetch
 let events = await dataSource.fetch()
