@@ -232,7 +232,7 @@ public class NDKLightningZapProtocol: NDKZapProtocol {
             }
             let username = String(parts[0])
             let domain = String(parts[1])
-            guard let lnurlURL = URL(string: "https://\(domain)/.well-known/lnurlp/\(username)") else {
+            guard let lnurlURL = URL(string: "https://\(domain)\(WellKnownPath.lnurlp)\(username)") else {
                 throw ZapError.invalidLNURL("Failed to construct LNURL")
             }
             url = lnurlURL

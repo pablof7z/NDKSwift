@@ -48,7 +48,7 @@ public actor BlossomClient {
             let (data, response) = try await urlSession.data(for: request)
             let httpResponse = try handleHTTPResponse(response, data: data, serverURL: serverURL)
 
-            guard httpResponse.statusCode == 200 else {
+            guard httpResponse.statusCode == HTTPStatusCode.ok else {
                 throw createServerError(response: httpResponse, data: data, serverURL: serverURL)
             }
 
@@ -115,7 +115,7 @@ public actor BlossomClient {
             let httpResponse = try handleHTTPResponse(response, data: responseData, serverURL: serverURL)
 
             switch httpResponse.statusCode {
-            case 200, 201:
+            case HTTPStatusCode.ok, HTTPStatusCode.created:
                 let uploadDescriptor = try JSONCoding.decode(BlossomUploadDescriptor.self, from: responseData)
 
                 // Verify SHA256 matches
@@ -131,13 +131,13 @@ public actor BlossomClient {
                     uploaded: Date(nostrTimestamp: uploadDescriptor.uploaded)
                 )
 
-            case 401:
+            case HTTPStatusCode.unauthorized:
                 throw NDKError.unauthorized(relay: serverURL, message: "Blossom authorization failed")
 
-            case 413:
+            case HTTPStatusCode.payloadTooLarge:
                 throw NDKError.fileTooLarge(maxSize: descriptor?.maxUploadSize ?? Int64.max)
 
-            case 415:
+            case HTTPStatusCode.unsupportedMediaType:
                 throw NDKError.unsupportedMimeType(mimeType ?? "unknown")
 
             default:
@@ -195,7 +195,7 @@ public actor BlossomClient {
             let httpResponse = try handleHTTPResponse(response, data: data, serverURL: serverURL)
 
             switch httpResponse.statusCode {
-            case 200:
+            case HTTPStatusCode.ok:
                 let listResponse = try JSONCoding.decode(BlossomListResponse.self, from: data)
 
                 return listResponse.blobs.map { item in
@@ -208,7 +208,7 @@ public actor BlossomClient {
                     )
                 }
 
-            case 401:
+            case HTTPStatusCode.unauthorized:
                 throw NDKError.unauthorized(relay: serverURL, message: "Blossom authorization failed")
 
             default:
@@ -244,14 +244,14 @@ public actor BlossomClient {
             let httpResponse = try handleHTTPResponse(response, data: data, serverURL: serverURL)
 
             switch httpResponse.statusCode {
-            case 200, 204:
+            case HTTPStatusCode.ok, HTTPStatusCode.noContent:
                 // Success
                 return
 
-            case 401:
+            case HTTPStatusCode.unauthorized:
                 throw NDKError.unauthorized(relay: serverURL, message: "Blossom authorization failed")
 
-            case 404:
+            case HTTPStatusCode.notFound:
                 throw NDKError.blobNotFound(sha256: sha256)
 
             default:
@@ -281,7 +281,7 @@ public actor BlossomClient {
             let httpResponse = try handleHTTPResponse(response, data: data, serverURL: serverURL)
 
             switch httpResponse.statusCode {
-            case 200:
+            case HTTPStatusCode.ok:
                 // Verify SHA256
                 let downloadedHex = Crypto.sha256(data).hexString
 
@@ -291,7 +291,7 @@ public actor BlossomClient {
 
                 return data
 
-            case 404:
+            case HTTPStatusCode.notFound:
                 throw NDKError.blobNotFound(sha256: sha256)
 
             default:
