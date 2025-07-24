@@ -80,7 +80,7 @@ struct ModernAuthenticationView: View {
     }
     
     private func createAccount() {
-        HapticManager.shared.impact(.medium)
+        HapticManager.shared.impact(HapticManager.ImpactStyle.medium)
         
         Task {
             do {
@@ -95,7 +95,7 @@ struct ModernAuthenticationView: View {
     private func importAccount() {
         guard !privateKey.isEmpty else { return }
         
-        HapticManager.shared.impact(.medium)
+        HapticManager.shared.impact(HapticManager.ImpactStyle.medium)
         
         Task {
             do {
