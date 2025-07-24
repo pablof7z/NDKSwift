@@ -555,6 +555,22 @@ struct ReactionPill: View {
     let isSelected: Bool
     let onTap: () -> Void
     
+    private var pillBackground: LinearGradient {
+        if isSelected {
+            return LinearGradient(
+                gradient: Gradient(colors: [Color.purple.opacity(0.6), Color.blue.opacity(0.4)]),
+                startPoint: .leading,
+                endPoint: .trailing
+            )
+        } else {
+            return LinearGradient(
+                gradient: Gradient(colors: [Color.white.opacity(0.08), Color.white.opacity(0.05)]),
+                startPoint: .leading,
+                endPoint: .trailing
+            )
+        }
+    }
+    
     var body: some View {
         Button(action: onTap) {
             HStack(spacing: 4) {
@@ -568,18 +584,7 @@ struct ReactionPill: View {
             .padding(.vertical, 4)
             .background(
                 Capsule()
-                    .fill(isSelected ? 
-                        LinearGradient(
-                            gradient: Gradient(colors: [Color.purple.opacity(0.6), Color.blue.opacity(0.4)]),
-                            startPoint: .leading,
-                            endPoint: .trailing
-                        ) : 
-                        LinearGradient(
-                            gradient: Gradient(colors: [Color.white.opacity(0.08), Color.white.opacity(0.05)]),
-                            startPoint: .leading,
-                            endPoint: .trailing
-                        )
-                    )
+                    .fill(pillBackground)
             )
         }
         .buttonStyle(PlainButtonStyle())
@@ -601,59 +606,12 @@ struct ReactionsDrawer: View {
                 
                 ScrollView {
                     VStack(spacing: 0) {
-                        // Emoji header
-                        Text(emoji)
-                            .font(.system(size: 60))
-                            .padding(.top, 20)
-                            .padding(.bottom, 8)
-                        
-                        Text("\(reactions.count) reaction\(reactions.count == 1 ? "" : "s")")
-                            .font(.system(size: 16))
-                            .foregroundColor(.white.opacity(0.6))
-                            .padding(.bottom, 20)
+                        headerSection
                         
                         Divider()
                             .background(Color.white.opacity(0.1))
                         
-                        // List of users who reacted
-                        LazyVStack(spacing: 0) {
-                            ForEach(reactions, id: \.id) { reaction in
-                                HStack(spacing: 12) {
-                                    NDKProfilePicture(pubkey: reaction.pubkey, size: 40)
-                                    
-                                    VStack(alignment: .leading, spacing: 2) {
-                                        if let profile = profiles[reaction.pubkey] {
-                                            Text(profile.displayName ?? profile.name ?? String(reaction.pubkey.prefix(8)))
-                                                .font(.system(size: 15, weight: .semibold))
-                                                .foregroundColor(.white)
-                                                .lineLimit(1)
-                                            
-                                            if let name = profile.name, profile.displayName != nil {
-                                                Text("@\(name)")
-                                                    .font(.system(size: 13))
-                                                    .foregroundColor(.white.opacity(0.5))
-                                                    .lineLimit(1)
-                                            }
-                                        } else {
-                                            Text(String(reaction.pubkey.prefix(8)) + "...")
-                                                .font(.system(size: 15, weight: .semibold))
-                                                .foregroundColor(.white)
-                                        }
-                                    }
-                                    
-                                    Spacer()
-                                    
-                                    Text(relativeTime(from: reaction.createdAt))
-                                        .font(.system(size: 12))
-                                        .foregroundColor(.white.opacity(0.4))
-                                }
-                                .padding(.horizontal, 16)
-                                .padding(.vertical, 12)
-                                
-                                Divider()
-                                    .background(Color.white.opacity(0.1))
-                            }
-                        }
+                        reactionsList
                     }
                 }
             }
@@ -669,6 +627,68 @@ struct ReactionsDrawer: View {
         }
         .onAppear {
             loadProfiles()
+        }
+    }
+    
+    private var headerSection: some View {
+        VStack(spacing: 8) {
+            Text(emoji)
+                .font(.system(size: 60))
+                .padding(.top, 20)
+            
+            Text("\(reactions.count) reaction\(reactions.count == 1 ? "" : "s")")
+                .font(.system(size: 16))
+                .foregroundColor(.white.opacity(0.6))
+                .padding(.bottom, 12)
+        }
+    }
+    
+    private var reactionsList: some View {
+        LazyVStack(spacing: 0) {
+            ForEach(reactions, id: \.id) { reaction in
+                reactionRow(for: reaction)
+                
+                Divider()
+                    .background(Color.white.opacity(0.1))
+            }
+        }
+    }
+    
+    private func reactionRow(for reaction: NDKEvent) -> some View {
+        HStack(spacing: 12) {
+            NDKProfilePicture(pubkey: reaction.pubkey, size: 40)
+            
+            profileInfo(for: reaction.pubkey)
+            
+            Spacer()
+            
+            Text(relativeTime(from: Date(timeIntervalSince1970: TimeInterval(reaction.createdAt))))
+                .font(.system(size: 12))
+                .foregroundColor(.white.opacity(0.4))
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 12)
+    }
+    
+    private func profileInfo(for pubkey: String) -> some View {
+        VStack(alignment: .leading, spacing: 2) {
+            if let profile = profiles[pubkey] {
+                Text(profile.displayName ?? profile.name ?? String(pubkey.prefix(8)))
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundColor(.white)
+                    .lineLimit(1)
+                
+                if let name = profile.name, profile.displayName != nil {
+                    Text("@\(name)")
+                        .font(.system(size: 13))
+                        .foregroundColor(.white.opacity(0.5))
+                        .lineLimit(1)
+                }
+            } else {
+                Text(String(pubkey.prefix(8)) + "...")
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundColor(.white)
+            }
         }
     }
     

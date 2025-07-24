@@ -44,7 +44,6 @@ extension CashuSwift {
             self.witness = nil
         }
         
-        // TODO: remove default for dleq
         public init(keysetID:String, amount:Int, secret:String, C:String, dleq: DLEQ? = nil, witness: String? = nil) {
             self.keysetID = keysetID
             self.amount = amount

@@ -61,7 +61,6 @@ extension CashuSwift {
         
         let mintRequest = Bolt11.MintRequest(quote: quote.quote, outputs: outputs.outputs)
         
-        // TODO: PARSE COMMON ERRORS
         let promises = try await Network.post(url: mint.url.appending(path: "/v1/mint/bolt11"),
                                               body: mintRequest,
                                               expected: Bolt11.MintResponse.self)
