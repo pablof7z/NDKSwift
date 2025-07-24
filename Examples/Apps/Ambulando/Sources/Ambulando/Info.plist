@@ -22,10 +22,6 @@
 	<string>1</string>
 	<key>ITSAppUsesNonExemptEncryption</key>
 	<false/>
-	<key>NSCameraUsageDescription</key>
-	<string>This app needs access to the camera to scan QR codes for login.</string>
-	<key>NSMicrophoneUsageDescription</key>
-	<string>This app needs access to the microphone for voice recording features.</string>
 	<key>UILaunchStoryboardName</key>
 	<string>LaunchScreen</string>
 	<key>UIRequiresFullScreen</key>

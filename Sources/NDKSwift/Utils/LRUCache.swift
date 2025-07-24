@@ -116,6 +116,11 @@ actor LRUCache<Key: Hashable, Value> {
         }
     }
     
+    /// Get all keys in the cache
+    func getAllKeys() -> [Key] {
+        return Array(cache.keys)
+    }
+    
     // MARK: - Private
     
     /// Remove a key from the access order list
