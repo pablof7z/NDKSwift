@@ -74,32 +74,9 @@ struct HighlightCard: View {
                 }
             }
             .padding(.ds.cardPadding)
-            .background(
-                RoundedRectangle(cornerRadius: .ds.large, style: .continuous)
-                    .fill(DesignSystem.Colors.surface)
-                    .shadow(
-                        color: DesignSystem.Shadow.small.color,
-                        radius: DesignSystem.Shadow.small.radius,
-                        x: DesignSystem.Shadow.small.x,
-                        y: DesignSystem.Shadow.small.y
-                    )
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: .ds.large, style: .continuous)
-                    .stroke(
-                        LinearGradient(
-                            colors: [
-                                DesignSystem.Colors.primary.opacity(isZapped ? 0.3 : 0.1),
-                                DesignSystem.Colors.warning.opacity(isZapped ? 0.3 : 0.1)
-                            ],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        ),
-                        lineWidth: 1
-                    )
-            )
         }
         .buttonStyle(PlainButtonStyle())
+        .modernCardSelected(isSelected: isZapped)
         .task {
             await loadAuthor()
         }
@@ -162,18 +139,9 @@ struct CompactHighlightCardView: View {
             }
             .padding(.ds.base)
             .frame(width: 280)
-            .background(
-                RoundedRectangle(cornerRadius: .ds.medium, style: .continuous)
-                    .fill(DesignSystem.Colors.surface)
-                    .shadow(
-                        color: DesignSystem.Shadow.subtle.color,
-                        radius: DesignSystem.Shadow.subtle.radius,
-                        x: DesignSystem.Shadow.subtle.x,
-                        y: DesignSystem.Shadow.subtle.y
-                    )
-            )
         }
         .buttonStyle(PlainButtonStyle())
+        .modernCard()
         .sheet(isPresented: $showDetail) {
             HighlightDetailView(highlight: highlight)
         }
