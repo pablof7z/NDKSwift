@@ -44,22 +44,6 @@ public enum ValidationHelpers {
         URL(string: urlString) != nil
     }
     
-    // MARK: - Collection Validation
-    
-    /// Check if a collection has exactly one element
-    /// - Parameter collection: The collection to check
-    /// - Returns: true if the collection has exactly one element
-    public static func hasOneElement<C: Collection>(_ collection: C) -> Bool {
-        collection.count == 1
-    }
-    
-    /// Check if a collection has any elements
-    /// - Parameter collection: The collection to check
-    /// - Returns: true if the collection is not empty
-    public static func hasElements<C: Collection>(_ collection: C) -> Bool {
-        !collection.isEmpty
-    }
-    
     // MARK: - Numeric Validation
     
     /// Check if a value is within a specific range

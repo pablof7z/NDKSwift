@@ -17,40 +17,6 @@ extension Collection where Element: BinaryFloatingPoint {
     }
 }
 
-// MARK: - Safe Collection Operations
-extension Collection {
-    /// Safely returns the first element that satisfies the given predicate
-    /// - Parameter predicate: A closure that takes an element and returns a Boolean
-    /// - Returns: The first element that satisfies predicate, or nil
-    public func firstWhere(_ predicate: (Element) throws -> Bool) rethrows -> Element? {
-        try first(where: predicate)
-    }
-    
-    /// Returns true if the collection is not empty
-    public var isNotEmpty: Bool {
-        !isEmpty
-    }
-    
-    /// More readable way to check if collection has elements
-    public var hasElements: Bool {
-        return !isEmpty
-    }
-    
-    /// Check if collection has exactly one element
-    public var hasOneElement: Bool {
-        return count == 1
-    }
-    
-    /// Check if collection has more than one element
-    public var hasMultipleElements: Bool {
-        return count > 1
-    }
-    
-    /// Safe way to get the only element if collection has exactly one
-    public var onlyElement: Element? {
-        return hasOneElement ? first : nil
-    }
-}
 
 // MARK: - Array Extensions
 
@@ -103,16 +69,3 @@ public extension String {
     }
 }
 
-// MARK: - Optional Extensions
-
-public extension Optional where Wrapped: Collection {
-    /// Returns true if optional is nil or empty
-    var isNilOrEmpty: Bool {
-        return self?.isEmpty ?? true
-    }
-    
-    /// Returns true if optional has elements
-    var hasElements: Bool {
-        return !isNilOrEmpty
-    }
-}
