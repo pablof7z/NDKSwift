@@ -7,15 +7,6 @@ public extension Array {
     }
 }
 
-// MARK: - Array to Set Conversion
-
-public extension Array where Element: Hashable {
-    /// Convert array to set
-    var set: Set<Element> {
-        Set(self)
-    }
-}
-
 // MARK: - Async Operations
 
 public extension Array {
