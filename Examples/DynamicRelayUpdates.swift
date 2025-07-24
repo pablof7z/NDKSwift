@@ -14,8 +14,8 @@ struct DynamicRelayUpdatesExample {
         let ndk = NDK()
         
         // Add some default relays
-        await ndk.addRelay("wss://relay.damus.io")
-        await ndk.addRelay("wss://nos.lol")
+        await ndk.addRelay(RelayConstants.damus)
+        await ndk.addRelay(RelayConstants.nosLol)
         
         // Connect to relays
         await ndk.connect()
