@@ -265,7 +265,10 @@ struct AudioEventCard: View {
     }
     
     private func seek(to progress: Double) {
-        guard let duration = audioPlayer?.currentItem?.duration else { return }
+        guard let duration = audioPlayer?.currentItem?.duration,
+              duration.isValid,
+              duration.isNumeric,
+              !duration.isIndefinite else { return }
         
         let targetTime = CMTime(seconds: progress * duration.seconds, preferredTimescale: duration.timescale)
         audioPlayer?.seek(to: targetTime)
@@ -507,12 +510,18 @@ struct AudioPlayerView: View {
             .gesture(
                 DragGesture(minimumDistance: 0)
                     .onChanged { value in
-                        isDragging = true
-                        dragProgress = min(max(0, value.location.x / geometry.size.width), 1)
+                        // Only allow dragging if duration is valid
+                        if duration > 0 {
+                            isDragging = true
+                            dragProgress = min(max(0, value.location.x / geometry.size.width), 1)
+                        }
                     }
                     .onEnded { _ in
-                        isDragging = false
-                        onSeek(dragProgress)
+                        // Only seek if duration is valid
+                        if duration > 0 {
+                            isDragging = false
+                            onSeek(dragProgress)
+                        }
                     }
             )
         }
