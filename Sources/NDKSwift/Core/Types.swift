@@ -30,13 +30,19 @@ public enum TimeConstants {
     public static let minute: TimeInterval = 60
     
     /// One hour in seconds
-    public static let hour: TimeInterval = 60 * 60
+    public static let hour: TimeInterval = 60 * minute
     
     /// One day in seconds
-    public static let day: TimeInterval = 24 * 60 * 60
+    public static let day: TimeInterval = 24 * hour
     
     /// One week in seconds
-    public static let week: TimeInterval = 7 * 24 * 60 * 60
+    public static let week: TimeInterval = 7 * day
+    
+    /// One month in seconds (30 days)
+    public static let month: TimeInterval = 30 * day
+    
+    /// One year in seconds (365 days)
+    public static let year: TimeInterval = 365 * day
     
     // MARK: - Cache TTLs
     

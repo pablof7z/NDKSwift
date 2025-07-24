@@ -35,12 +35,12 @@ private struct ProfileCacheEntry {
 /// Use maxAge parameter to control cache behavior:
 /// - maxAge: nil - Use default staleAfter from config (typically 1 hour)
 /// - maxAge: 0 - Always fetch fresh data, bypass cache
-/// - maxAge: 300 - Use cached data if less than 5 minutes old
+/// - maxAge: 5 * TimeConstants.minute - Use cached data if less than 5 minutes old
 /// 
 /// Example usage:
 /// ```swift
 /// // Feed view - many profiles, older data acceptable
-/// for await profile in profileManager.observe(for: pubkey, maxAge: 3600) {
+/// for await profile in profileManager.observe(for: pubkey, maxAge: TimeConstants.hour) {
 ///     // Use profile (may be nil if not found)
 ///     break // If you only need one value
 /// }
