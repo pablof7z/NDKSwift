@@ -13,8 +13,9 @@ struct HighlightCard: View {
             VStack(alignment: .leading, spacing: 12) {
                 // Quote
                 Text("\"\(highlight.content)\"")
-                    .font(.highlighterQuote)
-                    .foregroundColor(.highlighterText)
+                    .font(.ds.title3)
+                    .fontWeight(.medium)
+                    .foregroundColor(.ds.text)
                     .multilineTextAlignment(.leading)
                     .lineLimit(4)
                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -22,69 +23,74 @@ struct HighlightCard: View {
                 // Comment if available
                 if let comment = highlight.comment {
                     Text(comment)
-                        .font(.highlighterBody)
-                        .foregroundColor(.highlighterSecondaryText)
+                        .font(.ds.body)
+                        .foregroundColor(.ds.textSecondary)
                         .lineLimit(2)
-                        .padding(.top, 4)
+                        .padding(.top, .ds.micro)
                 }
                 
                 // Metadata row
                 HStack {
                     // Author
-                    HStack(spacing: 8) {
+                    HStack(spacing: .ds.small) {
                         Image(systemName: "person.circle.fill")
                             .font(.system(size: 20))
-                            .foregroundColor(.highlighterPurple)
+                            .foregroundColor(.ds.primary)
                         
                         Text(author?.name ?? author?.displayName ?? String(highlight.author.prefix(8)))
-                            .font(.highlighterCaption)
+                            .font(.ds.caption)
                             .fontWeight(.medium)
-                            .foregroundColor(.highlighterText)
+                            .foregroundColor(.ds.text)
                     }
                     
                     Spacer()
                     
                     // Actions
-                    HStack(spacing: 16) {
+                    HStack(spacing: .ds.medium) {
                         // Zap button
                         Button(action: zapHighlight) {
                             Image(systemName: isZapped ? "bolt.fill" : "bolt")
                                 .font(.system(size: 16))
-                                .foregroundColor(isZapped ? .highlighterOrange : .highlighterSecondaryText)
+                                .foregroundColor(isZapped ? .ds.warning : .ds.textSecondary)
                         }
                         .buttonStyle(PlainButtonStyle())
                         
                         // Time
                         Text(relativeTime(from: highlight.createdAt))
-                            .font(.highlighterCaption)
-                            .foregroundColor(.highlighterSecondaryText)
+                            .font(.ds.caption)
+                            .foregroundColor(.ds.textSecondary)
                     }
                 }
                 
                 // Source indicator
                 if let url = highlight.url {
-                    HStack(spacing: 4) {
+                    HStack(spacing: .ds.micro) {
                         Image(systemName: "link")
                             .font(.system(size: 12))
                         Text(URL(string: url)?.host ?? "Source")
-                            .font(.highlighterCaption)
+                            .font(.ds.caption)
                     }
-                    .foregroundColor(.highlighterPurple)
+                    .foregroundColor(.ds.primary)
                 }
             }
-            .padding()
+            .padding(.ds.cardPadding)
             .background(
-                RoundedRectangle(cornerRadius: 16)
-                    .fill(Color.highlighterCardBackground)
-                    .shadow(color: Color.black.opacity(0.05), radius: 8, x: 0, y: 2)
+                RoundedRectangle(cornerRadius: .ds.large, style: .continuous)
+                    .fill(DesignSystem.Colors.surface)
+                    .shadow(
+                        color: DesignSystem.Shadow.small.color,
+                        radius: DesignSystem.Shadow.small.radius,
+                        x: DesignSystem.Shadow.small.x,
+                        y: DesignSystem.Shadow.small.y
+                    )
             )
             .overlay(
-                RoundedRectangle(cornerRadius: 16)
+                RoundedRectangle(cornerRadius: .ds.large, style: .continuous)
                     .stroke(
                         LinearGradient(
                             colors: [
-                                Color.highlighterPurple.opacity(isZapped ? 0.3 : 0.1),
-                                Color.highlighterOrange.opacity(isZapped ? 0.3 : 0.1)
+                                DesignSystem.Colors.primary.opacity(isZapped ? 0.3 : 0.1),
+                                DesignSystem.Colors.warning.opacity(isZapped ? 0.3 : 0.1)
                             ],
                             startPoint: .topLeading,
                             endPoint: .bottomTrailing
@@ -116,7 +122,7 @@ struct HighlightCard: View {
     
     private func zapHighlight() {
         isZapped.toggle()
-        HapticType.light.trigger()
+        HapticManager.shared.impact(.light)
         // TODO: Implement actual zapping
     }
     
@@ -134,11 +140,11 @@ struct CompactHighlightCardView: View {
     
     var body: some View {
         Button(action: { showDetail = true }) {
-            VStack(alignment: .leading, spacing: 8) {
+            VStack(alignment: .leading, spacing: .ds.small) {
                 Text("\"\(highlight.content)\"")
-                    .font(.highlighterBody)
+                    .font(.ds.body)
                     .fontWeight(.medium)
-                    .foregroundColor(.highlighterText)
+                    .foregroundColor(.ds.text)
                     .multilineTextAlignment(.leading)
                     .lineLimit(3)
                     .frame(minHeight: 60, alignment: .topLeading)
@@ -146,25 +152,30 @@ struct CompactHighlightCardView: View {
                 HStack {
                     Image(systemName: "person.circle.fill")
                         .font(.system(size: 16))
-                        .foregroundColor(.highlighterPurple)
+                        .foregroundColor(.ds.primary)
                     
                     Text(String(highlight.author.prefix(8)))
-                        .font(.highlighterCaption)
-                        .foregroundColor(.highlighterSecondaryText)
+                        .font(.ds.caption)
+                        .foregroundColor(.ds.textSecondary)
                     
                     Spacer()
                     
                     Image(systemName: "bolt")
                         .font(.system(size: 14))
-                        .foregroundColor(.highlighterSecondaryText)
+                        .foregroundColor(.ds.textSecondary)
                 }
             }
-            .padding()
+            .padding(.ds.base)
             .frame(width: 280)
             .background(
-                RoundedRectangle(cornerRadius: 12)
-                    .fill(Color.highlighterCardBackground)
-                    .shadow(color: Color.black.opacity(0.05), radius: 4, x: 0, y: 2)
+                RoundedRectangle(cornerRadius: .ds.medium, style: .continuous)
+                    .fill(DesignSystem.Colors.surface)
+                    .shadow(
+                        color: DesignSystem.Shadow.subtle.color,
+                        radius: DesignSystem.Shadow.subtle.radius,
+                        x: DesignSystem.Shadow.subtle.x,
+                        y: DesignSystem.Shadow.subtle.y
+                    )
             )
         }
         .buttonStyle(PlainButtonStyle())
@@ -213,5 +224,5 @@ struct CompactHighlightCardView: View {
             .padding(.horizontal)
         }
     }
-    .background(Color.highlighterBackground)
+    .background(DesignSystem.Colors.background)
 }
