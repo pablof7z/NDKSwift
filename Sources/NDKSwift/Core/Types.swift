@@ -102,10 +102,14 @@ public enum EventKind {
     public static let reaction = 7
     public static let genericRepost = 16
     public static let image = 20  // NIP-68 Picture-first feeds
+    public static let channel = 40
+    public static let channelMetadata = 41
+    public static let channelMessage = 42
     
     // MARK: - Extended Events (1000-9999)
     public static let fileMetadata = 1063
     public static let genericReply = 1111  // NIP-22 comment
+    public static let report = 1984  // NIP-56 Report
     
     // MARK: - NIP-60 Cashu Events
     public static let cashuWalletBackup = 375  // Wallet backup event (NIP-60)
@@ -147,9 +151,15 @@ public enum EventKind {
     public static let categorizedPeopleList = 30000
     public static let categorizedBookmarkList = 30001
     public static let relayListMetadata = 30002
+    public static let profileBadges = 30008
+    public static let badgeDefinition = 30009
     public static let longFormContent = 30023
+    public static let draftLongForm = 30024
     public static let blossomServerList = 30063
     public static let applicationSpecificData = 30078
+    public static let liveEvent = 30311
+    public static let handlerRecommendation = 31989
+    public static let handlerInformation = 31990
     public static let mintAnnouncement = 38000  // NIP-87 mint discovery
     public static let cashuMintAnnouncement = 38172  // NIP-87
     public static let followPack = 39089  // NIP-51 follow pack
