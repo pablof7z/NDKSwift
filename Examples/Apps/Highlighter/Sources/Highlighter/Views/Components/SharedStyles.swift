@@ -1,55 +1,27 @@
 import SwiftUI
 
-// MARK: - Color Hex Extension
+// MARK: - Legacy Color Extensions (for backward compatibility)
+// These are deprecated - use DesignSystem.Colors instead
 extension Color {
-    init(hex: String) {
-        let hex = hex.trimmingCharacters(in: CharacterSet.alphanumerics.inverted)
-        var int: UInt64 = 0
-        Scanner(string: hex).scanHexInt64(&int)
-        let a, r, g, b: UInt64
-        switch hex.count {
-        case 3:
-            (a, r, g, b) = (255, (int >> 8) * 17, (int >> 4 & 0xF) * 17, (int & 0xF) * 17)
-        case 6:
-            (a, r, g, b) = (255, int >> 16, int >> 8 & 0xFF, int & 0xFF)
-        case 8:
-            (a, r, g, b) = (int >> 24, int >> 16 & 0xFF, int >> 8 & 0xFF, int & 0xFF)
-        default:
-            (a, r, g, b) = (255, 0, 0, 0)
-        }
-        
-        self.init(
-            .sRGB,
-            red: Double(r) / 255,
-            green: Double(g) / 255,
-            blue: Double(b) / 255,
-            opacity: Double(a) / 255
-        )
-    }
-}
-
-// MARK: - Theme Colors
-extension Color {
-    // Primary Colors
-    static let highlighterPurple = Color(hex: "6A1B9A")
-    static let highlighterOrange = Color(hex: "FF9500")
+    // Primary Colors - mapped to DesignSystem
+    static let highlighterPurple = DesignSystem.Colors.primary
+    static let highlighterOrange = DesignSystem.Colors.secondary
     
-    // Background Colors
-    static let highlighterBackground = Color(hex: "F5F5F5")
-    static let highlighterCardBackground = Color.white
-    static let highlighterDarkBackground = Color(hex: "1C1C1E")
-    static let highlighterDarkCard = Color(hex: "2C2C2E")
+    // Background Colors - mapped to DesignSystem  
+    static let highlighterBackground = DesignSystem.Colors.background
+    static let highlighterCardBackground = DesignSystem.Colors.surface
+    static let highlighterDarkBackground = DesignSystem.Colors.darkBackground
+    static let highlighterDarkCard = DesignSystem.Colors.darkSurface
     
-    // Text Colors
-    static let highlighterText = Color.black
-    static let highlighterSecondaryText = Color.gray
-    static let highlighterDarkText = Color.white
+    // Text Colors - mapped to DesignSystem
+    static let highlighterText = DesignSystem.Colors.text
+    static let highlighterSecondaryText = DesignSystem.Colors.textSecondary
+    static let highlighterDarkText = DesignSystem.Colors.darkText
     
-    // Accent Colors
-    static let highlighterSuccess = Color.green
-    static let highlighterWarning = Color.orange
-    static let highlighterError = Color.red
-    
+    // Accent Colors - mapped to DesignSystem
+    static let highlighterSuccess = DesignSystem.Colors.success
+    static let highlighterWarning = DesignSystem.Colors.warning
+    static let highlighterError = DesignSystem.Colors.error
 }
 
 // MARK: - View Modifiers
@@ -59,9 +31,18 @@ struct CardStyle: ViewModifier {
     
     func body(content: Content) -> some View {
         content
-            .background(colorScheme == .dark ? Color.highlighterDarkCard : Color.highlighterCardBackground)
-            .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
-            .shadow(color: Color.black.opacity(0.05), radius: 8, x: 0, y: 2)
+            .background(
+                colorScheme == .dark ? 
+                DesignSystem.Colors.darkSurface : 
+                DesignSystem.Colors.surface
+            )
+            .clipShape(RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.large, style: .continuous))
+            .shadow(
+                color: DesignSystem.Shadow.small.color,
+                radius: DesignSystem.Shadow.small.radius,
+                x: DesignSystem.Shadow.small.x,
+                y: DesignSystem.Shadow.small.y
+            )
     }
 }
 
@@ -70,69 +51,75 @@ struct HighlightCardStyle: ViewModifier {
     
     func body(content: Content) -> some View {
         content
-            .padding()
+            .padding(DesignSystem.Spacing.cardPadding)
             .background(
-                RoundedRectangle(cornerRadius: 16, style: .continuous)
-                    .fill(Color.highlighterCardBackground)
+                RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.large, style: .continuous)
+                    .fill(DesignSystem.Colors.surface)
                     .overlay(
-                        RoundedRectangle(cornerRadius: 16, style: .continuous)
-                            .stroke(isSelected ? Color.highlighterOrange : Color.clear, lineWidth: 2)
+                        RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.large, style: .continuous)
+                            .stroke(
+                                isSelected ? DesignSystem.Colors.secondary : Color.clear, 
+                                lineWidth: 2
+                            )
                     )
             )
-            .shadow(color: isSelected ? Color.highlighterOrange.opacity(0.3) : Color.black.opacity(0.05), 
-                    radius: isSelected ? 12 : 8, 
-                    x: 0, 
-                    y: isSelected ? 4 : 2)
+            .shadow(
+                color: isSelected ? DesignSystem.Colors.secondary.opacity(0.3) : DesignSystem.Shadow.small.color,
+                radius: isSelected ? 12 : DesignSystem.Shadow.small.radius,
+                x: 0,
+                y: isSelected ? 4 : DesignSystem.Shadow.small.y
+            )
             .scaleEffect(isSelected ? 1.02 : 1.0)
-            .animation(.spring(response: 0.3, dampingFraction: 0.7), value: isSelected)
+            .animation(DesignSystem.Animation.springSnappy, value: isSelected)
     }
 }
 
 struct PrimaryButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
-            .font(.system(size: 16, weight: .semibold, design: .default))
+            .font(DesignSystem.Typography.headline)
             .foregroundColor(.white)
-            .padding(.horizontal, 24)
-            .padding(.vertical, 14)
+            .padding(.horizontal, DesignSystem.Spacing.xl)
+            .padding(.vertical, DesignSystem.Spacing.medium)
             .background(
-                RoundedRectangle(cornerRadius: 12, style: .continuous)
-                    .fill(Color.highlighterPurple)
+                RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.medium, style: .continuous)
+                    .fill(DesignSystem.Colors.primary)
             )
             .scaleEffect(configuration.isPressed ? 0.95 : 1.0)
-            .animation(.spring(response: 0.2, dampingFraction: 0.8), value: configuration.isPressed)
+            .animation(DesignSystem.Animation.interactive, value: configuration.isPressed)
     }
 }
 
 struct SecondaryButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
-            .font(.system(size: 16, weight: .medium, design: .default))
-            .foregroundColor(.highlighterPurple)
-            .padding(.horizontal, 24)
-            .padding(.vertical, 14)
+            .font(DesignSystem.Typography.bodyMedium)
+            .foregroundColor(DesignSystem.Colors.primary)
+            .padding(.horizontal, DesignSystem.Spacing.xl)
+            .padding(.vertical, DesignSystem.Spacing.medium)
             .background(
-                RoundedRectangle(cornerRadius: 12, style: .continuous)
-                    .stroke(Color.highlighterPurple, lineWidth: 2)
+                RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.medium, style: .continuous)
+                    .stroke(DesignSystem.Colors.primary, lineWidth: 2)
             )
             .scaleEffect(configuration.isPressed ? 0.95 : 1.0)
-            .animation(.spring(response: 0.2, dampingFraction: 0.8), value: configuration.isPressed)
+            .animation(DesignSystem.Animation.interactive, value: configuration.isPressed)
     }
 }
 
 struct ZapButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
-            .font(.system(size: 14, weight: .medium, design: .default))
+            .font(DesignSystem.Typography.callout)
+            .fontWeight(.medium)
             .foregroundColor(.white)
-            .padding(.horizontal, 16)
-            .padding(.vertical, 8)
+            .padding(.horizontal, DesignSystem.Spacing.medium)
+            .padding(.vertical, DesignSystem.Spacing.small)
             .background(
                 Capsule()
-                    .fill(Color.highlighterOrange)
+                    .fill(DesignSystem.Colors.secondary)
             )
             .scaleEffect(configuration.isPressed ? 0.9 : 1.0)
-            .animation(.spring(response: 0.2, dampingFraction: 0.8), value: configuration.isPressed)
+            .animation(DesignSystem.Animation.interactive, value: configuration.isPressed)
     }
 }
 
@@ -147,37 +134,6 @@ extension View {
         modifier(HighlightCardStyle(isSelected: isSelected))
     }
     
-    
-    func fadeSlide(isVisible: Bool, delay: Double = 0) -> some View {
-        self
-            .offset(y: isVisible ? 0 : 20)
-            .opacity(isVisible ? 1 : 0)
-            .animation(.easeOut(duration: 0.4).delay(delay), value: isVisible)
-    }
-    
-    func glassBackground(cornerRadius: CGFloat = 16) -> some View {
-        self.background {
-            RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                .fill(.ultraThinMaterial)
-                .overlay {
-                    RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                        .stroke(
-                            LinearGradient(
-                                colors: [
-                                    Color.white.opacity(0.3),
-                                    Color.white.opacity(0.1)
-                                ],
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
-                            ),
-                            lineWidth: 1
-                        )
-                }
-                .shadow(color: .black.opacity(0.1), radius: 8, x: 0, y: 4)
-        }
-    }
-    
-    
     func pulse() -> some View {
         modifier(PulseModifier())
     }
@@ -185,58 +141,24 @@ extension View {
     func rotateAndScale(isActive: Bool) -> some View {
         modifier(RotateAndScaleModifier(isActive: isActive))
     }
-    
-    func cardBackground(isSelected: Bool = false) -> some View {
-        modifier(EnhancedCardModifier(isSelected: isSelected))
-    }
 }
 
-// MARK: - Haptic Feedback
+// MARK: - Haptic Feedback (Deprecated - use HapticType from DesignSystem)
+// HapticType is now defined in DesignSystem.swift
 
-enum HapticType {
-    case light
-    case medium
-    case heavy
-    case selection
-    case success
-    case warning
-    case error
-    
-    func trigger() {
-        switch self {
-        case .light:
-            UIImpactFeedbackGenerator(style: .light).impactOccurred()
-        case .medium:
-            UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-        case .heavy:
-            UIImpactFeedbackGenerator(style: .heavy).impactOccurred()
-        case .selection:
-            UISelectionFeedbackGenerator().selectionChanged()
-        case .success:
-            UINotificationFeedbackGenerator().notificationOccurred(.success)
-        case .warning:
-            UINotificationFeedbackGenerator().notificationOccurred(.warning)
-        case .error:
-            UINotificationFeedbackGenerator().notificationOccurred(.error)
-        }
-    }
-}
-
-// MARK: - Typography
-
+// MARK: - Typography (Legacy - use DesignSystem.Typography instead)
 extension Font {
-    static let highlighterTitle = Font.system(size: 28, weight: .bold, design: .default)
-    static let highlighterHeadline = Font.system(size: 20, weight: .semibold, design: .default)
-    static let highlighterBody = Font.system(size: 16, weight: .regular, design: .default)
-    static let highlighterCaption = Font.system(size: 14, weight: .regular, design: .default)
+    static let highlighterTitle = DesignSystem.Typography.title
+    static let highlighterHeadline = DesignSystem.Typography.headline  
+    static let highlighterBody = DesignSystem.Typography.body
+    static let highlighterCaption = DesignSystem.Typography.caption
     static let highlighterQuote = Font.custom("Georgia", size: 18).italic()
 }
 
-// MARK: - Animations
-
+// MARK: - Animations (Legacy - use DesignSystem.Animation instead) 
 extension Animation {
-    static let highlighterSpring = Animation.spring(response: 0.4, dampingFraction: 0.8)
-    static let highlighterEase = Animation.easeInOut(duration: 0.3)
+    static let highlighterSpring = DesignSystem.Animation.springSnappy
+    static let highlighterEase = DesignSystem.Animation.standard
 }
 
 // MARK: - Additional Components
@@ -249,9 +171,9 @@ struct PressButtonStyle: ButtonStyle {
     }
 }
 
-// MARK: - Unused components removed for YAGNI compliance
-// Removed: LoadingDots, AnimatedGradientBackground, CustomTabBar, TabBarItem
-// These were not being used anywhere in the codebase
+// MARK: - Legacy Components (Cleaned up following YAGNI principles)
+// Removed unused components: LoadingDots, AnimatedGradientBackground, CustomTabBar, TabBarItem
+// Consolidated duplicate design systems into single DesignSystem.swift
 
 // MARK: - Additional Modifiers
 
@@ -297,39 +219,11 @@ struct RotateAndScaleModifier: ViewModifier {
     }
 }
 
+// MARK: - Enhanced Card Modifier (Deprecated - use cardBackground() from DesignSystem)
 struct EnhancedCardModifier: ViewModifier {
     let isSelected: Bool
     
     func body(content: Content) -> some View {
-        content
-            .background {
-                RoundedRectangle(cornerRadius: 20, style: .continuous)
-                    .fill(Color.highlighterCardBackground)
-                    .overlay {
-                        RoundedRectangle(cornerRadius: 20, style: .continuous)
-                            .stroke(
-                                isSelected ?
-                                LinearGradient(
-                                    colors: [Color.highlighterOrange, Color.highlighterPurple],
-                                    startPoint: .topLeading,
-                                    endPoint: .bottomTrailing
-                                ) :
-                                LinearGradient(
-                                    colors: [Color.gray.opacity(0.2), Color.gray.opacity(0.1)],
-                                    startPoint: .topLeading,
-                                    endPoint: .bottomTrailing
-                                ),
-                                lineWidth: isSelected ? 2 : 1
-                            )
-                    }
-                    .shadow(
-                        color: isSelected ? Color.highlighterOrange.opacity(0.3) : Color.black.opacity(0.08),
-                        radius: isSelected ? 12 : 8,
-                        x: 0,
-                        y: isSelected ? 6 : 4
-                    )
-            }
-            .scaleEffect(isSelected ? 1.02 : 1.0)
-            .animation(.spring(response: 0.3, dampingFraction: 0.7), value: isSelected)
+        content.cardBackground(isSelected: isSelected)
     }
 }

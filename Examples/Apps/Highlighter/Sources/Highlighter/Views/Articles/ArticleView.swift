@@ -46,16 +46,16 @@ struct ArticleView: View {
                         }
                     }
                     
-                    VStack(alignment: .leading, spacing: .spacingM) {
+                    VStack(alignment: .leading, spacing: .ds.medium) {
                         // Title and metadata
-                        VStack(alignment: .leading, spacing: .spacingS) {
+                        VStack(alignment: .leading, spacing: .ds.small) {
                             Text(article.title)
                                 .font(.highlighterTitle)
                                 .foregroundColor(.highlighterText)
                             
-                            HStack(spacing: .spacingM) {
+                            HStack(spacing: .ds.medium) {
                                 // Author
-                                HStack(spacing: .spacingXS) {
+                                HStack(spacing: .ds.micro) {
                                     Circle()
                                         .fill(Color.highlighterPurple.opacity(0.2))
                                         .frame(width: 32, height: 32)
@@ -83,7 +83,7 @@ struct ArticleView: View {
                                         
                                         if let publishedAt = article.publishedAt {
                                             Text(publishedAt.formatted(.relative(presentation: .named)))
-                                                .font(.highlighterCaption2)
+                                                .font(.ds.micro)
                                                 .foregroundColor(.highlighterSecondaryText)
                                         }
                                     }
@@ -97,38 +97,38 @@ struct ArticleView: View {
                                     .foregroundColor(.highlighterSecondaryText)
                             }
                         }
-                        .padding(.horizontal, .spacingL)
-                        .padding(.top, .spacingL)
+                        .padding(.horizontal, .ds.large)
+                        .padding(.top, .ds.large)
                         
                         if let summary = article.summary {
                             Text(summary)
                                 .font(.highlighterBody)
                                 .foregroundColor(.highlighterSecondaryText)
-                                .padding(.horizontal, .spacingL)
+                                .padding(.horizontal, .ds.large)
                         }
                         
                         // Tags
                         if !article.hashtags.isEmpty {
                             ScrollView(.horizontal, showsIndicators: false) {
-                                HStack(spacing: .spacingS) {
+                                HStack(spacing: .ds.small) {
                                     ForEach(article.hashtags, id: \.self) { tag in
                                         Text("#\(tag)")
                                             .font(.highlighterCaption)
                                             .foregroundColor(.highlighterPurple)
-                                            .padding(.horizontal, .spacingM)
-                                            .padding(.vertical, .spacingXS)
+                                            .padding(.horizontal, .ds.medium)
+                                            .padding(.vertical, .ds.micro)
                                             .background(
                                                 Capsule()
                                                     .fill(Color.highlighterPurple.opacity(0.1))
                                             )
                                     }
                                 }
-                                .padding(.horizontal, .spacingL)
+                                .padding(.horizontal, .ds.large)
                             }
                         }
                         
                         Divider()
-                            .padding(.vertical, .spacingL)
+                            .padding(.vertical, .ds.large)
                         
                         // Article Content with markdown rendering and text selection
                         if let ndk = appState.ndk {
@@ -152,7 +152,7 @@ struct ArticleView: View {
                             .onLinkTap { url in
                                 handleLinkTap(url)
                             }
-                            .padding(.bottom, .spacingXL)
+                            .padding(.bottom, .ds.xl)
                         }
                     }
                 }
@@ -166,7 +166,7 @@ struct ArticleView: View {
                 }
                 
                 ToolbarItem(placement: .navigationBarTrailing) {
-                    HStack(spacing: .spacingM) {
+                    HStack(spacing: .ds.medium) {
                         Button(action: { 
                             isBookmarked.toggle()
                             HapticType.light.trigger()
@@ -297,7 +297,7 @@ struct ArticleView: View {
         config.h3Font = .title2
         
         // No content padding since we handle it ourselves
-        config.contentPadding = EdgeInsets(top: 0, leading: .spacingL, bottom: 0, trailing: .spacingL)
+        config.contentPadding = EdgeInsets(top: 0, leading: .ds.large, bottom: 0, trailing: .ds.large)
         
         return config
     }
@@ -343,8 +343,8 @@ struct HighlightOptionsSheet: View {
     
     var body: some View {
         NavigationStack {
-            VStack(alignment: .leading, spacing: .spacingL) {
-                VStack(alignment: .leading, spacing: .spacingS) {
+            VStack(alignment: .leading, spacing: .ds.large) {
+                VStack(alignment: .leading, spacing: .ds.small) {
                     Text("Selected Text")
                         .font(.highlighterCaption)
                         .foregroundColor(.highlighterSecondaryText)
@@ -357,7 +357,7 @@ struct HighlightOptionsSheet: View {
                         .cornerRadius(12)
                 }
                 
-                VStack(alignment: .leading, spacing: .spacingS) {
+                VStack(alignment: .leading, spacing: .ds.small) {
                     Text("Add a comment (optional)")
                         .font(.highlighterCaption)
                         .foregroundColor(.highlighterSecondaryText)
@@ -369,7 +369,7 @@ struct HighlightOptionsSheet: View {
                 
                 Spacer()
                 
-                VStack(spacing: .spacingM) {
+                VStack(spacing: .ds.medium) {
                     Button(action: {
                         onHighlight(comment.isEmpty ? nil : comment)
                         dismiss()
