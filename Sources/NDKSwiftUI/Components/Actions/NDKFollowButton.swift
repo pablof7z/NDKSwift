@@ -379,7 +379,7 @@ private class FollowState: ObservableObject {
             
         } catch {
             self.error = error
-            print("Failed to follow user: \(error)")
+            NDKLogger.log(.error, category: .general, "Failed to follow user: \(error)")
         }
     }
     
@@ -406,7 +406,7 @@ private class FollowState: ObservableObject {
             
         } catch {
             self.error = error
-            print("Failed to unfollow user: \(error)")
+            NDKLogger.log(.error, category: .general, "Failed to unfollow user: \(error)")
         }
     }
     
