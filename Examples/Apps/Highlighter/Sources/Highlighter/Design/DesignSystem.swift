@@ -205,10 +205,27 @@ extension Color {
 // MARK: - Convenience extensions
 extension Color {
     static let ds = DesignSystem.Colors.self
+    
+    // Legacy color names for backward compatibility
+    static let highlighterPurple = DesignSystem.Colors.primary
+    static let highlighterOrange = DesignSystem.Colors.secondary
+    static let highlighterBackground = DesignSystem.Colors.background
+    static let highlighterCardBackground = DesignSystem.Colors.surface
+    static let highlighterText = DesignSystem.Colors.text
+    static let highlighterSecondaryText = DesignSystem.Colors.textSecondary
+    static let highlighterDivider = DesignSystem.Colors.divider
 }
 
 extension Font {
     static let ds = DesignSystem.Typography.self
+    
+    // Legacy font names for backward compatibility
+    static let highlighterTitle = DesignSystem.Typography.title
+    static let highlighterHeadline = DesignSystem.Typography.headline
+    static let highlighterBody = DesignSystem.Typography.body
+    static let highlighterCaption = DesignSystem.Typography.caption
+    static let highlighterQuote = DesignSystem.Typography.highlighterQuote
+    static let highlighterMicro = DesignSystem.Typography.micro
 }
 
 extension CGFloat {
@@ -581,18 +598,18 @@ struct EnhancedZapButtonStyle: ButtonStyle {
     
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
-            .font(Typography.callout)
+            .font(DesignSystem.Typography.callout)
             .fontWeight(.medium)
             .foregroundColor(.white)
-            .padding(.horizontal, Spacing.medium)
-            .padding(.vertical, Spacing.small)
+            .padding(.horizontal, DesignSystem.Spacing.medium)
+            .padding(.vertical, DesignSystem.Spacing.small)
             .background(
                 Capsule()
                     .fill(
                         LinearGradient(
                             colors: [
-                                Colors.secondary,
-                                Colors.secondaryDark
+                                DesignSystem.Colors.secondary,
+                                DesignSystem.Colors.secondaryDark
                             ],
                             startPoint: .topLeading,
                             endPoint: .bottomTrailing
@@ -615,7 +632,7 @@ struct EnhancedZapButtonStyle: ButtonStyle {
             )
             .scaleEffect(configuration.isPressed ? 0.95 : (isAnimating ? 1.05 : 1.0))
             .shadow(
-                color: Colors.secondary.opacity(0.4),
+                color: DesignSystem.Colors.secondary.opacity(0.4),
                 radius: configuration.isPressed ? 2 : 4,
                 x: 0,
                 y: configuration.isPressed ? 1 : 2
@@ -658,43 +675,7 @@ extension View {
             )
     }
     
-    func modernListItem(showDivider: Bool = false) -> some View {
-        self
-            .padding(.horizontal, DesignSystem.Spacing.medium)
-            .padding(.vertical, DesignSystem.Spacing.base)
-            .overlay(alignment: .bottom) {
-                if showDivider {
-                    Divider()
-                        .padding(.leading, DesignSystem.Spacing.medium)
-                }
-            }
-    }
-    
-    func modernPlaceholder() -> some View {
-        self
-            .overlay(
-                LinearGradient(
-                    colors: [
-                        Color.clear,
-                        DesignSystem.Colors.surface.opacity(0.6),
-                        Color.clear
-                    ],
-                    startPoint: .leading,
-                    endPoint: .trailing
-                )
-                .mask(
-                    Rectangle()
-                        .fill(LinearGradient(
-                            colors: [Color.black.opacity(0.3), Color.black, Color.black.opacity(0.3)],
-                            startPoint: .leading,
-                            endPoint: .trailing
-                        ))
-                )
-                .scaleEffect(x: 3)
-                .animation(.linear(duration: 1.5).repeatForever(autoreverses: false), value: UUID())
-            )
-            .clipped()
-    }
+    // modernListItem and modernPlaceholder are already defined in ModernViewModifiers.swift
 }
 
 // MARK: - Additional View Modifiers for Highlighter
@@ -719,36 +700,6 @@ struct LazyRenderModifier: ViewModifier {
     }
 }
 
-struct ModernSectionHeader: View {
-    let title: String
-    let action: (() -> Void)?
-    let actionTitle: String?
-    
-    init(title: String, action: (() -> Void)? = nil, actionTitle: String? = nil) {
-        self.title = title
-        self.action = action
-        self.actionTitle = actionTitle
-    }
-    
-    var body: some View {
-        HStack {
-            Text(title)
-                .font(DesignSystem.Typography.title2)
-                .fontWeight(.semibold)
-                .foregroundColor(DesignSystem.Colors.text)
-            
-            Spacer()
-            
-            if let action = action, let actionTitle = actionTitle {
-                Button(action: action) {
-                    Text(actionTitle)
-                        .font(DesignSystem.Typography.footnoteMedium)
-                        .foregroundColor(DesignSystem.Colors.primary)
-                }
-            }
-        }
-        .padding(.horizontal, DesignSystem.Spacing.screenPadding)
-    }
-}
+// ModernSectionHeader is already defined in ModernViewModifiers.swift
 
 

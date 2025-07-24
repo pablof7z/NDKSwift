@@ -91,7 +91,7 @@ struct ModernPrimaryButton: ButtonStyle {
             .disabled(!isEnabled)
             .onChange(of: configuration.isPressed) { _, newValue in
                 if newValue {
-                    HapticManager.shared.impact(.medium)
+                    HapticManager.shared.impact(HapticManager.ImpactStyle.medium)
                 }
             }
     }
@@ -130,7 +130,7 @@ struct ModernSecondaryButton: ButtonStyle {
             .disabled(!isEnabled)
             .onChange(of: configuration.isPressed) { _, newValue in
                 if newValue {
-                    HapticManager.shared.impact(.light)
+                    HapticManager.shared.impact(HapticManager.ImpactStyle.light)
                 }
             }
     }
@@ -159,7 +159,7 @@ struct ModernGhostButton: ButtonStyle {
             .disabled(!isEnabled)
             .onChange(of: configuration.isPressed) { _, newValue in
                 if newValue {
-                    HapticManager.shared.impact(.light)
+                    HapticManager.shared.impact(HapticManager.ImpactStyle.light)
                 }
             }
     }
@@ -200,7 +200,7 @@ struct ModernDestructiveButton: ButtonStyle {
             .disabled(!isEnabled)
             .onChange(of: configuration.isPressed) { _, newValue in
                 if newValue {
-                    HapticManager.shared.impact(.medium)
+                    HapticManager.shared.impact(HapticManager.ImpactStyle.medium)
                 }
             }
     }
@@ -270,7 +270,7 @@ struct ModernFloatingButton: ButtonStyle {
             .animation(DesignSystem.Animation.springSnappy, value: configuration.isPressed)
             .onChange(of: configuration.isPressed) { _, newValue in
                 if newValue {
-                    HapticManager.shared.impact(.medium)
+                    HapticManager.shared.impact(HapticManager.ImpactStyle.medium)
                 }
             }
     }

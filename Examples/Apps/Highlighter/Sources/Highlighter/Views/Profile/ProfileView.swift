@@ -98,7 +98,7 @@ struct ProfileView: View {
                 limit: 100
             )
             
-            let highlightDataSource = ndk.observe(
+            let highlightDataSource = await ndk.outbox.observe(
                 filter: highlightFilter,
                 maxAge: 300, // 5 minute cache
                 cachePolicy: .cacheWithNetwork
@@ -111,7 +111,7 @@ struct ProfileView: View {
                 limit: 50
             )
             
-            let curationDataSource = ndk.observe(
+            let curationDataSource = await ndk.outbox.observe(
                 filter: curationFilter,
                 maxAge: 600, // 10 minute cache
                 cachePolicy: .cacheWithNetwork

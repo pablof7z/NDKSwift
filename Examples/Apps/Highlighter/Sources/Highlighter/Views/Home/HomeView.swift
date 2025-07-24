@@ -117,7 +117,7 @@ struct HomeView: View {
         
         // Stream recent highlights with cache for immediate display
         Task {
-            let highlightSource = ndk.observe(
+            let highlightSource = await ndk.outbox.observe(
                 filter: NDKFilter(kinds: [9802], limit: 20),
                 maxAge: 300, // 5 minute cache
                 cachePolicy: .cacheWithNetwork
@@ -141,7 +141,7 @@ struct HomeView: View {
         if let signer = appState.activeSigner {
             Task {
                 if let userPubkey = try? await signer.pubkey {
-                    let oldHighlightSource = ndk.observe(
+                    let oldHighlightSource = await ndk.outbox.observe(
                         filter: NDKFilter(
                             authors: [userPubkey],
                             kinds: [9802],
@@ -168,7 +168,7 @@ struct HomeView: View {
         
         // Stream bookstr discussions
         Task {
-            let discussionSource = ndk.observe(
+            let discussionSource = await ndk.outbox.observe(
                 filter: NDKFilter(kinds: [1], limit: 10, tags: ["t": Set(["bookstr"])]),
                 maxAge: 300,
                 cachePolicy: .cacheWithNetwork
@@ -188,7 +188,7 @@ struct HomeView: View {
         
         // Stream zapped articles (kind 9735 zap receipts)
         Task {
-            let zapSource = ndk.observe(
+            let zapSource = await ndk.outbox.observe(
                 filter: NDKFilter(kinds: [9735], limit: 10),
                 maxAge: 300,
                 cachePolicy: .cacheWithNetwork

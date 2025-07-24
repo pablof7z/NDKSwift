@@ -12,7 +12,7 @@ class PublishingService: ObservableObject {
     
     // MARK: - Private Properties
     private weak var ndk: NDK?
-    private weak var signer: NDKSigner?
+    private var signer: NDKSigner?
     
     // MARK: - Initialization
     init() {}
@@ -52,9 +52,9 @@ class PublishingService: ObservableObject {
         } catch {
             lastPublishError = error
             throw error
-        } finally {
-            isPublishing = false
         }
+        
+        isPublishing = false
     }
     
     /// Create and publish a new article curation
@@ -87,9 +87,9 @@ class PublishingService: ObservableObject {
         } catch {
             lastPublishError = error
             throw error
-        } finally {
-            isPublishing = false
         }
+        
+        isPublishing = false
     }
     
     /// Publish a text note with bookstr tag
@@ -112,22 +112,20 @@ class PublishingService: ObservableObject {
                 eventTags.append(["t", tag])
             }
             
-            let event = try await NDKEvent.create(
-                kind: 1, // Text note
-                content: content,
-                tags: eventTags,
-                ndk: ndk,
-                signer: signer
-            )
+            let event = try await NDKEventBuilder(ndk: ndk)
+                .kind(1) // Text note
+                .content(content)
+                .tags(eventTags)
+                .build(signer: signer)
             
             _ = try await ndk.publish(event)
             
         } catch {
             lastPublishError = error
             throw error
-        } finally {
-            isPublishing = false
         }
+        
+        isPublishing = false
     }
     
     /// Publish a reaction to an event
@@ -140,22 +138,20 @@ class PublishingService: ObservableObject {
         lastPublishError = nil
         
         do {
-            let event = try await NDKEvent.create(
-                kind: 7, // Reaction
-                content: content,
-                tags: [["e", eventId]],
-                ndk: ndk,
-                signer: signer
-            )
+            let event = try await NDKEventBuilder(ndk: ndk)
+                .kind(7) // Reaction
+                .content(content)
+                .tags([["e", eventId]])
+                .build(signer: signer)
             
             _ = try await ndk.publish(event)
             
         } catch {
             lastPublishError = error
             throw error
-        } finally {
-            isPublishing = false
         }
+        
+        isPublishing = false
     }
     
     // MARK: - State Management

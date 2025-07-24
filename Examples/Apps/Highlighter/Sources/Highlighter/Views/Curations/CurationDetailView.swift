@@ -226,7 +226,7 @@ struct CurationDetailView: View {
         if !eventIds.isEmpty {
             Task {
                 let filter = NDKFilter(ids: eventIds)
-                let articleSource = ndk.observe(
+                let articleSource = await ndk.outbox.observe(
                     filter: filter,
                     maxAge: 300,
                     cachePolicy: .cacheWithNetwork
@@ -254,7 +254,7 @@ struct CurationDetailView: View {
                     kinds: [address.kind]
                 )
                 
-                let articleSource = ndk.observe(
+                let articleSource = await ndk.outbox.observe(
                     filter: filter,
                     maxAge: 300,
                     cachePolicy: .cacheWithNetwork

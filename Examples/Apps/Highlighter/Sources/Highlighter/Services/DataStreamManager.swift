@@ -63,7 +63,7 @@ class DataStreamManager: ObservableObject {
     
     private func startHighlightStream(ndk: NDK) async {
         let highlightFilter = NDKFilter(kinds: [9802], limit: 100)
-        let dataSource = ndk.observe(
+        let dataSource = await ndk.outbox.observe(
             filter: highlightFilter,
             maxAge: CachePolicies.shortTerm,
             cachePolicy: .cacheWithNetwork
@@ -82,7 +82,7 @@ class DataStreamManager: ObservableObject {
     
     private func startCurationStream(ndk: NDK) async {
         let curationFilter = NDKFilter(kinds: [30004], limit: 50)
-        let dataSource = ndk.observe(
+        let dataSource = await ndk.outbox.observe(
             filter: curationFilter,
             maxAge: CachePolicies.mediumTerm,
             cachePolicy: .cacheWithNetwork
@@ -101,7 +101,7 @@ class DataStreamManager: ObservableObject {
     
     private func startFollowPackStream(ndk: NDK) async {
         let followPackFilter = NDKFilter(kinds: [39089], limit: 20)
-        let dataSource = ndk.observe(
+        let dataSource = await ndk.outbox.observe(
             filter: followPackFilter,
             maxAge: CachePolicies.mediumTerm,
             cachePolicy: .cacheWithNetwork
@@ -145,6 +145,8 @@ class DataStreamManager: ObservableObject {
     
     // MARK: - Cleanup
     deinit {
-        stopAllStreams()
+        Task { @MainActor in
+            stopAllStreams()
+        }
     }
 }

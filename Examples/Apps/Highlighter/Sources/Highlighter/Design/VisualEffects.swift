@@ -153,7 +153,7 @@ struct FloatingActionButton: View {
     
     var body: some View {
         Button(action: {
-            HapticManager.shared.impact(.light)
+            HapticManager.shared.impact(HapticManager.ImpactStyle.light)
             action()
         }) {
             Image(systemName: icon)

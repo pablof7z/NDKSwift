@@ -334,8 +334,8 @@ extension AnyTransition {
     /// Premium rotation transition
     static var premiumRotation: AnyTransition {
         .asymmetric(
-            insertion: .rotation(angle: .degrees(-90)).combined(with: .opacity),
-            removal: .rotation(angle: .degrees(90)).combined(with: .opacity)
+            insertion: .scale(scale: 0.8).combined(with: .opacity),
+            removal: .scale(scale: 1.2).combined(with: .opacity)
         )
         .animation(PremiumAnimations.elasticBounce)
     }

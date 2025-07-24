@@ -216,7 +216,7 @@ struct ArticleView: View {
         guard let ndk = appState.ndk else { return }
         
         // Load individual profile using declarative data source
-        let profileDataSource = ndk.observe(
+        let profileDataSource = await ndk.outbox.observe(
             filter: NDKFilter(
                 authors: [article.author],
                 kinds: [0]
@@ -380,12 +380,12 @@ struct HighlightOptionsSheet: View {
                         }
                         .frame(maxWidth: .infinity)
                     }
-                    .buttonStyle(PrimaryButtonStyle())
+                    .buttonStyle(ModernPrimaryButton())
                     
                     Button("Cancel") {
                         dismiss()
                     }
-                    .buttonStyle(SecondaryButtonStyle())
+                    .buttonStyle(ModernSecondaryButton())
                 }
             }
             .padding()

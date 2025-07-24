@@ -160,7 +160,7 @@ struct CompactHighlightCard: View {
                 
                 Button(action: {
                     isLiked.toggle()
-                    HapticManager.shared.impact(.light)
+                    HapticManager.shared.impact(HapticManager.ImpactStyle.light)
                 }) {
                     Image(systemName: isLiked ? "heart.fill" : "heart")
                         .font(.system(size: 14))
@@ -431,7 +431,7 @@ struct HighlightedArticleCard: View {
                         
                         Button(action: {
                             isBookmarked.toggle()
-                            HapticManager.shared.impact(.light)
+                            HapticManager.shared.impact(HapticManager.ImpactStyle.light)
                         }) {
                             Image(systemName: isBookmarked ? "bookmark.fill" : "bookmark")
                                 .font(.system(size: 14))
