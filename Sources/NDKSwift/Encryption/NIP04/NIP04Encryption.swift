@@ -20,9 +20,9 @@ public enum NIP04 {
     /// Compute shared secret using ECDH
     /// - Parameters:
     ///   - privateKey: Sender's private key (hex)
-    ///   - publicKey: Recipient's public key (hex)
+    ///   - pubkey: Recipient's public key (hex)
     /// - Returns: 32-byte shared secret
-    static func computeSharedSecret(privateKey: PrivateKey, publicKey: PublicKey) throws -> Data {
+    static func computeSharedSecret(privateKey: PrivateKey, pubkey: PublicKey) throws -> Data {
         let privKeyData: Data
         do {
             privKeyData = try HexValidator.validate32ByteHex(privateKey)
@@ -30,9 +30,9 @@ public enum NIP04 {
             throw Crypto.CryptoError.invalidKeyLength
         }
         
-        let pubKeyData: Data
+        let pubkeyData: Data
         do {
-            pubKeyData = try HexValidator.validate32ByteHex(publicKey)
+            pubkeyData = try HexValidator.validate32ByteHex(pubkey)
         } catch {
             throw Crypto.CryptoError.invalidKeyLength
         }
@@ -42,19 +42,19 @@ public enum NIP04 {
         
         // For x-only pubkey, we need to try both possible y coordinates
         // First try with 02 prefix (even y)
-        let fullPubKey = Data([0x02]) + pubKeyData
+        let fullPubkey = Data([0x02]) + pubkeyData
         
-        let pubKey: secp256k1.KeyAgreement.PublicKey
+        let pubkey: secp256k1.KeyAgreement.PublicKey
         do {
-            pubKey = try secp256k1.KeyAgreement.PublicKey(dataRepresentation: fullPubKey)
+            pubkey = try secp256k1.KeyAgreement.PublicKey(dataRepresentation: fullPubkey)
         } catch {
             // If that fails, try with 03 prefix (odd y)
-            let fullPubKeyOdd = Data([0x03]) + pubKeyData
-            pubKey = try secp256k1.KeyAgreement.PublicKey(dataRepresentation: fullPubKeyOdd)
+            let fullPubkeyOdd = Data([0x03]) + pubkeyData
+            pubkey = try secp256k1.KeyAgreement.PublicKey(dataRepresentation: fullPubkeyOdd)
         }
         
         // Get shared secret (returns x coordinate only)
-        let sharedSecret = try privKey.sharedSecretFromKeyAgreement(with: pubKey)
+        let sharedSecret = try privKey.sharedSecretFromKeyAgreement(with: pubkey)
         
         // Return the raw bytes (x-coordinate) as per NIP-04
         let sharedData = Data(sharedSecret.bytes)
@@ -71,14 +71,14 @@ public enum NIP04 {
     /// - Parameters:
     ///   - message: The plaintext message to encrypt
     ///   - privateKey: Sender's private key (hex)
-    ///   - publicKey: Recipient's public key (hex)
+    ///   - pubkey: Recipient's public key (hex)
     /// - Returns: Encrypted message in format: base64(ciphertext)?iv=base64(iv)
-    public static func encrypt(message: String, privateKey: PrivateKey, publicKey: PublicKey) throws -> String {
+    public static func encrypt(message: String, privateKey: PrivateKey, pubkey: PublicKey) throws -> String {
         // Generate random IV
         let iv = Crypto.randomBytes(count: 16)
         
         // Compute shared secret via ECDH
-        let sharedSecret = try computeSharedSecret(privateKey: privateKey, publicKey: publicKey)
+        let sharedSecret = try computeSharedSecret(privateKey: privateKey, pubkey: pubkey)
         
         // Encrypt using AES-256-CBC with shared secret
         let encrypted = try encryptAES(message: message, key: sharedSecret, iv: iv)
@@ -91,9 +91,9 @@ public enum NIP04 {
     /// - Parameters:
     ///   - encrypted: Encrypted message in format: base64(ciphertext)?iv=base64(iv)
     ///   - privateKey: Recipient's private key (hex)
-    ///   - publicKey: Sender's public key (hex)
+    ///   - pubkey: Sender's public key (hex)
     /// - Returns: Decrypted plaintext message
-    public static func decrypt(encrypted: String, privateKey: PrivateKey, publicKey: PublicKey) throws -> String {
+    public static func decrypt(encrypted: String, privateKey: PrivateKey, pubkey: PublicKey) throws -> String {
         // Parse the encrypted format
         let parts = encrypted.split(separator: "?")
         guard parts.count == 2,
@@ -111,7 +111,7 @@ public enum NIP04 {
         }
         
         // Compute shared secret via ECDH
-        let sharedSecret = try computeSharedSecret(privateKey: privateKey, publicKey: publicKey)
+        let sharedSecret = try computeSharedSecret(privateKey: privateKey, pubkey: pubkey)
         
         // Decrypt using AES-256-CBC with shared secret
         return try decryptAES(encrypted: encryptedData, key: sharedSecret, iv: iv)
@@ -189,17 +189,17 @@ public enum NIP04 {
 
 public extension Crypto {
     /// Encrypt a message using NIP-04 (deprecated)
-    static func nip04Encrypt(message: String, privateKey: PrivateKey, publicKey: PublicKey) throws -> String {
-        return try NIP04.encrypt(message: message, privateKey: privateKey, publicKey: publicKey)
+    static func nip04Encrypt(message: String, privateKey: PrivateKey, pubkey: PublicKey) throws -> String {
+        return try NIP04.encrypt(message: message, privateKey: privateKey, pubkey: pubkey)
     }
 
     /// Decrypt a message using NIP-04 (deprecated)
-    static func nip04Decrypt(encrypted: String, privateKey: PrivateKey, publicKey: PublicKey) throws -> String {
-        return try NIP04.decrypt(encrypted: encrypted, privateKey: privateKey, publicKey: publicKey)
+    static func nip04Decrypt(encrypted: String, privateKey: PrivateKey, pubkey: PublicKey) throws -> String {
+        return try NIP04.decrypt(encrypted: encrypted, privateKey: privateKey, pubkey: pubkey)
     }
     
     /// Compute shared secret using ECDH (for NIP-04 compatibility)
-    static func computeSharedSecret(privateKey: PrivateKey, publicKey: PublicKey) throws -> Data {
-        return try NIP04.computeSharedSecret(privateKey: privateKey, publicKey: publicKey)
+    static func computeSharedSecret(privateKey: PrivateKey, pubkey: PublicKey) throws -> Data {
+        return try NIP04.computeSharedSecret(privateKey: privateKey, pubkey: pubkey)
     }
 }

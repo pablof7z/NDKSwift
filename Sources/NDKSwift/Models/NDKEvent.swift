@@ -217,7 +217,7 @@ public struct NDKEvent: Codable, Equatable, Hashable, Sendable {
             
             // Use crypto utilities to verify signature
             let messageData = Data(hexString: id) ?? Data()
-            return try Crypto.verify(signature: sig, message: messageData, publicKey: pubkey)
+            return try Crypto.verify(signature: sig, message: messageData, pubkey: pubkey)
         } catch {
             return false
         }

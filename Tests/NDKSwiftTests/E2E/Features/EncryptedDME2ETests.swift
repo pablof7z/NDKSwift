@@ -268,14 +268,14 @@ final class EncryptedDME2ETests: XCTestCase {
                     let decrypted = try Crypto.nip44Decrypt(
                         encrypted: dmEvent.content,
                         privateKey: receiverSigner.privateKeyValue,
-                        publicKey: senderPubkey
+                        pubkey: senderPubkey
                     )
                     XCTAssertEqual(decrypted, message, "\(scheme) decryption should recover original message")
                 } else {
                     let decrypted = try Crypto.nip04Decrypt(
                         encrypted: dmEvent.content,
                         privateKey: receiverSigner.privateKeyValue,
-                        publicKey: senderPubkey
+                        pubkey: senderPubkey
                     )
                     XCTAssertEqual(decrypted, message, "\(scheme) decryption should recover original message")
                 }
@@ -309,7 +309,7 @@ final class EncryptedDME2ETests: XCTestCase {
             _ = try Crypto.nip04Decrypt(
                 encrypted: nip44Event.content,
                 privateKey: receiverSigner.privateKeyValue,
-                publicKey: senderPubkey
+                pubkey: senderPubkey
             )
             XCTFail("NIP-04 should not decrypt NIP-44 messages")
         } catch {

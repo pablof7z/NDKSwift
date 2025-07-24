@@ -137,9 +137,9 @@ public enum NIP44 {
     /// Get conversation key for NIP-44
     /// - Parameters:
     ///   - privateKey: Sender's private key (hex)
-    ///   - publicKey: Recipient's public key (hex)
+    ///   - pubkey: Recipient's public key (hex)
     /// - Returns: 32-byte conversation key
-    public static func getConversationKey(privateKey: PrivateKey, publicKey: PublicKey) throws -> Data {
+    public static func getConversationKey(privateKey: PrivateKey, pubkey: PublicKey) throws -> Data {
         // Compute shared secret using ECDH
         let privKeyData: Data
         do {
@@ -148,9 +148,9 @@ public enum NIP44 {
             throw Crypto.CryptoError.invalidKeyLength
         }
         
-        let pubKeyData: Data
+        let pubkeyData: Data
         do {
-            pubKeyData = try HexValidator.validate32ByteHex(publicKey)
+            pubkeyData = try HexValidator.validate32ByteHex(pubkey)
         } catch {
             throw Crypto.CryptoError.invalidKeyLength
         }
@@ -160,7 +160,7 @@ public enum NIP44 {
         var pubkey = secp256k1_pubkey()
         
         // First try with even y-coordinate (0x02 prefix)
-        var publicKeyBytes = [UInt8]([0x02]) + [UInt8](pubKeyData)
+        var publicKeyBytes = [UInt8]([0x02]) + [UInt8](pubkeyData)
         var parseResult = secp256k1_ec_pubkey_parse(secp256k1.Context.rawRepresentation, &pubkey, publicKeyBytes, publicKeyBytes.count)
         
         // If that fails, try with odd y-coordinate (0x03 prefix)
@@ -320,10 +320,10 @@ public enum NIP44 {
     /// - Parameters:
     ///   - message: The plaintext message to encrypt
     ///   - privateKey: Sender's private key (hex)
-    ///   - publicKey: Recipient's public key (hex)
+    ///   - pubkey: Recipient's public key (hex)
     /// - Returns: Base64-encoded encrypted payload
-    public static func encrypt(message: String, privateKey: PrivateKey, publicKey: PublicKey) throws -> String {
-        let conversationKey = try getConversationKey(privateKey: privateKey, publicKey: publicKey)
+    public static func encrypt(message: String, privateKey: PrivateKey, pubkey: PublicKey) throws -> String {
+        let conversationKey = try getConversationKey(privateKey: privateKey, pubkey: pubkey)
         let nonce = Crypto.randomBytes(count: Constants.nonceSize)
         return try encrypt(plaintext: message, conversationKey: conversationKey, nonce: nonce)
     }
@@ -332,10 +332,10 @@ public enum NIP44 {
     /// - Parameters:
     ///   - encrypted: Base64-encoded encrypted payload
     ///   - privateKey: Recipient's private key (hex)
-    ///   - publicKey: Sender's public key (hex)
+    ///   - pubkey: Sender's public key (hex)
     /// - Returns: Decrypted plaintext message
-    public static func decrypt(encrypted: String, privateKey: PrivateKey, publicKey: PublicKey) throws -> String {
-        let conversationKey = try getConversationKey(privateKey: privateKey, publicKey: publicKey)
+    public static func decrypt(encrypted: String, privateKey: PrivateKey, pubkey: PublicKey) throws -> String {
+        let conversationKey = try getConversationKey(privateKey: privateKey, pubkey: pubkey)
         return try decrypt(payload: encrypted, conversationKey: conversationKey)
     }
 }

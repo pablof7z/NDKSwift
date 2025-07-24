@@ -73,13 +73,13 @@ public final class NDKPrivateKeySigner: NDKSigner {
         switch scheme {
         case .nip04:
             do {
-                return try Crypto.nip04Encrypt(message: value, privateKey: privateKey, publicKey: recipient.pubkey)
+                return try Crypto.nip04Encrypt(message: value, privateKey: privateKey, pubkey: recipient.pubkey)
             } catch {
                 throw NDKError.cryptoOperation(CryptoConstants.Operation.encryption, nip: CryptoConstants.NIP.nip04, error: error)
             }
         case .nip44:
             do {
-                return try Crypto.nip44Encrypt(message: value, privateKey: privateKey, publicKey: recipient.pubkey)
+                return try Crypto.nip44Encrypt(message: value, privateKey: privateKey, pubkey: recipient.pubkey)
             } catch {
                 throw NDKError.cryptoOperation(CryptoConstants.Operation.encryption, nip: CryptoConstants.NIP.nip44, error: error)
             }
@@ -90,13 +90,13 @@ public final class NDKPrivateKeySigner: NDKSigner {
         switch scheme {
         case .nip04:
             do {
-                return try Crypto.nip04Decrypt(encrypted: value, privateKey: privateKey, publicKey: sender.pubkey)
+                return try Crypto.nip04Decrypt(encrypted: value, privateKey: privateKey, pubkey: sender.pubkey)
             } catch {
                 throw NDKError.cryptoOperation(CryptoConstants.Operation.decryption, nip: CryptoConstants.NIP.nip04, error: error)
             }
         case .nip44:
             do {
-                return try Crypto.nip44Decrypt(encrypted: value, privateKey: privateKey, publicKey: sender.pubkey)
+                return try Crypto.nip44Decrypt(encrypted: value, privateKey: privateKey, pubkey: sender.pubkey)
             } catch {
                 throw NDKError.cryptoOperation(CryptoConstants.Operation.decryption, nip: CryptoConstants.NIP.nip44, error: error)
             }
