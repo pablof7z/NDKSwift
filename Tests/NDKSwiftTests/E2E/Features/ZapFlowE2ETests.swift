@@ -40,21 +40,11 @@ final class ZapFlowE2ETests: XCTestCase {
     }
     
     func testLightningZapFlow() async throws {
-        // TODO: Fix this test after API changes
-        // The test needs to be updated to work with the current API:
-        // - prepareZap now expects RecipientZapInfo instead of NDKUser
-        // - Need to use NDKZapManager instead of direct protocol calls
-        
-        throw XCTSkip("Test needs to be updated for current API")
+        throw XCTSkip("Test needs to be updated for current API: prepareZap now expects RecipientZapInfo instead of NDKUser, need to use NDKZapManager instead of direct protocol calls")
     }
     
     func testNutzapFlow() async throws {
-        // TODO: Fix this test after API changes
-        // The test needs to be updated to work with the current API:
-        // - prepareZap now expects RecipientZapInfo instead of NDKUser
-        // - Need to use NDKZapManager instead of direct protocol calls
-        
-        throw XCTSkip("Test needs to be updated for current API")
+        throw XCTSkip("Test needs to be updated for current API: prepareZap now expects RecipientZapInfo instead of NDKUser, need to use NDKZapManager instead of direct protocol calls")
     }
     
     // MARK: - Helper Methods

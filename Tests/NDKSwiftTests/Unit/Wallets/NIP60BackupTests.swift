@@ -40,43 +40,32 @@ final class NIP60BackupTests: XCTestCase {
     // MARK: - Backup Tests
     
     func testCreateBackup() async throws {
-        // TODO: Fix this test after API changes
-        // The test needs to be updated to work with the current API:
-        // - configureWithNewMints method no longer exists
-        // - MockRelay.setHandler method no longer exists
-        // - Need to find alternative ways to configure wallet and capture events
-        
-        throw XCTSkip("Test needs to be updated for current API")
+        throw XCTSkip("Test needs to be updated for current API: configureWithNewMints method no longer exists, MockRelay.setHandler method no longer exists, need to find alternative ways to configure wallet and capture events")
     }
     
     // MARK: - Restore Tests
     
     func testRestoreFromBackup() async throws {
-        // TODO: Fix this test after API changes
         throw XCTSkip("Test needs to be updated for current API")
     }
     
     func testRestoreFromBackupNoBackupExists() async throws {
-        // TODO: Fix this test after API changes
         throw XCTSkip("Test needs to be updated for current API")
     }
     
     // MARK: - Has Backup Tests
     
     func testHasBackup() async throws {
-        // TODO: Fix this test after API changes
         throw XCTSkip("Test needs to be updated for current API")
     }
     
     func testHasBackupNoBackupExists() async throws {
-        // TODO: Fix this test after API changes
         throw XCTSkip("Test needs to be updated for current API")
     }
     
     // MARK: - Integration Tests
     
     func testBackupAndRestoreRoundTrip() async throws {
-        // TODO: Fix this test after API changes
         throw XCTSkip("Test needs to be updated for current API")
     }
 }

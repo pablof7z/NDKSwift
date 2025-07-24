@@ -262,12 +262,7 @@ final class NDKFollowPackTests: XCTestCase {
     // MARK: - Publishing Tests
     
     func testPublishWithBuilder() async throws {
-        // TODO: Fix this test after API changes
-        // The test needs to be updated to work with the current API:
-        // - relayPool property no longer exists
-        // - Need different way to mock relay connections
-        
-        throw XCTSkip("Test needs to be updated for current API")
+        throw XCTSkip("Test needs to be updated for current API: relayPool property no longer exists, need different way to mock relay connections")
     }
     
     // MARK: - Observation Tests
