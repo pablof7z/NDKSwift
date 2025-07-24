@@ -119,7 +119,7 @@ struct PulseEffect: ViewModifier {
     }
 }
 
-struct ParallaxEffect: ViewModifier {
+struct SimplifiedParallaxEffect: ViewModifier {
     let magnitude: CGFloat
     
     func body(content: Content) -> some View {
@@ -140,8 +140,8 @@ struct ParallaxEffect: ViewModifier {
 extension View {
     // shimmer() method moved to DesignSystem.swift to avoid duplication
     
-    func parallax(magnitude: CGFloat = 20) -> some View {
-        modifier(ParallaxEffect(magnitude: magnitude))
+    func simplifiedParallax(magnitude: CGFloat = 20) -> some View {
+        modifier(SimplifiedParallaxEffect(magnitude: magnitude))
     }
 }
 

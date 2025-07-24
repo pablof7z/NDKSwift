@@ -243,9 +243,9 @@ struct ZapAmountSheet: View {
                     TextField("Custom amount", text: $customAmount)
                         .keyboardType(.numberPad)
                         .textFieldStyle(RoundedBorderTextFieldStyle())
-                        .onChange(of: customAmount) { _ in
-                            useCustomAmount = !customAmount.isEmpty
-                            if let amount = Int(customAmount) {
+                        .onChange(of: customAmount) { _, newValue in
+                            useCustomAmount = !newValue.isEmpty
+                            if let amount = Int(newValue) {
                                 zapAmount = amount
                             }
                         }

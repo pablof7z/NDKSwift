@@ -50,20 +50,6 @@ class HapticManager {
         }
     }
     
-    /// Overloaded method to support UIKit impact styles directly
-    func impact(_ style: UIImpactFeedbackGenerator.FeedbackStyle) {
-        guard isEnabled else { return }
-        switch style {
-        case .light:
-            impact(ImpactStyle.light)
-        case .medium:
-            impact(ImpactStyle.medium)
-        case .heavy:
-            impact(ImpactStyle.heavy)
-        @unknown default:
-            impact(ImpactStyle.light)
-        }
-    }
     
     func triggerSelection() {
         guard isEnabled else { return }

@@ -102,7 +102,7 @@ struct ModernCardModifier: ViewModifier {
             )
             .scaleEffect(isPressed ? 0.98 : 1.0)
             .animation(DesignSystem.Animation.quick, value: isPressed)
-            .onLongPressGesture(minimumDuration: 0, maximumDistance: .infinity) { _ in
+            .onLongPressGesture(minimumDuration: 0, maximumDistance: .infinity) {
             } onPressingChanged: { pressing in
                 if isInteractive {
                     isPressed = pressing
@@ -173,7 +173,7 @@ extension View {
 // Bridge the UnifiedCard component approach with the modifier approach
 extension UnifiedCard {
     /// Create a UnifiedCard using a simple modifier-style API
-    static func card<Content: View>(
+    static func card(
         variant: CardVariant = .standard,
         isSelected: Bool = false,
         action: (() -> Void)? = nil,
