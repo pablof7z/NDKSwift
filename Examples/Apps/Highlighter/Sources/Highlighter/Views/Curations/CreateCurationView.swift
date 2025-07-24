@@ -9,7 +9,6 @@ struct CreateCurationView: View {
     @State private var curationTitle = ""
     @State private var description = ""
     @State private var imageUrl = ""
-    @State private var isPublishing = false
     @State private var showError = false
     @State private var errorMessage = ""
     
@@ -125,15 +124,9 @@ struct CreateCurationView: View {
                     // Create button
                     Button(action: createCuration) {
                         HStack {
-                            if isPublishing {
-                                ProgressView()
-                                    .progressViewStyle(CircularProgressViewStyle(tint: .white))
-                                    .scaleEffect(0.8)
-                            } else {
-                                Image(systemName: "folder.badge.plus")
-                                Text("Create Curation")
-                                    .fontWeight(.semibold)
-                            }
+                            Image(systemName: "folder.badge.plus")
+                            Text("Create Curation")
+                                .fontWeight(.semibold)
                         }
                         .frame(maxWidth: .infinity)
                         .padding()
@@ -146,7 +139,7 @@ struct CreateCurationView: View {
                         )
                         .foregroundColor(.white)
                         .cornerRadius(12)
-                        .disabled(curationName.isEmpty || curationTitle.isEmpty || isPublishing)
+                        .disabled(curationName.isEmpty || curationTitle.isEmpty)
                         .opacity(curationName.isEmpty || curationTitle.isEmpty ? 0.6 : 1)
                     }
                     .padding(.horizontal)
@@ -175,7 +168,6 @@ struct CreateCurationView: View {
     private func createCuration() {
         guard !curationName.isEmpty, !curationTitle.isEmpty else { return }
         
-        isPublishing = true
         HapticType.light.trigger()
         
         Task {
@@ -189,12 +181,10 @@ struct CreateCurationView: View {
                 
                 await MainActor.run {
                     HapticType.success.trigger()
-                    isPublishing = false
                     dismiss()
                 }
             } catch {
                 await MainActor.run {
-                    isPublishing = false
                     errorMessage = error.localizedDescription
                     showError = true
                     HapticType.error.trigger()

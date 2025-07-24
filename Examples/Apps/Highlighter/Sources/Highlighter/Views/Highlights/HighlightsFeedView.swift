@@ -166,8 +166,8 @@ struct HighlightsFeedView: View {
         let filter = NDKFilter(
             authors: [author],
             kinds: [30023],
-            tags: ["d": [String(identifier)]],
-            limit: 1
+            limit: 1,
+            tags: ["d": [String(identifier)]]
         )
         
         let dataSource = ndk.observe(filter: filter, maxAge: 3600)
@@ -247,8 +247,8 @@ struct HighlightsFeedView: View {
             let filter = NDKFilter(
                 authors: [author],
                 kinds: [30023],
-                tags: ["d": [String(identifier)]],
-                limit: 1
+                limit: 1,
+                tags: ["d": [String(identifier)]]
             )
             
             // Fetch the article

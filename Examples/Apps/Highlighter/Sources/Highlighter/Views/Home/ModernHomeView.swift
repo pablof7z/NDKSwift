@@ -516,13 +516,7 @@ struct TrendingItemCard: View {
     }
 }
 
-// MARK: - Preference Key
-struct ScrollOffsetPreferenceKey: PreferenceKey {
-    static var defaultValue: CGFloat = 0
-    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
-        value = nextValue()
-    }
-}
+// ScrollOffsetPreferenceKey is already defined in HomeView.swift
 
 struct HighlightedArticleCard: View {
     let article: Article
