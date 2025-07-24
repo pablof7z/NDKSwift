@@ -107,7 +107,7 @@ actor WalletEventProcessor {
         NDKLogger.log(.debug, category: .wallet, "Event Kind: \(event.kind)")
         NDKLogger.log(.debug, category: .wallet, "Event Author: \(event.pubkey)")
         NDKLogger.log(.debug, category: .wallet, "Encrypted content length: \(event.content.count) characters")
-        NDKLogger.log(.debug, category: .wallet, "Encrypted content (first 100 chars): \(event.content.prefix(100))")
+        NDKLogger.log(.debug, category: .wallet, "Encrypted content (first \(StringConstants.DisplayFormatting.debugLogPreviewLength) chars): \(event.content.prefix(StringConstants.DisplayFormatting.debugLogPreviewLength))")
         
         // Decrypt content
         let sender = NDKUser(pubkey: event.pubkey)

@@ -270,7 +270,7 @@ public actor NDKOutboxManager {
     internal func processRelayListEvent(_ event: NDKEvent) async {
         guard event.kind == EventKind.relayList else { return }
         
-        NDKLogger.log(.debug, category: .outbox, "📋 Processing relay list for \(event.pubkey.prefix(8))")
+        NDKLogger.log(.debug, category: .outbox, "📋 Processing relay list for \(event.pubkey.prefix(StringConstants.DisplayFormatting.hexPrefixLength))")
         
         // Parse relay list from event
         var readRelays = Set<RelayInfo>()
@@ -299,7 +299,7 @@ public actor NDKOutboxManager {
             source: .nip65
         )
         
-        NDKLogger.log(.info, category: .outbox, "✅ Updated relay info for \(event.pubkey.prefix(8)): \(readRelays.count) read, \(writeRelays.count) write")
+        NDKLogger.log(.info, category: .outbox, "✅ Updated relay info for \(event.pubkey.prefix(StringConstants.DisplayFormatting.hexPrefixLength)): \(readRelays.count) read, \(writeRelays.count) write")
         
         // Notify about relay discovery
         let discoveryInfo = RelayDiscoveryInfo(
