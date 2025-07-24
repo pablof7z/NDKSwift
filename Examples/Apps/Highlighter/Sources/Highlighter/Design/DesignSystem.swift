@@ -67,6 +67,15 @@ struct DesignSystem {
         static let caption = Font.system(size: 12, weight: .regular, design: .default)
         static let captionMedium = Font.system(size: 12, weight: .medium, design: .default)
         static let micro = Font.system(size: 11, weight: .regular, design: .default)
+        
+        // Specialized fonts for Highlighter app
+        static let highlighterQuote = Font.custom("Georgia", size: 18).italic()
+        
+        // Dynamic quote sizing based on content length
+        static func dynamicQuote(for length: Int) -> Font {
+            let size: CGFloat = length > 100 ? 16 : (length > 50 ? 17 : 18)
+            return Font.custom("Georgia", size: size).italic()
+        }
     }
     
     // MARK: - Spacing (Tighter, more modern)
@@ -248,6 +257,13 @@ struct RelativeTimeFormatter {
     static func relativeTime(from date: Date) -> String {
         let formatter = RelativeDateTimeFormatter()
         formatter.unitsStyle = .abbreviated
+        return formatter.localizedString(for: date, relativeTo: Date())
+    }
+    
+    static func shortRelativeTime(from timestamp: Timestamp) -> String {
+        let date = Date(timeIntervalSince1970: TimeInterval(timestamp))
+        let formatter = RelativeDateTimeFormatter()
+        formatter.unitsStyle = .short
         return formatter.localizedString(for: date, relativeTo: Date())
     }
 }
@@ -568,6 +584,201 @@ struct PressButtonStyle: ButtonStyle {
         configuration.label
             .scaleEffect(configuration.isPressed ? 0.95 : 1.0)
             .animation(.easeInOut(duration: 0.1), value: configuration.isPressed)
+    }
+}
+
+// Enhanced Zap Button Style for specialized zap actions
+struct EnhancedZapButtonStyle: ButtonStyle {
+    @State private var isAnimating = false
+    
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .font(Typography.callout)
+            .fontWeight(.medium)
+            .foregroundColor(.white)
+            .padding(.horizontal, Spacing.medium)
+            .padding(.vertical, Spacing.small)
+            .background(
+                Capsule()
+                    .fill(
+                        LinearGradient(
+                            colors: [
+                                Colors.secondary,
+                                Colors.secondaryDark
+                            ],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+                    .overlay(
+                        Capsule()
+                            .stroke(
+                                LinearGradient(
+                                    colors: [
+                                        Color.white.opacity(0.3),
+                                        Color.clear
+                                    ],
+                                    startPoint: .top,
+                                    endPoint: .bottom
+                                ),
+                                lineWidth: 1
+                            )
+                    )
+            )
+            .scaleEffect(configuration.isPressed ? 0.95 : (isAnimating ? 1.05 : 1.0))
+            .shadow(
+                color: Colors.secondary.opacity(0.4),
+                radius: configuration.isPressed ? 2 : 4,
+                x: 0,
+                y: configuration.isPressed ? 1 : 2
+            )
+            .animation(.spring(response: 0.3, dampingFraction: 0.7), value: configuration.isPressed)
+            .animation(.easeInOut(duration: 2).repeatForever(autoreverses: true), value: isAnimating)
+            .onAppear {
+                isAnimating = true
+            }
+            .onChange(of: configuration.isPressed) { _, newValue in
+                if newValue {
+                    HapticType.medium.trigger()
+                }
+            }
+    }
+}
+
+// MARK: - Enhanced View Extensions for Highlighter
+
+extension View {
+    func enhancedZapButton() -> some View {
+        self.buttonStyle(EnhancedZapButtonStyle())
+    }
+    
+    func lazyRender(threshold: CGFloat = 100) -> some View {
+        self.modifier(LazyRenderModifier(threshold: threshold))
+    }
+    
+    func modernCard(noPadding: Bool = false, variant: CardStyle.Variant = .standard) -> some View {
+        self.padding(noPadding ? 0 : variant.padding)
+            .background(
+                RoundedRectangle(cornerRadius: variant.cornerRadius, style: .continuous)
+                    .fill(DesignSystem.Colors.surface)
+                    .shadow(
+                        color: variant.shadow.color,
+                        radius: variant.shadow.radius,
+                        x: variant.shadow.x,
+                        y: variant.shadow.y
+                    )
+            )
+    }
+    
+    func modernListItem(showDivider: Bool = false) -> some View {
+        self
+            .padding(.horizontal, DesignSystem.Spacing.medium)
+            .padding(.vertical, DesignSystem.Spacing.base)
+            .overlay(alignment: .bottom) {
+                if showDivider {
+                    Divider()
+                        .padding(.leading, DesignSystem.Spacing.medium)
+                }
+            }
+    }
+    
+    func modernPlaceholder() -> some View {
+        self
+            .overlay(
+                LinearGradient(
+                    colors: [
+                        Color.clear,
+                        DesignSystem.Colors.surface.opacity(0.6),
+                        Color.clear
+                    ],
+                    startPoint: .leading,
+                    endPoint: .trailing
+                )
+                .mask(
+                    Rectangle()
+                        .fill(LinearGradient(
+                            colors: [Color.black.opacity(0.3), Color.black, Color.black.opacity(0.3)],
+                            startPoint: .leading,
+                            endPoint: .trailing
+                        ))
+                )
+                .scaleEffect(x: 3)
+                .animation(.linear(duration: 1.5).repeatForever(autoreverses: false), value: UUID())
+            )
+            .clipped()
+    }
+}
+
+// MARK: - Additional View Modifiers for Highlighter
+
+struct LazyRenderModifier: ViewModifier {
+    let threshold: CGFloat
+    @State private var isVisible = false
+    
+    init(threshold: CGFloat = 100) {
+        self.threshold = threshold
+        self.isVisible = false
+    }
+    
+    func body(content: Content) -> some View {
+        content
+            .opacity(isVisible ? 1 : 0)
+            .onAppear {
+                withAnimation(.easeIn(duration: 0.2)) {
+                    isVisible = true
+                }
+            }
+    }
+}
+
+struct ModernSectionHeader: View {
+    let title: String
+    let action: (() -> Void)?
+    let actionTitle: String?
+    
+    init(title: String, action: (() -> Void)? = nil, actionTitle: String? = nil) {
+        self.title = title
+        self.action = action
+        self.actionTitle = actionTitle
+    }
+    
+    var body: some View {
+        HStack {
+            Text(title)
+                .font(DesignSystem.Typography.title2)
+                .fontWeight(.semibold)
+                .foregroundColor(DesignSystem.Colors.text)
+            
+            Spacer()
+            
+            if let action = action, let actionTitle = actionTitle {
+                Button(action: action) {
+                    Text(actionTitle)
+                        .font(DesignSystem.Typography.footnoteMedium)
+                        .foregroundColor(DesignSystem.Colors.primary)
+                }
+            }
+        }
+        .padding(.horizontal, DesignSystem.Spacing.screenPadding)
+    }
+}
+
+// MARK: - Common Formatters
+
+struct PubkeyFormatter {
+    /// Format a pubkey to show first 8 characters with ellipsis
+    static func formatShort(_ pubkey: String) -> String {
+        String(pubkey.prefix(8)) + "..."
+    }
+    
+    /// Format a pubkey to show first 8 characters only
+    static func formatCompact(_ pubkey: String) -> String {
+        String(pubkey.prefix(8))
+    }
+    
+    /// Format a pubkey for avatar display (first character uppercase)
+    static func formatForAvatar(_ pubkey: String) -> String {
+        String(pubkey.prefix(1)).uppercased()
     }
 }
 
