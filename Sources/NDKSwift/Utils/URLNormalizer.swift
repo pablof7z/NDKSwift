@@ -18,7 +18,7 @@ public enum URLNormalizer {
     /// - Returns: A normalized URL string
     /// - Throws: URLNormalizationError if the URL cannot be normalized
     public static func normalizeRelayUrl(_ url: String) throws -> String {
-        var normalized = url.trimmingCharacters(in: .whitespacesAndNewlines)
+        var normalized = ValidationHelpers.trim(url)
 
         // Check for obviously invalid URLs
         if normalized.contains(" ") || normalized.isEmpty || normalized.hasPrefix("://") {
