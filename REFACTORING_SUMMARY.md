@@ -49,6 +49,20 @@ While we identified that 11 constants files could be consolidated into fewer fil
 
 This consolidation should be done carefully with comprehensive testing due to the number of files affected.
 
+### 4. Code Quality Improvements ✅
+- **Issue**: Magic number in SQLite cache
+- **Solution**: Created `SQLiteConstants.queryBatchSize` constant to replace magic number 100
+- **Impact**: Better maintainability and self-documenting code
+
+### 5. Removed Unused Imports ✅
+- **Files Updated**:
+  - `NDK+Helpers.swift` - Removed unused Foundation import (only uses NDK types)
+  - `NostrJSONConstants.swift` - Removed unused Foundation import (only contains string constants)
+- **Impact**: Cleaner dependencies and slightly faster compilation
+
+### 6. Verified Correct Naming ✅
+- **FileManagerExtensions.swift** - Confirmed correctly named (contains extensions, not a manager class)
+
 ## Principles Applied
 - **DRY (Don't Repeat Yourself)**: Eliminated duplicate error constants
 - **YAGNI (You Aren't Gonna Need It)**: Removed deprecated methods and empty implementations
