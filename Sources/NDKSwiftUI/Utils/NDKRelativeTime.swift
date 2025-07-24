@@ -57,7 +57,7 @@ public struct NDKRelativeTime: View {
     
     /// Initialize with an NDKEvent
     public init(event: NDKEvent) {
-        self.date = Date(timeIntervalSince1970: TimeInterval(event.createdAt))
+        self.date = Date(nostrTimestamp: event.createdAt)
     }
     
     /// Initialize with a Date
@@ -67,7 +67,7 @@ public struct NDKRelativeTime: View {
     
     /// Initialize with a Unix timestamp
     public init(timestamp: Timestamp) {
-        self.date = Date(timeIntervalSince1970: TimeInterval(timestamp))
+        self.date = Date(nostrTimestamp: timestamp)
     }
     
     // MARK: - Body
@@ -160,7 +160,7 @@ public struct NDKRelativeTimeLong: View {
     
     /// Initialize with an NDKEvent
     public init(event: NDKEvent) {
-        self.date = Date(timeIntervalSince1970: TimeInterval(event.createdAt))
+        self.date = Date(nostrTimestamp: event.createdAt)
     }
     
     /// Initialize with a Date
@@ -170,7 +170,7 @@ public struct NDKRelativeTimeLong: View {
     
     /// Initialize with a Unix timestamp
     public init(timestamp: Timestamp) {
-        self.date = Date(timeIntervalSince1970: TimeInterval(timestamp))
+        self.date = Date(nostrTimestamp: timestamp)
     }
     
     // MARK: - Body

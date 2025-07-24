@@ -128,7 +128,7 @@ public actor BlossomClient {
                     url: uploadDescriptor.url,
                     size: uploadDescriptor.size,
                     type: uploadDescriptor.type,
-                    uploaded: Date(timeIntervalSince1970: TimeInterval(uploadDescriptor.uploaded))
+                    uploaded: Date(nostrTimestamp: uploadDescriptor.uploaded)
                 )
 
             case 401:

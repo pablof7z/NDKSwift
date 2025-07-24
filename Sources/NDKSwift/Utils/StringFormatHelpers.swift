@@ -74,7 +74,7 @@ public enum StringFormatHelpers {
     
     /// Format Unix timestamp for display
     public static func formatTimestamp(_ timestamp: Timestamp) -> String {
-        let date = Date(timeIntervalSince1970: TimeInterval(timestamp))
+        let date = Date(nostrTimestamp: timestamp)
         let formatter = DateFormatter()
         formatter.dateStyle = .medium
         formatter.timeStyle = .short

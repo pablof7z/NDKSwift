@@ -912,7 +912,7 @@ public actor NIP60Wallet: NDKPaymentProvider {
     /// Internal method to start quote tracking
     private func startQuoteTracking(quote: CashuMintQuote, event: NDKEvent) async {
         // Calculate age from event's created_at
-        let eventDate = Date(timeIntervalSince1970: TimeInterval(event.createdAt))
+        let eventDate = Date(nostrTimestamp: event.createdAt)
         let age = Date().timeIntervalSince(eventDate)
         
         // Skip if older than 24 hours

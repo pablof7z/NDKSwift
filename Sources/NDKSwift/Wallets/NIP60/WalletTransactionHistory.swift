@@ -339,7 +339,7 @@ public actor WalletTransactionHistory {
             status: status,
             memo: nutzapData.comment ?? "Nutzap received",
             mint: nil,  // Could extract from u tags if needed
-            timestamp: Date(timeIntervalSince1970: TimeInterval(event.createdAt)),
+            timestamp: Date(nostrTimestamp: event.createdAt),
             events: TransactionEvents(nutzapEventId: event.id),
             lookupKeys: TransactionLookupKeys(nutzapEventId: event.id),
             nutzapData: nutzapData
@@ -389,7 +389,7 @@ public actor WalletTransactionHistory {
             status: .completed,
             memo: nutzapData.comment ?? "Nutzap sent",
             mint: nil,
-            timestamp: Date(timeIntervalSince1970: TimeInterval(event.createdAt)),
+            timestamp: Date(nostrTimestamp: event.createdAt),
             events: TransactionEvents(nutzapEventId: event.id),
             lookupKeys: TransactionLookupKeys(
                 nutzapEventId: event.id,
@@ -719,7 +719,7 @@ public actor WalletTransactionHistory {
             status: .completed,
             memo: historyData.memo ?? historyData.defaultMemo,
             mint: historyData.mint,
-            timestamp: Date(timeIntervalSince1970: TimeInterval(event.createdAt)),
+            timestamp: Date(nostrTimestamp: event.createdAt),
             events: events,
             lookupKeys: lookupKeys,
             nutzapData: nutzapData,
