@@ -25,6 +25,18 @@ struct HomeFeedView: View {
     @State private var recordingWaveform: [CGFloat] = []
     @State private var fullWaveform: [Double] = [] // Store full waveform for imeta
     
+    // Upload and preview states
+    @State private var isUploading = false
+    @State private var uploadedURL: String?
+    @State private var isShowingPreview = false
+    @State private var audioPlayer: AVAudioPlayer?
+    
+    // Playback states
+    @State private var isPlaying = false
+    @State private var playbackTimer: Timer?
+    @State private var playbackProgress: TimeInterval = 0
+    @State private var playbackWaveformProgress: Int = 0
+    
     var sortedEvents: [AudioEvent] {
         audioEvents.sorted { $0.sortScore > $1.sortScore }
     }
@@ -67,7 +79,14 @@ struct HomeFeedView: View {
                     duration: recordingDuration,
                     waveform: recordingWaveform,
                     onCancel: cancelRecording,
-                    onComplete: completeRecording
+                    onComplete: completeRecording,
+                    isUploading: isUploading,
+                    uploadedURL: uploadedURL,
+                    onPreview: playPreview,
+                    onPublish: publishRecording,
+                    isPlaying: isPlaying,
+                    playbackProgress: playbackProgress,
+                    playbackWaveformProgress: playbackWaveformProgress
                 )
                 .transition(.opacity.combined(with: .scale))
             }
@@ -228,6 +247,7 @@ struct HomeFeedView: View {
             
             audioRecorder = try AVAudioRecorder(url: audioFilename, settings: settings)
             audioRecorder?.isMeteringEnabled = true
+            
             audioRecorder?.record()
             
             appState.isRecording = true
@@ -301,10 +321,19 @@ struct HomeFeedView: View {
         audioRecorder?.deleteRecording()
         audioRecorder = nil
         
+        audioPlayer?.stop()
+        audioPlayer = nil
+        
+        // Clean up playback state
+        stopPlaybackTracking()
+        
         appState.isRecording = false
         showingRecordingUI = false
         recordingWaveform = []
         fullWaveform = []
+        isUploading = false
+        self.uploadedURL = nil
+        isShowingPreview = false
     }
     
     private func completeRecording() {
@@ -312,19 +341,30 @@ struct HomeFeedView: View {
               let ndk = nostrManager.ndk,
               let signer = ndk.signer else { return }
         
-        let audioUrl = recorder.url
-        let finalDuration = recordingDuration
+        // Stop the timer and recording first
+        recordingTimer?.invalidate()
+        recordingTimer = nil
         
-        // Compress waveform to less than 100 values as recommended
-        let compressedWaveform = compressWaveform(fullWaveform, targetSamples: 50)
+        recorder.stop()
+        appState.isRecording = false
+        
+        let audioUrl = recorder.url
+        
+        // Start upload process
+        isUploading = true
         
         Task {
             do {
                 // Read audio file data
                 let audioData = try Data(contentsOf: audioUrl)
                 
+                // Check if we have actual audio data
+                guard audioData.count > 1000 else { // At least 1KB of data
+                    throw NSError(domain: "RecordingError", code: 1, userInfo: [NSLocalizedDescriptionKey: "Recording file is too small or empty"])
+                }
+                
                 // Upload to Blossom servers with fallback
-                var uploadedURL: String? = nil
+                var uploadResult: String? = nil
                 var uploadError: Error? = nil
                 
                 for server in blossomServerManager.allServers {
@@ -333,7 +373,7 @@ struct HomeFeedView: View {
                         let blossomClient = BlossomClient()
                         
                         // Upload audio file with auth
-                        let uploadResult = try await blossomClient.uploadWithAuth(
+                        let result = try await blossomClient.uploadWithAuth(
                             data: audioData,
                             mimeType: "audio/m4a",
                             to: server,
@@ -341,7 +381,7 @@ struct HomeFeedView: View {
                             ndk: ndk
                         )
                         
-                        uploadedURL = uploadResult.url
+                        uploadResult = result.url
                         print("Successfully uploaded audio to \(server)")
                         break // Success, no need to try other servers
                         
@@ -352,44 +392,20 @@ struct HomeFeedView: View {
                     }
                 }
                 
-                guard let finalUploadedURL = uploadedURL else {
+                guard let finalUploadedURL = uploadResult else {
                     throw uploadError ?? BlossomError.uploadFailed
                 }
                 
-                // Create imeta tag with waveform and duration
-                var imetaComponents = ["imeta"]
-                imetaComponents.append("url \(finalUploadedURL)")
-                imetaComponents.append("m audio/m4a")
-                imetaComponents.append("duration \(Int(finalDuration))")
-                
-                // Add waveform data as space-separated values
-                let waveformString = compressedWaveform
-                    .map { String(format: "%.2f", $0) }
-                    .joined(separator: " ")
-                imetaComponents.append("waveform \(waveformString)")
-                
-                // Publish audio event
-                _ = try await ndk.publish { builder in
-                    builder
-                        .kind(1222) // Audio event kind
-                        .content(finalUploadedURL)
-                        .tag(imetaComponents)
-                }
-                
                 await MainActor.run {
-                    showingRecordingUI = false
-                    recordingWaveform = []
-                    fullWaveform = []
-                    audioRecorder = nil
+                    self.uploadedURL = finalUploadedURL
+                    self.isUploading = false
+                    self.isShowingPreview = true
                 }
-                
-                // Clean up local file
-                try? FileManager.default.removeItem(at: audioUrl)
                 
             } catch {
-                print("Failed to publish audio event: \(error)")
+                print("Failed to upload audio: \(error)")
                 await MainActor.run {
-                    showingRecordingUI = false
+                    self.isUploading = false
                     // TODO: Show error to user
                 }
             }
@@ -415,6 +431,128 @@ struct HomeFeedView: View {
         }
         
         return compressed
+    }
+    
+    private func playPreview() {
+        guard let uploadedURL = uploadedURL,
+              let url = URL(string: uploadedURL) else { return }
+        
+        Task {
+            do {
+                // Download and play the audio
+                let (data, _) = try await URLSession.shared.data(from: url)
+                
+                await MainActor.run {
+                    do {
+                        // Configure audio session for playback
+                        let audioSession = AVAudioSession.sharedInstance()
+                        try audioSession.setCategory(.playback, mode: .default)
+                        try audioSession.setActive(true)
+                        
+                        self.audioPlayer = try AVAudioPlayer(data: data)
+                        self.audioPlayer?.volume = 1.0
+                        self.audioPlayer?.play()
+                        
+                        // Start playback tracking
+                        self.isPlaying = true
+                        self.playbackProgress = 0
+                        self.playbackWaveformProgress = 0
+                        
+                        // Start timer to track playback progress
+                        self.playbackTimer = Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { _ in
+                            self.updatePlaybackProgress()
+                        }
+                    } catch {
+                        // Failed to play audio preview
+                    }
+                }
+            } catch {
+                // Failed to download audio for preview
+            }
+        }
+    }
+    
+    private func updatePlaybackProgress() {
+        guard let player = audioPlayer, player.isPlaying else {
+            // Playback finished or stopped
+            stopPlaybackTracking()
+            return
+        }
+        
+        playbackProgress = player.currentTime
+        
+        // Update waveform progress based on playback time and total duration
+        if player.duration > 0 {
+            let progressRatio = player.currentTime / player.duration
+            playbackWaveformProgress = Int(progressRatio * Double(recordingWaveform.count))
+        }
+    }
+    
+    private func stopPlaybackTracking() {
+        playbackTimer?.invalidate()
+        playbackTimer = nil
+        isPlaying = false
+        playbackProgress = 0
+        playbackWaveformProgress = 0
+    }
+    
+    private func publishRecording() {
+        guard let recorder = audioRecorder,
+              let uploadedURL = uploadedURL,
+              let ndk = nostrManager.ndk else { return }
+        
+        let finalDuration = recordingDuration
+        
+        // Compress waveform to less than 100 values as recommended
+        let compressedWaveform = compressWaveform(fullWaveform, targetSamples: 50)
+        
+        Task {
+            do {
+                // Create imeta tag with waveform and duration
+                var imetaComponents = ["imeta"]
+                imetaComponents.append("url \(uploadedURL)")
+                imetaComponents.append("m audio/m4a")
+                imetaComponents.append("duration \(Int(finalDuration))")
+                
+                // Add waveform data as space-separated values
+                let waveformString = compressedWaveform
+                    .map { String(format: "%.2f", $0) }
+                    .joined(separator: " ")
+                imetaComponents.append("waveform \(waveformString)")
+                
+                // Publish audio event
+                _ = try await ndk.publish { builder in
+                    builder
+                        .kind(1222) // Audio event kind
+                        .content(uploadedURL)
+                        .tag(imetaComponents)
+                }
+                
+                await MainActor.run {
+                    showingRecordingUI = false
+                    recordingWaveform = []
+                    fullWaveform = []
+                    audioRecorder = nil
+                    self.uploadedURL = nil
+                    self.isShowingPreview = false
+                    audioPlayer?.stop()
+                    audioPlayer = nil
+                    
+                    // Clean up playback state
+                    self.stopPlaybackTracking()
+                }
+                
+                // Clean up local file
+                try? FileManager.default.removeItem(at: recorder.url)
+                
+            } catch {
+                print("Failed to publish audio event: \(error)")
+                await MainActor.run {
+                    showingRecordingUI = false
+                    // TODO: Show error to user
+                }
+            }
+        }
     }
 }
 
@@ -658,10 +796,33 @@ struct RecordingOverlay: View {
     let waveform: [CGFloat]
     let onCancel: () -> Void
     let onComplete: () -> Void
+    let isUploading: Bool
+    let uploadedURL: String?
+    let onPreview: () -> Void
+    let onPublish: () -> Void
+    let isPlaying: Bool
+    let playbackProgress: TimeInterval
+    let playbackWaveformProgress: Int
+    
+    @State private var rotationAngle: Double = 0
     
     var formattedDuration: String {
         let minutes = Int(duration) / 60
         let seconds = Int(duration) % 60
+        return String(format: "%d:%02d", minutes, seconds)
+    }
+    
+    var isRecordingComplete: Bool {
+        !isUploading && uploadedURL == nil
+    }
+    
+    var isPreviewReady: Bool {
+        !isUploading && uploadedURL != nil
+    }
+    
+    var formattedPlaybackProgress: String {
+        let minutes = Int(playbackProgress) / 60
+        let seconds = Int(playbackProgress) % 60
         return String(format: "%d:%02d", minutes, seconds)
     }
     
@@ -681,8 +842,9 @@ struct RecordingOverlay: View {
                             .fill(
                                 LinearGradient(
                                     gradient: Gradient(colors: [
-                                        Color.purple,
-                                        Color.blue
+                                        // Show different colors for played vs unplayed parts
+                                        index < playbackWaveformProgress ? Color.green : Color.purple,
+                                        index < playbackWaveformProgress ? Color.mint : Color.blue
                                     ]),
                                     startPoint: .top,
                                     endPoint: .bottom
@@ -690,12 +852,13 @@ struct RecordingOverlay: View {
                             )
                             .frame(width: 4, height: 20 + waveform[index] * 80)
                             .animation(.easeOut(duration: 0.1), value: waveform[index])
+                            .animation(.easeInOut(duration: 0.2), value: playbackWaveformProgress)
                     }
                 }
                 .frame(height: 100)
                 
-                // Duration
-                Text(formattedDuration)
+                // Duration - show playback progress when playing, recording duration otherwise
+                Text(isPlaying ? formattedPlaybackProgress : formattedDuration)
                     .font(.system(size: 48, weight: .bold, design: .monospaced))
                     .foregroundColor(.white)
                     .padding(.vertical, 30)
@@ -723,31 +886,81 @@ struct RecordingOverlay: View {
                     
                     Spacer()
                     
-                    // Send button (bottom right) - same style as record button
-                    Button(action: onComplete) {
-                        ZStack {
-                            Circle()
-                                .fill(
-                                    LinearGradient(
-                                        gradient: Gradient(colors: [
-                                            Color.purple,
-                                            Color(red: 0.5, green: 0.1, blue: 0.9)
-                                        ]),
-                                        startPoint: .topLeading,
-                                        endPoint: .bottomTrailing
-                                    )
-                                )
-                                .frame(width: 56, height: 56)
-                                .shadow(color: Color.purple.opacity(0.5), radius: 15, x: 0, y: 5)
-                            
-                            Image(systemName: "arrow.up")
-                                .font(.system(size: 24))
-                                .foregroundColor(.white)
+                    HStack(spacing: 16) {
+                        // Preview button (when upload is complete)
+                        if isPreviewReady {
+                            Button(action: onPreview) {
+                                ZStack {
+                                    Circle()
+                                        .fill(Color.white.opacity(0.15))
+                                        .frame(width: 56, height: 56)
+                                    
+                                    Image(systemName: "play.fill")
+                                        .font(.system(size: 24))
+                                        .foregroundColor(.white)
+                                }
+                            }
                         }
+                        
+                        // Main action button (right side)
+                        Button(action: {
+                            if isRecordingComplete {
+                                onComplete()
+                            } else if isPreviewReady {
+                                onPublish()
+                            }
+                        }) {
+                            ZStack {
+                                Circle()
+                                    .fill(
+                                        LinearGradient(
+                                            gradient: Gradient(colors: [
+                                                Color.purple,
+                                                Color(red: 0.5, green: 0.1, blue: 0.9)
+                                            ]),
+                                            startPoint: .topLeading,
+                                            endPoint: .bottomTrailing
+                                        )
+                                    )
+                                    .frame(width: 56, height: 56)
+                                    .shadow(color: Color.purple.opacity(0.5), radius: 15, x: 0, y: 5)
+                                
+                                if isUploading {
+                                    // Upload animation
+                                    Circle()
+                                        .stroke(Color.white.opacity(0.3), lineWidth: 2)
+                                        .frame(width: 40, height: 40)
+                                    
+                                    Circle()
+                                        .trim(from: 0, to: 0.3)
+                                        .stroke(Color.white, lineWidth: 2)
+                                        .frame(width: 40, height: 40)
+                                        .rotationEffect(Angle(degrees: rotationAngle))
+                                        .animation(.linear(duration: 1).repeatForever(autoreverses: false), value: rotationAngle)
+                                } else {
+                                    Image(systemName: isPreviewReady ? "paperplane.fill" : "checkmark")
+                                        .font(.system(size: 24))
+                                        .foregroundColor(.white)
+                                }
+                            }
+                        }
+                        .disabled(isUploading)
                     }
                     .padding(.trailing, 20)
                 }
                 .padding(.bottom, 20)
+            }
+        }
+        .onAppear {
+            if isUploading {
+                rotationAngle = 360
+            }
+        }
+        .onChange(of: isUploading) { _, newValue in
+            if newValue {
+                rotationAngle = 360
+            } else {
+                rotationAngle = 0
             }
         }
     }

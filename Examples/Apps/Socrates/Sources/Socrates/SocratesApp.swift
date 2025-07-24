@@ -15,14 +15,7 @@ struct SocratesApp: App {
     
     var body: some Scene {
         WindowGroup {
-            Group {
-                #if DEBUG
-                // Use debug view that bypasses authentication for testing
-                DebugContentView()
-                #else
-                ContentView()
-                #endif
-            }
+            ContentView()
             .environment(\.colorScheme, .dark)
             .preferredColorScheme(.dark)
             .environmentObject(nostrManager)
@@ -109,7 +102,6 @@ class NostrManager: ObservableObject {
                     }
                 }
                 
-                // Handle initial state
                 await handleAuthStateChange()
             }
         }
@@ -121,8 +113,6 @@ class NostrManager: ObservableObject {
             // If authenticated, ensure signer is set on NDK
             if let activeSigner = ndkAuthManager.activeSigner {
                 ndk?.signer = activeSigner
-                print("Setting active signer on NDK")
-                
                 // Start session if not already started
                 if ndk?.sessionData == nil {
                     do {
@@ -133,9 +123,8 @@ class NostrManager: ObservableObject {
                                 preloadStrategy: .progressive
                             )
                         )
-                        print("Session data loaded successfully")
                     } catch {
-                        print("Failed to start session: \(error)")
+                        // Session start failed
                     }
                 }
             }
@@ -226,7 +215,6 @@ class NostrManager: ObservableObject {
         
         userRelays.append(relayURL)
         UserDefaults.standard.set(userRelays, forKey: Self.userRelaysKey)
-        print("Added user relay: \(relayURL)")
     }
     
     /// Remove a user relay and persist the change
@@ -234,7 +222,6 @@ class NostrManager: ObservableObject {
         var userRelays = getUserAddedRelays()
         userRelays.removeAll(value: relayURL)
         UserDefaults.standard.set(userRelays, forKey: Self.userRelaysKey)
-        print("Removed user relay: \(relayURL)")
     }
     
     /// Get list of user-added relays (for UI display)

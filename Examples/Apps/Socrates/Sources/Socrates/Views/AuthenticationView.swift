@@ -63,98 +63,95 @@ struct AuthenticationView: View {
                 )
             }
             
-            VStack(spacing: 40) {
-                Spacer()
-                
-                // Logo and title
-                ZStack {
-                    // Outer pulsing glow
-                    Circle()
-                        .fill(
-                            RadialGradient(
-                                gradient: Gradient(colors: [
-                                    Color.purple.opacity(0.8),
-                                    Color.blue.opacity(0.4),
-                                    Color.clear
-                                ]),
-                                center: .center,
-                                startRadius: 10,
-                                endRadius: showingLogin ? 90 : 120
-                            )
-                        )
-                        .frame(width: showingLogin ? 210 : 280, height: showingLogin ? 210 : 280)
-                        .blur(radius: 30)
-                        .scaleEffect(pulseScale)
-                        .opacity(logoOpacity * 0.7)
-                        .animation(.spring(response: 0.6, dampingFraction: 0.8), value: showingLogin)
+            if !showingLogin {
+                // Initial welcome screen
+                VStack(spacing: 40) {
+                    Spacer()
                     
-                    // Logo background circle
-                    Circle()
-                        .fill(
+                    // Logo and title
+                    ZStack {
+                        // Outer pulsing glow
+                        Circle()
+                            .fill(
+                                RadialGradient(
+                                    gradient: Gradient(colors: [
+                                        Color.purple.opacity(0.8),
+                                        Color.blue.opacity(0.4),
+                                        Color.clear
+                                    ]),
+                                    center: .center,
+                                    startRadius: 10,
+                                    endRadius: 120
+                                )
+                            )
+                            .frame(width: 280, height: 280)
+                            .blur(radius: 30)
+                            .scaleEffect(pulseScale)
+                            .opacity(logoOpacity * 0.7)
+                        
+                        // Logo background circle
+                        Circle()
+                            .fill(
+                                LinearGradient(
+                                    gradient: Gradient(colors: [
+                                        Color.purple,
+                                        Color.purple.opacity(0.9),
+                                        Color(red: 0.4, green: 0.1, blue: 0.8)
+                                    ]),
+                                    startPoint: .topLeading,
+                                    endPoint: .bottomTrailing
+                                )
+                            )
+                            .frame(width: 140, height: 140)
+                            .shadow(color: Color.purple.opacity(0.5), radius: 20, x: 0, y: 5)
+                            .scaleEffect(logoScale)
+                            .opacity(logoOpacity)
+                            .rotationEffect(.degrees(logoRotation))
+                        
+                        // Logo icon
+                        Image(systemName: "waveform.circle.fill")
+                            .font(.system(size: 80))
+                            .foregroundColor(.white)
+                            .scaleEffect(logoScale)
+                            .opacity(logoOpacity)
+                            .rotationEffect(.degrees(logoRotation))
+                    }
+                    
+                    // Title
+                    Text("SOCRATES")
+                        .font(.system(size: 52, weight: .black, design: .default))
+                        .tracking(4)
+                        .foregroundStyle(
                             LinearGradient(
                                 gradient: Gradient(colors: [
-                                    Color.purple,
-                                    Color.purple.opacity(0.9),
-                                    Color(red: 0.4, green: 0.1, blue: 0.8)
+                                    Color.white,
+                                    Color.white.opacity(0.9)
                                 ]),
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
+                                startPoint: .top,
+                                endPoint: .bottom
                             )
                         )
-                        .frame(width: showingLogin ? 105 : 140, height: showingLogin ? 105 : 140)
-                        .shadow(color: Color.purple.opacity(0.5), radius: 20, x: 0, y: 5)
-                        .scaleEffect(logoScale)
-                        .opacity(logoOpacity)
-                        .rotationEffect(.degrees(logoRotation))
-                        .animation(.spring(response: 0.6, dampingFraction: 0.8), value: showingLogin)
+                        .shadow(color: Color.purple.opacity(0.3), radius: 10, x: 0, y: 2)
+                        .opacity(titleOpacity)
+                        .offset(y: titleOffset)
                     
-                    // Logo icon
-                    Image(systemName: "waveform.circle.fill")
-                        .font(.system(size: showingLogin ? 60 : 80))
-                        .foregroundColor(.white)
-                        .scaleEffect(logoScale)
-                        .opacity(logoOpacity)
-                        .rotationEffect(.degrees(logoRotation))
-                        .animation(.spring(response: 0.6, dampingFraction: 0.8), value: showingLogin)
-                }
-                .offset(y: showingLogin ? -80 : 0)
-                .animation(.spring(response: 0.6, dampingFraction: 0.8), value: showingLogin)
-                
-                // Title
-                Text("SOCRATES")
-                    .font(.system(size: showingLogin ? 36 : 52, weight: .black, design: .default))
-                    .tracking(4)
-                    .foregroundStyle(
-                        LinearGradient(
-                            gradient: Gradient(colors: [
-                                Color.white,
-                                Color.white.opacity(0.9)
-                            ]),
-                            startPoint: .top,
-                            endPoint: .bottom
-                        )
-                    )
-                    .shadow(color: Color.purple.opacity(0.3), radius: 10, x: 0, y: 2)
-                    .opacity(showingLogin ? 0 : titleOpacity)
-                    .offset(y: showingLogin ? -100 : titleOffset)
-                    .animation(.spring(response: 0.6, dampingFraction: 0.8), value: showingLogin)
-                
-                // Slogan
-                Text("WISDOM THROUGH VOICE")
-                    .font(.system(size: 16, weight: .medium, design: .monospaced))
-                    .tracking(2)
-                    .foregroundColor(Color.white.opacity(0.7))
-                    .scaleEffect(sloganScale)
-                    .opacity(showingLogin ? 0 : sloganOpacity)
-                    .offset(y: showingLogin ? -120 : 0)
-                    .animation(.spring(response: 0.6, dampingFraction: 0.8), value: showingLogin)
-                
-                Spacer()
-                
-                if !showingLogin {
+                    // Slogan
+                    Text("WISDOM THROUGH VOICE")
+                        .font(.system(size: 16, weight: .medium, design: .monospaced))
+                        .tracking(2)
+                        .foregroundColor(Color.white.opacity(0.7))
+                        .scaleEffect(sloganScale)
+                        .opacity(sloganOpacity)
+                    
+                    Spacer()
+                    
                     // Login buttons
                     VStack(spacing: 16) {
-                        Button(action: { showingLogin = true }) {
+                        Button(action: { 
+                            withAnimation(.spring(response: 0.6, dampingFraction: 0.8)) {
+                                showingLogin = true 
+                            }
+                        }) {
                             HStack {
                                 Image(systemName: "key.fill")
                                     .font(.system(size: 20))
@@ -208,17 +205,17 @@ struct AuthenticationView: View {
                     .padding(.horizontal, 32)
                     .offset(y: buttonsOffset)
                     .opacity(buttonsOpacity)
-                } else {
-                    // Login form
-                    loginForm
-                        .transition(.asymmetric(
-                            insertion: .move(edge: .trailing).combined(with: .opacity),
-                            removal: .move(edge: .leading).combined(with: .opacity)
-                        ))
+                    
+                    Spacer()
+                        .frame(height: 60)
                 }
-                
-                Spacer()
-                    .frame(height: 60)
+            } else {
+                // Login form
+                loginForm
+                    .transition(.asymmetric(
+                        insertion: .move(edge: .trailing).combined(with: .opacity),
+                        removal: .move(edge: .leading).combined(with: .opacity)
+                    ))
             }
         }
         .alert("Error", isPresented: $showError) {
@@ -234,137 +231,184 @@ struct AuthenticationView: View {
         .onAppear {
             animateIntro()
         }
-        .ignoresSafeArea(.keyboard, edges: .bottom)
     }
     
     private var loginForm: some View {
-        VStack {
-            // Back button - positioned at the top
-            HStack {
-                Button(action: {
-                    withAnimation(.spring(response: 0.6, dampingFraction: 0.8)) {
-                        showingLogin = false
-                        nsecInput = ""
-                        showPassword = false
+        GeometryReader { geometry in
+            ScrollView {
+                VStack(spacing: 0) {
+                    // Navigation bar
+                    HStack {
+                        Button(action: {
+                            withAnimation(.spring(response: 0.6, dampingFraction: 0.8)) {
+                                showingLogin = false
+                                nsecInput = ""
+                                showPassword = false
+                            }
+                        }) {
+                            HStack(spacing: 8) {
+                                Image(systemName: "chevron.left")
+                                    .font(.system(size: 18, weight: .medium))
+                                Text("Back")
+                                    .font(.system(size: 16, weight: .medium))
+                            }
+                            .foregroundColor(Color.purple)
+                        }
+                        Spacer()
                     }
-                }) {
-                    HStack(spacing: 8) {
-                        Image(systemName: "chevron.left")
-                            .font(.system(size: 18, weight: .medium))
-                        Text("Back")
-                            .font(.system(size: 16, weight: .medium))
-                    }
-                    .foregroundColor(Color.purple)
-                }
-                Spacer()
-            }
-            .padding(.horizontal, 32)
-            .padding(.top, 20)
-            
-            Spacer(minLength: 40)
-            
-            // Content section
-            VStack(spacing: 30) {
-                VStack(spacing: 12) {
-                    Text("Welcome Back")
-                        .font(.system(size: 28, weight: .bold))
-                        .foregroundColor(.white)
+                    .padding(.horizontal, 20)
+                    .padding(.top, 60) // Account for safe area
+                    .padding(.bottom, 30)
                     
-                    Text("Enter your private key to continue")
-                        .font(.system(size: 16))
-                        .foregroundColor(Color.white.opacity(0.7))
-                }
-                
-                // Input section
-                VStack(spacing: 24) {
-                    VStack(alignment: .leading, spacing: 10) {
-                        Text("Private Key")
-                            .font(.system(size: 15, weight: .medium))
-                            .foregroundColor(Color.white.opacity(0.9))
-                        
-                        HStack {
-                            if showPassword {
-                                TextField("nsec1...", text: $nsecInput)
-                                    .textContentType(.password)
-                                    .textInputAutocapitalization(.never)
-                                    .font(.system(.body, design: .monospaced))
-                            } else {
-                                SecureField("nsec1...", text: $nsecInput)
-                                    .textContentType(.password)
-                                    .textInputAutocapitalization(.never)
-                                    .font(.system(.body, design: .monospaced))
-                            }
-                            
-                            Button(action: { showPassword.toggle() }) {
-                                Image(systemName: showPassword ? "eye.slash.fill" : "eye.fill")
-                                    .font(.system(size: 16))
-                                    .foregroundColor(Color.white.opacity(0.6))
-                            }
-                        }
-                        .padding(18)
-                        .background(Color.white.opacity(0.08))
-                        .foregroundColor(.white)
-                        .accentColor(.purple)
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 12)
-                                .stroke(Color.white.opacity(0.2), lineWidth: 1)
-                        )
-                        .clipShape(RoundedRectangle(cornerRadius: 12))
-                        
-                        HStack {
-                            Image(systemName: "lock.shield.fill")
-                                .font(.system(size: 12))
-                                .foregroundColor(Color.white.opacity(0.5))
-                            
-                            Text("Your key is stored securely on this device")
-                                .font(.system(size: 13))
-                                .foregroundColor(Color.white.opacity(0.5))
-                        }
-                        .padding(.top, 2)
-                    }
-                    
-                    // Login button
-                    Button(action: login) {
-                        ZStack {
-                            if isLoggingIn {
-                                HStack(spacing: 12) {
-                                    ProgressView()
-                                        .progressViewStyle(CircularProgressViewStyle(tint: .white))
-                                        .scaleEffect(0.9)
-                                    
-                                    Text("Logging in...")
-                                        .fontWeight(.semibold)
-                                }
-                            } else {
-                                HStack {
-                                    Image(systemName: "arrow.right.circle.fill")
-                                    Text("Log In")
-                                        .fontWeight(.semibold)
-                                }
-                            }
-                        }
-                        .foregroundColor(.white)
-                        .frame(maxWidth: .infinity)
-                        .frame(height: 56)
-                        .background(
-                            LinearGradient(
-                                gradient: Gradient(colors: [
-                                    nsecInput.isEmpty ? Color.gray : Color.purple,
-                                    nsecInput.isEmpty ? Color.gray.opacity(0.8) : Color(red: 0.5, green: 0.1, blue: 0.9)
-                                ]),
-                                startPoint: .leading,
-                                endPoint: .trailing
+                    // Logo section - smaller and properly positioned
+                    ZStack {
+                        // Glow effect
+                        Circle()
+                            .fill(
+                                RadialGradient(
+                                    gradient: Gradient(colors: [
+                                        Color.purple.opacity(0.4),
+                                        Color.blue.opacity(0.2),
+                                        Color.clear
+                                    ]),
+                                    center: .center,
+                                    startRadius: 5,
+                                    endRadius: 50
+                                )
                             )
-                        )
-                        .clipShape(RoundedRectangle(cornerRadius: 16))
-                        .shadow(color: nsecInput.isEmpty ? Color.clear : Color.purple.opacity(0.3), radius: 10, x: 0, y: 4)
-                        .disabled(nsecInput.isEmpty || isLoggingIn)
+                            .frame(width: 120, height: 120)
+                            .blur(radius: 20)
+                        
+                        // Logo background
+                        Circle()
+                            .fill(
+                                LinearGradient(
+                                    gradient: Gradient(colors: [
+                                        Color.purple,
+                                        Color.purple.opacity(0.9),
+                                        Color(red: 0.4, green: 0.1, blue: 0.8)
+                                    ]),
+                                    startPoint: .topLeading,
+                                    endPoint: .bottomTrailing
+                                )
+                            )
+                            .frame(width: 80, height: 80)
+                            .shadow(color: Color.purple.opacity(0.3), radius: 10, x: 0, y: 3)
+                        
+                        // Logo icon
+                        Image(systemName: "waveform.circle.fill")
+                            .font(.system(size: 45))
+                            .foregroundColor(.white)
                     }
+                    .padding(.bottom, 40)
+                    
+                    // Content section
+                    VStack(spacing: 30) {
+                        VStack(spacing: 12) {
+                            Text("Welcome Back")
+                                .font(.system(size: 28, weight: .bold))
+                                .foregroundColor(.white)
+                            
+                            Text("Enter your private key to continue")
+                                .font(.system(size: 16))
+                                .foregroundColor(Color.white.opacity(0.7))
+                        }
+                        
+                        // Input section
+                        VStack(spacing: 24) {
+                            VStack(alignment: .leading, spacing: 10) {
+                                Text("Private Key")
+                                    .font(.system(size: 15, weight: .medium))
+                                    .foregroundColor(Color.white.opacity(0.9))
+                                
+                                HStack {
+                                    if showPassword {
+                                        TextField("nsec1...", text: $nsecInput)
+                                            .textContentType(.password)
+                                            .textInputAutocapitalization(.never)
+                                            .font(.system(.body, design: .monospaced))
+                                    } else {
+                                        SecureField("nsec1...", text: $nsecInput)
+                                            .textContentType(.password)
+                                            .textInputAutocapitalization(.never)
+                                            .font(.system(.body, design: .monospaced))
+                                    }
+                                    
+                                    Button(action: { showPassword.toggle() }) {
+                                        Image(systemName: showPassword ? "eye.slash.fill" : "eye.fill")
+                                            .font(.system(size: 16))
+                                            .foregroundColor(Color.white.opacity(0.6))
+                                    }
+                                }
+                                .padding(18)
+                                .background(Color.white.opacity(0.08))
+                                .foregroundColor(.white)
+                                .accentColor(.purple)
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 12)
+                                        .stroke(Color.white.opacity(0.2), lineWidth: 1)
+                                )
+                                .clipShape(RoundedRectangle(cornerRadius: 12))
+                                
+                                HStack {
+                                    Image(systemName: "lock.shield.fill")
+                                        .font(.system(size: 12))
+                                        .foregroundColor(Color.white.opacity(0.5))
+                                    
+                                    Text("Your key is stored securely on this device")
+                                        .font(.system(size: 13))
+                                        .foregroundColor(Color.white.opacity(0.5))
+                                }
+                                .padding(.top, 2)
+                            }
+                            
+                            // Login button
+                            Button(action: login) {
+                                ZStack {
+                                    if isLoggingIn {
+                                        HStack(spacing: 12) {
+                                            ProgressView()
+                                                .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                                                .scaleEffect(0.9)
+                                            
+                                            Text("Logging in...")
+                                                .fontWeight(.semibold)
+                                        }
+                                    } else {
+                                        HStack {
+                                            Image(systemName: "arrow.right.circle.fill")
+                                            Text("Log In")
+                                                .fontWeight(.semibold)
+                                        }
+                                    }
+                                }
+                                .foregroundColor(.white)
+                                .frame(maxWidth: .infinity)
+                                .frame(height: 56)
+                                .background(
+                                    LinearGradient(
+                                        gradient: Gradient(colors: [
+                                            nsecInput.isEmpty ? Color.gray : Color.purple,
+                                            nsecInput.isEmpty ? Color.gray.opacity(0.8) : Color(red: 0.5, green: 0.1, blue: 0.9)
+                                        ]),
+                                        startPoint: .leading,
+                                        endPoint: .trailing
+                                    )
+                                )
+                                .clipShape(RoundedRectangle(cornerRadius: 16))
+                                .shadow(color: nsecInput.isEmpty ? Color.clear : Color.purple.opacity(0.3), radius: 10, x: 0, y: 4)
+                                .disabled(nsecInput.isEmpty || isLoggingIn)
+                            }
+                        }
+                        .padding(.horizontal, 32)
+                    }
+                    
+                    // Bottom padding to ensure content is above keyboard
+                    Spacer(minLength: 50)
                 }
-                .padding(.horizontal, 32)
+                .frame(minHeight: geometry.size.height)
             }
-            
-            Spacer(minLength: 100) // Ensure button stays above keyboard
+            .scrollDismissesKeyboard(.interactively)
         }
     }
     
