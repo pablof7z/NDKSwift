@@ -17,6 +17,7 @@ struct ContentView: View {
                     NavigationView {
                         HomeFeedView()
                     }
+                    .environment(\.ndk, nostrManager.ndk)
                 }
             } authenticationContent: {
                 // Authentication screen
@@ -38,5 +39,6 @@ struct ContentView: View {
         .onAppear {
             appState.setNostrManager(nostrManager)
         }
+        .environment(\.ndk, nostrManager.ndk)
     }
 }

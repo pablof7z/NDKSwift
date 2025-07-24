@@ -39,7 +39,7 @@ struct RelaySelectorView: View {
             .background(Color.black.opacity(0.3))
             
             // All relays option
-            RelayRowView(
+            RelaySelectorRowView(
                 title: "All Relays",
                 subtitle: "\(relayStates.filter { $0.isConnected }.count) connected",
                 isSelected: selectedRelay == nil,
@@ -56,7 +56,7 @@ struct RelaySelectorView: View {
             ScrollView {
                 VStack(spacing: 0) {
                     ForEach(relayStates) { relay in
-                        RelayRowView(
+                        RelaySelectorRowView(
                             title: formatRelayUrl(relay.url),
                             subtitle: relay.isConnected ? "Connected" : "Disconnected",
                             isSelected: selectedRelay == relay.url,
@@ -158,7 +158,7 @@ struct RelaySelectorView: View {
     }
 }
 
-struct RelayRowView: View {
+struct RelaySelectorRowView: View {
     let title: String
     let subtitle: String
     let isSelected: Bool

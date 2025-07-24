@@ -40,7 +40,8 @@ public struct NDKProfilePicture: View {
     private var tapAction: (() -> Void)?
     
     @Environment(\.ndk) private var ndk
-    @StateObject private var profileDataSource: NDKProfileDataSource
+    @State private var profile: NDKUserProfile?
+    @State private var profileTask: Task<Void, Never>?
     
     // MARK: - Initialization
     
@@ -64,12 +65,7 @@ public struct NDKProfilePicture: View {
         self.borderColor = borderColor
         self.borderWidth = borderWidth
         
-        // We need to handle the StateObject initialization carefully
-        // since we can't use @StateObject with a computed property
-        self._profileDataSource = StateObject(wrappedValue: NDKProfileDataSource(
-            ndk: NDK(), // This will be updated in onAppear
-            pubkey: pubkey
-        ))
+        // Profile will be loaded in onAppear when we have access to the environment NDK
     }
     
     /// Initialize with an NDKUser
@@ -99,7 +95,7 @@ public struct NDKProfilePicture: View {
     
     public var body: some View {
         Group {
-            if let pictureURL = profileDataSource.pictureURL {
+            if let pictureURL = pictureURL {
                 AsyncImage(url: pictureURL) { image in
                     image
                         .resizable()
@@ -121,14 +117,15 @@ public struct NDKProfilePicture: View {
         .onTapGesture {
             tapAction?()
         }
-        .accessibilityLabel("Profile picture for \(profileDataSource.displayName)")
+        .accessibilityLabel("Profile picture for \(displayName)")
         .onAppear {
-            // Update the data source with the environment NDK
-            if ndk != nil {
-                // We need to recreate the data source with the correct NDK
-                // This is a limitation of the current approach - in a real implementation,
-                // we might want to use a different pattern
-            }
+            loadProfile()
+        }
+        .onDisappear {
+            profileTask?.cancel()
+        }
+        .onChange(of: pubkey) { _, newPubkey in
+            loadProfile()
         }
     }
     
@@ -139,7 +136,7 @@ public struct NDKProfilePicture: View {
             .fill(Color.ndkGray5)
             .frame(width: size, height: size)
             .overlay(
-                Text(profileDataSource.displayName.prefix(1).uppercased())
+                Text(displayName.prefix(1).uppercased())
                     .font(.system(size: size * 0.4, weight: .medium))
                     .foregroundStyle(.secondary)
             )
@@ -147,6 +144,39 @@ public struct NDKProfilePicture: View {
     
     private var effectiveCornerRadius: CGFloat {
         cornerRadius ?? (size / 2) // Default to circular
+    }
+    
+    private var pictureURL: URL? {
+        guard let picture = profile?.picture, !picture.isEmpty else { return nil }
+        return URL(string: picture)
+    }
+    
+    private var displayName: String {
+        if let displayName = profile?.displayName, !displayName.isEmpty {
+            return displayName
+        }
+        if let name = profile?.name, !name.isEmpty {
+            return name
+        }
+        // Fallback to shortened pubkey
+        return String(pubkey.prefix(8)) + "..."
+    }
+    
+    // MARK: - Private Methods
+    
+    private func loadProfile() {
+        profileTask?.cancel()
+        
+        guard let ndk = ndk else { return }
+        
+        profileTask = Task {
+            for await profile in await ndk.profileManager.observe(for: pubkey, maxAge: 3600) {
+                await MainActor.run {
+                    self.profile = profile
+                }
+                // Continue listening for updates
+            }
+        }
     }
     
     // MARK: - Modifiers

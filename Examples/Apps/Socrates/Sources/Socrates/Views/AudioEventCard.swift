@@ -21,6 +21,7 @@ struct AudioEventCard: View {
     @State private var reactionCount: Int = 0
     @State private var reactions: [NDKEvent] = []
     @State private var cardScale: CGFloat = 1
+    @State private var showingUserProfile = false
     
     var isCurrentlyPlaying: Bool {
         appState.currentlyPlayingId == audioEvent.id && isPlaying
@@ -30,6 +31,9 @@ struct AudioEventCard: View {
         HStack(alignment: .top, spacing: 12) {
             // Author avatar using NDKSwiftUI component
             NDKProfilePicture(pubkey: audioEvent.author.pubkey, size: 40)
+                .onTapGesture {
+                    showingUserProfile = true
+                }
             
             VStack(alignment: .leading, spacing: 4) {
                 // Author info
@@ -38,6 +42,9 @@ struct AudioEventCard: View {
                         .font(.system(size: 15, weight: .semibold))
                         .foregroundColor(.white)
                         .lineLimit(1)
+                        .onTapGesture {
+                            showingUserProfile = true
+                        }
                     
                     if audioEvent.webOfTrustScore >= 0.8 {
                         Image(systemName: "checkmark.seal.fill")
@@ -72,6 +79,7 @@ struct AudioEventCard: View {
                     isPlaying: $isPlaying,
                     progress: $playbackProgress,
                     duration: duration,
+                    waveform: audioEvent.waveform,
                     onPlayPause: togglePlayback,
                     onSeek: seek
                 )
@@ -123,6 +131,11 @@ struct AudioEventCard: View {
         .fullScreenCover(isPresented: $showingReplyRecorder) {
             ReplyRecordingView(replyingTo: audioEvent)
         }
+        .sheet(isPresented: $showingUserProfile) {
+            NavigationView {
+                UserProfileView(pubkey: audioEvent.author.pubkey)
+            }
+        }
     }
     
     private func loadAuthorProfile() {
@@ -144,11 +157,16 @@ struct AudioEventCard: View {
         let playerItem = AVPlayerItem(url: url)
         audioPlayer = AVPlayer(playerItem: playerItem)
         
-        // Get duration
-        Task {
-            let duration = try await playerItem.asset.load(.duration)
-            await MainActor.run {
-                self.duration = duration.seconds
+        // Use pre-loaded duration from imeta if available, otherwise load from asset
+        if let metadataDuration = audioEvent.duration {
+            self.duration = metadataDuration
+        } else {
+            // Get duration
+            Task {
+                let duration = try await playerItem.asset.load(.duration)
+                await MainActor.run {
+                    self.duration = duration.seconds
+                }
             }
         }
         
@@ -314,6 +332,7 @@ struct AudioPlayerView: View {
     @Binding var isPlaying: Bool
     @Binding var progress: Double
     let duration: TimeInterval
+    let waveform: [Double]?
     let onPlayPause: () -> Void
     let onSeek: (Double) -> Void
     
@@ -334,24 +353,60 @@ struct AudioPlayerView: View {
     var body: some View {
         GeometryReader { geometry in
             ZStack(alignment: .leading) {
-                // Background
-                Capsule()
-                    .fill(Color.white.opacity(0.08))
+                // Background with waveform or simple capsule
+                if let waveform = waveform, !waveform.isEmpty {
+                    // Waveform visualization
+                    HStack(spacing: 1) {
+                        ForEach(0..<waveform.count, id: \.self) { index in
+                            let barHeight = 8 + (waveform[index] * 20) // Min 8, max 28
+                            let progressPosition = Double(index) / Double(waveform.count - 1)
+                            let isPassed = progressPosition <= displayProgress
+                            
+                            Capsule()
+                                .fill(
+                                    isPassed ?
+                                    LinearGradient(
+                                        gradient: Gradient(colors: [
+                                            Color.purple.opacity(0.7),
+                                            Color.blue.opacity(0.5)
+                                        ]),
+                                        startPoint: .top,
+                                        endPoint: .bottom
+                                    ) :
+                                    LinearGradient(
+                                        gradient: Gradient(colors: [
+                                            Color.white.opacity(0.15),
+                                            Color.white.opacity(0.08)
+                                        ]),
+                                        startPoint: .top,
+                                        endPoint: .bottom
+                                    )
+                                )
+                                .frame(width: max(1, geometry.size.width / CGFloat(waveform.count) - 1), 
+                                       height: barHeight)
+                        }
+                    }
                     .frame(height: 36)
-                
-                // Progress
-                Capsule()
-                    .fill(
-                        LinearGradient(
-                            gradient: Gradient(colors: [
-                                Color.purple.opacity(0.7),
-                                Color.blue.opacity(0.5)
-                            ]),
-                            startPoint: .leading,
-                            endPoint: .trailing
+                } else {
+                    // Fallback to simple progress bar
+                    Capsule()
+                        .fill(Color.white.opacity(0.08))
+                        .frame(height: 36)
+                    
+                    // Progress
+                    Capsule()
+                        .fill(
+                            LinearGradient(
+                                gradient: Gradient(colors: [
+                                    Color.purple.opacity(0.7),
+                                    Color.blue.opacity(0.5)
+                                ]),
+                                startPoint: .leading,
+                                endPoint: .trailing
+                            )
                         )
-                    )
-                    .frame(width: geometry.size.width * displayProgress, height: 36)
+                        .frame(width: geometry.size.width * displayProgress, height: 36)
+                }
                 
                 // Content overlay
                 HStack {

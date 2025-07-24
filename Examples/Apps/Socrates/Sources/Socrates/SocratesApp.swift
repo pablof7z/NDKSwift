@@ -75,13 +75,17 @@ class NostrManager: ObservableObject {
         "wss://nostr.wine"
     ]
     
+    // Key for storing user-added relays
+    private static let userRelaysKey = "SocratesUserAddedRelays"
+    
     init() {
         self.ndkAuthManager = NDKAuthManager.shared
         setupNDK()
     }
     
     private func setupNDK() {
-        ndk = NDK(relayUrls: defaultRelays)
+        let allRelays = getAllRelays()
+        ndk = NDK(relayUrls: allRelays)
         
         if let ndk = ndk {
             ndkAuthManager.setNDK(ndk)
@@ -137,6 +141,46 @@ class NostrManager: ObservableObject {
     // Get auth manager for use in UI
     var authManager: NDKAuthManager {
         return ndkAuthManager
+    }
+    
+    // MARK: - Relay Management
+    
+    /// Get all relays (default + user-added)
+    private func getAllRelays() -> [String] {
+        let userRelays = getUserAddedRelays()
+        let allRelays = defaultRelays + userRelays
+        return Array(Set(allRelays)) // Remove duplicates
+    }
+    
+    /// Get user-added relays from UserDefaults
+    private func getUserAddedRelays() -> [String] {
+        return UserDefaults.standard.stringArray(forKey: Self.userRelaysKey) ?? []
+    }
+    
+    /// Add a user relay and persist it
+    func addUserRelay(_ relayURL: String) {
+        var userRelays = getUserAddedRelays()
+        guard !userRelays.contains(relayURL) && !defaultRelays.contains(relayURL) else {
+            print("Relay \(relayURL) already exists")
+            return
+        }
+        
+        userRelays.append(relayURL)
+        UserDefaults.standard.set(userRelays, forKey: Self.userRelaysKey)
+        print("Added user relay: \(relayURL)")
+    }
+    
+    /// Remove a user relay and persist the change
+    func removeUserRelay(_ relayURL: String) {
+        var userRelays = getUserAddedRelays()
+        userRelays.removeAll { $0 == relayURL }
+        UserDefaults.standard.set(userRelays, forKey: Self.userRelaysKey)
+        print("Removed user relay: \(relayURL)")
+    }
+    
+    /// Get list of user-added relays (for UI display)
+    var userAddedRelays: [String] {
+        return getUserAddedRelays()
     }
 }
 

@@ -10,6 +10,8 @@ struct AudioEvent: Identifiable {
     let isReply: Bool
     let replyTo: String?
     let webOfTrustScore: Double
+    let waveform: [Double]?
+    let duration: TimeInterval?
     
     // Reaction tracking (populated separately)
     var likeCount: Int = 0
@@ -28,6 +30,9 @@ struct AudioEvent: Identifiable {
         let isReply = event.kind == 1244
         let replyTo = isReply ? extractReplyTo(from: event) : nil
         
+        // Parse imeta tag for waveform and duration
+        let (waveform, duration) = extractMetadata(from: event, audioURL: audioURL)
+        
         return AudioEvent(
             id: event.id,
             event: event,
@@ -36,7 +41,9 @@ struct AudioEvent: Identifiable {
             createdAt: Date(timeIntervalSince1970: TimeInterval(event.createdAt)),
             isReply: isReply,
             replyTo: replyTo,
-            webOfTrustScore: webOfTrustScore
+            webOfTrustScore: webOfTrustScore,
+            waveform: waveform,
+            duration: duration
         )
     }
     
@@ -57,5 +64,25 @@ struct AudioEvent: Identifiable {
             }
         }
         return nil
+    }
+    
+    private static func extractMetadata(from event: NDKEvent, audioURL: String) -> (waveform: [Double]?, duration: TimeInterval?) {
+        // Use NDKSwift's built-in imeta parsing
+        let audioImeta = event.imetas(for: audioURL).first
+        
+        // Extract waveform from additionalFields
+        var waveform: [Double]?
+        if let waveformString = audioImeta?.additionalFields["waveform"] {
+            waveform = waveformString.split(separator: " ")
+                .compactMap { Double($0) }
+        }
+        
+        // Extract duration from additionalFields
+        var duration: TimeInterval?
+        if let durationString = audioImeta?.additionalFields["duration"] {
+            duration = TimeInterval(durationString)
+        }
+        
+        return (waveform, duration)
     }
 }

@@ -1,5 +1,3 @@
-import Foundation
-
 /// Helper methods for common NDK operations
 public extension NDK {
     /// Ensures a signer is configured and returns it

@@ -8,6 +8,9 @@ import GRDB
 private enum SQLiteConstants {
     /// SQLite cache size in KB (negative means KB, positive means pages)
     static let cacheSize = -64000 // 64MB
+    
+    /// Batch size for bulk database operations to avoid SQLite limits
+    static let queryBatchSize = 100
 }
 
 
@@ -1270,8 +1273,8 @@ public actor NDKSQLiteCache: NDKCache {
                     result[id] = false
                 }
                 
-                // Query in batches of 100 to avoid SQLite limits
-                let batchSize = 100
+                // Query in batches to avoid SQLite limits
+                let batchSize = SQLiteConstants.queryBatchSize
                 for i in stride(from: 0, to: ids.count, by: batchSize) {
                     let endIndex = min(i + batchSize, ids.count)
                     let batch = Array(ids[i..<endIndex])
