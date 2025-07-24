@@ -2,7 +2,7 @@ name: Socrates
 options:
   bundleIdPrefix: com.socrates
   deploymentTarget:
-    iOS: 16.0
+    iOS: 17.0
   developmentLanguage: en
   xcodeVersion: "15.0"
   createIntermediateGroups: true

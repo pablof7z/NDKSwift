@@ -22,6 +22,7 @@ struct HomeFeedView: View {
     @State private var recordingDuration: TimeInterval = 0
     @State private var showingRecordingUI = false
     @State private var recordingWaveform: [CGFloat] = []
+    @State private var fullWaveform: [Double] = [] // Store full waveform for imeta
     
     var sortedEvents: [AudioEvent] {
         audioEvents.sorted { $0.sortScore > $1.sortScore }
@@ -120,14 +121,25 @@ struct HomeFeedView: View {
         // Cancel any existing task
         dataSourceTask?.cancel()
         
+        // Clear events when switching relays
+        audioEvents.removeAll()
+        
         // Create filter for audio events
         let filter = NDKFilter(
             kinds: [1222, 1244]
         )
         
+        // If a specific relay is selected, use it; otherwise use all relays
+        let relayUrls: Set<String>? = selectedRelay != nil ? [selectedRelay!] : nil
+        
         // Stream audio events with cache-first approach
         // maxAge: 300 means show cached data up to 5 minutes old immediately
-        let dataSource = ndk.observe(filter: filter, maxAge: 300, cachePolicy: .cacheWithNetwork)
+        let dataSource: NDKDataSource<NDKEvent>
+        if let relayUrls = relayUrls {
+            dataSource = ndk.observe(filter: filter, maxAge: 300, cachePolicy: .cacheWithNetwork, relays: relayUrls)
+        } else {
+            dataSource = ndk.observe(filter: filter, maxAge: 300, cachePolicy: .cacheWithNetwork)
+        }
         
         // Start streaming task
         dataSourceTask = Task {
@@ -140,7 +152,7 @@ struct HomeFeedView: View {
                     continue
                 }
                 
-                let wotScore = await appState.webOfTrust[event.pubkey] ?? 0.1
+                let wotScore = appState.webOfTrust[event.pubkey] ?? 0.1
                 if let audioEvent = AudioEvent.from(event: event, webOfTrustScore: wotScore) {
                     await MainActor.run {
                         // Add new event if it doesn't already exist
@@ -156,7 +168,7 @@ struct HomeFeedView: View {
     }
     
     private func refreshAudioEvents() async {
-        guard let ndk = nostrManager.ndk else { return }
+        guard nostrManager.ndk != nil else { return }
         
         // Clear existing events for a fresh feed
         await MainActor.run {
@@ -205,6 +217,7 @@ struct HomeFeedView: View {
             appState.recordingStartTime = Date()
             showingRecordingUI = true
             recordingDuration = 0
+            fullWaveform = [] // Reset waveform data
             
             // Start timer for duration and waveform
             recordingTimer = Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { _ in
@@ -228,7 +241,10 @@ struct HomeFeedView: View {
         let normalizedValue = pow(10, recorder.averagePower(forChannel: 0) / 20)
         recordingWaveform.append(CGFloat(normalizedValue))
         
-        // Keep last 50 samples
+        // Store normalized amplitude value for imeta (0-1 range)
+        fullWaveform.append(Double(normalizedValue))
+        
+        // Keep last 50 samples for UI display
         if recordingWaveform.count > 50 {
             recordingWaveform.removeFirst()
         }
@@ -263,20 +279,80 @@ struct HomeFeedView: View {
         appState.isRecording = false
         showingRecordingUI = false
         recordingWaveform = []
+        fullWaveform = []
     }
     
     private func completeRecording() {
-        guard let recorder = audioRecorder else { return }
+        guard let recorder = audioRecorder,
+              let ndk = nostrManager.ndk else { return }
         
         let _ = recorder.url
+        let finalDuration = recordingDuration
         
-        // TODO: Upload to file hosting service
-        // TODO: Create and publish NDKEvent with kind 1222
+        // Compress waveform to less than 100 values as recommended
+        let compressedWaveform = compressWaveform(fullWaveform, targetSamples: 50)
         
-        showingRecordingUI = false
-        recordingWaveform = []
+        Task {
+            do {
+                // TODO: Upload audio file to file hosting service
+                // For now, using a placeholder URL
+                let uploadedURL = "https://example.com/audio/\(Date().timeIntervalSince1970).webm"
+                
+                // Create imeta tag with waveform and duration
+                var imetaComponents = ["imeta"]
+                imetaComponents.append("url \(uploadedURL)")
+                imetaComponents.append("m audio/webm")
+                imetaComponents.append("duration \(Int(finalDuration))")
+                
+                // Add waveform data as space-separated values
+                let waveformString = compressedWaveform
+                    .map { String(format: "%.2f", $0) }
+                    .joined(separator: " ")
+                imetaComponents.append("waveform \(waveformString)")
+                
+                // Publish audio event
+                _ = try await ndk.publish { builder in
+                    builder
+                        .kind(1222) // Audio event kind
+                        .content(uploadedURL)
+                        .tag(imetaComponents)
+                }
+                
+                await MainActor.run {
+                    showingRecordingUI = false
+                    recordingWaveform = []
+                    fullWaveform = []
+                    audioRecorder = nil
+                }
+                
+            } catch {
+                print("Failed to publish audio event: \(error)")
+                await MainActor.run {
+                    showingRecordingUI = false
+                }
+            }
+        }
+    }
+    
+    private func compressWaveform(_ waveform: [Double], targetSamples: Int) -> [Double] {
+        guard waveform.count > targetSamples else { return waveform }
         
-        // Show success feedback
+        var compressed: [Double] = []
+        let bucketSize = Double(waveform.count) / Double(targetSamples)
+        
+        for i in 0..<targetSamples {
+            let startIndex = Int(Double(i) * bucketSize)
+            let endIndex = min(Int(Double(i + 1) * bucketSize), waveform.count)
+            
+            if startIndex < endIndex {
+                // Take the average of values in this bucket
+                let bucketValues = waveform[startIndex..<endIndex]
+                let average = bucketValues.reduce(0.0, +) / Double(bucketValues.count)
+                compressed.append(average)
+            }
+        }
+        
+        return compressed
     }
 }
 
@@ -324,32 +400,16 @@ struct HeaderView: View {
             
             Spacer()
             
-            // Profile button
-            if let user = appState.currentUser {
-                AsyncImage(url: nil) { image in
-                    image
-                        .resizable()
-                        .scaledToFill()
-                } placeholder: {
-                    Circle()
-                        .fill(
-                            LinearGradient(
-                                gradient: Gradient(colors: [
-                                    Color.purple,
-                                    Color.blue
-                                ]),
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
-                            )
-                        )
-                        .overlay(
-                            Text(String(user.pubkey.prefix(2)))
-                                .font(.system(size: 14, weight: .bold))
-                                .foregroundColor(.white)
-                        )
-                }
-                .frame(width: 36, height: 36)
-                .clipShape(Circle())
+            // Settings button
+            NavigationLink(destination: SettingsView()) {
+                Image(systemName: "gearshape.fill")
+                    .font(.system(size: 20))
+                    .foregroundColor(Color.white.opacity(0.8))
+                    .frame(width: 36, height: 36)
+                    .background(
+                        Circle()
+                            .fill(Color.white.opacity(0.1))
+                    )
             }
         }
     }

@@ -3,19 +3,23 @@
 	archiveVersion = 1;
 	classes = {
 	};
-	objectVersion = 63;
+	objectVersion = 54;
 	objects = {
 
 /* Begin PBXBuildFile section */
+		1F422151F1F1CC73D565E48D /* UserProfileView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BEE222498AC852F7BE79CAF4 /* UserProfileView.swift */; };
 		242D24A53D59E016845341B0 /* NDKSwift in Frameworks */ = {isa = PBXBuildFile; productRef = BC858B297A1F5C5D5A41FF23 /* NDKSwift */; };
 		3AB8EE1EE8304575A090EB21 /* NDKSwiftUI in Frameworks */ = {isa = PBXBuildFile; productRef = 6B98B08C3F0FB18DF0197002 /* NDKSwiftUI */; };
+		40C1DD8A6F0890CAA3E5641F /* RelaySelectorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 558465E4F55D567C57A014EC /* RelaySelectorView.swift */; };
 		4A41939A39987E54083B22DA /* AudioEvent.swift in Sources */ = {isa = PBXBuildFile; fileRef = EADB1B82B858D84DCC0FD38A /* AudioEvent.swift */; };
 		4D5F686EEF182E7EBF3D6867 /* AudioEventCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8B8F53511A32689EFEF1609F /* AudioEventCard.swift */; };
 		528BA384039B7EDFCC81AB4E /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 08DDF10E5B3980BDA92AB6FE /* ContentView.swift */; };
 		55B31370C13C78656ADC43A5 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 440D3F1E85605D9F3B50FF30 /* Assets.xcassets */; };
 		6A1EC79596B1BC84867C4B0D /* AuthenticationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 624E1033520124ED3046A8FB /* AuthenticationView.swift */; };
 		903342389D8567E371A22508 /* HomeFeedView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B34DE9D6D851E93B36168925 /* HomeFeedView.swift */; };
+		9A451131A1EA9D2B9D8C70A2 /* RelayManagementView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 74E368483893E3ABAF5517A0 /* RelayManagementView.swift */; };
 		B563B954DB73F03CB111C6CC /* LoadingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 02E7FB115000B8B003A26F9A /* LoadingView.swift */; };
+		EA6502F90E837099D4DA88A5 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6B60F979A61DE300148519B2 /* SettingsView.swift */; };
 		ED4EB5652AF4127BD55CD911 /* SocratesApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = C6CAD7F4A7FFDCF19160C1E8 /* SocratesApp.swift */; };
 /* End PBXBuildFile section */
 
@@ -24,13 +28,17 @@
 		08DDF10E5B3980BDA92AB6FE /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
 		2DA6D01B074A1B3A914D864A /* NDKSwift */ = {isa = PBXFileReference; lastKnownFileType = folder; name = NDKSwift; path = ../../..; sourceTree = SOURCE_ROOT; };
 		440D3F1E85605D9F3B50FF30 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		558465E4F55D567C57A014EC /* RelaySelectorView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RelaySelectorView.swift; sourceTree = "<group>"; };
 		624E1033520124ED3046A8FB /* AuthenticationView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuthenticationView.swift; sourceTree = "<group>"; };
+		6B60F979A61DE300148519B2 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
+		74E368483893E3ABAF5517A0 /* RelayManagementView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RelayManagementView.swift; sourceTree = "<group>"; };
 		8B8F53511A32689EFEF1609F /* AudioEventCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioEventCard.swift; sourceTree = "<group>"; };
 		8D43FF9375FFDAA103800FE9 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		B34DE9D6D851E93B36168925 /* HomeFeedView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeFeedView.swift; sourceTree = "<group>"; };
+		BEE222498AC852F7BE79CAF4 /* UserProfileView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UserProfileView.swift; sourceTree = "<group>"; };
 		C6CAD7F4A7FFDCF19160C1E8 /* SocratesApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SocratesApp.swift; sourceTree = "<group>"; };
 		EADB1B82B858D84DCC0FD38A /* AudioEvent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioEvent.swift; sourceTree = "<group>"; };
-		F411B1B80B8F4CB6D8C2B8F8 /* Socrates.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Socrates.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		F411B1B80B8F4CB6D8C2B8F8 /* Socrates.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = Socrates.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -66,6 +74,10 @@
 				624E1033520124ED3046A8FB /* AuthenticationView.swift */,
 				B34DE9D6D851E93B36168925 /* HomeFeedView.swift */,
 				02E7FB115000B8B003A26F9A /* LoadingView.swift */,
+				74E368483893E3ABAF5517A0 /* RelayManagementView.swift */,
+				558465E4F55D567C57A014EC /* RelaySelectorView.swift */,
+				6B60F979A61DE300148519B2 /* SettingsView.swift */,
+				BEE222498AC852F7BE79CAF4 /* UserProfileView.swift */,
 			);
 			path = Views;
 			sourceTree = "<group>";
@@ -145,6 +157,7 @@
 				LastUpgradeCheck = 1500;
 				TargetAttributes = {
 					DD6239409F0638F9ACBCFEEE = {
+						DevelopmentTeam = "";
 						ProvisioningStyle = Automatic;
 					};
 				};
@@ -162,6 +175,7 @@
 			packageReferences = (
 				2C30A4BD0D0F90BA9F16E74B /* XCLocalSwiftPackageReference "../../..//" */,
 			);
+			preferredProjectObjectVersion = 54;
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
@@ -192,7 +206,11 @@
 				528BA384039B7EDFCC81AB4E /* ContentView.swift in Sources */,
 				903342389D8567E371A22508 /* HomeFeedView.swift in Sources */,
 				B563B954DB73F03CB111C6CC /* LoadingView.swift in Sources */,
+				9A451131A1EA9D2B9D8C70A2 /* RelayManagementView.swift in Sources */,
+				40C1DD8A6F0890CAA3E5641F /* RelaySelectorView.swift in Sources */,
+				EA6502F90E837099D4DA88A5 /* SettingsView.swift in Sources */,
 				ED4EB5652AF4127BD55CD911 /* SocratesApp.swift in Sources */,
+				1F422151F1F1CC73D565E48D /* UserProfileView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -244,7 +262,7 @@
 				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
-				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -263,10 +281,9 @@
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				CODE_SIGN_STYLE = Automatic;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
-				DEVELOPMENT_TEAM = 456SHKPP26;
+				DEVELOPMENT_TEAM = "";
 				ENABLE_PREVIEWS = YES;
 				INFOPLIST_FILE = Sources/Socrates/Info.plist;
-				IPHONEOS_DEPLOYMENT_TARGET = 17;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
@@ -288,10 +305,9 @@
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				CODE_SIGN_STYLE = Automatic;
 				DEBUG_INFORMATION_FORMAT = dwarf;
-				DEVELOPMENT_TEAM = 456SHKPP26;
+				DEVELOPMENT_TEAM = "";
 				ENABLE_PREVIEWS = YES;
 				INFOPLIST_FILE = Sources/Socrates/Info.plist;
-				IPHONEOS_DEPLOYMENT_TARGET = 17;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
@@ -357,7 +373,7 @@
 				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
-				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
 				MTL_FAST_MATH = YES;
 				ONLY_ACTIVE_ARCH = YES;

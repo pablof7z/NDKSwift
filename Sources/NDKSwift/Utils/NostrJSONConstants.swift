@@ -1,5 +1,3 @@
-import Foundation
-
 /// Constants for Nostr JSON field names used in event serialization
 public struct NostrJSONConstants {
     // Core event fields

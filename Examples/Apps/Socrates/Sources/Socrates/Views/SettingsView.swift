@@ -165,10 +165,10 @@ struct SettingsView: View {
     
     private func loadUserData() async {
         guard let ndk = nostrManager.ndk else { return }
-        currentUser = await ndk.sessionData?.user
-        appState.currentUser = currentUser
         
-        if let pubkey = currentUser?.pubkey {
+        if let pubkey = await ndk.sessionData?.pubkey {
+            currentUser = NDKUser(pubkey: pubkey)
+            appState.currentUser = currentUser
             // Fetch profile using NDKProfileManager
             for await profile in await ndk.profileManager.observe(for: pubkey, maxAge: 3600) {
                 userProfile = profile

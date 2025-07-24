@@ -24,7 +24,8 @@ let package = Package(
         .executable(name: "NIP92MediaDemo", targets: ["NIP92MediaDemo"]),
         .executable(name: "ProfileCachingDemo", targets: ["ProfileCachingDemo"]),
         .executable(name: "TestNIP46Publishing", targets: ["TestNIP46Publishing"]),
-        .executable(name: "RawLoggingDemo", targets: ["RawLoggingDemo"])
+        .executable(name: "RawLoggingDemo", targets: ["RawLoggingDemo"]),
+        .executable(name: "TestProfileLoading", targets: ["TestProfileLoading"])
     ],
     dependencies: [
         .package(path: "..")
@@ -137,6 +138,13 @@ let package = Package(
             ],
             path: ".",
             sources: ["RawLoggingDemo.swift"]
+        ),
+        .executableTarget(
+            name: "TestProfileLoading",
+            dependencies: [
+                .product(name: "NDKSwift", package: "NDKSwift")
+            ],
+            path: "Features/TestProfileLoading"
         )
     ]
 )
