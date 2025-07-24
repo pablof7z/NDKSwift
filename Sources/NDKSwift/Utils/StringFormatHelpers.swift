@@ -3,15 +3,7 @@ import Foundation
 /// Common string formatting helpers to reduce duplication
 public enum StringFormatHelpers {
     
-    // MARK: - Error Message Formatting
-    
-    /// Format an error message with operation context
-    public static func errorMessage(operation: String, details: String? = nil) -> String {
-        if let details = details {
-            return "\(ErrorMessageConstants.failedTo(operation)): \(details)"
-        }
-        return ErrorMessageConstants.failedTo(operation)
-    }
+    // MARK: - Validation Message Formatting
     
     /// Format a validation error message
     public static func validationError(field: String, requirement: String) -> String {
