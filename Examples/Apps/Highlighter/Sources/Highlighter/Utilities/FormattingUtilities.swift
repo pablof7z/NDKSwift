@@ -372,3 +372,24 @@ struct GreetingFormatter {
         Date().formatted(.dateTime.weekday(.wide).month(.wide).day())
     }
 }
+
+// MARK: - Cache Policies
+
+/// Common cache duration policies for consistent caching behavior across the app
+struct CachePolicies {
+    /// Short-term cache for frequently changing content (5 minutes)
+    /// Used for: Highlights (kind 9802) that update frequently  
+    static let shortTerm: TimeInterval = 5 * 60
+    
+    /// Medium-term cache for moderately changing content (1 hour)
+    /// Used for: Curations (kind 30004) and Follow Packs (kind 39089)
+    static let mediumTerm: TimeInterval = 60 * 60
+    
+    /// Long-term cache for rarely changing content (24 hours)
+    /// Used for: User profiles and metadata
+    static let longTerm: TimeInterval = 24 * 60 * 60
+    
+    /// Extended cache for very stable content (7 days)
+    /// Used for: Relay lists and other configuration data
+    static let extended: TimeInterval = 7 * 24 * 60 * 60
+}

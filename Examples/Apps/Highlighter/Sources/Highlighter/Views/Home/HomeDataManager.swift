@@ -79,7 +79,7 @@ class HomeDataManager: ObservableObject {
         let task = Task {
             let highlightSource = ndk.observe(
                 filter: NDKFilter(kinds: [9802], limit: 50),
-                maxAge: 300,
+                maxAge: CachePolicies.shortTerm,
                 cachePolicy: .cacheWithNetwork
             )
             
@@ -133,7 +133,7 @@ class HomeDataManager: ObservableObject {
                         kinds: [9802],
                         limit: 5
                     ),
-                    maxAge: 3600
+                    maxAge: CachePolicies.mediumTerm
                 )
                 
                 for await event in userHighlightSource.events {
@@ -159,7 +159,7 @@ class HomeDataManager: ObservableObject {
         let task = Task {
             let discussionSource = ndk.observe(
                 filter: NDKFilter(kinds: [1], limit: 10, tags: ["t": Set(["bookstr"])]),
-                maxAge: 300,
+                maxAge: CachePolicies.shortTerm,
                 cachePolicy: .cacheWithNetwork
             )
             
@@ -181,7 +181,7 @@ class HomeDataManager: ObservableObject {
         let task = Task {
             let zapSource = ndk.observe(
                 filter: NDKFilter(kinds: [9735], limit: 10),
-                maxAge: 300,
+                maxAge: CachePolicies.shortTerm,
                 cachePolicy: .cacheWithNetwork
             )
             
@@ -229,7 +229,7 @@ class HomeDataManager: ObservableObject {
             let task = Task {
                 let dataSource = ndk.observe(
                     filter: filter,
-                    maxAge: 300,
+                    maxAge: CachePolicies.shortTerm,
                     cachePolicy: .cacheWithNetwork
                 )
                 

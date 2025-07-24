@@ -10,24 +10,21 @@ class AppState: ObservableObject {
     // Auth Manager
     @Published private var authManager = NDKAuthManager.shared
     
-    // User State
-    @Published private(set) var currentUserProfile: NDKUserProfile?
+    // Service Dependencies
+    @Published private(set) var dataStreamManager = DataStreamManager()
+    @Published private(set) var profileManager = ProfileManager()
+    @Published private(set) var publishingService = PublishingService()
     
-    // Content State  
-    @Published private(set) var highlights: [HighlightEvent] = []
-    @Published private(set) var curations: [ArticleCuration] = []
-    @Published private(set) var followPacks: [FollowPack] = []
+    // Computed Content State (from services)
+    var highlights: [HighlightEvent] { dataStreamManager.highlights }
+    var curations: [ArticleCuration] { dataStreamManager.curations }
+    var followPacks: [FollowPack] { dataStreamManager.followPacks }
+    var currentUserProfile: NDKUserProfile? { profileManager.currentUserProfile }
+    
+    // App-level state
     @Published private(set) var following: Set<String> = []
-    
-    // UI State
     @Published var selectedTab = 0
     @Published var errorMessage: String?
-    
-    // Data Sources
-    private var highlightDataSource: NDKDataSource<NDKEvent>?
-    private var curationDataSource: NDKDataSource<NDKEvent>?
-    private var followPackDataSource: NDKDataSource<NDKEvent>?
-    private var streamingTasks: [Task<Void, Never>] = []
     
     var isAuthenticated: Bool {
         authManager.isAuthenticated
@@ -53,6 +50,11 @@ class AppState: ObservableObject {
                 cache: cache
             )
             
+            // Configure services with NDK instance
+            dataStreamManager.configure(with: ndk!)
+            profileManager.configure(with: ndk!)
+            publishingService.configure(with: ndk!, signer: authManager.activeSigner)
+            
             // Connect to relays asynchronously
             Task {
                 await ndk?.connect()
@@ -69,14 +71,16 @@ class AppState: ObservableObject {
                 await syncHighlights()
             }
             
-            // If authenticated after restore, start streaming immediately
+            // If authenticated after restore, start services immediately
             if authManager.isAuthenticated {
                 // Start streaming data
-                await startDataStreams()
+                await dataStreamManager.startAllStreams()
                 
                 // Load user profile in background
-                Task {
-                    await loadUserProfile()
+                if let signer = authManager.activeSigner {
+                    Task {
+                        await profileManager.loadCurrentUserProfile(for: signer)
+                    }
                 }
             }
         } catch {
@@ -94,8 +98,11 @@ class AppState: ObservableObject {
         
         try await authManager.switchToSession(session)
         
+        // Update publishing service with new signer
+        publishingService.configure(with: ndk!, signer: signer)
+        
         // Start streaming data
-        await startDataStreams()
+        await dataStreamManager.startAllStreams()
     }
     
     func importAccount(nsec: String) async throws {
@@ -108,23 +115,25 @@ class AppState: ObservableObject {
         
         try await authManager.switchToSession(session)
         
+        // Update publishing service with new signer
+        publishingService.configure(with: ndk!, signer: signer)
+        
         // Start streaming data
-        await startDataStreams()
+        await dataStreamManager.startAllStreams()
         
         // Load user profile
-        await loadUserProfile()
+        await profileManager.loadCurrentUserProfile(for: signer)
     }
     
     func logout() async {
-        // Cancel all streaming tasks first
-        stopAllStreams()
+        // Stop all services
+        dataStreamManager.stopAllStreams()
+        profileManager.stopAllTasks()
         
-        // Clear state
-        highlights = []
-        curations = []
-        followPacks = []
+        // Clear service state
+        await dataStreamManager.refresh()
+        profileManager.clearCache()
         following = []
-        currentUserProfile = nil
         
         // Proper logout implementation - clear cache and delete sessions from keychain
         Task {
@@ -168,21 +177,8 @@ class AppState: ObservableObject {
             print("- Bytes transferred: \(syncResult.bytesTransferred)")
             print("- Efficiency: \(syncResult.efficiencyRatio)%")
             
-            // Convert downloaded events to HighlightEvent objects
-            for event in syncResult.downloadedEvents {
-                if let highlight = try? HighlightEvent(from: event) {
-                    await MainActor.run {
-                        if !highlights.contains(where: { $0.id == highlight.id }) {
-                            highlights.append(highlight)
-                        }
-                    }
-                }
-            }
-            
-            // Sort highlights by creation date
-            await MainActor.run {
-                highlights.sort { $0.createdAt > $1.createdAt }
-            }
+            // Let the DataStreamManager handle the highlights after sync
+            await dataStreamManager.refresh()
             
         } catch {
             print("NIP-77 sync failed: \(error)")
@@ -190,169 +186,14 @@ class AppState: ObservableObject {
         }
     }
     
-    private func startDataStreams() async {
-        guard let ndk = ndk else { return }
-        
-        // Cancel existing tasks
-        stopAllStreams()
-        
-        // Start all streams concurrently for better performance
-        async let highlightStream = startHighlightStream(ndk: ndk)
-        async let curationStream = startCurationStream(ndk: ndk)
-        async let followPackStream = startFollowPackStream(ndk: ndk)
-        
-        // Await all streams
-        _ = await (highlightStream, curationStream, followPackStream)
-    }
-    
-    private func stopAllStreams() {
-        for task in streamingTasks {
-            task.cancel()
-        }
-        streamingTasks.removeAll()
-    }
-    
-    private func startHighlightStream(ndk: NDK) async {
-        let highlightFilter = NDKFilter(kinds: [9802], limit: 100)
-        highlightDataSource = ndk.observe(
-            filter: highlightFilter,
-            maxAge: 300, // 5 minute cache
-            cachePolicy: .cacheWithNetwork
-        )
-        
-        let task = Task {
-            guard let source = highlightDataSource else { return }
-            for await event in source.events {
-                if let highlight = try? HighlightEvent(from: event) {
-                    await addHighlight(highlight)
-                }
-            }
-        }
-        streamingTasks.append(task)
-    }
-    
-    private func startCurationStream(ndk: NDK) async {
-        let curationFilter = NDKFilter(kinds: [30004], limit: 50)
-        curationDataSource = ndk.observe(
-            filter: curationFilter,
-            maxAge: 600, // 10 minute cache
-            cachePolicy: .cacheWithNetwork
-        )
-        
-        let task = Task {
-            guard let source = curationDataSource else { return }
-            for await event in source.events {
-                if let curation = try? ArticleCuration(from: event) {
-                    await addCuration(curation)
-                }
-            }
-        }
-        streamingTasks.append(task)
-    }
-    
-    private func startFollowPackStream(ndk: NDK) async {
-        let followPackFilter = NDKFilter(kinds: [39089], limit: 20)
-        followPackDataSource = ndk.observe(
-            filter: followPackFilter,
-            maxAge: 3600, // 1 hour cache
-            cachePolicy: .cacheWithNetwork
-        )
-        
-        let task = Task {
-            guard let source = followPackDataSource else { return }
-            for await event in source.events {
-                if let pack = try? FollowPack(from: event) {
-                    await addFollowPack(pack)
-                }
-            }
-        }
-        streamingTasks.append(task)
-    }
-    
-    @MainActor
-    private func addHighlight(_ highlight: HighlightEvent) {
-        if !highlights.contains(where: { $0.id == highlight.id }) {
-            highlights.append(highlight)
-            highlights.sort { $0.createdAt > $1.createdAt }
-        }
-    }
-    
-    @MainActor
-    private func addCuration(_ curation: ArticleCuration) {
-        if !curations.contains(where: { $0.id == curation.id }) {
-            curations.append(curation)
-            curations.sort { $0.updatedAt > $1.updatedAt }
-        }
-    }
-    
-    @MainActor
-    private func addFollowPack(_ pack: FollowPack) {
-        if !followPacks.contains(where: { $0.id == pack.id }) {
-            followPacks.append(pack)
-        }
-    }
-    
-    private func loadUserProfile() async {
-        guard let ndk = ndk, let signer = activeSigner else { return }
-        
-        let pubkey: String
-        do {
-            pubkey = try await signer.pubkey
-        } catch {
-            print("Failed to get pubkey: \(error)")
-            return
-        }
-        
-        // Use profile manager for efficient caching
-        let profileTask = Task {
-            for await profile in await ndk.profileManager.observe(for: pubkey, maxAge: 3600) {
-                await MainActor.run {
-                    self.currentUserProfile = profile
-                }
-                break // Only need current value
-            }
-        }
-        streamingTasks.append(profileTask)
-    }
-    
-    // MARK: - Publishing Methods
+    // MARK: - Publishing Methods (delegated to PublishingService)
     
     func publishHighlight(_ highlight: HighlightEvent) async throws {
-        guard let ndk = ndk, let signer = activeSigner else {
-            throw AuthError.noSigner
-        }
-        
-        let event = try await HighlightEvent.create(
-            ndk: ndk,
-            content: highlight.content,
-            context: highlight.context,
-            url: highlight.url,
-            referencedEvent: highlight.referencedEvent,
-            attributedAuthors: highlight.attributedAuthors,
-            comment: highlight.comment,
-            signer: signer
-        )
-        
-        // Publish with optimistic updates
-        _ = try await ndk.publish(event)
+        try await publishingService.publishHighlight(highlight)
     }
     
     func createCuration(name: String, title: String, description: String?, image: String?) async throws {
-        guard let ndk = ndk, let signer = activeSigner else {
-            throw AuthError.noSigner
-        }
-        
-        let event = try await ArticleCuration.create(
-            ndk: ndk,
-            name: name,
-            title: title,
-            description: description,
-            image: image,
-            articles: [],
-            signer: signer
-        )
-        
-        _ = try await ndk.publish(event)
+        try await publishingService.createCuration(name: name, title: title, description: description, image: image)
     }
 }
 

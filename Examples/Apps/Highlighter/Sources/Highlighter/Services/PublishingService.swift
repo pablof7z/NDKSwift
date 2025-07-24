@@ -1,0 +1,172 @@
+import Foundation
+import NDKSwift
+import Combine
+
+/// Handles all content publishing operations
+/// Follows SRP by focusing solely on publishing and content creation
+@MainActor
+class PublishingService: ObservableObject {
+    // MARK: - Published State
+    @Published private(set) var isPublishing = false
+    @Published private(set) var lastPublishError: Error?
+    
+    // MARK: - Private Properties
+    private weak var ndk: NDK?
+    private weak var signer: NDKSigner?
+    
+    // MARK: - Initialization
+    init() {}
+    
+    // MARK: - Configuration
+    func configure(with ndk: NDK, signer: NDKSigner?) {
+        self.ndk = ndk
+        self.signer = signer
+    }
+    
+    // MARK: - Publishing Methods
+    
+    /// Publish a new highlight with optimistic updates
+    func publishHighlight(_ highlight: HighlightEvent) async throws {
+        guard let ndk = ndk, let signer = signer else {
+            throw AuthError.noSigner
+        }
+        
+        isPublishing = true
+        lastPublishError = nil
+        
+        do {
+            let event = try await HighlightEvent.create(
+                ndk: ndk,
+                content: highlight.content,
+                context: highlight.context,
+                url: highlight.url,
+                referencedEvent: highlight.referencedEvent,
+                attributedAuthors: highlight.attributedAuthors,
+                comment: highlight.comment,
+                signer: signer
+            )
+            
+            // Publish with optimistic updates
+            _ = try await ndk.publish(event)
+            
+        } catch {
+            lastPublishError = error
+            throw error
+        } finally {
+            isPublishing = false
+        }
+    }
+    
+    /// Create and publish a new article curation
+    func createCuration(
+        name: String,
+        title: String,
+        description: String?,
+        image: String?
+    ) async throws {
+        guard let ndk = ndk, let signer = signer else {
+            throw AuthError.noSigner
+        }
+        
+        isPublishing = true
+        lastPublishError = nil
+        
+        do {
+            let event = try await ArticleCuration.create(
+                ndk: ndk,
+                name: name,
+                title: title,
+                description: description,
+                image: image,
+                articles: [],
+                signer: signer
+            )
+            
+            _ = try await ndk.publish(event)
+            
+        } catch {
+            lastPublishError = error
+            throw error
+        } finally {
+            isPublishing = false
+        }
+    }
+    
+    /// Publish a text note with bookstr tag
+    func publishNote(_ content: String, tags: [String] = []) async throws {
+        guard let ndk = ndk, let signer = signer else {
+            throw AuthError.noSigner
+        }
+        
+        isPublishing = true
+        lastPublishError = nil
+        
+        do {
+            var eventTags: [[String]] = []
+            
+            // Add bookstr tag by default
+            eventTags.append(["t", "bookstr"])
+            
+            // Add additional tags
+            for tag in tags {
+                eventTags.append(["t", tag])
+            }
+            
+            let event = try await NDKEvent.create(
+                kind: 1, // Text note
+                content: content,
+                tags: eventTags,
+                ndk: ndk,
+                signer: signer
+            )
+            
+            _ = try await ndk.publish(event)
+            
+        } catch {
+            lastPublishError = error
+            throw error
+        } finally {
+            isPublishing = false
+        }
+    }
+    
+    /// Publish a reaction to an event
+    func publishReaction(to eventId: String, content: String = "🤙") async throws {
+        guard let ndk = ndk, let signer = signer else {
+            throw AuthError.noSigner
+        }
+        
+        isPublishing = true
+        lastPublishError = nil
+        
+        do {
+            let event = try await NDKEvent.create(
+                kind: 7, // Reaction
+                content: content,
+                tags: [["e", eventId]],
+                ndk: ndk,
+                signer: signer
+            )
+            
+            _ = try await ndk.publish(event)
+            
+        } catch {
+            lastPublishError = error
+            throw error
+        } finally {
+            isPublishing = false
+        }
+    }
+    
+    // MARK: - State Management
+    
+    /// Clear the last publish error
+    func clearError() {
+        lastPublishError = nil
+    }
+    
+    /// Check if service is ready to publish
+    var canPublish: Bool {
+        return ndk != nil && signer != nil && !isPublishing
+    }
+}
