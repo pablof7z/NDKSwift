@@ -23,7 +23,7 @@ struct TestRealRelay {
             let ndk = NDK()
             
             // Connect to strfry relay which supports NIP-77
-            let relayURL = "wss://relay.nostr.band"
+            let relayURL = RelayConstants.nostrBand
             print("Connecting to \(relayURL)...")
             
             // Add relay and connect

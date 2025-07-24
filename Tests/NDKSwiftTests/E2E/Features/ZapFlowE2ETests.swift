@@ -11,11 +11,7 @@ final class ZapFlowE2ETests: XCTestCase {
         try await super.setUp()
         
         // Use test relays (faster response)
-        let testRelays = [
-            "wss://relay.primal.net",
-            "wss://relay.damus.io",
-            "wss://nos.lol"
-        ]
+        let testRelays = RelayConstants.walletRelays
         
         // Create zapper instance (the one sending zaps)
         let zapperSigner = try NDKPrivateKeySigner.generate()

@@ -7,7 +7,7 @@ struct Example02_PublishEvent {
         print("==================================\n")
         
         // Step 1: Create NDK and connect
-        let ndk = NDK(relayUrls: ["wss://relay.primal.net"])
+        let ndk = NDK(relayUrls: [RelayConstants.primal])
         
         // Step 2: Generate a new key pair for this example
         let signer = try NDKPrivateKeySigner.generate()
