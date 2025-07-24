@@ -68,11 +68,27 @@ struct ModernLoadingView: View {
         HStack(spacing: DesignSystem.Spacing.small) {
             ForEach(0..<3, id: \.self) { index in
                 Circle()
-                    .fill(DesignSystem.Colors.primary)
+                    .fill(
+                        LinearGradient(
+                            colors: [
+                                DesignSystem.Colors.primary,
+                                DesignSystem.Colors.primary.opacity(0.6)
+                            ],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
                     .frame(width: 8, height: 8)
-                    .scaleEffect(animateGradient ? 1.2 : 0.8)
+                    .scaleEffect(animateGradient ? 1.3 : 0.7)
+                    .opacity(animateGradient ? 1.0 : 0.5)
+                    .shadow(
+                        color: DesignSystem.Colors.primary.opacity(0.3),
+                        radius: animateGradient ? 3 : 1,
+                        x: 0,
+                        y: 1
+                    )
                     .animation(
-                        style.animation.delay(Double(index) * 0.2),
+                        style.animation.delay(Double(index) * 0.15),
                         value: animateGradient
                     )
             }
@@ -80,21 +96,38 @@ struct ModernLoadingView: View {
     }
     
     private var spinnerIndicator: some View {
-        Circle()
-            .trim(from: 0, to: 0.7)
-            .stroke(
-                AngularGradient(
-                    colors: [
-                        DesignSystem.Colors.primary,
-                        DesignSystem.Colors.primary.opacity(0.3)
-                    ],
-                    center: .center
-                ),
-                style: StrokeStyle(lineWidth: 3, lineCap: .round)
-            )
-            .frame(width: 32, height: 32)
-            .rotationEffect(.degrees(rotationAngle))
-            .animation(style.animation, value: rotationAngle)
+        ZStack {
+            // Background circle for depth
+            Circle()
+                .stroke(
+                    DesignSystem.Colors.primary.opacity(0.1),
+                    style: StrokeStyle(lineWidth: 3, lineCap: .round)
+                )
+            
+            // Animated spinner
+            Circle()
+                .trim(from: 0, to: 0.7)
+                .stroke(
+                    AngularGradient(
+                        colors: [
+                            DesignSystem.Colors.primary,
+                            DesignSystem.Colors.secondary,
+                            DesignSystem.Colors.primary.opacity(0.2)
+                        ],
+                        center: .center
+                    ),
+                    style: StrokeStyle(lineWidth: 3, lineCap: .round)
+                )
+                .rotationEffect(.degrees(rotationAngle))
+                .animation(style.animation, value: rotationAngle)
+        }
+        .frame(width: 32, height: 32)
+        .shadow(
+            color: DesignSystem.Colors.primary.opacity(0.2),
+            radius: 4,
+            x: 0,
+            y: 2
+        )
     }
     
     private var skeletonIndicator: some View {
@@ -133,17 +166,48 @@ struct ModernLoadingView: View {
     }
     
     private var pulseIndicator: some View {
-        Circle()
-            .fill(DesignSystem.Colors.primary.opacity(0.3))
-            .frame(width: 40, height: 40)
-            .overlay(
-                Circle()
-                    .fill(DesignSystem.Colors.primary)
-                    .frame(width: 20, height: 20)
-                    .scaleEffect(animateGradient ? 1.5 : 1.0)
-                    .opacity(animateGradient ? 0.3 : 1.0)
-                    .animation(style.animation, value: animateGradient)
-            )
+        ZStack {
+            // Outer pulse ring
+            Circle()
+                .fill(
+                    RadialGradient(
+                        colors: [
+                            DesignSystem.Colors.primary.opacity(0.1),
+                            DesignSystem.Colors.primary.opacity(0.3),
+                            Color.clear
+                        ],
+                        center: .center,
+                        startRadius: 5,
+                        endRadius: 25
+                    )
+                )
+                .frame(width: 50, height: 50)
+                .scaleEffect(animateGradient ? 1.2 : 0.8)
+                .opacity(animateGradient ? 0.3 : 0.8)
+                .animation(style.animation, value: animateGradient)
+            
+            // Inner core
+            Circle()
+                .fill(
+                    LinearGradient(
+                        colors: [
+                            DesignSystem.Colors.primary,
+                            DesignSystem.Colors.secondary
+                        ],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                )
+                .frame(width: 16, height: 16)
+                .shadow(
+                    color: DesignSystem.Colors.primary.opacity(0.4),
+                    radius: animateGradient ? 6 : 3,
+                    x: 0,
+                    y: 1
+                )
+                .scaleEffect(animateGradient ? 1.1 : 1.0)
+                .animation(style.animation, value: animateGradient)
+        }
     }
     
     private func startAnimation() {

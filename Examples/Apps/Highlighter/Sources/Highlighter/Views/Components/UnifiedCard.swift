@@ -42,6 +42,7 @@ struct UnifiedCard<Content: View>: View {
             .frame(maxWidth: variant.maxWidth, minHeight: variant.minHeight)
             .background(variant.backgroundView)
             .overlay(variant.borderView(isSelected: isSelected))
+            .clipShape(RoundedRectangle(cornerRadius: variant.cornerRadius, style: .continuous))
             .shadow(
                 color: variant.shadowColor(isSelected: isSelected),
                 radius: variant.shadowRadius(isSelected: isSelected),
@@ -49,7 +50,10 @@ struct UnifiedCard<Content: View>: View {
                 y: variant.shadowY(isSelected: isSelected)
             )
             .scaleEffect(isSelected ? 1.02 : 1.0)
-            .animation(.spring(response: 0.3, dampingFraction: 0.7), value: isSelected)
+            .opacity(isSelected ? 1.0 : 0.95)
+            .animation(PremiumAnimations.premiumSpring, value: isSelected)
+            .premiumCardInteraction()
+            .premiumEntrance(delay: 0.1)
     }
 }
 
