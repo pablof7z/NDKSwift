@@ -120,7 +120,7 @@ public final class NDKDataSource<T>: ObservableObject, CacheObserver {
         self.correlationId = IDGenerator.randomId(length: 8)
         self.subscriptionId = subscriptionId
         
-        NDKLogger.log(.debug, category: .subscription, "🏗️ NDKDataSource init - filter: \(filter), maxAge: \(maxAge), cachePolicy: \(cachePolicy)", correlationId: correlationId)
+        NDKLogger.log(.trace, category: .subscription, "🏗️ NDKDataSource init - filter: \(filter), maxAge: \(maxAge), cachePolicy: \(cachePolicy)", correlationId: correlationId)
         
         // Set up the AsyncStream for events
         var continuation: AsyncStream<T>.Continuation!
@@ -144,7 +144,7 @@ public final class NDKDataSource<T>: ObservableObject, CacheObserver {
     }
     
     deinit {
-        NDKLogger.log(.debug, category: .subscription, "🔚 NDKDataSource deinit - Cleaning up resources", correlationId: correlationId)
+        NDKLogger.log(.trace, category: .subscription, "🔚 NDKDataSource deinit - Cleaning up resources", correlationId: correlationId)
         task?.cancel()
         eventsContinuation.finish()
         relayUpdatesContinuation.finish()
@@ -171,7 +171,7 @@ public final class NDKDataSource<T>: ObservableObject, CacheObserver {
                 exclusiveRelays: exclusiveRelays,
                 subscriptionId: subscriptionId
             )
-            NDKLogger.log(.debug, category: .subscription, "✅ Requirement registered with handle: \(String(describing: requirementHandle))", correlationId: correlationId)
+            NDKLogger.log(.trace, category: .subscription, "✅ Requirement registered with handle", correlationId: correlationId)
         } else {
             // No data requirement manager available
             NDKLogger.log(.error, category: .subscription, "❌ No data requirement manager available! Data source will not receive events", correlationId: correlationId)
@@ -222,12 +222,12 @@ public final class NDKDataSource<T>: ObservableObject, CacheObserver {
         await stateManager.clearProcessed()
         
         if let handle = requirementHandle {
-            NDKLogger.log(.debug, category: .subscription, "Releasing existing requirement handle", correlationId: correlationId)
+            NDKLogger.log(.trace, category: .subscription, "Releasing existing requirement handle", correlationId: correlationId)
             await handle.release()
         }
         requirementHandle = nil
         
-        NDKLogger.log(.debug, category: .subscription, "Restarting observation", correlationId: correlationId)
+        NDKLogger.log(.trace, category: .subscription, "Restarting observation", correlationId: correlationId)
         await startObserving()
     }
     
