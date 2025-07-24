@@ -173,7 +173,7 @@ public extension Bech32 {
     static func pubkey(from npub: String) throws -> PublicKey {
         let (hrp, data) = try decode(npub)
         guard hrp == Bech32HRP.npub else {
-            throw NDKError.validationError(ErrorMessageConstants.invalid("bech32: no separator found"))
+            throw NDKError.validationError(ErrorMessageConstants.withContext(ErrorMessageConstants.invalid("HRP"), context: "expected \(Bech32HRP.npub), got \(hrp)"))
         }
         return Data(data).hexString
     }
@@ -194,7 +194,7 @@ public extension Bech32 {
     static func privateKey(from nsec: String) throws -> PrivateKey {
         let (hrp, data) = try decode(nsec)
         guard hrp == Bech32HRP.nsec else {
-            throw NDKError.validationError(ErrorMessageConstants.invalid("bech32: no separator found"))
+            throw NDKError.validationError(ErrorMessageConstants.withContext(ErrorMessageConstants.invalid("HRP"), context: "expected \(Bech32HRP.nsec), got \(hrp)"))
         }
         return Data(data).hexString
     }
@@ -214,7 +214,7 @@ public extension Bech32 {
     static func eventId(from note: String) throws -> EventID {
         let (hrp, data) = try decode(note)
         guard hrp == Bech32HRP.note else {
-            throw NDKError.validationError(ErrorMessageConstants.invalid("bech32: no separator found"))
+            throw NDKError.validationError(ErrorMessageConstants.withContext(ErrorMessageConstants.invalid("HRP"), context: "expected \(Bech32HRP.note), got \(hrp)"))
         }
         return Data(data).hexString
     }
