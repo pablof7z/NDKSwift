@@ -214,7 +214,7 @@ struct CreateCurationView: View {
                                             
                                             if !curationName.isEmpty {
                                                 Text("\(curationName.count)/50")
-                                                    .font(.ds.small)
+                                                    .font(.ds.footnote)
                                                     .foregroundColor(curationName.count > 50 ? .red : .highlighterSecondaryText)
                                             }
                                         }
@@ -268,7 +268,7 @@ struct CreateCurationView: View {
                                             
                                             if !curationTitle.isEmpty {
                                                 Text("\(curationTitle.count)/100")
-                                                    .font(.ds.small)
+                                                    .font(.ds.footnote)
                                                     .foregroundColor(curationTitle.count > 100 ? .red : .highlighterSecondaryText)
                                             }
                                         }
@@ -319,7 +319,7 @@ struct CreateCurationView: View {
                                             Spacer()
                                             
                                             Text("Optional")
-                                                .font(.ds.small)
+                                                .font(.ds.footnote)
                                                 .foregroundColor(.highlighterSecondaryText)
                                         }
                                         .animation(.easeInOut(duration: 0.2), value: descriptionFieldFocused)
@@ -665,7 +665,7 @@ struct FeatureBadge: View {
             }
             
             Text(text)
-                .font(.ds.small)
+                .font(.ds.footnote)
                 .foregroundColor(.highlighterSecondaryText)
         }
         .onAppear {

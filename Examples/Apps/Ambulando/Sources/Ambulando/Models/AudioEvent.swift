@@ -1,7 +1,7 @@
 import Foundation
 import NDKSwift
 
-struct AudioEvent: Identifiable {
+struct AudioEvent: Identifiable, Equatable {
     let id: String
     let event: NDKEvent
     let author: NDKUser

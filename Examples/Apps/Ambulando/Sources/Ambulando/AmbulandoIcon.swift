@@ -17,14 +17,14 @@ struct AmbulandoIcon: View {
             )
             
             // Main footprint
-            FootprintShape()
+            FootprintIconShape()
                 .fill(Color.white.opacity(0.85))
                 .frame(width: size * 0.65, height: size * 0.75)
                 .rotationEffect(.degrees(-15))
                 .offset(x: -size * 0.05, y: -size * 0.05)
             
             // Shadow footprint for depth
-            FootprintShape()
+            FootprintIconShape()
                 .fill(Color(red: 0.4, green: 0.05, blue: 0.4).opacity(0.3))
                 .frame(width: size * 0.65, height: size * 0.75)
                 .rotationEffect(.degrees(-15))
@@ -37,7 +37,7 @@ struct AmbulandoIcon: View {
 }
 
 // Custom shape for a realistic footprint
-struct FootprintShape: Shape {
+struct FootprintIconShape: Shape {
     func path(in rect: CGRect) -> Path {
         var path = Path()
         

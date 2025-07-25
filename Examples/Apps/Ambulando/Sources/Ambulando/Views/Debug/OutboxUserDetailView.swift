@@ -1,4 +1,5 @@
 import SwiftUI
+import NDKSwift
 
 struct OutboxUserDetailView: View {
     let entry: OutboxEntry

@@ -76,7 +76,7 @@ struct OutboxEntry: Identifiable {
     init(from item: NDKOutboxItem, displayName: String? = nil) {
         self.pubkey = item.pubkey
         self.displayName = displayName
-        self.npub = Bech32.encode(hrp: "npub", data: Data(hex: item.pubkey) ?? Data())
+        self.npub = (try? Bech32.encode(hrp: "npub", data: Array(Data(hex: item.pubkey) ?? Data()))) ?? ""
         self.readRelays = item.readRelays.map { RelayDisplayInfo(from: $0) }
         self.writeRelays = item.writeRelays.map { RelayDisplayInfo(from: $0) }
         self.lastUpdated = item.fetchedAt
@@ -121,6 +121,8 @@ extension RelayListSource {
             return "Contact List (Kind 3)"
         case .manual:
             return "Manual Configuration"
+        case .unknown:
+            return "Unknown Source"
         }
     }
 }

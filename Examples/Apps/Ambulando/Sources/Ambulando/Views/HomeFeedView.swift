@@ -1,5 +1,6 @@
 import SwiftUI
 import NDKSwift
+import NDKSwiftUI
 import AVFoundation
 
 struct HomeFeedView: View {

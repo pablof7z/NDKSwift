@@ -3,14 +3,10 @@ import NDKSwift
 import UniformTypeIdentifiers
 
 // Move DraggedArticle outside to make it accessible to nested types
-struct DraggedArticle: Codable, Transferable {
+struct DraggedArticle: Codable {
     let url: String?
     let eventId: String?
     let title: String
-    
-    static var transferRepresentation: some TransferRepresentation {
-        CodableRepresentation(contentType: .json)
-    }
 }
 
 struct CurationManagementView: View {
@@ -329,9 +325,10 @@ struct CurationManagementView: View {
     
     private func handleDrop(providers: [NSItemProvider]) -> Bool {
         for provider in providers {
-            if provider.canLoadObject(ofClass: DraggedArticle.self) {
-                provider.loadObject(ofClass: DraggedArticle.self) { article, error in
-                    if let article = article as? DraggedArticle {
+            if provider.hasItemConformingToTypeIdentifier(UTType.json.identifier) {
+                provider.loadDataRepresentation(forTypeIdentifier: UTType.json.identifier) { data, error in
+                    if let data = data,
+                       let article = try? JSONDecoder().decode(DraggedArticle.self, from: data) {
                         DispatchQueue.main.async {
                             // Handle adding article to curation
                             HapticManager.shared.impact(.medium)
@@ -371,30 +368,36 @@ struct GridView: View {
         ScrollView {
             LazyVGrid(columns: columns, spacing: 16) {
                 ForEach(curations) { curation in
-                    CurationGridItem(
-                        curation: curation,
-                        isSelected: selectedCurations.contains(curation),
-                        isEditMode: isEditMode,
-                        isHovered: hoveredCuration?.id == curation.id && draggedArticle != nil
-                    )
-                    .onTapGesture {
-                        if isEditMode {
-                            toggleSelection(curation)
-                        } else {
-                            curationToEdit = curation
-                        }
-                    }
-                    .onDrop(of: [.json], isTargeted: { isTargeted in
-                        hoveredCuration = isTargeted ? curation : nil
-                    }) { providers in
-                        handleDropOnCuration(providers: providers, curation: curation)
-                    }
-                    .contextMenu {
-                        CurationContextMenu(curation: curation, curationToEdit: $curationToEdit)
-                    }
+                    gridItem(for: curation)
                 }
             }
             .padding()
+        }
+    }
+    
+    @ViewBuilder
+    private func gridItem(for curation: ArticleCuration) -> some View {
+        let isSelected = selectedCurations.contains(curation)
+        let isHovered = hoveredCuration?.id == curation.id && draggedArticle != nil
+        
+        CurationGridItem(
+            curation: curation,
+            isSelected: isSelected,
+            isEditMode: isEditMode,
+            isHovered: isHovered
+        )
+        .onTapGesture {
+            if isEditMode {
+                toggleSelection(curation)
+            } else {
+                curationToEdit = curation
+            }
+        }
+        .onDrop(of: [.json], isTargeted: .constant(false)) { providers in
+            handleDropOnCuration(providers: providers, curation: curation)
+        }
+        .contextMenu {
+            CurationContextMenu(curation: curation, curationToEdit: $curationToEdit)
         }
     }
     
@@ -428,32 +431,38 @@ struct ListView: View {
     var body: some View {
         List {
             ForEach(curations) { curation in
-                CurationListRow(
-                    curation: curation,
-                    isSelected: selectedCurations.contains(curation),
-                    isEditMode: isEditMode,
-                    isHovered: hoveredCuration?.id == curation.id && draggedArticle != nil
-                )
-                .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
-                .listRowBackground(Color.clear)
-                .onTapGesture {
-                    if isEditMode {
-                        toggleSelection(curation)
-                    } else {
-                        curationToEdit = curation
-                    }
-                }
-                .onDrop(of: [.json], isTargeted: { isTargeted in
-                    hoveredCuration = isTargeted ? curation : nil
-                }) { providers in
-                    handleDropOnCuration(providers: providers, curation: curation)
-                }
-                .contextMenu {
-                    CurationContextMenu(curation: curation, curationToEdit: $curationToEdit)
-                }
+                listRow(for: curation)
             }
         }
         .listStyle(.plain)
+    }
+    
+    @ViewBuilder
+    private func listRow(for curation: ArticleCuration) -> some View {
+        let isSelected = selectedCurations.contains(curation)
+        let isHovered = hoveredCuration?.id == curation.id && draggedArticle != nil
+        
+        CurationListRow(
+            curation: curation,
+            isSelected: isSelected,
+            isEditMode: isEditMode,
+            isHovered: isHovered
+        )
+        .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
+        .listRowBackground(Color.clear)
+        .onTapGesture {
+            if isEditMode {
+                toggleSelection(curation)
+            } else {
+                curationToEdit = curation
+            }
+        }
+        .onDrop(of: [.json], isTargeted: .constant(false)) { providers in
+            handleDropOnCuration(providers: providers, curation: curation)
+        }
+        .contextMenu {
+            CurationContextMenu(curation: curation, curationToEdit: $curationToEdit)
+        }
     }
     
     private func toggleSelection(_ curation: ArticleCuration) {
@@ -644,7 +653,7 @@ struct CurationGridItem: View {
                     Spacer()
                     
                     Text(RelativeTimeFormatter.relativeTime(from: curation.updatedAt))
-                        .font(.ds.small)
+                        .font(.ds.footnote)
                         .foregroundColor(.highlighterSecondaryText)
                 }
             }
@@ -725,11 +734,11 @@ struct CurationListRow: View {
                 
                 HStack(spacing: 12) {
                     Label("\(curation.articles.count) articles", systemImage: "doc.text")
-                        .font(.ds.small)
+                        .font(.ds.footnote)
                         .foregroundColor(.highlighterSecondaryText)
                     
                     Text(RelativeTimeFormatter.relativeTime(from: curation.updatedAt))
-                        .font(.ds.small)
+                        .font(.ds.footnote)
                         .foregroundColor(.highlighterSecondaryText)
                 }
             }
@@ -794,7 +803,7 @@ struct CurationManagementCarouselCard: View {
             // Content section
             VStack(alignment: .leading, spacing: 12) {
                 Text(curation.title)
-                    .font(.highlighterTitle3.weight(.bold))
+                    .font(.ds.title3.weight(.bold))
                     .lineLimit(2)
                 
                 if let description = curation.description {
@@ -876,7 +885,7 @@ struct EmptyStateView: View {
                 }
             
             Text(searchText.isEmpty ? "No curations yet" : "No results found")
-                .font(.highlighterTitle3.weight(.medium))
+                .font(.ds.title3.weight(.medium))
                 .foregroundColor(.highlighterText)
             
             Text(searchText.isEmpty ? 

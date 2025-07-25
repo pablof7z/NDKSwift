@@ -30,24 +30,16 @@ class OutboxDebugViewModel: ObservableObject {
         isLoading = true
         errorMessage = nil
         
-        do {
-            // Get current outbox statistics
-            let stats = await ndk.outbox.getRelayUpdateStats()
-            
-            // Get all tracked outbox items
-            let outboxItems = await getAllOutboxItems()
-            
-            // Process entries and calculate summary
-            let entries = await processOutboxItems(outboxItems)
-            let summaryData = calculateSummary(from: entries, stats: stats)
-            
-            // Update UI
-            self.outboxEntries = entries
-            self.summary = summaryData
-            
-        } catch {
-            errorMessage = "Failed to load outbox data: \(error.localizedDescription)"
-        }
+        // Get all tracked outbox items
+        let outboxItems = await getAllOutboxItems()
+        
+        // Process entries and calculate summary
+        let entries = await processOutboxItems(outboxItems)
+        let summaryData = calculateSummary(from: entries)
+        
+        // Update UI
+        self.outboxEntries = entries
+        self.summary = summaryData
         
         isLoading = false
         
@@ -84,13 +76,13 @@ class OutboxDebugViewModel: ObservableObject {
         
         // Attempt to get profile from cache (don't fetch if not available)
         for await profile in await ndk.profileManager.observe(for: pubkey, maxAge: TimeConstants.hour) {
-            return profile.name ?? profile.displayName
+            return profile?.name ?? profile?.displayName
         }
         
         return nil
     }
     
-    private func calculateSummary(from entries: [OutboxEntry], stats: RelayUpdateStats) -> OutboxSummary {
+    private func calculateSummary(from entries: [OutboxEntry]) -> OutboxSummary {
         let allRelays = Set(entries.flatMap { entry in
             entry.readRelays.map { $0.url } + entry.writeRelays.map { $0.url }
         })
@@ -103,64 +95,58 @@ class OutboxDebugViewModel: ObservableObject {
             totalRelays: allRelays.count,
             averageRelaysPerUser: averageRelays,
             lastUpdateTime: entries.first?.lastUpdated ?? Date(),
-            unknownUsersCount: stats.totalUnknownAuthors,
-            activeSubscriptions: stats.activeSubscriptions
+            unknownUsersCount: 0, // TODO: Track unknown authors when API is available
+            activeSubscriptions: 0 // TODO: Track active subscriptions when API is available
         )
     }
     
     private func startRealtimeUpdates() {
-        guard let ndk = ndk else { return }
+        guard ndk != nil else { return }
         
         relayUpdateTask?.cancel()
-        relayUpdateTask = Task {
-            for await update in ndk.outbox.relayUpdates {
-                await handleRelayUpdate(update)
-            }
-        }
+        // TODO: Implement real-time updates when relay updates API is available
+        // Currently NDKOutboxTracker has relayDiscoveries but not relayUpdates
     }
     
-    private func handleRelayUpdate(_ update: RelayUpdateEvent) async {
+    private func handleRelayDiscovery(_ discovery: RelayDiscoveryEvent) async {
         // Update existing entry or add new one
-        if let index = outboxEntries.firstIndex(where: { $0.pubkey == update.pubkey }) {
+        if let index = outboxEntries.firstIndex(where: { $0.pubkey == discovery.pubkey }) {
             // Update existing entry
-            let displayName = await getDisplayName(for: update.pubkey)
-            let mockItem = createMockOutboxItem(from: update, displayName: displayName)
+            let displayName = await getDisplayName(for: discovery.pubkey)
+            let mockItem = createMockOutboxItem(from: discovery, displayName: displayName)
             let updatedEntry = OutboxEntry(from: mockItem, displayName: displayName)
             outboxEntries[index] = updatedEntry
         } else {
             // Add new entry
-            let displayName = await getDisplayName(for: update.pubkey)
-            let mockItem = createMockOutboxItem(from: update, displayName: displayName)
+            let displayName = await getDisplayName(for: discovery.pubkey)
+            let mockItem = createMockOutboxItem(from: discovery, displayName: displayName)
             let newEntry = OutboxEntry(from: mockItem, displayName: displayName)
             outboxEntries.append(newEntry)
         }
         
         // Recalculate summary
-        if let ndk = ndk {
-            let stats = await ndk.outbox.getRelayUpdateStats()
-            summary = calculateSummary(from: outboxEntries, stats: stats)
-        }
+        summary = calculateSummary(from: outboxEntries)
         
         // Re-sort entries
         outboxEntries.sort { $0.lastUpdated > $1.lastUpdated }
     }
     
-    private func createMockOutboxItem(from update: RelayUpdateEvent, displayName: String?) -> NDKOutboxItem {
-        // Convert RelayUpdateEvent to NDKOutboxItem for UI display
-        let readRelays = Set(update.relays.readRelays.map { url in
-            RelayInfo(url: url, metadata: nil) // We don't have metadata in the update
+    private func createMockOutboxItem(from discovery: RelayDiscoveryEvent, displayName: String?) -> NDKOutboxItem {
+        // Convert RelayDiscoveryEvent to NDKOutboxItem for UI display
+        let readRelays = Set(discovery.readRelays.map { url in
+            RelayInfo(url: url, metadata: nil) // We don't have metadata in the discovery
         })
         
-        let writeRelays = Set(update.relays.writeRelays.map { url in
+        let writeRelays = Set(discovery.writeRelays.map { url in
             RelayInfo(url: url, metadata: nil)
         })
         
         return NDKOutboxItem(
-            pubkey: update.pubkey,
+            pubkey: discovery.pubkey,
             readRelays: readRelays,
             writeRelays: writeRelays,
-            fetchedAt: update.timestamp,
-            source: .nip65 // Assume NIP-65 for updates
+            fetchedAt: discovery.timestamp,
+            source: discovery.source
         )
     }
     
@@ -179,11 +165,8 @@ class OutboxDebugViewModel: ObservableObject {
     }
     
     func untrackUser(_ pubkey: String) {
-        guard let ndk = ndk else { return }
-        
-        Task {
-            await ndk.outbox.untrackUser(pubkey)
-        }
+        // TODO: Implement untracking when API is available
+        // Currently NDKOutboxManager doesn't have untrackUser method
     }
     
     // Filtered entries for search
@@ -243,7 +226,7 @@ extension OutboxDebugViewModel {
         readRelays: [String],
         writeRelays: [String]
     ) -> OutboxEntry {
-        let readRelayInfos = readRelays.map { url in
+        _ = readRelays.map { url in
             RelayDisplayInfo(from: RelayInfo(url: url, metadata: RelayMetadata(
                 score: Double.random(in: 0.3...0.9),
                 lastConnectedAt: Date().addingTimeInterval(-Double.random(in: 0...3600)),
@@ -254,7 +237,7 @@ extension OutboxDebugViewModel {
             )))
         }
         
-        let writeRelayInfos = writeRelays.map { url in
+        _ = writeRelays.map { url in
             RelayDisplayInfo(from: RelayInfo(url: url, metadata: RelayMetadata(
                 score: Double.random(in: 0.3...0.9),
                 lastConnectedAt: Date().addingTimeInterval(-Double.random(in: 0...3600)),
