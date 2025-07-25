@@ -142,12 +142,12 @@ public struct NDKNutzap {
         var tags: [[String]] = []
 
         for mint in mints {
-            tags.append(["mint", mint.url.absoluteString])
+            tags.append([NostrConstants.TagName.mint, mint.url.absoluteString])
         }
 
         // Add P2PK pubkey tag (for now, same as event author)
         let pubkey = try await signer.pubkey
-        tags.append(["pubkey", pubkey])
+        tags.append([NostrConstants.TagName.pubkey, pubkey])
 
         let event = try await NDKEventBuilder(ndk: ndk)
             .kind(10019)
@@ -179,14 +179,14 @@ public struct NDKNutzapPreferences {
 
     /// Check if any mints are configured (synchronous)
     public var hasMints: Bool {
-        event.tags.contains { $0.first == "mint" }
+        event.tags.contains { $0.first == NostrConstants.TagName.mint }
     }
 
     /// Get configured mints
     public var mints: [MintConfig] {
         get async {
             return event.tags
-                .filter { $0.first == "mint" }
+                .filter { $0.first == NostrConstants.TagName.mint }
                 .compactMap { tag in
                     guard let urlString = tag[safe: 1],
                           let url = URL(string: urlString) else {
