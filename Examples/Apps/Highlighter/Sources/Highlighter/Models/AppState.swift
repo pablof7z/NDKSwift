@@ -41,12 +41,7 @@ class AppState: ObservableObject {
             // Setup NDK with cache
             let cache = try await NDKSQLiteCache(path: nil)
             ndk = NDK(
-                relayUrls: [
-                    "wss://relay.damus.io",
-                    "wss://relay.nostr.band", 
-                    "wss://nos.lol",
-                    "wss://relay.primal.net"
-                ],
+                relayUrls: RelayConstants.extendedRelays.dropLast(),
                 cache: cache
             )
             
