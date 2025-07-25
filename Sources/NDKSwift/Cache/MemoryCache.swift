@@ -467,7 +467,7 @@ public actor MemoryCache: NDKCache {
     
     private func removeObserver(_ observer: WeakObserver, for signature: FilterSignature) async {
         observers[signature]?.remove(observer)
-        if observers[signature]?.isEmpty == true {
+        if observers[signature]?.isEmpty ?? false {
             observers.removeValue(forKey: signature)
         }
     }

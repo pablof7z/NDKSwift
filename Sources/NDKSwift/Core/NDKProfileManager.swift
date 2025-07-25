@@ -134,7 +134,7 @@ public actor NDKProfileManager {
                 
                 // Clean up when done
                 activeObservations[pubkey]?.removeAll { $0 === wrapper }
-                if activeObservations[pubkey]?.isEmpty == true {
+                if activeObservations[pubkey]?.isEmpty ?? false {
                     activeObservations.removeValue(forKey: pubkey)
                 }
                 continuation.finish()
