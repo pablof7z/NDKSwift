@@ -15,13 +15,7 @@ class AppState: ObservableObject {
     let authManager = NDKAuthManager.shared
     
     // Default relays
-    private let defaultRelays = [
-        "wss://relay.damus.io",
-        "wss://relay.nostr.band",
-        "wss://nos.lol",
-        "wss://relay.primal.net",
-        "wss://relay.snort.social"
-    ]
+    private let defaultRelays = RelayConstants.extendedRelays
     
     init() {
         Task {
