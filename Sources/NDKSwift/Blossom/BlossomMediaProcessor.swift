@@ -58,25 +58,42 @@ public enum BlossomMediaProcessor {
                 mimeType.contains("heif"))
     }
     
+    // Image format file signatures
+    private enum ImageSignatures {
+        // JPEG signature: FF D8 FF
+        static let jpeg: [UInt8] = [0xFF, 0xD8, 0xFF]
+        // PNG signature: 89 50 4E 47 (‰PNG)
+        static let png: [UInt8] = [0x89, 0x50, 0x4E, 0x47]
+        // GIF signature: 47 49 46 (GIF)
+        static let gif: [UInt8] = [0x47, 0x49, 0x46]
+        // WebP signature at offset 8: 57 45 42 50 (WEBP)
+        static let webp: [UInt8] = [0x57, 0x45, 0x42, 0x50]
+        static let webpOffset = 8
+        // HEIC file type box at offset 4: 66 74 79 70 (ftyp) followed by 68 65 69 63 (heic)
+        static let ftypBox: [UInt8] = [0x66, 0x74, 0x79, 0x70]
+        static let heicType: [UInt8] = [0x68, 0x65, 0x69, 0x63]
+        static let ftypOffset = 4
+        
+        static let minimumHeaderSize = 12
+    }
+    
     /// Infer MIME type from data signature
     public static func inferMimeType(from data: Data) -> String? {
-        guard data.count >= 12 else { return nil }
+        guard data.count >= ImageSignatures.minimumHeaderSize else { return nil }
         
-        let bytes = [UInt8](data.prefix(12))
+        let bytes = [UInt8](data.prefix(ImageSignatures.minimumHeaderSize))
         
         // Check common image format signatures
-        if bytes[0] == 0xFF && bytes[1] == 0xD8 && bytes[2] == 0xFF {
+        if bytes.starts(with: ImageSignatures.jpeg) {
             return "image/jpeg"
-        } else if bytes[0] == 0x89 && bytes[1] == 0x50 && bytes[2] == 0x4E && bytes[3] == 0x47 {
+        } else if bytes.starts(with: ImageSignatures.png) {
             return "image/png"
-        } else if bytes[0] == 0x47 && bytes[1] == 0x49 && bytes[2] == 0x46 {
+        } else if bytes.starts(with: ImageSignatures.gif) {
             return "image/gif"
-        } else if data.count >= 12 && 
-                  bytes[8] == 0x57 && bytes[9] == 0x45 && bytes[10] == 0x42 && bytes[11] == 0x50 {
+        } else if Array(bytes[ImageSignatures.webpOffset...]).starts(with: ImageSignatures.webp) {
             return "image/webp"
-        } else if data.count >= 12 &&
-                  bytes[4] == 0x66 && bytes[5] == 0x74 && bytes[6] == 0x79 && bytes[7] == 0x70 &&
-                  (bytes[8] == 0x68 && bytes[9] == 0x65 && bytes[10] == 0x69 && bytes[11] == 0x63) {
+        } else if Array(bytes[ImageSignatures.ftypOffset...]).starts(with: ImageSignatures.ftypBox) &&
+                  Array(bytes[(ImageSignatures.ftypOffset + ImageSignatures.ftypBox.count)...]).starts(with: ImageSignatures.heicType) {
             return "image/heic"
         }
         
