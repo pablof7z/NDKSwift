@@ -11,7 +11,7 @@ public final class NDKPrivateKeySigner: NDKSigner {
         do {
             _ = try HexValidator.validate32ByteHex(privateKey)
         } catch {
-            throw NDKError.invalidDataFormat("private key", details: "Must be 64 character hex string")
+            throw NDKError.invalidDataFormat("private key", details: ValidationConstants.hex64CharacterDetails)
         }
 
         self.privateKey = privateKey
