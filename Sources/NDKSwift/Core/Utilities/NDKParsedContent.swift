@@ -38,16 +38,3 @@ public struct NDKParsedContent {
         case nprofileMention(String)
     }
 }
-
-// Extension to add helper methods for converting pubkeys
-public extension String {
-    /// Convert a hex pubkey to npub format
-    static func toNpub(_ pubkey: String) throws -> String {
-        return try Bech32.npub(from: pubkey)
-    }
-    
-    /// Convert an npub to hex pubkey
-    static func fromNpub(_ npub: String) throws -> String? {
-        return try Bech32.pubkey(from: npub)
-    }
-}
