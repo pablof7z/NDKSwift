@@ -53,7 +53,7 @@ public actor P2PKManager {
 
         // Create message to sign (secret)
         guard let messageData = secret.data(using: .utf8) else {
-            throw NDKError.validationError("Invalid secret for P2PK signing")
+            throw NDKError.validationError(ErrorMessageConstants.invalid("secret for P2PK signing"))
         }
 
         // Sign the secret - using same pattern as Crypto.swift
