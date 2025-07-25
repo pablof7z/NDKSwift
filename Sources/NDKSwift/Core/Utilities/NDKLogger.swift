@@ -97,15 +97,7 @@ public enum NDKLogger {
     public static func logTiming<T>(_ level: NDKLogLevel, category: NDKLogCategory, operation: String, correlationId: String? = nil, _ block: () throws -> T) rethrows -> T {
         let startTime = CFAbsoluteTimeGetCurrent()
         let result = try block()
-        let duration = CFAbsoluteTimeGetCurrent() - startTime
-        let durationMs = String(format: "%.2f", duration * 1000)
-
-        let message = "⏱️ \(operation) completed in \(durationMs)ms"
-        if let correlationId = correlationId {
-            log(level, category: category, message, correlationId: correlationId)
-        } else {
-            log(level, category: category, message)
-        }
+        logTimingResult(startTime: startTime, level: level, category: category, operation: operation, correlationId: correlationId)
         return result
     }
 
@@ -113,16 +105,22 @@ public enum NDKLogger {
     public static func logTiming<T>(_ level: NDKLogLevel, category: NDKLogCategory, operation: String, correlationId: String? = nil, _ block: () async throws -> T) async rethrows -> T {
         let startTime = CFAbsoluteTimeGetCurrent()
         let result = try await block()
+        logTimingResult(startTime: startTime, level: level, category: category, operation: operation, correlationId: correlationId)
+        return result
+    }
+    
+    // MARK: - Private Helpers
+    
+    private static func logTimingResult(startTime: CFAbsoluteTime, level: NDKLogLevel, category: NDKLogCategory, operation: String, correlationId: String?) {
         let duration = CFAbsoluteTimeGetCurrent() - startTime
         let durationMs = String(format: "%.2f", duration * 1000)
-
         let message = "⏱️ \(operation) completed in \(durationMs)ms"
+        
         if let correlationId = correlationId {
             log(level, category: category, message, correlationId: correlationId)
         } else {
             log(level, category: category, message)
         }
-        return result
     }
 
 }
