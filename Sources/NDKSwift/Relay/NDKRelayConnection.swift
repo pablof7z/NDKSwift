@@ -299,7 +299,7 @@ public actor NDKRelayConnection {
 
         // Log network traffic
         let parsed = try? NostrMessage.parse(from: json)
-        NDKLogger.logNetworkSend(to: url, message: json, parsed: parsed)
+        NDKNetworkLogger.logNetworkSend(to: url, message: json, parsed: parsed)
 
         #if os(iOS) || os(macOS) || os(watchOS) || os(tvOS)
             guard let task = webSocketTask else {
@@ -374,7 +374,7 @@ public actor NDKRelayConnection {
             let message = try NostrMessage.parse(from: json)
 
             // Log received message
-            NDKLogger.logNetworkReceive(from: url, message: json, parsed: message)
+            NDKNetworkLogger.logNetworkReceive(from: url, message: json, parsed: message)
 
             // Handle OK messages for pending events
             if case let .ok(eventId, accepted, errorMessage) = message {
@@ -401,7 +401,7 @@ public actor NDKRelayConnection {
             }
         } catch {
             // Log parsing error
-            NDKLogger.logNetworkParseError(from: url, message: json, error: error)
+            NDKNetworkLogger.logNetworkParseError(from: url, message: json, error: error)
         }
     }
 

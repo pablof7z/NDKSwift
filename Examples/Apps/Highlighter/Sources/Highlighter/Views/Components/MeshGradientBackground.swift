@@ -46,13 +46,14 @@ struct MeshGradientBackground: View {
                             )
                         }
                         
-                        let gradient = LinearGradient(
-                            colors: gradientColors(for: row, col: col, time: time),
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        )
+                        let colors = gradientColors(for: row, col: col, time: time)
+                        let gradient = Gradient(colors: colors)
                         
-                        context.fill(path, with: .linearGradient(gradient))
+                        context.fill(path, with: .linearGradient(
+                            gradient,
+                            startPoint: CGPoint(x: 0, y: 0),
+                            endPoint: CGPoint(x: 1, y: 1)
+                        ))
                     }
                 }
             }

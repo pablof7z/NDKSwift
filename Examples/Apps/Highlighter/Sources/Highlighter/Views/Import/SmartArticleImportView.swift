@@ -179,7 +179,7 @@ struct SmartArticleImportView: View {
                     )
                     .symbolEffect(.pulse, options: .repeating, value: aiThinkingAnimation)
                     .scaleEffect(1 + floatingOffset / 100)
-                    .rotationEffect(.degrees(sin(brainWaveAnimation * .pi) * 5))
+                    .rotationEffect(.degrees(Foundation.sin(brainWaveAnimation * .pi) * 5))
                 
                 // Neural sparkles
                 ForEach(0..<6) { index in
@@ -726,8 +726,7 @@ struct SmartArticleImportView: View {
                 y: UIScreen.main.bounds.height / 2,
                 size: .random(in: 6...16),
                 color: .orange,
-                speed: .random(in: 40...100),
-                isBurst: true
+                speed: .random(in: 40...100)
             )
             particlePositions.append(particle)
         }
@@ -1429,7 +1428,6 @@ struct ArticleSuggestedHighlight: Identifiable {
     let category: HighlightCategory
     
     init(text: String, confidence: Double, reason: String?, hasContext: Bool, startIndex: Int = 0, endIndex: Int = 0, category: HighlightCategory = .insight) {
-        self.id = UUID().uuidString
         self.text = text
         self.confidence = confidence
         self.reason = reason
@@ -1566,7 +1564,7 @@ struct HighlightedParagraph: View {
                     highlight.category.color.opacity(0.1)
                 
                 attributed[range].underlineStyle = isHovered ? .single : .none
-                attributed[range].underlineColor = highlight.category.color
+                attributed[range].underlineColor = UIColor(highlight.category.color)
                 
                 // Add interactive tap
                 attributed[range].link = URL(string: "highlight://\(highlight.id)")
