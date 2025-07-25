@@ -15,6 +15,7 @@ struct ArticleView: View {
     @State private var swarmPulseAnimation = false
     @State private var showTextSelection = false
     @State private var highlightModeActive = false
+    @State private var showHeatmap = false
     @StateObject private var swarmManager = SwarmHighlightManager(ndk: NDK(relayUrls: []))
     @Environment(\.dismiss) var dismiss
     
@@ -159,7 +160,7 @@ struct ArticleView: View {
                                     handleLinkTap(url)
                                 }
                                 .padding(.bottom, .ds.xl)
-                                .opacity(showSwarmOverlay ? 0 : 1)
+                                .opacity(showSwarmOverlay || showHeatmap ? 0 : 1)
                                 
                                 // Swarm Overlay
                                 if showSwarmOverlay {
@@ -174,6 +175,20 @@ struct ArticleView: View {
                                         removal: .opacity
                                     ))
                                 }
+                                
+                                // NEW: Swarm Heatmap View
+                                // if showHeatmap {
+                                //     SwarmHeatmapView(
+                                //         articleId: article.identifier ?? "",
+                                //         content: article.content
+                                //     )
+                                //     .padding(.horizontal, .ds.large)
+                                //     .padding(.bottom, .ds.xl)
+                                //     .transition(.asymmetric(
+                                //         insertion: .opacity.combined(with: .scale(scale: 0.98)),
+                                //         removal: .opacity
+                                //     ))
+                                // }
                             }
                         }
                     }
@@ -214,6 +229,7 @@ struct ArticleView: View {
                         Button(action: { 
                             withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
                                 showSwarmOverlay.toggle()
+                                if showSwarmOverlay { showHeatmap = false }
                             }
                             HapticManager.shared.impact(.light)
                             if showSwarmOverlay {
@@ -242,6 +258,36 @@ struct ArticleView: View {
                                 swarmPulseAnimation = true
                             }
                         }
+                        
+                        // NEW: Heatmap Toggle with spectacular animation
+                        // Button(action: { 
+                        //     withAnimation(.spring(response: 0.4, dampingFraction: 0.7)) {
+                        //         showHeatmap.toggle()
+                        //         if showHeatmap { showSwarmOverlay = false }
+                        //     }
+                        //     HapticManager.shared.impact(.medium)
+                        // }) {
+                        //     ZStack {
+                        //         Image(systemName: "heat.waves")
+                        //             .foregroundColor(showHeatmap ? .highlighterOrange : .highlighterPurple)
+                        //             .symbolEffect(.variableColor.iterative, value: showHeatmap)
+                        //         
+                        //         if showHeatmap {
+                        //             Circle()
+                        //                 .fill(
+                        //                     RadialGradient(
+                        //                         colors: [.highlighterOrange, .highlighterOrange.opacity(0)],
+                        //                         center: .center,
+                        //                         startRadius: 0,
+                        //                         endRadius: 12
+                        //                     )
+                        //                 )
+                        //                 .frame(width: 24, height: 24)
+                        //                 .blur(radius: 4)
+                        //                 .allowsHitTesting(false)
+                        //         }
+                        //     }
+                        // }
                         
                         Button(action: { 
                             isBookmarked.toggle()

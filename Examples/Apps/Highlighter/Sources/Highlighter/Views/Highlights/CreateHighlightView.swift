@@ -138,9 +138,9 @@ struct CreateHighlightView: View {
                     author: sourceAuthor.isEmpty ? nil : sourceAuthor
                 )
             }
-            .fullScreenCover(isPresented: $showSmartImporter) {
-                SmartArticleImportView()
-            }
+            // .fullScreenCover(isPresented: $showSmartImporter) {
+            //     SmartArticleImportView()
+            // }
         }
         .onAppear {
             withAnimation(.easeInOut(duration: 3).repeatForever(autoreverses: true)) {
