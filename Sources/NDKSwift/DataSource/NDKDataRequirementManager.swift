@@ -903,7 +903,7 @@ actor DataRequirement {
             }
 
             // Close subscription if closeOnEose is set OR if we have all requested event IDs
-            let shouldClose = await self.closeOnEose ||
+            let shouldClose = self.closeOnEose ||
                 (requestedIds != nil && receivedIds != nil && Set(requestedIds!) == receivedIds!)
 
             if shouldClose {
@@ -955,7 +955,7 @@ actor DataRequirement {
                 }
 
                 // Also forward as relay update to data sources
-                for (_, observer) in await self.observers {
+                for (_, observer) in self.observers {
                     await observer.handleRelayUpdate(.event(event, relay: relay))
                 }
             }
