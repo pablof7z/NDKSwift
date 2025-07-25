@@ -60,34 +60,35 @@ public enum LoggingConstants {
     // MARK: - Common Log Message Templates
     
     public enum Messages {
+        /// Generic formatter for log messages with optional details
+        private static func format(_ prefix: String, _ operation: String, details: String? = nil, detailsFormat: (String) -> String = { ": \($0)" }) -> String {
+            let base = "\(prefix) \(operation)"
+            return details.map { "\(base)\(detailsFormat($0))" } ?? base
+        }
+        
         /// Format a success message
         public static func success(_ operation: String, details: String? = nil) -> String {
-            let base = "\(LoggingConstants.success) \(operation)"
-            return details.map { "\(base): \($0)" } ?? base
+            format(LoggingConstants.success, operation, details: details)
         }
         
         /// Format an error message
         public static func error(_ operation: String, details: String? = nil) -> String {
-            let base = "\(LoggingConstants.error) \(operation)"
-            return details.map { "\(base): \($0)" } ?? base
+            format(LoggingConstants.error, operation, details: details)
         }
         
         /// Format an info message
         public static func info(_ operation: String, details: String? = nil) -> String {
-            let base = "\(LoggingConstants.info) \(operation)"
-            return details.map { "\(base): \($0)" } ?? base
+            format(LoggingConstants.info, operation, details: details)
         }
         
         /// Format a network operation message
         public static func network(_ operation: String, relay: String? = nil) -> String {
-            let base = "\(LoggingConstants.network) \(operation)"
-            return relay.map { "\(base) [\($0)]" } ?? base
+            format(LoggingConstants.network, operation, details: relay) { " [\($0)]" }
         }
         
         /// Format a wallet operation message
         public static func wallet(_ operation: String, amount: Int? = nil) -> String {
-            let base = "\(LoggingConstants.wallet) \(operation)"
-            return amount.map { "\(base) - \($0) sats" } ?? base
+            format(LoggingConstants.wallet, operation, details: amount.map(String.init)) { " - \($0) sats" }
         }
     }
 }
