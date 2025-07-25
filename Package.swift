@@ -24,7 +24,7 @@ let package = Package(
     ],
     dependencies: [
         .package(url: "https://github.com/anquii/CryptoSwiftWrapper.git", from: "1.4.3"),
-        .package(url: "https://github.com/zeugmaster/swift-secp256k1.git", branch: "main"),
+        .package(url: "https://github.com/GigaBitcoin/secp256k1.swift.git", exact: "0.21.1"),
         .package(url: "https://github.com/groue/GRDB.swift.git", from: "6.29.3"),
         .package(path: "Libraries/CashuSwift"),
     ],
