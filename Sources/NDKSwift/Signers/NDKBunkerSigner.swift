@@ -564,7 +564,7 @@ public actor NDKBunkerSigner: NDKSigner, Sendable {
               let secret = payload[NostrConstants.JSONField.secret] as? String,
               let localSignerData = payload["localSignerData"] as? Data,
               let connectionTypeRaw = payload["connectionType"] as? String else {
-            throw NDKSignerRegistryError.deserializationError("Missing required bunker signer data")
+            throw NDKSignerRegistryError.deserializationError(ErrorMessageConstants.missing("required bunker signer data"))
         }
 
         // Deserialize local signer (it also expects just the payload data)

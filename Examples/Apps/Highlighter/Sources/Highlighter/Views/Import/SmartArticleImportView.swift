@@ -476,41 +476,108 @@ struct SmartArticleImportView: View {
     
     @ViewBuilder
     private func resultsSection(article: ProcessedArticle) -> some View {
-        VStack(spacing: .ds.large) {
-            // Article info card
-            ArticleInfoCard(
-                article: article,
-                complexityScore: contentComplexityScore,
-                readingTime: readingTimeEstimate
-            )
-            .premiumEntrance(delay: 0.1)
-            
-            // AI suggestions header
-            HStack {
-                Label("AI Suggestions", systemImage: "sparkles")
-                    .font(.ds.headline)
-                    .foregroundColor(.ds.text)
-                
-                Spacer()
-                
-                Text("\(selectedSuggestions.count) selected")
-                    .font(.ds.footnote)
-                    .foregroundColor(.ds.textSecondary)
-            }
-            .premiumEntrance(delay: 0.2)
-            
-            // Suggested highlights
-            VStack(spacing: .ds.base) {
-                ForEach(Array(article.suggestedHighlights.enumerated()), id: \.element.id) { index, suggestion in
-                    SuggestedHighlightCard(
-                        suggestion: suggestion,
-                        isSelected: selectedSuggestions.contains(suggestion.id),
-                        action: {
-                            toggleSuggestion(suggestion.id)
+        GeometryReader { geometry in
+            HStack(spacing: 0) {
+                // Left side - Article preview with live highlights
+                ScrollView {
+                    VStack(alignment: .leading, spacing: .ds.large) {
+                        // Article header
+                        VStack(alignment: .leading, spacing: .ds.small) {
+                            Text(article.title)
+                                .font(.ds.largeTitle)
+                                .foregroundColor(.ds.text)
+                            
+                            if let author = article.author {
+                                Text("by \(author)")
+                                    .font(.ds.body)
+                                    .foregroundColor(.ds.textSecondary)
+                            }
                         }
-                    )
-                    .premiumEntrance(delay: 0.3 + Double(index) * 0.05)
+                        .padding(.horizontal, .ds.screenPadding)
+                        .padding(.top, .ds.large)
+                        
+                        // Live preview with highlights
+                        LiveArticlePreview(
+                            article: article,
+                            selectedSuggestions: selectedSuggestions,
+                            onHighlightTap: { suggestionId in
+                                toggleSuggestion(suggestionId)
+                            }
+                        )
+                        .padding(.horizontal, .ds.screenPadding)
+                    }
+                    .padding(.bottom, 100)
                 }
+                .frame(width: geometry.size.width * 0.6)
+                .background(DesignSystem.Colors.background)
+                
+                // Divider
+                Rectangle()
+                    .fill(DesignSystem.Colors.divider)
+                    .frame(width: 1)
+                
+                // Right side - AI suggestions panel
+                ScrollView {
+                    VStack(spacing: .ds.large) {
+                        // Article metrics
+                        ArticleMetricsCard(
+                            article: article,
+                            complexityScore: contentComplexityScore,
+                            readingTime: readingTimeEstimate,
+                            selectedCount: selectedSuggestions.count
+                        )
+                        .premiumEntrance(delay: 0.1)
+                        .padding(.top, .ds.large)
+                        
+                        // AI suggestions header
+                        HStack {
+                            Label("AI Analysis", systemImage: "brain")
+                                .font(.ds.headline)
+                                .foregroundColor(.ds.text)
+                            
+                            Spacer()
+                            
+                            // Select all/none buttons
+                            HStack(spacing: .ds.small) {
+                                Button("All") {
+                                    selectAllSuggestions(article)
+                                }
+                                .font(.ds.footnoteMedium)
+                                .foregroundColor(.ds.primary)
+                                
+                                Text("/")
+                                    .font(.ds.footnote)
+                                    .foregroundColor(.ds.textTertiary)
+                                
+                                Button("None") {
+                                    selectedSuggestions.removeAll()
+                                }
+                                .font(.ds.footnoteMedium)
+                                .foregroundColor(.ds.primary)
+                            }
+                        }
+                        .premiumEntrance(delay: 0.2)
+                        
+                        // Suggested highlights with enhanced UI
+                        VStack(spacing: .ds.base) {
+                            ForEach(Array(article.suggestedHighlights.enumerated()), id: \.element.id) { index, suggestion in
+                                EnhancedSuggestionCard(
+                                    suggestion: suggestion,
+                                    isSelected: selectedSuggestions.contains(suggestion.id),
+                                    index: index,
+                                    action: {
+                                        toggleSuggestion(suggestion.id)
+                                    }
+                                )
+                                .premiumEntrance(delay: 0.3 + Double(index) * 0.05)
+                            }
+                        }
+                    }
+                    .padding(.horizontal, .ds.screenPadding)
+                    .padding(.bottom, 100)
+                }
+                .frame(width: geometry.size.width * 0.4)
+                .background(DesignSystem.Colors.surfaceSecondary.opacity(0.3))
             }
         }
     }
@@ -584,6 +651,13 @@ struct SmartArticleImportView: View {
             } else {
                 selectedSuggestions.insert(id)
             }
+        }
+    }
+    
+    private func selectAllSuggestions(_ article: ProcessedArticle) {
+        HapticManager.shared.impact(.light)
+        withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+            selectedSuggestions = Set(article.suggestedHighlights.map { $0.id })
         }
     }
     
@@ -1292,31 +1366,36 @@ class SmartImportManager: ObservableObject {
                 text: "The future of knowledge sharing lies in decentralized networks that empower users to own their data and insights.",
                 confidence: 0.95,
                 reason: "Key thesis statement",
-                hasContext: true
+                hasContext: true,
+                category: .thesis
             ),
             SuggestedHighlight(
                 text: "Studies show that collaborative highlighting increases retention by 40% compared to solo reading.",
                 confidence: 0.88,
                 reason: "Important statistic",
-                hasContext: true
+                hasContext: true,
+                category: .statistic
             ),
             SuggestedHighlight(
                 text: "The swarm intelligence approach treats every reader as a potential curator, creating emergent patterns of importance.",
                 confidence: 0.92,
                 reason: "Novel concept",
-                hasContext: true
+                hasContext: true,
+                category: .insight
             ),
             SuggestedHighlight(
                 text: "By combining AI suggestions with human curation, we achieve a balance between efficiency and nuance.",
                 confidence: 0.85,
                 reason: "Key insight",
-                hasContext: true
+                hasContext: true,
+                category: .insight
             ),
             SuggestedHighlight(
                 text: "The most valuable highlights are often those that spark the most discussion and engagement.",
                 confidence: 0.78,
                 reason: "Community wisdom",
-                hasContext: true
+                hasContext: true,
+                category: .quote
             )
         ]
         
@@ -1345,4 +1424,517 @@ struct SuggestedHighlight: Identifiable {
     let confidence: Double
     let reason: String?
     let hasContext: Bool
+    let startIndex: Int
+    let endIndex: Int
+    let category: HighlightCategory
+    
+    init(text: String, confidence: Double, reason: String?, hasContext: Bool, startIndex: Int = 0, endIndex: Int = 0, category: HighlightCategory = .insight) {
+        self.id = UUID().uuidString
+        self.text = text
+        self.confidence = confidence
+        self.reason = reason
+        self.hasContext = hasContext
+        self.startIndex = startIndex
+        self.endIndex = endIndex
+        self.category = category
+    }
+}
+
+enum HighlightCategory: String, CaseIterable {
+    case thesis = "Thesis"
+    case statistic = "Statistic"
+    case insight = "Insight"
+    case quote = "Quote"
+    case definition = "Definition"
+    
+    var color: Color {
+        switch self {
+        case .thesis: return .purple
+        case .statistic: return .blue
+        case .insight: return .orange
+        case .quote: return .green
+        case .definition: return .pink
+        }
+    }
+    
+    var icon: String {
+        switch self {
+        case .thesis: return "lightbulb.fill"
+        case .statistic: return "chart.bar.fill"
+        case .insight: return "sparkles"
+        case .quote: return "quote.bubble.fill"
+        case .definition: return "book.fill"
+        }
+    }
+}
+
+// MARK: - New Enhanced Components
+
+struct LiveArticlePreview: View {
+    let article: ProcessedArticle
+    let selectedSuggestions: Set<String>
+    let onHighlightTap: (String) -> Void
+    @State private var hoveredHighlight: String? = nil
+    @State private var scrollToHighlight: String? = nil
+    @State private var highlightAnimations: [String: Bool] = [:]
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: .ds.large) {
+            // Article content with inline highlights
+            ScrollViewReader { proxy in
+                VStack(alignment: .leading, spacing: .ds.medium) {
+                    ForEach(generateContentParagraphs(), id: \.self) { paragraph in
+                        HighlightedParagraph(
+                            text: paragraph,
+                            highlights: findHighlightsInParagraph(paragraph),
+                            selectedSuggestions: selectedSuggestions,
+                            hoveredHighlight: hoveredHighlight,
+                            onHighlightTap: onHighlightTap,
+                            onHighlightHover: { id in
+                                withAnimation(.easeInOut(duration: 0.2)) {
+                                    hoveredHighlight = id
+                                }
+                            }
+                        )
+                        .id(paragraph)
+                    }
+                }
+                .onChange(of: scrollToHighlight) { _, newValue in
+                    if let highlight = newValue {
+                        withAnimation(.spring(response: 0.5, dampingFraction: 0.8)) {
+                            proxy.scrollTo(highlight, anchor: .center)
+                        }
+                    }
+                }
+            }
+        }
+        .padding(.vertical, .ds.large)
+        .background(
+            RoundedRectangle(cornerRadius: .ds.large, style: .continuous)
+                .fill(DesignSystem.Colors.surface)
+                .shadow(color: .black.opacity(0.05), radius: 20, x: 0, y: 10)
+        )
+    }
+    
+    private func generateContentParagraphs() -> [String] {
+        // This would be replaced with actual article content
+        return [
+            "The future of knowledge sharing lies in decentralized networks that empower users to own their data and insights. This paradigm shift represents a fundamental change in how we think about information ownership and distribution.",
+            "Traditional centralized platforms have dominated the knowledge-sharing landscape for decades, creating walled gardens where user-generated content becomes the property of corporations. However, a new wave of decentralized technologies is challenging this model.",
+            "Studies show that collaborative highlighting increases retention by 40% compared to solo reading. This finding has profound implications for educational technology and the design of reading applications.",
+            "The swarm intelligence approach treats every reader as a potential curator, creating emergent patterns of importance. When thousands of readers highlight the same passage, it signals something deeply resonant about that particular insight.",
+            "By combining AI suggestions with human curation, we achieve a balance between efficiency and nuance. Artificial intelligence can process vast amounts of text quickly, but human judgment remains essential for contextual understanding.",
+            "The most valuable highlights are often those that spark the most discussion and engagement. This social layer transforms passive reading into an active, community-driven experience."
+        ]
+    }
+    
+    private func findHighlightsInParagraph(_ paragraph: String) -> [SuggestedHighlight] {
+        article.suggestedHighlights.filter { highlight in
+            paragraph.contains(highlight.text)
+        }
+    }
+}
+
+struct HighlightedParagraph: View {
+    let text: String
+    let highlights: [SuggestedHighlight]
+    let selectedSuggestions: Set<String>
+    let hoveredHighlight: String?
+    let onHighlightTap: (String) -> Void
+    let onHighlightHover: (String?) -> Void
+    @State private var highlightOpacities: [String: Double] = [:]
+    
+    var body: some View {
+        Text(attributedText)
+            .font(.ds.body)
+            .lineSpacing(8)
+            .onAppear {
+                animateHighlights()
+            }
+    }
+    
+    private var attributedText: AttributedString {
+        var attributed = AttributedString(text)
+        
+        for highlight in highlights {
+            if let range = attributed.range(of: highlight.text) {
+                let isSelected = selectedSuggestions.contains(highlight.id)
+                let isHovered = hoveredHighlight == highlight.id
+                
+                attributed[range].backgroundColor = isSelected ? 
+                    highlight.category.color.opacity(0.3) : 
+                    highlight.category.color.opacity(0.1)
+                
+                attributed[range].underlineStyle = isHovered ? .single : .none
+                attributed[range].underlineColor = highlight.category.color
+                
+                // Add interactive tap
+                attributed[range].link = URL(string: "highlight://\(highlight.id)")
+            }
+        }
+        
+        return attributed
+    }
+    
+    private func animateHighlights() {
+        for highlight in highlights {
+            withAnimation(.easeInOut(duration: 0.5).delay(Double.random(in: 0...0.3))) {
+                highlightOpacities[highlight.id] = 1.0
+            }
+        }
+    }
+}
+
+struct ArticleMetricsCard: View {
+    let article: ProcessedArticle
+    let complexityScore: Double
+    let readingTime: Int
+    let selectedCount: Int
+    @State private var animateMetrics = false
+    
+    var body: some View {
+        VStack(spacing: .ds.medium) {
+            // Animated metrics
+            HStack(spacing: .ds.medium) {
+                AnimatedMetric(
+                    value: readingTime,
+                    unit: "min read",
+                    icon: "clock.fill",
+                    color: .blue,
+                    animate: animateMetrics
+                )
+                
+                AnimatedMetric(
+                    value: Int(complexityScore * 100),
+                    unit: "complexity",
+                    icon: "brain",
+                    color: .purple,
+                    animate: animateMetrics
+                )
+                
+                AnimatedMetric(
+                    value: selectedCount,
+                    unit: "selected",
+                    icon: "checkmark.circle.fill",
+                    color: .green,
+                    animate: animateMetrics
+                )
+            }
+            
+            // Visual complexity indicator
+            ComplexityVisualization(score: complexityScore)
+                .frame(height: 40)
+        }
+        .padding(.ds.medium)
+        .background(
+            RoundedRectangle(cornerRadius: .ds.medium, style: .continuous)
+                .fill(DesignSystem.Colors.surface)
+                .shadow(color: .black.opacity(0.05), radius: 10, x: 0, y: 5)
+        )
+        .onAppear {
+            withAnimation(.spring(response: 0.5, dampingFraction: 0.8).delay(0.2)) {
+                animateMetrics = true
+            }
+        }
+    }
+}
+
+struct AnimatedMetric: View {
+    let value: Int
+    let unit: String
+    let icon: String
+    let color: Color
+    let animate: Bool
+    @State private var displayValue: Int = 0
+    
+    var body: some View {
+        VStack(spacing: .ds.micro) {
+            Image(systemName: icon)
+                .font(.system(size: 24))
+                .foregroundColor(color)
+                .symbolEffect(.bounce, value: animate)
+            
+            Text("\(displayValue)")
+                .font(.ds.title2.monospacedDigit())
+                .foregroundColor(.ds.text)
+            
+            Text(unit)
+                .font(.ds.caption)
+                .foregroundColor(.ds.textSecondary)
+        }
+        .frame(maxWidth: .infinity)
+        .onAppear {
+            if animate {
+                animateValue()
+            }
+        }
+        .onChange(of: animate) { _, newValue in
+            if newValue {
+                animateValue()
+            }
+        }
+    }
+    
+    private func animateValue() {
+        let steps = 20
+        let stepDuration = 0.5 / Double(steps)
+        
+        for i in 0...steps {
+            DispatchQueue.main.asyncAfter(deadline: .now() + Double(i) * stepDuration) {
+                displayValue = Int(Double(value) * (Double(i) / Double(steps)))
+            }
+        }
+    }
+}
+
+struct ComplexityVisualization: View {
+    let score: Double
+    @State private var animatedScore: Double = 0
+    
+    var body: some View {
+        GeometryReader { geometry in
+            ZStack(alignment: .leading) {
+                // Background gradient
+                LinearGradient(
+                    colors: [.green, .yellow, .orange, .red],
+                    startPoint: .leading,
+                    endPoint: .trailing
+                )
+                .clipShape(Capsule())
+                .opacity(0.3)
+                
+                // Filled portion
+                LinearGradient(
+                    colors: [.green, .yellow, .orange, .red],
+                    startPoint: .leading,
+                    endPoint: .trailing
+                )
+                .clipShape(Capsule())
+                .frame(width: geometry.size.width * animatedScore)
+                
+                // Indicator
+                Circle()
+                    .fill(.white)
+                    .frame(width: 20, height: 20)
+                    .overlay(
+                        Circle()
+                            .stroke(Color.black.opacity(0.2), lineWidth: 2)
+                    )
+                    .offset(x: geometry.size.width * animatedScore - 10)
+            }
+        }
+        .onAppear {
+            withAnimation(.spring(response: 0.8, dampingFraction: 0.8)) {
+                animatedScore = score
+            }
+        }
+    }
+}
+
+struct EnhancedSuggestionCard: View {
+    let suggestion: SuggestedHighlight
+    let isSelected: Bool
+    let index: Int
+    let action: () -> Void
+    @State private var isPressed = false
+    @State private var showInsight = false
+    @State private var glowAnimation = false
+    
+    var body: some View {
+        Button(action: action) {
+            VStack(alignment: .leading, spacing: .ds.base) {
+                // Header with category badge
+                HStack {
+                    CategoryBadge(category: suggestion.category)
+                    
+                    Spacer()
+                    
+                    // Confidence indicator
+                    ConfidenceIndicator(
+                        confidence: suggestion.confidence,
+                        isAnimating: glowAnimation
+                    )
+                }
+                
+                // Highlight text with enhanced styling
+                Text("\"\(suggestion.text)\"")
+                    .font(.ds.callout)
+                    .foregroundColor(.ds.text)
+                    .italic()
+                    .lineLimit(showInsight ? nil : 3)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                
+                // AI reasoning with animation
+                if let reason = suggestion.reason {
+                    HStack(spacing: .ds.small) {
+                        Image(systemName: "cpu")
+                            .font(.system(size: 12))
+                            .foregroundColor(.purple)
+                            .symbolEffect(.pulse, value: isSelected)
+                        
+                        Text(reason)
+                            .font(.ds.caption)
+                            .foregroundColor(.ds.textSecondary)
+                            .transition(.push(from: .bottom).combined(with: .opacity))
+                    }
+                }
+                
+                // Selection indicator with animation
+                HStack {
+                    ZStack {
+                        RoundedRectangle(cornerRadius: .ds.small, style: .continuous)
+                            .fill(
+                                isSelected ?
+                                    AnyShapeStyle(LinearGradient(
+                                        colors: [suggestion.category.color, suggestion.category.color.opacity(0.7)],
+                                        startPoint: .leading,
+                                        endPoint: .trailing
+                                    )) :
+                                    AnyShapeStyle(DesignSystem.Colors.surfaceSecondary)
+                            )
+                            .frame(width: 40, height: 24)
+                        
+                        Circle()
+                            .fill(.white)
+                            .frame(width: 18, height: 18)
+                            .offset(x: isSelected ? 8 : -8)
+                            .shadow(color: .black.opacity(0.1), radius: 2, x: 0, y: 1)
+                    }
+                    
+                    Text(isSelected ? "Selected" : "Select")
+                        .font(.ds.footnoteMedium)
+                        .foregroundColor(isSelected ? suggestion.category.color : .ds.textSecondary)
+                    
+                    Spacer()
+                    
+                    // Expand button
+                    Button(action: {
+                        withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                            showInsight.toggle()
+                        }
+                    }) {
+                        Image(systemName: "chevron.down")
+                            .font(.system(size: 12, weight: .medium))
+                            .foregroundColor(.ds.textSecondary)
+                            .rotationEffect(.degrees(showInsight ? 180 : 0))
+                    }
+                }
+            }
+            .padding(.ds.medium)
+            .background(
+                ZStack {
+                    // Base background
+                    RoundedRectangle(cornerRadius: .ds.medium, style: .continuous)
+                        .fill(
+                            isSelected ?
+                                AnyShapeStyle(suggestion.category.color.opacity(0.1)) :
+                                AnyShapeStyle(DesignSystem.Colors.surface)
+                        )
+                    
+                    // Glow effect for selected state
+                    if isSelected {
+                        RoundedRectangle(cornerRadius: .ds.medium, style: .continuous)
+                            .stroke(
+                                LinearGradient(
+                                    colors: [
+                                        suggestion.category.color.opacity(0.5),
+                                        suggestion.category.color.opacity(0.2)
+                                    ],
+                                    startPoint: .topLeading,
+                                    endPoint: .bottomTrailing
+                                ),
+                                lineWidth: 2
+                            )
+                            .blur(radius: glowAnimation ? 3 : 1)
+                    }
+                }
+            )
+            .scaleEffect(isPressed ? 0.98 : 1)
+            .shadow(
+                color: isSelected ? suggestion.category.color.opacity(0.2) : .black.opacity(0.05),
+                radius: isSelected ? 15 : 10,
+                x: 0,
+                y: 5
+            )
+        }
+        .buttonStyle(PlainButtonStyle())
+        .onAppear {
+            withAnimation(.easeInOut(duration: 1.5).repeatForever(autoreverses: true)) {
+                glowAnimation = true
+            }
+        }
+        .onLongPressGesture(minimumDuration: 0) {
+            // Action handled by button
+        } onPressingChanged: { pressing in
+            withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                isPressed = pressing
+            }
+        }
+    }
+}
+
+struct CategoryBadge: View {
+    let category: HighlightCategory
+    @State private var pulseAnimation = false
+    
+    var body: some View {
+        HStack(spacing: .ds.micro) {
+            Image(systemName: category.icon)
+                .font(.system(size: 12, weight: .medium))
+                .symbolEffect(.pulse, value: pulseAnimation)
+            
+            Text(category.rawValue)
+                .font(.ds.caption.weight(.medium))
+        }
+        .foregroundColor(category.color)
+        .padding(.horizontal, .ds.small)
+        .padding(.vertical, .ds.micro)
+        .background(
+            Capsule()
+                .fill(category.color.opacity(0.15))
+                .overlay(
+                    Capsule()
+                        .stroke(category.color.opacity(0.3), lineWidth: 1)
+                )
+        )
+        .onAppear {
+            withAnimation(.easeInOut(duration: 2).repeatForever()) {
+                pulseAnimation = true
+            }
+        }
+    }
+}
+
+struct ConfidenceIndicator: View {
+    let confidence: Double
+    let isAnimating: Bool
+    
+    var body: some View {
+        HStack(spacing: 2) {
+            ForEach(0..<5) { index in
+                Circle()
+                    .fill(
+                        Double(index) < confidence * 5 ?
+                            LinearGradient(
+                                colors: [.orange, .yellow],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            ) :
+                            LinearGradient(
+                                colors: [Color.gray.opacity(0.3)],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                    )
+                    .frame(width: 6, height: 6)
+                    .scaleEffect(isAnimating && Double(index) < confidence * 5 ? 1.2 : 1)
+                    .animation(
+                        .spring(response: 0.3, dampingFraction: 0.6)
+                        .delay(Double(index) * 0.05),
+                        value: isAnimating
+                    )
+            }
+        }
+    }
 }

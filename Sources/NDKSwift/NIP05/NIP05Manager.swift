@@ -357,7 +357,7 @@ public actor NIP05Manager {
                 claimedAt: Date(),
                 verifiedAt: nil,
                 lastCheckAt: Date(),
-                errorMessage: "Invalid JSON format"
+                errorMessage: ErrorMessageConstants.invalid("JSON format")
             )
             await memoryCache.set(identifier, value: invalidEntry)
             try? await cache.saveNIP05Resolution(invalidEntry)

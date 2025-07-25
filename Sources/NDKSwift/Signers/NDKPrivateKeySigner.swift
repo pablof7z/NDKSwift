@@ -138,7 +138,7 @@ public final class NDKPrivateKeySigner: NDKSigner {
         let payload = try JSONCoding.decode([String: String].self, from: data)
 
         guard let privateKey = payload["privateKey"] else {
-            throw NDKSignerRegistryError.deserializationError("Missing or invalid privateKey")
+            throw NDKSignerRegistryError.deserializationError(ErrorMessageConstants.invalid("privateKey"))
         }
 
         return try NDKPrivateKeySigner(privateKey: privateKey)
