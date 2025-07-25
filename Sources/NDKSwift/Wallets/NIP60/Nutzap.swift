@@ -49,7 +49,7 @@ public enum Nutzap {
         for mintURL in viableMintURLs {
             // Load mint dynamically
             guard let mintUrl = URL(string: mintURL) else {
-                NDKLogger.log(.error, category: .general, "Invalid mint URL: \(mintURL)")
+                NDKLogger.log(.error, category: .general, "\(ErrorMessageConstants.invalid("mint URL")): \(mintURL)")
                 continue
             }
 
@@ -57,7 +57,7 @@ public enum Nutzap {
             do {
                 mint = try await wallet.mints.loadMint(url: mintUrl)
             } catch {
-                NDKLogger.log(.error, category: .general, "Failed to load mint \(mintURL): \(error)")
+                NDKLogger.log(.error, category: .general, "\(ErrorMessageConstants.failedTo("load mint \(mintURL)")): \(error)")
                 lastError = error
                 continue
             }
@@ -71,7 +71,7 @@ public enum Nutzap {
             // Convert ProofRepresenting to concrete Proof types
             let selectedProofs = pickResult.selected.compactMap { $0 as? CashuSwift.Proof }
             guard selectedProofs.count == pickResult.selected.count else {
-                lastError = NDKError.invalidProof("Failed to convert selected proofs")
+                lastError = NDKError.invalidProof(ErrorMessageConstants.failedTo("convert selected proofs"))
                 continue
             }
 
@@ -238,7 +238,7 @@ public enum Nutzap {
         for proofTag in proofTags {
             guard let proofData = proofTag[1].data(using: .utf8),
                   let proof = try? JSONCoding.decode(CashuSwift.Proof.self, from: proofData) else {
-                NDKLogger.log(.error, category: .wallet, "Failed to decode proof from tag: \(proofTag[1])")
+                NDKLogger.log(.error, category: .wallet, "\(ErrorMessageConstants.failedTo("decode proof from tag")): \(proofTag[1])")
                 continue
             }
 
@@ -253,8 +253,9 @@ public enum Nutzap {
 
                         // Validate P2PK pubkey format (compressed secp256k1 keys)
                         if data.count != 66 || (!data.hasPrefix("02") && !data.hasPrefix("03")) {
-                            NDKLogger.log(.error, category: .wallet, "Invalid P2PK pubkey format: \(data) (must be 66 hex chars starting with 02 or 03)")
-                            invalidP2PKError = "Invalid P2PK pubkey format: \(data) (must be 66 hex chars starting with 02 or 03)"
+                            let errorMessage = "\(ErrorMessageConstants.invalid("P2PK pubkey format")): \(data) (must be 66 hex chars starting with 02 or 03)"
+                            NDKLogger.log(.error, category: .wallet, errorMessage)
+                            invalidP2PKError = errorMessage
                         }
                         break
                     }
@@ -296,7 +297,7 @@ public enum Nutzap {
         for mintURL in mintURLs {
             // Load mint dynamically
             guard let mintUrl = URL(string: mintURL) else {
-                NDKLogger.log(.error, category: .general, "Invalid mint URL in nutzap: \(mintURL)")
+                NDKLogger.log(.error, category: .general, "\(ErrorMessageConstants.invalid("mint URL in nutzap")): \(mintURL)")
                 continue
             }
 
@@ -304,7 +305,7 @@ public enum Nutzap {
             do {
                 mint = try await wallet.mints.loadMint(url: mintUrl)
             } catch {
-                NDKLogger.log(.error, category: .general, "Failed to load mint \(mintURL) for nutzap: \(error)")
+                NDKLogger.log(.error, category: .general, "\(ErrorMessageConstants.failedTo("load mint \(mintURL) for nutzap")): \(error)")
                 continue
             }
 
@@ -454,7 +455,7 @@ extension Nutzap {
             case .transactionUnbalanced:
                 return .invalidProofs(reason: "Transaction unbalanced")
             case .invalidToken:
-                return .invalidProofs(reason: "Invalid token format")
+                return .invalidProofs(reason: ErrorMessageConstants.invalid("token format"))
             case .tokenEncoding(let message):
                 return .invalidProofs(reason: "Token encoding error: \(message)")
             case .tokenDecoding(let message):
@@ -484,7 +485,7 @@ extension Nutzap {
             case .unitError(let message):
                 return .invalidProofs(reason: "Unit error: \(message)")
             case .invalidAmount:
-                return .invalidProofs(reason: "Invalid amount")
+                return .invalidProofs(reason: ErrorMessageConstants.invalid("amount"))
             case .missingRequestDetail(let message):
                 return .invalidProofs(reason: "Missing request detail: \(message)")
             case .restoreError(let message):
