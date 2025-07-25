@@ -70,6 +70,17 @@ struct PubkeyFormatter {
 // MARK: - Time Formatting
 
 struct RelativeTimeFormatter {
+    // Time interval constants in seconds
+    private enum TimeIntervals {
+        static let justNow: TimeInterval = 30
+        static let minute: TimeInterval = 60
+        static let hour: TimeInterval = 3600
+        static let day: TimeInterval = 86400
+        static let week: TimeInterval = 604800
+        static let month: TimeInterval = 2592000  // 30 days approximation
+        static let year: TimeInterval = 31536000  // 365 days
+    }
+    
     /// Format timestamp as relative time (e.g., "2 hours ago", "just now")
     /// - Parameter timestamp: NDK timestamp to format
     /// - Returns: Human-readable relative time string
@@ -91,42 +102,42 @@ struct RelativeTimeFormatter {
         }
         
         // Just now (under 30 seconds)
-        if interval < 30 {
+        if interval < TimeIntervals.justNow {
             return "just now"
         }
         
         // Minutes
-        if interval < 3600 {
-            let minutes = Int(interval / 60)
+        if interval < TimeIntervals.hour {
+            let minutes = Int(interval / TimeIntervals.minute)
             return "\(minutes) minute\(minutes == 1 ? "" : "s") ago"
         }
         
         // Hours (under 24 hours)
-        if interval < 86400 {
-            let hours = Int(interval / 3600)
+        if interval < TimeIntervals.day {
+            let hours = Int(interval / TimeIntervals.hour)
             return "\(hours) hour\(hours == 1 ? "" : "s") ago"
         }
         
         // Days (under 7 days)
-        if interval < 604800 {
-            let days = Int(interval / 86400)
+        if interval < TimeIntervals.week {
+            let days = Int(interval / TimeIntervals.day)
             return "\(days) day\(days == 1 ? "" : "s") ago"
         }
         
         // Weeks (under 30 days)
-        if interval < 2592000 {
-            let weeks = Int(interval / 604800)
+        if interval < TimeIntervals.month {
+            let weeks = Int(interval / TimeIntervals.week)
             return "\(weeks) week\(weeks == 1 ? "" : "s") ago"
         }
         
         // Months (under 365 days)
-        if interval < 31536000 {
-            let months = Int(interval / 2592000)
+        if interval < TimeIntervals.year {
+            let months = Int(interval / TimeIntervals.month)
             return "\(months) month\(months == 1 ? "" : "s") ago"
         }
         
         // Years
-        let years = Int(interval / 31536000)
+        let years = Int(interval / TimeIntervals.year)
         return "\(years) year\(years == 1 ? "" : "s") ago"
     }
     
@@ -151,42 +162,42 @@ struct RelativeTimeFormatter {
         }
         
         // Just now (under 30 seconds)
-        if interval < 30 {
+        if interval < TimeIntervals.justNow {
             return "now"
         }
         
         // Minutes
-        if interval < 3600 {
-            let minutes = Int(interval / 60)
+        if interval < TimeIntervals.hour {
+            let minutes = Int(interval / TimeIntervals.minute)
             return "\(minutes)m"
         }
         
         // Hours (under 24 hours)
-        if interval < 86400 {
-            let hours = Int(interval / 3600)
+        if interval < TimeIntervals.day {
+            let hours = Int(interval / TimeIntervals.hour)
             return "\(hours)h"
         }
         
         // Days (under 7 days)
-        if interval < 604800 {
-            let days = Int(interval / 86400)
+        if interval < TimeIntervals.week {
+            let days = Int(interval / TimeIntervals.day)
             return "\(days)d"
         }
         
         // Weeks (under 30 days)
-        if interval < 2592000 {
-            let weeks = Int(interval / 604800)
+        if interval < TimeIntervals.month {
+            let weeks = Int(interval / TimeIntervals.week)
             return "\(weeks)w"
         }
         
         // Months (under 365 days)
-        if interval < 31536000 {
-            let months = Int(interval / 2592000)
+        if interval < TimeIntervals.year {
+            let months = Int(interval / TimeIntervals.month)
             return "\(months)mo"
         }
         
         // Years
-        let years = Int(interval / 31536000)
+        let years = Int(interval / TimeIntervals.year)
         return "\(years)y"
     }
     
@@ -215,7 +226,7 @@ struct RelativeTimeFormatter {
         let interval = now.timeIntervalSince(date)
         
         // Use relative time for recent items (under 7 days)
-        if interval < 604800 {
+        if interval < TimeIntervals.week {
             return relativeTime(from: date)
         }
         
@@ -264,13 +275,16 @@ struct ContentFormatter {
     
     /// Format sats amount with appropriate units
     static func formatSatsAmount(_ sats: Int64) -> String {
-        if sats < 1000 {
+        let thousand: Int64 = 1_000
+        let million: Int64 = 1_000_000
+        
+        if sats < thousand {
             return "\(sats)"
-        } else if sats < 1_000_000 {
-            let k = Double(sats) / 1000.0
+        } else if sats < million {
+            let k = Double(sats) / Double(thousand)
             return String(format: "%.1fk", k)
         } else {
-            let m = Double(sats) / 1_000_000.0
+            let m = Double(sats) / Double(million)
             return String(format: "%.1fM", m)
         }
     }
@@ -368,19 +382,24 @@ struct GreetingFormatter {
 
 /// Common cache duration policies for consistent caching behavior across the app
 struct CachePolicies {
+    // Base time units
+    private static let minute: TimeInterval = 60
+    private static let hour: TimeInterval = 60 * minute
+    private static let day: TimeInterval = 24 * hour
+    
     /// Short-term cache for frequently changing content (5 minutes)
     /// Used for: Highlights (kind 9802) that update frequently  
-    static let shortTerm: TimeInterval = 5 * 60
+    static let shortTerm: TimeInterval = 5 * minute
     
     /// Medium-term cache for moderately changing content (1 hour)
     /// Used for: Curations (kind 30004) and Follow Packs (kind 39089)
-    static let mediumTerm: TimeInterval = 60 * 60
+    static let mediumTerm: TimeInterval = hour
     
     /// Long-term cache for rarely changing content (24 hours)
     /// Used for: User profiles and metadata
-    static let longTerm: TimeInterval = 24 * 60 * 60
+    static let longTerm: TimeInterval = day
     
     /// Extended cache for very stable content (7 days)
     /// Used for: Relay lists and other configuration data
-    static let extended: TimeInterval = 7 * 24 * 60 * 60
+    static let extended: TimeInterval = 7 * day
 }
