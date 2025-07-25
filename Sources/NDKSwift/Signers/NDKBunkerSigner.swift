@@ -58,7 +58,7 @@ struct BunkerURLParser {
         
         for item in queryItems {
             switch item.name {
-            case "pubkey":
+            case NostrEventKeys.pubkey:
                 userPubkey = item.value
             case "relay":
                 if let relay = item.value {
