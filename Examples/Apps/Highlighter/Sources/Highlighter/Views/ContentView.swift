@@ -6,6 +6,9 @@ struct ContentView: View {
     @State private var authManager = NDKAuthManager.shared
     @State private var selectedTab = Tab.home
     @State private var tabBarVisible = true
+    @State private var showCreateHighlight = false
+    @State private var fabScale: CGFloat = 1.0
+    @State private var fabRotation: Double = 0
     
     enum Tab: CaseIterable {
         case home, feed, discover, library, profile
@@ -31,12 +34,66 @@ struct ContentView: View {
                 .animation(DesignSystem.Animation.quick, value: selectedTab)
                 
                 if tabBarVisible {
-                    ModernTabBar(selectedTab: $selectedTab)
-                        .transition(.move(edge: .bottom).combined(with: .opacity))
-                        .animation(DesignSystem.Animation.springSnappy, value: tabBarVisible)
+                    VStack(spacing: 0) {
+                        // Floating Action Button
+                        HStack {
+                            Spacer()
+                            
+                            Button(action: {
+                                HapticManager.shared.impact(.medium)
+                                withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) {
+                                    fabScale = 1.2
+                                    fabRotation += 180
+                                }
+                                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                                    withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) {
+                                        fabScale = 1.0
+                                    }
+                                }
+                                showCreateHighlight = true
+                            }) {
+                                ZStack {
+                                    // Gradient background
+                                    Circle()
+                                        .fill(
+                                            LinearGradient(
+                                                colors: [Color.orange, Color.orange.opacity(0.8)],
+                                                startPoint: .topLeading,
+                                                endPoint: .bottomTrailing
+                                            )
+                                        )
+                                        .frame(width: 56, height: 56)
+                                    
+                                    // Shadow layers for depth
+                                    Circle()
+                                        .fill(Color.orange.opacity(0.2))
+                                        .frame(width: 56, height: 56)
+                                        .blur(radius: 8)
+                                        .offset(y: 4)
+                                    
+                                    // Icon
+                                    Image(systemName: "highlighter")
+                                        .font(.system(size: 24, weight: .semibold))
+                                        .foregroundColor(.white)
+                                        .rotationEffect(.degrees(fabRotation))
+                                }
+                                .scaleEffect(fabScale)
+                            }
+                            .padding(.trailing, 20)
+                            .padding(.bottom, 16)
+                            .shadow(color: Color.orange.opacity(0.4), radius: 12, y: 6)
+                        }
+                        
+                        ModernTabBar(selectedTab: $selectedTab)
+                    }
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
+                    .animation(DesignSystem.Animation.springSnappy, value: tabBarVisible)
                 }
             }
             .background(DesignSystem.Colors.background)
+            .fullScreenCover(isPresented: $showCreateHighlight) {
+                CreateHighlightView()
+            }
         } else {
             ModernAuthenticationView()
                 .transition(.opacity)

@@ -13,6 +13,8 @@ struct ArticleView: View {
     @State private var showShareSheet = false
     @State private var showSwarmOverlay = false
     @State private var swarmPulseAnimation = false
+    @State private var showTextSelection = false
+    @State private var highlightModeActive = false
     @StateObject private var swarmManager = SwarmHighlightManager(ndk: NDK(relayUrls: []))
     @Environment(\.dismiss) var dismiss
     
@@ -187,6 +189,27 @@ struct ArticleView: View {
                 
                 ToolbarItem(placement: .navigationBarTrailing) {
                     HStack(spacing: .ds.medium) {
+                        // Text Selection Mode Toggle
+                        Button(action: {
+                            showTextSelection = true
+                            HapticManager.shared.impact(.light)
+                        }) {
+                            ZStack {
+                                Image(systemName: "highlighter")
+                                    .foregroundColor(highlightModeActive ? .highlighterOrange : .highlighterPurple)
+                                    .symbolRenderingMode(.hierarchical)
+                                
+                                if highlightModeActive {
+                                    Circle()
+                                        .fill(Color.highlighterOrange)
+                                        .frame(width: 8, height: 8)
+                                        .offset(x: 8, y: -8)
+                                        .transition(.scale.combined(with: .opacity))
+                                }
+                            }
+                        }
+                        .animation(.spring(response: 0.3, dampingFraction: 0.7), value: highlightModeActive)
+                        
                         // Swarm Overlay Toggle with animation
                         Button(action: { 
                             withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
@@ -233,6 +256,16 @@ struct ArticleView: View {
                                 .foregroundColor(.highlighterPurple)
                         }
                     }
+                }
+            }
+            .fullScreenCover(isPresented: $showTextSelection) {
+                TextSelectionView(
+                    content: article.content,
+                    source: article.title,
+                    author: author?.displayName ?? formatPubkey(article.author)
+                )
+                .onDisappear {
+                    highlightModeActive = false
                 }
             }
             .sheet(isPresented: $showHighlightOptions) {

@@ -48,9 +48,7 @@ public actor P2PKManager {
         let (privateKeyHex, _) = try await getOrCreateKeypair()
         
         // Convert hex private key back to PrivateKey object
-        guard let privateKeyData = Data(hexString: privateKeyHex) else {
-            throw NDKError.invalidDataFormat("P2PK private key", details: "Invalid hex format")
-        }
+        let privateKeyData = try HexValidator.validate32ByteHex(privateKeyHex)
         let privateKey = try secp256k1.Schnorr.PrivateKey(dataRepresentation: privateKeyData)
         
         // Create message to sign (secret)

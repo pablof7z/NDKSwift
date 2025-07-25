@@ -102,7 +102,7 @@ class SwarmHighlightManager: ObservableObject {
                 author: NDKUser(pubkey: event.pubkey),
                 profile: profile,
                 note: event.tags.first(where: { $0.count > 1 && $0[0] == "comment" })?.dropFirst().joined(separator: " "),
-                createdAt: Date(timeIntervalSince1970: TimeInterval(event.createdAt ?? 0)),
+                createdAt: Date(timeIntervalSince1970: TimeInterval(event.createdAt)),
                 zapCount: zapCount
             )
             

@@ -131,7 +131,7 @@ struct SwarmHeatmapView: View {
                 let gradient = Gradient(colors: [midColor, startColor, endColor])
                 let radialGradient = GraphicsContext.Shading.radialGradient(
                     gradient,
-                    center: .center,
+                    center: .zero,
                     startRadius: 5,
                     endRadius: 50 * intensity
                 )
@@ -178,7 +178,7 @@ struct ParticleView: View {
                         Color.orange.opacity(particle.opacity),
                         Color.orange.opacity(0)
                     ],
-                    center: .center,
+                    center: UnitPoint.center,
                     startRadius: 0,
                     endRadius: 5
                 )
@@ -358,7 +358,7 @@ struct SwarmPopover: View {
         .simultaneousGesture(
             DragGesture(minimumDistance: 30)
                 .onEnded { _ in
-                    HapticManager.shared.impact(.soft)
+                    HapticManager.shared.impact(.light)
                     withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
                         onDismiss()
                     }
@@ -380,6 +380,7 @@ struct SwarmPopover: View {
                     .lineLimit(2)
                     .fixedSize(horizontal: false, vertical: true)
                     .opacity(0.9)
+            }
             
             Spacer()
             

@@ -16,6 +16,23 @@ struct HighlightEvent: Identifiable, Equatable {
     let attributedAuthors: [String]
     let comment: String?
     
+    // Additional fields for publishing
+    var source: String? { url }
+    
+    // For creating new highlights
+    init(content: String, context: String? = nil, source: String? = nil, author: String? = nil, comment: String? = nil) {
+        self.id = UUID().uuidString
+        self.event = NDKEvent(id: "", pubkey: "", createdAt: 0, kind: 9802, tags: [], content: content, sig: "")
+        self.content = content
+        self.author = ""
+        self.createdAt = Date()
+        self.context = context
+        self.url = source
+        self.referencedEvent = nil
+        self.attributedAuthors = author != nil ? [author!] : []
+        self.comment = comment
+    }
+    
     // For testing/preview
     init(id: String, event: NDKEvent, content: String, author: String, createdAt: Date, context: String?, url: String?, referencedEvent: String?, attributedAuthors: [String], comment: String?) {
         self.id = id

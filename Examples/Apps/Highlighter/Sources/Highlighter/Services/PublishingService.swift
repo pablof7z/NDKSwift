@@ -6,6 +6,7 @@ import Combine
 /// Follows SRP by focusing solely on publishing and content creation
 @MainActor
 class PublishingService: ObservableObject {
+    static let shared = PublishingService()
     // MARK: - Published State
     @Published private(set) var isPublishing = false
     @Published private(set) var lastPublishError: Error?
@@ -35,16 +36,33 @@ class PublishingService: ObservableObject {
         lastPublishError = nil
         
         do {
-            let event = try await HighlightEvent.create(
-                ndk: ndk,
-                content: highlight.content,
-                context: highlight.context,
-                url: highlight.url,
-                referencedEvent: highlight.referencedEvent,
-                attributedAuthors: highlight.attributedAuthors,
-                comment: highlight.comment,
-                signer: signer
-            )
+            var tags: [[String]] = []
+            
+            // Add content with context if available
+            if let context = highlight.context, !context.isEmpty {
+                tags.append(["context", context])
+            }
+            
+            // Add source/URL reference
+            if let source = highlight.source {
+                tags.append(["r", source])
+            }
+            
+            // Add author attribution from attributed authors
+            for author in highlight.attributedAuthors {
+                tags.append(["p", author])
+            }
+            
+            // Add alt tag for clients
+            let preview = highlight.content.prefix(50)
+            tags.append(["alt", "Highlight: '\(preview)...'" ])
+            
+            // Build event
+            let event = try await NDKEventBuilder(ndk: ndk)
+                .kind(9802) // NIP-84 highlight kind
+                .content(highlight.comment ?? highlight.content)
+                .tags(tags)
+                .build(signer: signer)
             
             // Publish with optimistic updates
             _ = try await ndk.publish(event)
