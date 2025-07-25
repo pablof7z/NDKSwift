@@ -243,10 +243,14 @@ public enum CrossMintTransfer {
         )
         
         // Get melt quote from source mint
-        let meltQuote = try await CashuSwift.getQuote(
+        let meltResponse = try await CashuSwift.getQuote(
             mint: sourceMint,
             quoteRequest: quoteRequest
-        ) as! CashuSwift.Bolt11.MeltQuote
+        )
+        
+        guard let meltQuote = meltResponse as? CashuSwift.Bolt11.MeltQuote else {
+            throw NDKError.walletError(message: "Unexpected melt quote response type")
+        }
         
         // Get available proofs for fee calculation
         let availableProofs = await proofStateManager.getAvailableProofs(mint: sourceMintURL.absoluteString)

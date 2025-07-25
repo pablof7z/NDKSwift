@@ -94,10 +94,14 @@ public enum Payment {
         )
         
         // Get melt quote from mint
-        let quote = try await CashuSwift.getQuote(
+        let response = try await CashuSwift.getQuote(
             mint: mint,
             quoteRequest: quoteRequest
-        ) as! CashuSwift.Bolt11.MeltQuote
+        )
+        
+        guard let quote = response as? CashuSwift.Bolt11.MeltQuote else {
+            throw NDKError.walletError(message: "Unexpected melt quote response type")
+        }
         
         // Get available proofs for this mint
         let availableProofs = await proofStateManager.getAvailableProofs(mint: mintURL)
@@ -217,10 +221,14 @@ public enum Payment {
             amount: Int(amount)
         )
         
-        let mintQuote = try await CashuSwift.getQuote(
+        let mintResponse = try await CashuSwift.getQuote(
             mint: destinationMint,
             quoteRequest: mintQuoteRequest
-        ) as! CashuSwift.Bolt11.MintQuote
+        )
+        
+        guard let mintQuote = mintResponse as? CashuSwift.Bolt11.MintQuote else {
+            throw NDKError.walletError(message: "Unexpected mint quote response type")
+        }
         
         let invoice = mintQuote.request
         

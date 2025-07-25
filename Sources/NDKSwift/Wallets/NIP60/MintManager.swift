@@ -164,10 +164,14 @@ public actor MintManager {
             amount: Int(amount)
         )
         
-        let quoteResponse = try await CashuSwift.getQuote(
+        let response = try await CashuSwift.getQuote(
             mint: mint,
             quoteRequest: quoteRequest
-        ) as! CashuSwift.Bolt11.MintQuote
+        )
+        
+        guard let quoteResponse = response as? CashuSwift.Bolt11.MintQuote else {
+            throw NDKError.walletError(message: "Unexpected quote response type")
+        }
         
         return quoteResponse
     }
