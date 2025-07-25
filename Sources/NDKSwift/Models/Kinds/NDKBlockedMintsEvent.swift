@@ -39,7 +39,7 @@ public struct NDKBlockedMintsEvent {
         
         // Add blocked mint tags
         for mintURL in blockedMints {
-            _ = builder.tag([NostrTagConstants.TagName.url, mintURL])
+            _ = builder.tag([NostrConstants.TagName.url, mintURL])
         }
         
         let blockedMintsEvent = try await builder.build(signer: signer)
@@ -49,7 +49,7 @@ public struct NDKBlockedMintsEvent {
     
     /// The blocked mint URLs in this event
     public var blockedMints: [String] {
-        event.tags.tagValues(named: NostrTagConstants.TagName.url)
+        event.tags.tagValues(named: NostrConstants.TagName.url)
     }
     
     /// Check if a specific mint URL is blocked

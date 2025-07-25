@@ -27,26 +27,26 @@ public struct NDKNutzap {
         let totalAmount = proofs.reduce(0) { $0 + Int64($1.amount) }
         
         // Add mint URL (u tag per NIP-61)
-        tags.append([NostrTagConstants.TagName.url, mint.absoluteString])
+        tags.append([NostrConstants.TagName.url, mint.absoluteString])
         
         // Add recipient
-        tags.append([NostrTagConstants.TagName.pubkey, recipient.pubkey])
+        tags.append([NostrConstants.TagName.pubkey, recipient.pubkey])
         
         // Add amount tag
-        tags.append([NostrTagConstants.TagName.amount, String(totalAmount)])
+        tags.append([NostrConstants.TagName.amount, String(totalAmount)])
         
         // Add unit tag (hardcoded to "sat")
-        tags.append([NostrTagConstants.TagName.unit, "sat"])
+        tags.append([NostrConstants.TagName.unit, "sat"])
         
         // Add proof tags
         for proof in proofs {
             let proofString = try JSONCoding.encodeToString(proof)
-            tags.append([NostrTagConstants.TagName.proof, proofString])
+            tags.append([NostrConstants.TagName.proof, proofString])
         }
         
         // Add zapped event if present
         if let zappedEvent = zappedEvent {
-            tags.append([NostrTagConstants.TagName.event, zappedEvent.id, ""])
+            tags.append([NostrConstants.TagName.event, zappedEvent.id, ""])
         }
         
         let event = try await NDKEventBuilder(ndk: ndk)
@@ -69,7 +69,7 @@ public struct NDKNutzap {
     /// Cashu proofs
     public var proofs: [CashuSwift.Proof] {
         return event.tags
-            .filter { $0.first == NostrTagConstants.TagName.proof }
+            .filter { $0.first == NostrConstants.TagName.proof }
             .compactMap { tag in
                 guard let proofJSON = tag[safe: 1] else { return nil }
                 return JSONCoding.safeDecode(CashuSwift.Proof.self, from: proofJSON)
@@ -78,7 +78,7 @@ public struct NDKNutzap {
     
     /// Mint URL
     public var mintURL: URL? {
-        guard let urlString = event.tags.first(where: { $0.first == NostrTagConstants.TagName.url })?[safe: 1] else {
+        guard let urlString = event.tags.first(where: { $0.first == NostrConstants.TagName.url })?[safe: 1] else {
             return nil
         }
         return URL(string: urlString)
@@ -86,12 +86,12 @@ public struct NDKNutzap {
     
     /// Recipient's pubkey
     public var recipientPubkey: String? {
-        return event.tags.first(where: { $0.first == NostrTagConstants.TagName.pubkey })?[safe: 1]
+        return event.tags.first(where: { $0.first == NostrConstants.TagName.pubkey })?[safe: 1]
     }
     
     /// Zapped event ID if this is zapping an event
     public var zappedEventId: String? {
-        return event.tags.first(where: { $0.first == NostrTagConstants.TagName.event })?[safe: 1]
+        return event.tags.first(where: { $0.first == NostrConstants.TagName.event })?[safe: 1]
     }
     
     /// Total amount in the proofs
@@ -204,7 +204,7 @@ public struct NDKNutzapPreferences {
     public var p2pkPubkey: String {
         get async {
             // Look for p2pk tag (as per NIP-61)
-            if let pubkey = event.tags.firstTagValue(named: NostrTagConstants.TagName.p2pk) {
+            if let pubkey = event.tags.firstTagValue(named: NostrConstants.TagName.p2pk) {
                 return pubkey
             }
             // Fall back to event author's pubkey

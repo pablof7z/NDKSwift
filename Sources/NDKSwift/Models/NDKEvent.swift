@@ -276,7 +276,7 @@ public struct NDKEvent: Codable, Equatable, Hashable, Sendable {
     public var tagAddress: String {
         if isParameterizedReplaceable {
             // Parameterized replaceable events
-            let dTag = tags.firstTagValue(named: NostrTagConstants.TagName.identifier) ?? ""
+            let dTag = tags.firstTagValue(named: NostrConstants.TagName.identifier) ?? ""
             return "\(kind):\(pubkey):\(dTag)"
         } else if isReplaceable {
             // Regular replaceable events - NIP-01 requires trailing colon

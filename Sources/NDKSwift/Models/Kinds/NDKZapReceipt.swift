@@ -13,17 +13,17 @@ public struct NDKZapReceipt {
     
     /// The bolt11 invoice
     public var bolt11: String? {
-        return event.tags.first(where: { $0.first == NostrTagConstants.TagName.bolt11 })?[safe: 1]
+        return event.tags.first(where: { $0.first == NostrConstants.TagName.bolt11 })?[safe: 1]
     }
     
     /// The preimage (payment proof)
     public var preimage: String? {
-        return event.tags.first(where: { $0.first == NostrTagConstants.TagName.preimage })?[safe: 1]
+        return event.tags.first(where: { $0.first == NostrConstants.TagName.preimage })?[safe: 1]
     }
     
     /// The original zap request as JSON
     public var descriptionJSON: String? {
-        return event.tags.first(where: { $0.first == NostrTagConstants.TagName.description })?[safe: 1]
+        return event.tags.first(where: { $0.first == NostrConstants.TagName.description })?[safe: 1]
     }
     
     /// The decoded zap request
@@ -130,24 +130,24 @@ public struct NDKZapReceipt {
         // Copy p, e, a, P tags from zap request
         for tag in zapRequest.event.tags {
             if let tagName = tag.first,
-               [NostrTagConstants.TagName.pubkey, 
-                NostrTagConstants.TagName.event, 
-                NostrTagConstants.TagName.address, 
-                NostrTagConstants.TagName.uppercasePubkey].contains(tagName) {
+               [NostrConstants.TagName.pubkey, 
+                NostrConstants.TagName.event, 
+                NostrConstants.TagName.address, 
+                NostrConstants.TagName.uppercasePubkey].contains(tagName) {
                 tags.append(tag)
             }
         }
         
         // Add bolt11 tag
-        tags.append([NostrTagConstants.TagName.bolt11, bolt11])
+        tags.append([NostrConstants.TagName.bolt11, bolt11])
         
         // Add description tag (JSON-encoded zap request)
         let description = try zapRequest.encodeForCallback()
-        tags.append([NostrTagConstants.TagName.description, description])
+        tags.append([NostrConstants.TagName.description, description])
         
         // Add preimage if available
         if let preimage = preimage {
-            tags.append([NostrTagConstants.TagName.preimage, preimage])
+            tags.append([NostrConstants.TagName.preimage, preimage])
         }
         
         let event = try await NDKEventBuilder(ndk: ndk)

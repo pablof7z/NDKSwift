@@ -238,8 +238,3 @@ public enum NostrConstants {
         public static let expiration = "expiration"
     }
 }
-
-// MARK: - Compatibility Type Aliases (for backward compatibility during migration)
-
-public typealias NostrTagConstants = NostrConstants
-public typealias NostrJSONConstants = NostrConstants.JSONField

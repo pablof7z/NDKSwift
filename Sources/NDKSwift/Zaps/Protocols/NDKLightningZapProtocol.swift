@@ -367,7 +367,7 @@ public class NDKLightningZapProtocol: NDKZapProtocol {
         let events = await dataSource.collect(timeout: NetworkConstants.timeoutDataCollectionMedium)
         if let relayListEvent = events.mostRecent {
             let eventTags = relayListEvent.tags
-            let relays = eventTags.tagValues(named: NostrTagConstants.TagName.reference)
+            let relays = eventTags.tagValues(named: NostrConstants.TagName.reference)
             
             if !relays.isEmpty {
                 return relays
