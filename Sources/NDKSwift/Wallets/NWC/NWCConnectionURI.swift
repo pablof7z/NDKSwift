@@ -68,8 +68,8 @@ public struct NWCConnectionURI {
         self.relayURLs = relays
 
         // Extract secret
-        guard let secret = queryItems.first(where: { $0.name == "secret" })?.value else {
-            throw NDKError.missingRequired("secret", in: "NWC URI")
+        guard let secret = queryItems.first(where: { $0.name == NostrConstants.JSONField.secret })?.value else {
+            throw NDKError.missingRequired(NostrConstants.JSONField.secret, in: "NWC URI")
         }
 
         // Validate secret format (64 character hex)
@@ -118,7 +118,7 @@ public struct NWCConnectionURI {
         for relay in relayURLs {
             queryItems.append(URLQueryItem(name: NostrConstants.JSONField.relay, value: relay))
         }
-        queryItems.append(URLQueryItem(name: "secret", value: self.secret))
+        queryItems.append(URLQueryItem(name: NostrConstants.JSONField.secret, value: self.secret))
         if let lud16 = lud16 {
             queryItems.append(URLQueryItem(name: "lud16", value: lud16))
         }

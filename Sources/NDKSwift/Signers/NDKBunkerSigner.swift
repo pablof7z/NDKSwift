@@ -64,7 +64,7 @@ struct BunkerURLParser {
                 if let relay = item.value {
                     relays.append(relay)
                 }
-            case "secret":
+            case NostrConstants.JSONField.secret:
                 secret = item.value
             default:
                 break
@@ -543,7 +543,7 @@ public actor NDKBunkerSigner: NDKSigner, Sendable {
             "bunkerPubkey": bunkerPubkey ?? "",
             "userPubkey": userPubkey ?? "",
             "relayUrls": relayUrls,
-            "secret": secret ?? "",
+            NostrConstants.JSONField.secret: secret ?? "",
             "localSignerData": try await localSigner.serialize(),
             "connectionType": connectionType.rawValue
         ]
@@ -561,7 +561,7 @@ public actor NDKBunkerSigner: NDKSigner, Sendable {
         guard let bunkerPubkey = payload["bunkerPubkey"] as? String,
               let userPubkey = payload["userPubkey"] as? String,
               let relayUrls = payload["relayUrls"] as? [String],
-              let secret = payload["secret"] as? String,
+              let secret = payload[NostrConstants.JSONField.secret] as? String,
               let localSignerData = payload["localSignerData"] as? Data,
               let connectionTypeRaw = payload["connectionType"] as? String else {
             throw NDKSignerRegistryError.deserializationError("Missing required bunker signer data")
