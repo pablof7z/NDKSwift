@@ -219,13 +219,13 @@ struct ParticleLayer: View {
     var body: some View {
         ZStack {
             ForEach(particles) { particle in
-                ParticleView(particle: particle)
+                HeatmapParticleView(particle: particle)
             }
         }
     }
 }
 
-struct ParticleView: View {
+struct HeatmapParticleView: View {
     let particle: ParticlePosition
     @State private var opacity: Double = 1.0
     @State private var scale: Double = 0.5

@@ -519,7 +519,7 @@ class FeedViewModel: ObservableObject {
         profileTasks[pubkey] = Task {
             guard let profileManager = ndk.profileManager else { return }
             
-            for await profile in await profileManager.observe(for: pubkey, maxAge: 3600) {
+            for await profile in await profileManager.observe(for: pubkey) {
                 if let profile = profile {
                     await MainActor.run {
                         updateItemsWithProfile(pubkey: pubkey, profile: profile)

@@ -711,65 +711,9 @@ struct CameraImportView: View {
 
 // MARK: - Supporting Types
 
-enum ImportSource: Identifiable {
-    case file(URL)
-    case web(URL)
-    case text(String)
-    
-    var id: String {
-        switch self {
-        case .file(let url): return url.absoluteString
-        case .web(let url): return url.absoluteString
-        case .text(let string): return string.prefix(50).description
-        }
-    }
-}
 
-struct ExtractedContent: Identifiable {
-    let id = UUID()
-    let title: String
-    let author: String?
-    let content: String
-    let source: ImportSource
-    let suggestedHighlights: [SuggestedHighlight]
-}
 
-struct SuggestedHighlight: Identifiable {
-    let id = UUID()
-    let text: String
-    let context: String
-    let confidence: Double
-    let tags: [[String]]
-    var isSelected: Bool = true
-    
-    var importance: HighlightImportance {
-        switch confidence {
-        case 0.8...: return .high
-        case 0.5..<0.8: return .medium
-        default: return .low
-        }
-    }
-}
 
-enum HighlightImportance {
-    case high, medium, low
-    
-    var color: Color {
-        switch self {
-        case .high: return .orange
-        case .medium: return .yellow
-        case .low: return .gray
-        }
-    }
-    
-    var icon: String {
-        switch self {
-        case .high: return "star.fill"
-        case .medium: return "star.leadinghalf.filled"
-        case .low: return "star"
-        }
-    }
-}
 
 // MARK: - Content Import Manager
 

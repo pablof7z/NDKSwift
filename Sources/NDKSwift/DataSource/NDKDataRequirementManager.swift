@@ -72,6 +72,9 @@ actor NDKDataRequirementManager {
         let correlationId = requirementId.uuidString.prefix(8)
 
         NDKLogger.log(.info, category: .subscription, "📥 [DataReqManager] registerRequirement - filter: \(filter), maxAge: \(maxAge), policy: \(cachePolicy), subscriptionId: \(subscriptionId ?? "auto")", correlationId: String(correlationId))
+        
+        // MARK: - OUTBOX_DEBUG_HOOK
+        await NDKDebugHooks.emit(.flowStep(description: "DataRequirementManager registering requirement for filter"))
 
         // IMMEDIATELY register cache observer to deliver existing events
         // This happens before any delay, giving instant cache hits
@@ -267,6 +270,10 @@ actor NDKDataRequirementManager {
                 // Handle outbox model filter decomposition
                 if relays == nil && ndk.outboxEnabled && optimizedFilter.authors != nil {
                     NDKLogger.log(.info, category: .subscription, "[DataReqManager] Using outbox strategy for filter")
+                    
+                    // MARK: - OUTBOX_DEBUG_HOOK
+                    await NDKDebugHooks.emit(.flowStep(description: "DataRequirementManager requesting outbox strategy"))
+                    
                     let outboxStrategy = await ndk.outbox.getOutboxStrategy(for: optimizedFilter)
 
                     // Start background discovery if needed

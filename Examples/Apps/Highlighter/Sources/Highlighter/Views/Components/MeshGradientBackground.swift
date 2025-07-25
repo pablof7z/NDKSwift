@@ -6,7 +6,7 @@ struct MeshGradientBackground: View {
     @Environment(\.colorScheme) var colorScheme
     
     var body: some View {
-        TimelineView(.animation) { timeline in
+        TimelineView(.animation) { (timeline: TimelineViewDefaultContext) in
             Canvas { context, size in
                 let time = timeline.date.timeIntervalSinceReferenceDate
                 

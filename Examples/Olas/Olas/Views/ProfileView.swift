@@ -401,7 +401,7 @@ class ProfileViewModel: ObservableObject {
         Task {
             guard let profileManager = ndk.profileManager else { return }
             
-            for await profile in await profileManager.observe(for: pubkey, maxAge: 3600) {
+            for await profile in await profileManager.observe(for: pubkey) {
                 if let profile = profile {
                     await MainActor.run {
                         self.profile = profile

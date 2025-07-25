@@ -24,6 +24,12 @@ public actor NDKOutboxManager {
     }
 
     // MARK: - Public API
+    
+    // MARK: - OUTBOX_DEBUG_HOOK
+    /// Get cached outbox information for a user (for debugging)
+    public func getCachedOutbox(for pubkey: String) async -> NDKOutboxItem? {
+        await tracker.getRelaysSyncFor(pubkey: pubkey)
+    }
 
     /// Stream of relay update events for monitoring
     public var relayUpdates: AsyncStream<RelayUpdateEvent> {
@@ -152,8 +158,15 @@ public actor NDKOutboxManager {
     /// - Parameter filter: The filter to analyze
     /// - Returns: Strategy with filters broken down by relay
     public func getOutboxStrategy(for filter: NDKFilter) async -> OutboxFilterStrategy {
+        // MARK: - OUTBOX_DEBUG_HOOK
+        await NDKDebugHooks.emit(.outboxStrategyRequested(filter: filter))
+        
         guard let authors = filter.authors, !authors.isEmpty else {
             NDKLogger.log(.debug, category: .outbox, "📡 No authors in filter, no outbox strategy needed")
+            
+            // MARK: - OUTBOX_DEBUG_HOOK
+            await NDKDebugHooks.emit(.flowStep(description: "No authors in filter, returning empty strategy"))
+            
             return OutboxFilterStrategy(
                 filtersByRelay: [:],
                 unknownAuthors: [],
@@ -162,6 +175,9 @@ public actor NDKOutboxManager {
         }
 
         NDKLogger.log(.info, category: .outbox, "📡 Building outbox strategy for \(authors.count) authors")
+        
+        // MARK: - OUTBOX_DEBUG_HOOK
+        await NDKDebugHooks.emit(.flowStep(description: "Building outbox strategy for \(authors.count) authors"))
 
         var filtersByRelay: [RelayURL: NDKFilter] = [:]
         var unknownAuthors = Set<String>()
@@ -171,8 +187,13 @@ public actor NDKOutboxManager {
         var relayToAuthors: [RelayURL: Set<String>] = [:]
 
         for author in authors {
+            // MARK: - OUTBOX_DEBUG_HOOK
+            await NDKDebugHooks.emit(.outboxLookupStarted(pubkey: author))
+            
             // Get cached relay info synchronously (non-blocking)
             if let item = await tracker.getRelaysSyncFor(pubkey: author, type: .read) {
+                // MARK: - OUTBOX_DEBUG_HOOK
+                await NDKDebugHooks.emit(.outboxLookupCompleted(pubkey: author, found: true))
                 // Author has known read relays - prefer these for fetching
                 let readRelays = item.readRelays.map { $0.url }
 

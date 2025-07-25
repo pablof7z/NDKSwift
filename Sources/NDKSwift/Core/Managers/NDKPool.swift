@@ -164,6 +164,9 @@ public actor NDKPool {
             return blockedRelay
         }
 
+        // MARK: - OUTBOX_DEBUG_HOOK
+        await NDKDebugHooks.emit(.poolConnecting(relay: normalizedUrl))
+        
         // Create new relay
         let relay = NDKRelay(url: normalizedUrl)
         if let ndk = ndk {

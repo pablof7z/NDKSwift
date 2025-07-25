@@ -652,32 +652,7 @@ extension AnyTransition {
 // MARK: - Animated Components (From ModernAnimations.swift)
 
 // MARK: - Mesh Gradient Background
-struct MeshGradientBackground: View {
-    @State private var animateGradient = false
-    let colors: [Color]
-    
-    init(colors: [Color] = [
-        DesignSystem.Colors.primary.opacity(0.3),
-        DesignSystem.Colors.secondary.opacity(0.3),
-        DesignSystem.Colors.primaryDark.opacity(0.2)
-    ]) {
-        self.colors = colors
-    }
-    
-    var body: some View {
-        LinearGradient(
-            colors: colors,
-            startPoint: animateGradient ? .topLeading : .bottomLeading,
-            endPoint: animateGradient ? .bottomTrailing : .topTrailing
-        )
-        .blur(radius: 50)
-        .onAppear {
-            withAnimation(.easeInOut(duration: 5).repeatForever(autoreverses: true)) {
-                animateGradient.toggle()
-            }
-        }
-    }
-}
+// Note: MeshGradientBackground is defined in Views/Components/MeshGradientBackground.swift
 
 struct ModernLoadingIndicator: View {
     @State private var rotation = 0.0

@@ -109,7 +109,7 @@ struct HighlightsFeedView: View {
         // Don't reload if we already have it
         if authorProfiles[author] != nil { return }
         
-        for await profile in await ndk.profileManager.observe(for: author, maxAge: 3600) {
+        for await profile in await ndk.profileManager.observe(for: author) {
             await MainActor.run {
                 self.authorProfiles[author] = profile
             }

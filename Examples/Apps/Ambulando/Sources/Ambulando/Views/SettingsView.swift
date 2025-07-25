@@ -111,7 +111,7 @@ struct SettingsView: View {
             appState.currentUser = currentUser
             
             // Fetch profile using NDKProfileManager
-            for await profile in await ndk.profileManager.observe(for: pubkey, maxAge: 3600) {
+            for await profile in await ndk.profileManager.observe(for: pubkey) {
                 userProfile = profile
                 break // Take first profile
             }

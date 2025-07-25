@@ -2,231 +2,177 @@
 
 ## Overview
 
-The profile manager in NDKSwift fetches and parses user metadata (kind:0 events). Instead of caching whether we found or didn't find a profile event, we cache the **parsed profile data** itself, including the absence of a profile.
+The profile manager in NDKSwift provides an in-memory LRU cache for user profiles that is always synchronized with the database. When profile updates arrive from relays, both the memory cache and database are updated together, ensuring consistency.
 
-## The Problem
+## Architecture
 
-Without proper caching, the profile manager would:
-1. Query for kind:0 for every profile display
-2. Parse the JSON metadata
-3. Validate and transform the data
-4. Repeat this even when showing the same profile multiple times
+The caching system consists of:
+1. **In-memory LRU cache** in `NDKProfileManager` for fast access
+2. **Persistent storage** in the database (SQLite or other cache adapter)
+3. **Automatic synchronization** between memory and persistent storage
 
-This is especially wasteful in feed views where the same authors appear repeatedly.
+## Key Design Principles
 
-## The Solution: Semantic Profile Caching
+### Always Synchronized
 
-Cache the **parsed profile object**, not the raw event:
+The memory cache and database are updated atomically when new profile events arrive:
+- Profile updates from relays update both caches simultaneously
+- There's no scenario where the database has newer data than memory cache
+- No "staleness" exists between cache layers
+
+### LRU Memory Cache
+
+The in-memory cache uses LRU (Least Recently Used) eviction:
 
 ```swift
-enum CachedProfile {
-    case profile(NDKUserProfile, fetchedAt: Date)
-    case noProfile(checkedAt: Date)  // User has no profile
-    case error(Error, occurredAt: Date)  // Parse/fetch error
+// Simple cache entry without staleness tracking
+private struct ProfileCacheEntry {
+    let profile: NDKUserProfile
 }
 
-struct NDKUserProfile {
-    let pubkey: Pubkey
-    let name: String?
-    let displayName: String?
-    let about: String?
-    let picture: URL?
-    let banner: URL?
-    let nip05: String?
-    let lud16: String?
-    let website: URL?
-    // Computed properties
-    var hasLightningAddress: Bool { lud16 != nil }
+// In-memory LRU cache
+private var profileCache: [PublicKey: ProfileCacheEntry] = [:]
+private var cacheOrder: [PublicKey] = [] // For LRU tracking
+```
+
+The cache stores parsed `NDKUserProfile` objects to avoid repeated JSON decoding.
+
+## How It Works
+
+### Profile Loading Flow
+
+1. **Cache Hit (Fastest Path)**:
+   - Check memory cache
+   - If found → return immediately
+   - No database access, no JSON decoding
+   - Just a dictionary lookup: O(1)
+
+2. **Cache Miss**:
+   - Memory cache miss → fetch from database
+   - Database loads and decodes the profile
+   - Result stored in memory cache
+   - Future requests hit memory cache
+
+3. **Profile Updates**:
+   - New profile event arrives from relay
+   - Update memory cache
+   - Update database
+   - Notify all active observers
+
+### The `forceNetworkFetch` Parameter
+
+The `observe` method accepts a `forceNetworkFetch` parameter that controls network behavior:
+
+```swift
+// Use cached data if available (default)
+for await profile in profileManager.observe(for: pubkey) {
+    // Returns cached profile immediately, then updates
+}
+
+// Force checking relays for updates
+for await profile in profileManager.observe(for: pubkey, forceNetworkFetch: true) {
+    // Checks relays even if profile is cached
 }
 ```
 
-## Cache Implementation
+This parameter only affects **network fetching**, not cache usage:
+- `false` (default): Return cached data immediately if available
+- `true`: Always check relays for updates (useful for profile pages)
+
+## Implementation Details
+
+### Memory Cache Management
 
 ```swift
-actor ProfileCache {
-    private var cache: [Pubkey: CachedProfile] = [:]
-    private var observers: [Pubkey: Set<ProfileObserver>] = [:]
-    private let defaultMaxAge: TimeInterval = 3600  // 1 hour default
+private func updateCache(pubkey: PublicKey, profile: NDKUserProfile) {
+    // Remove old entry if exists
+    if profileCache[pubkey] != nil {
+        cacheOrder.removeAll(value: pubkey)
+    }
     
-    func getProfile(
-        for pubkey: Pubkey,
-        maxAge: TimeInterval? = nil
-    ) async -> NDKUserProfile? {
-        guard let cached = cache[pubkey] else { return nil }
-        
-        let effectiveMaxAge = maxAge ?? defaultMaxAge
-        
-        switch cached {
-        case .profile(let profile, let fetchedAt):
-            if Date().timeIntervalSince(fetchedAt) <= effectiveMaxAge {
-                return profile
-            }
-        case .noProfile(let checkedAt):
-            if Date().timeIntervalSince(checkedAt) <= effectiveMaxAge {
-                return nil  // Still fresh "no profile" result
-            }
-        case .error(_, let occurredAt):
-            if Date().timeIntervalSince(occurredAt) <= effectiveMaxAge {
-                return nil  // Don't retry errors too quickly
-            }
+    // Add new entry
+    profileCache[pubkey] = ProfileCacheEntry(profile: profile)
+    cacheOrder.append(pubkey)
+    
+    // Enforce cache size limit
+    while cacheOrder.count > config.cacheSize {
+        if let oldestKey = cacheOrder.first {
+            profileCache.removeValue(forKey: oldestKey)
+            cacheOrder.removeFirst()
         }
-        
-        return nil  // Cache miss or stale
-    }
-    
-    func setProfile(for pubkey: Pubkey, profile: NDKUserProfile) async {
-        cache[pubkey] = .profile(profile, fetchedAt: Date())
-        await notifyObservers(pubkey: pubkey, profile: profile)
-    }
-    
-    func setNoProfile(for pubkey: Pubkey) async {
-        cache[pubkey] = .noProfile(checkedAt: Date())
-        await notifyObservers(pubkey: pubkey, profile: nil)
     }
 }
 ```
 
-## Integration with Profile Manager
+### LRU Ordering
+
+When a profile is accessed, it's moved to the end of the LRU list:
 
 ```swift
-extension NDKProfileManager {
-    func fetchProfile(
-        for pubkey: Pubkey,
-        maxAge: TimeInterval = 3600
-    ) async -> NDKUserProfile? {
-        // 1. Check cache first
-        if let cached = await cache.getProfile(for: pubkey, maxAge: maxAge) {
-            return cached
-        }
-        
-        // 2. Not in cache or stale - fetch kind:0
-        let dataSource = CoreDataSource(
-            filter: NDKFilter(authors: [pubkey], kinds: [0], limit: 1),
-            maxAge: 0  // Keep subscription open for profile updates
-        )
-        
-        // 3. Get the most recent profile event
-        guard let event = await dataSource.first() else {
-            // No profile found
-            await cache.setNoProfile(for: pubkey)
-            return nil
-        }
-        
-        // 4. Parse the profile
-        do {
-            let profile = try parseProfile(from: event)
-            await cache.setProfile(for: pubkey, profile: profile)
-            return profile
-        } catch {
-            await cache.setError(for: pubkey, error: error)
-            return nil
-        }
-    }
-    
-    func observeProfile(
-        for pubkey: Pubkey,
-        maxAge: TimeInterval = 3600
-    ) -> AsyncStream<NDKUserProfile?> {
-        AsyncStream { continuation in
-            Task {
-                // 1. Add observer
-                let observer = ProfileObserver(continuation: continuation)
-                await cache.addObserver(observer, for: pubkey)
-                
-                // 2. Send current value if fresh
-                if let profile = await cache.getProfile(for: pubkey, maxAge: maxAge) {
-                    continuation.yield(profile)
-                }
-                
-                // 3. Create reactive data source
-                let dataSource = CoreDataSource(
-                    filter: NDKFilter(authors: [pubkey], kinds: [0]),
-                    maxAge: 0  // Keep open for updates
-                )
-                
-                // 4. React to updates
-                for await event in dataSource.events {
-                    if let profile = try? parseProfile(from: event) {
-                        await cache.setProfile(for: pubkey, profile: profile)
-                        // Observers notified automatically
-                    }
-                }
-            }
-        }
-    }
+private func updateCacheOrder(for pubkey: PublicKey) {
+    // Move to end (most recently used)
+    cacheOrder.removeAll(value: pubkey)
+    cacheOrder.append(pubkey)
 }
 ```
 
 ## Key Benefits
 
-1. **Parsed Data Caching**: Cache the expensive JSON parsing, not just raw events
-2. **Negative Result Caching**: Remember when users have no profile
-3. **Error Caching**: Don't hammer relays after parse errors
-4. **Reactive Updates**: Support both one-shot and continuous observation
+1. **No Database Round-trips**: Previously loaded profiles are served from memory
+2. **No JSON Decoding**: Parsed profiles are kept in memory
+3. **Automatic Synchronization**: Memory and database always in sync
+4. **LRU Eviction**: Frequently accessed profiles stay in memory
+5. **Configurable Cache Size**: Default from `NetworkConstants.profileCacheSize`
 
-## Special Considerations
+## Performance Characteristics
 
-### Memory Management
+- **Cache Hit**: O(1) dictionary lookup, no I/O
+- **Cache Miss**: Database query + JSON decode + memory cache update
+- **Updates**: Both caches updated atomically
+- **Memory Usage**: Bounded by cache size configuration
 
-Profiles can contain image URLs and large text fields. Implement intelligent eviction:
+## Usage Examples
+
+### Feed View (Many Profiles)
 
 ```swift
-extension ProfileCache {
-    private let maxCacheSize = 5_000  // Limit total profiles
-    private let maxLRUSize = 1_000   // Keep 1k most recent in fast cache
-    
-    func evictLeastRecentlyUsed() async {
-        // Remove oldest entries when over limit
+// Use cached data, don't force network checks
+for await profile in profileManager.observe(for: pubkey) {
+    // Display profile
+    break // If you only need one value
+}
+```
+
+### Profile Page (Focused View)
+
+```swift
+// Force network check to ensure fresh data
+for await profile in profileManager.observe(for: pubkey, forceNetworkFetch: true) {
+    // Display and react to updates
+}
+```
+
+### Batch Loading
+
+```swift
+// Load multiple profiles efficiently
+for pubkey in pubkeys {
+    Task {
+        for await profile in profileManager.observe(for: pubkey) {
+            // Cache will prevent redundant fetches
+            updateUI(pubkey: pubkey, profile: profile)
+            break
+        }
     }
 }
 ```
 
-### Freshness by Context
-
-Different UI contexts need different freshness:
+## Configuration
 
 ```swift
-// Feed view - many profiles, older data acceptable
-let profile = await profileManager.fetchProfile(
-    for: authorPubkey,
-    maxAge: 3600  // 1 hour
+let config = NDKProfileConfig(
+    cacheSize: 1000  // Keep 1000 profiles in memory
 )
 
-// Profile page - focused view, want fresh data
-let profile = await profileManager.observeProfile(
-    for: profilePubkey,
-    maxAge: 60  // 1 minute
-)
-
-// Settings/edit - need real-time updates
-let profileStream = await profileManager.observeProfile(
-    for: ownPubkey,
-    maxAge: 0  // Always fresh
-)
+let profileManager = NDKProfileManager(ndk: ndk, config: config)
 ```
-
-### Placeholder Handling
-
-When profile is missing or loading:
-
-```swift
-extension NDKUserProfile {
-    static func placeholder(pubkey: Pubkey) -> NDKUserProfile {
-        NDKUserProfile(
-            pubkey: pubkey,
-            name: nil,
-            displayName: String(pubkey.prefix(8)) + "...",
-            about: nil,
-            picture: nil,
-            // ... other fields nil
-        )
-    }
-}
-```
-
-## Migration Path
-
-The existing profile manager can be gradually migrated:
-1. Add caching layer alongside existing code
-2. Update UI components to use cached profiles
-3. Remove old fetching logic once stable

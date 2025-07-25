@@ -154,7 +154,7 @@ struct FollowPackDetailView: View {
         guard let ndk = appState.ndk else { return }
         
         // Load creator profile
-        for await profile in await ndk.profileManager.observe(for: followPack.author, maxAge: 3600) {
+        for await profile in await ndk.profileManager.observe(for: followPack.author) {
             await MainActor.run {
                 self.creator = profile
             }
@@ -164,7 +164,7 @@ struct FollowPackDetailView: View {
         // Load profiles in the pack
         for pubkey in followPack.profiles {
             Task {
-                for await profile in await ndk.profileManager.observe(for: pubkey, maxAge: 3600) {
+                for await profile in await ndk.profileManager.observe(for: pubkey) {
                     await MainActor.run {
                         self.profiles[pubkey] = profile
                     }

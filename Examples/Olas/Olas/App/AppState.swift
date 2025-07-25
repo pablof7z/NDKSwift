@@ -72,7 +72,7 @@ class AppState: ObservableObject {
         
         // Observe profile updates
         Task {
-            for await profile in await profileManager.observe(for: pubkey, maxAge: 3600) {
+            for await profile in await profileManager.observe(for: pubkey) {
                 await MainActor.run {
                     self.currentUserProfile = profile
                 }

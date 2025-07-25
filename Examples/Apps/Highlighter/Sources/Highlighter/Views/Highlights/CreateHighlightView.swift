@@ -14,6 +14,8 @@ struct CreateHighlightView: View {
     @State private var isImporting = false
     @State private var animateBackground = false
     @State private var showSmartImporter = false
+    @State private var showAIAnalysis = false
+    @State private var aiButtonGlow = false
     @Environment(\.dismiss) var dismiss
     
     enum HighlightMode: CaseIterable {
@@ -54,7 +56,7 @@ struct CreateHighlightView: View {
         NavigationStack {
             ZStack {
                 // Animated gradient background
-                AnimatedGradientBackground(animate: $animateBackground)
+                CreateHighlightGradientBackground(animate: $animateBackground)
                 
                 ScrollView {
                     VStack(spacing: 24) {
@@ -138,6 +140,13 @@ struct CreateHighlightView: View {
                     author: sourceAuthor.isEmpty ? nil : sourceAuthor
                 )
             }
+            .fullScreenCover(isPresented: $showAIAnalysis) {
+                AIAnalysisVisualizationView(
+                    text: pastedText,
+                    source: sourceTitle.isEmpty ? nil : sourceTitle,
+                    author: sourceAuthor.isEmpty ? nil : sourceAuthor
+                )
+            }
             // .fullScreenCover(isPresented: $showSmartImporter) {
             //     SmartArticleImportView()
             // }
@@ -191,6 +200,24 @@ struct CreateHighlightView: View {
                     placeholder: "Author (optional)",
                     text: $sourceAuthor
                 )
+            }
+            
+            // AI Analysis Card
+            if !pastedText.isEmpty {
+                AIAnalysisCard(
+                    hasText: !pastedText.isEmpty,
+                    glowing: aiButtonGlow,
+                    action: {
+                        HapticManager.shared.impact(.medium)
+                        showAIAnalysis = true
+                    }
+                )
+                .transition(.scale.combined(with: .opacity))
+                .onAppear {
+                    withAnimation(.easeInOut(duration: 2).repeatForever(autoreverses: true)) {
+                        aiButtonGlow = true
+                    }
+                }
             }
         }
     }
@@ -434,7 +461,7 @@ struct ArticlePlaceholderCard: View {
     }
 }
 
-struct AnimatedGradientBackground: View {
+struct CreateHighlightGradientBackground: View {
     @Binding var animate: Bool
     
     var body: some View {
@@ -475,6 +502,158 @@ struct ModernTextField: View {
             RoundedRectangle(cornerRadius: 12)
                 .strokeBorder(Color.orange.opacity(0.2), lineWidth: 1)
         )
+    }
+}
+
+// MARK: - AI Analysis Card
+
+struct AIAnalysisCard: View {
+    let hasText: Bool
+    let glowing: Bool
+    let action: () -> Void
+    @State private var neuralPulse = false
+    @State private var particleOffset: CGFloat = 0
+    
+    var body: some View {
+        Button(action: action) {
+            ZStack {
+                // Quantum gradient background
+                RoundedRectangle(cornerRadius: 20, style: .continuous)
+                    .fill(
+                        LinearGradient(
+                            colors: [
+                                Color(red: 0.5, green: 0.0, blue: 1.0),
+                                Color(red: 0.0, green: 0.5, blue: 1.0),
+                                Color(red: 0.5, green: 0.0, blue: 1.0)
+                            ],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+                    .opacity(glowing ? 0.8 : 0.6)
+                
+                // Neural network overlay
+                NeuralNetworkOverlay()
+                    .opacity(glowing ? 0.5 : 0.3)
+                
+                // Holographic shimmer
+                RoundedRectangle(cornerRadius: 20, style: .continuous)
+                    .fill(
+                        LinearGradient(
+                            colors: [
+                                Color.clear,
+                                Color.white.opacity(0.3),
+                                Color.clear
+                            ],
+                            startPoint: .leading,
+                            endPoint: .trailing
+                        )
+                    )
+                    .offset(x: particleOffset)
+                    .mask(
+                        RoundedRectangle(cornerRadius: 20, style: .continuous)
+                    )
+                
+                HStack(spacing: 16) {
+                    // Animated AI icon
+                    ZStack {
+                        Circle()
+                            .fill(Color.white.opacity(0.2))
+                            .frame(width: 60, height: 60)
+                        
+                        Image(systemName: "brain.filled.head.profile")
+                            .font(.system(size: 30, weight: .bold))
+                            .foregroundStyle(
+                                LinearGradient(
+                                    colors: [.white, .cyan],
+                                    startPoint: .topLeading,
+                                    endPoint: .bottomTrailing
+                                )
+                            )
+                            .scaleEffect(neuralPulse ? 1.2 : 1.0)
+                            .rotationEffect(.degrees(neuralPulse ? 5 : -5))
+                    }
+                    
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("AI Analysis")
+                            .font(.system(size: 20, weight: .bold, design: .rounded))
+                            .foregroundColor(.white)
+                        
+                        Text("Discover intelligent highlights with quantum AI")
+                            .font(.system(size: 14))
+                            .foregroundColor(.white.opacity(0.9))
+                            .lineLimit(1)
+                    }
+                    
+                    Spacer()
+                    
+                    Image(systemName: "chevron.right.circle.fill")
+                        .font(.system(size: 24))
+                        .foregroundColor(.white)
+                        .rotationEffect(.degrees(glowing ? 180 : 0))
+                }
+                .padding(.horizontal, 20)
+                .padding(.vertical, 16)
+            }
+            .frame(height: 88)
+            .shadow(color: Color.purple.opacity(glowing ? 0.6 : 0.3), radius: glowing ? 20 : 10, y: 5)
+            .scaleEffect(glowing ? 1.02 : 1.0)
+        }
+        .buttonStyle(.plain)
+        .onAppear {
+            withAnimation(.easeInOut(duration: 1.5).repeatForever(autoreverses: true)) {
+                neuralPulse = true
+            }
+            
+            withAnimation(.linear(duration: 3).repeatForever(autoreverses: false)) {
+                particleOffset = 300
+            }
+        }
+    }
+}
+
+struct NeuralNetworkOverlay: View {
+    var body: some View {
+        GeometryReader { geometry in
+            Canvas { context, size in
+                let nodeCount = 8
+                let layerCount = 3
+                
+                for layer in 0..<layerCount {
+                    let x = size.width * CGFloat(layer + 1) / CGFloat(layerCount + 1)
+                    
+                    for node in 0..<nodeCount {
+                        let y = size.height * CGFloat(node + 1) / CGFloat(nodeCount + 1)
+                        
+                        // Draw connections to next layer
+                        if layer < layerCount - 1 {
+                            let nextX = size.width * CGFloat(layer + 2) / CGFloat(layerCount + 1)
+                            for nextNode in 0..<nodeCount {
+                                let nextY = size.height * CGFloat(nextNode + 1) / CGFloat(nodeCount + 1)
+                                
+                                let path = Path { path in
+                                    path.move(to: CGPoint(x: x, y: y))
+                                    path.addLine(to: CGPoint(x: nextX, y: nextY))
+                                }
+                                
+                                context.stroke(
+                                    path,
+                                    with: .color(.white.opacity(0.1)),
+                                    lineWidth: 0.5
+                                )
+                            }
+                        }
+                        
+                        // Draw node
+                        context.fill(
+                            Circle().path(in: CGRect(x: x - 2, y: y - 2, width: 4, height: 4)),
+                            with: .color(.white.opacity(0.3))
+                        )
+                    }
+                }
+            }
+        }
+        .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
     }
 }
 

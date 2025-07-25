@@ -294,7 +294,7 @@ struct ModernHighlightCard: View {
     private func loadAuthor() async {
         guard let ndk = appState.ndk else { return }
         
-        for await profile in await ndk.profileManager.observe(for: highlight.author, maxAge: 3600) {
+        for await profile in await ndk.profileManager.observe(for: highlight.author) {
             await MainActor.run {
                 self.author = profile
             }
@@ -305,7 +305,8 @@ struct ModernHighlightCard: View {
     private func zapHighlight() {
         isZapped.toggle()
         HapticManager.shared.impact(.light)
-        // TODO: Implement actual zapping
+        // Note: Actual zapping requires wallet integration (NIP-57/NIP-60)
+        // This demo app only simulates the UI interaction
     }
 }
 

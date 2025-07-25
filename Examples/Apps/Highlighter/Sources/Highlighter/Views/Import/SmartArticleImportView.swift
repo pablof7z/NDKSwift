@@ -957,7 +957,7 @@ struct MetricBadge: View {
 }
 
 struct SuggestedHighlightCard: View {
-    let suggestion: SuggestedHighlight
+    let suggestion: ArticleSuggestedHighlight
     let isSelected: Bool
     let action: () -> Void
     @State private var isHovered = false
@@ -1362,35 +1362,35 @@ class SmartImportManager: ObservableObject {
     func completeProcessing() {
         // Generate mock article with suggestions
         let suggestions = [
-            SuggestedHighlight(
+            ArticleSuggestedHighlight(
                 text: "The future of knowledge sharing lies in decentralized networks that empower users to own their data and insights.",
                 confidence: 0.95,
                 reason: "Key thesis statement",
                 hasContext: true,
                 category: .thesis
             ),
-            SuggestedHighlight(
+            ArticleSuggestedHighlight(
                 text: "Studies show that collaborative highlighting increases retention by 40% compared to solo reading.",
                 confidence: 0.88,
                 reason: "Important statistic",
                 hasContext: true,
                 category: .statistic
             ),
-            SuggestedHighlight(
+            ArticleSuggestedHighlight(
                 text: "The swarm intelligence approach treats every reader as a potential curator, creating emergent patterns of importance.",
                 confidence: 0.92,
                 reason: "Novel concept",
                 hasContext: true,
                 category: .insight
             ),
-            SuggestedHighlight(
+            ArticleSuggestedHighlight(
                 text: "By combining AI suggestions with human curation, we achieve a balance between efficiency and nuance.",
                 confidence: 0.85,
                 reason: "Key insight",
                 hasContext: true,
                 category: .insight
             ),
-            SuggestedHighlight(
+            ArticleSuggestedHighlight(
                 text: "The most valuable highlights are often those that spark the most discussion and engagement.",
                 confidence: 0.78,
                 reason: "Community wisdom",
@@ -1415,10 +1415,10 @@ struct ProcessedArticle {
     let title: String
     let author: String?
     let preview: String
-    let suggestedHighlights: [SuggestedHighlight]
+    let suggestedHighlights: [ArticleSuggestedHighlight]
 }
 
-struct SuggestedHighlight: Identifiable {
+struct ArticleSuggestedHighlight: Identifiable {
     let id = UUID().uuidString
     let text: String
     let confidence: Double
@@ -1528,7 +1528,7 @@ struct LiveArticlePreview: View {
         ]
     }
     
-    private func findHighlightsInParagraph(_ paragraph: String) -> [SuggestedHighlight] {
+    private func findHighlightsInParagraph(_ paragraph: String) -> [ArticleSuggestedHighlight] {
         article.suggestedHighlights.filter { highlight in
             paragraph.contains(highlight.text)
         }
@@ -1537,7 +1537,7 @@ struct LiveArticlePreview: View {
 
 struct HighlightedParagraph: View {
     let text: String
-    let highlights: [SuggestedHighlight]
+    let highlights: [ArticleSuggestedHighlight]
     let selectedSuggestions: Set<String>
     let hoveredHighlight: String?
     let onHighlightTap: (String) -> Void
@@ -1732,7 +1732,7 @@ struct ComplexityVisualization: View {
 }
 
 struct EnhancedSuggestionCard: View {
-    let suggestion: SuggestedHighlight
+    let suggestion: ArticleSuggestedHighlight
     let isSelected: Bool
     let index: Int
     let action: () -> Void

@@ -37,6 +37,10 @@ public enum NDKLogCategory: String {
 
 /// NDK Logger for configurable logging
 public enum NDKLogger {
+    // MARK: - OUTBOX_DEBUG_HOOK
+    /// Disable all logging (for debugging tools)
+    public static var isEnabled: Bool = true
+    
     /// Current log level
     public static var logLevel: NDKLogLevel = {
         #if DEBUG
@@ -63,6 +67,8 @@ public enum NDKLogger {
 
     /// Log a message at the specified level
     public static func log(_ level: NDKLogLevel, category: NDKLogCategory, _ message: String) {
+        // MARK: - OUTBOX_DEBUG_HOOK
+        guard isEnabled else { return }
         guard level <= logLevel else { return }
         guard enabledCategories.contains(category) else { return }
 

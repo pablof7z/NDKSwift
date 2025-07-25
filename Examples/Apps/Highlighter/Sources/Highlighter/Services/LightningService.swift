@@ -21,13 +21,36 @@ class LightningService: ObservableObject {
     
     // Smart split configurations
     struct SplitConfiguration {
-        var authorPercentage: Double = 0.5
-        var highlighterPercentage: Double = 0.3
-        var curatorPercentage: Double = 0.2
+        var author: Double = 0.5
+        var highlighter: Double = 0.3
+        var curator: Double = 0.15
+        var platform: Double = 0.05
+        
+        var authorPercentage: Double {
+            get { author }
+            set { author = newValue }
+        }
+        
+        var highlighterPercentage: Double {
+            get { highlighter }
+            set { highlighter = newValue }
+        }
+        
+        var curatorPercentage: Double {
+            get { curator }
+            set { curator = newValue }
+        }
         
         var isValid: Bool {
-            abs((authorPercentage + highlighterPercentage + curatorPercentage) - 1.0) < 0.001
+            abs((author + highlighter + curator + platform) - 1.0) < 0.001
         }
+        
+        static let highlight = SplitConfiguration(
+            author: 0.5,
+            highlighter: 0.3,
+            curator: 0.15,
+            platform: 0.05
+        )
     }
     
     @Published var splitConfig = SplitConfiguration()
@@ -449,102 +472,120 @@ class LightningService: ObservableObject {
         
         if author > 0 || highlighter > 0 || curator > 0 {
             splitConfig = SplitConfiguration(
-                authorPercentage: author > 0 ? author : 0.5,
-                highlighterPercentage: highlighter > 0 ? highlighter : 0.3,
-                curatorPercentage: curator > 0 ? curator : 0.2
+                author: author > 0 ? author : 0.5,
+                highlighter: highlighter > 0 ? highlighter : 0.3,
+                curator: curator > 0 ? curator : 0.2,
+                platform: 0.05
             )
         }
     }
-}
-
-// MARK: - Supporting Types
-
-struct ZapTransaction: Identifiable {
-    let id: UUID
-    let totalAmount: Int
-    let splits: [SubTransaction]
-    let highlightId: String
-    let comment: String?
-    let timestamp: Date
     
-    var formattedAmount: String {
-        "\(totalAmount.formatted()) sats"
+    // MARK: - Nested Types
+    
+        struct ZapTransaction: Identifiable {
+        let id: UUID
+        let totalAmount: Int
+        let splits: [SubTransaction]
+        let highlightId: String
+        let comment: String?
+        let timestamp: Date
+        
+        var formattedAmount: String {
+            "\(totalAmount.formatted()) sats"
+        }
     }
-}
-
-struct SubTransaction {
-    let recipientPubkey: String
-    let amount: Int
-    let role: PaymentRole
-    let paymentHash: String
-    let timestamp: Date
-}
-
-struct PaymentSplit {
-    let recipientPubkey: String
-    var amount: Int
-    let role: PaymentRole
-    let isOriginal: Bool // True for the main recipient
-}
-
-enum PaymentRole: String {
-    case author
-    case highlighter
-    case curator
-}
-
-struct PendingZap: Identifiable {
-    let id: UUID
-    let amount: Int
-    let recipientPubkey: String
-    var status: Status
     
-    enum Status {
-        case calculating
-        case sending
-        case failed(String)
+        struct SubTransaction {
+        let recipientPubkey: String
+        let amount: Int
+        let role: PaymentRole
+        let paymentHash: String
+        let timestamp: Date
     }
-}
-
-struct WalletInfo {
-    let alias: String
-    let color: String?
-    let pubkey: String
-    let network: String
-    let blockHeight: Int
-    let methods: [String]
-}
-
-// MARK: - Errors
-
-enum LightningError: LocalizedError {
-    case walletNotConnected
-    case ndkNotInitialized
-    case signerNotAvailable
-    case invalidConnectionString
-    case noLightningAddress
-    case lnurlNotImplemented
-    case insufficientBalance
-    case paymentFailed(String)
     
-    var errorDescription: String? {
-        switch self {
-        case .walletNotConnected:
-            return "Lightning wallet not connected"
-        case .ndkNotInitialized:
-            return "NDK not initialized"
-        case .signerNotAvailable:
-            return "No active signer available"
-        case .invalidConnectionString:
-            return "Invalid NWC connection string"
-        case .noLightningAddress:
-            return "Recipient has no Lightning address"
-        case .lnurlNotImplemented:
-            return "LNURL support not yet implemented"
-        case .insufficientBalance:
-            return "Insufficient balance"
-        case .paymentFailed(let reason):
-            return "Payment failed: \(reason)"
+        struct PaymentSplit {
+        let recipientPubkey: String
+        var amount: Int
+        let role: PaymentRole
+        let isOriginal: Bool // True for the main recipient
+    }
+    
+        enum PaymentRole: String {
+        case author
+        case highlighter
+        case curator
+    }
+    
+        struct PendingZap: Identifiable {
+        let id: UUID
+        let amount: Int
+        let recipientPubkey: String
+        var status: Status
+        
+        enum Status {
+            case calculating
+            case sending
+            case failed(String)
+        }
+    }
+    
+        struct ActivePayment: Identifiable {
+        let id: UUID
+        let totalAmount: Int
+        let splits: [PaymentSplit]
+        let highlightId: String?
+        let comment: String?
+        var status: PaymentStatus
+        let timestamp: Date
+        
+        enum PaymentStatus {
+            case preparing
+            case sending
+            case completed(ZapTransaction)
+            case failed(String)
+        }
+    }
+    
+        struct WalletInfo {
+        let alias: String
+        let color: String?
+        let pubkey: String
+        let network: String
+        let blockHeight: Int
+        let methods: [String]
+    }
+    
+    // MARK: - Errors
+    
+        enum LightningError: LocalizedError {
+        case walletNotConnected
+        case ndkNotInitialized
+        case signerNotAvailable
+        case invalidConnectionString
+        case noLightningAddress
+        case lnurlNotImplemented
+        case insufficientBalance
+        case paymentFailed(String)
+        
+        var errorDescription: String? {
+            switch self {
+            case .walletNotConnected:
+                return "Lightning wallet not connected"
+            case .ndkNotInitialized:
+                return "NDK not initialized"
+            case .signerNotAvailable:
+                return "No active signer available"
+            case .invalidConnectionString:
+                return "Invalid NWC connection string"
+            case .noLightningAddress:
+                return "Recipient has no Lightning address"
+            case .lnurlNotImplemented:
+                return "LNURL support not yet implemented"
+            case .insufficientBalance:
+                return "Insufficient balance"
+            case .paymentFailed(let reason):
+                return "Payment failed: \(reason)"
+            }
         }
     }
 }
@@ -562,9 +603,9 @@ struct NostrWalletConnect {
         self.ndk = ndk
     }
     
-    func getInfo() async throws -> WalletInfo {
+    func getInfo() async throws -> LightningService.WalletInfo {
         // Mock implementation
-        return WalletInfo(
+        return LightningService.WalletInfo(
             alias: "Highlighter Wallet",
             color: "#FF9500",
             pubkey: "mock_pubkey",
