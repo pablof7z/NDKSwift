@@ -10,18 +10,69 @@ struct SwarmOverlayView: View {
     @State private var particlePositions: [ParticlePosition] = []
     @State private var heatmapOpacity: Double = 0
     @State private var newHighlightAnimation: [String: Bool] = [:]
+    @State private var liveActivityPulse = false
+    @State private var swarmActivityLevel: Double = 0
+    @State private var gestureOffset: CGSize = .zero
+    @State private var dragVelocity: CGSize = .zero
+    @State private var cardRotation: Double = 0
+    @State private var activeHighlightIndex = 0
+    @State private var cosmicParticles: [CosmicParticle] = []
+    @State private var rippleEffects: [SwarmRippleEffect] = []
+    @State private var highlightPath = Path()
+    @State private var pathAnimation: CGFloat = 0
     @Namespace private var animation
+    @Environment(\.colorScheme) var colorScheme
     
     var body: some View {
         GeometryReader { geometry in
             ZStack {
-                // Heatmap overlay layer
+                // Cosmic background layer
+                CosmicBackgroundView(
+                    particles: cosmicParticles,
+                    activityLevel: swarmActivityLevel
+                )
+                .allowsHitTesting(false)
+                .blur(radius: 3)
+                
+                // Live activity indicator
+                LiveSwarmActivityIndicator(
+                    activityLevel: swarmActivityLevel,
+                    isPulsing: liveActivityPulse
+                )
+                .position(x: geometry.size.width - 40, y: 40)
+                .allowsHitTesting(false)
+                
+                // Ripple effects layer
+                ForEach(rippleEffects) { ripple in
+                    SwarmRippleEffectView(ripple: ripple)
+                }
+                .allowsHitTesting(false)
+                
+                // Heatmap overlay layer with enhanced effects
                 SwarmHeatmapView(
                     text: text,
                     swarmHighlights: swarmManager.findOverlappingHighlights(in: text),
                     opacity: heatmapOpacity
                 )
                 .allowsHitTesting(false)
+                .blur(radius: 6 + (swarmActivityLevel * 4))
+                .scaleEffect(1 + (swarmActivityLevel * 0.05))
+                
+                // Connection paths between highlights
+                if highlightPath.isEmpty == false {
+                    highlightPath
+                        .trim(from: 0, to: pathAnimation)
+                        .stroke(
+                            LinearGradient(
+                                colors: [.orange.opacity(0.6), .orange.opacity(0.2)],
+                                startPoint: .leading,
+                                endPoint: .trailing
+                            ),
+                            style: StrokeStyle(lineWidth: 2, lineCap: .round, dash: [5, 3])
+                        )
+                        .blur(radius: 1)
+                        .allowsHitTesting(false)
+                }
                 
                 // Main text view with highlights
                 SwarmTextView(
@@ -32,12 +83,39 @@ struct SwarmOverlayView: View {
                     geometry: geometry,
                     newHighlightAnimation: $newHighlightAnimation
                 )
+                .offset(gestureOffset)
+                .scaleEffect(1 - abs(gestureOffset.width) / 1000)
+                .rotation3DEffect(
+                    .degrees(Double(gestureOffset.width / 10)),
+                    axis: (x: 0, y: 1, z: 0),
+                    perspective: 0.5
+                )
                 
-                // Particle effects layer
+                // Particle effects layer with physics
                 ForEach(particlePositions) { particle in
                     ParticleView(particle: particle)
+                        .offset(
+                            x: dragVelocity.width * 0.3,
+                            y: dragVelocity.height * 0.3
+                        )
                 }
             }
+            .gesture(
+                DragGesture()
+                    .onChanged { value in
+                        gestureOffset = value.translation
+                        dragVelocity = CGSize(
+                            width: value.velocity.width / 50,
+                            height: value.velocity.height / 50
+                        )
+                    }
+                    .onEnded { _ in
+                        withAnimation(.spring(response: 0.5, dampingFraction: 0.8)) {
+                            gestureOffset = .zero
+                            dragVelocity = .zero
+                        }
+                    }
+            )
         }
         .overlay(alignment: .topLeading) {
             if let highlight = selectedHighlight {
@@ -60,9 +138,16 @@ struct SwarmOverlayView: View {
         .onAppear {
             startAnimations()
             generateParticles()
+            generateCosmicParticles()
+            calculateHighlightPaths()
         }
         .onChange(of: swarmManager.swarmHighlights) { oldValue, newValue in
             animateNewHighlights(oldValue: oldValue, newValue: newValue)
+            updateSwarmActivity(oldCount: oldValue.count, newCount: newValue.count)
+            calculateHighlightPaths()
+        }
+        .onReceive(Timer.publish(every: 3, on: .main, in: .common).autoconnect()) { _ in
+            simulateLiveActivity()
         }
     }
     
@@ -73,6 +158,14 @@ struct SwarmOverlayView: View {
         
         withAnimation(.easeIn(duration: 1)) {
             heatmapOpacity = 0.6
+        }
+        
+        withAnimation(.easeInOut(duration: 1.5).repeatForever(autoreverses: true)) {
+            liveActivityPulse = true
+        }
+        
+        withAnimation(.linear(duration: 3).delay(0.5)) {
+            pathAnimation = 1.0
         }
     }
     
@@ -93,6 +186,38 @@ struct SwarmOverlayView: View {
         }
     }
     
+    private func generateCosmicParticles() {
+        for _ in 0..<20 {
+            let particle = CosmicParticle(
+                x: .random(in: -50...UIScreen.main.bounds.width + 50),
+                y: .random(in: -50...UIScreen.main.bounds.height + 50),
+                size: .random(in: 2...6),
+                speed: .random(in: 10...30),
+                angle: .random(in: 0...360)
+            )
+            cosmicParticles.append(particle)
+        }
+    }
+    
+    private func calculateHighlightPaths() {
+        let highlights = swarmManager.findOverlappingHighlights(in: text)
+        guard highlights.count > 1 else { return }
+        
+        highlightPath = Path { path in
+            for i in 0..<highlights.count - 1 {
+                let start = CGPoint(x: CGFloat(highlights[i].range.location) * 10, y: 50)
+                let end = CGPoint(x: CGFloat(highlights[i + 1].range.location) * 10, y: 50)
+                let control = CGPoint(
+                    x: (start.x + end.x) / 2,
+                    y: 50 - CGFloat.random(in: 20...50)
+                )
+                
+                path.move(to: start)
+                path.addQuadCurve(to: end, control: control)
+            }
+        }
+    }
+    
     private func animateNewHighlights(oldValue: [SwarmHighlight], newValue: [SwarmHighlight]) {
         let newIds = Set(newValue.map { $0.id })
         let oldIds = Set(oldValue.map { $0.id })
@@ -100,9 +225,56 @@ struct SwarmOverlayView: View {
         
         for id in addedIds {
             newHighlightAnimation[id.uuidString] = false
+            
+            // Create ripple effect at highlight location
+            if let highlight = newValue.first(where: { $0.id.uuidString == id.uuidString }) {
+                let ripple = SwarmRippleEffect(
+                    x: CGFloat(highlight.range.location) * 10,
+                    y: 50
+                )
+                rippleEffects.append(ripple)
+                
+                // Remove ripple after animation
+                DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
+                    rippleEffects.removeAll { $0.id == ripple.id }
+                }
+            }
+            
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
                 withAnimation(.spring(response: 0.5, dampingFraction: 0.7)) {
                     newHighlightAnimation[id.uuidString] = true
+                }
+            }
+        }
+    }
+    
+    private func updateSwarmActivity(oldCount: Int, newCount: Int) {
+        if newCount > oldCount {
+            withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) {
+                swarmActivityLevel = min(1.0, swarmActivityLevel + 0.2)
+            }
+            
+            // Decay activity over time
+            DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
+                withAnimation(.easeOut(duration: 1)) {
+                    swarmActivityLevel = max(0, swarmActivityLevel - 0.1)
+                }
+            }
+            
+            HapticManager.shared.impact(.light)
+        }
+    }
+    
+    private func simulateLiveActivity() {
+        // Simulate random live activity for demo purposes
+        if Bool.random() && swarmActivityLevel < 0.3 {
+            withAnimation(.spring(response: 0.5, dampingFraction: 0.7)) {
+                swarmActivityLevel = .random(in: 0.3...0.6)
+            }
+            
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
+                withAnimation(.easeOut(duration: 1)) {
+                    swarmActivityLevel = 0
                 }
             }
         }
@@ -332,28 +504,59 @@ struct SwarmPopover: View {
     @State private var glowIntensity: Double = 0.5
     @State private var pulseScale: CGFloat = 1.0
     @State private var rotationAngle: Double = 0
+    @State private var cardFlipRotation: Double = 0
+    @State private var showBackSide = false
+    @State private var floatingOffset: CGFloat = 0
     @Environment(\.colorScheme) var colorScheme
     
     var body: some View {
-        VStack(spacing: 0) {
-            // Header with stats
-            popoverHeader
+        ZStack {
+            // Front side of card
+            if !showBackSide {
+                VStack(spacing: 0) {
+                    // Header with stats
+                    popoverHeader
+                    
+                    // Expanded details with staggered animation
+                    if isExpanded {
+                        expandedContent
+                    }
+                }
+                .frame(maxWidth: 360)
+                .background(popoverBackground)
+                .overlay(animatedBorderGlow)
+                .rotation3DEffect(
+                    .degrees(cardFlipRotation),
+                    axis: (x: 0, y: 1, z: 0),
+                    perspective: 1
+                )
+            }
             
-            // Expanded details with staggered animation
-            if isExpanded {
-                expandedContent
+            // Back side of card (detailed analytics)
+            if showBackSide {
+                SwarmAnalyticsView(highlight: highlight)
+                    .frame(maxWidth: 360)
+                    .background(popoverBackground)
+                    .overlay(animatedBorderGlow)
+                    .rotation3DEffect(
+                        .degrees(cardFlipRotation + 180),
+                        axis: (x: 0, y: 1, z: 0),
+                        perspective: 1
+                    )
             }
         }
-        .frame(maxWidth: 360)
-        .background(popoverBackground)
-        .overlay(animatedBorderGlow)
         .scaleEffect(pulseScale)
+        .offset(y: floatingOffset)
         .position(x: position.x, y: position.y)
         .onAppear {
             startAnimations()
         }
+        .onTapGesture(count: 2) {
+            // Double tap to flip card
+            flipCard()
+        }
         .onTapGesture {
-            // Prevent dismissal when tapping inside
+            // Single tap does nothing (prevent dismissal)
         }
         .simultaneousGesture(
             DragGesture(minimumDistance: 30)
@@ -364,6 +567,14 @@ struct SwarmPopover: View {
                     }
                 }
         )
+    }
+    
+    private func flipCard() {
+        HapticManager.shared.impact(.medium)
+        withAnimation(.spring(response: 0.6, dampingFraction: 0.8)) {
+            cardFlipRotation += 180
+            showBackSide.toggle()
+        }
     }
     
     @ViewBuilder
@@ -554,6 +765,11 @@ struct SwarmPopover: View {
         // Rotation for border gradient
         withAnimation(.linear(duration: 10).repeatForever(autoreverses: false)) {
             rotationAngle = 360
+        }
+        
+        // Floating animation
+        withAnimation(.easeInOut(duration: 2).repeatForever(autoreverses: true)) {
+            floatingOffset = -10
         }
     }
 }
@@ -828,5 +1044,374 @@ struct SwarmZapParticleView: View {
                     opacity = 0
                 }
             }
+    }
+}
+
+// MARK: - New Components for Enhanced Swarm Experience
+
+// Cosmic background with floating particles
+struct CosmicBackgroundView: View {
+    let particles: [CosmicParticle]
+    let activityLevel: Double
+    @State private var animationProgress: CGFloat = 0
+    
+    var body: some View {
+        TimelineView(.animation) { timeline in
+            Canvas { context, size in
+                let time = timeline.date.timeIntervalSinceReferenceDate
+                
+                for particle in particles {
+                    let x = particle.x + cos(particle.angle * .pi / 180) * particle.speed * CGFloat(time.truncatingRemainder(dividingBy: 20))
+                    let y = particle.y + sin(particle.angle * .pi / 180) * particle.speed * CGFloat(time.truncatingRemainder(dividingBy: 20))
+                    
+                    let wrappedX = x.truncatingRemainder(dividingBy: size.width + 100) - 50
+                    let wrappedY = y.truncatingRemainder(dividingBy: size.height + 100) - 50
+                    
+                    context.fill(
+                        Circle().path(in: CGRect(
+                            x: wrappedX - particle.size/2,
+                            y: wrappedY - particle.size/2,
+                            width: particle.size,
+                            height: particle.size
+                        )),
+                        with: .radialGradient(
+                            Gradient(colors: [
+                                Color.orange.opacity(0.3 + activityLevel * 0.4),
+                                Color.orange.opacity(0)
+                            ]),
+                            center: .zero,
+                            startRadius: 0,
+                            endRadius: particle.size
+                        )
+                    )
+                }
+            }
+        }
+    }
+}
+
+// Live activity indicator showing real-time swarm engagement
+struct LiveSwarmActivityIndicator: View {
+    let activityLevel: Double
+    let isPulsing: Bool
+    @State private var rotationAngle: Double = 0
+    @State private var ringExpansion: CGFloat = 1
+    
+    var body: some View {
+        ZStack {
+            // Outer pulsing ring
+            Circle()
+                .stroke(
+                    AngularGradient(
+                        colors: [
+                            .orange.opacity(activityLevel),
+                            .orange.opacity(activityLevel * 0.3),
+                            .orange.opacity(activityLevel)
+                        ],
+                        center: .center,
+                        angle: .degrees(rotationAngle)
+                    ),
+                    lineWidth: 3
+                )
+                .frame(width: 50 * ringExpansion, height: 50 * ringExpansion)
+                .blur(radius: isPulsing ? 2 : 0)
+            
+            // Inner activity dots
+            ForEach(0..<8) { index in
+                Circle()
+                    .fill(Color.orange)
+                    .frame(width: 4, height: 4)
+                    .offset(x: 15)
+                    .rotationEffect(.degrees(Double(index) * 45 + rotationAngle))
+                    .opacity(activityLevel > Double(index) / 8 ? 1 : 0.3)
+                    .scaleEffect(isPulsing && activityLevel > Double(index) / 8 ? 1.2 : 1)
+            }
+            
+            // Center live indicator
+            HStack(spacing: 2) {
+                Circle()
+                    .fill(Color.red)
+                    .frame(width: 6, height: 6)
+                    .opacity(isPulsing ? 1 : 0.6)
+                
+                Text("LIVE")
+                    .font(.system(size: 8, weight: .bold))
+                    .foregroundColor(.white)
+            }
+            .padding(.horizontal, 6)
+            .padding(.vertical, 2)
+            .background(
+                Capsule()
+                    .fill(Color.black.opacity(0.6))
+            )
+            .opacity(activityLevel > 0.3 ? 1 : 0)
+        }
+        .onAppear {
+            withAnimation(.linear(duration: 2).repeatForever(autoreverses: false)) {
+                rotationAngle = 360
+            }
+            
+            withAnimation(.easeInOut(duration: 1).repeatForever(autoreverses: true)) {
+                ringExpansion = 1.2
+            }
+        }
+    }
+}
+
+// Ripple effect for new highlights
+struct SwarmRippleEffect: Identifiable {
+    let id = UUID()
+    let x: CGFloat
+    let y: CGFloat
+}
+
+struct SwarmRippleEffectView: View {
+    let ripple: SwarmRippleEffect
+    @State private var scale: CGFloat = 0.5
+    @State private var opacity: Double = 1
+    
+    var body: some View {
+        Circle()
+            .stroke(
+                LinearGradient(
+                    colors: [.orange, .orange.opacity(0.5)],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                ),
+                lineWidth: 2
+            )
+            .frame(width: 50 * scale, height: 50 * scale)
+            .opacity(opacity)
+            .position(x: ripple.x, y: ripple.y)
+            .onAppear {
+                withAnimation(.easeOut(duration: 2)) {
+                    scale = 4
+                    opacity = 0
+                }
+            }
+    }
+}
+
+// Cosmic particle model
+struct CosmicParticle: Identifiable {
+    let id = UUID()
+    let x: CGFloat
+    let y: CGFloat
+    let size: CGFloat
+    let speed: CGFloat
+    let angle: Double
+}
+
+// Enhanced swarm popover with 3D card flip
+extension SwarmPopover {
+    struct CardFlip3D: ViewModifier {
+        let rotation: Double
+        let axis: (x: CGFloat, y: CGFloat, z: CGFloat)
+        
+        func body(content: Content) -> some View {
+            content
+                .rotation3DEffect(
+                    .degrees(rotation),
+                    axis: axis,
+                    anchor: .center,
+                    anchorZ: 0,
+                    perspective: 1
+                )
+        }
+    }
+}
+
+// Analytics view for the back of the card
+struct SwarmAnalyticsView: View {
+    let highlight: SwarmHighlight
+    @State private var chartAnimation: CGFloat = 0
+    @State private var numberAnimation: Double = 0
+    @Environment(\.colorScheme) var colorScheme
+    
+    var body: some View {
+        VStack(spacing: 20) {
+            // Header
+            HStack {
+                Image(systemName: "chart.line.uptrend.xyaxis")
+                    .font(.title2)
+                    .foregroundColor(.orange)
+                    .symbolEffect(.pulse)
+                
+                Text("Swarm Analytics")
+                    .font(.headline)
+                    .foregroundColor(.primary)
+                
+                Spacer()
+            }
+            .padding()
+            
+            // Engagement metrics
+            VStack(spacing: 16) {
+                // Intensity meter
+                IntensityMeterView(
+                    intensity: highlight.intensity,
+                    animation: chartAnimation
+                )
+                
+                // Stats grid
+                LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 16) {
+                    StatCard(
+                        icon: "person.2.fill",
+                        value: Int(Double(highlight.totalHighlighters) * numberAnimation),
+                        label: "Highlighters",
+                        color: .orange
+                    )
+                    
+                    StatCard(
+                        icon: "bolt.fill",
+                        value: Int(Double(highlight.totalZaps) * numberAnimation),
+                        label: "Total Zaps",
+                        color: .yellow
+                    )
+                    
+                    StatCard(
+                        icon: "clock.fill",
+                        value: highlight.highlights.count,
+                        label: "Time Periods",
+                        color: .blue
+                    )
+                    
+                    StatCard(
+                        icon: "chart.bar.fill",
+                        value: Int(highlight.intensity * 100),
+                        label: "Intensity %",
+                        color: .purple
+                    )
+                }
+                
+                // Activity timeline
+                ActivityTimelineView(highlights: highlight.highlights)
+                    .opacity(chartAnimation)
+            }
+            .padding()
+        }
+        .onAppear {
+            withAnimation(.easeOut(duration: 0.8)) {
+                chartAnimation = 1
+                numberAnimation = 1
+            }
+        }
+    }
+}
+
+// Intensity meter component
+struct IntensityMeterView: View {
+    let intensity: Double
+    let animation: CGFloat
+    
+    var body: some View {
+        VStack(spacing: 8) {
+            Text("Community Intensity")
+                .font(.caption)
+                .foregroundColor(.secondary)
+            
+            GeometryReader { geometry in
+                ZStack(alignment: .leading) {
+                    // Background
+                    Capsule()
+                        .fill(Color.gray.opacity(0.2))
+                        .frame(height: 20)
+                    
+                    // Intensity bar
+                    Capsule()
+                        .fill(
+                            LinearGradient(
+                                colors: [.yellow, .orange, .red],
+                                startPoint: .leading,
+                                endPoint: .trailing
+                            )
+                        )
+                        .frame(width: geometry.size.width * intensity * animation, height: 20)
+                    
+                    // Glow effect
+                    Capsule()
+                        .fill(
+                            LinearGradient(
+                                colors: [.orange.opacity(0.6), .clear],
+                                startPoint: .center,
+                                endPoint: .trailing
+                            )
+                        )
+                        .frame(width: geometry.size.width * intensity * animation, height: 20)
+                        .blur(radius: 4)
+                }
+            }
+            .frame(height: 20)
+        }
+    }
+}
+
+// Stat card component
+struct StatCard: View {
+    let icon: String
+    let value: Int
+    let label: String
+    let color: Color
+    @State private var scaleEffect: CGFloat = 0.8
+    
+    var body: some View {
+        VStack(spacing: 8) {
+            Image(systemName: icon)
+                .font(.title2)
+                .foregroundColor(color)
+                .scaleEffect(scaleEffect)
+            
+            Text("\(value)")
+                .font(.title3.bold().monospacedDigit())
+                .foregroundColor(.primary)
+            
+            Text(label)
+                .font(.caption)
+                .foregroundColor(.secondary)
+        }
+        .frame(maxWidth: .infinity)
+        .padding()
+        .background(
+            RoundedRectangle(cornerRadius: 12)
+                .fill(color.opacity(0.1))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 12)
+                        .stroke(color.opacity(0.3), lineWidth: 1)
+                )
+        )
+        .onAppear {
+            withAnimation(.spring(response: 0.5, dampingFraction: 0.6)) {
+                scaleEffect = 1
+            }
+        }
+    }
+}
+
+// Activity timeline view
+struct ActivityTimelineView: View {
+    let highlights: [SwarmHighlight.HighlightInfo]
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Activity Timeline")
+                .font(.caption)
+                .foregroundColor(.secondary)
+            
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 12) {
+                    ForEach(highlights.prefix(10), id: \.id) { info in
+                        VStack(spacing: 4) {
+                            Circle()
+                                .fill(Color.orange)
+                                .frame(width: 8, height: 8)
+                            
+                            Text(info.createdAt.formatted(.dateTime.hour().minute()))
+                                .font(.system(size: 8))
+                                .foregroundColor(.secondary)
+                        }
+                    }
+                }
+            }
+        }
     }
 }
