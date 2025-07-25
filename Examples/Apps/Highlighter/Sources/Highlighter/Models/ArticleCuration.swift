@@ -2,7 +2,7 @@ import Foundation
 import NDKSwift
 
 /// NIP-51 Article Curation (kind:30004)
-struct ArticleCuration: Identifiable, Equatable {
+struct ArticleCuration: Identifiable, Equatable, Hashable {
     let id: String
     let event: NDKEvent
     let name: String
@@ -13,6 +13,21 @@ struct ArticleCuration: Identifiable, Equatable {
     let createdAt: Date
     let updatedAt: Date
     let articles: [ArticleReference]
+    
+    func hash(into hasher: inout Hasher) {
+        hasher.combine(id)
+        hasher.combine(name)
+        hasher.combine(title)
+        hasher.combine(author)
+    }
+    
+    static func == (lhs: ArticleCuration, rhs: ArticleCuration) -> Bool {
+        lhs.id == rhs.id &&
+        lhs.name == rhs.name &&
+        lhs.title == rhs.title &&
+        lhs.author == rhs.author &&
+        lhs.articles == rhs.articles
+    }
     
     // For testing/preview
     init(id: String, event: NDKEvent, name: String, title: String, description: String?, image: String?, author: String, createdAt: Date, updatedAt: Date, articles: [ArticleReference]) {
@@ -28,7 +43,7 @@ struct ArticleCuration: Identifiable, Equatable {
         self.articles = articles
     }
     
-    struct ArticleReference: Equatable {
+    struct ArticleReference: Equatable, Hashable {
         let url: String?
         let eventId: String?
         let eventAddress: String?

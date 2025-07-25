@@ -370,7 +370,7 @@ struct ProfileContentTabs: View {
                         switch selectedTab {
                         case 0:
                             if highlights.isEmpty {
-                                EmptyStateView(
+                                ProfileEmptyStateView(
                                     icon: "quote.bubble",
                                     title: "No Highlights Yet",
                                     subtitle: "Your highlights will appear here"
@@ -383,7 +383,7 @@ struct ProfileContentTabs: View {
                             
                         case 1:
                             if curations.isEmpty {
-                                EmptyStateView(
+                                ProfileEmptyStateView(
                                     icon: "list.bullet.rectangle",
                                     title: "No Curations Yet",
                                     subtitle: "Your article curations will appear here"
@@ -434,7 +434,7 @@ struct ContentItemPlaceholder: View {
     }
 }
 
-struct EmptyStateView: View {
+struct ProfileEmptyStateView: View {
     let icon: String
     let title: String
     let subtitle: String

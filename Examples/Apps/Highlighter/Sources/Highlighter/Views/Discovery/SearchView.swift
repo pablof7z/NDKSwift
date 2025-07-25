@@ -40,7 +40,7 @@ struct SearchView: View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 12) {
                 ForEach(DiscoveryTab.allCases, id: \.self) { tab in
-                    TabButton(
+                    SearchTabButton(
                         title: tab.rawValue,
                         icon: tab.icon,
                         isSelected: selectedTab == tab
@@ -83,7 +83,7 @@ struct SearchView: View {
 
 // MARK: - Tab Button
 
-struct TabButton: View {
+struct SearchTabButton: View {
     let title: String
     let icon: String
     let isSelected: Bool

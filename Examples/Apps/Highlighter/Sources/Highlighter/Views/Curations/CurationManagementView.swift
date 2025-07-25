@@ -2,6 +2,17 @@ import SwiftUI
 import NDKSwift
 import UniformTypeIdentifiers
 
+// Move DraggedArticle outside to make it accessible to nested types
+struct DraggedArticle: Codable, Transferable {
+    let url: String?
+    let eventId: String?
+    let title: String
+    
+    static var transferRepresentation: some TransferRepresentation {
+        CodableRepresentation(contentType: .json)
+    }
+}
+
 struct CurationManagementView: View {
     @EnvironmentObject var appState: AppState
     @Environment(\.dismiss) var dismiss
@@ -51,16 +62,6 @@ struct CurationManagementView: View {
             case .alphabetical: return "textformat"
             case .articleCount: return "number"
             }
-        }
-    }
-    
-    struct DraggedArticle: Codable, Transferable {
-        let url: String?
-        let eventId: String?
-        let title: String
-        
-        static var transferRepresentation: some TransferRepresentation {
-            CodableRepresentation(contentType: .json)
         }
     }
     

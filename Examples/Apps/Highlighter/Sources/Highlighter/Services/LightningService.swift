@@ -407,7 +407,7 @@ class LightningService: ObservableObject {
         do {
             let balanceInfo = try await nwc.getBalance()
             await MainActor.run {
-                self.balance = balanceInfo.balance / 1000 // Convert millisats to sats
+                self.balance = balanceInfo / 1000 // Convert millisats to sats
             }
         } catch {
             print("Failed to update balance: \(error)")
@@ -574,9 +574,9 @@ struct NostrWalletConnect {
         )
     }
     
-    func getBalance() async throws -> (balance: Int) {
+    func getBalance() async throws -> Int {
         // Mock implementation - return random balance
-        return (balance: Int.random(in: 100000...1000000) * 1000)
+        return Int.random(in: 100000...1000000) * 1000
     }
     
     func payInvoice(_ invoice: String) async throws -> String {
