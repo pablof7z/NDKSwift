@@ -84,22 +84,46 @@ func createTestEvent(
     createdAt: Timestamp? = nil,
     signer: NDKSigner? = nil
 ) async throws -> NDKEvent {
-    let actualPubkey = pubkey ?? try generateRandomHex(32)
-    let actualCreatedAt = createdAt ?? Timestamp(Date().timeIntervalSince1970)
+    // Create a temporary NDK instance for building the event
+    let ndk = NDK()
     
-    let event = NDKEvent(
-        pubkey: actualPubkey,
-        kind: kind,
-        content: content,
-        tags: tags,
-        createdAt: actualCreatedAt
-    )
+    // Build the event using NDKEventBuilder
+    let builder = NDKEventBuilder(ndk: ndk)
+        .kind(kind)
+        .content(content)
     
-    if let signer = signer {
-        _ = try await event.sign(with: signer)
+    // Add tags
+    for tag in tags {
+        builder.tag(tag)
     }
     
-    return event
+    // Set pubkey if provided (otherwise will use signer's pubkey)
+    if let pubkey = pubkey {
+        // For test events without a signer, we need to build manually
+        if signer == nil {
+            let actualCreatedAt = createdAt ?? Timestamp.now
+            let eventId = try calculateEventId(
+                pubkey: pubkey,
+                createdAt: actualCreatedAt,
+                kind: kind,
+                tags: tags,
+                content: content
+            )
+            
+            return NDKEvent(
+                id: eventId,
+                pubkey: pubkey,
+                createdAt: actualCreatedAt,
+                kind: kind,
+                tags: tags,
+                content: content,
+                sig: "" // Unsigned event
+            )
+        }
+    }
+    
+    // Build with signer if provided
+    return try await builder.build(signer: signer)
 }
 
 /// Generates a random hex string of specified byte length
@@ -110,5 +134,26 @@ func generateRandomHex(_ byteCount: Int) throws -> String {
         throw TestError.invalidResponse("Failed to generate random bytes")
     }
     return bytes.map { String(format: "%02x", $0) }.joined()
+}
+
+/// Calculate event ID according to NIP-01
+func calculateEventId(
+    pubkey: PublicKey,
+    createdAt: Timestamp,
+    kind: Kind,
+    tags: [Tag],
+    content: String
+) throws -> EventID {
+    let serialized: [Any] = [
+        0,
+        pubkey,
+        createdAt,
+        kind,
+        tags,
+        content
+    ]
+    
+    let jsonData = try JSONSerialization.data(withJSONObject: serialized, options: [])
+    return Crypto.sha256(jsonData).hexEncodedString()
 }
 
