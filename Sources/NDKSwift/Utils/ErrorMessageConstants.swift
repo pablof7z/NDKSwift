@@ -99,6 +99,11 @@ public enum ErrorMessageConstants {
         public static let paymentFailed = "Payment failed"
         public static let quotaExceeded = "Quota exceeded"
 
+        /// NDK errors
+        public static let ndkInstanceNotSet = "NDK instance not set"
+        public static let ndkNotAvailable = "NDK not available"
+        public static let ndkReferenceLost = "NDK reference lost"
+
         /// General errors
         public static let unknownError = "Unknown error"
         public static let cancelled = "Operation cancelled"

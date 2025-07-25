@@ -689,7 +689,7 @@ extension NDKUser {
         preferredType: ZapType? = nil
     ) async throws -> ZapResult {
         guard let ndk = self.ndk else {
-            throw NDKError.notConfigured("NDK not available")
+            throw NDKError.notConfigured(ErrorMessageConstants.Messages.ndkNotAvailable)
         }
 
         return try await ndk.zapManager.zap(
@@ -703,7 +703,7 @@ extension NDKUser {
     /// Fetch zaps sent to this user
     public func fetchZaps() async throws -> [ZapInfo] {
         guard let ndk = self.ndk else {
-            throw NDKError.notConfigured("NDK not available")
+            throw NDKError.notConfigured(ErrorMessageConstants.Messages.ndkNotAvailable)
         }
 
         return try await ndk.zapManager.fetchZaps(
