@@ -281,7 +281,7 @@ actor AIHighlightEngine {
         let namedEntityCount = await countNamedEntities(in: text)
         
         // Check for quotations
-        let quotationPresent = text.contains("\"") || text.contains(""") || text.contains("'")
+        let quotationPresent = text.contains("\"") || text.contains("\u{201C}") || text.contains("'")
         
         // Check for statistics
         let statisticPresent = containsStatistic(text)
@@ -329,17 +329,17 @@ actor AIHighlightEngine {
     
     private func containsStatistic(_ text: String) -> Bool {
         // Check for percentages
-        if text.range(of: #"\d+\.?\d*\s*%"#, options: .regularExpression) != nil {
+        if text.range(of: #"\\d+\\.?\\d*\\s*%"#, options: .regularExpression) != nil {
             return true
         }
         
         // Check for numerical comparisons
-        if text.range(of: #"\d+\.?\d*\s*(times|x|×)\s+(more|less|greater|higher|lower)"#, options: [.regularExpression, .caseInsensitive]) != nil {
+        if text.range(of: #"\\d+\\.?\\d*\\s*(times|x|×)\\s+(more|less|greater|higher|lower)"#, options: [.regularExpression, .caseInsensitive]) != nil {
             return true
         }
         
         // Check for fractions and ratios
-        if text.range(of: #"\d+\s*(out of|of|in)\s*\d+"#, options: .regularExpression) != nil {
+        if text.range(of: #"\\d+\\s*(out of|of|in)\\s*\\d+"#, options: .regularExpression) != nil {
             return true
         }
         
@@ -347,7 +347,7 @@ actor AIHighlightEngine {
         let statisticalTerms = ["average", "median", "mean", "increased", "decreased", "rose", "fell", "growth", "decline"]
         for term in statisticalTerms {
             if text.localizedCaseInsensitiveContains(term) && 
-               text.range(of: #"\d+\.?\d*"#, options: .regularExpression) != nil {
+               text.range(of: #"\\d+\\.?\\d*"#, options: .regularExpression) != nil {
                 return true
             }
         }
@@ -435,7 +435,7 @@ actor AIHighlightEngine {
         if text.contains("—") || text.contains("--") { score += 0.2 }
         
         // Check for quoted content
-        if text.contains("\"") || text.contains(""") { score += 0.3 }
+        if text.contains("\"") || text.contains("\u{201C}") { score += 0.3 }
         
         // Check for all caps words (but not single letters)
         let words = text.components(separatedBy: .whitespaces)

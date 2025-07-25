@@ -421,10 +421,12 @@ public class NDKList {
     private func parseATag(_ value: String) -> (kind: Int, pubkey: String, dTag: String?)? {
         let parts = value.split(separator: ":")
         guard parts.count >= 2,
-              let kind = Int(parts[0]),
-              let pubkey = String(parts[1]).isEmpty ? nil : String(parts[1]) else { return nil }
+              let kind = Int(parts[0]) else { return nil }
+        
+        let pubkey = String(parts[1])
+        guard !pubkey.isEmpty else { return nil }
 
-        let dTag = parts.count > 2 ? String(parts[2]) : nil
+        let dTag = parts.count > 2 ? String(parts[2]).nilIfEmpty : nil
         return (kind: kind, pubkey: pubkey, dTag: dTag)
     }
 
