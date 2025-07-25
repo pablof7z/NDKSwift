@@ -309,7 +309,7 @@ public actor WalletTransactionHistory {
         let nutzapData = NutzapData(
             senderPubkey: event.pubkey,
             nutzapEventId: event.id,
-            comment: event.content.isEmpty ? nil : event.content
+            comment: event.content.nilIfEmpty
         )
 
         // Check nutzap status
@@ -379,7 +379,7 @@ public actor WalletTransactionHistory {
         let nutzapData = NutzapData(
             recipientPubkey: recipient,
             nutzapEventId: event.id,
-            comment: event.content.isEmpty ? nil : event.content
+            comment: event.content.nilIfEmpty
         )
 
         let transaction = WalletTransaction(
@@ -644,7 +644,7 @@ public actor WalletTransactionHistory {
                     nutzapData = NutzapData(
                         senderPubkey: nutzapEvent.pubkey,
                         nutzapEventId: redeemedId,
-                        comment: nutzapEvent.content.isEmpty ? nil : nutzapEvent.content
+                        comment: nutzapEvent.content.nilIfEmpty
                     )
                 }
             }

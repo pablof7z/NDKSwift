@@ -62,8 +62,7 @@ public struct NDKNutzap {
 
     /// The comment/message
     public var comment: String? {
-        let content = event.content
-        return content.isEmpty ? nil : content
+        return event.content.nilIfEmpty
     }
 
     /// Cashu proofs

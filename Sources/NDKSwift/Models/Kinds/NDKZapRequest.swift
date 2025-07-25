@@ -72,7 +72,7 @@ public struct NDKZapRequest {
 
     /// Optional comment
     public var comment: String? {
-        return event.content.isEmpty ? nil : event.content
+        return event.content.nilIfEmpty
     }
 
     /// Recipient's pubkey
