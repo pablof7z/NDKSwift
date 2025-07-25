@@ -57,7 +57,7 @@ struct NDKMarkdownImageView: View {
                             image
                                 .resizable()
                                 .aspectRatio(contentMode: .fit)
-                                .frame(maxHeight: 300)
+                                .frame(maxHeight: UIConstants.markdownImageMaxHeight)
                                 .cornerRadius(configuration.codeBlockCornerRadius)
                                 .onTapGesture {
                                     onImageTap?(url)

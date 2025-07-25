@@ -597,7 +597,7 @@ private struct PictureGrid: View {
             return AnyView(
                 Rectangle()
                     .fill(Color.black.opacity(OpacityConstants.overlay))
-                    .frame(width: 60, height: 40)
+                    .frame(width: UIConstants.MediaThumbnail.width, height: UIConstants.MediaThumbnail.height)
                     .clipShape(RoundedRectangle(cornerRadius: 8))
                     .overlay(
                         Text("+\(count)")
@@ -635,9 +635,9 @@ private struct SingleImageView: View {
     
     private var imageHeight: CGFloat {
         switch style {
-        case .compact: return 150
-        case .embedded: return 200
-        default: return 300
+        case .compact: return UIConstants.EventImageHeight.compact
+        case .embedded: return UIConstants.EventImageHeight.embedded
+        default: return UIConstants.EventImageHeight.default
         }
     }
 }

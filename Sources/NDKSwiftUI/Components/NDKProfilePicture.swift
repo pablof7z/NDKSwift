@@ -198,15 +198,15 @@ struct NDKProfilePicture_Previews: PreviewProvider {
             // Different sizes
             HStack(spacing: 16) {
                 NDKProfilePicture(pubkey: "sample_pubkey", size: 30)
-                NDKProfilePicture(pubkey: "sample_pubkey", size: 40)
-                NDKProfilePicture(pubkey: "sample_pubkey", size: 60)
-                NDKProfilePicture(pubkey: "sample_pubkey", size: 80)
+                NDKProfilePicture(pubkey: "sample_pubkey", size: UIConstants.ProfilePictureSize.small)
+                NDKProfilePicture(pubkey: "sample_pubkey", size: UIConstants.ProfilePictureSize.medium)
+                NDKProfilePicture(pubkey: "sample_pubkey", size: UIConstants.ProfilePictureSize.large)
             }
             
             // With border
             NDKProfilePicture(
                 pubkey: "sample_pubkey",
-                size: 60,
+                size: UIConstants.ProfilePictureSize.medium,
                 borderColor: .blue,
                 borderWidth: 2
             )
@@ -214,7 +214,7 @@ struct NDKProfilePicture_Previews: PreviewProvider {
             // Square with custom corner radius
             NDKProfilePicture(
                 pubkey: "sample_pubkey",
-                size: 60,
+                size: UIConstants.ProfilePictureSize.medium,
                 cornerRadius: 12
             )
         }

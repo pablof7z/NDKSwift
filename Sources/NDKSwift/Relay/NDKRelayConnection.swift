@@ -303,7 +303,7 @@ public actor NDKRelayConnection {
     #if os(iOS) || os(macOS) || os(watchOS) || os(tvOS)
     private func receiveMessages() async {
         guard let task = webSocketTask else {
-            NDKLogger.log(.error, category: .connection, "❌ No WebSocket task available for receiving messages")
+            NDKLogger.log(.error, category: .connection, "❌ \(ErrorMessageConstants.Messages.notConnected) - WebSocket task not available for receiving messages")
             return 
         }
         
