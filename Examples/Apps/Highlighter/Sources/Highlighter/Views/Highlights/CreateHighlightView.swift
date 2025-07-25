@@ -13,6 +13,7 @@ struct CreateHighlightView: View {
     @State private var showImportOptions = false
     @State private var isImporting = false
     @State private var animateBackground = false
+    @State private var showSmartImporter = false
     @Environment(\.dismiss) var dismiss
     
     enum HighlightMode: CaseIterable {
@@ -137,6 +138,9 @@ struct CreateHighlightView: View {
                     author: sourceAuthor.isEmpty ? nil : sourceAuthor
                 )
             }
+            .fullScreenCover(isPresented: $showSmartImporter) {
+                SmartContentImporter()
+            }
         }
         .onAppear {
             withAnimation(.easeInOut(duration: 3).repeatForever(autoreverses: true)) {
@@ -209,8 +213,8 @@ struct CreateHighlightView: View {
                 }
             }
             
-            Button(action: { showImportOptions = true }) {
-                Label("Browse All Articles", systemImage: "arrow.right.circle")
+            Button(action: { showSmartImporter = true }) {
+                Label("Smart Import", systemImage: "sparkles")
                     .font(.system(size: 15, weight: .medium))
                     .foregroundColor(.orange)
             }
@@ -262,17 +266,17 @@ struct CreateHighlightView: View {
                 .foregroundColor(.primary)
             
             // File import button
-            Button(action: { showImportOptions = true }) {
+            Button(action: { showSmartImporter = true }) {
                 VStack(spacing: 12) {
                     Image(systemName: "doc.badge.plus")
                         .font(.system(size: 48))
                         .foregroundColor(.orange)
                     
-                    Text("Tap to select file")
+                    Text("Smart Import")
                         .font(.system(size: 16, weight: .medium))
                         .foregroundColor(.primary)
                     
-                    Text("PDF, EPUB, TXT supported")
+                    Text("AI-powered content extraction")
                         .font(.footnote)
                         .foregroundColor(.secondary)
                 }

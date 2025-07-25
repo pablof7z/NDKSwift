@@ -137,7 +137,7 @@ struct LightningWalletView: View {
                     )
                     .font(.ds.footnoteMedium)
                 }
-                .buttonStyle(ModernSecondaryButton(size: .small))
+                .buttonStyle(ModernSecondaryButton())
             }
             
             if let error = lightning.connectionError {

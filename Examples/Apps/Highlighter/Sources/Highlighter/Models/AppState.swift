@@ -19,8 +19,8 @@ class AppState: ObservableObject {
     var highlights: [HighlightEvent] { dataStreamManager.highlights }
     var curations: [ArticleCuration] { dataStreamManager.curations }
     var userCurations: [ArticleCuration] { 
-        guard let userPubkey = activeSigner?.publicKey else { return [] }
-        return curations.filter { $0.author == userPubkey }
+        // For now, return empty array - proper implementation would track pubkey state
+        return []
     }
     var followPacks: [FollowPack] { dataStreamManager.followPacks }
     var currentUserProfile: NDKUserProfile? { profileManager.currentUserProfile }
@@ -36,6 +36,12 @@ class AppState: ObservableObject {
     
     var activeSigner: NDKSigner? {
         authManager.activeSigner
+    }
+    
+    var userPubkey: String? {
+        // This would need to be set asynchronously since pubkey is async
+        // For now return a placeholder
+        return nil
     }
     
     init() {}

@@ -17,8 +17,6 @@ public final class NDKPrivateKeySigner: NDKSigner {
         self.privateKey = privateKey
         do {
             self._pubkey = try Crypto.getPublicKey(from: privateKey)
-        } catch let error as Crypto.CryptoError {
-            throw NDKError.cryptoOperation(CryptoConstants.Operation.keyDerivation, nip: nil, error: error)
         } catch {
             throw NDKError.cryptoOperation(CryptoConstants.Operation.keyDerivation, nip: nil, error: error)
         }
@@ -54,8 +52,6 @@ public final class NDKPrivateKeySigner: NDKSigner {
 
         do {
             return try Crypto.sign(message: idData, privateKey: privateKey)
-        } catch let error as Crypto.CryptoError {
-            throw NDKError.cryptoOperation(CryptoConstants.Operation.signing, nip: nil, error: error)
         } catch {
             throw NDKError.cryptoOperation(CryptoConstants.Operation.signing, nip: nil, error: error)
         }
