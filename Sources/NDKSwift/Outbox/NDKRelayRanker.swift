@@ -105,7 +105,7 @@ actor NDKRelayRanker {
     }
 
     /// Get score for a relay and pubkey combination
-    func getScore(relay: String, pubkey: String) async -> Double {
+    public func getScore(relay: String, pubkey: String) async -> Double {
         let preferences = RelayPreferences.default
         let isConnected = await ndk.pool.connectedRelays().contains { $0.url == relay }
         return await calculateRelayScore(relay, for: [pubkey], isConnected: isConnected, preferences: preferences)
