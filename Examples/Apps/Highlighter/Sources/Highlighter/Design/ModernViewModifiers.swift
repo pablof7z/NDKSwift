@@ -63,7 +63,7 @@ struct ModernSectionHeader: View {
     var body: some View {
         HStack {
             Text(title)
-                .font(.ds.title3)
+                .font(Font.ds.title3)
                 .foregroundColor(.ds.text)
             
             Spacer()
@@ -71,8 +71,8 @@ struct ModernSectionHeader: View {
             if let action = action, let actionTitle = actionTitle {
                 Button(action: action) {
                     Text(actionTitle)
-                        .font(.ds.footnoteMedium)
-                        .foregroundColor(.ds.primary)
+                        .font(Font.ds.footnoteMedium)
+                        .foregroundColor(Color.ds.primary)
                 }
             }
         }
@@ -142,7 +142,7 @@ struct ModernEmptyState: View {
         VStack(spacing: .ds.medium) {
             Image(systemName: icon)
                 .font(.system(size: 48, weight: .light))
-                .foregroundColor(.ds.textTertiary)
+                .foregroundColor(Color.ds.textTertiary)
             
             VStack(spacing: .ds.small) {
                 Text(title)

@@ -45,7 +45,7 @@ struct SearchView: View {
                         icon: tab.icon,
                         isSelected: selectedTab == tab
                     ) {
-                        withAnimation(DesignSystem.Animation.springSnappy) {
+                        withAnimation(AnimationSystem.Curves.springSnappy) {
                             selectedTab = tab
                         }
                         HapticManager.shared.triggerSelection()
@@ -95,15 +95,15 @@ struct TabButton: View {
                 Image(systemName: icon)
                     .font(.system(size: 16))
                 Text(title)
-                    .font(.ds.caption)
+                    .font(DesignSystem.Typography.caption)
                     .fontWeight(isSelected ? .semibold : .regular)
             }
-            .foregroundColor(isSelected ? .white : .ds.text)
+            .foregroundColor(isSelected ? .white : DesignSystem.Colors.text)
             .padding(.horizontal, 16)
             .padding(.vertical, 8)
             .background(
                 Capsule()
-                    .fill(isSelected ? Color.ds.primary : Color.gray.opacity(0.1))
+                    .fill(isSelected ? DesignSystem.Colors.primary : Color(UIColor.systemGray).opacity(0.1))
             )
         }
         .buttonStyle(PlainButtonStyle())

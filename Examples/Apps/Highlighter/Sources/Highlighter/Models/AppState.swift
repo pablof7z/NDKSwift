@@ -18,6 +18,10 @@ class AppState: ObservableObject {
     // Computed Content State (from services)
     var highlights: [HighlightEvent] { dataStreamManager.highlights }
     var curations: [ArticleCuration] { dataStreamManager.curations }
+    var userCurations: [ArticleCuration] { 
+        guard let userPubkey = activeSigner?.publicKey else { return [] }
+        return curations.filter { $0.author == userPubkey }
+    }
     var followPacks: [FollowPack] { dataStreamManager.followPacks }
     var currentUserProfile: NDKUserProfile? { profileManager.currentUserProfile }
     

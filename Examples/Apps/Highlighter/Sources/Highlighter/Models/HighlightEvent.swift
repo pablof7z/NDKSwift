@@ -18,6 +18,12 @@ struct HighlightEvent: Identifiable, Equatable {
     
     // Additional fields for publishing
     var source: String? { url }
+    var pubkey: String { event.pubkey }
+    
+    // Convert to NDKEvent for use with ZapButton
+    func toNostrEvent() -> NDKEvent {
+        return event
+    }
     
     // For creating new highlights
     init(content: String, context: String? = nil, source: String? = nil, author: String? = nil, comment: String? = nil) {
