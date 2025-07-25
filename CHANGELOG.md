@@ -6,6 +6,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- Replaced hardcoded tag string literals with `NostrConstants` throughout codebase
+  - Tag names like "p", "e", "a", "k" now use `NostrConstants.TagName` constants
+  - Marker strings like "reply", "root", "redeemed" now use `NostrConstants.Marker` constants
+  - Improves maintainability and reduces potential for typos
+- Added utility extensions to reduce code duplication
+  - Added `nilIfEmpty` property to `String` and `Collection` types
+  - Added `setOrNil` property to `String` collections for cleaner optional Set conversion
+  - Replaced multiple `.isEmpty ? nil : value` patterns with new extensions
+- Replaced magic numbers with named constants
+  - Added `defaultCashuFeeBuffer` constant to `PaymentConstants`
+  - Replaced hardcoded fee buffer values (1000) with the constant
+
+### Fixed
+- Replaced force unwrap with safer `compactMap` in `IDGenerator.randomId()`
+  - While the force unwrap was technically safe, using `compactMap` follows best practices
+
 ## [0.1.4] - 2025-07-25
 
 ### Changed
