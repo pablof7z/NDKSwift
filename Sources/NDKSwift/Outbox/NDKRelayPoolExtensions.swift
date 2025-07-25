@@ -29,7 +29,3 @@ public extension NDKPool {
         return await connectedRelays()
     }
 }
-
-/// Extensions to NDKRelay for outbox model support
-public extension NDKRelay {
-}

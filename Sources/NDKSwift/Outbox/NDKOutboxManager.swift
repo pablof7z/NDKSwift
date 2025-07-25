@@ -294,13 +294,3 @@ public actor NDKOutboxManager {
         NDKLogger.log(.info, category: .outbox, "✅ Updated relay info for \(event.pubkey.prefix(StringConstants.DisplayFormatting.hexPrefixLength)): \(readRelays.count) read, \(writeRelays.count) write")
     }
 }
-
-/// Custom relay selection strategy that can be provided by users
-public struct RelaySelectionStrategy {
-    /// Closure that selects relays for a given public key
-    public let selectRelays: (String) async -> [String]
-
-    public init(selectRelays: @escaping (String) async -> [String]) {
-        self.selectRelays = selectRelays
-    }
-}
