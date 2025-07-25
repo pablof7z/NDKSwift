@@ -67,6 +67,7 @@ struct DesignSystem {
         static let caption = Font.system(size: 12, weight: .regular, design: .default)
         static let captionMedium = Font.system(size: 12, weight: .medium, design: .default)
         static let micro = Font.system(size: 11, weight: .regular, design: .default)
+        static let calloutMedium = Font.system(size: 14, weight: .medium, design: .default)
         
         // Specialized fonts for Highlighter app
         static let highlighterQuote = Font.custom("Georgia", size: 18).italic()
@@ -214,6 +215,8 @@ extension Font {
 extension CGFloat {
     static let ds = DesignSystem.Spacing.self
 }
+
+// Color extensions moved above to avoid duplication
 
 // MARK: - Haptic Feedback
 // Haptic feedback is handled by HapticManager.shared
