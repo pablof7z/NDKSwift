@@ -54,9 +54,9 @@ public struct NWCConnectionURI {
         }
 
         // Extract relay URLs
-        let relays = queryItems.filter { $0.name == "relay" }.compactMap { $0.value }
+        let relays = queryItems.filter { $0.name == NostrConstants.JSONField.relay }.compactMap { $0.value }
         guard !relays.isEmpty else {
-            throw NDKError.missingRequired("relay", in: "NWC URI")
+            throw NDKError.missingRequired(NostrConstants.JSONField.relay, in: "NWC URI")
         }
 
         // Validate relay URLs
@@ -116,7 +116,7 @@ public struct NWCConnectionURI {
 
         var queryItems = [URLQueryItem]()
         for relay in relayURLs {
-            queryItems.append(URLQueryItem(name: "relay", value: relay))
+            queryItems.append(URLQueryItem(name: NostrConstants.JSONField.relay, value: relay))
         }
         queryItems.append(URLQueryItem(name: "secret", value: self.secret))
         if let lud16 = lud16 {

@@ -240,7 +240,7 @@ public struct NDKCashuWalletEvent {
         // Add relay tags (unencrypted according to NIP-60)
         if let relays = relays {
             for relay in relays {
-                _ = builder.tag(["relay", relay])
+                _ = builder.tag([NostrConstants.TagName.relay, relay])
             }
         }
 
@@ -277,7 +277,7 @@ public struct NDKCashuWalletEvent {
     /// The relays configured in this wallet event (unencrypted)
     public var relays: [String] {
         let relayURLs = event.tags
-            .filter { $0.first == "relay" && $0.count > 1 }
+            .filter { $0.first == NostrConstants.TagName.relay && $0.count > 1 }
             .map { $0[1] }
         return relayURLs
     }
@@ -387,7 +387,7 @@ public struct NDKCashuWalletBackupEvent {
         // Add relay tags (unencrypted according to NIP-60)
         if let relays = relays {
             for relay in relays {
-                _ = builder.tag(["relay", relay])
+                _ = builder.tag([NostrConstants.TagName.relay, relay])
             }
         }
 
@@ -675,7 +675,7 @@ public struct NDKCashuMintList: NDKPublishableEvent {
         // Add relay tags if provided (recommended for nutzaps per NIP-61)
         if let relays = relays {
             for relay in relays {
-                _ = builder.tag(["relay", relay])
+                _ = builder.tag([NostrConstants.TagName.relay, relay])
             }
         }
 

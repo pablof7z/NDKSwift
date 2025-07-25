@@ -60,7 +60,7 @@ struct BunkerURLParser {
             switch item.name {
             case NostrConstants.JSONField.pubkey:
                 userPubkey = item.value
-            case "relay":
+            case NostrConstants.JSONField.relay:
                 if let relay = item.value {
                     relays.append(relay)
                 }
