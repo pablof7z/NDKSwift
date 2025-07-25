@@ -6,6 +6,7 @@ struct LibraryView: View {
     @State private var showCreateCuration = false
     @State private var selectedCuration: ArticleCuration?
     @State private var selectedFollowPack: FollowPack?
+    @State private var showCurationManagement = false
     
     var body: some View {
         NavigationStack {
@@ -16,9 +17,10 @@ struct LibraryView: View {
                     
                     // Your curations
                     YourCurationsSection(
-                        curations: appState.curations,
+                        curations: appState.userCurations,
                         showCreateCuration: $showCreateCuration,
-                        selectedCuration: $selectedCuration
+                        selectedCuration: $selectedCuration,
+                        showCurationManagement: $showCurationManagement
                     )
                     
                     // Follow packs
@@ -42,6 +44,10 @@ struct LibraryView: View {
         }
         .sheet(item: $selectedFollowPack) { followPack in
             FollowPackDetailView(followPack: followPack)
+                .environmentObject(appState)
+        }
+        .sheet(isPresented: $showCurationManagement) {
+            CurationManagementView()
                 .environmentObject(appState)
         }
     }
@@ -138,6 +144,7 @@ struct YourCurationsSection: View {
     let curations: [ArticleCuration]
     @Binding var showCreateCuration: Bool
     @Binding var selectedCuration: ArticleCuration?
+    @Binding var showCurationManagement: Bool
     
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
@@ -147,13 +154,32 @@ struct YourCurationsSection: View {
                 
                 Spacer()
                 
+                // Manage button
+                if !curations.isEmpty {
+                    Button(action: { showCurationManagement = true }) {
+                        Label("Manage", systemImage: "folder.badge.gearshape")
+                            .font(.caption.weight(.medium))
+                            .foregroundColor(.highlighterPurple)
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 6)
+                            .background(Color.highlighterPurple.opacity(0.1))
+                            .cornerRadius(20)
+                    }
+                    .transition(.asymmetric(
+                        insertion: .scale.combined(with: .opacity),
+                        removal: .scale.combined(with: .opacity)
+                    ))
+                }
+                
                 Button(action: { showCreateCuration = true }) {
                     Image(systemName: "plus.circle.fill")
                         .font(.title2)
                         .foregroundColor(DesignSystem.Colors.primary)
+                        .symbolEffect(.bounce, value: showCreateCuration)
                 }
             }
             .padding(.horizontal)
+            .animation(.spring(response: 0.3, dampingFraction: 0.7), value: curations.isEmpty)
             
             if curations.isEmpty {
                 EmptyCurationsPlaceholder(showCreateCuration: $showCreateCuration)

@@ -39,6 +39,49 @@ struct ProfileView: View {
                         Divider()
                             .background(DesignSystem.Colors.divider)
                         
+                        // Lightning Wallet button
+                        // Lightning wallet will be enabled when Lightning service is integrated
+                        NavigationLink(destination: EmptyView()) {
+                            HStack {
+                                Image(systemName: "bolt.circle.fill")
+                                    .font(.system(size: 20))
+                                    .foregroundStyle(
+                                        LinearGradient(
+                                            colors: [.orange, .yellow],
+                                            startPoint: .topLeading,
+                                            endPoint: .bottomTrailing
+                                        )
+                                    )
+                                
+                                Text("Lightning Wallet")
+                                    .fontWeight(.medium)
+                                    .foregroundColor(.ds.text)
+                                
+                                Spacer()
+                                
+                                Image(systemName: "chevron.right")
+                                    .font(.system(size: 14))
+                                    .foregroundColor(.ds.textTertiary)
+                            }
+                            .padding()
+                            .background(
+                                LinearGradient(
+                                    colors: [
+                                        Color.orange.opacity(0.08),
+                                        Color.orange.opacity(0.03)
+                                    ],
+                                    startPoint: .topLeading,
+                                    endPoint: .bottomTrailing
+                                )
+                            )
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 12)
+                                    .stroke(Color.orange.opacity(0.2), lineWidth: 1)
+                            )
+                            .cornerRadius(12)
+                        }
+                        .magneticHover()
+                        
                         Button(action: {
                             showLogoutConfirmation = true
                         }) {

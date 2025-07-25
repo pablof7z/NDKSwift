@@ -583,7 +583,7 @@ struct SwarmHighlightRow: View {
     let info: SwarmHighlight.HighlightInfo
     @State private var showZapAnimation = false
     @State private var isHovered = false
-    @State private var zapParticles: [ZapParticle] = []
+    @State private var zapParticles: [SwarmZapParticle] = []
     @Environment(\.colorScheme) var colorScheme
     
     var body: some View {
@@ -694,7 +694,7 @@ struct SwarmHighlightRow: View {
             ZStack {
                 // Particle effects
                 ForEach(zapParticles) { particle in
-                    ZapParticleView(particle: particle)
+                    SwarmZapParticleView(particle: particle)
                 }
                 
                 Button(action: {
@@ -775,7 +775,7 @@ struct SwarmHighlightRow: View {
         // Create particle burst
         for i in 0..<8 {
             let angle = Double(i) * (360.0 / 8.0)
-            let particle = ZapParticle(
+            let particle = SwarmZapParticle(
                 angle: angle,
                 distance: CGFloat.random(in: 30...60),
                 duration: Double.random(in: 0.6...1.0)
@@ -799,16 +799,16 @@ struct SwarmHighlightRow: View {
     }
 }
 
-// Zap particle effect
-struct ZapParticle: Identifiable {
+// Local particle type for swarm view to avoid conflict
+struct SwarmZapParticle: Identifiable {
     let id = UUID()
     let angle: Double
     let distance: CGFloat
     let duration: Double
 }
 
-struct ZapParticleView: View {
-    let particle: ZapParticle
+struct SwarmZapParticleView: View {
+    let particle: SwarmZapParticle
     @State private var offset: CGSize = .zero
     @State private var opacity: Double = 1
     

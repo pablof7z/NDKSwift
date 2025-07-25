@@ -47,13 +47,17 @@ struct HighlightCard: View {
                     
                     // Actions
                     HStack(spacing: .ds.medium) {
-                        // Zap button
-                        Button(action: zapHighlight) {
-                            Image(systemName: isZapped ? "bolt.fill" : "bolt")
-                                .font(.system(size: 16))
-                                .foregroundColor(isZapped ? .ds.warning : .ds.textSecondary)
-                        }
-                        .buttonStyle(PlainButtonStyle())
+                        // Smart Zap button
+                        ZapButton(
+                            event: highlight.toNostrEvent(),
+                            size: .small,
+                            highlight: highlight,
+                            onZapComplete: {
+                                isZapped = true
+                                print("Zap completed with smart splits")
+                            }
+                        )
+                        .environmentObject(appState)
                         
                         // Time
                         Text(RelativeTimeFormatter.relativeTime(from: highlight.createdAt))
@@ -98,6 +102,7 @@ struct HighlightCard: View {
     }
     
     private func zapHighlight() {
+        // This is now handled by the ZapButton component
         isZapped.toggle()
         HapticManager.shared.impact(HapticManager.ImpactStyle.light)
         // TODO: Implement actual zapping
