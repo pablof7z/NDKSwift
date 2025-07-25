@@ -56,7 +56,7 @@ struct PubkeyFormatter {
     
     /// Check if a string is a valid pubkey format
     static func isValidPubkey(_ pubkey: String) -> Bool {
-        pubkey.count == 64 && pubkey.allSatisfy { $0.isHexDigit }
+        HexValidator.isValid32ByteHex(pubkey)
     }
     
     /// Convert hex pubkey to npub format (if needed in the future)
@@ -64,12 +64,6 @@ struct PubkeyFormatter {
         // For now, just return the hex format as specified in the NDK guidance
         // "All public keys are hex encoded (not npub)"
         return hexPubkey
-    }
-}
-
-private extension Character {
-    var isHexDigit: Bool {
-        return self.isNumber || ("a"..."f").contains(self.lowercased()) || ("A"..."F").contains(self)
     }
 }
 

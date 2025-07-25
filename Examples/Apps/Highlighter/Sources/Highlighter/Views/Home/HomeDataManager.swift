@@ -25,8 +25,8 @@ class HomeDataManager: ObservableObject {
     }
     
     // MARK: - Initialization
-    init(appState: AppState) {
-        self.appState = appState
+    init() {
+        // AppState will be set by the view that creates this manager
     }
     
     // MARK: - Public Methods

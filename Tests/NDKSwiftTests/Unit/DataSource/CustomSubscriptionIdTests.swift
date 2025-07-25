@@ -40,7 +40,7 @@ final class CustomSubscriptionIdTests: XCTestCase {
         try await Task.sleep(nanoseconds: 100_000_000) // 100ms
         
         // Check the captured messages
-        let reqMessages = await mockRelay.capturedMessages.filter { $0.contains("\"REQ\"") }
+        let reqMessages = mockRelay.capturedMessages.filter { $0.contains("\"REQ\"") }
         XCTAssertFalse(reqMessages.isEmpty, "Should have sent at least one REQ message")
         
         // Parse the first REQ message to check the subscription ID
@@ -81,7 +81,7 @@ final class CustomSubscriptionIdTests: XCTestCase {
         try await Task.sleep(nanoseconds: 200_000_000) // 200ms
         
         // Check captured messages
-        let reqMessages = await mockRelay.capturedMessages.filter { $0.contains("\"REQ\"") }
+        let reqMessages = mockRelay.capturedMessages.filter { $0.contains("\"REQ\"") }
         XCTAssertGreaterThanOrEqual(reqMessages.count, 2, "Should have sent at least 2 REQ messages")
         
         // Extract all subscription IDs
@@ -117,7 +117,7 @@ final class CustomSubscriptionIdTests: XCTestCase {
         try await Task.sleep(nanoseconds: 100_000_000) // 100ms
         
         // Check captured messages
-        let reqMessages = await mockRelay.capturedMessages.filter { $0.contains("\"REQ\"") }
+        let reqMessages = mockRelay.capturedMessages.filter { $0.contains("\"REQ\"") }
         
         if let firstReq = reqMessages.first,
            let data = firstReq.data(using: .utf8),
@@ -134,7 +134,7 @@ final class CustomSubscriptionIdTests: XCTestCase {
 }
 
 // Mock relay that captures sent messages
-class MockRelayWithCapture: MockRelay {
+class MockRelayWithCapture: MockRelay, @unchecked Sendable {
     var capturedMessages: [String] = []
     
     override func send(_ message: String) async throws {

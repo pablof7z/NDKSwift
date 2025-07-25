@@ -76,7 +76,7 @@ struct HighlightCard: View {
             .padding(.ds.cardPadding)
         }
         .buttonStyle(PlainButtonStyle())
-        .modernCardSelected(isSelected: isZapped)
+        .modernCardSelected(isZapped)
         .task {
             await loadAuthor()
         }

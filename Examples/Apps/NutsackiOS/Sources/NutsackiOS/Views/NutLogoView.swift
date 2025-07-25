@@ -1,5 +1,35 @@
 import SwiftUI
 
+struct HexagonShape: Shape {
+    func path(in rect: CGRect) -> Path {
+        var path = Path()
+        let center = CGPoint(x: rect.midX, y: rect.midY)
+        let radius = min(rect.width, rect.height) / 2
+        let angle: CGFloat = 60 * .pi / 180
+        
+        // Start from the top point
+        var currentAngle: CGFloat = -90 * .pi / 180
+        
+        // Move to first vertex
+        path.move(to: CGPoint(
+            x: center.x + radius * cos(currentAngle),
+            y: center.y + radius * sin(currentAngle)
+        ))
+        
+        // Draw lines to create hexagon
+        for _ in 0..<6 {
+            currentAngle += angle
+            path.addLine(to: CGPoint(
+                x: center.x + radius * cos(currentAngle),
+                y: center.y + radius * sin(currentAngle)
+            ))
+        }
+        
+        path.closeSubpath()
+        return path
+    }
+}
+
 struct NutLogoView: View {
     let size: CGFloat
     let color: Color
@@ -10,135 +40,25 @@ struct NutLogoView: View {
     }
     
     var body: some View {
-        GeometryReader { geometry in
-            let scale = size / 24
-            
-            ZStack {
-                // Main nut shape paths
-                Path { path in
-                    // Top stem
-                    path.move(to: CGPoint(x: 12 * scale, y: 4 * scale))
-                    path.addLine(to: CGPoint(x: 12 * scale, y: 2 * scale))
-                }
-                .stroke(color, style: StrokeStyle(lineWidth: 2 * scale, lineCap: .round))
-                
-                Path { path in
-                    // Bottom V-shape
-                    path.move(to: CGPoint(x: 5 * scale, y: 10 * scale))
-                    path.addLine(to: CGPoint(x: 5 * scale, y: 14 * scale))
-                    path.addCurve(
-                        to: CGPoint(x: 10.277 * scale, y: 20.787 * scale),
-                        control1: CGPoint(x: 5 * scale, y: 17.866 * scale),
-                        control2: CGPoint(x: 7.368 * scale, y: 20.366 * scale)
-                    )
-                    path.addCurve(
-                        to: CGPoint(x: 11.379 * scale, y: 21.379 * scale),
-                        control1: CGPoint(x: 10.689 * scale, y: 20.891 * scale),
-                        control2: CGPoint(x: 11.079 * scale, y: 21.079 * scale)
-                    )
-                    path.addLine(to: CGPoint(x: 12 * scale, y: 22 * scale))
-                    path.addLine(to: CGPoint(x: 12.621 * scale, y: 21.379 * scale))
-                    path.addCurve(
-                        to: CGPoint(x: 13.723 * scale, y: 20.787 * scale),
-                        control1: CGPoint(x: 12.921 * scale, y: 21.079 * scale),
-                        control2: CGPoint(x: 13.311 * scale, y: 20.891 * scale)
-                    )
-                    path.addCurve(
-                        to: CGPoint(x: 19 * scale, y: 14 * scale),
-                        control1: CGPoint(x: 16.632 * scale, y: 20.366 * scale),
-                        control2: CGPoint(x: 19 * scale, y: 17.866 * scale)
-                    )
-                    path.addLine(to: CGPoint(x: 19 * scale, y: 10 * scale))
-                }
-                .stroke(color, style: StrokeStyle(lineWidth: 2 * scale, lineCap: .round, lineJoin: .round))
-                
-                Path { path in
-                    // Top crown shape
-                    path.move(to: CGPoint(x: 12 * scale, y: 4 * scale))
-                    path.addCurve(
-                        to: CGPoint(x: 4 * scale, y: 8 * scale),
-                        control1: CGPoint(x: 8 * scale, y: 4 * scale),
-                        control2: CGPoint(x: 4.5 * scale, y: 6 * scale)
-                    )
-                    path.addCurve(
-                        to: CGPoint(x: 2 * scale, y: 11 * scale),
-                        control1: CGPoint(x: 3.757 * scale, y: 8.97 * scale),
-                        control2: CGPoint(x: 3.081 * scale, y: 9.952 * scale)
-                    )
-                    
-                    // Left curve
-                    path.addCurve(
-                        to: CGPoint(x: 5 * scale, y: 10 * scale),
-                        control1: CGPoint(x: 3.31 * scale, y: 10.918 * scale),
-                        control2: CGPoint(x: 3.972 * scale, y: 10.71 * scale)
-                    )
-                    
-                    // First valley
-                    path.addCurve(
-                        to: CGPoint(x: 7 * scale, y: 12 * scale),
-                        control1: CGPoint(x: 5.54 * scale, y: 10.92 * scale),
-                        control2: CGPoint(x: 5.982 * scale, y: 11.356 * scale)
-                    )
-                    
-                    // Second peak
-                    path.addCurve(
-                        to: CGPoint(x: 9.5 * scale, y: 10 * scale),
-                        control1: CGPoint(x: 8.452 * scale, y: 11.353 * scale),
-                        control2: CGPoint(x: 8.954 * scale, y: 10.902 * scale)
-                    )
-                    
-                    // Center valley
-                    path.addCurve(
-                        to: CGPoint(x: 12 * scale, y: 12 * scale),
-                        control1: CGPoint(x: 10.095 * scale, y: 10.995 * scale),
-                        control2: CGPoint(x: 10.651 * scale, y: 11.427 * scale)
-                    )
-                    
-                    // Third peak
-                    path.addCurve(
-                        to: CGPoint(x: 14.5 * scale, y: 10 * scale),
-                        control1: CGPoint(x: 13.349 * scale, y: 11.427 * scale),
-                        control2: CGPoint(x: 13.905 * scale, y: 10.995 * scale)
-                    )
-                    
-                    // Fourth valley
-                    path.addCurve(
-                        to: CGPoint(x: 17 * scale, y: 12 * scale),
-                        control1: CGPoint(x: 15.046 * scale, y: 10.902 * scale),
-                        control2: CGPoint(x: 15.548 * scale, y: 11.353 * scale)
-                    )
-                    
-                    // Right curve
-                    path.addCurve(
-                        to: CGPoint(x: 19 * scale, y: 10 * scale),
-                        control1: CGPoint(x: 18.018 * scale, y: 11.356 * scale),
-                        control2: CGPoint(x: 18.46 * scale, y: 10.92 * scale)
-                    )
-                    
-                    path.addCurve(
-                        to: CGPoint(x: 22 * scale, y: 11 * scale),
-                        control1: CGPoint(x: 20.028 * scale, y: 10.71 * scale),
-                        control2: CGPoint(x: 20.69 * scale, y: 10.918 * scale)
-                    )
-                    
-                    // Close to starting point
-                    path.addCurve(
-                        to: CGPoint(x: 20 * scale, y: 8 * scale),
-                        control1: CGPoint(x: 20.919 * scale, y: 9.952 * scale),
-                        control2: CGPoint(x: 20.243 * scale, y: 8.97 * scale)
-                    )
-                    path.addCurve(
-                        to: CGPoint(x: 12 * scale, y: 4 * scale),
-                        control1: CGPoint(x: 19.5 * scale, y: 6 * scale),
-                        control2: CGPoint(x: 16 * scale, y: 4 * scale)
-                    )
-                    path.closeSubpath()
-                }
-                .stroke(color, style: StrokeStyle(lineWidth: 2 * scale, lineCap: .round, lineJoin: .round))
-            }
+        // Create a hexagon with a circular hole in the center
+        HexagonShape()
+            .fill(color)
             .frame(width: size, height: size)
-        }
-        .frame(width: size, height: size)
+            .mask(
+                ZStack {
+                    // Full hexagon
+                    Rectangle()
+                        .fill(Color.white)
+                        .frame(width: size * 2, height: size * 2)
+                    
+                    // Cut out the center circle
+                    Circle()
+                        .fill(Color.black)
+                        .frame(width: size * 0.4, height: size * 0.4)
+                        .blendMode(.destinationOut)
+                }
+                .compositingGroup()
+            )
     }
 }
 
