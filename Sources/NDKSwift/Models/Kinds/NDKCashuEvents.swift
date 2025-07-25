@@ -969,7 +969,7 @@ public struct NDKNutzapEvent {
 
     /// Get the comment from the event content
     public var comment: String? {
-        event.content.isEmpty ? nil : event.content
+        event.content.nilIfEmpty
     }
 }
 
@@ -1053,6 +1053,6 @@ public struct NDKMintRecommendation {
 
     /// Extract recommendation reason
     public var reason: String? {
-        event.content.isEmpty ? nil : event.content
+        event.content.nilIfEmpty
     }
 }
