@@ -15,7 +15,7 @@ struct RawLoggingDemo {
         let smallMessage = NostrMessage.req(subscriptionId: "ds_3crnld2z", filters: [smallFilter])
         if let serialized = try? smallMessage.serialize() {
             print("Original: \(serialized)")
-            print("Truncated: \(NDKLogger.truncateMessage(serialized))")
+            print("Truncated: \(NDKLogFormatter.truncateMessage(serialized))")
         }
 
         // Test 2: Large authors array (>100 items)
@@ -28,7 +28,7 @@ struct RawLoggingDemo {
         let largeMessage = NostrMessage.req(subscriptionId: "large_authors", filters: [largeFilter])
         if let serialized = try? largeMessage.serialize() {
             print("Original length: \(serialized.count) chars")
-            let truncated = NDKLogger.truncateMessage(serialized)
+            let truncated = NDKLogFormatter.truncateMessage(serialized)
             print("Truncated length: \(truncated.count) chars")
             print("Truncated: \(truncated)")
         }
@@ -43,7 +43,7 @@ struct RawLoggingDemo {
         let hugeMessage = NostrMessage.req(subscriptionId: "huge_arrays", filters: [hugeFilter])
         if let serialized = try? hugeMessage.serialize() {
             print("Original length: \(serialized.count) chars")
-            let truncated = NDKLogger.truncateMessage(serialized)
+            let truncated = NDKLogFormatter.truncateMessage(serialized)
             print("Truncated length: \(truncated.count) chars")
             print("Truncated: \(truncated)")
         }
@@ -51,6 +51,6 @@ struct RawLoggingDemo {
         // Test 4: Actual logging output
         print("\n=== Test 4: Actual logging output ===")
         let testURL = URL(string: "wss://relay.nostr.band")!
-        NDKLogger.logNetworkSend(to: testURL, message: try! largeMessage.serialize(), parsed: largeMessage)
+        NDKNetworkLogger.logNetworkSend(to: testURL, message: try! largeMessage.serialize(), parsed: largeMessage)
     }
 }

@@ -58,7 +58,7 @@ struct HybridFeedView: View {
                             // Hero header with parallax
                             heroHeader
                                 .offset(y: parallaxOffset * 0.5)
-                                .opacity(1 - (abs(parallaxOffset) / 200))
+                                .opacity(1 - (abs(parallaxOffset) / 200.0))
                             
                             // Sticky section tabs
                             sectionTabs
@@ -407,14 +407,19 @@ struct CarouselSection<Content: View>: View {
                 .scrollTargetLayout()
             }
             .scrollTargetBehavior(.viewAligned)
-            .onScrollGeometryChange(for: CGFloat.self) { geometry in
-                geometry.contentOffset.x
-            } action: { _, newOffset in
-                scrollOffset = newOffset
+            .background(
+                GeometryReader { geometry in
+                    Color.clear
+                        .preference(key: ScrollOffsetPreferenceKey.self, value: -geometry.frame(in: .named("scroll")).origin.x)
+                }
+            )
+            .onPreferenceChange(ScrollOffsetPreferenceKey.self) { value in
+                scrollOffset = value
                 withAnimation(.spring(response: 0.3)) {
                     titleScale = 1 + (abs(scrollOffset) / 1000)
                 }
             }
+            .coordinateSpace(name: "scroll")
         }
     }
 }
@@ -689,7 +694,7 @@ struct PersonDiscoveryCard: View {
                     .padding(.vertical, 6)
                     .background(
                         Capsule()
-                            .fill(isFollowing ? Color.ds.surfaceTertiary : Color.ds.primary)
+                            .fill(isFollowing ? Color.ds.surfaceSecondary : Color.ds.primary)
                     )
             }
         }
@@ -1006,6 +1011,13 @@ extension View {
 // MARK: - Preference Keys
 
 struct ScrollOffsetKey: PreferenceKey {
+    static var defaultValue: CGFloat = 0
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
+        value = nextValue()
+    }
+}
+
+struct ScrollOffsetPreferenceKey: PreferenceKey {
     static var defaultValue: CGFloat = 0
     static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
         value = nextValue()

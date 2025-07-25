@@ -257,6 +257,11 @@ public actor NDKOutboxManager {
         guard !authors.isEmpty else { return }
 
         NDKLogger.log(.info, category: .outbox, "🔍 Starting background relay discovery for \(authors.count) authors")
+        
+        // MARK: - OUTBOX_DEBUG_HOOK
+        Task {
+            await NDKDebugHooks.emit(.flowStep(description: "Starting background relay discovery for \(authors.count) unknown authors"))
+        }
 
         Task {
             // Create filter for relay lists
@@ -275,6 +280,9 @@ public actor NDKOutboxManager {
             }
 
             NDKLogger.log(.debug, category: .outbox, "📡 Querying \(outboxRelays.count) outbox relays for relay lists")
+            
+            // MARK: - OUTBOX_DEBUG_HOOK
+            await NDKDebugHooks.emit(.flowStep(description: "Querying \(outboxRelays.count) relay(s) to discover relay lists: \(outboxRelays.joined(separator: ", "))"))
 
             // Create data source for relay list discovery
             let dataSource = NDKDataSource(
@@ -327,6 +335,9 @@ public actor NDKOutboxManager {
         )
 
         NDKLogger.log(.info, category: .outbox, "✅ Updated relay info for \(event.pubkey.prefix(StringConstants.DisplayFormatting.hexPrefixLength)): \(readRelays.count) read, \(writeRelays.count) write")
+        
+        // MARK: - OUTBOX_DEBUG_HOOK
+        await NDKDebugHooks.emit(.flowStep(description: "Discovered relay list for \(event.pubkey.prefix(8))...: \(readRelays.count) read, \(writeRelays.count) write relays"))
 
         // Notify about relay discovery
         let discoveryInfo = RelayDiscoveryInfo(

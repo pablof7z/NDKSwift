@@ -68,21 +68,53 @@ actor DebuggerCLI {
     }
     
     func run() async {
+        // Set up debug hook to capture initialization
+        var initProgress: [String] = []
+        NDKDebugHooks.setDebugHook { event in
+            switch event {
+            case .poolConnecting(let relay):
+                initProgress.append("🔌 Connecting to \(relay)")
+            case .poolConnected(let relay):
+                initProgress.append("✅ Connected to \(relay)")
+            case .poolDisconnected(let relay, let error):
+                if let error = error {
+                    initProgress.append("❌ Failed to connect to \(relay): \(error.localizedDescription)")
+                } else {
+                    initProgress.append("🔴 Disconnected from \(relay)")
+                }
+            case .flowStep(let description):
+                initProgress.append("➡️ \(description)")
+            default:
+                break
+            }
+        }
+        
+        // Initial render
+        await renderer.render(inputBuffer: "", output: "🚀 Starting Outbox Debugger...\n\n📝 Configuration:\n  - Default relay: wss://relay.primal.net\n  - Outbox enabled: true\n\n🔄 Initializing NDK...")
+        
         // Connect to relay
-        await renderer.render(inputBuffer: "", output: "Connecting to relay.primal.net...")
         await ndk.connect()
         
-        // Wait for connection
-        await renderer.render(inputBuffer: "", output: "Waiting for relay connection...")
+        // Show connection progress
+        let progressOutput = initProgress.joined(separator: "\n")
+        await renderer.render(inputBuffer: "", output: "🚀 Starting Outbox Debugger...\n\n📝 Configuration:\n  - Default relay: wss://relay.primal.net\n  - Outbox enabled: true\n\n🔄 Connection Progress:\n" + progressOutput)
         
         // Wait a bit for connections to establish
         try? await Task.sleep(nanoseconds: 2_000_000_000) // 2 seconds
         
-        let (connectedCount, _) = await ndk.getRelayConnectionSummary()
+        let (connectedCount, totalCount) = await ndk.getRelayConnectionSummary()
+        
+        // Clear debug hook
+        NDKDebugHooks.setDebugHook(nil)
+        
+        let finalStatus = "\n\n📊 Connection Summary: \(connectedCount)/\(totalCount) relays connected"
         
         if connectedCount == 0 {
-            await renderer.render(inputBuffer: "", output: Terminal.color("⚠️ Warning: No relays connected! Commands may hang.\n\nTry waiting a moment or check your internet connection.", .yellow))
+            await renderer.render(inputBuffer: "", output: progressOutput + finalStatus + "\n\n" + Terminal.color("⚠️ Warning: No relays connected! Commands may hang.\n\nTry waiting a moment or check your internet connection.", .yellow))
             try? await Task.sleep(nanoseconds: 2_000_000_000) // Show warning for 2s
+        } else {
+            await renderer.render(inputBuffer: "", output: progressOutput + finalStatus)
+            try? await Task.sleep(nanoseconds: 1_000_000_000) // Show summary for 1s
         }
         
         // Set up terminal
@@ -124,23 +156,7 @@ actor DebuggerCLI {
                     commandHistory.append(command)
                     historyIndex = -1
                     
-                    // For long-running commands, show progress
-                    if command.starts(with: "req") || command.starts(with: "publish") {
-                        await renderer.render(inputBuffer: inputBuffer, output: "Processing: \(command)\n\nConnecting to relays...")
-                        
-                        // Give visual feedback that something is happening
-                        Task {
-                            var dots = 0
-                            while true {
-                                try? await Task.sleep(nanoseconds: 500_000_000) // 0.5s
-                                dots = (dots + 1) % 4
-                                let dotString = String(repeating: ".", count: dots)
-                                await renderer.render(inputBuffer: inputBuffer, output: "Processing: \(command)\n\nConnecting to relays\(dotString)")
-                            }
-                        }
-                    } else {
-                        await renderer.render(inputBuffer: inputBuffer, output: "Processing: \(command)")
-                    }
+                    await renderer.render(inputBuffer: inputBuffer, output: "Processing: \(command)")
                     
                     let output = await processCommand(command)
                     await renderer.render(inputBuffer: inputBuffer, output: output)

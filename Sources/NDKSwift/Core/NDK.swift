@@ -295,16 +295,24 @@ public final class NDK {
     /// Initiates WebSocket connections to all relays in the pool.
     /// Connections are managed automatically with reconnection logic.
     public func connect() async {
+        // MARK: - OUTBOX_DEBUG_HOOK
+        await NDKDebugHooks.emit(.flowStep(description: "NDK.connect() called - initializing relay connections"))
+        
         // Ensure initial relays are added first
         if !initialRelayUrls.isEmpty {
+            await NDKDebugHooks.emit(.flowStep(description: "Adding \(initialRelayUrls.count) initial relay(s) from configuration"))
             await initializeRelays()
         }
 
         // Add outbox relays from config
-        for relayUrl in outboxConfig.outboxRelays {
-            await pool.addRelay(relayUrl, origin: .outboxConfig)
+        if !outboxConfig.outboxRelays.isEmpty {
+            await NDKDebugHooks.emit(.flowStep(description: "Adding \(outboxConfig.outboxRelays.count) outbox relay(s) from configuration"))
+            for relayUrl in outboxConfig.outboxRelays {
+                await pool.addRelay(relayUrl, origin: .outboxConfig)
+            }
         }
 
+        await NDKDebugHooks.emit(.flowStep(description: "Connecting to all relays in pool"))
         await pool.connectAll()
     }
 

@@ -196,8 +196,8 @@ class HeatmapTextUIView: UITextView {
     }
     
     private func getRects(for range: NSRange) -> [CGRect] {
-        guard let layoutManager = layoutManager,
-              let textContainer = textContainer else { return [] }
+        let layoutManager = layoutManager
+        let textContainer = textContainer
         
         var rects: [CGRect] = []
         let glyphRange = layoutManager.glyphRange(forCharacterRange: range, actualCharacterRange: nil)
@@ -239,7 +239,7 @@ struct HeatmapParticleView: View {
     var body: some View {
         Circle()
             .fill(LinearGradient(
-                colors: [Color.ds.accent, Color.ds.accent.opacity(0.3)],
+                colors: [Color.ds.primary, Color.ds.primary.opacity(0.3)],
                 startPoint: .top,
                 endPoint: .bottom
             ))
@@ -274,16 +274,17 @@ struct SwarmTooltipView: View {
             HStack {
                 Image(systemName: "sparkles")
                     .font(.caption)
-                    .foregroundColor(.ds.accent)
+                    .foregroundColor(.ds.primary)
                 
                 Text("\(highlighters.count) highlights")
-                    .font(.ds.captionBold)
+                    .font(.ds.caption)
+                    .fontWeight(.bold)
                 
                 Spacer()
                 
                 Text("\(totalZaps) zaps")
                     .font(.ds.caption)
-                    .foregroundColor(.ds.secondaryText)
+                    .foregroundColor(.ds.textSecondary)
             }
             
             // User avatars
@@ -301,10 +302,10 @@ struct SwarmTooltipView: View {
                     if highlighters.count > 10 {
                         Text("+\(highlighters.count - 10)")
                             .font(.ds.caption)
-                            .foregroundColor(.ds.secondaryText)
+                            .foregroundColor(.ds.textSecondary)
                             .padding(.horizontal, 8)
                             .padding(.vertical, 4)
-                            .background(Color.ds.tertiaryBackground)
+                            .background(Color.ds.surfaceSecondary)
                             .clipShape(Capsule())
                             .padding(.leading, 8)
                     }
@@ -366,12 +367,13 @@ struct HighlighterAvatarView: View {
             ZStack {
                 // Avatar
                 Circle()
-                    .fill(Color.ds.tertiaryBackground)
+                    .fill(Color.ds.surfaceSecondary)
                     .frame(width: 40, height: 40)
                     .overlay(
                         Text(highlighter.name.prefix(2).uppercased())
-                            .font(.ds.captionBold)
-                            .foregroundColor(.ds.accent)
+                            .font(.ds.caption)
+                            .fontWeight(.bold)
+                            .foregroundColor(.ds.primary)
                     )
                 
                 // Zap indicator
@@ -401,7 +403,7 @@ struct ParticlePosition: Identifiable {
     let startTime: Date
 }
 
-struct HighlighterInfo: Identifiable {
+struct HighlighterInfo: Identifiable, Equatable {
     let id: String
     let name: String
     let zapCount: Int
@@ -429,7 +431,8 @@ class SwarmHeatmapData: ObservableObject {
             tags: ["r": [articleId]]
         )
         
-        dataSource = NDK.shared.observe(filter: filter)
+        // Need to get NDK instance from AppState
+        // dataSource = ndk.observe(filter: filter)
         
         // Stream highlights
         guard let events = dataSource?.events else { return }
@@ -441,14 +444,14 @@ class SwarmHeatmapData: ObservableObject {
     
     private func processHighlightEvent(_ event: NDKEvent) {
         // Process incoming highlight events and update heatmap
-        guard let content = event.content,
-              let range = extractRange(from: event) else { return }
+        let content = event.content
+        guard let range = extractRange(from: event) else { return }
         
         withAnimation(.spring(response: 0.5)) {
             // Update or add highlight
             if let index = highlights.firstIndex(where: { $0.range == range }) {
                 var highlight = highlights[index]
-                let newUsers = highlight.users + [event.author]
+                let newUsers = highlight.users + [event.pubkey]
                 let newIntensity = min(Double(newUsers.count) / 10.0, 1.0)
                 
                 highlights[index] = HeatmapHighlight(
@@ -463,7 +466,7 @@ class SwarmHeatmapData: ObservableObject {
                     id: event.id,
                     range: range,
                     intensity: 0.1,
-                    users: [event.author],
+                    users: [event.pubkey],
                     timestamp: Date()
                 )
                 highlights.append(newHighlight)
@@ -513,7 +516,7 @@ struct MicroButtonStyle: ButtonStyle {
             .padding(.vertical, 6)
             .background(
                 RoundedRectangle(cornerRadius: 8)
-                    .fill(isPrimary ? Color.ds.accent : Color.ds.tertiaryBackground)
+                    .fill(isPrimary ? Color.ds.primary : Color.ds.surfaceSecondary)
             )
             .foregroundColor(isPrimary ? .white : .ds.text)
             .scaleEffect(configuration.isPressed ? 0.95 : 1.0)

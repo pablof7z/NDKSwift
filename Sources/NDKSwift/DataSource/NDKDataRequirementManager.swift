@@ -300,6 +300,10 @@ actor NDKDataRequirementManager {
                     // If we have relay-specific filters, create multiple subscriptions
                     if outboxStrategy.hasRelaySpecificFilters {
                         NDKLogger.log(.info, category: .subscription, "📊 [DataReqManager] Creating \(outboxStrategy.filtersByRelay.count) relay-specific subscriptions")
+                        
+                        // MARK: - OUTBOX_DEBUG_HOOK
+                        await NDKDebugHooks.emit(.flowStep(description: "Creating \(outboxStrategy.filtersByRelay.count) relay-specific subscriptions"))
+                        await NDKDebugHooks.emit(.outboxStrategyComputed(relays: outboxStrategy.filtersByRelay.mapValues { $0.authors ?? [] }))
 
                         // Track all requirements created for this group
                         var createdRequirements: [DataRequirement] = []
