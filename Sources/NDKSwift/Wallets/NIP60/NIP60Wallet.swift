@@ -779,7 +779,7 @@ public actor NIP60Wallet: NDKPaymentProvider {
     /// ```
     public func monitorDeposit(
         quote: CashuMintQuote,
-        timeout: TimeInterval = 600.0,
+        timeout: TimeInterval = NetworkConstants.timeoutWalletDeposit,
         manualCheckTrigger: AsyncStream<Void>? = nil
     ) -> AsyncThrowingStream<DepositStatus, Error> {
         return AsyncThrowingStream { continuation in
@@ -1514,7 +1514,7 @@ public actor NIP60Wallet: NDKPaymentProvider {
                 // Only retry transient errors
                 if redemptionError.isRetryable && attempt < maxAttempts {
                     // Exponential backoff: 1s, 2s, 4s...
-                    let delay = UInt64(pow(2.0, Double(attempt - 1))) * 1_000_000_000
+                    let delay = UInt64(pow(2.0, Double(attempt - 1))) * TimeConstants.nanosecondsPerSecond
                     try? await Task.sleep(nanoseconds: delay)
                     continue
                 }
