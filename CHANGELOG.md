@@ -6,20 +6,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.4] - 2025-07-25
+
 ### Changed
-- Updated Highlighter app to use NDKSwiftUI's comprehensive markdown renderer for article content
-  - Replaced basic markdown parsing with full-featured NDKMarkdownRenderer
-  - Added support for all markdown elements: headings, lists, code blocks, blockquotes, tables
-  - Added Nostr entity parsing and rendering (npub, note, nevent, naddr)
-  - Added hashtag and mention support with tap handlers
-  - Integrated custom styling to match Highlighter's theme
-  - Created SelectableMarkdownRenderer wrapper to preserve text selection for highlights
-  - Maintained original highlighting functionality with improved markdown rendering
-- Enhanced Highlighter app article list with dual layout system
-  - Featured articles now display as portrait cards in a horizontal scroll view
-  - Regular articles display as horizontal row cards with compact layout
-  - Featured section highlights first 3 articles with images
-  - Improved visual hierarchy and content discovery
+- Consolidated duplicate constants to follow DRY principle
+  - Removed redundant `NostrEventKeys.swift` file
+  - Updated all references to use centralized `NostrConstants` instead
+  - Replaced string literals ("relay", "secret") with appropriate constants throughout codebase
+- Eliminated code duplication in string validation
+  - Updated `StringExtensions` to use `ValidationHelpers` methods
+  - Removed duplicate implementations of `hasContent`, `trim`, and `normalize`
+
+### Fixed
+- Removed unnecessary `await` on non-async property access in `NDKDataRequirementManager`
+  - Fixed compiler warnings about awaiting synchronous properties
+  - Improved code clarity by removing misleading async indicators
 
 ## [0.1.3] - 2025-07-24
 
