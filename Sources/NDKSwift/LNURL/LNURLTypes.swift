@@ -12,17 +12,17 @@ public enum LNURLError: LocalizedError {
     public var errorDescription: String? {
         switch self {
         case .invalidFormat(let detail):
-            return "Invalid LNURL format: \(detail)"
+            return ErrorMessageConstants.withContext(ErrorMessageConstants.invalid("LNURL format"), context: detail)
         case .networkError(let error):
-            return "Network error: \(error.localizedDescription)"
+            return ErrorMessageConstants.withContext(ErrorMessageConstants.Messages.networkError, context: error.localizedDescription)
         case .invalidResponse(let detail):
-            return "Invalid LNURL response: \(detail)"
+            return ErrorMessageConstants.withContext(ErrorMessageConstants.invalid("LNURL response"), context: detail)
         case .decodingError(let detail):
-            return "Failed to decode LNURL data: \(detail)"
+            return ErrorMessageConstants.withContext(ErrorMessageConstants.failedTo("decode LNURL data"), context: detail)
         case .unsupportedProtocol:
             return "LNURL protocol not supported"
         case .noProviderPubkey:
-            return "No provider pubkey found in LNURL metadata"
+            return ErrorMessageConstants.notFound("Provider pubkey in LNURL metadata")
         }
     }
 }

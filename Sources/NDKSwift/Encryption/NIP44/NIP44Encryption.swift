@@ -33,15 +33,15 @@ public enum NIP44 {
             case .unsupportedVersion:
                 return "Unsupported NIP-44 version"
             case .invalidPayloadSize:
-                return "Invalid payload size (must be \(Constants.minPayloadSize)-\(Constants.maxPayloadSize) chars)"
+                return ErrorMessageConstants.withContext(ErrorMessageConstants.invalid("payload size"), context: "must be \(Constants.minPayloadSize)-\(Constants.maxPayloadSize) chars")
             case .invalidDataSize:
-                return "Invalid data size (must be \(Constants.minDataSize)-\(Constants.maxDataSize) bytes)"
+                return ErrorMessageConstants.withContext(ErrorMessageConstants.invalid("data size"), context: "must be \(Constants.minDataSize)-\(Constants.maxDataSize) bytes")
             case .invalidMAC:
-                return "Invalid message authentication code"
+                return ErrorMessageConstants.invalid("message authentication code")
             case .invalidPadding:
-                return "Invalid padding format"
+                return ErrorMessageConstants.invalid("padding format")
             case .invalidNonce:
-                return "Invalid nonce (must be \(Constants.nonceSize) bytes)"
+                return ErrorMessageConstants.withContext(ErrorMessageConstants.invalid("nonce"), context: "must be \(Constants.nonceSize) bytes")
             }
         }
     }

@@ -221,15 +221,15 @@ public enum NIP77Error: LocalizedError {
     public var errorDescription: String? {
         switch self {
         case .invalidMessage:
-            return "Invalid NIP-77 message format"
+            return ErrorMessageConstants.invalid("NIP-77 message format")
         case .syncFailed(let reason):
-            return "Sync failed: \(reason)"
+            return ErrorMessageConstants.withContext("Sync failed", context: reason)
         case .relayError(let error):
-            return "Relay error: \(error)"
+            return ErrorMessageConstants.relayError(relay: "NIP-77", message: error)
         case .unsupportedByRelay:
             return "Relay does not support NIP-77"
         case .timeout(let message):
-            return "Timeout: \(message)"
+            return ErrorMessageConstants.withContext(ErrorMessageConstants.Messages.timeout, context: message)
         }
     }
 }
