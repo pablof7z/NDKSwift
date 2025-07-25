@@ -619,7 +619,7 @@ struct NDKZapButton_Previews: PreviewProvider {
             // Different configurations
             HStack(spacing: 16) {
                 NDKZapButton(event: mockEvent, amounts: [21])
-                NDKZapButton(event: mockEvent, amounts: [100, 1000, 10000])
+                NDKZapButton(event: mockEvent, amounts: UIConstants.ZapAmounts.standard)
                 NDKZapButton(event: mockEvent, showCount: false)
             }
         }

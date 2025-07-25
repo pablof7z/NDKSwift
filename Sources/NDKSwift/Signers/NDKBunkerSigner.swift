@@ -20,7 +20,7 @@ struct BunkerURLParser {
         guard let url = URL(string: urlString),
               url.scheme == "bunker"
         else {
-            NDKLogger.log(.error, category: .auth, "\(logPrefix) Invalid bunker URL format")
+            NDKLogger.log(.error, category: .auth, "\(logPrefix) \(ErrorMessageConstants.invalid("bunker URL format"))")
             return (nil, nil, [], nil)
         }
         
