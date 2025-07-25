@@ -27,7 +27,7 @@ actor StartupNutzapRedemption {
 
     /// Track nutzap event during initial sync
     func trackNutzap(_ event: NDKEvent) {
-        NDKLogger.log(.debug, category: .wallet, "🎯 Tracking nutzap for startup redemption: \(event.id)")
+        NDKLogger.log(.debug, category: .wallet, "Tracking nutzap for startup redemption: \(event.id)")
         pendingNutzaps.append(event)
     }
 

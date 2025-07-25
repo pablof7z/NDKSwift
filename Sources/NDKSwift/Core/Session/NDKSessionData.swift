@@ -173,7 +173,7 @@ public class NDKSessionData {
         if let timestamp = newestTimestamp {
             // Add 1 second to avoid re-fetching the same events
             filter.since = timestamp + 1
-            NDKLogger.log(.debug, category: .subscription, "🎯 Optimizing session data fetch - only fetching events newer than \(timestamp)")
+            NDKLogger.log(.debug, category: .subscription, "Optimizing session data fetch - only fetching events newer than \(timestamp)")
         }
 
         // Create data source for continuous updates with meaningful subscription ID
