@@ -15,7 +15,7 @@ public actor NDKEventManager {
     /// Publish an event to relays
     public func publish(_ event: NDKEvent, logRawJSON: Bool = false) async throws -> Set<NDKRelay> {
         guard let ndk = ndk else {
-            throw NDKError.notConfigured("NDK reference lost")
+            throw NDKError.notConfigured(ErrorMessageConstants.Messages.ndkReferenceLost)
         }
 
         // Determine relays for publication
@@ -38,7 +38,7 @@ public actor NDKEventManager {
     /// Common implementation for publishing events
     private func publishToRelays(event: NDKEvent, relayUrls: Set<String>, logRawJSON: Bool, useOptimistic: Bool) async throws -> Set<NDKRelay> {
         guard let ndk = ndk else {
-            throw NDKError.notConfigured("NDK reference lost")
+            throw NDKError.notConfigured(ErrorMessageConstants.Messages.ndkReferenceLost)
         }
 
         // Events should already be signed before publishing
@@ -121,7 +121,7 @@ public actor NDKEventManager {
     /// Build and publish an event in one step
     public func publish(_ builder: (NDKEventBuilder) -> NDKEventBuilder) async throws -> (event: NDKEvent, relays: Set<NDKRelay>) {
         guard let ndk = ndk else {
-            throw NDKError.notConfigured("NDK reference lost")
+            throw NDKError.notConfigured(ErrorMessageConstants.Messages.ndkReferenceLost)
         }
 
         let signer = try ndk.requireSigner()
@@ -141,7 +141,7 @@ public actor NDKEventManager {
     /// Retry publishing unpublished events
     public func retryUnpublishedEvents(maxAge: TimeInterval = TimeConstants.hour, limit: Int? = nil) async throws -> [(event: NDKEvent, relays: Set<NDKRelay>)] {
         guard ndk != nil else {
-            throw NDKError.notConfigured("NDK reference lost")
+            throw NDKError.notConfigured(ErrorMessageConstants.Messages.ndkReferenceLost)
         }
 
         let unpublishedEvents = await cache.getUnpublishedEvents(maxAge: maxAge, limit: limit)

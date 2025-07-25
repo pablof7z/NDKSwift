@@ -478,7 +478,7 @@ public class NDKList {
     /// Sign this list as an event
     public func sign() async throws {
         guard let ndk = ndk else {
-            throw NDKError.notConfigured("NDK reference lost")
+            throw NDKError.notConfigured(ErrorMessageConstants.Messages.ndkReferenceLost)
         }
         let signer = try ndk.requireSigner()
 

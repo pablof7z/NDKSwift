@@ -124,7 +124,7 @@ public final class NDKUser: Equatable, Hashable, Sendable {
     @discardableResult
     public func fetchRelayList() async throws -> [NDKRelayInfo] {
         guard let ndk = ndk else {
-            throw NDKError.configurationError("NDK instance not set")
+            throw NDKError.configurationError(ErrorMessageConstants.Messages.ndkInstanceNotSet)
         }
 
         // Create filter for kind 10002 events
@@ -171,7 +171,7 @@ public final class NDKUser: Equatable, Hashable, Sendable {
     /// Get users this user follows
     public func follows() async throws -> Set<NDKUser> {
         guard let ndk = ndk else {
-            throw NDKError.configurationError("NDK instance not set")
+            throw NDKError.configurationError(ErrorMessageConstants.Messages.ndkInstanceNotSet)
         }
 
         // Create filter for kind 3 events
@@ -253,7 +253,7 @@ public final class NDKUser: Equatable, Hashable, Sendable {
     /// - Returns: True if the NIP-05 is verified and belongs to this user
     public func verifyNIP05(maxAge: TimeInterval = TimeConstants.day) async throws -> Bool {
         guard let ndk = ndk else {
-            throw NDKError.configurationError("NDK instance not set")
+            throw NDKError.configurationError(ErrorMessageConstants.Messages.ndkInstanceNotSet)
         }
 
         return try await ndk.verifyNIP05(for: self, maxAge: maxAge)
@@ -269,7 +269,7 @@ public final class NDKUser: Equatable, Hashable, Sendable {
     /// - Returns: Payment confirmation
     public func pay(amount: Int64, comment: String? = nil, tags: [[String]]? = nil) async throws -> PaymentConfirmation {
         guard ndk != nil else {
-            throw NDKError.configurationError("NDK instance not set")
+            throw NDKError.configurationError(ErrorMessageConstants.Messages.ndkInstanceNotSet)
         }
 
         // Payment routing will be implemented when wallet integration is complete
@@ -280,7 +280,7 @@ public final class NDKUser: Equatable, Hashable, Sendable {
     /// - Returns: Set of payment methods this user supports
     public func getPaymentMethods() async throws -> Set<NDKPaymentMethod> {
         guard let ndk = ndk else {
-            throw NDKError.configurationError("NDK instance not set")
+            throw NDKError.configurationError(ErrorMessageConstants.Messages.ndkInstanceNotSet)
         }
 
         var methods = Set<NDKPaymentMethod>()

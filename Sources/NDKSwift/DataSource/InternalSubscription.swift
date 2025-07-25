@@ -194,7 +194,7 @@ actor InternalSubscription {
     func start() async {
         NDKLogger.log(.debug, category: .subscription, "🚀 [InternalSub] start() called for subscription: \(id)")
         guard !isActive, let ndk = ndk else {
-            let reason = isActive ? "already active" : "NDK reference lost"
+            let reason = isActive ? "already active" : ErrorMessageConstants.Messages.ndkReferenceLost
             let filterSummary = filters.map { filter in
                 var parts: [String] = []
                 if let kinds = filter.kinds { parts.append("kinds:\(kinds)") }
