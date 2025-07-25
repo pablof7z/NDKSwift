@@ -7,7 +7,8 @@ final class NDKFollowPackTests: XCTestCase {
     
     override func setUp() async throws {
         ndk = NDK()
-        signer = try NDKPrivateKeySigner(privateKey: "test_private_key_64_chars_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
+        // Use a valid 64-character hex string for the private key
+        signer = try NDKPrivateKeySigner(privateKey: "1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef")
         ndk.signer = signer
     }
     
