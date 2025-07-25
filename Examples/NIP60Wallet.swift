@@ -660,7 +660,7 @@ struct NIP60WalletREPL {
                     print("❌ Failed to resolve NIP-05: \(error)")
                     return
                 }
-            } else if recipient.count == 64 && recipient.allSatisfy({ $0.isHexDigit }) {
+            } else if HexValidator.isValid32ByteHex(recipient) {
                 // Hex pubkey
                 recipientUser = NDKUser(pubkey: recipient)
                 recipientUser.ndk = ndk

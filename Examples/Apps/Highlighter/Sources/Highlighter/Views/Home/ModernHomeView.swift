@@ -9,8 +9,8 @@ struct ModernHomeView: View {
     
     init(tabBarVisible: Binding<Bool>) {
         self._tabBarVisible = tabBarVisible
-        // Initialize with placeholder - will be set properly in .onAppear
-        self._dataManager = StateObject(wrappedValue: HomeDataManager(appState: AppState()))
+        // Initialize data manager - appState will be set in .onAppear
+        self._dataManager = StateObject(wrappedValue: HomeDataManager())
     }
     
     var body: some View {
@@ -463,6 +463,7 @@ struct HighlightedArticleCard: View {
                                 .font(.system(size: 14))
                                 .foregroundColor(isBookmarked ? .ds.primary : .ds.textTertiary)
                         }
+                        .buttonStyle(PlainButtonStyle())
                     }
                 }
                 .padding(.horizontal, .ds.base)

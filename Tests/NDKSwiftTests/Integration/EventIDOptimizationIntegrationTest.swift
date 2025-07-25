@@ -10,7 +10,7 @@ final class EventIDOptimizationIntegrationTest: XCTestCase {
         
         // 1. Create NDK with a cache that has some events
         let cache = MemoryCache()
-        let ndk = NDK(cache: cache)
+        _ = NDK(cache: cache)
         
         // 2. Pre-populate cache with some events
         // Create a signer for testing
@@ -25,7 +25,7 @@ final class EventIDOptimizationIntegrationTest: XCTestCase {
         try await cache.saveEvent(event1)
         
         // 3. Create a filter requesting both cached and non-cached IDs
-        let filter = NDKFilter(ids: [event1.id, "missing_event_1", "missing_event_2"])
+        _ = NDKFilter(ids: [event1.id, "missing_event_1", "missing_event_2"])
         
         // 4. When calling ndk.observe(filter:), the optimization will:
         //    - Check cache for existing IDs

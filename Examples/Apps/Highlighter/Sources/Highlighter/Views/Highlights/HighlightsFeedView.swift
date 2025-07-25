@@ -51,39 +51,6 @@ struct HighlightsFeedView: View {
                     }
                     .tabViewStyle(PageTabViewStyle(indexDisplayMode: .never))
                     .ignoresSafeArea()
-                    
-                    // Top overlay
-                    VStack {
-                        HStack {
-                            Button(action: { tabBarVisible = true }) {
-                                Image(systemName: "chevron.left")
-                                    .font(.system(size: 20, weight: .semibold))
-                                    .foregroundColor(.white)
-                                    .padding(12)
-                                    .background(Circle().fill(Color.white.opacity(0.2)))
-                            }
-                            
-                            Spacer()
-                            
-                            Text("Highlights")
-                                .font(DesignSystem.Typography.headline)
-                                .foregroundColor(.white)
-                            
-                            Spacer()
-                            
-                            Button(action: refreshFeed) {
-                                Image(systemName: "arrow.clockwise")
-                                    .font(.system(size: 18))
-                                    .foregroundColor(.white)
-                                    .padding(12)
-                                    .background(Circle().fill(Color.white.opacity(0.2)))
-                            }
-                        }
-                        .padding(.horizontal)
-                        .padding(.top, geometry.safeAreaInsets.top)
-                        
-                        Spacer()
-                    }
                 }
             }
         }
@@ -306,375 +273,233 @@ struct HighlightFeedItemView: View {
     let onShare: () -> Void
     let onComment: () -> Void
     
-    @State private var isZapped = false
+    @State private var isLiked = false
     @State private var showingActions = false
-    @State private var imageOpacity = 0.0
-    @State private var showBlurHash = true
     
     var body: some View {
         GeometryReader { geometry in
             ZStack {
-                // Background with article image or gradient
-                if article != nil {
-                    ZStack {
-                        // Default gradient background (shows while image loads)
-                        if showBlurHash {
-                            LinearGradient(
-                                colors: [
-                                    DesignSystem.Colors.primary.opacity(0.3),
-                                    DesignSystem.Colors.secondary.opacity(0.3)
-                                ],
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
-                            )
-                            .ignoresSafeArea()
-                        }
-                        
-                        // Article image with overlay
-                        if let articleImage = articleImage {
-                            Image(uiImage: articleImage)
-                                .resizable()
-                                .aspectRatio(contentMode: .fill)
-                                .frame(width: geometry.size.width, height: geometry.size.height)
-                                .clipped()
-                                .opacity(imageOpacity)
-                                .onAppear {
-                                    withAnimation(.easeIn(duration: 0.5)) {
-                                        imageOpacity = 1.0
-                                        // Hide blurhash after image loads
-                                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                                            showBlurHash = false
-                                        }
-                                    }
-                                }
-                        }
-                        
-                        // Dark gradient overlay for readability
-                        LinearGradient(
-                            stops: [
-                                .init(color: .black.opacity(0.3), location: 0),
-                                .init(color: .black.opacity(0.5), location: 0.3),
-                                .init(color: .black.opacity(0.8), location: 0.8),
-                                .init(color: .black.opacity(0.9), location: 1)
-                            ],
-                            startPoint: .top,
-                            endPoint: .bottom
-                        )
-                    }
+                // Background Layer - Fullscreen image with overlay
+                if let articleImage = articleImage {
+                    // Article image background with blur
+                    Image(uiImage: articleImage)
+                        .resizable()
+                        .aspectRatio(contentMode: .fill)
+                        .frame(width: geometry.size.width, height: geometry.size.height)
+                        .clipped()
+                        .blur(radius: 20) // Gaussian blur
+                        .opacity(0.4) // Standardized opacity (0.3-0.5)
                 } else {
-                    // Sophisticated gradient background
-                    ZStack {
-                        // Base gradient
-                        LinearGradient(
-                            colors: [
-                                Color(hex: "1a1a2e"),
-                                Color(hex: "0f0f1e"),
-                                Color.black
-                            ],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        )
-                        
-                        // Accent gradient overlay
-                        RadialGradient(
-                            colors: [
-                                DesignSystem.Colors.primary.opacity(0.3),
-                                DesignSystem.Colors.primary.opacity(0.1),
-                                Color.clear
-                            ],
-                            center: .topTrailing,
-                            startRadius: 100,
-                            endRadius: 400
-                        )
-                        
-                        // Mesh gradient effect
-                        GeometryReader { _ in
-                            ForEach(0..<3) { index in
-                                Circle()
-                                    .fill(
-                                        RadialGradient(
-                                            colors: [
-                                                DesignSystem.Colors.primary.opacity(0.15),
-                                                Color.clear
-                                            ],
-                                            center: .center,
-                                            startRadius: 50,
-                                            endRadius: 200
-                                        )
-                                    )
-                                    .frame(width: 300, height: 300)
-                                    .offset(
-                                        x: CGFloat.random(in: -100...geometry.size.width),
-                                        y: CGFloat.random(in: -100...geometry.size.height)
-                                    )
-                                    .blur(radius: 40)
-                            }
-                        }
-                    }
+                    // Purple-to-orange gradient fallback
+                    LinearGradient(
+                        colors: [
+                            Color(hex: "7B3FF2"), // Purple
+                            Color(hex: "E94057"), // Pink-red
+                            Color(hex: "F27121")  // Orange
+                        ],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
                 }
                 
-                // Content
+                // Dark overlay for text contrast - increased to 0.5
+                Color.black.opacity(0.5)
+                    .ignoresSafeArea()
+                
+                // Main Content Layout
+                VStack {
+                    // Header Area - Source info capsule (top-left)
+                    HStack {
+                        HStack(spacing: 4) {
+                            Text(sourceText)
+                                .font(.system(size: 13, weight: .medium))
+                                .foregroundColor(Color(hex: "CCCCCC"))
+                            Text("·")
+                                .font(.system(size: 13, weight: .medium))
+                                .foregroundColor(Color(hex: "CCCCCC"))
+                            Text(relativeTime(from: highlight.createdAt))
+                                .font(.system(size: 13, weight: .medium))
+                                .foregroundColor(Color(hex: "CCCCCC"))
+                        }
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 6)
+                        .background(
+                            Capsule()
+                                .fill(Color.black.opacity(0.3))
+                                .overlay(
+                                    Capsule()
+                                        .strokeBorder(Color.white.opacity(0.1), lineWidth: 0.5)
+                                )
+                        )
+                        .padding(.leading, 16)
+                        .padding(.top, 16)
+                        
+                        Spacer()
+                    }
+                    
+                    Spacer()
+                    
+                    // Main Quote Block (centered vertically)
+                    Text(highlight.content)
+                        .font(.system(size: 26, weight: .semibold, design: .serif))
+                        .foregroundColor(.white)
+                        .lineSpacing(10)
+                        .multilineTextAlignment(.center)
+                        .frame(maxWidth: geometry.size.width * 0.8)
+                        .shadow(color: .black.opacity(0.5), radius: 4, x: 0, y: 2)
+                    
+                    Spacer()
+                    
+                    // Bottom User Info (bottom-left)
+                    HStack {
+                        HStack(spacing: 10) {
+                            // Small avatar or placeholder
+                            Circle()
+                                .fill(Color.white.opacity(0.2))
+                                .frame(width: 32, height: 32)
+                                .overlay(
+                                    Text(authorInitial)
+                                        .font(.system(size: 14, weight: .medium))
+                                        .foregroundColor(.white)
+                                )
+                            
+                            Text(authorName)
+                                .font(.system(size: 13, weight: .regular))
+                                .foregroundColor(.white)
+                            
+                            // Follow button
+                            Button(action: {}) {
+                                Text("Follow")
+                                    .font(.system(size: 12, weight: .medium))
+                                    .foregroundColor(.white)
+                                    .padding(.horizontal, 14)
+                                    .padding(.vertical, 5)
+                                    .background(
+                                        Capsule()
+                                            .fill(Color.white.opacity(0.15))
+                                            .overlay(
+                                                Capsule()
+                                                    .strokeBorder(Color.white.opacity(0.2), lineWidth: 0.5)
+                                            )
+                                    )
+                            }
+                        }
+                        
+                        Spacer()
+                    }
+                    .padding(.horizontal, 16)
+                    .padding(.bottom, 16)
+                }
+                
+                // Action buttons overlay (positioned absolutely)
                 VStack {
                     Spacer()
                     
-                    // Main content area
-                    VStack(alignment: .leading, spacing: 20) {
-                        // Article context if available
-                        if let article = article {
-                            VStack(alignment: .leading, spacing: 8) {
-                                Text("From")
-                                    .font(DesignSystem.Typography.caption)
-                                    .foregroundColor(.white.opacity(0.7))
-                                
-                                Text(article.title)
-                                    .font(DesignSystem.Typography.bodyMedium)
-                                    .foregroundColor(.white)
-                                    .lineLimit(2)
-                                
-                                if let summary = article.summary {
-                                    Text(summary)
-                                        .font(DesignSystem.Typography.footnote)
-                                        .foregroundColor(.white.opacity(0.7))
-                                        .lineLimit(2)
+                    HStack {
+                        Spacer()
+                        
+                        // Actions Stack (bottom-right, vertical)
+                        VStack(spacing: 16) {
+                            // Like
+                            Button(action: {
+                                withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) {
+                                    isLiked.toggle()
+                                }
+                                HapticManager.shared.impact(.light)
+                            }) {
+                                VStack(spacing: 4) {
+                                    ZStack {
+                                        Circle()
+                                            .fill(Color.black.opacity(0.3))
+                                            .frame(width: 42, height: 42)
+                                        
+                                        Image(systemName: isLiked ? "heart.fill" : "heart")
+                                            .font(.system(size: 20))
+                                            .foregroundColor(isLiked ? .red : .white)
+                                            .scaleEffect(isLiked ? 1.1 : 1.0)
+                                    }
+                                    .shadow(color: .black.opacity(0.3), radius: 3, x: 0, y: 2)
                                 }
                             }
-                            .padding(.horizontal, 24)
-                            .padding(.vertical, 16)
-                            .background(
-                                RoundedRectangle(cornerRadius: 16)
-                                    .fill(Color.white.opacity(0.1))
-                                    .overlay(
-                                        RoundedRectangle(cornerRadius: 16)
-                                            .strokeBorder(Color.white.opacity(0.2), lineWidth: 1)
-                                    )
-                            )
-                            .padding(.horizontal, 24)
-                        }
-                        
-                        // Quote
-                        VStack(alignment: .leading, spacing: 16) {
-                            Image(systemName: "quote.opening")
-                                .font(.system(size: 24))
-                                .foregroundColor(.white.opacity(0.6))
                             
-                            Text(highlight.content)
-                                .font(.system(size: article != nil ? 20 : 24, weight: .medium, design: .serif))
-                                .foregroundColor(.white)
-                                .lineSpacing(article != nil ? 6 : 8)
-                                .multilineTextAlignment(.leading)
-                                .fixedSize(horizontal: false, vertical: true)
-                                .shadow(color: .black.opacity(0.3), radius: 2, x: 0, y: 1)
+                            // Comment
+                            Button(action: onComment) {
+                                VStack(spacing: 4) {
+                                    ZStack {
+                                        Circle()
+                                            .fill(Color.black.opacity(0.3))
+                                            .frame(width: 42, height: 42)
+                                        
+                                        Image(systemName: "message")
+                                            .font(.system(size: 18))
+                                            .foregroundColor(.white)
+                                    }
+                                    .shadow(color: .black.opacity(0.3), radius: 3, x: 0, y: 2)
+                                    
+                                    Text("5")
+                                        .font(.system(size: 11))
+                                        .foregroundColor(.white.opacity(0.8))
+                                }
+                            }
                             
-                            Image(systemName: "quote.closing")
-                                .font(.system(size: 24))
-                                .foregroundColor(.white.opacity(0.6))
-                                .frame(maxWidth: .infinity, alignment: .trailing)
-                        }
-                        .padding(.horizontal, 24)
-                        
-                        // Comment if available
-                        if let comment = highlight.comment {
-                            Text(comment)
-                                .font(DesignSystem.Typography.body)
-                                .foregroundColor(.white.opacity(0.9))
-                                .padding(.horizontal, 20)
-                                .padding(.vertical, 16)
-                                .background(
-                                    RoundedRectangle(cornerRadius: 12)
-                                        .fill(Color.white.opacity(0.08))
-                                        .overlay(
-                                            RoundedRectangle(cornerRadius: 12)
-                                                .strokeBorder(Color.white.opacity(0.15), lineWidth: 1)
-                                        )
-                                )
-                                .padding(.horizontal, 24)
-                        }
-                        
-                        // Context/Source
-                        if let url = highlight.url, article == nil {
-                            HStack(spacing: 8) {
-                                Image(systemName: "link.circle.fill")
-                                    .font(.system(size: 16))
-                                Text(URL(string: url)?.host ?? "Source")
-                                    .font(DesignSystem.Typography.footnote)
-                            }
-                            .foregroundColor(.white.opacity(0.7))
-                            .padding(.horizontal, 24)
-                        }
-                        
-                        // Author info
-                        Button(action: onAuthorTap) {
-                            HStack(spacing: 12) {
-                                // Author avatar with gradient border
+                            // Repost
+                            Button(action: {}) {
                                 ZStack {
                                     Circle()
-                                        .strokeBorder(
-                                            LinearGradient(
-                                                colors: [
-                                                    DesignSystem.Colors.primary,
-                                                    DesignSystem.Colors.primary.opacity(0.5)
-                                                ],
-                                                startPoint: .topLeading,
-                                                endPoint: .bottomTrailing
-                                            ),
-                                            lineWidth: 2
-                                        )
-                                        .frame(width: 48, height: 48)
+                                        .fill(Color.black.opacity(0.3))
+                                        .frame(width: 42, height: 42)
                                     
-                                    Circle()
-                                        .fill(
-                                            LinearGradient(
-                                                colors: [.white.opacity(0.2), .white.opacity(0.1)],
-                                                startPoint: .topLeading,
-                                                endPoint: .bottomTrailing
-                                            )
-                                        )
-                                        .frame(width: 44, height: 44)
-                                        .overlay(
-                                            Text((author?.name ?? author?.displayName ?? "U").prefix(1).uppercased())
-                                                .font(DesignSystem.Typography.headline)
-                                                .foregroundColor(.white)
-                                        )
-                                }
-                                
-                                VStack(alignment: .leading, spacing: 2) {
-                                    Text(author?.name ?? author?.displayName ?? String(highlight.author.prefix(8)))
-                                        .font(DesignSystem.Typography.bodyMedium)
+                                    Image(systemName: "arrow.2.squarepath")
+                                        .font(.system(size: 18))
                                         .foregroundColor(.white)
-                                    
-                                    Text(relativeTime(from: highlight.createdAt))
-                                        .font(DesignSystem.Typography.caption)
-                                        .foregroundColor(.white.opacity(0.7))
                                 }
-                                
-                                Spacer()
-                                
-                                // Follow button
-                                Button(action: {}) {
-                                    Text("Follow")
-                                        .font(DesignSystem.Typography.footnoteMedium)
-                                        .foregroundColor(.white)
-                                        .padding(.horizontal, 20)
-                                        .padding(.vertical, 10)
-                                        .background(
-                                            Capsule()
-                                                .fill(Color.white.opacity(0.15))
-                                                .overlay(
-                                                    Capsule()
-                                                        .strokeBorder(Color.white.opacity(0.3), lineWidth: 1)
-                                                )
-                                        )
-                                }
+                                .shadow(color: .black.opacity(0.3), radius: 3, x: 0, y: 2)
                             }
-                            .padding(.horizontal, 24)
+                            
+                            // Share
+                            Button(action: onShare) {
+                                ZStack {
+                                    Circle()
+                                        .fill(Color.black.opacity(0.3))
+                                        .frame(width: 42, height: 42)
+                                    
+                                    Image(systemName: "square.and.arrow.up")
+                                        .font(.system(size: 18))
+                                        .foregroundColor(.white)
+                                }
+                                .shadow(color: .black.opacity(0.3), radius: 3, x: 0, y: 2)
+                            }
                         }
-                        .buttonStyle(PlainButtonStyle())
+                        .padding(.trailing, 16)
+                        .padding(.bottom, 80) // Extra padding to position above user info
                     }
-                    .padding(.bottom, 100)
-                    
-                    Spacer()
-                }
-                
-                // Action buttons on the right
-                VStack(spacing: 24) {
-                    Spacer()
-                    
-                    VStack(spacing: 20) {
-                        // Zap
-                        Button(action: {
-                            onZap()
-                            withAnimation(DesignSystem.Animation.springSnappy) {
-                                isZapped.toggle()
-                            }
-                        }) {
-                            VStack(spacing: 4) {
-                                ZStack {
-                                    Circle()
-                                        .fill(Color.white.opacity(0.1))
-                                        .frame(width: 48, height: 48)
-                                    
-                                    Image(systemName: isZapped ? "bolt.fill" : "bolt")
-                                        .font(.system(size: 24))
-                                        .foregroundColor(isZapped ? .orange : .white)
-                                        .scaleEffect(isZapped ? 1.2 : 1.0)
-                                        .animation(DesignSystem.Animation.springBouncy, value: isZapped)
-                                }
-                                
-                                if isZapped {
-                                    Text("21")
-                                        .font(DesignSystem.Typography.caption)
-                                        .foregroundColor(.white)
-                                }
-                            }
-                        }
-                        
-                        // Comment
-                        Button(action: onComment) {
-                            VStack(spacing: 4) {
-                                ZStack {
-                                    Circle()
-                                        .fill(Color.white.opacity(0.1))
-                                        .frame(width: 48, height: 48)
-                                    
-                                    Image(systemName: "bubble.left")
-                                        .font(.system(size: 22))
-                                        .foregroundColor(.white)
-                                }
-                                
-                                Text("5")
-                                    .font(DesignSystem.Typography.caption)
-                                    .foregroundColor(.white)
-                            }
-                        }
-                        
-                        // Share
-                        Button(action: onShare) {
-                            ZStack {
-                                Circle()
-                                    .fill(Color.white.opacity(0.1))
-                                    .frame(width: 48, height: 48)
-                                
-                                Image(systemName: "square.and.arrow.up")
-                                    .font(.system(size: 22))
-                                    .foregroundColor(.white)
-                            }
-                        }
-                        
-                        // More options
-                        Button(action: { showingActions = true }) {
-                            ZStack {
-                                Circle()
-                                    .fill(Color.white.opacity(0.1))
-                                    .frame(width: 48, height: 48)
-                                
-                                Image(systemName: "ellipsis")
-                                    .font(.system(size: 22))
-                                    .foregroundColor(.white)
-                            }
-                        }
-                    }
-                    .padding(.trailing, 16)
-                    .padding(.bottom, 100)
                 }
             }
         }
-        .actionSheet(isPresented: $showingActions) {
-            ActionSheet(
-                title: Text("Highlight Options"),
-                buttons: [
-                    .default(Text("Save to Library")) {},
-                    .default(Text("Copy Text")) {
-                        UIPasteboard.general.string = highlight.content
-                        HapticManager.shared.notification(.success)
-                    },
-                    .default(Text("View Article")) {
-                        // Navigate to article
-                    },
-                    .default(Text("Report")) {},
-                    .cancel()
-                ]
-            )
+        .ignoresSafeArea()
+    }
+    
+    // Computed properties for cleaner code
+    private var sourceText: String {
+        if let article = article {
+            return article.title.count > 30 ? String(article.title.prefix(27)) + "..." : article.title
+        } else if let url = highlight.url, let host = URL(string: url)?.host {
+            return host.replacingOccurrences(of: "www.", with: "")
+        } else {
+            return "Highlight"
         }
+    }
+    
+    private var authorName: String {
+        if let name = author?.name ?? author?.displayName {
+            return name.count > 20 ? String(name.prefix(17)) + "..." : name
+        } else {
+            return String(highlight.author.prefix(8))
+        }
+    }
+    
+    private var authorInitial: String {
+        (author?.name ?? author?.displayName ?? "U").prefix(1).uppercased()
     }
     
     private func relativeTime(from date: Date) -> String {

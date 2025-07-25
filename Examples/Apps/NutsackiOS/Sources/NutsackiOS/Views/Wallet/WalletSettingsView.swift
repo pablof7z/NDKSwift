@@ -18,8 +18,7 @@ struct WalletSettingsView: View {
     @State private var showAddMintSheet = false
     @State private var showAddRelaySheet = false
     @State private var showDiscoveredMints = false
-    @State private var discoveredMints: [DiscoveredMint] = []
-    @State private var isDiscovering = false
+    @State private var discoveryTask: Task<Void, Never>?
     
     var body: some View {
         NavigationStack {
@@ -54,20 +53,19 @@ struct WalletSettingsView: View {
                             )
                             .scaleEffect(0.85)
                             
-                            Button(action: discoverMints) {
-                                if isDiscovering {
-                                    HStack(spacing: 4) {
-                                        ProgressView()
-                                            .scaleEffect(0.8)
-                                        Text("Discovering...")
-                                    }
-                                } else {
+                            HStack(spacing: 12) {
+                                Button(action: { showAddMintSheet = true }) {
+                                    Label("Add URL", systemImage: "link")
+                                }
+                                .buttonStyle(.bordered)
+                                .controlSize(.regular)
+                                
+                                Button(action: discoverMints) {
                                     Label("Discover", systemImage: "sparkle.magnifyingglass")
                                 }
+                                .buttonStyle(.borderedProminent)
+                                .controlSize(.regular)
                             }
-                            .buttonStyle(.borderedProminent)
-                            .controlSize(.regular)
-                            .disabled(isDiscovering)
                         }
                     } else {
                         ForEach(mints, id: \.url.absoluteString) { mint in
@@ -94,7 +92,6 @@ struct WalletSettingsView: View {
                             Button(action: discoverMints) {
                                 Label("Discover Mints", systemImage: "sparkle.magnifyingglass")
                             }
-                            .disabled(isDiscovering)
                         } label: {
                             Image(systemName: "plus")
                                 .font(.caption)
@@ -193,7 +190,7 @@ struct WalletSettingsView: View {
                 }
             }
             .sheet(isPresented: $showDiscoveredMints) {
-                DiscoveredMintsSheet(discoveredMints: discoveredMints) { selectedMints in
+                DiscoveredMintsSheet(discoveryTask: discoveryTask) { selectedMints in
                     for mint in selectedMints {
                         // Skip if blacklisted
                         if appState.isMintBlacklisted(mint.url) {
@@ -354,39 +351,19 @@ struct WalletSettingsView: View {
     }
     
     private func discoverMints() {
-        isDiscovering = true
-        discoveredMints = []
+        // Cancel any existing discovery task
+        discoveryTask?.cancel()
         
-        Task {
-            guard let ndk = nostrManager.ndk else { 
-                await MainActor.run {
-                    isDiscovering = false
-                }
-                return 
-            }
+        // Start new discovery task
+        discoveryTask = Task {
+            guard let ndk = nostrManager.ndk else { return }
             
             let discoveryManager = MintDiscoveryManager(ndk: ndk)
-            var hasReceivedMints = false
-            
-            for await mints in discoveryManager.discoverMintsStream() {
-                await MainActor.run {
-                    discoveredMints = mints
-                    
-                    if !hasReceivedMints && !mints.isEmpty {
-                        hasReceivedMints = true
-                        showDiscoveredMints = true
-                    }
-                    
-                    if isDiscovering && !mints.isEmpty {
-                        isDiscovering = false
-                    }
-                }
-            }
-            
-            await MainActor.run {
-                isDiscovering = false
-            }
+            _ = discoveryManager.discoverMintsStream() // Start the stream
         }
+        
+        // Show the sheet immediately
+        showDiscoveredMints = true
     }
     
 }
@@ -731,9 +708,12 @@ struct AddRelaySheet: View {
 // MARK: - Discovered Mints Sheet  
 struct DiscoveredMintsSheet: View {
     @Environment(\.dismiss) private var dismiss
-    let discoveredMints: [DiscoveredMint]
+    @Environment(NostrManager.self) private var nostrManager
+    let discoveryTask: Task<Void, Never>?
     let onSelect: ([DiscoveredMint]) async -> Void
     @State private var selectedMints: Set<String> = []
+    @State private var discoveredMints: [DiscoveredMint] = []
+    @State private var streamTask: Task<Void, Never>?
     
     var body: some View {
         NavigationStack {
@@ -743,24 +723,61 @@ struct DiscoveredMintsSheet: View {
                 .toolbar {
                     toolbarContent
                 }
+                .task {
+                    await startDiscovery()
+                }
+                .onDisappear {
+                    streamTask?.cancel()
+                }
+        }
+    }
+    
+    private func startDiscovery() async {
+        guard let ndk = nostrManager.ndk else { return }
+        
+        streamTask = Task {
+            let discoveryManager = MintDiscoveryManager(ndk: ndk)
+            
+            for await mints in discoveryManager.discoverMintsStream() {
+                if Task.isCancelled { break }
+                
+                await MainActor.run {
+                    discoveredMints = mints
+                }
+            }
         }
     }
     
     @ViewBuilder
     private var mintsList: some View {
-        List {
-            ForEach(discoveredMints) { mint in
-                DiscoveredMintRowItem(
-                    mint: mint,
-                    isSelected: selectedMints.contains(mint.url),
-                    onToggle: {
-                        if selectedMints.contains(mint.url) {
-                            selectedMints.remove(mint.url)
-                        } else {
-                            selectedMints.insert(mint.url)
+        if discoveredMints.isEmpty {
+            VStack(spacing: 16) {
+                ProgressView()
+                    .scaleEffect(1.2)
+                Text("Searching for mints...")
+                    .font(.headline)
+                    .foregroundStyle(.secondary)
+                Text("This may take a moment")
+                    .font(.caption)
+                    .foregroundStyle(.tertiary)
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .listRowBackground(Color.clear)
+        } else {
+            List {
+                ForEach(discoveredMints) { mint in
+                    DiscoveredMintRowItem(
+                        mint: mint,
+                        isSelected: selectedMints.contains(mint.url),
+                        onToggle: {
+                            if selectedMints.contains(mint.url) {
+                                selectedMints.remove(mint.url)
+                            } else {
+                                selectedMints.insert(mint.url)
+                            }
                         }
-                    }
-                )
+                    )
+                }
             }
         }
     }
