@@ -252,8 +252,9 @@ public enum Nutzap {
                         p2pkInfo = data
 
                         // Validate P2PK pubkey format (compressed secp256k1 keys)
-                        if data.count != 66 || (!data.hasPrefix("02") && !data.hasPrefix("03")) {
-                            let errorMessage = "\(ErrorMessageConstants.invalid("P2PK pubkey format")): \(data) (must be 66 hex chars starting with 02 or 03)"
+                        if data.count != CryptoConstants.KeyFormat.compressedPublicKeyHexLength || 
+                           !CryptoConstants.KeyFormat.compressedPublicKeyPrefixes.contains(where: { data.hasPrefix($0) }) {
+                            let errorMessage = "\(ErrorMessageConstants.invalid("P2PK pubkey format")): \(data) (must be \(CryptoConstants.KeyFormat.compressedPublicKeyHexLength) hex chars starting with \(CryptoConstants.KeyFormat.compressedPublicKeyPrefixes.joined(separator: " or ")))"
                             NDKLogger.log(.error, category: .wallet, errorMessage)
                             invalidP2PKError = errorMessage
                         }

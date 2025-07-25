@@ -410,10 +410,10 @@ struct CarouselSection<Content: View>: View {
             .background(
                 GeometryReader { geometry in
                     Color.clear
-                        .preference(key: ScrollOffsetPreferenceKey.self, value: -geometry.frame(in: .named("scroll")).origin.x)
+                        .preference(key: ScrollOffsetKey.self, value: -geometry.frame(in: .named("scroll")).origin.x)
                 }
             )
-            .onPreferenceChange(ScrollOffsetPreferenceKey.self) { value in
+            .onPreferenceChange(ScrollOffsetKey.self) { value in
                 scrollOffset = value
                 withAnimation(.spring(response: 0.3)) {
                     titleScale = 1 + (abs(scrollOffset) / 1000)
@@ -1017,12 +1017,6 @@ struct ScrollOffsetKey: PreferenceKey {
     }
 }
 
-struct ScrollOffsetPreferenceKey: PreferenceKey {
-    static var defaultValue: CGFloat = 0
-    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
-        value = nextValue()
-    }
-}
 
 // MARK: - Preview
 
