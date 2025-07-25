@@ -19,7 +19,7 @@ public enum URLNormalizer {
     /// - Throws: URLNormalizationError if the URL cannot be normalized
     public static func normalizeRelayUrl(_ url: String) throws -> String {
         // Step 1: Clean and validate input
-        let cleanedURL = ValidationHelpers.trim(url)
+        let cleanedURL = url.trimmed
         try validateURLString(cleanedURL)
         
         // Step 2: Ensure WebSocket scheme
