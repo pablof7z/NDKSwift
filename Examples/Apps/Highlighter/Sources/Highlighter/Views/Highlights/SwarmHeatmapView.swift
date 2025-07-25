@@ -35,7 +35,7 @@ struct SwarmHeatmapView: View {
                         heatmapData: heatmapData,
                         position: tooltipPosition,
                         onZap: { userId in
-                            HapticManager.impact(.light)
+                            HapticManager.shared.impact(.light)
                             zapHighlighter(userId: userId)
                         }
                     )
@@ -345,12 +345,12 @@ struct SwarmTooltipView: View {
     }
     
     private func addHighlight() {
-        HapticManager.impact(.medium)
+        HapticManager.shared.impact(.medium)
         // Implement
     }
     
     private func zapAll() {
-        HapticManager.impact(.heavy)
+        HapticManager.shared.impact(.heavy)
         // Implement
     }
 }
