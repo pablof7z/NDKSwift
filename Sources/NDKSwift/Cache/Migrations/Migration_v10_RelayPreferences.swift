@@ -13,7 +13,7 @@ extension NDKSQLiteCache {
                 t.column("expires_at", .integer).notNull()
                 t.column("checked_relays", .text)    // JSON array of relays that sent EOSE (for negative cache)
             }
-            
+
             // Create index on expires_at for efficient cleanup
             try db.create(index: "idx_relay_preferences_expires_at",
                           on: "relay_preferences",

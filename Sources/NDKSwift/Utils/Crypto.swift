@@ -14,7 +14,7 @@ public enum Crypto {
         /// secp256k1 signature size in bytes
         public static let signatureSize = 64
     }
-    
+
     /// Errors that can occur during cryptographic operations
     public enum CryptoError: LocalizedError {
         case invalidKeyLength
@@ -40,7 +40,7 @@ public enum Crypto {
                 return "Invalid scalar value"
             }
         }
-        
+
     }
 
     /// Generate a new private key (internal use only - use NDKPrivateKeySigner.generate() instead)
@@ -125,17 +125,17 @@ public enum Crypto {
     }
 
     // MARK: - NIP-44 Encryption
-    
+
     /// Encrypt a message using NIP-44
     static func nip44Encrypt(message: String, privateKey: PrivateKey, pubkey: PublicKey) throws -> String {
         return try NIP44.encrypt(message: message, privateKey: privateKey, pubkey: pubkey)
     }
-    
+
     /// Decrypt a message using NIP-44
     static func nip44Decrypt(encrypted: String, privateKey: PrivateKey, pubkey: PublicKey) throws -> String {
         return try NIP44.decrypt(encrypted: encrypted, privateKey: privateKey, pubkey: pubkey)
     }
-    
+
     typealias NIP44Error = NIP44.NIP44Error
 }
 

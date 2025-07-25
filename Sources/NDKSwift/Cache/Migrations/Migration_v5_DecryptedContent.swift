@@ -12,7 +12,7 @@ extension NDKSQLiteCache {
                 t.column("content", .text).notNull()
                 t.column("decrypted_at", .integer).notNull().defaults(sql: "(CAST(strftime('%s', 'now') AS INTEGER))")
             }
-            
+
             // Create indexes for efficient lookups and cleanup
             try db.create(index: "idx_decrypted_content_viewer", on: "decrypted_content", columns: ["viewer_pubkey"])
             try db.create(index: "idx_decrypted_content_time", on: "decrypted_content", columns: ["decrypted_at"])

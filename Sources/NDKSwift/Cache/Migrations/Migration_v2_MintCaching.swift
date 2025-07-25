@@ -11,7 +11,7 @@ extension NDKSQLiteCache {
                 t.column("last_updated", .integer).notNull()
                 t.column("last_accessed", .integer).notNull()
             }
-            
+
             // Create keysets table
             try db.create(table: "keysets") { t in
                 t.column("keyset_id", .text).primaryKey()
@@ -24,7 +24,7 @@ extension NDKSQLiteCache {
                 t.column("last_accessed", .integer).notNull()
                 t.column("json", .text).notNull()
             }
-            
+
             // Create indexes for keysets
             try db.create(index: "idx_keysets_mint", on: "keysets", columns: ["mint_url"])
             try db.create(index: "idx_keysets_unit", on: "keysets", columns: ["unit"])

@@ -2,7 +2,7 @@ import Foundation
 import CryptoKit
 
 /// Filter for subscribing to events
-/// 
+///
 /// PERFORMANCE NOTE: Always batch multiple criteria in a single filter!
 /// BAD:  observe(filter1) then observe(filter2) - creates 2 separate subscriptions
 /// GOOD: observe(NDKFilter(kinds: [kind1, kind2])) - creates 1 subscription
@@ -298,27 +298,27 @@ public struct NDKFilter: Codable, Equatable, Sendable {
 
         return merged
     }
-    
+
     /// Merge with another filter using union semantics (for profile batching)
     public func mergedUnion(with other: NDKFilter) -> NDKFilter? {
         // Only allow union merging for compatible filters
         guard canMergeUnion(with: other) else { return nil }
-        
+
         var merged = NDKFilter()
-        
+
         // Union arrays
         if let selfIds = ids, let otherIds = other.ids {
             merged.ids = Array(Set(selfIds).union(Set(otherIds)))
         } else {
             merged.ids = ids ?? other.ids
         }
-        
+
         if let selfAuthors = authors, let otherAuthors = other.authors {
             merged.authors = Array(Set(selfAuthors).union(Set(otherAuthors)))
         } else {
             merged.authors = authors ?? other.authors
         }
-        
+
         if let selfKinds = kinds, let otherKinds = other.kinds {
             // For union merging, kinds must match exactly
             if Set(selfKinds) != Set(otherKinds) { return nil }
@@ -326,49 +326,49 @@ public struct NDKFilter: Codable, Equatable, Sendable {
         } else {
             merged.kinds = kinds ?? other.kinds
         }
-        
+
         // For timestamps, both filters must have the same values (enforced by canMergeUnion)
         merged.since = since
         merged.until = until
-        
+
         // For limit, sum them up (capped at some reasonable max)
         if let selfLimit = limit, let otherLimit = other.limit {
             merged.limit = min(selfLimit + otherLimit, NetworkConstants.maxFilterLimit)
         }
-        
+
         // Don't merge if tag filters differ
         if !tagFilters.isEmpty || !other.tagFilters.isEmpty {
             return nil
         }
-        
+
         return merged
     }
-    
+
     /// Check if this filter can be union-merged with another
     private func canMergeUnion(with other: NDKFilter) -> Bool {
         // Only allow union merging for metadata (profile) queries
         if let selfKinds = kinds, let otherKinds = other.kinds {
             let selfKindSet = Set(selfKinds)
             let otherKindSet = Set(otherKinds)
-            
+
             // Both must be requesting only metadata events
             if selfKindSet != otherKindSet || selfKindSet != [EventKind.metadata] {
                 return false
             }
         }
-        
+
         // Don't merge if either has tag filters, events, or pubkeys
         if !tagFilters.isEmpty || !other.tagFilters.isEmpty ||
            events != nil || other.events != nil ||
            pubkeys != nil || other.pubkeys != nil {
             return false
         }
-        
+
         // Don't merge if filters have different until or since timestamps
         if until != other.until || since != other.since {
             return false
         }
-        
+
         return true
     }
 
@@ -392,52 +392,52 @@ public struct NDKFilter: Codable, Equatable, Sendable {
 
         return dict
     }
-    
+
     /// Generate a fingerprint for this filter (used for subscription ID generation)
     /// This follows the same pattern as ndk-core
     public var fingerprint: String {
         // Build a consistent string representation of the filter
         var parts: [String] = []
-        
+
         // Add filter components in a consistent order
         if let kinds = kinds?.sorted() {
             parts.append("kinds:\(kinds.map { String($0) }.joined(separator: ","))")
         }
-        
+
         if let authors = authors?.sorted() {
             // Take first 8 chars of each author pubkey for brevity
             let authorPrefixes = authors.map { String($0.prefix(8)) }.joined(separator: ",")
             parts.append("authors:\(authorPrefixes)")
         }
-        
+
         if let ids = ids?.sorted() {
             // Take first 8 chars of each event ID for brevity
             let idPrefixes = ids.map { String($0.prefix(8)) }.joined(separator: ",")
             parts.append("ids:\(idPrefixes)")
         }
-        
+
         if let events = events?.sorted() {
             let eventPrefixes = events.map { String($0.prefix(8)) }.joined(separator: ",")
             parts.append("#e:\(eventPrefixes)")
         }
-        
+
         if let pubkeys = pubkeys?.sorted() {
             let pubkeyPrefixes = pubkeys.map { String($0.prefix(8)) }.joined(separator: ",")
             parts.append("#p:\(pubkeyPrefixes)")
         }
-        
+
         if let since = since {
             parts.append("since:\(since)")
         }
-        
+
         if let until = until {
             parts.append("until:\(until)")
         }
-        
+
         if let limit = limit {
             parts.append("limit:\(limit)")
         }
-        
+
         // Add tag filters
         let sortedTagFilters = tagFilters.keys.sorted()
         for key in sortedTagFilters {
@@ -446,20 +446,20 @@ public struct NDKFilter: Codable, Equatable, Sendable {
                 parts.append("\(key):\(valuePrefixes)")
             }
         }
-        
+
         // Create a string representation
         let filterString = parts.joined(separator: "-")
-        
+
         // If the string is empty, return a default
         if filterString.isEmpty {
             return "empty-filter"
         }
-        
+
         // If it's short enough, use it directly
         if filterString.count <= 20 {
             return filterString
         }
-        
+
         // Otherwise, hash it and take first 15 chars
         let data = filterString.data(using: .utf8)!
         let hash = SHA256.hash(data: data)
@@ -473,35 +473,35 @@ public struct NDKFilter: Codable, Equatable, Sendable {
 extension NDKFilter: CustomStringConvertible {
     public var description: String {
         var parts: [String] = []
-        
+
         if let kinds = kinds {
             parts.append("kinds:\(kinds.map { String($0) }.joined(separator: ","))")
         }
-        
+
         if let authors = authors {
             let authorPrefixes = authors.prefix(3).map { String($0.prefix(8)) }.joined(separator: ",")
             let suffix = authors.count > 3 ? "..." : ""
             parts.append("authors:\(authorPrefixes)\(suffix)")
         }
-        
+
         if let ids = ids {
             let idPrefixes = ids.prefix(3).map { String($0.prefix(8)) }.joined(separator: ",")
             let suffix = ids.count > 3 ? "..." : ""
             parts.append("ids:\(idPrefixes)\(suffix)")
         }
-        
+
         if let since = since {
             parts.append("since:\(since)")
         }
-        
+
         if let until = until {
             parts.append("until:\(until)")
         }
-        
+
         if let limit = limit {
             parts.append("limit:\(limit)")
         }
-        
+
         if !tagFilters.isEmpty {
             let tagParts = tagFilters.map { key, values in
                 let valuePrefixes = values.prefix(2).map { String($0.prefix(8)) }.joined(separator: ",")
@@ -510,7 +510,7 @@ extension NDKFilter: CustomStringConvertible {
             }
             parts.append(contentsOf: tagParts)
         }
-        
+
         return "NDKFilter(\(parts.joined(separator: ", ")))"
     }
 }

@@ -416,18 +416,18 @@ public class NDKList {
 
         return filters
     }
-    
+
     /// Parse an 'a' tag value into its components
     private func parseATag(_ value: String) -> (kind: Int, pubkey: String, dTag: String?)? {
         let parts = value.split(separator: ":")
         guard parts.count >= 2,
               let kind = Int(parts[0]),
               let pubkey = String(parts[1]).isEmpty ? nil : String(parts[1]) else { return nil }
-        
+
         let dTag = parts.count > 2 ? String(parts[2]) : nil
         return (kind: kind, pubkey: pubkey, dTag: dTag)
     }
-    
+
     /// Create filters for 'a' tags grouped by kind
     private func createFiltersForATags(_ items: [[String]]) -> [NDKFilter] {
         let aTags = items.extractTags(named: NostrConstants.TagName.address)
@@ -435,20 +435,20 @@ public class NDKList {
             guard let value = tag[safe: 1] else { return nil }
             return parseATag(value)
         }
-        
+
         let aTagGroups = Dictionary(grouping: parsedATags) { $0.kind }
-        
+
         return aTagGroups.map { (kind, items) in
             let authors = items.map { $0.pubkey }
             let filter = NDKFilter(authors: authors, kinds: [kind])
-            
+
             // Add d-tag filter if we have specific d-tags
             let dTags = items.compactMap { $0.dTag }
             if !dTags.isEmpty, dTags.count == items.count {
                 // Note: This would need proper tag filter implementation
                 // filter.addTagFilter("d", values: Set(dTags))
             }
-            
+
             return filter
         }
     }
@@ -640,18 +640,18 @@ public extension NDKList {
     var isMuteList: Bool {
         return kind == EventKind.muteList
     }
-    
+
     /// Check if this is a blocked relays list (kind 10006)
     var isBlockedRelaysList: Bool {
         return kind == EventKind.blockedRelays
     }
-    
+
     /// Check if a specific mint URL is blacklisted (for mute lists containing mint URLs)
     func isMintBlacklisted(_ mintUrl: String) -> Bool {
         guard isMuteList else { return false }
         return urls.contains(mintUrl)
     }
-    
+
     /// Check if a specific relay URL is blocked
     func isRelayBlocked(_ relayUrl: String) -> Bool {
         guard isBlockedRelaysList else { return false }
@@ -662,7 +662,7 @@ public extension NDKList {
             return normalizedListUrl == normalizedUrl
         }
     }
-    
+
     /// Get all blacklisted mint URLs from a mute list
     var blacklistedMints: [String] {
         guard isMuteList else { return [] }
@@ -671,7 +671,7 @@ public extension NDKList {
             url.contains("cashu") || url.contains("fedimint") || url.contains("mint")
         }
     }
-    
+
     /// Get all blocked relay URLs
     var blockedRelays: [String] {
         guard isBlockedRelaysList else { return [] }

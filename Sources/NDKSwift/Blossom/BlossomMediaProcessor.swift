@@ -8,7 +8,7 @@ import AppKit
 
 /// Processes media files to extract metadata like blurhash and dimensions
 public enum BlossomMediaProcessor {
-    
+
     /// Process image data to extract metadata
     /// - Parameter data: The image data
     /// - Returns: Tuple containing blurhash and dimensions, or nil if not an image
@@ -19,45 +19,45 @@ public enum BlossomMediaProcessor {
         let scale = image.scale
         let pixelWidth = Int(size.width * scale)
         let pixelHeight = Int(size.height * scale)
-        
+
         // For now, return a placeholder blurhash since we can't use external dependencies
         // A real implementation would calculate the actual blurhash
         let blurhash = "L00000fQfQfQfQfQfQfQfQfQfQfQ"
-        
+
         return (blurhash: blurhash, dimensions: (width: pixelWidth, height: pixelHeight))
-        
+
         #elseif canImport(AppKit)
         guard let image = NSImage(data: data) else { return nil }
-        
+
         // For macOS, we need to get the pixel dimensions differently
         guard let cgImage = image.cgImage(forProposedRect: nil, context: nil, hints: nil) else {
             return nil
         }
-        
+
         let pixelWidth = cgImage.width
         let pixelHeight = cgImage.height
-        
+
         // For now, return a placeholder blurhash since we can't use external dependencies
         // A real implementation would calculate the actual blurhash with component counts
         // based on image dimensions (e.g., min(9, max(4, pixelWidth / 100)))
         let blurhash = "L00000fQfQfQfQfQfQfQfQfQfQfQ"
-        
+
         return (blurhash: blurhash, dimensions: (width: pixelWidth, height: pixelHeight))
         #endif
     }
-    
+
     /// Check if the given MIME type is an image type we can process
     public static func isProcessableImageType(_ mimeType: String?) -> Bool {
         guard let mimeType = mimeType?.lowercased() else { return false }
-        return mimeType.hasPrefix("image/") && 
-               (mimeType.contains("jpeg") || 
-                mimeType.contains("jpg") || 
-                mimeType.contains("png") || 
+        return mimeType.hasPrefix("image/") &&
+               (mimeType.contains("jpeg") ||
+                mimeType.contains("jpg") ||
+                mimeType.contains("png") ||
                 mimeType.contains("webp") ||
                 mimeType.contains("heic") ||
                 mimeType.contains("heif"))
     }
-    
+
     // Image format file signatures
     private enum ImageSignatures {
         // JPEG signature: FF D8 FF
@@ -73,16 +73,16 @@ public enum BlossomMediaProcessor {
         static let ftypBox: [UInt8] = [0x66, 0x74, 0x79, 0x70]
         static let heicType: [UInt8] = [0x68, 0x65, 0x69, 0x63]
         static let ftypOffset = 4
-        
+
         static let minimumHeaderSize = 12
     }
-    
+
     /// Infer MIME type from data signature
     public static func inferMimeType(from data: Data) -> String? {
         guard data.count >= ImageSignatures.minimumHeaderSize else { return nil }
-        
+
         let bytes = [UInt8](data.prefix(ImageSignatures.minimumHeaderSize))
-        
+
         // Check common image format signatures
         if bytes.starts(with: ImageSignatures.jpeg) {
             return "image/jpeg"
@@ -96,7 +96,7 @@ public enum BlossomMediaProcessor {
                   Array(bytes[(ImageSignatures.ftypOffset + ImageSignatures.ftypBox.count)...]).starts(with: ImageSignatures.heicType) {
             return "image/heic"
         }
-        
+
         return nil
     }
 }

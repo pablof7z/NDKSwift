@@ -6,7 +6,7 @@ actor InternalSubscriptionManager {
     private let ndk: NDK
     private var activeSubscriptions: [String: InternalSubscription] = [:]
     private var relayMonitorTask: Task<Void, Never>?
-    
+
     init(ndk: NDK) {
         self.ndk = ndk
         // Start monitoring in a task to avoid accessing pool before it's ready
@@ -14,13 +14,13 @@ actor InternalSubscriptionManager {
             await startRelayMonitoring()
         }
     }
-    
+
     /// Start relay monitoring if not already started
     private func ensureRelayMonitoring() async {
         guard relayMonitorTask == nil else { return }
         await startRelayMonitoring()
     }
-    
+
     /// Create an internal subscription
     func createSubscription(
         id: String,
@@ -28,34 +28,34 @@ actor InternalSubscriptionManager {
         relays: Set<RelayURL>? = nil
     ) async -> InternalSubscription {
         NDKLogger.log(.debug, category: .subscription, "📋 [InternalSubManager] createSubscription called - id: \(id), filters: \(filters)")
-        
+
         // Ensure relay monitoring is started when first subscription is created
         await ensureRelayMonitoring()
-        
+
         // Remove any existing subscription with same ID
         if let existing = activeSubscriptions[id] {
             NDKLogger.log(.warning, category: .subscription, "♻️ Replacing existing subscription with ID: \(id)")
             await existing.close()
         }
-        
+
         let subscription = InternalSubscription(
             id: id,
             filters: filters,
             relays: relays,
             ndk: ndk
         )
-        
+
         activeSubscriptions[id] = subscription
         NDKLogger.log(.debug, category: .subscription, "📌 [InternalSubManager] Subscription created and stored in activeSubscriptions")
-        
+
         // Start the subscription
         NDKLogger.log(.debug, category: .subscription, "🚀 [InternalSubManager] Starting subscription...")
         await subscription.start()
         NDKLogger.log(.debug, category: .subscription, "✅ [InternalSubManager] Subscription started")
-        
+
         return subscription
     }
-    
+
     /// Close a subscription
     func closeSubscription(id: String) async {
         NDKLogger.log(.debug, category: .subscription, "🚪 Closing subscription: \(id)")
@@ -66,7 +66,7 @@ actor InternalSubscriptionManager {
             NDKLogger.log(.warning, category: .subscription, "⚠️ Attempted to close non-existent subscription: \(id)")
         }
     }
-    
+
     /// Process incoming event from relay
     func processEvent(_ event: NDKEvent, subscriptionId: String, from relay: RelayProtocol) async {
         guard let subscription = activeSubscriptions[subscriptionId] else {
@@ -75,7 +75,7 @@ actor InternalSubscriptionManager {
         }
         await subscription.handleEvent(event, from: relay)
     }
-    
+
     /// Process EOSE from relay
     func processEOSE(subscriptionId: String, from relay: RelayProtocol) async {
         guard let subscription = activeSubscriptions[subscriptionId] else {
@@ -84,9 +84,9 @@ actor InternalSubscriptionManager {
         }
         await subscription.handleEOSE(from: relay)
     }
-    
+
     // MARK: - Relay Monitoring
-    
+
     /// Start monitoring relay connection events
     private func startRelayMonitoring() async {
         // Ensure pool is available before starting monitoring
@@ -94,13 +94,13 @@ actor InternalSubscriptionManager {
             NDKLogger.log(.warning, category: .subscription, "⚠️ [InternalSubManager] Pool not available, skipping relay monitoring")
             return
         }
-        
+
         relayMonitorTask = Task {
             NDKLogger.log(.info, category: .subscription, "🔍 [InternalSubManager] Starting relay connection monitoring")
-            
+
             for await event in await pool.relayChanges {
                 guard !Task.isCancelled else { break }
-                
+
                 switch event {
                 case .relayConnected(let relay):
                     NDKLogger.log(.info, category: .subscription, "🔌 [InternalSubManager] Relay connected: \(relay.url) - replaying subscriptions")
@@ -111,18 +111,18 @@ actor InternalSubscriptionManager {
             }
         }
     }
-    
+
     /// Replay active subscriptions for a newly connected relay
     private func replaySubscriptionsForRelay(_ relay: NDKRelay) async {
         let subscriptionsToReplay = activeSubscriptions.values
-        
+
         guard !subscriptionsToReplay.isEmpty else {
             NDKLogger.log(.debug, category: .subscription, "📭 No active subscriptions to replay")
             return
         }
-        
+
         NDKLogger.log(.info, category: .subscription, "🔄 Replaying \(subscriptionsToReplay.count) subscriptions to \(relay.url)")
-        
+
         for subscription in subscriptionsToReplay {
             // Check if this subscription should go to this specific relay
             if let specificRelays = subscription.relays {
@@ -133,22 +133,22 @@ actor InternalSubscriptionManager {
                 }
             }
             // If no specific relays, subscription goes to all connected relays
-            
+
             do {
                 let message = await subscription.createREQMessage()
                 NDKLogger.log(.debug, category: .subscription, "📨 Replaying subscription \(subscription.id) to \(relay.url)")
                 try await relay.send(message)
-                
+
                 // Track subscription on the relay
                 await relay.trackSubscription(id: subscription.id, filters: subscription.filters)
-                
+
                 NDKLogger.log(.info, category: .subscription, "✅ Replayed subscription \(subscription.id) to \(relay.url)")
             } catch {
                 NDKLogger.log(.error, category: .subscription, "❌ Failed to replay subscription \(subscription.id) to \(relay.url): \(error)")
             }
         }
     }
-    
+
     deinit {
         relayMonitorTask?.cancel()
     }
@@ -161,35 +161,35 @@ actor InternalSubscription {
     let filters: [NDKFilter]
     let relays: Set<RelayURL>?
     private weak var ndk: NDK?
-    
+
     private var eventHandlers: [(NDKEvent) async -> Void] = []
     private var eoseHandlers: [(String) async -> Void] = []  // Changed to include relay URL
     private var isActive = false
-    
+
     // AsyncSequence support
     private var eventStream: AsyncStream<(event: NDKEvent, relay: String)>?
     private var eventContinuation: AsyncStream<(event: NDKEvent, relay: String)>.Continuation?
-    
+
     /// Events as an AsyncSequence with relay information
     var events: AsyncStream<(event: NDKEvent, relay: String)> {
         if let existingStream = eventStream {
             return existingStream
         }
-        
+
         let (stream, continuation) = AsyncStream<(event: NDKEvent, relay: String)>.makeStream()
         eventStream = stream
         eventContinuation = continuation
-        
+
         return stream
     }
-    
+
     init(id: String, filters: [NDKFilter], relays: Set<RelayURL>?, ndk: NDK) {
         self.id = id
         self.filters = filters
         self.relays = relays
         self.ndk = ndk
     }
-    
+
     /// Start the subscription
     func start() async {
         NDKLogger.log(.debug, category: .subscription, "🚀 [InternalSub] start() called for subscription: \(id)")
@@ -202,12 +202,12 @@ actor InternalSubscription {
                 if let limit = filter.limit { parts.append("limit:\(limit)") }
                 return parts.joined(separator: ",")
             }.joined(separator: "; ")
-            
+
             NDKLogger.log(.warning, category: .subscription, "⚠️ Cannot start subscription '\(id)' - reason: \(reason), filters: [\(filterSummary)]")
             return
         }
         isActive = true
-        
+
         // Get relays to use
         let targetRelays: [NDKRelay]
         if let specificRelays = relays {
@@ -217,28 +217,28 @@ actor InternalSubscription {
             targetRelays = await ndk.pool.connectedRelays()
             NDKLogger.log(.debug, category: .subscription, "📡 [InternalSub] Using all connected relays: \(targetRelays.count)")
         }
-        
+
         NDKLogger.log(.debug, category: .subscription, "📤 [InternalSub] Sending REQ to \(targetRelays.count) relays")
-        
+
         // Send REQ message to each relay
         var successCount = 0
         for relay in targetRelays {
             do {
                 let message = createREQMessage()
                 try await relay.send(message)
-                
+
                 // Track subscription on the relay
                 await relay.trackSubscription(id: id, filters: filters)
-                
+
                 successCount += 1
             } catch {
                 NDKLogger.log(.error, category: .subscription, "❌ Failed to send REQ to \(relay.url): \(error)")
             }
         }
-        
+
         NDKLogger.log(.info, category: .subscription, "✅ [InternalSub] REQ sent to \(successCount)/\(targetRelays.count) relays")
     }
-    
+
     /// Close the subscription
     func close() async {
         guard isActive, let ndk = ndk else {
@@ -247,7 +247,7 @@ actor InternalSubscription {
         }
         isActive = false
         NDKLogger.log(.info, category: .subscription, "🛑 Closing subscription: \(id)")
-        
+
         // Get relays to close on
         let targetRelays: [NDKRelay]
         if let specificRelays = relays {
@@ -255,41 +255,41 @@ actor InternalSubscription {
         } else {
             targetRelays = await ndk.pool.connectedRelays()
         }
-        
+
         // Send CLOSE message to each relay
         var closeCount = 0
         for relay in targetRelays {
             do {
                 let message = createCLOSEMessage()
                 try await relay.send(message)
-                
+
                 // Untrack subscription from the relay
                 await relay.untrackSubscription(id: id)
-                
+
                 closeCount += 1
             } catch {
                 NDKLogger.log(.error, category: .subscription, "❌ Failed to send CLOSE to \(relay.url): \(error)")
             }
         }
-        
+
         // Close the event stream
         eventContinuation?.finish()
         eventContinuation = nil
         eventStream = nil
-        
+
         eventHandlers.removeAll()
         eoseHandlers.removeAll()
     }
-    
+
     /// Register a handler for EOSE (End of Stored Events) with relay information
     func onEOSE(_ handler: @escaping (String) async -> Void) {
         eoseHandlers.append(handler)
     }
-    
+
     /// Handle incoming event
     func handleEvent(_ event: NDKEvent, from relay: RelayProtocol) async {
         NDKLogger.log(.trace, category: .subscription, "📨 Handling event - id: \(event.id), kind: \(event.kind), from: \(relay.url)")
-        
+
         // Feed event to stream with relay information
         if eventContinuation != nil {
             eventContinuation?.yield((event: event, relay: relay.url))
@@ -297,7 +297,7 @@ actor InternalSubscription {
         } else {
             NDKLogger.log(.warning, category: .subscription, "⚠️ No event continuation available")
         }
-        
+
         // Notify all handlers
         if !eventHandlers.isEmpty {
             NDKLogger.log(.trace, category: .subscription, "📢 Notifying \(eventHandlers.count) event handlers")
@@ -306,10 +306,10 @@ actor InternalSubscription {
             }
         }
     }
-    
+
     /// Handle EOSE
     func handleEOSE(from relay: RelayProtocol) async {
-        
+
         // Notify all handlers with relay URL
         if !eoseHandlers.isEmpty {
             NDKLogger.log(.trace, category: .subscription, "📢 Notifying \(eoseHandlers.count) EOSE handlers")
@@ -320,47 +320,47 @@ actor InternalSubscription {
             NDKLogger.log(.trace, category: .subscription, "📦 No EOSE handlers registered")
         }
     }
-    
+
     /// Create REQ message
     internal func createREQMessage() -> String {
         var message: [Any] = ["REQ", id]
-        
+
         for filter in filters {
             var filterDict: [String: Any] = [:]
-            
+
             if let authors = filter.authors {
                 filterDict["authors"] = authors
             }
-            
+
             if let kinds = filter.kinds {
                 filterDict["kinds"] = kinds
             }
-            
+
             if let ids = filter.ids {
                 filterDict["ids"] = ids
             }
-            
+
             if let tags = filter.tags {
                 for (key, values) in tags {
                     filterDict["#\(key)"] = Array(values)
                 }
             }
-            
+
             if let since = filter.since {
                 filterDict["since"] = since
             }
-            
+
             if let until = filter.until {
                 filterDict["until"] = until
             }
-            
+
             if let limit = filter.limit {
                 filterDict["limit"] = limit
             }
-            
+
             message.append(filterDict)
         }
-        
+
         do {
             return try JSONCoding.serializeToString(message)
         } catch {
@@ -368,11 +368,11 @@ actor InternalSubscription {
             return ""
         }
     }
-    
+
     /// Create CLOSE message
     private func createCLOSEMessage() -> String {
         let message: [Any] = ["CLOSE", id]
-        
+
         do {
             return try JSONCoding.serializeToString(message)
         } catch {

@@ -50,7 +50,7 @@ import Foundation
 public actor NegentropyReconciler {
     private let negentropy: Negentropy
     private var isInitiated = false
-    
+
     /// Creates a new reconciler instance for a single reconciliation session.
     ///
     /// - Parameters:
@@ -61,7 +61,7 @@ public actor NegentropyReconciler {
     public init(storage: NegentropyStorage, frameSizeLimit: Int = 60_000) {
         self.negentropy = Negentropy(storage: storage, frameSizeLimit: frameSizeLimit)
     }
-    
+
     /// Initiates reconciliation as the initiator.
     ///
     /// - Returns: Initial message data to send to the peer
@@ -75,7 +75,7 @@ public actor NegentropyReconciler {
         isInitiated = true
         return try await negentropy.initiate()
     }
-    
+
     /// Processes a message from the peer and generates an appropriate response.
     ///
     /// - Parameter data: Message data received from the peer
@@ -102,19 +102,19 @@ public actor NegentropyReconciler {
         if !isInitiated {
             isInitiated = true
         }
-        
+
         let (responseData, haveIds, needIds) = try await negentropy.reconcile(data)
-        
+
         if let data = responseData {
             return .continuing(
-                data: data, 
-                haveIds: haveIds.compactMap { Data(hexString: $0) }, 
+                data: data,
+                haveIds: haveIds.compactMap { Data(hexString: $0) },
                 needIds: needIds.compactMap { Data(hexString: $0) }
             )
         } else {
             return .terminated(
-                haveIds: haveIds.compactMap { Data(hexString: $0) }, 
-                needIds: needIds.compactMap { Data(hexString: $0) }, 
+                haveIds: haveIds.compactMap { Data(hexString: $0) },
+                needIds: needIds.compactMap { Data(hexString: $0) },
                 isDone: true
             )
         }
@@ -130,7 +130,7 @@ public enum NegentropyResponse {
     ///   - haveIds: Item IDs we have that the peer needs (as raw Data)
     ///   - needIds: Item IDs we need from the peer (as raw Data)
     case continuing(data: Data, haveIds: [Data], needIds: [Data])
-    
+
     /// Reconciliation has completed successfully.
     ///
     /// - Parameters:

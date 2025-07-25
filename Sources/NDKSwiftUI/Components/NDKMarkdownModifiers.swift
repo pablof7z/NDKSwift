@@ -16,7 +16,7 @@ public extension MarkdownConfiguration {
         config.nostrEntityColor = .orange
         return config
     }
-    
+
     /// A dark mode optimized style
     static var dark: MarkdownConfiguration {
         var config = MarkdownConfiguration()
@@ -32,7 +32,7 @@ public extension MarkdownConfiguration {
         config.nostrEntityColor = Color.orange
         return config
     }
-    
+
     /// A style optimized for Nostr content
     static var nostr: MarkdownConfiguration {
         var config = MarkdownConfiguration()
@@ -43,7 +43,7 @@ public extension MarkdownConfiguration {
         config.bulletCharacter = "⚡"
         return config
     }
-    
+
     /// A compact style with reduced spacing
     static var compact: MarkdownConfiguration {
         var config = MarkdownConfiguration()
@@ -81,17 +81,17 @@ public struct NDKMarkdownPreview: View {
     let content: String
     let ndk: NDK
     let previewLines: Int
-    
+
     @State private var isExpanded = false
-    
+
     var configuration = MarkdownConfiguration()
-    
+
     public init(_ content: String, ndk: NDK, previewLines: Int = 3) {
         self.content = content
         self.ndk = ndk
         self.previewLines = previewLines
     }
-    
+
     public var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             if isExpanded {
@@ -102,7 +102,7 @@ public struct NDKMarkdownPreview: View {
                     .markdownStyle(configuration)
                     .lineLimit(previewLines)
             }
-            
+
             if shouldShowToggle {
                 Button(action: { isExpanded.toggle() }) {
                     Label(
@@ -115,7 +115,7 @@ public struct NDKMarkdownPreview: View {
             }
         }
     }
-    
+
     private var truncatedContent: String {
         let lines = content.components(separatedBy: .newlines)
         if lines.count <= previewLines {
@@ -123,7 +123,7 @@ public struct NDKMarkdownPreview: View {
         }
         return lines.prefix(previewLines).joined(separator: "\n")
     }
-    
+
     private var shouldShowToggle: Bool {
         content.components(separatedBy: .newlines).count > previewLines
     }
@@ -143,36 +143,36 @@ public extension NDKMarkdownPreview {
 public struct NDKNostrEntityText: View {
     let content: String
     let ndk: NDK
-    
+
     @State private var parsedEntities: [ContentEntity] = []
     @State private var attributedString = AttributedString()
-    
+
     var textColor = Color.primary
     var font = Font.body
     var mentionColor = Color.blue
     var hashtagColor = Color.purple
     var nostrEntityColor = Color.orange
-    
+
     public init(_ content: String, ndk: NDK) {
         self.content = content
         self.ndk = ndk
     }
-    
+
     public var body: some View {
         Text(attributedString)
             .task {
                 await parseContent()
             }
     }
-    
+
     private func parseContent() async {
         let result = ContentParser.parseContent(content)
         self.parsedEntities = result.entities
-        
+
         var attributed = AttributedString(result.normalizedContent)
         attributed.font = font
         attributed.foregroundColor = textColor
-        
+
         // Apply styling to entities
         for entity in result.entities {
             let entityText: String
@@ -198,7 +198,7 @@ public struct NDKNostrEntityText: View {
             case .text(_):
                 continue
             }
-            
+
             if let range = attributed.range(of: entityText) {
                 switch entity {
                 case .npub, .nprofile, .userMention:
@@ -215,7 +215,7 @@ public struct NDKNostrEntityText: View {
                 }
             }
         }
-        
+
         // Apply hashtag styling
         let hashtagRegex = try? NSRegularExpression(pattern: "#\\w+", options: [])
         let nsString = result.normalizedContent as NSString
@@ -231,7 +231,7 @@ public struct NDKNostrEntityText: View {
                 attributed[attributedRange].font = font.weight(.medium)
             }
         }
-        
+
         self.attributedString = attributed
     }
 }
@@ -243,7 +243,7 @@ public extension NDKMarkdownRenderer {
     init(event: NDKEvent, ndk: NDK) {
         self.init(event.content, ndk: ndk)
     }
-    
+
     /// Initialize with optional content, showing a placeholder if nil
     init(_ content: String?, ndk: NDK, placeholder: String = "No content") {
         self.init(content ?? placeholder, ndk: ndk)

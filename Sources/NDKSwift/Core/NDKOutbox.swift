@@ -39,7 +39,7 @@ extension NDK {
 public struct NDKOutboxConfig {
     /// Relays to blacklist from outbox selection
     public let blacklistedRelays: Set<String>
-    
+
     /// Dedicated relays for fetching relay lists (kind:10002)
     /// These relays should be optimized for metadata queries
     public let outboxRelays: Set<String>

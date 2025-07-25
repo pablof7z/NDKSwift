@@ -11,23 +11,23 @@ public enum SpendingDirection: String {
 /// This includes creating, deleting, and managing token events, quote events, and spending history
 public actor WalletEventManager {
     // MARK: - Properties
-    
+
     private let ndk: NDK
     private var currentTokenEventIds: Set<String> = []
     private var deletedTokenEventIds: Set<String> = []
-    
+
     // Nutzap tracking
     private var nutzapEvents: [String: NutzapInfo] = [:] // eventId -> NutzapInfo
     private var redeemedNutzaps: Set<String> = [] // Set of redeemed nutzap event IDs
-    
+
     // MARK: - Initialization
-    
+
     public init(ndk: NDK) {
         self.ndk = ndk
     }
-    
+
     // MARK: - Token Event Management
-    
+
     /// Create or update token events based on calculated token changes
     public func updateTokenEvents(
         tokenChange: WalletTokenChange,
@@ -37,16 +37,16 @@ public actor WalletEventManager {
         NDKLogger.log(.debug, category: .wallet, "=== WalletEventManager.updateTokenEvents START ===")
         NDKLogger.log(.debug, category: .wallet, "Tokens to delete: \(tokenChange.deletedTokenIds)")
         NDKLogger.log(.debug, category: .wallet, "Proofs to save: \(tokenChange.saveProofs.count)")
-        
+
         var newEventIds = Set<String>()
-        
+
         // Keep existing token events that aren't being deleted
         for existingId in currentTokenEventIds {
             if !tokenChange.deletedTokenIds.contains(existingId) {
                 newEventIds.insert(existingId)
             }
         }
-        
+
         // Create deletion events for tokens being deleted
         if !tokenChange.deletedTokenIds.isEmpty {
             let deleteEvent = try await NDKEventBuilder(ndk: ndk)
@@ -56,10 +56,10 @@ public actor WalletEventManager {
                     ["k", String(7375)] // Cashu token kind
                 ] + tokenChange.deletedTokenIds.map { ["e", $0] })
                 .build(signer: signer)
-            
+
             let relays = try await ndk.publish(deleteEvent)
             NDKLogger.log(.debug, category: .wallet, "🗑️ Token deletion event published to \(relays.count) relays")
-            
+
             // Create individual Kind 5 events for each deleted token
             for tokenId in tokenChange.deletedTokenIds {
                 Task {
@@ -71,7 +71,7 @@ public actor WalletEventManager {
                 }
             }
         }
-        
+
         // Create new token event if we have proofs to save
         if !tokenChange.saveProofs.isEmpty {
             // Group proofs by mint
@@ -80,22 +80,22 @@ public actor WalletEventManager {
                 let mint = await proofStateManager.getMintForProof(proof) ?? "unknown"
                 proofsByMint[mint, default: []].append(proof)
             }
-            
+
             // Create a token event for each mint
             for (mint, proofs) in proofsByMint {
                 let token = CashuSwift.Token(
                     proofs: [mint: proofs],
                     unit: "sat"
                 )
-                
+
                 let eventId = try await saveTokenEvent(
                     token: token,
                     signer: signer,
                     deletedEventIds: Array(tokenChange.deletedTokenIds)
                 )
-                
+
                 newEventIds.insert(eventId)
-                
+
                 // Update proof ownership
                 await proofStateManager.updateProofOwnership(
                     proofs,
@@ -104,14 +104,14 @@ public actor WalletEventManager {
                 )
             }
         }
-        
+
         // Update tracking
         currentTokenEventIds = newEventIds
-        
+
         NDKLogger.log(.debug, category: .wallet, "=== WalletEventManager.updateTokenEvents END ===")
         return Array(newEventIds)
     }
-    
+
     /// Save individual token event
     private func saveTokenEvent(
         token: CashuSwift.Token,
@@ -126,12 +126,12 @@ public actor WalletEventManager {
         )
         return tokenEvent.event.id
     }
-    
+
     /// Create a delete event for a token event
     private func createDeleteEvent(eventId: String, signer: NDKSigner) async throws {
         // First get the event to delete
         let filter = NDKFilter(ids: [eventId])
-        
+
         let dataSource = NDKDataSource(
             ndk: ndk,
             filter: filter,
@@ -139,19 +139,19 @@ public actor WalletEventManager {
             cachePolicy: .networkOnly, // Need to confirm it exists
             subscriptionId: "nip60-delete-event"
         )
-        
+
         // Collect all matching events to ensure we find it
         let events = await dataSource.collect(timeout: NetworkConstants.timeoutDataCollectionShort)
         if let eventToDelete = events.first {
             try await eventToDelete.delete(reason: "Deleted token event", signer: signer, ndk: ndk)
         }
-        
+
         deletedTokenEventIds.insert(eventId)
         NDKLogger.log(.debug, category: .wallet, "WalletEventManager - Created delete event for token: \(eventId)")
     }
-    
+
     // MARK: - Quote Event Management
-    
+
     /// Save a quote event and return its event ID
     @discardableResult
     public func saveQuoteEvent(quote: CashuMintQuote, signer: NDKSigner) async throws -> String {
@@ -162,12 +162,12 @@ public actor WalletEventManager {
         )
         return quoteEvent.event.id
     }
-    
+
     /// Delete a quote event by its Nostr event ID
     public func deleteQuoteEvent(eventId: String, signer: NDKSigner) async throws {
         // First get the event to delete
         let filter = NDKFilter(ids: [eventId])
-        
+
         let dataSource = NDKDataSource(
             ndk: ndk,
             filter: filter,
@@ -175,18 +175,18 @@ public actor WalletEventManager {
             cachePolicy: .networkOnly, // Need to confirm it exists
             subscriptionId: "nip60-delete-event"
         )
-        
+
         // Collect all matching events to ensure we find it
         let events = await dataSource.collect(timeout: NetworkConstants.timeoutDataCollectionShort)
         if let quoteEvent = events.first {
             try await quoteEvent.delete(reason: "Quote expired or used", signer: signer, ndk: ndk)
         }
-        
+
         NDKLogger.log(.debug, category: .wallet, "WalletEventManager - Deleted quote event: \(eventId)")
     }
-    
+
     // MARK: - Spending History
-    
+
     /// Create spending history event
     public func createSpendingHistoryEvent(
         direction: SpendingDirection,
@@ -212,49 +212,49 @@ public actor WalletEventManager {
         )
         NDKLogger.log(.info, category: .wallet, "✅ Spending history event created and published")
     }
-    
+
     // MARK: - Event State Management
-    
+
     /// Track a deleted event
     public func markEventDeleted(_ eventId: String) {
         deletedTokenEventIds.insert(eventId)
     }
-    
+
     /// Check if an event should be filtered
     public func shouldFilterEvent(_ eventId: String) -> Bool {
         return deletedTokenEventIds.contains(eventId)
     }
-    
+
     /// Clear all tracked event IDs
     public func clearTrackedEvents() {
         currentTokenEventIds.removeAll()
         deletedTokenEventIds.removeAll()
         clearNutzapTracking()
     }
-    
+
     /// Get current token event IDs
     public func getCurrentTokenEventIds() -> Set<String> {
         return currentTokenEventIds
     }
-    
+
     /// Update current token event IDs
     public func setCurrentTokenEventIds(_ eventIds: Set<String>) {
         currentTokenEventIds = eventIds
     }
-    
+
     /// Add a current token event ID
     public func addCurrentTokenEventId(_ eventId: String) {
         currentTokenEventIds.insert(eventId)
     }
-    
+
     // MARK: - Nutzap Tracking
-    
+
     /// Track a nutzap event
     public func trackNutzap(_ event: NDKEvent) {
         // Extract amount and mint from proof tags
         var totalAmount: Int64 = 0
         var mint = ""
-        
+
         for tag in event.tags {
             if tag.count >= 2 && tag[0] == NostrConstants.TagName.proof {
                 if let proofData = tag[1].data(using: .utf8),
@@ -267,12 +267,12 @@ public actor WalletEventManager {
                 mint = tag[1]
             }
         }
-        
+
         // Determine initial status based on whether it was already redeemed
-        let status: NutzapRedemptionStatus = redeemedNutzaps.contains(event.id) 
-            ? .redeemed(at: event.createdAt, proofsCount: 0) 
+        let status: NutzapRedemptionStatus = redeemedNutzaps.contains(event.id)
+            ? .redeemed(at: event.createdAt, proofsCount: 0)
             : .pending
-        
+
         nutzapEvents[event.id] = NutzapInfo(
             eventId: event.id,
             event: event,
@@ -284,7 +284,7 @@ public actor WalletEventManager {
             status: status
         )
     }
-    
+
     /// Mark a nutzap as redeemed
     public func markNutzapRedeemed(_ eventId: String, proofsCount: Int = 0) {
         redeemedNutzaps.insert(eventId)
@@ -293,37 +293,37 @@ public actor WalletEventManager {
             nutzapEvents[eventId] = info
         }
     }
-    
+
     /// Get all nutzap events
     public func getNutzaps() -> [NutzapInfo] {
         return Array(nutzapEvents.values).sorted { $0.createdAt > $1.createdAt }
     }
-    
+
     /// Get pending (unredeemed) nutzaps
     public func getPendingNutzaps() -> [NutzapInfo] {
         return nutzapEvents.values
             .filter { !$0.isRedeemed }
             .sorted { $0.createdAt > $1.createdAt }
     }
-    
+
     /// Get redeemed nutzaps
     public func getRedeemedNutzaps() -> [NutzapInfo] {
         return nutzapEvents.values
             .filter { $0.isRedeemed }
             .sorted { $0.createdAt > $1.createdAt }
     }
-    
+
     /// Check if a nutzap is redeemed
     public func isNutzapRedeemed(_ eventId: String) -> Bool {
         return redeemedNutzaps.contains(eventId)
     }
-    
+
     /// Clear nutzap tracking (for wallet reload)
     public func clearNutzapTracking() {
         nutzapEvents.removeAll()
         redeemedNutzaps.removeAll()
     }
-    
+
     /// Update nutzap status
     public func updateNutzapStatus(_ eventId: String, status: NutzapRedemptionStatus) {
         if var info = nutzapEvents[eventId] {
@@ -335,7 +335,7 @@ public actor WalletEventManager {
             nutzapEvents[eventId] = info
         }
     }
-    
+
     /// Update nutzap redemption attempt timestamp
     public func updateNutzapAttemptTimestamp(_ eventId: String) {
         if var info = nutzapEvents[eventId] {
@@ -343,16 +343,16 @@ public actor WalletEventManager {
             nutzapEvents[eventId] = info
         }
     }
-    
+
     /// Get specific nutzap info
     public func getNutzapInfo(_ eventId: String) -> NutzapInfo? {
         return nutzapEvents[eventId]
     }
-    
+
     /// Get nutzaps by status filter
     public func getNutzapsByStatus(_ filter: NutzapStatusFilter) -> [NutzapInfo] {
         let filtered: [NutzapInfo]
-        
+
         switch filter {
         case .all:
             filtered = Array(nutzapEvents.values)
@@ -379,10 +379,10 @@ public actor WalletEventManager {
                 return false
             }
         }
-        
+
         return filtered.sorted { $0.createdAt > $1.createdAt }
     }
-    
+
     /// Get failed nutzaps
     public func getFailedNutzaps() -> [NutzapInfo] {
         return getNutzapsByStatus(.failed)
@@ -402,7 +402,7 @@ public struct NutzapInfo: Sendable, Codable {
     public let mint: String
     public var status: NutzapRedemptionStatus
     public var latestRedemptionAttemptTimestamp: Timestamp?
-    
+
     public init(
         eventId: String,
         event: NDKEvent,
@@ -424,7 +424,7 @@ public struct NutzapInfo: Sendable, Codable {
         self.status = status
         self.latestRedemptionAttemptTimestamp = latestRedemptionAttemptTimestamp
     }
-    
+
     // For backward compatibility
     public var isRedeemed: Bool {
         if case .redeemed = status {
@@ -432,7 +432,7 @@ public struct NutzapInfo: Sendable, Codable {
         }
         return false
     }
-    
+
     // For backward compatibility
     public var redeemedAt: Timestamp? {
         if case .redeemed(let at, _) = status {

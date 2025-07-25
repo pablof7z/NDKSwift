@@ -4,16 +4,16 @@ import CashuSwift
 public struct WalletStateChange {
     /// Proofs to be added to the wallet
     public let store: [CashuSwift.Proof]
-    
+
     /// Proofs to be removed from the wallet
     public let destroy: [CashuSwift.Proof]
-    
+
     /// The mint this change applies to
     public let mint: String
-    
+
     /// Optional memo describing the change
     public let memo: String?
-    
+
     public init(
         store: [CashuSwift.Proof] = [],
         destroy: [CashuSwift.Proof] = [],
@@ -31,10 +31,10 @@ public struct WalletStateChange {
 public struct WalletTokenChange {
     /// Token event IDs to be deleted
     public let deletedTokenIds: Set<String>
-    
+
     /// Proofs to be saved in new token events
     public let saveProofs: [CashuSwift.Proof]
-    
+
     public init(deletedTokenIds: Set<String>, saveProofs: [CashuSwift.Proof]) {
         self.deletedTokenIds = deletedTokenIds
         self.saveProofs = saveProofs

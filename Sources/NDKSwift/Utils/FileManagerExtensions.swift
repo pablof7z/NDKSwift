@@ -12,7 +12,7 @@ extension FileManager {
         let data = try Data(contentsOf: fileURL)
         return try JSONCoding.decode(type, from: data)
     }
-    
+
     /// Saves a Codable object to a file
     /// - Parameters:
     ///   - object: The object to encode and save
@@ -21,7 +21,7 @@ extension FileManager {
         let data = try JSONCoding.encode(object)
         try data.write(to: fileURL)
     }
-    
+
     /// Loads all Codable objects from a directory
     /// - Parameters:
     ///   - type: The type to decode
@@ -39,14 +39,14 @@ extension FileManager {
         ) else {
             return []
         }
-        
+
         return files
             .filter { $0.pathExtension == fileExtension }
             .compactMap { fileURL in
                 try? loadCodable(type, from: fileURL)
             }
     }
-    
+
     /// Loads all Codable objects from a directory with their filenames
     /// - Parameters:
     ///   - type: The type to decode
@@ -64,16 +64,16 @@ extension FileManager {
         ) else {
             return [:]
         }
-        
+
         var result: [String: T] = [:]
-        
+
         for fileURL in files where fileURL.pathExtension == fileExtension {
             let filename = fileURL.deletingPathExtension().lastPathComponent
             if let object = try? loadCodable(type, from: fileURL) {
                 result[filename] = object
             }
         }
-        
+
         return result
     }
 }

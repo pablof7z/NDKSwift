@@ -5,13 +5,13 @@ public struct NDKParsedContent {
     public let original: String
     public let components: [Component]
     public let isMentioningCurrentUser: Bool
-    
+
     public init(original: String, components: [Component], isMentioningCurrentUser: Bool) {
         self.original = original
         self.components = components
         self.isMentioningCurrentUser = isMentioningCurrentUser
     }
-    
+
     /// Component types found in parsed content
     public enum Component {
         case text(String)
@@ -24,7 +24,7 @@ public struct NDKParsedContent {
         case neventMention(String)
         case nprofileMention(String)
     }
-    
+
     /// Component type enum for pattern matching
     public enum ComponentType {
         case text

@@ -13,7 +13,7 @@ extension NDKSQLiteCache {
                 t.column("created_at", .integer).notNull().defaults(sql: "(CAST(strftime('%s', 'now') AS INTEGER))")
                 t.column("confirmed_at", .integer) // null until confirmed
             }
-            
+
             // Create indexes for efficient querying
             try db.create(index: "idx_confirmations_state", on: "event_confirmations", columns: ["state"])
             try db.create(index: "idx_confirmations_relay", on: "event_confirmations", columns: ["relay_url"])

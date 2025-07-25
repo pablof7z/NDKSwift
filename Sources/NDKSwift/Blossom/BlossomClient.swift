@@ -4,15 +4,15 @@ import Foundation
 public actor BlossomClient {
     private let urlSession: URLSession
     private var serverCache: [String: BlossomServerDescriptor] = [:]
-    
+
     // MARK: - Constants
 
     public init(urlSession: URLSession = .shared) {
         self.urlSession = urlSession
     }
-    
+
     // MARK: - Private Helpers
-    
+
     /// Helper method to handle HTTP responses and extract error messages
     private func handleHTTPResponse(_ response: URLResponse?, data: Data, serverURL: String) throws -> HTTPURLResponse {
         guard let httpResponse = response as? HTTPURLResponse else {
@@ -20,7 +20,7 @@ public actor BlossomClient {
         }
         return httpResponse
     }
-    
+
     /// Helper method to create server error with message extraction
     private func createServerError(response: HTTPURLResponse, data: Data, serverURL: String) -> NDKError {
         let errorMessage = String(data: data, encoding: .utf8)
@@ -317,14 +317,14 @@ public actor BlossomClient {
     ) async throws -> BlossomBlob {
         // Calculate SHA256
         let sha256Hex = Crypto.sha256(data).hexString
-        
+
         // Determine MIME type if not provided
         let finalMimeType = mimeType ?? BlossomMediaProcessor.inferMimeType(from: data)
-        
+
         // Extract media metadata if it's an image
         var blurhash: String?
         var dimensions: (width: Int, height: Int)?
-        
+
         if BlossomMediaProcessor.isProcessableImageType(finalMimeType) {
             if let metadata = BlossomMediaProcessor.processImage(data) {
                 blurhash = metadata.blurhash
@@ -341,7 +341,7 @@ public actor BlossomClient {
             ndk: ndk,
             expiration: expiration
         )
-        
+
         // Upload the file
         let blob = try await upload(
             data: data,
@@ -349,7 +349,7 @@ public actor BlossomClient {
             to: serverURL,
             auth: auth
         )
-        
+
         // Return blob with extracted metadata
         return BlossomBlob(
             sha256: blob.sha256,

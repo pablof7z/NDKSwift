@@ -31,9 +31,9 @@ public enum NostrMessage {
     case negMsg(subscriptionId: String, message: String)
     case negClose(subscriptionId: String)
     case negErr(subscriptionId: String, error: String)
-    
+
     // MARK: - Helper Functions
-    
+
     /// Create an invalid message error with consistent formatting
     private static func invalidMessageError(for messageType: String) -> NDKError {
         return .invalidMessage("Invalid \(messageType) message")
@@ -136,7 +136,7 @@ public enum NostrMessage {
                 throw invalidMessageError(for: "COUNT")
             }
             return .count(subscriptionId: subscriptionId, count: count)
-            
+
         case .negOpen:
             guard array.count >= 4,
                   let subscriptionId = array[1] as? String,
@@ -147,7 +147,7 @@ public enum NostrMessage {
             }
             let filter = try NDKFilter.fromDictionary(filterDict)
             return .negOpen(subscriptionId: subscriptionId, filter: filter, message: hexMessage)
-            
+
         case .negMsg:
             guard array.count >= 3,
                   let subscriptionId = array[1] as? String,
@@ -156,7 +156,7 @@ public enum NostrMessage {
                 throw invalidMessageError(for: "NEG-MSG")
             }
             return .negMsg(subscriptionId: subscriptionId, message: hexMessage)
-            
+
         case .negClose:
             guard array.count >= 2,
                   let subscriptionId = array[1] as? String
@@ -164,7 +164,7 @@ public enum NostrMessage {
                 throw invalidMessageError(for: "NEG-CLOSE")
             }
             return .negClose(subscriptionId: subscriptionId)
-            
+
         case .negErr:
             guard array.count >= 3,
                   let subscriptionId = array[1] as? String,
@@ -223,22 +223,22 @@ public enum NostrMessage {
             array.append("COUNT")
             array.append(subscriptionId)
             array.append(["count": count])
-            
+
         case let .negOpen(subscriptionId, filter, message):
             array.append("NEG-OPEN")
             array.append(subscriptionId)
             array.append(filter.toDictionary())
             array.append(message)
-            
+
         case let .negMsg(subscriptionId, message):
             array.append("NEG-MSG")
             array.append(subscriptionId)
             array.append(message)
-            
+
         case let .negClose(subscriptionId):
             array.append("NEG-CLOSE")
             array.append(subscriptionId)
-            
+
         case let .negErr(subscriptionId, error):
             array.append("NEG-ERR")
             array.append(subscriptionId)

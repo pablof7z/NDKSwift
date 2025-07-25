@@ -23,44 +23,44 @@ public enum TimeConstants {
     public static let nanosecondsPerSecond: UInt64 = 1_000_000_000
     /// Nanoseconds per millisecond (for Task.sleep conversion)
     public static let nanosecondsPerMillisecond: UInt64 = 1_000_000
-    
+
     // MARK: - Common Time Intervals
-    
+
     /// One minute in seconds
     public static let minute: TimeInterval = 60
-    
+
     /// One hour in seconds
     public static let hour: TimeInterval = 60 * minute
-    
+
     /// One day in seconds
     public static let day: TimeInterval = 24 * hour
-    
+
     /// One week in seconds
     public static let week: TimeInterval = 7 * day
-    
+
     /// One month in seconds (30 days)
     public static let month: TimeInterval = 30 * day
-    
+
     /// One year in seconds (365 days)
     public static let year: TimeInterval = 365 * day
-    
+
     // MARK: - Cache TTLs
-    
+
     /// Default cache TTL for profiles and metadata (1 hour)
     public static let defaultCacheTTL: TimeInterval = hour
-    
+
     /// Default TTL for NIP-05 verification cache (24 hours)
     public static let nip05CacheTTL: TimeInterval = day
-    
+
     /// Default TTL for relay list cache (24 hours)
     public static let relayListCacheTTL: TimeInterval = day
-    
+
     /// Default TTL for unpublished events retry window (1 hour)
     public static let unpublishedEventRetryWindow: TimeInterval = hour
-    
+
     /// Default TTL for mint info cache (7 days)
     public static let mintInfoCacheTTL: TimeInterval = week
-    
+
     /// Default TTL for keysets cache (3 days)
     public static let keysetsCacheTTL: TimeInterval = 3 * day
 }
@@ -71,12 +71,12 @@ public extension Timestamp {
     static var now: Timestamp {
         return Date.currentNostrTimestamp
     }
-    
+
     /// Create a timestamp from a Date
     static func from(_ date: Date) -> Timestamp {
         return Timestamp(date.timeIntervalSince1970)
     }
-    
+
     /// Convert to Date
     var date: Date {
         return Date(timeIntervalSince1970: TimeInterval(self))
@@ -105,12 +105,12 @@ public enum EventKind {
     public static let channel = 40
     public static let channelMetadata = 41
     public static let channelMessage = 42
-    
+
     // MARK: - Extended Events (1000-9999)
     public static let fileMetadata = 1063
     public static let genericReply = 1111  // NIP-22 comment
     public static let report = 1984  // NIP-56 Report
-    
+
     // MARK: - NIP-60 Cashu Events
     public static let cashuWalletBackup = 375  // Wallet backup event (NIP-60)
     public static let cashuQuote = 7374
@@ -118,12 +118,12 @@ public enum EventKind {
     public static let cashuSpendingHistory = 7376  // Spending history (NIP-60)
     public static let nutzap = 9321
     public static let cashuWalletConfig = 17375  // Wallet configuration (NIP-60)
-    
+
     // MARK: - Zap Events
     public static let zapRequest = 9734
     public static let zap = 9735
     public static let zapReceipt = 9735  // Alias for clarity
-    
+
     // MARK: - List Events (10000-19999)
     public static let muteList = 10000
     public static let pinList = 10001
@@ -138,7 +138,7 @@ public enum EventKind {
     public static let cashuMintList = 10019
     public static let nutzapPreferences = 10019  // Alias for NIP-61
     public static let blockedMints = 10020
-    
+
     // MARK: - Authentication Events (20000-29999)
     public static let clientAuthentication = 22242
     public static let nwcRequest = 23194
@@ -146,7 +146,7 @@ public enum EventKind {
     public static let nostrConnect = 24133
     public static let blossomAuth = 24242
     public static let httpAuth = 27235
-    
+
     // MARK: - Parameterized Replaceable Events (30000-39999)
     public static let categorizedPeopleList = 30000
     public static let categorizedBookmarkList = 30001
@@ -172,19 +172,19 @@ public enum EventKind {
 public enum AmountPresets {
     /// Small preset amounts for zaps
     public static let smallZapAmounts = [21, 100, 1000]
-    
+
     /// Standard preset amounts for zaps and nutzaps
     public static let standardAmounts = [100, 500, 1000, 5000, 10000, 50000]
-    
+
     /// Extended preset amounts including larger values
     public static let extendedAmounts = [100, 500, 1000, 5000, 10000, 50000, 100000]
-    
+
     /// Common nutzap preset amounts
     public static let nutzapAmounts = [1000, 5000, 10000, 50000]
-    
+
     /// Default zap amount
     public static let defaultZapAmount = 21
-    
+
     /// Minimum zap amount
     public static let minimumZapAmount = 1
 }
@@ -194,31 +194,31 @@ public enum AmountPresets {
 public extension EventKind {
     /// Regular events (0-999)
     static let regularRange = 0..<1000
-    
+
     /// Replaceable events (10000-19999)
     static let replaceableRange = 10000..<20000
-    
+
     /// Ephemeral events (20000-29999)
     static let ephemeralRange = 20000..<30000
-    
+
     /// Parameterized replaceable events (30000-39999)
     static let parameterizedReplaceableRange = 30000..<40000
-    
+
     /// Check if a kind is replaceable
     static func isReplaceable(_ kind: Int) -> Bool {
         return replaceableRange.contains(kind)
     }
-    
+
     /// Check if a kind is ephemeral
     static func isEphemeral(_ kind: Int) -> Bool {
         return ephemeralRange.contains(kind)
     }
-    
+
     /// Check if a kind is parameterized replaceable
     static func isParameterizedReplaceable(_ kind: Int) -> Bool {
         return parameterizedReplaceableRange.contains(kind)
     }
-    
+
     /// Check if a kind is regular
     static func isRegular(_ kind: Int) -> Bool {
         return regularRange.contains(kind)
@@ -271,7 +271,7 @@ public struct UserAnnotation: Sendable {
     public let pubkey: PublicKey
     public let x: Int
     public let y: Int
-    
+
     public init(pubkey: PublicKey, x: Int, y: Int) {
         self.pubkey = pubkey
         self.x = x
@@ -297,14 +297,14 @@ public enum NDKError: LocalizedError {
     case invalidSignature(String)
     case invalidFilter(String)
     case invalidInput(message: String)
-    
+
     // Crypto errors
     case signingFailed(String, underlying: Error? = nil)
     case verificationFailed(String, underlying: Error? = nil)
     case encryptionFailed(String, underlying: Error? = nil)
     case decryptionFailed(String, underlying: Error? = nil)
     case keyDerivationFailed(String, underlying: Error? = nil)
-    
+
     // Network errors
     case connectionFailed(relay: String, message: String, underlying: Error? = nil)
     case connectionLost(relay: String, message: String)
@@ -314,29 +314,29 @@ public enum NDKError: LocalizedError {
     case relayError(relay: String, message: String)
     case publishFailed(relay: String, message: String)
     case rateLimited(message: String)
-    
+
     // Storage errors
     case cacheFailed(operation: String, underlying: Error? = nil)
     case diskFull
     case fileNotFound(path: String)
     case corruptedData(path: String)
-    
+
     // Protocol errors
     case invalidMessage(String)
     case unsupportedVersion(String)
     case subscriptionFailed(String)
     case protocolViolation(String)
-    
+
     // Configuration errors
     case notConfigured(String)
     case invalidConfiguration(String)
-    
+
     // Runtime errors
     case notImplemented(String)
     case cancelled
     case unknown(String, underlying: Error? = nil)
     case internalError(String)
-    
+
     // Wallet errors (NWC)
     case walletRateLimited(retryAfter: Int?)
     case walletNotImplemented(method: String)
@@ -348,13 +348,13 @@ public enum NDKError: LocalizedError {
     case walletNotFound(resource: String)
     case walletError(message: String)
     case paymentRequired(String)
-    
+
     // Cashu errors
     case invalidRequest(String)
     case noMintAvailable(String)
     case encodingError(String)
     case invalidContent(String)
-    
+
     // File/Blossom errors
     case invalidURL(String)
     case invalidResponse(from: String)
@@ -363,10 +363,10 @@ public enum NDKError: LocalizedError {
     case blobNotFound(sha256: String)
     case uploadFailed(reason: String)
     case invalidSHA256(String)
-    
+
     // Serialization errors
     case serializationFailed(String)
-    
+
     public var errorDescription: String? {
         switch self {
         // Validation
@@ -382,7 +382,7 @@ public enum NDKError: LocalizedError {
             return "Invalid filter: \(filter)"
         case .invalidInput(let message):
             return message
-            
+
         // Crypto
         case .signingFailed(let message, let underlying):
             return underlying != nil ? "\(message): \(underlying!.localizedDescription)" : message
@@ -394,7 +394,7 @@ public enum NDKError: LocalizedError {
             return underlying != nil ? "\(message): \(underlying!.localizedDescription)" : message
         case .keyDerivationFailed(let message, let underlying):
             return underlying != nil ? "\(message): \(underlying!.localizedDescription)" : message
-            
+
         // Network
         case .connectionFailed(let relay, let message, let underlying):
             return underlying != nil ? "Connection to \(relay) failed: \(message) - \(underlying!.localizedDescription)" : "Connection to \(relay) failed: \(message)"
@@ -408,7 +408,7 @@ public enum NDKError: LocalizedError {
             return "Unauthorized on \(relay): \(message)"
         case .relayError(let relay, let message):
             return "Relay error from \(relay): \(message)"
-            
+
         // Storage
         case .cacheFailed(let operation, let underlying):
             return underlying != nil ? "Cache \(operation) failed: \(underlying!.localizedDescription)" : "Cache \(operation) failed"
@@ -418,7 +418,7 @@ public enum NDKError: LocalizedError {
             return "File not found: \(path)"
         case .corruptedData(let path):
             return "Corrupted data at: \(path)"
-            
+
         // Protocol
         case .invalidMessage(let message):
             return "Invalid protocol message: \(message)"
@@ -428,13 +428,13 @@ public enum NDKError: LocalizedError {
             return "Subscription failed: \(reason)"
         case .protocolViolation(let message):
             return "Protocol violation: \(message)"
-            
+
         // Configuration
         case .notConfigured(let component):
             return "\(component) is not configured"
         case .invalidConfiguration(let message):
             return "Invalid configuration: \(message)"
-            
+
         // Runtime
         case .notImplemented(let feature):
             return "\(feature) is not implemented"
@@ -448,7 +448,7 @@ public enum NDKError: LocalizedError {
             return "Failed to publish to \(relay): \(message)"
         case .rateLimited(let message):
             return message
-            
+
         // Wallet
         case .walletRateLimited(let retryAfter):
             return retryAfter != nil ? "Too many requests. Retry after \(retryAfter!) seconds." : "Too many requests. Please try again later."
@@ -470,7 +470,7 @@ public enum NDKError: LocalizedError {
             return message
         case .paymentRequired(let message):
             return message
-            
+
         // Cashu
         case .invalidRequest(let message):
             return "Invalid request: \(message)"
@@ -480,7 +480,7 @@ public enum NDKError: LocalizedError {
             return "Encoding error: \(message)"
         case .invalidContent(let message):
             return "Invalid content: \(message)"
-            
+
         // File/Blossom
         case .invalidURL(let url):
             return "Invalid URL: \(url)"
@@ -540,7 +540,7 @@ public enum EventConfirmationState: Equatable, Sendable {
     case optimistic
     /// Event was confirmed by a relay
     case confirmed(fromRelay: String)
-    
+
     public var isConfirmed: Bool {
         switch self {
         case .optimistic:

@@ -13,7 +13,7 @@ public protocol NDKRelayConnectionDelegate: AnyObject {
 /// WebSocket connection to a Nostr relay using actor for thread safety
 public actor NDKRelayConnection {
     private let url: URL
-    
+
     #if os(iOS) || os(macOS) || os(watchOS) || os(tvOS)
         private var webSocketTask: URLSessionWebSocketTask?
         // Shared URLSession for all connections (as per Gemini's suggestion)
@@ -27,57 +27,57 @@ public actor NDKRelayConnection {
             return URLSession(configuration: config)
         }()
     #endif
-    
+
     public weak var delegate: NDKRelayConnectionDelegate?
-    
+
     /// Current connection state
     public private(set) var isConnected = false
-    
+
     /// Connection statistics
     public private(set) var messagesSent = 0
     public private(set) var messagesReceived = 0
     public private(set) var connectedAt: Date?
-    
+
     /// Retry policy for reconnection
     private let retryPolicy = RetryPolicy(configuration: .relayConnection)
-    
+
     /// Connection completion handlers
     private var connectionContinuations: [CheckedContinuation<Void, Error>] = []
-    
+
     /// Track if connection is in progress
     private var isConnecting = false
-    
+
     /// Track if this is an initial connection attempt
     private var isInitialConnection = true
-    
+
     /// Track pending EVENT messages waiting for OK responses
     private var pendingEvents: [EventID: CheckedContinuation<Bool, Error>] = [:]
-    
+
     public init(url: URL) {
         self.url = url
         NDKLogger.log(.debug, category: .connection, "🆕 NDKRelayConnection initialized for \(url)")
     }
-    
+
     /// Set the delegate (needed because delegate is actor-isolated)
     public func setDelegate(_ delegate: NDKRelayConnectionDelegate?) {
         self.delegate = delegate
     }
-    
+
     deinit {
         Task { [weak self] in
             await self?.disconnect()
         }
     }
-    
+
     // MARK: - Connection Management
-    
+
     /// Connect to the relay (async version that properly waits)
     public func connect() async throws {
         guard !isConnected else {
             NDKLogger.log(.trace, category: .connection, "✔️ Already connected to \(url)")
             return
         }
-        
+
         // If there's already a connection attempt in progress, wait for it
         if isConnecting {
             NDKLogger.log(.debug, category: .connection, "🔃 Connection already in progress for \(url) - waiting...")
@@ -86,14 +86,14 @@ public actor NDKRelayConnection {
             }
             return
         }
-        
+
         // Mark that we're connecting
         isConnecting = true
-        
+
         do {
             try await withCheckedThrowingContinuation { continuation in
                 self.connectionContinuations.append(continuation)
-                
+
                 Task {
                     await self._connect()
                 }
@@ -115,7 +115,7 @@ public actor NDKRelayConnection {
             }
         }
     }
-    
+
     private func _connect() async {
         guard !isConnected else {
             // Resume all waiting continuations
@@ -126,7 +126,7 @@ public actor NDKRelayConnection {
             isConnecting = false
             return
         }
-        
+
         #if os(iOS) || os(macOS) || os(watchOS) || os(tvOS)
             guard webSocketTask == nil else {
                 // Resume all waiting continuations
@@ -137,23 +137,23 @@ public actor NDKRelayConnection {
                 isConnecting = false
                 return
             }
-            
-            
+
+
             // Create WebSocket request
             var request = URLRequest(url: url)
             request.addValue(HTTPConstants.webSocketProtocolNostr, forHTTPHeaderField: HTTPConstants.headerSecWebSocketProtocol)
             NDKLogger.log(.trace, category: .connection, "📦 Request headers: Sec-WebSocket-Protocol: \(HTTPConstants.webSocketProtocolNostr)")
-            
+
             // Create WebSocket task
             webSocketTask = Self.sharedURLSession.webSocketTask(with: request)
             webSocketTask?.resume()
-            
-            
+
+
             // Start receiving messages in a detached task so it doesn't block
             Task.detached { [weak self] in
                 await self?.receiveMessages()
             }
-            
+
             // Send a ping to verify connection is established
             await sendPing()
         #else
@@ -167,19 +167,19 @@ public actor NDKRelayConnection {
             }
             connectionContinuations.removeAll()
             isConnecting = false
-            
+
             await notifyDelegate { delegate in
                 delegate.relayConnectionDidConnect(self)
             }
         #endif
     }
-    
+
     /// Disconnect from relay
     public func disconnect() async {
         NDKLogger.log(.info, category: .connection, "🔌 Disconnecting from \(url)")
         retryPolicy.cancel()
         retryPolicy.reset()
-        
+
         #if os(iOS) || os(macOS) || os(watchOS) || os(tvOS)
             if let task = webSocketTask {
                 NDKLogger.log(.debug, category: .connection, "🚪 Closing WebSocket connection")
@@ -187,18 +187,18 @@ public actor NDKRelayConnection {
                 webSocketTask = nil
             }
         #endif
-        
+
         if isConnected {
             isConnected = false
             connectedAt = nil
-            
+
             // Clean up any pending event continuations to prevent leaks
             for (eventId, continuation) in pendingEvents {
                 NDKLogger.log(.warning, category: .relay, "⚠️ Cancelling pending event \(eventId) due to disconnect")
                 continuation.resume(throwing: NDKError.connectionLost(relay: url.absoluteString, message: "Connection closed"))
             }
             pendingEvents.removeAll()
-            
+
             NDKLogger.log(.info, category: .connection, "✅ Disconnected from \(url)")
             await notifyDelegate { delegate in
                 delegate.relayConnectionDidDisconnect(self, error: nil)
@@ -207,25 +207,25 @@ public actor NDKRelayConnection {
             NDKLogger.log(.trace, category: .connection, "📡 Already disconnected from \(url)")
         }
     }
-    
+
     // MARK: - Message Handling
-    
+
     /// Send a message to the relay
     public func send(_ message: NostrMessage) async throws {
         let json = try message.serialize()
         try await send(json)
     }
-    
+
     /// Publish an event and wait for OK response
     public func publishEvent(_ event: NDKEvent, timeout: TimeInterval = NetworkConstants.timeoutRelayConnection) async throws -> Bool {
         // Ensure we're connected first
         if !isConnected {
             try await connect()
         }
-        
+
         let eventId = event.id
         NDKLogger.log(.debug, category: .relay, "publishEvent called for event \(eventId)")
-        
+
         // Store continuation and handle the async work within actor context
         return try await withCheckedThrowingContinuation { continuation in
             Task { [weak self] in
@@ -233,12 +233,12 @@ public actor NDKRelayConnection {
             }
         }
     }
-    
+
     /// Perform the actual publish event work (actor-isolated)
     private func performPublishEvent(eventId: EventID, event: NDKEvent, continuation: CheckedContinuation<Bool, Error>, timeout: TimeInterval) async {
         // Store the continuation - now within actor context
         pendingEvents[eventId] = continuation
-        
+
         await withThrowingTaskGroup(of: Void.self) { group in
             // Send event task
             group.addTask {
@@ -246,13 +246,13 @@ public actor NDKRelayConnection {
                 try await self.send(eventMessage)
                 NDKLogger.log(.debug, category: .relay, "Event sent, waiting for OK response...")
             }
-            
+
             // Timeout task
             group.addTask {
                 try await Task.sleep(nanoseconds: UInt64(timeout * Double(TimeConstants.nanosecondsPerSecond)))
                 await self.handleTimeout(eventId: eventId)
             }
-            
+
             // Wait for any task to complete
             do {
                 try await group.next()
@@ -266,54 +266,54 @@ public actor NDKRelayConnection {
             }
         }
     }
-    
-    
+
+
     /// Handle timeout for a pending event (actor-isolated)
     private func handleTimeout(eventId: EventID) {
         if let continuation = pendingEvents.removeValue(forKey: eventId) {
             continuation.resume(throwing: NDKError.timeout(operation: "publishEvent", seconds: Int(NetworkConstants.timeoutRelayConnection)))
         }
     }
-    
+
     /// Send raw JSON to relay
     public func send(_ json: String) async throws {
         guard isConnected else {
             throw NDKError.connectionLost(relay: url.absoluteString, message: ErrorMessageConstants.Messages.notConnected)
         }
-        
+
         // Log network traffic
         let parsed = try? NostrMessage.parse(from: json)
         NDKLogger.logNetworkSend(to: url, message: json, parsed: parsed)
-        
+
         #if os(iOS) || os(macOS) || os(watchOS) || os(tvOS)
             guard let task = webSocketTask else {
                 throw NDKError.connectionLost(relay: url.absoluteString, message: "No WebSocket task")
             }
-            
+
             let message = URLSessionWebSocketTask.Message.string(json)
             try await task.send(message)
         #else
             // Mock sending for Linux
             NDKLogger.log(.debug, category: .relay, "Mock send to \(url): \(json)")
         #endif
-        
+
         messagesSent += 1
     }
-    
+
     #if os(iOS) || os(macOS) || os(watchOS) || os(tvOS)
     private func receiveMessages() async {
         guard let task = webSocketTask else {
             NDKLogger.log(.error, category: .connection, "❌ \(ErrorMessageConstants.Messages.notConnected) - WebSocket task not available for receiving messages")
-            return 
+            return
         }
-        
-        
+
+
         do {
             while true {
                 let message = try await task.receive()
                 messagesReceived += 1
                 NDKLogger.log(.trace, category: .connection, "📥 Received message #\(messagesReceived) from \(url)")
-                
+
                 switch message {
                 case let .string(json):
                     await handleReceivedMessage(json)
@@ -336,20 +336,20 @@ public actor NDKRelayConnection {
         }
     }
     #endif
-    
+
     private func handleReceivedMessage(_ json: String) async {
         // Validate input
         guard !json.isEmpty else {
             NDKLogger.log(.warning, category: .relay, "Received empty message from relay \(url)")
             return
         }
-        
+
         do {
             let message = try NostrMessage.parse(from: json)
-            
+
             // Log received message
             NDKLogger.logNetworkReceive(from: url, message: json, parsed: message)
-            
+
             // Handle OK messages for pending events
             if case let .ok(eventId, accepted, errorMessage) = message {
                 if let continuation = pendingEvents.removeValue(forKey: eventId) {
@@ -364,7 +364,7 @@ public actor NDKRelayConnection {
                     }
                 }
             }
-            
+
             await notifyDelegate { delegate in
                 delegate.relayConnection(self, didReceiveMessage: message)
             }
@@ -373,9 +373,9 @@ public actor NDKRelayConnection {
             NDKLogger.logNetworkParseError(from: url, message: json, error: error)
         }
     }
-    
+
     // MARK: - Connection Verification
-    
+
     #if os(iOS) || os(macOS) || os(watchOS) || os(tvOS)
     private func sendPing() async {
         guard let task = webSocketTask else {
@@ -388,12 +388,12 @@ public actor NDKRelayConnection {
             isConnecting = false
             return
         }
-        
-        
+
+
         // Use a single task with timeout built-in
         let pingCompleted = await withCheckedContinuation { continuation in
             var pingHandled = false
-            
+
             // Set up timeout
             let timeoutTask = Task {
                 try? await Task.sleep(nanoseconds: UInt64(NetworkConstants.timeoutPing * Double(TimeConstants.nanosecondsPerSecond)))
@@ -403,18 +403,18 @@ public actor NDKRelayConnection {
                     continuation.resume(returning: false)
                 }
             }
-            
+
             task.sendPing { [weak self] error in
                 guard !pingHandled else { return } // Ignore if timeout already fired
                 pingHandled = true
                 timeoutTask.cancel()
-                
+
                 Task { [weak self] in
                     guard let self = self else {
                         continuation.resume(returning: false)
                         return
                     }
-                    
+
                     if let error = error {
                         NDKLogger.log(.error, category: .connection, "❌ Ping failed for \(self.url): \(error)")
                         await self.resumeContinuationWithError(error)
@@ -427,14 +427,14 @@ public actor NDKRelayConnection {
                 }
             }
         }
-        
+
         if !pingCompleted {
             let timeoutError = NDKError.timeout(operation: "ping", seconds: Int(NetworkConstants.timeoutPing))
             await resumeContinuationWithError(timeoutError)
             await handleConnectionError(timeoutError)
         }
     }
-    
+
     private func markAsConnected() async {
         guard !isConnected else {
             // Resume all waiting continuations
@@ -444,26 +444,26 @@ public actor NDKRelayConnection {
             connectionContinuations.removeAll()
             return
         }
-        
+
         isConnected = true
         isInitialConnection = false
         connectedAt = Date()
         retryPolicy.reset()
-        
-        
+
+
         // Resume all waiting continuations
         for continuation in connectionContinuations {
             continuation.resume()
         }
         connectionContinuations.removeAll()
         isConnecting = false
-        
+
         // Notify delegate
         await notifyDelegate { delegate in
             delegate.relayConnectionDidConnect(self)
         }
     }
-    
+
     private func resumeContinuationWithError(_ error: Error) async {
         // Resume all waiting continuations with error
         for continuation in connectionContinuations {
@@ -473,27 +473,27 @@ public actor NDKRelayConnection {
         isConnecting = false
     }
     #endif
-    
+
     private func handleConnectionError(_ error: Error) async {
         NDKLogger.log(.error, category: .connection, "🔴 Connection error for \(url): \(error)")
         isConnected = false
         connectedAt = nil
-        
+
         #if os(iOS) || os(macOS) || os(watchOS) || os(tvOS)
             webSocketTask = nil
         #endif
-        
+
         // Clean up any pending event continuations to prevent leaks
         for (eventId, continuation) in pendingEvents {
             NDKLogger.log(.warning, category: .relay, "⚠️ Failing pending event \(eventId) due to connection error")
             continuation.resume(throwing: NDKError.networkError(for: url.absoluteString, operation: "send event", error: error))
         }
         pendingEvents.removeAll()
-        
+
         await notifyDelegate { delegate in
             delegate.relayConnectionDidDisconnect(self, error: error)
         }
-        
+
         // Only schedule reconnection if this wasn't an initial connection attempt
         if !isInitialConnection {
             NDKLogger.log(.debug, category: .connection, "🔁 Will attempt reconnection (not initial connection)")
@@ -502,7 +502,7 @@ public actor NDKRelayConnection {
             NDKLogger.log(.debug, category: .connection, "🚫 Not scheduling reconnection (initial connection failed)")
         }
     }
-    
+
     private func scheduleReconnection() async {
         NDKLogger.log(.debug, category: .connection, "🕒 Scheduling reconnection for \(url) with retry policy")
         // Use a detached task to avoid blocking on retry scheduling
@@ -515,9 +515,9 @@ public actor NDKRelayConnection {
             }
         }
     }
-    
+
     // MARK: - Delegate Notification Helper
-    
+
     private func notifyDelegate(_ block: @escaping (NDKRelayConnectionDelegate) -> Void) async {
         if let delegate = delegate {
             await MainActor.run {

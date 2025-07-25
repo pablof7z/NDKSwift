@@ -70,7 +70,7 @@ public struct NDKImage {
             sig: "" // Will be set when signed
         )
     }
-    
+
 
     /// Create an NDKImage from an existing NDKEvent
     public init(event: NDKEvent) {

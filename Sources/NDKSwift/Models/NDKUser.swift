@@ -5,13 +5,13 @@ actor UserStateActor {
     var profile: NDKUserProfile?
     var relayList: [NDKRelayInfo] = []
     var nip46Urls: [String]?
-    
+
     func getProfile() -> NDKUserProfile? { profile }
     func setProfile(_ newProfile: NDKUserProfile?) { profile = newProfile }
-    
+
     func getRelayList() -> [NDKRelayInfo] { relayList }
     func setRelayList(_ newList: [NDKRelayInfo]) { relayList = newList }
-    
+
     func getNip46Urls() -> [String]? { nip46Urls }
     func setNip46Urls(_ urls: [String]?) { nip46Urls = urls }
 }
@@ -23,7 +23,7 @@ public final class NDKUser: Equatable, Hashable, Sendable {
 
     /// Reference to NDK instance
     public nonisolated(unsafe) weak var ndk: NDK?
-    
+
     /// Internal state actor that manages all mutable state
     private let stateActor = UserStateActor()
 
@@ -84,23 +84,23 @@ public final class NDKUser: Equatable, Hashable, Sendable {
         ) else {
             throw NDKError.invalidInput(message: "NIP-05 verification failed for \(nip05)")
         }
-        
+
         // Restore NIP-46 URLs if available
         if let cached = await ndk.cache.getNIP05Entry(nip05.lowercased()),
            let nip46Relays = cached.nip46Relays {
             await user.stateActor.setNip46Urls(nip46Relays)
         }
-        
+
         return user
     }
 
     // MARK: - Profile Management
-    
+
     /// Update the user's profile
     internal func updateProfile(_ profile: NDKUserProfile) async {
         await stateActor.setProfile(profile)
     }
-    
+
     /// Process a metadata event to update the user's profile
     /// Used internally when fetching profiles from events
     public func processMetadataEvent(_ event: NDKEvent) {
@@ -108,11 +108,11 @@ public final class NDKUser: Equatable, Hashable, Sendable {
             let eventContent = event.content
             if let profile = JSONCoding.safeDecode(NDKUserProfile.self, from: eventContent) {
                 await updateProfile(profile)
-                
+
                 // Save to cache if available
                 if let ndk = ndk {
                     try? await ndk.cache.saveProfile(profile, pubkey: pubkey)
-                    
+
                     // Proactively cache NIP-05 identifier if present
                     await ndk.nip05Manager.processMetadataEvent(event, profile: profile)
                 }
@@ -140,7 +140,7 @@ public final class NDKUser: Equatable, Hashable, Sendable {
             filter: filter,
             maxAge: TimeConstants.day // 24 hours - relay lists rarely change
         )
-        
+
         // Collect all relay list events and use the most recent
         let events = await dataSource.collect(timeout: NetworkConstants.timeoutDataCollectionMedium)
         if let event = events.mostRecent {
@@ -150,19 +150,19 @@ public final class NDKUser: Equatable, Hashable, Sendable {
                 .extractTags(named: NostrConstants.TagName.reference)
                 .compactMap { tag -> NDKRelayInfo? in
                     guard let url = tag[safe: 1] else { return nil }
-                    
+
                     // Check for read/write markers
                     let marker = tag[safe: 2]?.lowercased()
                     let read = marker == nil || marker == "read"
                     let write = marker == nil || marker == "write"
-                    
+
                     return NDKRelayInfo(url: url, read: read, write: write)
                 }
-            
+
             await stateActor.setRelayList(relays)
             return relays
         }
-        
+
         return []
     }
 
@@ -187,7 +187,7 @@ public final class NDKUser: Equatable, Hashable, Sendable {
             filter: filter,
             maxAge: 10 * TimeConstants.minute // 10 minutes - contact lists don't change frequently
         )
-        
+
         // Collect all contact list events and use the most recent
         let events = await dataSource.collect(timeout: NetworkConstants.timeoutDataCollectionMedium)
         if let event = events.mostRecent {
@@ -196,17 +196,17 @@ public final class NDKUser: Equatable, Hashable, Sendable {
             let followedPubkeys = eventTags
                 .extractTags(named: NostrConstants.TagName.pubkey)
                 .compactMap { $0[safe: 1] }
-            
+
             // Create NDKUser instances for each followed pubkey
             let users = followedPubkeys.map { pubkey in
                 let user = NDKUser(pubkey: pubkey)
                 user.ndk = ndk
                 return user
             }
-            
+
             return Set(users)
         }
-        
+
         return []
     }
 
@@ -247,7 +247,7 @@ public final class NDKUser: Equatable, Hashable, Sendable {
     }
 
     // MARK: - NIP-05 Verification
-    
+
     /// Verify this user's NIP-05 identifier
     /// - Parameter maxAge: Maximum age before re-verification is needed (default: 24 hours)
     /// - Returns: True if the NIP-05 is verified and belongs to this user
@@ -255,10 +255,10 @@ public final class NDKUser: Equatable, Hashable, Sendable {
         guard let ndk = ndk else {
             throw NDKError.configurationError("NDK instance not set")
         }
-        
+
         return try await ndk.verifyNIP05(for: self, maxAge: maxAge)
     }
-    
+
     // MARK: - Payments
 
     /// Pay this user using the configured wallet
@@ -292,17 +292,17 @@ public final class NDKUser: Equatable, Hashable, Sendable {
             authors: [pubkey],
             kinds: [EventKind.metadata, EventKind.nutzapPreferences]  // Fetch BOTH in one request
         )
-        
+
         // Use NDKDataSource with reasonable maxAge for payment methods
         let dataSource = NDKDataSource(
             ndk: ndk,
             filter: filter,
             maxAge: 5 * TimeConstants.minute // 5 minutes - payment methods don't change often
         )
-        
+
         // Collect all profile events
         let events = await dataSource.collect(timeout: NetworkConstants.timeoutDataCollectionLong)
-        
+
         for event in events {
             switch event.kind {
             case EventKind.metadata:
@@ -438,7 +438,7 @@ public struct NDKUserProfile: Codable, Sendable {
     public mutating func setAdditionalField(_ key: String, value: String?) {
         additionalFields[key] = value
     }
-    
+
     /// Get all additional fields
     public var allAdditionalFields: [String: String] {
         return additionalFields

@@ -15,17 +15,17 @@ public struct NDKMintInfo: Codable, Equatable, Sendable {
     public let time: Int?
     public let tosURL: String?
     public let nuts: Nuts?
-    
+
     public struct Contact: Codable, Equatable, Sendable {
         public let method: String
         public let info: String
-        
+
         public init(method: String, info: String) {
             self.method = method
             self.info = info
         }
     }
-    
+
     public struct Nuts: Codable, Equatable, Sendable {
         public let nut04: PaymentMethodList?
         public let nut05: PaymentMethodList?
@@ -34,7 +34,7 @@ public struct NDKMintInfo: Codable, Equatable, Sendable {
         public let nut09: NutSupportFlag?
         public let nut10: NutSupportFlag?
         public let nut12: NutSupportFlag?
-        
+
         enum CodingKeys: String, CodingKey {
             case nut04 = "4"
             case nut05 = "5"
@@ -45,29 +45,29 @@ public struct NDKMintInfo: Codable, Equatable, Sendable {
             case nut12 = "12"
         }
     }
-    
+
     public struct PaymentMethodList: Codable, Equatable, Sendable {
         public let methods: [PaymentMethod]?
         public let disabled: Bool?
-        
+
         public init(methods: [PaymentMethod]?, disabled: Bool?) {
             self.methods = methods
             self.disabled = disabled
         }
     }
-    
+
     public struct PaymentMethod: Codable, Equatable, Sendable {
         public let method: String
         public let unit: String
         public let minAmount: Int?
         public let maxAmount: Int?
-        
+
         enum CodingKeys: String, CodingKey {
             case method, unit
             case minAmount = "min_amount"
             case maxAmount = "max_amount"
         }
-        
+
         public init(method: String, unit: String, minAmount: Int? = nil, maxAmount: Int? = nil) {
             self.method = method
             self.unit = unit
@@ -75,22 +75,22 @@ public struct NDKMintInfo: Codable, Equatable, Sendable {
             self.maxAmount = maxAmount
         }
     }
-    
+
     public struct NutSupportFlag: Codable, Equatable, Sendable {
         public let supported: Bool
-        
+
         public init(supported: Bool) {
             self.supported = supported
         }
     }
-    
+
     enum CodingKeys: String, CodingKey {
         case name, pubkey, version, description, contact, motd, urls, time, nuts
         case descriptionLong = "description_long"
         case iconURL = "icon_url"
         case tosURL = "tos_url"
     }
-    
+
     public init(
         name: String? = nil,
         pubkey: String? = nil,
@@ -118,12 +118,12 @@ public struct NDKMintInfo: Codable, Equatable, Sendable {
         self.tosURL = tosURL
         self.nuts = nuts
     }
-    
+
     /// Initialize from JSON data
     public init(from jsonData: Data) throws {
         self = try JSONCoding.decode(NDKMintInfo.self, from: jsonData)
     }
-    
+
     /// Convert to JSON data
     public func toJSONData() throws -> Data {
         return try JSONCoding.encode(self)

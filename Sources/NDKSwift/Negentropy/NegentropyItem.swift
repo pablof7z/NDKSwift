@@ -27,10 +27,10 @@ import Foundation
 public struct NegentropyItem: Comparable, Hashable {
     /// 32-byte identifier (typically event ID for Nostr)
     public let id: Data
-    
+
     /// Timestamp for ordering (unix timestamp)
     public let timestamp: UInt64
-    
+
     /// Creates a new Negentropy item with the specified ID and timestamp.
     ///
     /// - Parameters:
@@ -43,7 +43,7 @@ public struct NegentropyItem: Comparable, Hashable {
         self.id = id
         self.timestamp = timestamp
     }
-    
+
     /// Creates a new Negentropy item from a hex-encoded ID string.
     ///
     /// - Parameters:
@@ -62,7 +62,7 @@ public struct NegentropyItem: Comparable, Hashable {
             throw NegentropyError.invalidItemId
         }
     }
-    
+
     /// Creates a new Negentropy item from a Nostr event.
     ///
     /// - Parameter event: The Nostr event to convert
@@ -79,9 +79,9 @@ public struct NegentropyItem: Comparable, Hashable {
             throw NegentropyError.invalidItemId
         }
     }
-    
+
     // MARK: - Comparable
-    
+
     public static func < (lhs: NegentropyItem, rhs: NegentropyItem) -> Bool {
         // Sort by timestamp first, then by ID for stability
         if lhs.timestamp != rhs.timestamp {
@@ -89,13 +89,13 @@ public struct NegentropyItem: Comparable, Hashable {
         }
         return lhs.id.lexicographicallyPrecedes(rhs.id)
     }
-    
+
     public static func == (lhs: NegentropyItem, rhs: NegentropyItem) -> Bool {
         return lhs.timestamp == rhs.timestamp && lhs.id == rhs.id
     }
-    
+
     // MARK: - Hashable
-    
+
     public func hash(into hasher: inout Hasher) {
         hasher.combine(id)
         hasher.combine(timestamp)
@@ -110,7 +110,7 @@ public enum NegentropyError: LocalizedError {
     case decodingError
     case protocolError(String)
     case frameSizeExceeded
-    
+
     public var errorDescription: String? {
         switch self {
         case .invalidItemId:

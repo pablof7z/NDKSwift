@@ -3,7 +3,7 @@ import NDKSwift
 /// UI-related constants for consistent layout and styling across NDKSwiftUI components
 public enum UIConstants {
     // MARK: - Profile Picture Sizes
-    
+
     /// Standard profile picture sizes
     public enum ProfilePictureSize {
         /// Small profile picture (40 points)
@@ -15,14 +15,14 @@ public enum UIConstants {
         /// Extra large profile picture (120 points)
         public static let extraLarge: CGFloat = 120
     }
-    
+
     // MARK: - Image Display
-    
+
     /// Maximum height for images in markdown content
     public static let markdownImageMaxHeight: CGFloat = 300
-    
+
     // MARK: - Zap Button
-    
+
     /// Standard zap amounts in satoshis
     /// These reference the core amount definitions for consistency
     public enum ZapAmounts {
@@ -33,15 +33,15 @@ public enum UIConstants {
         /// Extended zap amounts including larger values - references core definition
         public static let extended = AmountPresets.extendedAmounts
     }
-    
+
     // MARK: - Event View
-    
+
     /// Thumbnail dimensions for media previews
     public enum MediaThumbnail {
         public static let width: CGFloat = 60
         public static let height: CGFloat = 40
     }
-    
+
     /// Maximum content height for different event types
     public enum MaxContentHeight {
         /// Default maximum height for most content
@@ -51,7 +51,7 @@ public enum UIConstants {
         /// Unlimited height (no restriction)
         public static let unlimited: CGFloat = .infinity
     }
-    
+
     /// Image heights for different event view styles
     public enum EventImageHeight {
         /// Compact view image height

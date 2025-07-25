@@ -25,15 +25,15 @@ public protocol NDKSigner {
 
     /// Decrypt a message
     func decrypt(sender: NDKUser, value: String, scheme: NDKEncryptionScheme) async throws -> String
-    
+
     // MARK: - Serialization
-    
+
     /// Unique identifier for this signer type
     static var signerType: String { get }
-    
+
     /// Serialize the signer's state to data for persistent storage
     func serialize() async throws -> Data
-    
+
     /// Deserialize a signer from stored data
     static func deserialize(_ data: Data, ndk: NDK?) throws -> Self
 }

@@ -13,16 +13,16 @@ public enum SessionData: Hashable {
 public struct NDKSessionConfiguration {
     /// Data requirements for the session
     public let dataRequirements: Set<SessionData>
-    
+
     /// Strategy for preloading data
     public let preloadStrategy: PreloadStrategy
-    
+
     public enum PreloadStrategy {
         case blocking       // Wait for all data before session ready
         case progressive    // Session ready with cache, update in background
         case lazy          // Load on demand
     }
-    
+
     /// Initialize with data requirements
     /// - Parameters:
     ///   - dataRequirements: Set of data to load (defaults to followList)
@@ -40,13 +40,13 @@ public struct NDKSessionConfiguration {
 public struct ReactiveFilter {
     /// Dependencies that trigger filter updates
     public let dependencies: Set<SessionData>
-    
+
     /// Builder function to create filter from session
     public let builder: (NDKSessionData) -> NDKFilter
-    
+
     /// Configuration for Web of Trust filtering
     public let wotConfig: WOTConfiguration?
-    
+
     /// Initialize reactive filter
     /// - Parameters:
     ///   - dependencies: Data dependencies
@@ -67,10 +67,10 @@ public struct ReactiveFilter {
 public struct WOTConfiguration {
     /// Minimum score required to pass filter
     public let minimumScore: Int
-    
+
     /// Whether to automatically include direct follows
     public let includeDirectFollows: Bool
-    
+
     /// Initialize WOT configuration
     /// - Parameters:
     ///   - minimumScore: Minimum connection score (default: 2)
@@ -90,7 +90,7 @@ public enum DataState<T>: Equatable where T: Equatable {
     case ready(T, fromCache: Bool)
     case updating(current: T, changes: T)
     case error(Error)
-    
+
     /// Whether data is available (ready or updating)
     public var isAvailable: Bool {
         switch self {
@@ -100,7 +100,7 @@ public enum DataState<T>: Equatable where T: Equatable {
             return false
         }
     }
-    
+
     /// Get current data if available
     public var data: T? {
         switch self {
@@ -112,7 +112,7 @@ public enum DataState<T>: Equatable where T: Equatable {
             return nil
         }
     }
-    
+
     public static func == (lhs: DataState<T>, rhs: DataState<T>) -> Bool {
         switch (lhs, rhs) {
         case (.loading, .loading):

@@ -3,7 +3,7 @@
 public protocol CacheObserver: AnyObject {
     /// Called when a new event matching the observer's filter is added to cache
     func handleEvent(_ event: NDKEvent) async
-    
+
     /// Called when a relay update is received (optional)
     func handleRelayUpdate(_ update: RelayUpdate) async
 }
@@ -18,11 +18,11 @@ public extension CacheObserver {
 /// Handle for managing observation lifecycle
 public struct ObservationHandle {
     private let cancellation: () async -> Void
-    
+
     public init(cancellation: @escaping () async -> Void) {
         self.cancellation = cancellation
     }
-    
+
     /// Stop observing cache changes
     public func cancel() async {
         await cancellation()
@@ -33,16 +33,16 @@ public struct ObservationHandle {
 struct WeakObserver: Hashable {
     weak var observer: CacheObserver?
     private let objectIdentifier: ObjectIdentifier
-    
+
     init(observer: CacheObserver) {
         self.observer = observer
         self.objectIdentifier = ObjectIdentifier(observer)
     }
-    
+
     static func == (lhs: WeakObserver, rhs: WeakObserver) -> Bool {
         lhs.objectIdentifier == rhs.objectIdentifier
     }
-    
+
     func hash(into hasher: inout Hasher) {
         hasher.combine(objectIdentifier)
     }
@@ -54,7 +54,7 @@ struct FilterSignature: Hashable {
     let authors: [String]?
     let ids: [String]?
     let tags: [String: [String]]?
-    
+
     init(from filter: NDKFilter) {
         self.kinds = filter.kinds?.sorted()
         self.authors = filter.authors?.sorted()
@@ -71,7 +71,7 @@ struct AggregationSignature: Hashable {
     let authors: [String]?
     let ids: [String]?
     let tagKeys: [String]?  // Only tag keys, not values, for grouping
-    
+
     init(from filter: NDKFilter) {
         self.kinds = filter.kinds?.sorted()
         self.authors = filter.authors?.sorted()

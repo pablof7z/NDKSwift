@@ -1,7 +1,7 @@
 import Foundation
 
 /// Utilities for working with Nostr event tags
-/// 
+///
 /// This file provides extensions and helpers for validating and extracting
 /// information from Nostr event tags according to various NIPs.
 
@@ -12,7 +12,7 @@ extension Tag {
     var isValid: Bool {
         guard !isEmpty else { return false }
         let tagType = self[0]
-        
+
         switch tagType {
         case "e", "p":
             // Event and pubkey tags must have 64-character hex IDs
@@ -30,22 +30,22 @@ extension Tag {
             return true
         }
     }
-    
+
     /// Returns the tag name (first element)
     var name: String? {
         return self.first
     }
-    
+
     /// Returns the primary value (second element)
     var value: String? {
         return count > 1 ? self[1] : nil
     }
-    
+
     /// Returns the relay hint (third element) if present
     var relayHint: String? {
         return count > 2 ? self[2] : nil
     }
-    
+
     /// Returns the marker (fourth element) if present
     var marker: String? {
         return count > 3 ? self[3] : nil
@@ -89,13 +89,13 @@ public struct DecodedNostrEntity {
 
 /// Content tagging utilities for NDK Swift
 public enum ContentTagger {
-    
+
     /// Result of parsing content without fetching entities
     public struct ParseResult {
         public let segments: [ParseSegment]
         public let tags: [Tag]
     }
-    
+
     /// A parsed segment with entity information but no fetched data
     public enum ParseSegment {
         case text(String)
@@ -104,13 +104,13 @@ public enum ContentTagger {
         case hashtag(String)
         case url(URL)
     }
-    
+
     /// Parse content into segments without fetching entities
     public static func parseContentSegments(from content: String) -> ParseResult {
         var segments: [ParseSegment] = []
         var tags: [Tag] = []
         var lastIndex = content.startIndex
-        
+
         // Combined regex for all entity types
         let patterns = [
             // Nostr entities: @npub, @nprofile, nostr:npub, etc.
@@ -120,29 +120,29 @@ public enum ContentTagger {
             // URLs
             (#"https?://[^\s<>"{}|\\^`\[\]]+"#, "url")
         ]
-        
+
         var allMatches: [(range: Range<String.Index>, type: String, value: String)] = []
-        
+
         // Collect all matches
         for (pattern, type) in patterns {
             guard let regex = try? NSRegularExpression(pattern: pattern, options: []) else { continue }
             let matches = regex.matches(in: content, options: [], range: NSRange(location: 0, length: content.utf16.count))
-            
+
             for match in matches {
                 if let range = Range(match.range, in: content) {
                     allMatches.append((range: range, type: type, value: String(content[range])))
                 }
             }
         }
-        
+
         // Sort matches by position
         allMatches.sort { $0.range.lowerBound < $1.range.lowerBound }
-        
+
         // Process matches and create segments
         for match in allMatches {
             // Skip if this match overlaps with previous match
             if match.range.lowerBound < lastIndex { continue }
-            
+
             // Add text segment before this match
             if lastIndex < match.range.lowerBound {
                 let textRange = lastIndex..<match.range.lowerBound
@@ -151,7 +151,7 @@ public enum ContentTagger {
                     segments.append(.text(text))
                 }
             }
-            
+
             // Process the match
             switch match.type {
             case "nostr":
@@ -160,7 +160,7 @@ public enum ContentTagger {
                 if let entity = components.last, !entity.isEmpty {
                     do {
                         let decoded = try decodeNostrEntity(entity)
-                        
+
                         switch decoded.type {
                         case "npub", "nprofile":
                             if let pubkey = decoded.pubkey {
@@ -193,26 +193,26 @@ public enum ContentTagger {
                         segments.append(.text(match.value))
                     }
                 }
-                
+
             case "hashtag":
                 let tag = String(match.value.dropFirst()) // Remove #
                 segments.append(.hashtag(tag))
                 tags.append(["t", tag.lowercased()]) // NIP-24: hashtags must be lowercase
-                
+
             case "url":
                 if let url = URL(string: match.value) {
                     segments.append(.url(url))
                 } else {
                     segments.append(.text(match.value))
                 }
-                
+
             default:
                 segments.append(.text(match.value))
             }
-            
+
             lastIndex = match.range.upperBound
         }
-        
+
         // Add remaining text
         if lastIndex < content.endIndex {
             let text = String(content[lastIndex...])
@@ -220,15 +220,15 @@ public enum ContentTagger {
                 segments.append(.text(text))
             }
         }
-        
+
         // If no matches found, entire content is text
         if segments.isEmpty {
             segments.append(.text(content))
         }
-        
+
         // Remove duplicate tags
         let uniqueTags = mergeTags([], tags)
-        
+
         return ParseResult(segments: segments, tags: uniqueTags)
     }
     /// Generate hashtags from content
@@ -528,12 +528,12 @@ extension NDKFilter {
     public mutating func addHashtagFilter(_ hashtags: String...) {
         addTagFilter("t", values: hashtags.map { $0.lowercased() })
     }
-    
+
     /// Adds a URL filter
     public mutating func addURLFilter(_ urls: String...) {
         addTagFilter("r", values: urls)
     }
-    
+
     /// Checks if this filter includes a specific tag type
     public func hasTagFilter(_ tagName: String) -> Bool {
         return tagFilter(tagName) != nil

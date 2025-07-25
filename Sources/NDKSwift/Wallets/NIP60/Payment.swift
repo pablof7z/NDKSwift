@@ -10,14 +10,14 @@ public enum MintFailureError: LocalizedError {
         amount: Int64,
         paymentProof: String
     )
-    
+
     public var errorDescription: String? {
         switch self {
         case .requiresUserIntervention(let op, let source, let dest, let amount, _):
             return "Failed to mint \(amount) sats at \(dest) after payment from \(source). Quote ID: \(op.quoteId)"
         }
     }
-    
+
     public var recoverySuggestion: String? {
         switch self {
         case .requiresUserIntervention:
@@ -28,9 +28,9 @@ public enum MintFailureError: LocalizedError {
 
 /// Functions for handling payment operations (Lightning, cross-mint transfers, and direct token transfers)
 public enum Payment {
-    
+
     // MARK: - Lightning Payments
-    
+
     /// Pay a Lightning invoice from the wallet
     public static func payLightning(
         wallet: NIP60Wallet,
@@ -42,10 +42,10 @@ public enum Payment {
         signer: NDKSigner
     ) async throws -> (preimage: String, feePaid: Int64?) {
         let invoiceAmount = amount
-        
+
         // Get mints with sufficient balance
         let viableMintURLs = await proofStateManager.getMintsWithSufficientBalance(amount: invoiceAmount)
-        
+
         for mintURL in viableMintURLs {
             do {
                 // Get mint with cached keysets
@@ -54,7 +54,7 @@ public enum Payment {
                     continue
                 }
                 let mint = try await wallet.mints.loadMint(url: mintUrl)
-                
+
                 return try await payLightningFromMint(
                     wallet: wallet,
                     invoice: invoice,
@@ -71,10 +71,10 @@ public enum Payment {
                 continue
             }
         }
-        
+
         throw NDKError.insufficientBalance(amount: invoiceAmount)
     }
-    
+
     /// Pay Lightning invoice from a specific mint
     private static func payLightningFromMint(
         wallet: NIP60Wallet,
@@ -92,34 +92,34 @@ public enum Payment {
             request: invoice,
             options: nil
         )
-        
+
         // Get melt quote from mint
         let response = try await CashuSwift.getQuote(
             mint: mint,
             quoteRequest: quoteRequest
         )
-        
+
         guard let quote = response as? CashuSwift.Bolt11.MeltQuote else {
             throw NDKError.walletError(message: "Unexpected melt quote response type")
         }
-        
+
         // Get available proofs for this mint
         let availableProofs = await proofStateManager.getAvailableProofs(mint: mintURL)
-        
+
         // Calculate total amount needed (invoice amount + fees)
         let lightningFee = Int64(quote.feeReserve)
         let inputFee = try CashuSwift.calculateFee(for: availableProofs, of: mint)
         let totalNeeded = amount + lightningFee + Int64(inputFee)
-        
+
         // Select proofs to cover the payment
         let selectedProofs = await proofStateManager.selectProofs(amount: totalNeeded, mint: mintURL)
         guard !selectedProofs.isEmpty else {
             throw NDKError.insufficientBalance(amount: totalNeeded)
         }
-        
+
         // Reserve proofs for this operation
         try await proofStateManager.reserveProofs(selectedProofs)
-        
+
         do {
             // Generate blank outputs for potential change
             let (outputs, blindingFactors, secrets) = try CashuSwift.generateBlankOutputs(
@@ -129,13 +129,13 @@ public enum Payment {
                 unit: "sat",
                 seed: nil
             )
-            
+
             let blankOutputs = (
                 outputs: outputs,
                 blindingFactors: blindingFactors,
                 secrets: secrets
             )
-            
+
             // Execute the melt operation
             let (paid, change, dleqValid) = try await CashuSwift.melt(
                 with: quote,
@@ -143,27 +143,27 @@ public enum Payment {
                 proofs: selectedProofs,
                 blankOutputs: blankOutputs
             )
-            
+
             // Check if payment was successful
             guard paid else {
                 throw NDKError.paymentFailed(reason: "Lightning payment was not successful")
             }
-            
+
             // Log DLEQ verification failure but continue
             if !dleqValid {
                 NDKLogger.log(.warning, category: .wallet, "⚠️ DLEQ verification failed but continuing since payment was successful. Mint: \(mintURL)")
             }
-            
+
             // Mark used proofs as deleted
             await proofStateManager.markProofsAsDeleted(selectedProofs)
-            
+
             // Add change proofs if any
             if let changeProofs = change {
                 for proof in changeProofs {
                     await proofStateManager.addProof(proof, mint: mintURL)
                 }
             }
-            
+
             // Update wallet state
             let stateChange = WalletStateChange(
                 store: change ?? [],
@@ -172,7 +172,7 @@ public enum Payment {
                 memo: StringConstants.Transactions.lightningPayment
             )
             let newEventIds = try await wallet.update(stateChange: stateChange)
-            
+
             // Create spending history
             try await eventManager.createSpendingHistoryEvent(
                 direction: .out,
@@ -183,19 +183,19 @@ public enum Payment {
                 redeemedEventId: nil,
                 signer: signer
             )
-            
+
             let actualFeePaid = lightningFee + Int64(inputFee)
             return (preimage: quote.quote, feePaid: actualFeePaid)
-            
+
         } catch {
             // Release reservation on failure
             await proofStateManager.releaseProofs(selectedProofs)
             throw error
         }
     }
-    
+
     // MARK: - Cross-Mint Transfers
-    
+
     /// Transfer tokens between mints using Lightning as a bridge
     public static func transferBetweenMints(
         wallet: NIP60Wallet,
@@ -214,24 +214,24 @@ public enum Payment {
         guard let destinationMint = mints[destinationMintURL.absoluteString] else {
             throw NDKError.invalidRequest("Destination mint not found in wallet")
         }
-        
+
         // Step 1: Create Lightning invoice at destination mint
         let mintQuoteRequest = CashuSwift.Bolt11.RequestMintQuote(
             unit: "sat",
             amount: Int(amount)
         )
-        
+
         let mintResponse = try await CashuSwift.getQuote(
             mint: destinationMint,
             quoteRequest: mintQuoteRequest
         )
-        
+
         guard let mintQuote = mintResponse as? CashuSwift.Bolt11.MintQuote else {
             throw NDKError.walletError(message: "Unexpected mint quote response type")
         }
-        
+
         let invoice = mintQuote.request
-        
+
         // Step 2: Pay invoice from source mint
         let (preimage, feePaid) = try await payLightning(
             wallet: wallet,
@@ -242,7 +242,7 @@ public enum Payment {
             eventManager: eventManager,
             signer: signer
         )
-        
+
         // Step 3: Mint new tokens at destination with retry logic
         let retryHandler = MintRetryHandler()
         let (newProofs, wasUserNotified) = try await retryHandler.retryMintWithBackoff(
@@ -254,7 +254,7 @@ public enum Payment {
                 NDKLogger.log(.info, category: .wallet, "⏳ Cross-mint transfer: Retry attempt \(attemptNumber) in \(Int(delay))s...")
             }
         )
-        
+
         // Check if user notification is required
         if wasUserNotified && newProofs.isEmpty {
             // Create a pending mint operation for user notification
@@ -267,7 +267,7 @@ public enum Payment {
                 createdAt: Date(),
                 lastAttemptAt: Date()
             )
-            
+
             throw MintFailureError.requiresUserIntervention(
                 pendingOperation: pendingOp,
                 sourceMint: sourceMintURL.absoluteString,
@@ -276,16 +276,16 @@ public enum Payment {
                 paymentProof: preimage
             )
         }
-        
+
         guard !newProofs.isEmpty else {
             throw NDKError.paymentFailed(reason: "Failed to mint tokens at destination after multiple retries")
         }
-        
+
         // Step 4: Update wallet state with new proofs
         for proof in newProofs {
             await proofStateManager.addProof(proof, mint: destinationMintURL.absoluteString)
         }
-        
+
         let stateChange = WalletStateChange(
             store: newProofs,
             destroy: [],
@@ -293,16 +293,16 @@ public enum Payment {
             memo: "Cross-mint transfer"
         )
         _ = try await wallet.update(stateChange: stateChange)
-        
+
         return PaymentTransferResult(
             proofs: newProofs,
             feePaid: feePaid ?? 0,
             preimage: preimage
         )
     }
-    
+
     // MARK: - Direct Token Transfers
-    
+
     /// Send P2PK-locked proofs to a recipient
     public static func sendP2PK(
         wallet: NIP60Wallet,
@@ -317,22 +317,22 @@ public enum Payment {
         guard let mint = mints[mintURL.absoluteString] else {
             throw NDKError.noMintAvailable("Mint not found: \(mintURL)")
         }
-        
+
         // Get available proofs for fee calculation
         let availableProofs = await proofStateManager.getAvailableProofs(mint: mintURL.absoluteString)
-        
+
         // Select proofs for the amount (with some extra for fees)
         let inputFee = try CashuSwift.calculateFee(for: availableProofs, of: mint)
         let totalNeeded = amount + Int64(inputFee)
-        
+
         let selectedProofs = await proofStateManager.selectProofs(amount: totalNeeded, mint: mintURL.absoluteString)
         guard !selectedProofs.isEmpty else {
             throw NDKError.insufficientBalance(amount: totalNeeded)
         }
-        
+
         // Reserve proofs for this operation
         try await proofStateManager.reserveProofs(selectedProofs)
-        
+
         do {
             // Use CashuSwift's send function with P2PK locking
             let (token, changeProofs, _) = try await CashuSwift.send(
@@ -343,22 +343,22 @@ public enum Payment {
                 memo: nil,
                 lockToPublicKey: recipientP2PK
             )
-            
+
             // Get the locked proofs from the token
             guard let lockedProofs = token.proofsByMint[mintURL.absoluteString] else {
                 throw NDKError.invalidProof("No proofs in created token")
             }
-            
+
             // Mark used proofs as deleted
             await proofStateManager.markProofsAsDeleted(selectedProofs)
-            
+
             // Add change proofs if any
             if !changeProofs.isEmpty {
                 for proof in changeProofs {
                     await proofStateManager.addProof(proof, mint: mintURL.absoluteString)
                 }
             }
-            
+
             // Update wallet state
             let stateChange = WalletStateChange(
                 store: changeProofs,
@@ -367,9 +367,9 @@ public enum Payment {
                 memo: "Send tokens"
             )
             _ = try await wallet.update(stateChange: stateChange)
-            
+
             return (proofs: lockedProofs, change: changeProofs)
-            
+
         } catch {
             // Release reservation on failure
             await proofStateManager.releaseProofs(selectedProofs)

@@ -32,7 +32,7 @@ public struct BlossomBlob: Codable, Sendable {
     public let size: Int64
     public let type: String?
     public let uploaded: Date
-    
+
     // Media metadata (calculated client-side for images)
     public let blurhash: String?
     public let dimensions: (width: Int, height: Int)?
@@ -54,19 +54,19 @@ public struct BlossomBlob: Codable, Sendable {
         self.blurhash = blurhash
         self.dimensions = dimensions
     }
-    
+
     /// Get dimensions as NIP-92 format string (e.g., "1920x1080")
     public var dimensionsString: String? {
         guard let dimensions = dimensions else { return nil }
         return "\(dimensions.width)x\(dimensions.height)"
     }
-    
+
     // Custom coding to handle tuple
     enum CodingKeys: String, CodingKey {
         case sha256, url, size, type, uploaded, blurhash
         case dimensionWidth, dimensionHeight
     }
-    
+
     public init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         sha256 = try container.decode(String.self, forKey: .sha256)
@@ -75,7 +75,7 @@ public struct BlossomBlob: Codable, Sendable {
         type = try container.decodeIfPresent(String.self, forKey: .type)
         uploaded = try container.decode(Date.self, forKey: .uploaded)
         blurhash = try container.decodeIfPresent(String.self, forKey: .blurhash)
-        
+
         if let width = try container.decodeIfPresent(Int.self, forKey: .dimensionWidth),
            let height = try container.decodeIfPresent(Int.self, forKey: .dimensionHeight) {
             dimensions = (width: width, height: height)
@@ -83,7 +83,7 @@ public struct BlossomBlob: Codable, Sendable {
             dimensions = nil
         }
     }
-    
+
     public func encode(to encoder: Encoder) throws {
         var container = encoder.container(keyedBy: CodingKeys.self)
         try container.encode(sha256, forKey: .sha256)
@@ -203,7 +203,7 @@ public struct BlossomAuth {
         }
 
         if let until = until {
-            tags.append(["until", String(Timestamp.from(until))]) 
+            tags.append(["until", String(Timestamp.from(until))])
         }
 
         let event = try await NDKEventBuilder(ndk: ndk)

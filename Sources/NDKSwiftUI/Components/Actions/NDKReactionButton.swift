@@ -32,29 +32,29 @@ import UIKit
 ///     .showCount(true)
 /// ```
 public struct NDKReactionButton: View {
-    
+
     // MARK: - Properties
-    
+
     private let event: NDKEvent
     private let reaction: String
     private let style: ButtonStyle
     private let showCount: Bool
     private let animateChanges: Bool
     private var onReactionChanged: ((Bool) -> Void)?
-    
+
     @Environment(\.ndk) private var ndk
     @StateObject private var reactionState: ReactionState
-    
+
     // MARK: - Supporting Types
-    
+
     public enum ButtonStyle {
         case standard       // Medium size with background
         case compact        // Small size, icon only
         case minimal        // Text-based, no background
     }
-    
+
     // MARK: - Initialization
-    
+
     /// Initialize a reaction button
     /// - Parameters:
     ///   - event: The event to react to
@@ -74,16 +74,16 @@ public struct NDKReactionButton: View {
         self.style = style
         self.showCount = showCount
         self.animateChanges = animateChanges
-        
+
         // Initialize reaction state
         self._reactionState = StateObject(wrappedValue: ReactionState(
             eventId: event.id,
             reaction: reaction
         ))
     }
-    
+
     // MARK: - Body
-    
+
     public var body: some View {
         Button(action: toggleReaction) {
             HStack(spacing: buttonSpacing) {
@@ -92,7 +92,7 @@ public struct NDKReactionButton: View {
                     .font(reactionFont)
                     .scaleEffect(reactionState.isReacted && animateChanges ? 1.2 : 1.0)
                     .animation(.spring(response: 0.3, dampingFraction: 0.6), value: reactionState.isReacted)
-                
+
                 // Count (if enabled and > 0)
                 if showCount && reactionState.count > 0 {
                     Text("\(reactionState.count)")
@@ -114,33 +114,33 @@ public struct NDKReactionButton: View {
             setupReactionObservation()
         }
     }
-    
+
     // MARK: - Private Methods
-    
+
     private func toggleReaction() {
         Task {
             guard let ndk = ndk else { return }
             await reactionState.toggleReaction(ndk: ndk, event: event)
             onReactionChanged?(reactionState.isReacted)
         }
-        
+
         // Haptic feedback
         #if canImport(UIKit)
         let impact = UIImpactFeedbackGenerator(style: .light)
         impact.impactOccurred()
         #endif
     }
-    
+
     private func setupReactionObservation() {
         guard let ndk = ndk else { return }
-        
+
         Task {
             await reactionState.startObserving(ndk: ndk)
         }
     }
-    
+
     // MARK: - Style Properties
-    
+
     private var buttonSpacing: CGFloat {
         switch style {
         case .standard: return 4
@@ -148,7 +148,7 @@ public struct NDKReactionButton: View {
         case .minimal: return 4
         }
     }
-    
+
     private var reactionFont: Font {
         switch style {
         case .standard: return .title3
@@ -156,7 +156,7 @@ public struct NDKReactionButton: View {
         case .minimal: return .body
         }
     }
-    
+
     private var countFont: Font {
         switch style {
         case .standard: return .caption
@@ -164,7 +164,7 @@ public struct NDKReactionButton: View {
         case .minimal: return .caption
         }
     }
-    
+
     private var buttonPadding: EdgeInsets {
         switch style {
         case .standard: return EdgeInsets(top: 6, leading: 8, bottom: 6, trailing: 8)
@@ -172,10 +172,10 @@ public struct NDKReactionButton: View {
         case .minimal: return EdgeInsets(top: 2, leading: 4, bottom: 2, trailing: 4)
         }
     }
-    
+
     private var backgroundColor: Color {
         switch style {
-        case .standard: 
+        case .standard:
             return reactionState.isReacted ? activeColor.opacity(OpacityConstants.subtle) : Color.ndkTertiaryBackground
         case .compact:
             return reactionState.isReacted ? activeColor.opacity(OpacityConstants.subtle) : Color.clear
@@ -183,7 +183,7 @@ public struct NDKReactionButton: View {
             return Color.clear
         }
     }
-    
+
     private var borderOverlay: some View {
         Group {
             if style == .standard {
@@ -192,7 +192,7 @@ public struct NDKReactionButton: View {
             }
         }
     }
-    
+
     private var cornerRadius: CGFloat {
         switch style {
         case .standard: return 16
@@ -200,7 +200,7 @@ public struct NDKReactionButton: View {
         case .minimal: return 8
         }
     }
-    
+
     private var activeColor: Color {
         // Different colors for different reactions
         switch reaction {
@@ -211,13 +211,13 @@ public struct NDKReactionButton: View {
         default: return .accentColor
         }
     }
-    
+
     private var inactiveColor: Color {
         .secondary
     }
-    
+
     // MARK: - Modifiers
-    
+
     /// Handle reaction state changes
     public func onReactionChanged(_ action: @escaping (Bool) -> Void) -> NDKReactionButton {
         var copy = self
@@ -231,67 +231,67 @@ public struct NDKReactionButton: View {
 /// Observable state for managing reaction data and interactions
 @MainActor
 private class ReactionState: ObservableObject {
-    
+
     @Published var isReacted: Bool = false
     @Published var count: Int = 0
     @Published var isLoading: Bool = false
-    
+
     private let eventId: String
     private let reaction: String
     private var reactionEventId: String?
     private var observationTask: Task<Void, Never>?
-    
+
     init(eventId: String, reaction: String) {
         self.eventId = eventId
         self.reaction = reaction
     }
-    
+
     deinit {
         observationTask?.cancel()
     }
-    
+
     func startObserving(ndk: NDK) async {
         // Cancel existing observation
         observationTask?.cancel()
-        
+
         observationTask = Task { [weak self] in
             await self?.observeReactions(ndk: ndk)
         }
     }
-    
+
     private func observeReactions(ndk: NDK) async {
         // Create filter for reaction events (kind:7) referencing our event
         let filter = NDKFilter(
             kinds: [7], // Reaction events
             tags: ["e": Set([eventId])] // Events that reference our event
         )
-        
+
         let dataSource = ndk.observe(
             filter: filter,
             maxAge: 0, // Real-time
             cachePolicy: .cacheWithNetwork
         )
-        
+
         // Process reaction events
         for await events in dataSource.$data.values {
             await updateReactionState(from: events, ndk: ndk)
         }
     }
-    
+
     private func updateReactionState(from events: [NDKEvent], ndk: NDK) async {
         var totalCount = 0
         var userReacted = false
         var userReactionEventId: String?
-        
+
         // Get current user's pubkey
         let userPubkey = try? await ndk.signer?.pubkey
-        
+
         // Process all reaction events
         for event in events {
             // Check if this reaction matches our emoji
             if event.content == reaction {
                 totalCount += 1
-                
+
                 // Check if this is the current user's reaction
                 if let userPubkey = userPubkey, event.pubkey == userPubkey {
                     userReacted = true
@@ -299,7 +299,7 @@ private class ReactionState: ObservableObject {
                 }
             }
         }
-        
+
         // Update state
         await MainActor.run {
             self.count = totalCount
@@ -307,13 +307,13 @@ private class ReactionState: ObservableObject {
             self.reactionEventId = userReactionEventId
         }
     }
-    
+
     func toggleReaction(ndk: NDK, event: NDKEvent) async {
         guard let signer = ndk.signer else { return }
-        
+
         isLoading = true
         defer { isLoading = false }
-        
+
         do {
             if isReacted {
                 // Remove reaction (delete the reaction event)
@@ -323,7 +323,7 @@ private class ReactionState: ObservableObject {
                         .content("Removing reaction")
                         .tag(["e", reactionEventId])
                         .build(signer: signer)
-                    
+
                     _ = try await ndk.publish(deleteEvent)
                 }
             } else {
@@ -334,7 +334,7 @@ private class ReactionState: ObservableObject {
                     .tag(["e", event.id])
                     .tag(["p", event.pubkey])
                     .build(signer: signer)
-                
+
                 _ = try await ndk.publish(reactionEvent)
             }
         } catch {
@@ -346,22 +346,22 @@ private class ReactionState: ObservableObject {
 // MARK: - Convenience Extensions
 
 public extension NDKReactionButton {
-    
+
     /// Create a like button (❤️)
     static func like(event: NDKEvent, style: ButtonStyle = .standard) -> NDKReactionButton {
         NDKReactionButton(event: event, reaction: "❤️", style: style)
     }
-    
+
     /// Create a repost button (🔄)
     static func repost(event: NDKEvent, style: ButtonStyle = .standard) -> NDKReactionButton {
         NDKReactionButton(event: event, reaction: "🔄", style: style)
     }
-    
+
     /// Create a fire button (🔥)
     static func fire(event: NDKEvent, style: ButtonStyle = .standard) -> NDKReactionButton {
         NDKReactionButton(event: event, reaction: "🔥", style: style)
     }
-    
+
     /// Create a thumbs up button (👍)
     static func thumbsUp(event: NDKEvent, style: ButtonStyle = .standard) -> NDKReactionButton {
         NDKReactionButton(event: event, reaction: "👍", style: style)
@@ -380,7 +380,7 @@ struct NDKReactionButton_Previews: PreviewProvider {
                 NDKReactionButton.like(event: mockEvent, style: .compact)
                 NDKReactionButton.like(event: mockEvent, style: .minimal)
             }
-            
+
             // Different reactions
             HStack(spacing: 16) {
                 NDKReactionButton.like(event: mockEvent)
@@ -392,11 +392,11 @@ struct NDKReactionButton_Previews: PreviewProvider {
         .padding()
         .environment(\.ndk, nil) // Mock environment
     }
-    
+
     // Mock event for preview
     private static let mockEvent = NDKEvent(
         id: "mock_id",
-        pubkey: "mock_pubkey", 
+        pubkey: "mock_pubkey",
         createdAt: Date.currentNostrTimestamp,
         kind: 1,
         tags: [],

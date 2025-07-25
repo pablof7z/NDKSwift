@@ -20,12 +20,12 @@ public struct NIP60WalletEvent {
         /// An existing transaction was updated
         case transactionUpdated(WalletTransaction)
     }
-    
+
     /// The type of event that occurred
     public let type: EventType
     /// When the event occurred
     public let timestamp: Date
-    
+
     init(type: EventType) {
         self.type = type
         self.timestamp = Date()
@@ -36,10 +36,10 @@ public struct NIP60WalletEvent {
 /// Provides a way to observe wallet state changes asynchronously
 public final class NIP60WalletEventStream: AsyncSequence {
     public typealias Element = NIP60WalletEvent
-    
+
     private let stream: AsyncStream<NIP60WalletEvent>
     private let continuation: AsyncStream<NIP60WalletEvent>.Continuation
-    
+
     init() {
         var savedContinuation: AsyncStream<NIP60WalletEvent>.Continuation?
         self.stream = AsyncStream { continuation in
@@ -47,15 +47,15 @@ public final class NIP60WalletEventStream: AsyncSequence {
         }
         self.continuation = savedContinuation!
     }
-    
+
     public func makeAsyncIterator() -> AsyncStream<NIP60WalletEvent>.AsyncIterator {
         stream.makeAsyncIterator()
     }
-    
+
     func yield(_ event: NIP60WalletEvent) {
         continuation.yield(event)
     }
-    
+
     func finish() {
         continuation.finish()
     }

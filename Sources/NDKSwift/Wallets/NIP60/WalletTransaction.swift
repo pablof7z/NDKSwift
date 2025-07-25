@@ -14,21 +14,21 @@ public struct WalletTransaction: Identifiable, Sendable {
     public let memo: String?
     public let mint: String?
     public let timestamp: Date
-    
+
     // Event tracking - which events are associated with this transaction
     public let events: TransactionEvents
-    
+
     // Lookup keys for finding this transaction
     public let lookupKeys: TransactionLookupKeys
-    
+
     // Type-specific data
     public let nutzapData: NutzapData?
     public let lightningData: LightningData?
     public let ecashTokenData: EcashTokenData?
-    
+
     // Error information for failed transactions
     public let errorDetails: String?
-    
+
     public init(
         id: String? = nil,
         type: WalletTransactionType,
@@ -60,7 +60,7 @@ public struct WalletTransaction: Identifiable, Sendable {
         self.ecashTokenData = ecashTokenData
         self.errorDetails = errorDetails
     }
-    
+
     /// Create a copy with updated fields
     public func with(
         status: TransactionStatus? = nil,
@@ -95,7 +95,7 @@ public struct TransactionEvents: Sendable {
     public let nutzapEventId: String?       // kind 9321
     public let tokenEventIds: [String]      // kind 7375
     public let quoteEventId: String?        // kind 7374
-    
+
     public init(
         spendingHistoryId: String? = nil,
         nutzapEventId: String? = nil,
@@ -107,13 +107,13 @@ public struct TransactionEvents: Sendable {
         self.tokenEventIds = tokenEventIds
         self.quoteEventId = quoteEventId
     }
-    
+
     /// Returns the primary event ID (most important event for this transaction)
     public var primaryEventId: String? {
         // Prefer spending history as it's the authoritative record
         return spendingHistoryId ?? nutzapEventId ?? tokenEventIds.first ?? quoteEventId
     }
-    
+
     /// All event IDs associated with this transaction
     public var allEventIds: [String] {
         var ids: [String] = []
@@ -134,7 +134,7 @@ public struct TransactionLookupKeys: Sendable {
     public let quoteId: String?            // For finding by mint quote
     public let paymentHash: String?        // For finding by Lightning invoice
     public let recipientPubkey: String?    // For finding outgoing nutzaps
-    
+
     public init(
         nutzapEventId: String? = nil,
         spendingHistoryId: String? = nil,
@@ -160,7 +160,7 @@ public enum WalletTransactionType: String, Sendable, CaseIterable {
     case nutzapSent = "nutzap_sent"       // Sent a nutzap
     case nutzapReceived = "nutzap_received"  // Received a nutzap
     case swap = "swap"           // Swap between mints
-    
+
     public var displayName: String {
         switch self {
         case .mint: return "Lightning Deposit"
@@ -172,7 +172,7 @@ public enum WalletTransactionType: String, Sendable, CaseIterable {
         case .swap: return "Mint Transfer"
         }
     }
-    
+
     public var icon: String {
         switch self {
         case .mint: return "bolt.fill"
@@ -209,7 +209,7 @@ public struct NutzapData: Sendable {
     public let nutzapEventId: String     // The 9321 event
     public let comment: String?
     public let eventBeingZapped: String? // Optional event ID being zapped
-    
+
     public init(
         senderPubkey: String? = nil,
         recipientPubkey: String? = nil,
@@ -230,7 +230,7 @@ public struct LightningData: Sendable {
     public let invoice: String
     public let preimage: String?
     public let feePaid: Int64?
-    
+
     public init(invoice: String, preimage: String? = nil, feePaid: Int64? = nil) {
         self.invoice = invoice
         self.preimage = preimage
@@ -242,7 +242,7 @@ public struct LightningData: Sendable {
 public struct EcashTokenData: Sendable {
     public let tokenString: String?  // For offline tokens
     public let proofCount: Int
-    
+
     public init(tokenString: String? = nil, proofCount: Int) {
         self.tokenString = tokenString
         self.proofCount = proofCount
@@ -260,13 +260,13 @@ extension WalletTransaction {
         case .neutral: return 0
         }
     }
-    
+
     /// A display-friendly description
     public var displayDescription: String {
         if let memo = memo, !memo.isEmpty {
             return memo
         }
-        
+
         // Type-specific descriptions
         switch type {
         case .nutzapReceived:
@@ -274,13 +274,13 @@ extension WalletTransaction {
                 return "From \(sender.prefix(8))..."
             }
             return "Nutzap received"
-            
+
         case .nutzapSent:
             if let recipient = nutzapData?.recipientPubkey {
                 return "To \(recipient.prefix(8))..."
             }
             return "Nutzap sent"
-            
+
         default:
             return type.displayName
         }
@@ -294,12 +294,12 @@ extension Array where Element == WalletTransaction {
     public func sortedByDate() -> [WalletTransaction] {
         self.sorted { $0.timestamp > $1.timestamp }
     }
-    
+
     /// Filter by transaction type
     public func filtered(by types: Set<WalletTransactionType>) -> [WalletTransaction] {
         self.filter { types.contains($0.type) }
     }
-    
+
     /// Filter by direction
     public func filtered(by direction: TransactionDirection) -> [WalletTransaction] {
         self.filter { $0.direction == direction }

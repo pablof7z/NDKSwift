@@ -140,7 +140,7 @@ public final class NDKPrivateKeySigner: NDKSigner {
         guard let privateKey = payload["privateKey"] else {
             throw NDKSignerRegistryError.deserializationError("Missing or invalid privateKey")
         }
-        
+
         return try NDKPrivateKeySigner(privateKey: privateKey)
     }
 }

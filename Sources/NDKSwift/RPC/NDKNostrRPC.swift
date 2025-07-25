@@ -127,13 +127,13 @@ public actor NDKNostrRPC {
 
         // Prepare target relays
         let targetRelayUrls = relayUrls.isEmpty ? nil : Set(relayUrls)
-        
+
         // Publish event
         let publishDescription = targetRelayUrls != nil ? "to specific relays: \(relayUrls)" : "to all connected relays"
         NDKLogger.log(.info, category: .auth, "Publishing \(publishDescription)")
-        
+
         let publishedRelays = try await ndk.publish(event, to: targetRelayUrls)
-        
+
         NDKLogger.log(.info, category: .auth, "Published to relays: \(publishedRelays.map { $0.url })")
 
         // If publishing to specific relays failed, try direct send as fallback
@@ -142,12 +142,12 @@ public actor NDKNostrRPC {
             await attemptDirectSend(event: event, to: relayUrls)
         }
     }
-    
+
     func sendRequest(to pubkey: String, method: String, params: [String], handler: ((NDKRPCResponse) -> Void)? = nil) async throws {
         let id = IDGenerator.randomId(length: 8)
-        
+
         try await sendRequestInternal(to: pubkey, method: method, params: params, id: id)
-        
+
         // If handler provided, call it when response arrives
         if let handler = handler {
             Task {
@@ -184,7 +184,7 @@ public actor NDKNostrRPC {
     private func waitForResponse(id: String) async throws -> NDKRPCResponse {
         return try await withCheckedThrowingContinuation { continuation in
             self.pendingRequests[id] = continuation
-            
+
             // Set up timeout
             setupTimeout(for: id, continuation: continuation)
         }
@@ -204,7 +204,7 @@ public actor NDKNostrRPC {
             continuation.resume(throwing: NDKError.timeout(operation: "RPC request", seconds: Int(NetworkConstants.timeoutRPCRequest)))
         }
     }
-    
+
     private func attemptDirectSend(event: NDKEvent, to relayUrls: [String]) async {
         for url in relayUrls {
             if let relay = (await ndk.relays).first(where: { $0.url == url }) {

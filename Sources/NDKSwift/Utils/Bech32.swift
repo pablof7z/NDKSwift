@@ -137,19 +137,19 @@ public extension Bech32 {
         guard let separatorIndex = string.lastIndex(of: "1") else {
             return false
         }
-        
+
         // HRP must not be empty
         let hrp = String(string[..<separatorIndex])
         guard !hrp.isEmpty else { return false }
-        
+
         // Data part must not be empty
         let dataString = String(string[string.index(after: separatorIndex)...])
         guard !dataString.isEmpty else { return false }
-        
+
         // Check if all characters after separator are in bech32 charset
         return dataString.allSatisfy { charset.contains($0) }
     }
-    
+
     /// Get the HRP (human readable part) from a bech32 string without full validation
     static func getHRP(_ string: String) -> String? {
         guard let separatorIndex = string.lastIndex(of: "1") else {
