@@ -364,7 +364,7 @@ actor InternalSubscription {
         do {
             return try JSONCoding.serializeToString(message)
         } catch {
-            NDKLogger.log(.error, category: .subscription, "Failed to create REQ message: \(error)")
+            NDKLogger.log(.error, category: .subscription, ErrorMessageConstants.failedTo("create REQ message") + ": \(error)")
             return ""
         }
     }
@@ -376,7 +376,7 @@ actor InternalSubscription {
         do {
             return try JSONCoding.serializeToString(message)
         } catch {
-            NDKLogger.log(.error, category: .subscription, "Failed to create CLOSE message: \(error)")
+            NDKLogger.log(.error, category: .subscription, ErrorMessageConstants.failedTo("create CLOSE message") + ": \(error)")
             return ""
         }
     }

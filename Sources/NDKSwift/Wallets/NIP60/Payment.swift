@@ -14,7 +14,7 @@ public enum MintFailureError: LocalizedError {
     public var errorDescription: String? {
         switch self {
         case .requiresUserIntervention(let op, let source, let dest, let amount, _):
-            return "Failed to mint \(amount) sats at \(dest) after payment from \(source). Quote ID: \(op.quoteId)"
+            return "\(ErrorMessageConstants.failedTo("mint \(amount) sats at \(dest)")) after payment from \(source). Quote ID: \(op.quoteId)"
         }
     }
 
@@ -67,7 +67,7 @@ public enum Payment {
                 )
             } catch {
                 // Try next mint if this one fails
-                NDKLogger.log(.warning, category: .wallet, "Failed to pay from mint \(mintURL): \(error)")
+                NDKLogger.log(.warning, category: .wallet, "\(ErrorMessageConstants.failedTo("pay from mint \(mintURL)")): \(error)")
                 continue
             }
         }
@@ -278,7 +278,7 @@ public enum Payment {
         }
 
         guard !newProofs.isEmpty else {
-            throw NDKError.paymentFailed(reason: "Failed to mint tokens at destination after multiple retries")
+            throw NDKError.paymentFailed(reason: ErrorMessageConstants.failedTo("mint tokens at destination after multiple retries"))
         }
 
         // Step 4: Update wallet state with new proofs
