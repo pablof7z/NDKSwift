@@ -63,7 +63,7 @@ struct NutsackApp: App {
         
         // Load enabled categories
         if let categoriesData = defaults.data(forKey: "ndkEnabledCategories"),
-           let categoryStrings = try? JSONDecoder().decode(Set<String>.self, from: categoriesData) {
+           let categoryStrings = JSONCoding.safeDecode(Set<String>.self, from: categoriesData) {
             let categories = Set(categoryStrings.compactMap { NDKLogCategory(rawValue: $0) })
             NDKLogger.enabledCategories = categories
         }

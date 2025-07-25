@@ -189,7 +189,7 @@ struct DebugLoggingView: View {
         NDKLogger.prettyPrintNetworkMessages = prettyPrintNetworkMessages
         
         // Load enabled categories
-        if let categories = try? JSONDecoder().decode(Set<String>.self, from: enabledCategoriesData) {
+        if let categories = JSONCoding.safeDecode(Set<String>.self, from: enabledCategoriesData) {
             enabledCategories = Set(categories.compactMap { rawValue in
                 NDKLogCategory(rawValue: rawValue)
             })
@@ -209,7 +209,7 @@ struct DebugLoggingView: View {
         
         // Save to UserDefaults
         let categoryStrings = enabledCategories.map { $0.rawValue }
-        if let data = try? JSONEncoder().encode(categoryStrings) {
+        if let data = try? JSONCoding.encode(categoryStrings) {
             enabledCategoriesData = data
         }
     }

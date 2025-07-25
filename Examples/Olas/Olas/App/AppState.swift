@@ -130,7 +130,7 @@ class AppState: ObservableObject {
                 
                 let events = await dataSource.collect(timeout: 3.0)
                 if let event = events.mostRecent,
-                   let profile = try? JSONDecoder().decode(NDKUserProfile.self, from: event.content.data(using: .utf8) ?? Data()) {
+                   let profile = JSONCoding.safeDecode(NDKUserProfile.self, from: event.content) {
                     await MainActor.run {
                         self.currentUserProfile = profile
                     }
