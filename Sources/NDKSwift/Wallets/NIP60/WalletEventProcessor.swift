@@ -35,7 +35,7 @@ actor WalletEventProcessor {
                 NDKLogger.log(.warning, category: .wallet, "No handler for event kind \(event.kind)")
             }
         } catch {
-            NDKLogger.log(.error, category: .wallet, "Failed to process wallet event \(event.id): \(error)")
+            NDKLogger.log(.error, category: .wallet, "\(ErrorMessageConstants.failedTo("process wallet event \(event.id)")): \(error)")
         }
     }
 

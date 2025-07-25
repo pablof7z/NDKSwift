@@ -89,7 +89,7 @@ public actor MintFailureHandler {
             do {
                 try await wallet.blacklistMint(operation.mintURL)
             } catch {
-                NDKLogger.log(.error, category: .wallet, "Failed to blacklist mint: \(error)")
+                NDKLogger.log(.error, category: .wallet, "\(ErrorMessageConstants.failedTo("blacklist mint")): \(error)")
             }
 
             // Log the failed operation for potential manual recovery
@@ -138,7 +138,7 @@ public actor MintFailureHandler {
             do {
                 try await wallet.blacklistMint(operation.mintURL)
             } catch {
-                NDKLogger.log(.error, category: .wallet, "Failed to blacklist mint after deposit failure: \(error)")
+                NDKLogger.log(.error, category: .wallet, "\(ErrorMessageConstants.failedTo("blacklist mint after deposit failure")): \(error)")
             }
 
         case .cancel:

@@ -138,7 +138,7 @@ public actor NDKNostrRPC {
 
         // If publishing to specific relays failed, try direct send as fallback
         if !relayUrls.isEmpty && publishedRelays.isEmpty {
-            NDKLogger.log(.warning, category: .auth, "Failed to publish to any relay! Attempting direct send fallback...")
+            NDKLogger.log(.warning, category: .auth, "\(ErrorMessageConstants.failedTo("publish to any relay"))! Attempting direct send fallback...")
             await attemptDirectSend(event: event, to: relayUrls)
         }
     }

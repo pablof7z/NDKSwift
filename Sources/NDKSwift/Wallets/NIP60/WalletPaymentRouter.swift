@@ -81,7 +81,7 @@ actor WalletPaymentRouter {
             // Perform the transfer
             guard let sourceURL = URL(string: sourceMint),
                   let targetURL = URL(string: targetMint) else {
-                throw NDKError.invalidRequest("Invalid mint URLs for transfer")
+                throw NDKError.invalidRequest(ErrorMessageConstants.invalid("mint URLs for transfer"))
             }
 
             let result = try await CrossMintTransfer.transferBetweenMints(
