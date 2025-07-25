@@ -316,7 +316,11 @@ public class NDKLightningZapProtocol: NDKZapProtocol {
         let zapRequestJSON = try zapRequest.encodeForCallback()
 
         // Build callback URL with parameters
-        var components = URLComponents(url: URL(string: endpoint.callback)!, resolvingAgainstBaseURL: false)!
+        guard let callbackURL = URL(string: endpoint.callback),
+              var components = URLComponents(url: callbackURL, resolvingAgainstBaseURL: false) else {
+            throw ZapError.invoiceFetchFailed("Invalid callback URL: \(endpoint.callback)")
+        }
+        
         components.queryItems = [
             URLQueryItem(name: "amount", value: String(amountMillisats)),
             URLQueryItem(name: "nostr", value: zapRequestJSON)
