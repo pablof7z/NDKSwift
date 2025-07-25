@@ -45,7 +45,7 @@ final class BlossomClientMetadataTests: XCTestCase {
             uploaded: Int64(Date().timeIntervalSince1970)
         )
         
-        mockURLSession.data = try JSONEncoder().encode(uploadResponse)
+        mockURLSession.data = try JSONCoding.encoder.encode(uploadResponse)
         mockURLSession.response = HTTPURLResponse(
             url: URL(string: "https://example.com/upload")!,
             statusCode: 201,
@@ -88,7 +88,7 @@ final class BlossomClientMetadataTests: XCTestCase {
             uploaded: Int64(Date().timeIntervalSince1970)
         )
         
-        mockURLSession.data = try JSONEncoder().encode(uploadResponse)
+        mockURLSession.data = try JSONCoding.encoder.encode(uploadResponse)
         mockURLSession.response = HTTPURLResponse(
             url: URL(string: "https://example.com/upload")!,
             statusCode: 201,
@@ -124,7 +124,7 @@ final class BlossomClientMetadataTests: XCTestCase {
             uploaded: Int64(Date().timeIntervalSince1970)
         )
         
-        mockURLSession.data = try JSONEncoder().encode(uploadResponse)
+        mockURLSession.data = try JSONCoding.encoder.encode(uploadResponse)
         mockURLSession.response = HTTPURLResponse(
             url: URL(string: "https://example.com/upload")!,
             statusCode: 201,
@@ -163,7 +163,7 @@ final class BlossomClientMetadataTests: XCTestCase {
             uploaded: Int64(Date().timeIntervalSince1970)
         )
         
-        mockURLSession.data = try JSONEncoder().encode(uploadResponse)
+        mockURLSession.data = try JSONCoding.encoder.encode(uploadResponse)
         mockURLSession.response = HTTPURLResponse(
             url: URL(string: "https://example.com/upload")!,
             statusCode: 201,
@@ -212,7 +212,7 @@ final class BlossomClientMetadataTests: XCTestCase {
             uploaded: Int64(Date().timeIntervalSince1970)
         )
         
-        mockURLSession.data = try JSONEncoder().encode(uploadResponse)
+        mockURLSession.data = try JSONCoding.encoder.encode(uploadResponse)
         mockURLSession.response = HTTPURLResponse(
             url: URL(string: "https://example.com/upload")!,
             statusCode: 201,

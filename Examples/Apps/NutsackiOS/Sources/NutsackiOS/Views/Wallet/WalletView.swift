@@ -169,7 +169,9 @@ struct WalletView: View {
                 }
             }
             .fullScreenCover(isPresented: $showWalletOnboarding) {
-                WalletOnboardingView()
+                WalletOnboardingView(authMode: .none)
+                    .environment(nostrManager)
+                    .environment(walletManager)
                     .onDisappear {
                         // Reload wallet after onboarding
                         Task {

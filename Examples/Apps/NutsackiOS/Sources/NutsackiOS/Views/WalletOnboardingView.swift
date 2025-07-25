@@ -9,13 +9,14 @@ struct WalletOnboardingView: View {
     @Environment(\.colorScheme) private var colorScheme
     
     enum AuthMode {
+        case none
         case create
         case `import`
     }
     
     let authMode: AuthMode
     
-    @State private var currentStep = -1 // Start at -1 for auth forms
+    @State private var currentStep: Int
     @State private var logoScale: CGFloat = 0.3
     @State private var logoOpacity: Double = 0
     @State private var logoRotation: Double = -180
@@ -44,6 +45,14 @@ struct WalletOnboardingView: View {
     @State private var showPassword = false
     @State private var isProcessing = false
     @State private var showScanner = false
+    @State private var authError: String?
+    @State private var showAuthError = false
+    
+    init(authMode: AuthMode = .none) {
+        self.authMode = authMode
+        // Start at -1 for auth forms if authMode is not .none
+        self._currentStep = State(initialValue: authMode == .none ? 0 : -1)
+    }
     
     private var currentTitle: String {
         switch currentStep {
@@ -208,7 +217,7 @@ struct WalletOnboardingView: View {
                                     insertion: .move(edge: .trailing).combined(with: .opacity),
                                     removal: .move(edge: .leading).combined(with: .opacity)
                                 ))
-                        } else {
+                        } else if authMode == .import {
                             importAccountForm
                                 .transition(.asymmetric(
                                     insertion: .move(edge: .trailing).combined(with: .opacity),
@@ -253,7 +262,10 @@ struct WalletOnboardingView: View {
                 
                 // Action buttons
                 VStack(spacing: 16) {
-                    if currentStep == 0 {
+                    if currentStep == -1 {
+                        // Auth form buttons - handled within forms
+                        EmptyView()
+                    } else if currentStep == 0 {
                         // Continue button
                         Button(action: {
                             withAnimation(.spring(response: 0.5, dampingFraction: 0.8)) {
@@ -407,6 +419,17 @@ struct WalletOnboardingView: View {
         } message: {
             Text(setupError ?? "Failed to setup wallet")
         }
+        .alert("Error", isPresented: $showAuthError) {
+            Button("OK") { }
+        } message: {
+            Text(authError ?? "An error occurred")
+        }
+        .sheet(isPresented: $showScanner) {
+            QRScannerView { scannedValue in
+                nsecInput = scannedValue
+                showScanner = false
+            }
+        }
     }
     
     private func animateOnboarding() {
@@ -494,6 +517,271 @@ struct WalletOnboardingView: View {
                     setupError = error.localizedDescription
                     showError = true
                     isSettingUpWallet = false
+                }
+            }
+        }
+    }
+    
+    // MARK: - Auth Forms
+    
+    @ViewBuilder
+    private var createAccountForm: some View {
+        VStack(spacing: 20) {
+            // Form fields
+            VStack(spacing: 20) {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Display Name")
+                        .font(.system(size: 14, weight: .medium))
+                        .foregroundColor(Color.white.opacity(0.8))
+                    
+                    TextField("", text: $displayName)
+                        .textFieldStyle(DarkTextFieldStyle())
+                        .textContentType(.name)
+                }
+                
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("About (optional)")
+                        .font(.system(size: 14, weight: .medium))
+                        .foregroundColor(Color.white.opacity(0.8))
+                    
+                    TextField("", text: $about, axis: .vertical)
+                        .textFieldStyle(DarkTextFieldStyle())
+                        .lineLimit(3...6)
+                }
+                
+                Text("This information will be public on Nostr")
+                    .font(.system(size: 12))
+                    .foregroundColor(Color.white.opacity(0.4))
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            
+            Spacer()
+            
+            // Create button
+            Button(action: createAccount) {
+                if isProcessing {
+                    ProgressView()
+                        .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                } else {
+                    HStack {
+                        Image(systemName: "bolt.fill")
+                        Text("Create Wallet")
+                            .fontWeight(.semibold)
+                    }
+                }
+            }
+            .frame(maxWidth: .infinity)
+            .frame(height: 56)
+            .background(
+                LinearGradient(
+                    gradient: Gradient(colors: [
+                        displayName.isEmpty ? Color.gray : Color.orange,
+                        displayName.isEmpty ? Color.gray.opacity(0.8) : Color(red: 0.9, green: 0.5, blue: 0.1)
+                    ]),
+                    startPoint: .leading,
+                    endPoint: .trailing
+                )
+            )
+            .foregroundColor(.white)
+            .clipShape(RoundedRectangle(cornerRadius: 16))
+            .shadow(color: displayName.isEmpty ? Color.clear : Color.orange.opacity(0.3), radius: 10, x: 0, y: 4)
+            .disabled(displayName.isEmpty || isProcessing)
+        }
+    }
+    
+    @ViewBuilder
+    private var importAccountForm: some View {
+        VStack(spacing: 20) {
+            // Form fields
+            VStack(spacing: 20) {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Private Key")
+                        .font(.system(size: 14, weight: .medium))
+                        .foregroundColor(Color.white.opacity(0.8))
+                    
+                    HStack(spacing: 12) {
+                        HStack {
+                            if showPassword {
+                                TextField("nsec1...", text: $nsecInput)
+                                    .textContentType(.password)
+                                    #if os(iOS)
+                                    .textInputAutocapitalization(.never)
+                                    #endif
+                                    .font(.system(.body, design: .monospaced))
+                            } else {
+                                SecureField("nsec1...", text: $nsecInput)
+                                    .textContentType(.password)
+                                    #if os(iOS)
+                                    .textInputAutocapitalization(.never)
+                                    #endif
+                                    .font(.system(.body, design: .monospaced))
+                            }
+                            
+                            Button(action: { showPassword.toggle() }) {
+                                Image(systemName: showPassword ? "eye.slash.fill" : "eye.fill")
+                                    .font(.callout)
+                                    .foregroundColor(Color.white.opacity(0.6))
+                            }
+                        }
+                        .padding(16)
+                        .background(Color.white.opacity(0.08))
+                        .foregroundColor(.white)
+                        .accentColor(.orange)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 12)
+                                .stroke(Color.white.opacity(0.2), lineWidth: 1)
+                        )
+                        .clipShape(RoundedRectangle(cornerRadius: 12))
+                        
+                        Button(action: { showScanner = true }) {
+                            ZStack {
+                                RoundedRectangle(cornerRadius: 12)
+                                    .fill(Color.white.opacity(0.08))
+                                    .frame(width: 50, height: 50)
+                                    .overlay(
+                                        RoundedRectangle(cornerRadius: 12)
+                                            .stroke(Color.white.opacity(0.2), lineWidth: 1)
+                                    )
+                                
+                                Image(systemName: "qrcode.viewfinder")
+                                    .font(.title2)
+                                    .foregroundColor(.orange)
+                            }
+                        }
+                    }
+                    
+                    HStack {
+                        Image(systemName: "lock.shield.fill")
+                            .font(.caption)
+                            .foregroundColor(Color.white.opacity(0.4))
+                        
+                        Text("Your key is stored securely on this device")
+                            .font(.caption)
+                            .foregroundColor(Color.white.opacity(0.4))
+                    }
+                    .padding(.top, 4)
+                }
+            }
+            
+            Spacer()
+            
+            // Login button
+            Button(action: importAccount) {
+                if isProcessing {
+                    HStack(spacing: 12) {
+                        ProgressView()
+                            .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                            .scaleEffect(0.9)
+                        
+                        Text("Logging in...")
+                            .fontWeight(.semibold)
+                    }
+                } else {
+                    HStack {
+                        Image(systemName: "arrow.right.circle.fill")
+                        Text("Log In")
+                            .fontWeight(.semibold)
+                    }
+                }
+            }
+            .foregroundColor(.white)
+            .frame(maxWidth: .infinity)
+            .frame(height: 56)
+            .background(
+                LinearGradient(
+                    gradient: Gradient(colors: [
+                        nsecInput.isEmpty ? Color.gray : Color.orange,
+                        nsecInput.isEmpty ? Color.gray.opacity(0.8) : Color(red: 0.9, green: 0.5, blue: 0.1)
+                    ]),
+                    startPoint: .leading,
+                    endPoint: .trailing
+                )
+            )
+            .clipShape(RoundedRectangle(cornerRadius: 16))
+            .shadow(color: nsecInput.isEmpty ? Color.clear : Color.orange.opacity(0.3), radius: 10, x: 0, y: 4)
+            .disabled(nsecInput.isEmpty || isProcessing)
+        }
+    }
+    
+    // MARK: - Auth Actions
+    
+    private func createAccount() {
+        guard !displayName.isEmpty else { return }
+        
+        isProcessing = true
+        
+        Task {
+            do {
+                _ = try await nostrManager.createNewAccount(
+                    displayName: displayName,
+                    about: about.isEmpty ? nil : about
+                )
+                
+                await MainActor.run {
+                    isProcessing = false
+                    // Transition to welcome step
+                    withAnimation(.spring(response: 0.8, dampingFraction: 0.8)) {
+                        currentStep = 0
+                    }
+                    setupMintDiscovery()
+                }
+            } catch {
+                await MainActor.run {
+                    authError = error.localizedDescription
+                    showAuthError = true
+                    isProcessing = false
+                }
+            }
+        }
+    }
+    
+    private func importAccount() {
+        isProcessing = true
+        
+        Task {
+            do {
+                let signer = try NDKPrivateKeySigner(nsec: nsecInput)
+                let pubkey = try await signer.pubkey
+                
+                var displayName = "Nostr User"
+                
+                if let ndk = nostrManager.ndk {
+                    let profileDataSource = ndk.observe(
+                        filter: NDKFilter(
+                            authors: [pubkey],
+                            kinds: [0]
+                        ),
+                        maxAge: 3600,
+                        cachePolicy: .cacheWithNetwork
+                    )
+                    
+                    for await event in profileDataSource.events {
+                        if let profileData = event.content.data(using: .utf8),
+                           let profile = JSONCoding.safeDecode(NDKUserProfile.self, from: profileData) {
+                            displayName = profile.displayName ?? profile.name ?? "Nostr User"
+                            break
+                        }
+                    }
+                }
+                
+                let _ = try await nostrManager.createAccountFromNsec(
+                    nsecInput,
+                    displayName: displayName
+                )
+                
+                await MainActor.run {
+                    isProcessing = false
+                    // Transition to welcome step
+                    withAnimation(.spring(response: 0.8, dampingFraction: 0.8)) {
+                        currentStep = 0
+                    }
+                    setupMintDiscovery()
+                }
+            } catch {
+                await MainActor.run {
+                    authError = error.localizedDescription
+                    showAuthError = true
+                    isProcessing = false
                 }
             }
         }
@@ -959,7 +1247,7 @@ struct MintSelectionView: View {
     }
     
     private func removeMint(_ url: String) {
-        withAnimation(.easeInOut(duration: 0.2)) {
+        _ = withAnimation(.easeInOut(duration: 0.2)) {
             selectedMints.remove(url)
         }
     }

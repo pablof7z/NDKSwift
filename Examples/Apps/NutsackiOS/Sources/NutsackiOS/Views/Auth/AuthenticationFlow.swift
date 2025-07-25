@@ -42,17 +42,13 @@ struct AuthenticationFlow: View {
     @State private var errorMessage = ""
     @State private var showScanner = false
     
-    // Onboarding states
-    @State private var onboardingStep = 0
-    @State private var selectedRelays: Set<String> = []
-    @State private var selectedMints: Set<String> = []
-    @State private var discoveredMints: [DiscoveredMint] = []
-    @State private var isDiscoveringMints = false
+    // Wallet onboarding sheet
+    @State private var showWalletOnboarding = false
+    @State private var walletOnboardingAuthMode: WalletOnboardingView.AuthMode = .none
     
     enum FlowState {
         case splash
         case auth
-        case onboarding
         case complete
     }
     
@@ -112,6 +108,17 @@ struct AuthenticationFlow: View {
                 showScanner = false
             }
         }
+        .fullScreenCover(isPresented: $showWalletOnboarding) {
+            WalletOnboardingView(authMode: walletOnboardingAuthMode)
+                .environment(nostrManager)
+                .environment(walletManager)
+                .onDisappear {
+                    // If wallet onboarding completes, dismiss the whole auth flow
+                    if walletManager.isWalletConfigured {
+                        dismiss()
+                    }
+                }
+        }
     }
     
     // MARK: - Computed Properties
@@ -122,8 +129,6 @@ struct AuthenticationFlow: View {
             return authMode == .none ? 400 : 120
         case .auth:
             return 120
-        case .onboarding:
-            return 100
         case .complete:
             return 0
         }
@@ -140,8 +145,6 @@ struct AuthenticationFlow: View {
             }
         case .auth:
             authForms
-        case .onboarding:
-            onboardingContent
         case .complete:
             EmptyView()
         }
@@ -417,160 +420,7 @@ struct AuthenticationFlow: View {
         }
     }
     
-    @ViewBuilder
-    private var onboardingContent: some View {
-        VStack(spacing: 0) {
-            // Step indicator
-            HStack(spacing: 12) {
-                ForEach(0..<3) { step in
-                    Capsule()
-                        .fill(onboardingStep >= step ? Color.orange : Color.white.opacity(0.2))
-                        .frame(width: onboardingStep == step ? 32 : 16, height: 4)
-                        .animation(.easeInOut(duration: 0.3), value: onboardingStep)
-                }
-            }
-            .padding(.top, 10)
-            .padding(.bottom, 30)
-            
-            // Step content
-            Group {
-                switch onboardingStep {
-                case 0:
-                    WelcomeStepView()
-                case 1:
-                    RelaySelectionView(
-                        selectedRelays: $selectedRelays,
-                        suggestedRelays: suggestedRelays
-                    )
-                case 2:
-                    MintSelectionView(
-                        selectedMints: $selectedMints,
-                        discoveredMints: discoveredMints,
-                        isDiscoveringMints: isDiscoveringMints
-                    )
-                default:
-                    EmptyView()
-                }
-            }
-            .transition(.asymmetric(
-                insertion: .move(edge: .trailing).combined(with: .opacity),
-                removal: .move(edge: .leading).combined(with: .opacity)
-            ))
-            
-            Spacer()
-            
-            // Navigation buttons
-            onboardingButtons
-                .padding(.horizontal, 24)
-                .padding(.bottom, 40)
-        }
-        .padding(.horizontal, 24)
-    }
     
-    @ViewBuilder
-    private var onboardingButtons: some View {
-        VStack(spacing: 16) {
-            if onboardingStep == 0 {
-                Button(action: {
-                    withAnimation(.spring(response: 0.5, dampingFraction: 0.8)) {
-                        onboardingStep = 1
-                        updateHeaderForOnboarding()
-                    }
-                }) {
-                    HStack {
-                        Text("Continue")
-                            .font(.system(size: 18, weight: .semibold))
-                        Image(systemName: "arrow.right")
-                            .font(.system(size: 16, weight: .semibold))
-                    }
-                    .frame(maxWidth: .infinity)
-                    .frame(height: 56)
-                    .background(primaryButtonGradient)
-                    .foregroundColor(.white)
-                    .clipShape(RoundedRectangle(cornerRadius: 16))
-                    .shadow(color: Color.orange.opacity(0.3), radius: 10, x: 0, y: 4)
-                }
-                
-                Button(action: logout) {
-                    Text("Logout")
-                        .font(.system(size: 16, weight: .medium))
-                        .foregroundColor(Color.white.opacity(0.6))
-                }
-            } else if onboardingStep == 1 {
-                Button(action: {
-                    withAnimation(.spring(response: 0.5, dampingFraction: 0.8)) {
-                        onboardingStep = 2
-                        updateHeaderForOnboarding()
-                    }
-                }) {
-                    HStack {
-                        Text("Next: Select Mints")
-                            .font(.system(size: 18, weight: .semibold))
-                        Image(systemName: "arrow.right")
-                            .font(.system(size: 16, weight: .semibold))
-                    }
-                    .frame(maxWidth: .infinity)
-                    .frame(height: 56)
-                    .background(
-                        selectedRelays.isEmpty 
-                            ? LinearGradient(gradient: Gradient(colors: [Color.gray]), startPoint: .leading, endPoint: .trailing)
-                            : primaryButtonGradient
-                    )
-                    .foregroundColor(.white)
-                    .clipShape(RoundedRectangle(cornerRadius: 16))
-                    .shadow(color: selectedRelays.isEmpty ? Color.clear : Color.orange.opacity(0.3), radius: 10, x: 0, y: 4)
-                }
-                .disabled(selectedRelays.isEmpty)
-                
-                Button(action: {
-                    withAnimation(.spring(response: 0.5, dampingFraction: 0.8)) {
-                        onboardingStep = 0
-                        updateHeaderForOnboarding()
-                    }
-                }) {
-                    Text("Back")
-                        .font(.system(size: 16, weight: .medium))
-                        .foregroundColor(Color.white.opacity(0.6))
-                }
-            } else if onboardingStep == 2 {
-                Button(action: setupWallet) {
-                    if isProcessing {
-                        ProgressView()
-                            .progressViewStyle(CircularProgressViewStyle(tint: .white))
-                            .frame(maxWidth: .infinity)
-                            .frame(height: 56)
-                            .background(primaryButtonGradient)
-                            .clipShape(RoundedRectangle(cornerRadius: 16))
-                    } else {
-                        HStack {
-                            Image(systemName: "checkmark.circle.fill")
-                                .font(.system(size: 20))
-                            Text("Complete Setup")
-                                .font(.system(size: 18, weight: .semibold))
-                        }
-                        .frame(maxWidth: .infinity)
-                        .frame(height: 56)
-                        .background(primaryButtonGradient)
-                        .foregroundColor(.white)
-                        .clipShape(RoundedRectangle(cornerRadius: 16))
-                        .shadow(color: Color.orange.opacity(0.3), radius: 10, x: 0, y: 4)
-                    }
-                }
-                .disabled(selectedRelays.isEmpty || isProcessing)
-                
-                Button(action: {
-                    withAnimation(.spring(response: 0.5, dampingFraction: 0.8)) {
-                        onboardingStep = 1
-                        updateHeaderForOnboarding()
-                    }
-                }) {
-                    Text("Back")
-                        .font(.system(size: 16, weight: .medium))
-                        .foregroundColor(Color.white.opacity(0.7))
-                }
-            }
-        }
-    }
     
     // MARK: - Background Views
     
@@ -700,6 +550,7 @@ struct AuthenticationFlow: View {
                 logoPosition = CGPoint(x: 0, y: 0)
                 titleText = "NUTSACK"
                 titleSize = 52
+                titleOffset = 0  // Reset title offset
                 sloganOpacity = 1
                 contentOpacity = 0
                 
@@ -712,18 +563,6 @@ struct AuthenticationFlow: View {
         }
     }
     
-    private func updateHeaderForOnboarding() {
-        switch onboardingStep {
-        case 0:
-            titleText = "SETUP"
-        case 1:
-            titleText = "RELAYS"
-        case 2:
-            titleText = "MINTS"
-        default:
-            break
-        }
-    }
     
     // MARK: - Action Methods
     
@@ -741,13 +580,9 @@ struct AuthenticationFlow: View {
                 
                 await MainActor.run {
                     isProcessing = false
-                    // Transition to onboarding
-                    withAnimation(.spring(response: 0.8, dampingFraction: 0.8)) {
-                        flowState = .onboarding
-                        onboardingStep = 0
-                        titleText = "SETUP"
-                    }
-                    setupMintDiscovery()
+                    // Open wallet onboarding
+                    walletOnboardingAuthMode = .create
+                    showWalletOnboarding = true
                 }
             } catch {
                 await MainActor.run {
@@ -795,13 +630,9 @@ struct AuthenticationFlow: View {
                 
                 await MainActor.run {
                     isProcessing = false
-                    // Transition to onboarding
-                    withAnimation(.spring(response: 0.8, dampingFraction: 0.8)) {
-                        flowState = .onboarding
-                        onboardingStep = 0
-                        titleText = "SETUP"
-                    }
-                    setupMintDiscovery()
+                    // Open wallet onboarding
+                    walletOnboardingAuthMode = .import
+                    showWalletOnboarding = true
                 }
             } catch {
                 await MainActor.run {
@@ -813,56 +644,6 @@ struct AuthenticationFlow: View {
         }
     }
     
-    private func setupWallet() {
-        guard !selectedRelays.isEmpty && !selectedMints.isEmpty else { return }
-        
-        isProcessing = true
-        
-        Task {
-            do {
-                guard let wallet = walletManager.activeWallet else {
-                    throw NSError(domain: "WalletOnboarding", code: 0, userInfo: [NSLocalizedDescriptionKey: "No active wallet found"])
-                }
-                
-                // Setup wallet with selected relays and mints
-                try await wallet.setup(
-                    mints: Array(selectedMints),
-                    relays: Array(selectedRelays),
-                    publishMintList: true
-                )
-                
-                await MainActor.run {
-                    dismiss()
-                }
-            } catch {
-                await MainActor.run {
-                    errorMessage = error.localizedDescription
-                    showError = true
-                    isProcessing = false
-                }
-            }
-        }
-    }
-    
-    private func setupMintDiscovery() {
-        guard let ndk = nostrManager.ndk else { return }
-        
-        Task {
-            isDiscoveringMints = true
-            
-            let discoveryManager = MintDiscoveryManager(ndk: ndk)
-            
-            for await mints in discoveryManager.discoverMintsStream() {
-                await MainActor.run {
-                    self.discoveredMints = mints
-                }
-            }
-            
-            await MainActor.run {
-                isDiscoveringMints = false
-            }
-        }
-    }
     
     private func logout() {
         Task {
@@ -974,11 +755,3 @@ struct AnimatedHeader: View {
     }
 }
 
-// MARK: - Suggested Relays
-private let suggestedRelays = [
-    RelayInfo(url: "wss://relay.primal.net", name: "Primal", description: "Fast and reliable public relay"),
-    RelayInfo(url: "wss://relay.damus.io", name: "Damus", description: "Popular iOS-friendly relay"),
-    RelayInfo(url: "wss://nos.lol", name: "nos.lol", description: "High-performance relay"),
-    RelayInfo(url: "wss://relay.nostr.band", name: "Nostr Band", description: "Analytics and search relay"),
-    RelayInfo(url: "wss://relay.nostr.wine", name: "Nostr Wine", description: "Paid relay with spam protection")
-]
