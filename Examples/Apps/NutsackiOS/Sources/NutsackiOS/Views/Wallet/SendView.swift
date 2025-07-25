@@ -403,7 +403,7 @@ struct SendView: View {
             Task {
                 do {
                     // Generate offline token
-                    let (token, transactionId) = try await walletManager.sendOffline(
+                    let (token, _) = try await walletManager.sendOffline(
                         proofs: proofs,
                         mint: mintURL,
                         memo: memo.isEmpty ? nil : memo
@@ -558,7 +558,7 @@ struct SendView: View {
                 // Try to construct this amount using a greedy algorithm
                 var remaining = targetAmount
                 var usedProofs: [CashuSwift.Proof] = []
-                var availableProofs = sortedProofs
+                let availableProofs = sortedProofs
                 
                 // First try to find exact matches
                 if let exactMatch = availableProofs.first(where: { Int64($0.amount) == remaining }) {
