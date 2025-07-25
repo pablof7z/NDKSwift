@@ -287,7 +287,7 @@ public enum ContentTagger {
             }
             let pubkey = Data(pubkeyData).hexString
             let relays = decoded[1]?.compactMap { String(data: Data($0), encoding: .utf8) } ?? []
-            return DecodedNostrEntity(type: "nprofile", eventId: nil, pubkey: pubkey, relays: relays.isEmpty ? nil : relays, kind: nil, identifier: nil)
+            return DecodedNostrEntity(type: "nprofile", eventId: nil, pubkey: pubkey, relays: relays.nilIfEmpty, kind: nil, identifier: nil)
 
         case "nevent":
             let decoded = try decodeTLV(data)
@@ -298,7 +298,7 @@ public enum ContentTagger {
             let relays = decoded[1]?.compactMap { String(data: Data($0), encoding: .utf8) } ?? []
             let pubkey = decoded[2]?.first.map { Data($0).hexString }
             let kind = decoded[3]?.first.map { kindFromBytes($0) }
-            return DecodedNostrEntity(type: "nevent", eventId: eventId, pubkey: pubkey, relays: relays.isEmpty ? nil : relays, kind: kind, identifier: nil)
+            return DecodedNostrEntity(type: "nevent", eventId: eventId, pubkey: pubkey, relays: relays.nilIfEmpty, kind: kind, identifier: nil)
 
         case "naddr":
             let decoded = try decodeTLV(data)
@@ -313,7 +313,7 @@ public enum ContentTagger {
             let kind = kindFromBytes(kindData)
             let relays = decoded[1]?.compactMap { String(data: Data($0), encoding: .utf8) } ?? []
             let eventId = "\(kind):\(pubkey):\(identifier)"
-            return DecodedNostrEntity(type: "naddr", eventId: eventId, pubkey: pubkey, relays: relays.isEmpty ? nil : relays, kind: kind, identifier: identifier)
+            return DecodedNostrEntity(type: "naddr", eventId: eventId, pubkey: pubkey, relays: relays.nilIfEmpty, kind: kind, identifier: identifier)
 
         default:
             throw NDKError.invalidDataFormat("bech32 type", details: "Unknown type: \(hrp)")
