@@ -70,21 +70,29 @@ class HapticManager {
         notification.prepare()
     }
     
+    // MARK: - Haptic Timing Constants
+    
+    private enum HapticDelays {
+        static let shortDelay: TimeInterval = 0.1
+        static let mediumDelay: TimeInterval = 0.2
+        static let longDelay: TimeInterval = 0.3
+    }
+    
     // MARK: - Contextual Haptic Methods for Highlighter App
     
     /// Haptic for highlighting text (medium impact)
-    func highlight() { impact(ImpactStyle.medium) }
+    func highlight() { impact(.medium) }
     
     /// Haptic for zap actions (heavy impact + success notification)
     func zap() {
-        impact(ImpactStyle.heavy)
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+        impact(.heavy)
+        DispatchQueue.main.asyncAfter(deadline: .now() + HapticDelays.shortDelay) {
             self.notification(.success)
         }
     }
     
     /// Haptic for bookmark/save actions (light impact)
-    func bookmark() { impact(ImpactStyle.light) }
+    func bookmark() { impact(.light) }
     
     /// Haptic for successful actions (e.g., publish highlight)
     func success() { notification(.success) }
@@ -102,35 +110,35 @@ class HapticManager {
     func buttonPress(style: ImpactStyle = .light) { impact(style) }
     
     /// Haptic for card interactions (light impact)
-    func cardTap() { impact(ImpactStyle.light) }
+    func cardTap() { impact(.light) }
     
     /// Haptic for swipe actions
-    func swipe() { impact(ImpactStyle.light) }
+    func swipe() { impact(.light) }
     
     /// Haptic for long press gestures
-    func longPress() { impact(ImpactStyle.heavy) }
+    func longPress() { impact(.heavy) }
     
     /// Subtle haptic for hover/selection preview
-    func preview() { impact(ImpactStyle.light) }
+    func preview() { impact(.light) }
     
     // MARK: - Complex Haptic Patterns
     
     /// Haptic pattern for publishing content (sequence of impacts)
     func publish() {
-        impact(ImpactStyle.medium)
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+        impact(.medium)
+        DispatchQueue.main.asyncAfter(deadline: .now() + HapticDelays.mediumDelay) {
             self.notification(.success)
         }
     }
     
     /// Haptic pattern for loading completion
-    func loadComplete() { impact(ImpactStyle.light) }
+    func loadComplete() { impact(.light) }
     
     /// Haptic pattern for pull-to-refresh
     func refresh() {
-        impact(ImpactStyle.light)
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-            self.impact(ImpactStyle.light)
+        impact(.light)
+        DispatchQueue.main.asyncAfter(deadline: .now() + HapticDelays.longDelay) {
+            self.impact(.light)
         }
     }
 }
