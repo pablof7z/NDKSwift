@@ -2,17 +2,26 @@ import UIKit
 import SwiftUI
 
 struct BlurHash {
+    // BlurHash algorithm constants
+    private enum Constants {
+        static let minimumHashLength = 6
+        static let componentDivisor = 9
+        static let maximumValueDivisor: Float = 166
+        static let headerLength = 4
+        static let componentDataLength = 2
+    }
+    
     static func decode(blurhash: String, width: Int, height: Int) -> UIImage? {
-        guard blurhash.count >= 6 else { return nil }
+        guard blurhash.count >= Constants.minimumHashLength else { return nil }
         
         let sizeFlag = String(blurhash[blurhash.startIndex]).decode83()
-        let numY = (sizeFlag / 9) + 1
-        let numX = (sizeFlag % 9) + 1
+        let numY = (sizeFlag / Constants.componentDivisor) + 1
+        let numX = (sizeFlag % Constants.componentDivisor) + 1
         
         let quantisedMaximumValue = String(blurhash[blurhash.index(blurhash.startIndex, offsetBy: 1)]).decode83()
-        let maximumValue = Float(quantisedMaximumValue + 1) / 166
+        let maximumValue = Float(quantisedMaximumValue + 1) / Constants.maximumValueDivisor
         
-        guard blurhash.count == 4 + 2 * numX * numY else { return nil }
+        guard blurhash.count == Constants.headerLength + Constants.componentDataLength * numX * numY else { return nil }
         
         var colours: [(Float, Float, Float)] = []
         for i in 0 ..< numX * numY {
@@ -26,7 +35,9 @@ struct BlurHash {
             }
         }
         
-        let bytesPerRow = width * 3
+        // Image data constants
+        let bytesPerPixel = 3  // RGB without alpha
+        let bytesPerRow = width * bytesPerPixel
         let pixels = UnsafeMutablePointer<UInt8>.allocate(capacity: bytesPerRow * height)
         
         for y in 0 ..< height {
@@ -49,9 +60,14 @@ struct BlurHash {
                 let intG = UInt8(linearTosRGB(g))
                 let intB = UInt8(linearTosRGB(b))
                 
-                pixels[3 * x + 0 + y * bytesPerRow] = intR
-                pixels[3 * x + 1 + y * bytesPerRow] = intG
-                pixels[3 * x + 2 + y * bytesPerRow] = intB
+                // RGB channel offsets
+                let redOffset = 0
+                let greenOffset = 1
+                let blueOffset = 2
+                
+                pixels[bytesPerPixel * x + redOffset + y * bytesPerRow] = intR
+                pixels[bytesPerPixel * x + greenOffset + y * bytesPerRow] = intG
+                pixels[bytesPerPixel * x + blueOffset + y * bytesPerRow] = intB
             }
         }
         
@@ -61,11 +77,15 @@ struct BlurHash {
             data.deallocate()
         }) else { return nil }
         
+        // Image format constants
+        let bitsPerComponent = 8
+        let bitsPerPixel = 24  // 8 bits × 3 channels (RGB)
+        
         guard let cgImage = CGImage(
             width: width,
             height: height,
-            bitsPerComponent: 8,
-            bitsPerPixel: 24,
+            bitsPerComponent: bitsPerComponent,
+            bitsPerPixel: bitsPerPixel,
             bytesPerRow: bytesPerRow,
             space: CGColorSpaceCreateDeviceRGB(),
             bitmapInfo: bitmapInfo,
@@ -78,42 +98,63 @@ struct BlurHash {
         return UIImage(cgImage: cgImage)
     }
     
+    // Color decoding constants
+    private enum ColorConstants {
+        static let redShift = 16
+        static let greenShift = 8
+        static let byteMask = 255
+        static let quantizationFactor = 19
+        static let centeringOffset: Float = 9
+        static let powerExponent: Float = 2
+    }
+    
     private static func decodeDC(_ value: Int) -> (Float, Float, Float) {
-        let intR = value >> 16
-        let intG = (value >> 8) & 255
-        let intB = value & 255
+        let intR = value >> ColorConstants.redShift
+        let intG = (value >> ColorConstants.greenShift) & ColorConstants.byteMask
+        let intB = value & ColorConstants.byteMask
         return (sRGBToLinear(intR), sRGBToLinear(intG), sRGBToLinear(intB))
     }
     
     private static func decodeAC(_ value: Int, maximumValue: Float) -> (Float, Float, Float) {
-        let quantR = value / (19 * 19)
-        let quantG = (value / 19) % 19
-        let quantB = value % 19
+        let quantR = value / (ColorConstants.quantizationFactor * ColorConstants.quantizationFactor)
+        let quantG = (value / ColorConstants.quantizationFactor) % ColorConstants.quantizationFactor
+        let quantB = value % ColorConstants.quantizationFactor
         
         let rgb = (
-            signPow((Float(quantR) - 9) / 9, 2) * maximumValue,
-            signPow((Float(quantG) - 9) / 9, 2) * maximumValue,
-            signPow((Float(quantB) - 9) / 9, 2) * maximumValue
+            signPow((Float(quantR) - ColorConstants.centeringOffset) / ColorConstants.centeringOffset, ColorConstants.powerExponent) * maximumValue,
+            signPow((Float(quantG) - ColorConstants.centeringOffset) / ColorConstants.centeringOffset, ColorConstants.powerExponent) * maximumValue,
+            signPow((Float(quantB) - ColorConstants.centeringOffset) / ColorConstants.centeringOffset, ColorConstants.powerExponent) * maximumValue
         )
         
         return rgb
     }
     
+    // sRGB color space conversion constants
+    private enum SRGBConstants {
+        static let maxColorValue: Float = 255
+        static let linearThreshold: Float = 0.04045
+        static let linearDivisor: Float = 12.92
+        static let gammaOffset: Float = 0.055
+        static let gammaMultiplier: Float = 1.055
+        static let gammaExponent: Float = 2.4
+        static let inverseLinearThreshold: Float = 0.0031308
+    }
+    
     private static func sRGBToLinear(_ value: Int) -> Float {
-        let v = Float(value) / 255
-        if v <= 0.04045 {
-            return v / 12.92
+        let v = Float(value) / SRGBConstants.maxColorValue
+        if v <= SRGBConstants.linearThreshold {
+            return v / SRGBConstants.linearDivisor
         } else {
-            return pow((v + 0.055) / 1.055, 2.4)
+            return pow((v + SRGBConstants.gammaOffset) / SRGBConstants.gammaMultiplier, SRGBConstants.gammaExponent)
         }
     }
     
     private static func linearTosRGB(_ value: Float) -> Int {
         let v = max(0, min(1, value))
-        if v <= 0.0031308 {
-            return Int(v * 12.92 * 255 + 0.5)
+        if v <= SRGBConstants.inverseLinearThreshold {
+            return Int(v * SRGBConstants.linearDivisor * SRGBConstants.maxColorValue + 0.5)
         } else {
-            return Int((1.055 * pow(v, 1 / 2.4) - 0.055) * 255 + 0.5)
+            return Int((SRGBConstants.gammaMultiplier * pow(v, 1 / SRGBConstants.gammaExponent) - SRGBConstants.gammaOffset) * SRGBConstants.maxColorValue + 0.5)
         }
     }
     
@@ -123,11 +164,13 @@ struct BlurHash {
 }
 
 private extension String {
+    private static let base83Radix = 83
+    
     func decode83() -> Int {
         var value: Int = 0
         for character in self {
             if let digit = decode83Map[character] {
-                value = value * 83 + digit
+                value = value * String.base83Radix + digit
             }
         }
         return value
@@ -164,13 +207,17 @@ struct BlurHashModifier: ViewModifier {
             .onAppear {
                 if let blurhash = blurhash {
                     DispatchQueue.global(qos: .userInitiated).async {
+                        // Performance optimization: decode at lower resolution
+                        let resolutionDivisor = 10
+                        let fadeInDuration = 0.3
+                        
                         let image = BlurHash.decode(
                             blurhash: blurhash,
-                            width: Int(size.width / 10), // Low res for performance
-                            height: Int(size.height / 10)
+                            width: Int(size.width / CGFloat(resolutionDivisor)),
+                            height: Int(size.height / CGFloat(resolutionDivisor))
                         )
                         DispatchQueue.main.async {
-                            withAnimation(.easeIn(duration: 0.3)) {
+                            withAnimation(.easeIn(duration: fadeInDuration)) {
                                 self.blurImage = image
                             }
                         }
