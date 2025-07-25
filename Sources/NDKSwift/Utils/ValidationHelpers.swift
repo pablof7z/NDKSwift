@@ -108,28 +108,3 @@ public enum ValidationHelpers {
         EventKind.isParameterizedReplaceable(kind)
     }
 }
-
-// MARK: - String Extensions for Validation
-
-public extension String {
-    
-    /// Check if the string is a valid WebSocket URL
-    var isWebSocketURL: Bool {
-        ValidationHelpers.isWebSocketURL(self)
-    }
-    
-    /// Check if the string is a valid URL
-    var isValidURL: Bool {
-        ValidationHelpers.isValidURL(self)
-    }
-    
-    /// Check if the string is valid 32-byte hex
-    var isValid32ByteHex: Bool {
-        ValidationHelpers.isValid32ByteHex(self)
-    }
-    
-    /// Check if the string is valid 64-byte hex
-    var isValid64ByteHex: Bool {
-        ValidationHelpers.isValid64ByteHex(self)
-    }
-}
