@@ -7,73 +7,99 @@ struct AuthenticationFlow: View {
     @Environment(WalletManager.self) private var walletManager
     @Environment(\.dismiss) private var dismiss
     
-    // Wizard state
-    enum WizardStep {
-        case welcome
-        case createAccount
-        case importAccount
-        case setupRelays
-        case setupMints
-    }
+    // Flow states
+    @State private var flowState: FlowState = .splash
+    @State private var authMode: AuthMode = .none
     
-    @State private var currentStep: WizardStep = .welcome
+    // Shared animation values for smooth transitions
+    @State private var logoSize: CGFloat = 140
+    @State private var logoOpacity: Double = 0
+    @State private var logoScale: CGFloat = 0.3
+    @State private var logoRotation: Double = -180
+    @State private var logoPosition = CGPoint(x: 0, y: 0)
+    
+    @State private var titleText = "NUTSACK"
+    @State private var titleOpacity: Double = 0
+    @State private var titleOffset: CGFloat = 50
+    @State private var titleSize: CGFloat = 52
+    
+    @State private var sloganOpacity: Double = 0
+    @State private var contentOpacity: Double = 0
+    @State private var buttonsOpacity: Double = 0
+    
+    // Background effects
+    @State private var glowOpacity: Double = 0
+    @State private var pulseScale: CGFloat = 1
+    @State private var electricityOffset: CGFloat = -100
+    
+    // Form states
+    @State private var displayName = ""
+    @State private var about = ""
+    @State private var nsecInput = ""
+    @State private var showPassword = false
     @State private var isProcessing = false
     @State private var showError = false
     @State private var errorMessage = ""
-    
-    // Account creation fields
-    @State private var displayName = ""
-    @State private var about = ""
-    
-    // Import fields
-    @State private var nsecInput = ""
-    @State private var showPassword = false
     @State private var showScanner = false
     
-    // Setup fields
+    // Onboarding states
+    @State private var onboardingStep = 0
     @State private var selectedRelays: Set<String> = []
     @State private var selectedMints: Set<String> = []
     @State private var discoveredMints: [DiscoveredMint] = []
     @State private var isDiscoveringMints = false
     
+    enum FlowState {
+        case splash
+        case auth
+        case onboarding
+        case complete
+    }
+    
+    enum AuthMode {
+        case none
+        case create
+        case `import`
+    }
+    
     var body: some View {
-        NavigationStack {
+        ZStack {
+            // Background
+            backgroundGradient
+            electricEffects
+            
+            // Main content
             VStack(spacing: 0) {
-                // Progress indicator
-                if currentStep != .welcome {
-                    progressIndicator
-                        .padding(.top, 10)
-                        .padding(.horizontal)
-                }
+                // Animated header that adapts based on state
+                AnimatedHeader(
+                    logoSize: logoSize,
+                    logoOpacity: logoOpacity,
+                    logoScale: logoScale,
+                    logoRotation: logoRotation,
+                    logoPosition: logoPosition,
+                    titleText: titleText,
+                    titleOpacity: titleOpacity,
+                    titleOffset: titleOffset,
+                    titleSize: titleSize,
+                    sloganOpacity: sloganOpacity,
+                    showSlogan: flowState == .splash && authMode == .none,
+                    glowOpacity: glowOpacity,
+                    pulseScale: pulseScale
+                )
+                .frame(height: headerHeight)
+                .animation(.spring(response: 0.8, dampingFraction: 0.8), value: flowState)
+                .animation(.spring(response: 0.8, dampingFraction: 0.8), value: authMode)
                 
-                // Main content
-                Group {
-                    switch currentStep {
-                    case .welcome:
-                        welcomeView
-                    case .createAccount:
-                        createAccountView
-                    case .importAccount:
-                        importAccountView
-                    case .setupRelays:
-                        relaySelectionView
-                    case .setupMints:
-                        mintSelectionView
-                    }
-                }
-                .padding(.horizontal)
+                // Content area
+                contentView
+                    .opacity(contentOpacity)
+                    .animation(.easeInOut(duration: 0.4), value: contentOpacity)
                 
-                Spacer()
-                
-                // Navigation buttons
-                if currentStep != .welcome {
-                    navigationButtons
-                        .padding(.horizontal)
-                        .padding(.bottom, 40)
-                }
+                Spacer(minLength: 0)
             }
-            .background(backgroundGradient)
-            .navigationBarHidden(true)
+        }
+        .onAppear {
+            startSplashAnimation()
         }
         .alert("Error", isPresented: $showError) {
             Button("OK") { }
@@ -86,189 +112,126 @@ struct AuthenticationFlow: View {
                 showScanner = false
             }
         }
-        .task {
-            setupMintDiscovery()
-        }
     }
     
-    // MARK: - Progress Indicator
+    // MARK: - Computed Properties
     
-    private var progressIndicator: some View {
-        HStack(spacing: 12) {
-            ForEach(progressSteps, id: \.self) { index in
-                Capsule()
-                    .fill(stepIndex >= index ? Color.orange : Color.white.opacity(0.2))
-                    .frame(width: stepIndex == index ? 32 : 16, height: 4)
-                    .animation(.easeInOut(duration: 0.3), value: stepIndex)
-            }
-        }
-    }
-    
-    private var progressSteps: [Int] {
-        switch currentStep {
-        case .welcome:
-            return []
-        case .createAccount, .importAccount:
-            return [0, 1, 2]
-        case .setupRelays:
-            return [0, 1, 2]
-        case .setupMints:
-            return [0, 1, 2]
-        }
-    }
-    
-    private var stepIndex: Int {
-        switch currentStep {
-        case .welcome:
-            return -1
-        case .createAccount, .importAccount:
+    private var headerHeight: CGFloat {
+        switch flowState {
+        case .splash:
+            return authMode == .none ? 400 : 120
+        case .auth:
+            return 120
+        case .onboarding:
+            return 100
+        case .complete:
             return 0
-        case .setupRelays:
-            return 1
-        case .setupMints:
-            return 2
         }
     }
     
-    // MARK: - Welcome View
-    
-    private var welcomeView: some View {
-        VStack(spacing: 40) {
-            Spacer()
-            
-            // Logo
-            ZStack {
-                // Glow effect
-                Circle()
-                    .fill(
-                        RadialGradient(
-                            gradient: Gradient(colors: [
-                                Color.orange.opacity(0.8),
-                                Color.purple.opacity(0.4),
-                                Color.clear
-                            ]),
-                            center: .center,
-                            startRadius: 10,
-                            endRadius: 70
-                        )
-                    )
-                    .frame(width: 280, height: 280)
-                    .blur(radius: 30)
-                
-                // Hexagon nut logo
-                HexagonShape()
-                    .fill(
-                        LinearGradient(
-                            gradient: Gradient(colors: [
-                                Color.orange,
-                                Color.orange.opacity(0.9),
-                                Color(red: 0.8, green: 0.4, blue: 0.1)
-                            ]),
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        )
-                    )
-                    .frame(width: 140, height: 140)
-                    .mask(
-                        ZStack {
-                            Rectangle()
-                                .fill(Color.white)
-                                .frame(width: 280, height: 280)
-                            
-                            Circle()
-                                .fill(Color.black)
-                                .frame(width: 56, height: 56)
-                                .blendMode(.destinationOut)
-                        }
-                        .compositingGroup()
-                    )
-                    .shadow(color: Color.orange.opacity(0.5), radius: 20, x: 0, y: 5)
+    @ViewBuilder
+    private var contentView: some View {
+        switch flowState {
+        case .splash:
+            if authMode == .none {
+                authButtons
+            } else {
+                authForms
             }
-            
-            // Title
-            VStack(spacing: 8) {
-                Text("NUTSACK")
-                    .font(.system(size: 52, weight: .black, design: .default))
-                    .tracking(4)
-                    .foregroundStyle(
-                        LinearGradient(
-                            gradient: Gradient(colors: [Color.white, Color.white.opacity(0.9)]),
-                            startPoint: .top,
-                            endPoint: .bottom
-                        )
-                    )
-                
-                Text("A WALLET FOR THE RELAYS")
-                    .font(.system(size: 14, weight: .medium, design: .default))
-                    .tracking(2)
-                    .foregroundColor(Color.white.opacity(0.5))
-            }
-            
-            Spacer()
-            
-            // Buttons
-            VStack(spacing: 16) {
-                Button(action: { currentStep = .createAccount }) {
-                    HStack {
-                        Image(systemName: "bolt.fill")
-                            .font(.system(size: 20))
-                        Text("New Account")
-                            .font(.system(size: 18, weight: .semibold))
-                    }
-                    .frame(maxWidth: .infinity)
-                    .frame(height: 56)
-                    .background(
-                        LinearGradient(
-                            gradient: Gradient(colors: [
-                                Color.orange,
-                                Color(red: 0.9, green: 0.5, blue: 0.1)
-                            ]),
-                            startPoint: .leading,
-                            endPoint: .trailing
-                        )
-                    )
-                    .foregroundColor(.white)
-                    .clipShape(RoundedRectangle(cornerRadius: 16))
-                    .shadow(color: Color.orange.opacity(0.3), radius: 10, x: 0, y: 4)
-                }
-                
-                Button(action: { currentStep = .importAccount }) {
-                    HStack {
-                        Image(systemName: "key.fill")
-                            .font(.system(size: 20))
-                        Text("Login")
-                            .font(.system(size: 18, weight: .semibold))
-                    }
-                    .frame(maxWidth: .infinity)
-                    .frame(height: 56)
-                    .background(Color.white.opacity(0.1))
-                    .foregroundColor(.white)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 16)
-                            .stroke(Color.white.opacity(0.3), lineWidth: 1)
-                    )
-                    .clipShape(RoundedRectangle(cornerRadius: 16))
-                }
-                
-                Text("Your keys, your nuts")
-                    .font(.system(size: 14, weight: .medium))
-                    .foregroundColor(Color.white.opacity(0.4))
-                    .padding(.top, 8)
-            }
-            .padding(.bottom, 40)
+        case .auth:
+            authForms
+        case .onboarding:
+            onboardingContent
+        case .complete:
+            EmptyView()
         }
     }
     
-    // MARK: - Create Account View
-    
-    private var createAccountView: some View {
-        VStack(spacing: 30) {
-            Text("Create Account")
-                .font(.largeTitle)
-                .fontWeight(.bold)
+    @ViewBuilder
+    private var authButtons: some View {
+        VStack(spacing: 16) {
+            Button(action: { selectAuthMode(.create) }) {
+                HStack {
+                    Image(systemName: "bolt.fill")
+                        .font(.system(size: 20))
+                    Text("New Account")
+                        .font(.system(size: 18, weight: .semibold))
+                }
+                .frame(maxWidth: .infinity)
+                .frame(height: 56)
+                .background(
+                    LinearGradient(
+                        gradient: Gradient(colors: [
+                            Color.orange,
+                            Color(red: 0.9, green: 0.5, blue: 0.1)
+                        ]),
+                        startPoint: .leading,
+                        endPoint: .trailing
+                    )
+                )
                 .foregroundColor(.white)
-                .padding(.top, 40)
+                .clipShape(RoundedRectangle(cornerRadius: 16))
+                .shadow(color: Color.orange.opacity(0.3), radius: 10, x: 0, y: 4)
+            }
             
+            Button(action: { selectAuthMode(.import) }) {
+                HStack {
+                    Image(systemName: "key.fill")
+                        .font(.system(size: 20))
+                    Text("Login")
+                        .font(.system(size: 18, weight: .semibold))
+                }
+                .frame(maxWidth: .infinity)
+                .frame(height: 56)
+                .background(Color.white.opacity(0.1))
+                .foregroundColor(.white)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 16)
+                        .stroke(Color.white.opacity(0.3), lineWidth: 1)
+                )
+                .clipShape(RoundedRectangle(cornerRadius: 16))
+            }
+            
+            Text("Your keys, your nuts")
+                .font(.system(size: 14, weight: .medium))
+                .foregroundColor(Color.white.opacity(0.4))
+                .padding(.top, 8)
+        }
+        .padding(.horizontal, 32)
+        .opacity(buttonsOpacity)
+    }
+    
+    @ViewBuilder
+    private var authForms: some View {
+        VStack(spacing: 30) {
+            if authMode == .create {
+                createAccountForm
+            } else if authMode == .import {
+                importAccountForm
+            }
+        }
+        .padding(.horizontal, 32)
+        .padding(.top, 20)
+    }
+    
+    @ViewBuilder
+    private var createAccountForm: some View {
+        VStack(spacing: 20) {
+            // Back button
+            HStack {
+                Button(action: { selectAuthMode(.none) }) {
+                    HStack(spacing: 8) {
+                        Image(systemName: "chevron.left")
+                            .font(.system(size: 18, weight: .medium))
+                        Text("Back")
+                            .font(.system(size: 16, weight: .medium))
+                    }
+                    .foregroundColor(Color.orange)
+                }
+                Spacer()
+            }
+            
+            // Form fields
             VStack(spacing: 20) {
                 VStack(alignment: .leading, spacing: 8) {
                     Text("Display Name")
@@ -295,20 +258,57 @@ struct AuthenticationFlow: View {
                     .foregroundColor(Color.white.opacity(0.4))
                     .frame(maxWidth: .infinity, alignment: .leading)
             }
-            .padding(.top, 20)
+            
+            // Create button
+            Button(action: createAccount) {
+                if isProcessing {
+                    ProgressView()
+                        .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                } else {
+                    HStack {
+                        Image(systemName: "bolt.fill")
+                        Text("Create Wallet")
+                            .fontWeight(.semibold)
+                    }
+                }
+            }
+            .frame(maxWidth: .infinity)
+            .frame(height: 56)
+            .background(
+                LinearGradient(
+                    gradient: Gradient(colors: [
+                        displayName.isEmpty ? Color.gray : Color.orange,
+                        displayName.isEmpty ? Color.gray.opacity(0.8) : Color(red: 0.9, green: 0.5, blue: 0.1)
+                    ]),
+                    startPoint: .leading,
+                    endPoint: .trailing
+                )
+            )
+            .foregroundColor(.white)
+            .clipShape(RoundedRectangle(cornerRadius: 16))
+            .shadow(color: displayName.isEmpty ? Color.clear : Color.orange.opacity(0.3), radius: 10, x: 0, y: 4)
+            .disabled(displayName.isEmpty || isProcessing)
         }
     }
     
-    // MARK: - Import Account View
-    
-    private var importAccountView: some View {
-        VStack(spacing: 30) {
-            Text("Import Account")
-                .font(.largeTitle)
-                .fontWeight(.bold)
-                .foregroundColor(.white)
-                .padding(.top, 40)
+    @ViewBuilder
+    private var importAccountForm: some View {
+        VStack(spacing: 20) {
+            // Back button
+            HStack {
+                Button(action: { selectAuthMode(.none) }) {
+                    HStack(spacing: 8) {
+                        Image(systemName: "chevron.left")
+                            .font(.system(size: 18, weight: .medium))
+                        Text("Back")
+                            .font(.system(size: 16, weight: .medium))
+                    }
+                    .foregroundColor(Color.orange)
+                }
+                Spacer()
+            }
             
+            // Form fields
             VStack(spacing: 20) {
                 VStack(alignment: .leading, spacing: 8) {
                     Text("Private Key")
@@ -377,219 +377,359 @@ struct AuthenticationFlow: View {
                     }
                     .padding(.top, 4)
                 }
-            }
-            .padding(.top, 20)
-        }
-    }
-    
-    // MARK: - Relay Selection View
-    
-    private var relaySelectionView: some View {
-        VStack(spacing: 30) {
-            Text("Select Relays")
-                .font(.largeTitle)
-                .fontWeight(.bold)
-                .foregroundColor(.white)
-                .padding(.top, 40)
-            
-            Text("Choose relays to connect to the Nostr network")
-                .font(.subheadline)
-                .foregroundColor(.white.opacity(0.7))
-                .multilineTextAlignment(.center)
-            
-            ScrollView {
-                VStack(spacing: 12) {
-                    ForEach(suggestedRelays, id: \.url) { relay in
-                        RelaySelectionRow(
-                            relay: relay,
-                            isSelected: selectedRelays.contains(relay.url),
-                            onToggle: {
-                                if selectedRelays.contains(relay.url) {
-                                    selectedRelays.remove(relay.url)
-                                } else {
-                                    selectedRelays.insert(relay.url)
-                                }
-                            }
-                        )
-                    }
-                }
-            }
-            .padding(.top, 10)
-        }
-    }
-    
-    // MARK: - Mint Selection View
-    
-    private var mintSelectionView: some View {
-        VStack(spacing: 30) {
-            Text("Select Mints")
-                .font(.largeTitle)
-                .fontWeight(.bold)
-                .foregroundColor(.white)
-                .padding(.top, 40)
-            
-            Text("Choose Cashu mints for your ecash wallet")
-                .font(.subheadline)
-                .foregroundColor(.white.opacity(0.7))
-                .multilineTextAlignment(.center)
-            
-            if discoveredMints.isEmpty && isDiscoveringMints {
-                VStack(spacing: 16) {
-                    ProgressView()
-                        .scaleEffect(1.2)
-                        .tint(.orange)
-                    Text("Discovering mints...")
-                        .font(.headline)
-                        .foregroundColor(.white.opacity(0.7))
-                }
-                .frame(maxHeight: .infinity)
-            } else {
-                ScrollView {
-                    VStack(spacing: 12) {
-                        ForEach(discoveredMints) { mint in
-                            MintSelectionRow(
-                                mint: mint,
-                                isSelected: selectedMints.contains(mint.url),
-                                onToggle: {
-                                    if selectedMints.contains(mint.url) {
-                                        selectedMints.remove(mint.url)
-                                    } else {
-                                        selectedMints.insert(mint.url)
-                                    }
-                                }
-                            )
+                
+                // Login button
+                Button(action: importAccount) {
+                    if isProcessing {
+                        HStack(spacing: 12) {
+                            ProgressView()
+                                .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                                .scaleEffect(0.9)
+                            
+                            Text("Logging in...")
+                                .fontWeight(.semibold)
+                        }
+                    } else {
+                        HStack {
+                            Image(systemName: "arrow.right.circle.fill")
+                            Text("Log In")
+                                .fontWeight(.semibold)
                         }
                     }
                 }
-                .padding(.top, 10)
+                .foregroundColor(.white)
+                .frame(maxWidth: .infinity)
+                .frame(height: 56)
+                .background(
+                    LinearGradient(
+                        gradient: Gradient(colors: [
+                            nsecInput.isEmpty ? Color.gray : Color.orange,
+                            nsecInput.isEmpty ? Color.gray.opacity(0.8) : Color(red: 0.9, green: 0.5, blue: 0.1)
+                        ]),
+                        startPoint: .leading,
+                        endPoint: .trailing
+                    )
+                )
+                .clipShape(RoundedRectangle(cornerRadius: 16))
+                .shadow(color: nsecInput.isEmpty ? Color.clear : Color.orange.opacity(0.3), radius: 10, x: 0, y: 4)
+                .disabled(nsecInput.isEmpty || isProcessing)
             }
         }
     }
     
-    // MARK: - Navigation Buttons
-    
-    private var navigationButtons: some View {
-        HStack {
-            // Back button
-            Button(action: navigateBack) {
-                Text("Back")
-                    .font(.system(size: 16, weight: .medium))
-                    .foregroundColor(Color.white.opacity(0.7))
+    @ViewBuilder
+    private var onboardingContent: some View {
+        VStack(spacing: 0) {
+            // Step indicator
+            HStack(spacing: 12) {
+                ForEach(0..<3) { step in
+                    Capsule()
+                        .fill(onboardingStep >= step ? Color.orange : Color.white.opacity(0.2))
+                        .frame(width: onboardingStep == step ? 32 : 16, height: 4)
+                        .animation(.easeInOut(duration: 0.3), value: onboardingStep)
+                }
             }
+            .padding(.top, 10)
+            .padding(.bottom, 30)
+            
+            // Step content
+            Group {
+                switch onboardingStep {
+                case 0:
+                    WelcomeStepView()
+                case 1:
+                    RelaySelectionView(
+                        selectedRelays: $selectedRelays,
+                        suggestedRelays: suggestedRelays
+                    )
+                case 2:
+                    MintSelectionView(
+                        selectedMints: $selectedMints,
+                        discoveredMints: discoveredMints,
+                        isDiscoveringMints: isDiscoveringMints
+                    )
+                default:
+                    EmptyView()
+                }
+            }
+            .transition(.asymmetric(
+                insertion: .move(edge: .trailing).combined(with: .opacity),
+                removal: .move(edge: .leading).combined(with: .opacity)
+            ))
             
             Spacer()
             
-            // Next/Complete button
-            Button(action: navigateNext) {
-                if isProcessing {
-                    ProgressView()
-                        .progressViewStyle(CircularProgressViewStyle(tint: .white))
-                } else {
-                    Text(nextButtonTitle)
-                        .font(.system(size: 18, weight: .semibold))
+            // Navigation buttons
+            onboardingButtons
+                .padding(.horizontal, 24)
+                .padding(.bottom, 40)
+        }
+        .padding(.horizontal, 24)
+    }
+    
+    @ViewBuilder
+    private var onboardingButtons: some View {
+        VStack(spacing: 16) {
+            if onboardingStep == 0 {
+                Button(action: {
+                    withAnimation(.spring(response: 0.5, dampingFraction: 0.8)) {
+                        onboardingStep = 1
+                        updateHeaderForOnboarding()
+                    }
+                }) {
+                    HStack {
+                        Text("Continue")
+                            .font(.system(size: 18, weight: .semibold))
+                        Image(systemName: "arrow.right")
+                            .font(.system(size: 16, weight: .semibold))
+                    }
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 56)
+                    .background(primaryButtonGradient)
+                    .foregroundColor(.white)
+                    .clipShape(RoundedRectangle(cornerRadius: 16))
+                    .shadow(color: Color.orange.opacity(0.3), radius: 10, x: 0, y: 4)
+                }
+                
+                Button(action: logout) {
+                    Text("Logout")
+                        .font(.system(size: 16, weight: .medium))
+                        .foregroundColor(Color.white.opacity(0.6))
+                }
+            } else if onboardingStep == 1 {
+                Button(action: {
+                    withAnimation(.spring(response: 0.5, dampingFraction: 0.8)) {
+                        onboardingStep = 2
+                        updateHeaderForOnboarding()
+                    }
+                }) {
+                    HStack {
+                        Text("Next: Select Mints")
+                            .font(.system(size: 18, weight: .semibold))
+                        Image(systemName: "arrow.right")
+                            .font(.system(size: 16, weight: .semibold))
+                    }
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 56)
+                    .background(
+                        selectedRelays.isEmpty 
+                            ? LinearGradient(gradient: Gradient(colors: [Color.gray]), startPoint: .leading, endPoint: .trailing)
+                            : primaryButtonGradient
+                    )
+                    .foregroundColor(.white)
+                    .clipShape(RoundedRectangle(cornerRadius: 16))
+                    .shadow(color: selectedRelays.isEmpty ? Color.clear : Color.orange.opacity(0.3), radius: 10, x: 0, y: 4)
+                }
+                .disabled(selectedRelays.isEmpty)
+                
+                Button(action: {
+                    withAnimation(.spring(response: 0.5, dampingFraction: 0.8)) {
+                        onboardingStep = 0
+                        updateHeaderForOnboarding()
+                    }
+                }) {
+                    Text("Back")
+                        .font(.system(size: 16, weight: .medium))
+                        .foregroundColor(Color.white.opacity(0.6))
+                }
+            } else if onboardingStep == 2 {
+                Button(action: setupWallet) {
+                    if isProcessing {
+                        ProgressView()
+                            .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                            .frame(maxWidth: .infinity)
+                            .frame(height: 56)
+                            .background(primaryButtonGradient)
+                            .clipShape(RoundedRectangle(cornerRadius: 16))
+                    } else {
+                        HStack {
+                            Image(systemName: "checkmark.circle.fill")
+                                .font(.system(size: 20))
+                            Text("Complete Setup")
+                                .font(.system(size: 18, weight: .semibold))
+                        }
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 56)
+                        .background(primaryButtonGradient)
+                        .foregroundColor(.white)
+                        .clipShape(RoundedRectangle(cornerRadius: 16))
+                        .shadow(color: Color.orange.opacity(0.3), radius: 10, x: 0, y: 4)
+                    }
+                }
+                .disabled(selectedRelays.isEmpty || isProcessing)
+                
+                Button(action: {
+                    withAnimation(.spring(response: 0.5, dampingFraction: 0.8)) {
+                        onboardingStep = 1
+                        updateHeaderForOnboarding()
+                    }
+                }) {
+                    Text("Back")
+                        .font(.system(size: 16, weight: .medium))
+                        .foregroundColor(Color.white.opacity(0.7))
                 }
             }
-            .frame(minWidth: 120)
-            .frame(height: 56)
-            .background(nextButtonBackground)
-            .foregroundColor(.white)
-            .clipShape(RoundedRectangle(cornerRadius: 16))
-            .shadow(color: isNextButtonEnabled ? Color.orange.opacity(0.3) : Color.clear, radius: 10, x: 0, y: 4)
-            .disabled(!isNextButtonEnabled || isProcessing)
         }
     }
     
-    private var nextButtonTitle: String {
-        switch currentStep {
-        case .welcome:
-            return ""
-        case .createAccount:
-            return "Next"
-        case .importAccount:
-            return "Next"
-        case .setupRelays:
-            return "Next"
-        case .setupMints:
-            return "Complete"
-        }
+    // MARK: - Background Views
+    
+    @ViewBuilder
+    private var backgroundGradient: some View {
+        LinearGradient(
+            gradient: Gradient(colors: [
+                Color(red: 0.05, green: 0.02, blue: 0.08),
+                Color(red: 0.02, green: 0.01, blue: 0.03),
+                Color.black
+            ]),
+            startPoint: .topLeading,
+            endPoint: .bottomTrailing
+        )
+        .ignoresSafeArea()
     }
     
-    private var nextButtonBackground: LinearGradient {
-        if isNextButtonEnabled {
-            return LinearGradient(
-                gradient: Gradient(colors: [
-                    Color.orange,
-                    Color(red: 0.9, green: 0.5, blue: 0.1)
-                ]),
-                startPoint: .leading,
-                endPoint: .trailing
+    @ViewBuilder
+    private var electricEffects: some View {
+        ForEach(0..<5) { index in
+            ElectricArc(
+                startPoint: CGPoint(x: 0.5, y: 0.5),
+                endPoint: CGPoint(
+                    x: 0.5 + cos(Double(index) * .pi / 2.5) * 0.4,
+                    y: 0.5 + sin(Double(index) * .pi / 2.5) * 0.4
+                )
             )
-        } else {
-            return LinearGradient(
-                gradient: Gradient(colors: [Color.gray]),
-                startPoint: .leading,
-                endPoint: .trailing
+            .stroke(
+                LinearGradient(
+                    gradient: Gradient(colors: [
+                        Color.orange.opacity(0.6),
+                        Color.purple.opacity(0.3),
+                        Color.clear
+                    ]),
+                    startPoint: .center,
+                    endPoint: .bottom
+                ),
+                lineWidth: 2
+            )
+            .blur(radius: 3)
+            .opacity(glowOpacity * 0.3)
+            .offset(y: electricityOffset)
+            .animation(
+                .easeInOut(duration: 2)
+                .delay(Double(index) * 0.1)
+                .repeatForever(autoreverses: true),
+                value: electricityOffset
             )
         }
     }
     
-    private var isNextButtonEnabled: Bool {
-        switch currentStep {
-        case .welcome:
-            return false
-        case .createAccount:
-            return !displayName.isEmpty
-        case .importAccount:
-            return !nsecInput.isEmpty
-        case .setupRelays:
-            return !selectedRelays.isEmpty
-        case .setupMints:
-            return !selectedRelays.isEmpty // Can complete without mints
+    private var primaryButtonGradient: LinearGradient {
+        LinearGradient(
+            gradient: Gradient(colors: [
+                Color.orange,
+                Color(red: 0.9, green: 0.5, blue: 0.1)
+            ]),
+            startPoint: .leading,
+            endPoint: .trailing
+        )
+    }
+    
+    // MARK: - Animation Methods
+    
+    private func startSplashAnimation() {
+        // Logo animation
+        withAnimation(.spring(response: 1.2, dampingFraction: 0.7)) {
+            logoScale = 1
+            logoOpacity = 1
+            logoRotation = 0
+        }
+        
+        // Glow effects
+        withAnimation(.easeInOut(duration: 1.5).delay(0.2)) {
+            glowOpacity = 0.8
+        }
+        
+        // Start electricity animation
+        withAnimation(.easeInOut(duration: 2).delay(0.5).repeatForever(autoreverses: true)) {
+            electricityOffset = 100
+        }
+        
+        // Title animation
+        withAnimation(.easeOut(duration: 0.8).delay(0.8)) {
+            titleOffset = 0
+            titleOpacity = 1
+        }
+        
+        // Slogan animation
+        withAnimation(.easeOut(duration: 0.8).delay(1.2)) {
+            sloganOpacity = 1
+        }
+        
+        // Pulse animation
+        withAnimation(.easeInOut(duration: 1.5).delay(1).repeatForever(autoreverses: true)) {
+            pulseScale = 1.1
+        }
+        
+        // Button animation
+        withAnimation(.spring(response: 0.8, dampingFraction: 0.8).delay(2.0)) {
+            buttonsOpacity = 1
+            contentOpacity = 1
         }
     }
     
-    // MARK: - Navigation Methods
-    
-    private func navigateBack() {
-        switch currentStep {
-        case .welcome:
-            break
-        case .createAccount, .importAccount:
-            currentStep = .welcome
-            // Clear form data
-            displayName = ""
-            about = ""
-            nsecInput = ""
-            showPassword = false
-        case .setupRelays:
-            if displayName.isEmpty {
-                currentStep = .importAccount
+    private func selectAuthMode(_ mode: AuthMode) {
+        withAnimation(.spring(response: 0.6, dampingFraction: 0.8)) {
+            authMode = mode
+            
+            if mode != .none {
+                // Transition to welcome state
+                flowState = .auth
+                logoSize = 60
+                logoPosition = CGPoint(x: -UIScreen.main.bounds.width/2 + 80, y: 0)
+                titleText = "WELCOME"
+                titleSize = 40
+                sloganOpacity = 0
+                
+                // Fade in content
+                withAnimation(.easeIn(duration: 0.3).delay(0.3)) {
+                    contentOpacity = 1
+                }
             } else {
-                currentStep = .createAccount
+                // Reset to splash
+                flowState = .splash
+                logoSize = 140
+                logoPosition = CGPoint(x: 0, y: 0)
+                titleText = "NUTSACK"
+                titleSize = 52
+                sloganOpacity = 1
+                contentOpacity = 0
+                
+                // Clear form data
+                displayName = ""
+                about = ""
+                nsecInput = ""
+                showPassword = false
             }
-        case .setupMints:
-            currentStep = .setupRelays
         }
     }
     
-    private func navigateNext() {
-        switch currentStep {
-        case .welcome:
+    private func updateHeaderForOnboarding() {
+        switch onboardingStep {
+        case 0:
+            titleText = "SETUP"
+        case 1:
+            titleText = "RELAYS"
+        case 2:
+            titleText = "MINTS"
+        default:
             break
-        case .createAccount:
-            createAccount()
-        case .importAccount:
-            importAccount()
-        case .setupRelays:
-            currentStep = .setupMints
-        case .setupMints:
-            completeSetup()
         }
     }
     
-    // MARK: - Actions
+    // MARK: - Action Methods
     
     private func createAccount() {
+        guard !displayName.isEmpty else { return }
+        
         isProcessing = true
         
         Task {
@@ -601,7 +741,13 @@ struct AuthenticationFlow: View {
                 
                 await MainActor.run {
                     isProcessing = false
-                    currentStep = .setupRelays
+                    // Transition to onboarding
+                    withAnimation(.spring(response: 0.8, dampingFraction: 0.8)) {
+                        flowState = .onboarding
+                        onboardingStep = 0
+                        titleText = "SETUP"
+                    }
+                    setupMintDiscovery()
                 }
             } catch {
                 await MainActor.run {
@@ -649,7 +795,13 @@ struct AuthenticationFlow: View {
                 
                 await MainActor.run {
                     isProcessing = false
-                    currentStep = .setupRelays
+                    // Transition to onboarding
+                    withAnimation(.spring(response: 0.8, dampingFraction: 0.8)) {
+                        flowState = .onboarding
+                        onboardingStep = 0
+                        titleText = "SETUP"
+                    }
+                    setupMintDiscovery()
                 }
             } catch {
                 await MainActor.run {
@@ -661,13 +813,15 @@ struct AuthenticationFlow: View {
         }
     }
     
-    private func completeSetup() {
+    private func setupWallet() {
+        guard !selectedRelays.isEmpty && !selectedMints.isEmpty else { return }
+        
         isProcessing = true
         
         Task {
             do {
                 guard let wallet = walletManager.activeWallet else {
-                    throw NSError(domain: "WalletSetup", code: 0, userInfo: [NSLocalizedDescriptionKey: "No active wallet found"])
+                    throw NSError(domain: "WalletOnboarding", code: 0, userInfo: [NSLocalizedDescriptionKey: "No active wallet found"])
                 }
                 
                 // Setup wallet with selected relays and mints
@@ -701,9 +855,6 @@ struct AuthenticationFlow: View {
             for await mints in discoveryManager.discoverMintsStream() {
                 await MainActor.run {
                     self.discoveredMints = mints
-                    if !mints.isEmpty {
-                        isDiscoveringMints = false
-                    }
                 }
             }
             
@@ -713,103 +864,117 @@ struct AuthenticationFlow: View {
         }
     }
     
-    // MARK: - Background
-    
-    private var backgroundGradient: some View {
-        LinearGradient(
-            gradient: Gradient(colors: [
-                Color(red: 0.05, green: 0.02, blue: 0.08),
-                Color(red: 0.02, green: 0.01, blue: 0.03),
-                Color.black
-            ]),
-            startPoint: .topLeading,
-            endPoint: .bottomTrailing
-        )
-        .ignoresSafeArea()
+    private func logout() {
+        Task {
+            nostrManager.logout()
+            dismiss()
+        }
     }
 }
 
-// MARK: - Supporting Views
-
-struct RelaySelectionRow: View {
-    let relay: RelayInfo
-    let isSelected: Bool
-    let onToggle: () -> Void
+// MARK: - Animated Header Component
+struct AnimatedHeader: View {
+    let logoSize: CGFloat
+    let logoOpacity: Double
+    let logoScale: CGFloat
+    let logoRotation: Double
+    let logoPosition: CGPoint
+    let titleText: String
+    let titleOpacity: Double
+    let titleOffset: CGFloat
+    let titleSize: CGFloat
+    let sloganOpacity: Double
+    let showSlogan: Bool
+    let glowOpacity: Double
+    let pulseScale: CGFloat
     
     var body: some View {
-        Button(action: onToggle) {
-            HStack {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(relay.name)
-                        .font(.headline)
-                        .foregroundColor(.white)
-                    Text(relay.description)
-                        .font(.caption)
-                        .foregroundColor(.white.opacity(0.7))
-                }
+        HStack(alignment: .center, spacing: 0) {
+            // Logo
+            ZStack {
+                // Outer pulsing glow
+                Circle()
+                    .fill(
+                        RadialGradient(
+                            gradient: Gradient(colors: [
+                                Color.orange.opacity(0.8),
+                                Color.purple.opacity(0.4),
+                                Color.clear
+                            ]),
+                            center: .center,
+                            startRadius: 10,
+                            endRadius: logoSize * 0.8
+                        )
+                    )
+                    .frame(width: logoSize * 2, height: logoSize * 2)
+                    .blur(radius: 30)
+                    .scaleEffect(pulseScale)
+                    .opacity(logoOpacity * 0.7)
                 
-                Spacer()
+                // Logo background circle
+                Circle()
+                    .fill(
+                        LinearGradient(
+                            gradient: Gradient(colors: [
+                                Color.orange,
+                                Color.orange.opacity(0.9),
+                                Color(red: 0.8, green: 0.4, blue: 0.1)
+                            ]),
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+                    .frame(width: logoSize, height: logoSize)
+                    .shadow(color: Color.orange.opacity(0.5), radius: 20, x: 0, y: 5)
+                    .scaleEffect(logoScale)
+                    .opacity(logoOpacity)
+                    .rotationEffect(.degrees(logoRotation))
                 
-                Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
-                    .font(.title2)
-                    .foregroundColor(isSelected ? .orange : .white.opacity(0.3))
+                // Nut logo
+                NutLogoView(size: logoSize * 0.57, color: .white)
+                    .scaleEffect(logoScale)
+                    .opacity(logoOpacity)
+                    .rotationEffect(.degrees(logoRotation))
             }
-            .padding()
-            .background(Color.white.opacity(isSelected ? 0.15 : 0.08))
-            .clipShape(RoundedRectangle(cornerRadius: 12))
-            .overlay(
-                RoundedRectangle(cornerRadius: 12)
-                    .stroke(isSelected ? Color.orange.opacity(0.5) : Color.white.opacity(0.2), lineWidth: 1)
-            )
-        }
-        .buttonStyle(.plain)
-    }
-}
-
-struct MintSelectionRow: View {
-    let mint: DiscoveredMint
-    let isSelected: Bool
-    let onToggle: () -> Void
-    
-    var body: some View {
-        Button(action: onToggle) {
-            HStack {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(mint.name)
-                        .font(.headline)
-                        .foregroundColor(.white)
-                    if let description = mint.description {
-                        Text(description)
-                            .font(.caption)
-                            .foregroundColor(.white.opacity(0.7))
-                            .lineLimit(2)
-                    }
-                    Text(mint.url)
-                        .font(.caption2)
-                        .foregroundColor(.white.opacity(0.5))
-                        .lineLimit(1)
+            .offset(x: logoPosition.x, y: logoPosition.y)
+            
+            // Title and slogan
+            VStack(spacing: 8) {
+                Text(titleText)
+                    .font(.system(size: titleSize, weight: .black, design: .default))
+                    .tracking(titleSize > 40 ? 4 : 3)
+                    .foregroundStyle(
+                        LinearGradient(
+                            gradient: Gradient(colors: [
+                                Color.white,
+                                Color.white.opacity(0.9)
+                            ]),
+                            startPoint: .top,
+                            endPoint: .bottom
+                        )
+                    )
+                    .shadow(color: Color.orange.opacity(0.3), radius: 10, x: 0, y: 2)
+                    .opacity(titleOpacity)
+                    .offset(y: titleOffset)
+                
+                if showSlogan {
+                    Text("A WALLET FOR THE RELAYS")
+                        .font(.system(size: 16, weight: .medium, design: .monospaced))
+                        .tracking(2)
+                        .foregroundColor(Color.white.opacity(0.7))
+                        .opacity(sloganOpacity)
+                        .transition(.opacity.combined(with: .scale))
                 }
-                
-                Spacer()
-                
-                Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
-                    .font(.title2)
-                    .foregroundColor(isSelected ? .orange : .white.opacity(0.3))
             }
-            .padding()
-            .background(Color.white.opacity(isSelected ? 0.15 : 0.08))
-            .clipShape(RoundedRectangle(cornerRadius: 12))
-            .overlay(
-                RoundedRectangle(cornerRadius: 12)
-                    .stroke(isSelected ? Color.orange.opacity(0.5) : Color.white.opacity(0.2), lineWidth: 1)
-            )
+            .padding(.leading, logoPosition.x != 0 ? 20 : 0)
+            
+            Spacer()
         }
-        .buttonStyle(.plain)
+        .padding(.horizontal, 32)
     }
 }
 
 // MARK: - Suggested Relays
-
 private let suggestedRelays = [
     RelayInfo(url: "wss://relay.primal.net", name: "Primal", description: "Fast and reliable public relay"),
     RelayInfo(url: "wss://relay.damus.io", name: "Damus", description: "Popular iOS-friendly relay"),
@@ -817,4 +982,3 @@ private let suggestedRelays = [
     RelayInfo(url: "wss://relay.nostr.band", name: "Nostr Band", description: "Analytics and search relay"),
     RelayInfo(url: "wss://relay.nostr.wine", name: "Nostr Wine", description: "Paid relay with spam protection")
 ]
-

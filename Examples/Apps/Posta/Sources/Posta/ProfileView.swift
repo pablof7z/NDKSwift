@@ -352,7 +352,7 @@ struct ProfileView: View {
         // Wait for first event
         for await event in dataSource.events {
             if let profileData = event.content.data(using: .utf8) {
-                profile = try? JSONDecoder().decode(NDKUserProfile.self, from: profileData)
+                profile = JSONCoding.safeDecode(NDKUserProfile.self, from: profileData)
                 isLoadingProfile = false
                 break // Only need the first/latest profile
             }

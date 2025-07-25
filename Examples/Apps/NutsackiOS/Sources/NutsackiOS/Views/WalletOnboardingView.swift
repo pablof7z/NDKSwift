@@ -8,7 +8,14 @@ struct WalletOnboardingView: View {
     @Environment(NostrManager.self) private var nostrManager
     @Environment(\.colorScheme) private var colorScheme
     
-    @State private var currentStep = 0
+    enum AuthMode {
+        case create
+        case `import`
+    }
+    
+    let authMode: AuthMode
+    
+    @State private var currentStep = -1 // Start at -1 for auth forms
     @State private var logoScale: CGFloat = 0.3
     @State private var logoOpacity: Double = 0
     @State private var logoRotation: Double = -180
@@ -30,8 +37,17 @@ struct WalletOnboardingView: View {
     @State private var discoveredMints: [DiscoveredMint] = []
     @State private var isDiscoveringMints = false
     
+    // Auth form states
+    @State private var displayName = ""
+    @State private var about = ""
+    @State private var nsecInput = ""
+    @State private var showPassword = false
+    @State private var isProcessing = false
+    @State private var showScanner = false
+    
     private var currentTitle: String {
         switch currentStep {
+        case -1: return authMode == .create ? "CREATE ACCOUNT" : "LOGIN"
         case 0: return "SETUP"
         case 1: return "RELAYS"
         case 2: return "MINTS"
@@ -185,6 +201,20 @@ struct WalletOnboardingView: View {
                 // Content
                 VStack {
                     switch currentStep {
+                    case -1:
+                        if authMode == .create {
+                            createAccountForm
+                                .transition(.asymmetric(
+                                    insertion: .move(edge: .trailing).combined(with: .opacity),
+                                    removal: .move(edge: .leading).combined(with: .opacity)
+                                ))
+                        } else {
+                            importAccountForm
+                                .transition(.asymmetric(
+                                    insertion: .move(edge: .trailing).combined(with: .opacity),
+                                    removal: .move(edge: .leading).combined(with: .opacity)
+                                ))
+                        }
                     case 0:
                         WelcomeStepView()
                             .transition(.asymmetric(
