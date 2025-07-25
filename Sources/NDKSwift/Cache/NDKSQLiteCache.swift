@@ -955,7 +955,7 @@ public actor NDKSQLiteCache: NDKCache {
         observers[signature]?.remove(observer)
         
         // Clean up empty sets
-        if observers[signature]?.isEmpty == true {
+        if observers[signature]?.isEmpty ?? false {
             observers.removeValue(forKey: signature)
         }
     }
