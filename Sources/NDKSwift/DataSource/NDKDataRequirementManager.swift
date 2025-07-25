@@ -266,7 +266,7 @@ actor NDKDataRequirementManager {
 
                 // Handle outbox model filter decomposition
                 if relays == nil && ndk.outboxEnabled && optimizedFilter.authors != nil {
-                    NDKLogger.log(.info, category: .subscription, "🎯 [DataReqManager] Using outbox strategy for filter")
+                    NDKLogger.log(.info, category: .subscription, "[DataReqManager] Using outbox strategy for filter")
                     let outboxStrategy = await ndk.outbox.getOutboxStrategy(for: optimizedFilter)
 
                     // Start background discovery if needed
@@ -486,7 +486,7 @@ actor NDKDataRequirementManager {
         if missingIds.count < requestedIds.count {
             var optimizedFilter = filter
             optimizedFilter.ids = missingIds
-            NDKLogger.log(.info, category: .subscription, "🎯 Optimized filter - removed \(requestedIds.count - missingIds.count) cached IDs")
+            NDKLogger.log(.info, category: .subscription, "Optimized filter - removed \(requestedIds.count - missingIds.count) cached IDs")
             return optimizedFilter
         }
 

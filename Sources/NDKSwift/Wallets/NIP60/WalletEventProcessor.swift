@@ -11,7 +11,7 @@ actor WalletEventProcessor {
 
         // Special logging for nutzaps
         if event.kind == EventKind.nutzap {
-            NDKLogger.log(.warning, category: .wallet, "🎯🎯🎯 NUTZAP EVENT DETECTED IN PROCESSOR!")
+            NDKLogger.log(.debug, category: .wallet, "Nutzap event detected in processor")
         }
 
         do {
@@ -162,11 +162,7 @@ actor WalletEventProcessor {
 
     /// Process incoming nutzap events
     private func processNutzapEvent(_ event: NDKEvent, context: WalletEventContext) async throws {
-        NDKLogger.log(.warning, category: .wallet, "🎯 NUTZAP EVENT RECEIVED!")
-        NDKLogger.log(.warning, category: .wallet, "🎯 Event ID: \(event.id)")
-        NDKLogger.log(.warning, category: .wallet, "🎯 Event Author: \(event.pubkey)")
-        NDKLogger.log(.warning, category: .wallet, "🎯 Event Content: \(event.content)")
-        NDKLogger.log(.warning, category: .wallet, "🎯 Event Tags: \(event.tags)")
+        NDKLogger.log(.debug, category: .wallet, "Nutzap event received - ID: \(event.id), Author: \(event.pubkey)")
 
         // Track the nutzap in the event manager
         await context.eventManager.trackNutzap(event)
