@@ -78,7 +78,11 @@ public enum CrossMintTransfer {
 
             let balance = proofs.reduce(0) { $0 + Int64($1.amount) }
             if balance >= requiredAmount {
-                if bestMint == nil || balance > bestMint!.balance {
+                if let currentBest = bestMint {
+                    if balance > currentBest.balance {
+                        bestMint = (url: mintURL, balance: balance)
+                    }
+                } else {
                     bestMint = (url: mintURL, balance: balance)
                 }
             }

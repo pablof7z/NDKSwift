@@ -560,8 +560,8 @@ actor NDKDataRequirementManager {
 
         // For tags: allow merging if they have the same tag keys
         // Different values will be aggregated (unioned) during merge
-        let keys1 = filter1.tags?.keys != nil ? Set(filter1.tags!.keys) : Set<String>()
-        let keys2 = filter2.tags?.keys != nil ? Set(filter2.tags!.keys) : Set<String>()
+        let keys1 = filter1.tags.map { Set($0.keys) } ?? Set<String>()
+        let keys2 = filter2.tags.map { Set($0.keys) } ?? Set<String>()
 
         // If they have different tag keys, they're likely different queries
         if !keys1.isEmpty && !keys2.isEmpty && keys1 != keys2 {
@@ -904,7 +904,7 @@ actor DataRequirement {
 
             // Close subscription if closeOnEose is set OR if we have all requested event IDs
             let shouldClose = self.closeOnEose ||
-                (requestedIds != nil && receivedIds != nil && Set(requestedIds!) == receivedIds!)
+                (requestedIds.map { Set($0) } == receivedIds)
 
             if shouldClose {
                 Task {
@@ -930,11 +930,12 @@ actor DataRequirement {
                 }
 
                 // Track received event IDs
-                if receivedIds != nil {
-                    receivedIds!.insert(event.id)
+                if var ids = receivedIds {
+                    ids.insert(event.id)
+                    receivedIds = ids
 
                     // Check if we've received all requested IDs
-                    if let requested = requestedIds, Set(requested) == receivedIds! {
+                    if let requested = requestedIds, Set(requested) == ids {
                         NDKLogger.log(.info, category: .subscription, "✅ Received all \(requested.count) requested event IDs - closing subscription immediately")
                         Task {
                             await self.internalSubscription.close()
