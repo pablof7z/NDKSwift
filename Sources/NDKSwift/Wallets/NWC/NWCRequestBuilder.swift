@@ -37,7 +37,7 @@ public struct NWCRequestBuilder {
             .createdAt(Timestamp.now)
             .kind(.nostrWalletConnectReq)
             .content(encryptedContent)
-            .tag(["p", walletPubkey])
+            .tag([NostrConstants.TagName.pubkey, walletPubkey])
             .build(signer: signer)
 
         return event

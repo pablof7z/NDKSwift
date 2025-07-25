@@ -121,7 +121,7 @@ public actor NDKNostrRPC {
         let event = try await NDKEventBuilder(ndk: ndk)
             .content(encryptedContent)
             .kind(24133)
-            .tags([["p", pubkey]])
+            .tags([[NostrConstants.TagName.pubkey, pubkey]])
             .build(signer: localSigner)
         NDKLogger.log(.debug, category: .auth, "Created and signed event - id: \(event.id)")
 

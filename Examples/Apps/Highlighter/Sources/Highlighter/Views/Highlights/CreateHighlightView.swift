@@ -139,7 +139,7 @@ struct CreateHighlightView: View {
                 )
             }
             .fullScreenCover(isPresented: $showSmartImporter) {
-                SmartContentImporter()
+                SmartArticleImportView()
             }
         }
         .onAppear {

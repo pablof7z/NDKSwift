@@ -145,12 +145,12 @@ public actor NIP60Wallet: NDKPaymentProvider {
                     NDKFilter(
                         authors: [userPubkey],
                         kinds: [EventKind.deletion],
-                        tags: ["k": Set([String(EventKind.cashuToken), String(EventKind.cashuQuote)])]
+                        tags: [NostrConstants.TagName.kind: Set([String(EventKind.cashuToken), String(EventKind.cashuQuote)])]
                     ),
                     // Incoming nutzaps
                     NDKFilter(
                         kinds: [EventKind.nutzap],
-                        tags: ["p": Set([userPubkey])]
+                        tags: [NostrConstants.TagName.pubkey: Set([userPubkey])]
                     ),
                     // Spending history (kind 7376)
                     NDKFilter(
