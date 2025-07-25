@@ -268,14 +268,14 @@ public enum ContentTagger {
         switch hrp {
         case "npub":
             guard data.count == 32 else {
-                throw NDKError.invalidDataFormat("bech32 data", details: "Expected 32 bytes")
+                throw NDKError.invalidDataFormat("bech32 data", details: ValidationConstants.expected32Bytes)
             }
             let pubkey = Data(data).hexString
             return DecodedNostrEntity(type: "npub", eventId: nil, pubkey: pubkey, relays: nil, kind: nil, identifier: nil)
 
         case "note":
             guard data.count == 32 else {
-                throw NDKError.invalidDataFormat("bech32 data", details: "Expected 32 bytes")
+                throw NDKError.invalidDataFormat("bech32 data", details: ValidationConstants.expected32Bytes)
             }
             let eventId = Data(data).hexString
             return DecodedNostrEntity(type: "note", eventId: eventId, pubkey: nil, relays: nil, kind: nil, identifier: nil)
@@ -283,7 +283,7 @@ public enum ContentTagger {
         case "nprofile":
             let decoded = try decodeTLV(data)
             guard let pubkeyData = decoded[2]?.first, pubkeyData.count == 32 else {
-                throw NDKError.invalidDataFormat("bech32 data", details: "Expected 32 bytes")
+                throw NDKError.invalidDataFormat("bech32 data", details: ValidationConstants.expected32Bytes)
             }
             let pubkey = Data(pubkeyData).hexString
             let relays = decoded[1]?.compactMap { String(data: Data($0), encoding: .utf8) } ?? []
@@ -292,7 +292,7 @@ public enum ContentTagger {
         case "nevent":
             let decoded = try decodeTLV(data)
             guard let eventIdData = decoded[0]?.first, eventIdData.count == 32 else {
-                throw NDKError.invalidDataFormat("bech32 data", details: "Expected 32 bytes")
+                throw NDKError.invalidDataFormat("bech32 data", details: ValidationConstants.expected32Bytes)
             }
             let eventId = Data(eventIdData).hexString
             let relays = decoded[1]?.compactMap { String(data: Data($0), encoding: .utf8) } ?? []
@@ -306,7 +306,7 @@ public enum ContentTagger {
                   let pubkeyData = decoded[2]?.first, pubkeyData.count == 32,
                   let kindData = decoded[3]?.first
             else {
-                throw NDKError.invalidDataFormat("bech32 data", details: "Expected 32 bytes")
+                throw NDKError.invalidDataFormat("bech32 data", details: ValidationConstants.expected32Bytes)
             }
             let identifier = String(data: Data(identifierData), encoding: .utf8) ?? ""
             let pubkey = Data(pubkeyData).hexString
@@ -498,7 +498,7 @@ public enum ContentTagger {
             index += 2
 
             guard index + length <= data.count else {
-                throw NDKError.invalidDataFormat("bech32 data", details: "Expected 32 bytes")
+                throw NDKError.invalidDataFormat("bech32 data", details: ValidationConstants.expected32Bytes)
             }
 
             let value = Array(data[index ..< index + length])

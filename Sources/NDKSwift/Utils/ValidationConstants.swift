@@ -28,6 +28,9 @@ public enum ValidationConstants {
     /// Key size requirement in bytes
     public static let keySize32Bytes = "32 bytes"
     
+    /// Expected data size for bech32 decoding
+    public static let expected32Bytes = "Expected 32 bytes"
+    
     // MARK: - Format Expectations
     
     /// Format expectation with count
