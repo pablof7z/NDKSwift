@@ -22,7 +22,7 @@ struct ContentView: View {
                     case .home:
                         ModernHomeView(tabBarVisible: $tabBarVisible)
                     case .feed:
-                        HighlightsFeedView(tabBarVisible: $tabBarVisible)
+                        SimplifiedHybridFeedView()
                     case .discover:
                         SearchView()
                     case .library:

@@ -126,7 +126,7 @@ struct MarkdownParser {
         while index < lines.count {
             if lines[index].starts(with: "```") {
                 let code = codeLines.joined(separator: "\n")
-                return (.codeBlock(language: language.isEmpty ? nil : language, code: code), index + 1)
+                return (.codeBlock(language: language.nilIfEmpty, code: code), index + 1)
             }
             codeLines.append(lines[index])
             index += 1
@@ -134,7 +134,7 @@ struct MarkdownParser {
 
         // Unclosed code block
         let code = codeLines.joined(separator: "\n")
-        return (.codeBlock(language: language.isEmpty ? nil : language, code: code), index)
+        return (.codeBlock(language: language.nilIfEmpty, code: code), index)
     }
 
     private static func parseBlockquote(lines: [String], startIndex: Int) -> (MarkdownBlock?, Int) {

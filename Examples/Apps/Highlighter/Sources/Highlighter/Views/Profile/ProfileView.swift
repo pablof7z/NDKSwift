@@ -161,7 +161,7 @@ struct ProfileView: View {
             )
             
             // Process highlights
-            let highlightTask = Task {
+            Task {
                 var highlights: [HighlightEvent] = []
                 for await event in highlightDataSource.events {
                     if let highlight = try? HighlightEvent(from: event) {
@@ -175,7 +175,7 @@ struct ProfileView: View {
             }
             
             // Process curations
-            let curationTask = Task {
+            Task {
                 var curations: [ArticleCuration] = []
                 for await event in curationDataSource.events {
                     if let curation = try? ArticleCuration(from: event) {

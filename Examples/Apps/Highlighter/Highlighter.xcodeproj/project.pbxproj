@@ -24,9 +24,11 @@
 		483E4645826EA9B78961A7BD /* .repomix-output.txt in Resources */ = {isa = PBXBuildFile; fileRef = 923EDFDDF5D99390303E706B /* .repomix-output.txt */; };
 		4B32ABBE29543BA6FCA0605B /* ModernHomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F0F357DAE1A92819205EE9FF /* ModernHomeView.swift */; };
 		4F557938220F55296A4E483F /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 288947C11C084EEA395DB4F3 /* ContentView.swift */; };
+		5328876790B7FC8B3F06147C /* AIHighlightEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = A9A59DD7DD81D1FEB67B662D /* AIHighlightEngine.swift */; };
 		56884CA05833E2E75660E7E3 /* BlurHashDecoder.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5C9A8C38CB54B7E5605AF14A /* BlurHashDecoder.swift */; };
 		584216E80F87025A63620635 /* ButtonSystem.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC9C86787D8110767C109BBB /* ButtonSystem.swift */; };
 		58CD029928844C6A40946A74 /* AnimationSystem.swift in Sources */ = {isa = PBXBuildFile; fileRef = C88288E64D986A7B021700F9 /* AnimationSystem.swift */; };
+		592922A038AC7CEB7AAD35F7 /* SmartArticleImportView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A4C6D9AB2A21C93E8951D6E4 /* SmartArticleImportView.swift */; };
 		5D62AE907A0A91BECED7DCD4 /* DataStreamManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 47D8FA7B43386CEE13EB7B18 /* DataStreamManager.swift */; };
 		63ED41BC7DD413BEE595F3A9 /* HighlightDiscoveryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B4C72655D262C9FB9C686CAF /* HighlightDiscoveryView.swift */; };
 		6462DC934F3BCE00CEEE8BF8 /* HighlightCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 19C631ECAA0313B22AD50212 /* HighlightCard.swift */; };
@@ -38,6 +40,7 @@
 		7686328E9D95E29C8EA0B48F /* CurationDiscoveryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 39B251BEAE7C275E85EB1BC1 /* CurationDiscoveryView.swift */; };
 		8691D5E4EAF2824D10C0E28B /* ModernTabBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9831C9AF1F1938111965B8CE /* ModernTabBar.swift */; };
 		8B1648772C86AD40FCF6602E /* DesignSystem.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A3025E76E14FBF1C8D93736 /* DesignSystem.swift */; };
+		8CC027C461CC53CF47AC2ECB /* LightningPaymentFlowView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 978B907455CE5F514DADD37A /* LightningPaymentFlowView.swift */; };
 		8D5D97226F6D2C4ABE8631F3 /* ArticleView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 71A83CD10503C7B187BEE747 /* ArticleView.swift */; };
 		8EE197235B1A83A04B155F56 /* VisualEffects.swift in Sources */ = {isa = PBXBuildFile; fileRef = 62A24BA9AAF6CD7CBED4A5EB /* VisualEffects.swift */; };
 		91774403D5A6E567EB9879C6 /* HighlighterApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = FD69175DE127E1B1E7016D16 /* HighlighterApp.swift */; };
@@ -64,6 +67,7 @@
 		DEF4ACD6D408D383F02A9C06 /* NDKSwift in Frameworks */ = {isa = PBXBuildFile; productRef = 8F0120155B5FA6FCE7E43793 /* NDKSwift */; };
 		E3A00B68BDE7C21BA3CD80C2 /* UserDiscoveryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 374EC425180288ED47940087 /* UserDiscoveryView.swift */; };
 		E85CEAE60DFDAE1A4E709ED0 /* CreateHighlightView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 513F373BC7DB42A589AB44E8 /* CreateHighlightView.swift */; };
+		EDF1676E64A7D57933E21659 /* SwarmHeatmapView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2A30F0A9531B551A701C1BD7 /* SwarmHeatmapView.swift */; };
 		F3882617AB54096ECD0A9CB3 /* SearchView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E14D0DCA79BDAC73A9F20925 /* SearchView.swift */; };
 /* End PBXBuildFile section */
 
@@ -77,6 +81,7 @@
 		19C631ECAA0313B22AD50212 /* HighlightCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HighlightCard.swift; sourceTree = "<group>"; };
 		1A3025E76E14FBF1C8D93736 /* DesignSystem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesignSystem.swift; sourceTree = "<group>"; };
 		288947C11C084EEA395DB4F3 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
+		2A30F0A9531B551A701C1BD7 /* SwarmHeatmapView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SwarmHeatmapView.swift; sourceTree = "<group>"; };
 		340014DACEA6C5443AE37553 /* TextSelectionView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TextSelectionView.swift; sourceTree = "<group>"; };
 		374EC425180288ED47940087 /* UserDiscoveryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UserDiscoveryView.swift; sourceTree = "<group>"; };
 		38C2252299BA0F18F563B8D8 /* LightningWalletView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LightningWalletView.swift; sourceTree = "<group>"; };
@@ -102,12 +107,15 @@
 		8C6C4024D5AE536DD3ADC4C4 /* HighlightsFeedView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HighlightsFeedView.swift; sourceTree = "<group>"; };
 		923EDFDDF5D99390303E706B /* .repomix-output.txt */ = {isa = PBXFileReference; lastKnownFileType = text; path = ".repomix-output.txt"; sourceTree = "<group>"; };
 		96BB1CEB6B1AF8996372B0A9 /* ModernFormComponents.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModernFormComponents.swift; sourceTree = "<group>"; };
+		978B907455CE5F514DADD37A /* LightningPaymentFlowView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LightningPaymentFlowView.swift; sourceTree = "<group>"; };
 		9831C9AF1F1938111965B8CE /* ModernTabBar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModernTabBar.swift; sourceTree = "<group>"; };
 		9906E08DF53F3E88E7370583 /* SwarmHighlight.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SwarmHighlight.swift; sourceTree = "<group>"; };
 		9FE479875030C79E23CEC371 /* CreateCurationView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CreateCurationView.swift; sourceTree = "<group>"; };
 		A0D6F1E556E98D164B99B869 /* FollowPackDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FollowPackDetailView.swift; sourceTree = "<group>"; };
 		A2CDAC5B2099CFF6ED8BE9AE /* ArticleCuration.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ArticleCuration.swift; sourceTree = "<group>"; };
+		A4C6D9AB2A21C93E8951D6E4 /* SmartArticleImportView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SmartArticleImportView.swift; sourceTree = "<group>"; };
 		A89145FF0C6BCD85C2ADB6B0 /* ArticleListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ArticleListView.swift; sourceTree = "<group>"; };
+		A9A59DD7DD81D1FEB67B662D /* AIHighlightEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AIHighlightEngine.swift; sourceTree = "<group>"; };
 		B4C72655D262C9FB9C686CAF /* HighlightDiscoveryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HighlightDiscoveryView.swift; sourceTree = "<group>"; };
 		B4CAEDCB43E983D35EC24C74 /* ModernButtonStyles.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModernButtonStyles.swift; sourceTree = "<group>"; };
 		C3CDA726BB07F1F8F89ABF1C /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
@@ -157,6 +165,7 @@
 				513F373BC7DB42A589AB44E8 /* CreateHighlightView.swift */,
 				842FF8B20D37A2852B7A0ED9 /* HighlightDetailView.swift */,
 				8C6C4024D5AE536DD3ADC4C4 /* HighlightsFeedView.swift */,
+				2A30F0A9531B551A701C1BD7 /* SwarmHeatmapView.swift */,
 				83206D6462CF11DCF490672D /* SwarmOverlayView.swift */,
 				340014DACEA6C5443AE37553 /* TextSelectionView.swift */,
 			);
@@ -191,6 +200,7 @@
 		413D3DAEE4E538F6BE0D214D /* Lightning */ = {
 			isa = PBXGroup;
 			children = (
+				978B907455CE5F514DADD37A /* LightningPaymentFlowView.swift */,
 				38C2252299BA0F18F563B8D8 /* LightningWalletView.swift */,
 			);
 			path = Lightning;
@@ -351,6 +361,7 @@
 			isa = PBXGroup;
 			children = (
 				D304A7FFF9887A1BBC5CD4A5 /* ImportComponents.swift */,
+				A4C6D9AB2A21C93E8951D6E4 /* SmartArticleImportView.swift */,
 				3EE49BE02AE3ECE3BD63A825 /* SmartContentImporter.swift */,
 			);
 			path = Import;
@@ -381,6 +392,7 @@
 		F7E48321CF585FC04732E331 /* Services */ = {
 			isa = PBXGroup;
 			children = (
+				A9A59DD7DD81D1FEB67B662D /* AIHighlightEngine.swift */,
 				47D8FA7B43386CEE13EB7B18 /* DataStreamManager.swift */,
 				5818E9E0A5081751B12C7A05 /* LightningService.swift */,
 				0CD20236BF86EF8694B01BCB /* ProfileManager.swift */,
@@ -476,6 +488,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				5328876790B7FC8B3F06147C /* AIHighlightEngine.swift in Sources */,
 				58CD029928844C6A40946A74 /* AnimationSystem.swift in Sources */,
 				218363F8C03885960CF5D248 /* AppState.swift in Sources */,
 				BB60DB5A67DACB9C750CA1D2 /* Article.swift in Sources */,
@@ -507,6 +520,7 @@
 				34DF18AC7EC3EE0F46E1A1A3 /* HomeDataManager.swift in Sources */,
 				BB95A1839717B5CFCB24CD1B /* ImportComponents.swift in Sources */,
 				39ED8F05509F9A4FFF466557 /* LibraryView.swift in Sources */,
+				8CC027C461CC53CF47AC2ECB /* LightningPaymentFlowView.swift in Sources */,
 				0CAD93077385698E44D03486 /* LightningService.swift in Sources */,
 				B27F8ADE7A1BC93C9447C110 /* LightningWalletView.swift in Sources */,
 				9D8D0E11AFFAEBF826CA8C35 /* ModernAuthenticationView.swift in Sources */,
@@ -522,7 +536,9 @@
 				F3882617AB54096ECD0A9CB3 /* SearchView.swift in Sources */,
 				2629890795B6D0A577BF09D3 /* SelectableMarkdownRenderer.swift in Sources */,
 				D3BD7A0160EE2E26A8529370 /* SharedStyles.swift in Sources */,
+				592922A038AC7CEB7AAD35F7 /* SmartArticleImportView.swift in Sources */,
 				99A884B98EA5E9A9DD9BFC8F /* SmartContentImporter.swift in Sources */,
+				EDF1676E64A7D57933E21659 /* SwarmHeatmapView.swift in Sources */,
 				06F1FA7B9C3130D22B35D122 /* SwarmHighlight.swift in Sources */,
 				6972D167F453E975971B28E6 /* SwarmOverlayView.swift in Sources */,
 				07E3CDA432D5B26DF5747DDD /* TextSelectionView.swift in Sources */,

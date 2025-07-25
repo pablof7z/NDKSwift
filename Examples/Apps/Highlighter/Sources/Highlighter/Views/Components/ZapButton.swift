@@ -9,10 +9,10 @@ struct ZapButton: View {
     var onZapComplete: (() -> Void)? = nil
     
     @EnvironmentObject var appState: AppState
-    // Lightning service will be injected via environment in production
-    // @StateObject private var lightning = LightningService()
+    @StateObject private var lightning = LightningService()
     @State private var zapState: ZapState = .idle
     @State private var showZapSheet = false
+    @State private var showPaymentFlow = false
     @State private var zapAmount = 21
     @State private var showParticles = false
     @State private var particles: [ZapParticle] = []
@@ -105,13 +105,26 @@ struct ZapButton: View {
             )
             .environmentObject(appState)
         }
+        .sheet(isPresented: $showPaymentFlow) {
+            if let highlight = highlight {
+                LightningPaymentFlowView(
+                    highlight: highlight,
+                    authorProfile: nil, // Would fetch from ProfileManager
+                    highlighterProfile: nil, // Would fetch from ProfileManager
+                    curatorProfile: nil // Would fetch from ProfileManager
+                )
+            }
+        }
     }
     
     private func handleZap() {
         HapticManager.shared.impact(.light)
         
-        // If already zapped, show amount picker to zap again
-        if zapState == .zapped {
+        // If we have a highlight event and Lightning is connected, show the smart payment flow
+        if highlight != nil && lightning.isConnected {
+            showPaymentFlow = true
+        } else if zapState == .zapped {
+            // If already zapped, show amount picker to zap again
             showZapSheet = true
         } else {
             // Quick zap with default amount
