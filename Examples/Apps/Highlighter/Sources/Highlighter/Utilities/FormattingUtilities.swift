@@ -202,10 +202,7 @@ struct RelativeTimeFormatter {
     /// - Parameter date: Date to format
     /// - Returns: Formatted date and time string
     static func exactTime(from date: Date) -> String {
-        let formatter = DateFormatter()
-        formatter.dateStyle = .medium
-        formatter.timeStyle = .short
-        return formatter.string(from: date)
+        return DateFormatters.display.string(from: date)
     }
     
     /// Smart formatting that switches between relative and exact based on age
