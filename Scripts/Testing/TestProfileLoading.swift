@@ -27,7 +27,7 @@ Task {
     print("Fetching profile for pubkey: \(testPubkey)")
     
     // Try direct profile manager
-    for await profile in ndk.profileManager.observe(for: testPubkey, maxAge: 0) {
+    for await profile in ndk.profileManager.observe(for: testPubkey) {
         if let profile = profile {
             print("✅ Profile loaded!")
             print("  Name: \(profile.name ?? "none")")

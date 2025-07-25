@@ -91,7 +91,7 @@ class SwarmHighlightManager: ObservableObject {
             
             // Use streaming observe API to get the profile
             var profile: NDKUserProfile?
-            for await p in await ndk.profileManager.observe(for: event.pubkey, maxAge: 3600) {
+            for await p in await ndk.profileManager.observe(for: event.pubkey) {
                 profile = p
                 break // Just get the first result
             }

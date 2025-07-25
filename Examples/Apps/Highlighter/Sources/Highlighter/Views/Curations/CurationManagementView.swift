@@ -485,7 +485,7 @@ struct CarouselView: View {
         GeometryReader { geometry in
             ZStack {
                 ForEach(Array(curations.enumerated()), id: \.element.id) { index, curation in
-                    CurationCarouselCard(
+                    CurationManagementCarouselCard(
                         curation: curation,
                         geometry: geometry,
                         index: index,
@@ -756,7 +756,7 @@ struct CurationListRow: View {
     }
 }
 
-struct CurationCarouselCard: View {
+struct CurationManagementCarouselCard: View {
     let curation: ArticleCuration
     let geometry: GeometryProxy
     let index: Int

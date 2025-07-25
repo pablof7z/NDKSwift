@@ -28,6 +28,10 @@ actor InternalSubscriptionManager {
         relays: Set<RelayURL>? = nil
     ) async -> InternalSubscription {
         NDKLogger.log(.debug, category: .subscription, "📋 [InternalSubManager] createSubscription called - id: \(id), filters: \(filters)")
+        
+        // MARK: - OUTBOX_DEBUG_HOOK
+        await NDKDebugHooks.emit(.subscriptionCreated(id: id, filter: filters.first ?? NDKFilter()))
+        await NDKDebugHooks.emit(.flowStep(description: "Creating subscription \(id) with \(filters.count) filters"))
 
         // Ensure relay monitoring is started when first subscription is created
         await ensureRelayMonitoring()
@@ -50,6 +54,10 @@ actor InternalSubscriptionManager {
 
         // Start the subscription
         NDKLogger.log(.debug, category: .subscription, "🚀 [InternalSubManager] Starting subscription...")
+        
+        // MARK: - OUTBOX_DEBUG_HOOK
+        await NDKDebugHooks.emit(.flowStep(description: "Starting subscription \(id)"))
+        
         await subscription.start()
         NDKLogger.log(.debug, category: .subscription, "✅ [InternalSubManager] Subscription started")
 
@@ -59,6 +67,10 @@ actor InternalSubscriptionManager {
     /// Close a subscription
     func closeSubscription(id: String) async {
         NDKLogger.log(.debug, category: .subscription, "🚪 Closing subscription: \(id)")
+        
+        // MARK: - OUTBOX_DEBUG_HOOK
+        await NDKDebugHooks.emit(.subscriptionClosed(id: id, reason: "User requested"))
+        
         if let subscription = activeSubscriptions.removeValue(forKey: id) {
             await subscription.close()
             NDKLogger.log(.info, category: .subscription, "✅ Closed subscription: \(id), remaining active: \(activeSubscriptions.count)")
@@ -73,6 +85,10 @@ actor InternalSubscriptionManager {
             NDKLogger.log(.trace, category: .subscription, "🚫 Ignoring event for non-existent subscription: \(subscriptionId)")
             return
         }
+        
+        // MARK: - OUTBOX_DEBUG_HOOK
+        await NDKDebugHooks.emit(.subscriptionReceived(id: subscriptionId, relay: relay.url, event: event))
+        
         await subscription.handleEvent(event, from: relay)
     }
 
@@ -82,6 +98,10 @@ actor InternalSubscriptionManager {
             NDKLogger.log(.trace, category: .subscription, "🚫 Ignoring EOSE for non-existent subscription: \(subscriptionId)")
             return
         }
+        
+        // MARK: - OUTBOX_DEBUG_HOOK
+        await NDKDebugHooks.emit(.subscriptionEose(id: subscriptionId, relay: relay.url))
+        
         await subscription.handleEOSE(from: relay)
     }
 
@@ -219,6 +239,11 @@ actor InternalSubscription {
         }
 
         NDKLogger.log(.debug, category: .subscription, "📤 [InternalSub] Sending REQ to \(targetRelays.count) relays")
+        
+        // MARK: - OUTBOX_DEBUG_HOOK
+        let relayUrls = Set(targetRelays.map { $0.url })
+        await NDKDebugHooks.emit(.subscriptionStarting(id: id, relays: relayUrls))
+        await NDKDebugHooks.emit(.flowStep(description: "Sending REQ to \(targetRelays.count) relays"))
 
         // Send REQ message to each relay
         var successCount = 0

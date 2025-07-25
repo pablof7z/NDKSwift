@@ -170,7 +170,7 @@ public struct NDKProfilePicture: View {
         guard let ndk = ndk else { return }
 
         profileTask = Task {
-            for await profile in await ndk.profileManager.observe(for: pubkey, maxAge: TimeConstants.hour) {
+            for await profile in await ndk.profileManager.observe(for: pubkey) {
                 await MainActor.run {
                     self.profile = profile
                 }

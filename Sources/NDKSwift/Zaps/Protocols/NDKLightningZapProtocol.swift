@@ -208,7 +208,7 @@ public class NDKLightningZapProtocol: NDKZapProtocol {
     private func resolveLNURL(for user: NDKUser) async throws -> LNURLPayEndpoint {
         var userProfile: NDKUserProfile?
 
-        for await profile in await ndk.profileManager.observe(for: user.pubkey, maxAge: TimeConstants.hour) {
+        for await profile in await ndk.profileManager.observe(for: user.pubkey) {
             userProfile = profile
             break // Only need first value
         }

@@ -7,7 +7,7 @@ struct SwarmOverlayView: View {
     @State private var selectedHighlight: SwarmHighlight?
     @State private var popoverPosition: CGPoint = .zero
     @State private var glowAnimation = false
-    @State private var particlePositions: [ParticlePosition] = []
+    @State private var particlePositions: [SwarmParticlePosition] = []
     @State private var heatmapOpacity: Double = 0
     @State private var newHighlightAnimation: [String: Bool] = [:]
     @State private var liveActivityPulse = false
@@ -49,7 +49,7 @@ struct SwarmOverlayView: View {
                 .allowsHitTesting(false)
                 
                 // Heatmap overlay layer with enhanced effects
-                SwarmHeatmapView(
+                SwarmHeatmapOverlay(
                     text: text,
                     swarmHighlights: swarmManager.findOverlappingHighlights(in: text),
                     opacity: heatmapOpacity
@@ -174,7 +174,7 @@ struct SwarmOverlayView: View {
         for (_, highlight) in highlights.prefix(5) {
             if highlight.intensity > 0.5 {
                 for _ in 0..<Int(highlight.intensity * 5) {
-                    let particle = ParticlePosition(
+                    let particle = SwarmParticlePosition(
                         x: .random(in: 0...UIScreen.main.bounds.width),
                         y: .random(in: 0...UIScreen.main.bounds.height),
                         scale: .random(in: 0.5...1.5),
@@ -282,7 +282,7 @@ struct SwarmOverlayView: View {
 }
 
 // New Heatmap Visualization Component
-struct SwarmHeatmapView: View {
+struct SwarmHeatmapOverlay: View {
     let text: String
     let swarmHighlights: [(range: NSRange, highlight: SwarmHighlight)]
     let opacity: Double
@@ -329,7 +329,7 @@ struct SwarmHeatmapView: View {
 }
 
 // Particle Effect Component
-struct ParticlePosition: Identifiable {
+struct SwarmParticlePosition: Identifiable {
     let id = UUID()
     var x: CGFloat
     var y: CGFloat
@@ -338,7 +338,7 @@ struct ParticlePosition: Identifiable {
 }
 
 struct ParticleView: View {
-    let particle: ParticlePosition
+    let particle: SwarmParticlePosition
     @State private var offset: CGSize = .zero
     @State private var rotation: Double = 0
     

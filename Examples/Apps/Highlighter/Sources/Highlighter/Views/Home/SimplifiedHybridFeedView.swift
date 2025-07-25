@@ -1,6 +1,9 @@
 import SwiftUI
 import NDKSwift
 
+// Make NDKEvent conform to Identifiable for SwiftUI usage
+extension NDKEvent: Identifiable {}
+
 struct SimplifiedHybridFeedView: View {
     @EnvironmentObject var appState: AppState
     @StateObject private var dataManager = HomeDataManager()

@@ -1,0 +1,27 @@
+#!/usr/bin/expect -f
+# Test script for OutboxDebugger
+
+set timeout 10
+
+spawn .build/debug/outbox-debug
+
+# Wait for initial connection
+expect "Welcome to Outbox Debugger"
+
+# Give it time to connect and show relay status
+sleep 3
+
+# Test help command
+send "help\r"
+expect "Available commands"
+
+# Test outbox command
+send "outbox npub1l2vyh47mk2p0qlsku7hg0vn29faehy9hy34ygaclpn66ukqp3afqutajft\r"
+expect "Outbox for"
+sleep 2
+
+# Exit
+send "exit\r"
+expect "Goodbye"
+
+wait

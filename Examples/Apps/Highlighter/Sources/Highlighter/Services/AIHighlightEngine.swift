@@ -369,20 +369,7 @@ actor AIHighlightEngine {
     }
     
     private func analyzeSentiment(_ text: String) async -> Double {
-        let sentiment = await sentimentAnalyzer.analyzeSentiment(for: text)
-        
-        switch sentiment {
-        case .positive:
-            return 1.0
-        case .negative:
-            return -1.0
-        case .neutral:
-            return 0.0
-        case .mixed:
-            return 0.5
-        @unknown default:
-            return 0.0
-        }
+        return await sentimentAnalyzer.analyzeSentiment(for: text)
     }
     
     private func calculateReadability(text: String, wordCount: Int) -> Double {
@@ -805,10 +792,19 @@ actor NLPProcessor {
 actor NLSentimentAnalyzer {
     private let tagger = NLTagger(tagSchemes: [.sentimentScore])
     
-    func analyzeSentiment(for text: String) async -> NLTag {
+    func analyzeSentiment(for text: String) async -> Double {
         tagger.string = text
-        let sentiment = tagger.tag(at: text.startIndex, unit: .paragraph, scheme: .sentimentScore).0
-        return sentiment ?? .neutral
+        
+        let (sentimentTag, _) = tagger.tag(at: text.startIndex, unit: .paragraph, scheme: .sentimentScore)
+        
+        guard let tag = sentimentTag,
+              let sentimentScore = Double(tag.rawValue) else {
+            return 0.0 // Neutral sentiment
+        }
+        
+        // NLTagger returns sentiment scores in range [-1, 1]
+        // -1 = most negative, 0 = neutral, 1 = most positive
+        return sentimentScore
     }
 }
 

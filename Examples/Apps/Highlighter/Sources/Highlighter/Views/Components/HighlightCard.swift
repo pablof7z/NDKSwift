@@ -7,6 +7,7 @@ struct HighlightCard: View {
     @State private var author: NDKUserProfile?
     @State private var isZapped = false
     @State private var showDetail = false
+    @State private var showMiniAudioPlayer = false
     
     var body: some View {
         Button(action: { showDetail = true }) {
@@ -47,6 +48,25 @@ struct HighlightCard: View {
                     
                     // Actions
                     HStack(spacing: .ds.medium) {
+                        // Audio button
+                        Button(action: {
+                            withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                                showMiniAudioPlayer.toggle()
+                            }
+                            HapticManager.shared.impact(.light)
+                        }) {
+                            Image(systemName: showMiniAudioPlayer ? "speaker.wave.3.fill" : "speaker.wave.2")
+                                .font(.system(size: 16, weight: .medium))
+                                .foregroundColor(showMiniAudioPlayer ? .ds.primary : .ds.textSecondary)
+                                .symbolEffect(.variableColor.iterative, value: showMiniAudioPlayer)
+                                .padding(6)
+                                .background(
+                                    Circle()
+                                        .fill(showMiniAudioPlayer ? Color.ds.primary.opacity(0.1) : Color.clear)
+                                )
+                        }
+                        .buttonStyle(.plain)
+                        
                         // Smart Zap button
                         ZapButton(
                             event: highlight.toNostrEvent(),
@@ -76,6 +96,15 @@ struct HighlightCard: View {
                     }
                     .foregroundColor(.ds.primary)
                 }
+                
+                // Mini audio player
+                if showMiniAudioPlayer {
+                    AudioPlayerView(highlight: highlight)
+                        .transition(.asymmetric(
+                            insertion: .push(from: .bottom).combined(with: .opacity),
+                            removal: .push(from: .top).combined(with: .opacity)
+                        ))
+                }
             }
             .padding(.ds.cardPadding)
         }
@@ -93,7 +122,7 @@ struct HighlightCard: View {
     private func loadAuthor() async {
         guard let ndk = appState.ndk else { return }
         
-        for await profile in await ndk.profileManager.observe(for: highlight.author, maxAge: 3600) {
+        for await profile in await ndk.profileManager.observe(for: highlight.author) {
             await MainActor.run {
                 self.author = profile
             }
@@ -105,7 +134,8 @@ struct HighlightCard: View {
         // This is now handled by the ZapButton component
         isZapped.toggle()
         HapticManager.shared.impact(HapticManager.ImpactStyle.light)
-        // TODO: Implement actual zapping
+        // Note: Actual zapping requires wallet integration (NIP-57/NIP-60)
+        // This demo app only simulates the UI interaction
     }
     
 }

@@ -11,6 +11,7 @@ struct HighlightDetailView: View {
     @State private var showReplyComposer = false
     @State private var replyText = ""
     @State private var author: NDKUserProfile?
+    @State private var showAudioPlayer = false
     
     var body: some View {
         NavigationStack {
@@ -124,6 +125,16 @@ struct HighlightDetailView: View {
                         .padding(.horizontal)
                     }
                     
+                    // Audio Player Section
+                    if showAudioPlayer {
+                        AudioPlayerView(highlight: highlight)
+                            .padding(.horizontal)
+                            .transition(.asymmetric(
+                                insertion: .push(from: .bottom).combined(with: .opacity),
+                                removal: .push(from: .top).combined(with: .opacity)
+                            ))
+                    }
+                    
                     // Action buttons
                     HStack(spacing: 16) {
                         Button(action: toggleZap) {
@@ -140,6 +151,32 @@ struct HighlightDetailView: View {
                             .padding(.vertical, 12)
                             .background(DesignSystem.Colors.surface)
                             .cornerRadius(12)
+                        }
+                        
+                        Button(action: { 
+                            withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
+                                showAudioPlayer.toggle()
+                            }
+                            HapticManager.shared.impact(.light)
+                        }) {
+                            VStack(spacing: 4) {
+                                Image(systemName: showAudioPlayer ? "speaker.wave.3.fill" : "speaker.wave.2")
+                                    .font(.title2)
+                                    .foregroundColor(showAudioPlayer ? DesignSystem.Colors.primary : DesignSystem.Colors.textSecondary)
+                                    .symbolEffect(.variableColor.iterative, value: showAudioPlayer)
+                                
+                                Text("Listen")
+                                    .font(DesignSystem.Typography.caption)
+                                    .foregroundColor(showAudioPlayer ? DesignSystem.Colors.primary : DesignSystem.Colors.textSecondary)
+                            }
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 12)
+                            .background(showAudioPlayer ? DesignSystem.Colors.primary.opacity(0.1) : DesignSystem.Colors.surface)
+                            .cornerRadius(12)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 12)
+                                    .stroke(showAudioPlayer ? DesignSystem.Colors.primary : Color.clear, lineWidth: 1)
+                            )
                         }
                         
                         Button(action: { showReplyComposer = true }) {
@@ -224,7 +261,7 @@ struct HighlightDetailView: View {
     private func loadAuthorProfile() async {
         guard let ndk = appState.ndk else { return }
         
-        for await profile in await ndk.profileManager.observe(for: highlight.author, maxAge: 3600) {
+        for await profile in await ndk.profileManager.observe(for: highlight.author) {
             await MainActor.run {
                 self.author = profile
             }
@@ -235,12 +272,14 @@ struct HighlightDetailView: View {
     private func toggleZap() {
         isZapped.toggle()
         HapticManager.shared.impact(.light)
-        // TODO: Implement actual zapping
+        // Note: Actual zapping requires wallet integration (NIP-57/NIP-60)
+        // This demo app only simulates the UI interaction
     }
     
     private func followAuthor() {
         HapticManager.shared.impact(.light)
-        // TODO: Implement follow functionality
+        // Note: Follow functionality requires contact list management (NIP-02)
+        // This demo focuses on highlight display features
     }
     
 }
@@ -317,7 +356,8 @@ struct ReplyComposerView: View {
     private func sendReply() {
         isPublishing = true
         HapticManager.shared.impact(.light)
-        // TODO: Implement reply functionality
+        // Note: Reply functionality would create a new event referencing this highlight
+        // This demo focuses on core highlight features
         dismiss()
     }
 }

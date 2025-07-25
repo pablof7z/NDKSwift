@@ -143,9 +143,9 @@ struct ZapButton: View {
                 // Add realistic delay for better UX feedback
                 try await Task.sleep(nanoseconds: 800_000_000) // 0.8 seconds
                 
-                // TODO: Implement actual zapping once NDK supports it
+                // Note: Actual zapping requires wallet integration (NIP-57/NIP-60)
                 // This would create a zap event (kind 9735) and send payment
-                // For now, just show success immediately
+                // This demo app simulates the zap UI without actual payment
                 
                 await MainActor.run {
                     zapAmount = amount
