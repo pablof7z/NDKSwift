@@ -285,13 +285,6 @@ extension View {
         .clipped()
     }
     
-    // This functionality is now provided by CardSystem.swift
-    // Use .modernCard(), .modernCardSelected(), .glassCard(), or .compactCard() instead
-    @available(*, deprecated, message: "Use modernCard() or modernCardSelected() from CardSystem.swift instead")
-    func cardBackground(isSelected: Bool = false) -> some View {
-        self.modernCardSelected(isSelected)
-    }
-    
     func pulseGently() -> some View {
         self.modifier(GentlePulseModifier())
     }
