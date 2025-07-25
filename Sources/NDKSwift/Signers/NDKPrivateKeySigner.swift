@@ -123,24 +123,24 @@ public final class NDKPrivateKeySigner: NDKSigner {
     public var privateKeyValue: PrivateKey {
         return privateKey
     }
-    
+
     // MARK: - Serialization (NDKSigner Protocol)
-    
+
     public static var signerType: String {
         return "privatekey"
     }
-    
+
     public func serialize() async throws -> Data {
         let payload: [String: Any] = [
             "privateKey": privateKey
         ]
         return try NDKSignerSerialization.createContainer(type: Self.signerType, payload: payload)
     }
-    
+
     public static func deserialize(_ data: Data, ndk: NDK?) throws -> NDKPrivateKeySigner {
         // The registry already extracted the payload, so we just need to decode it directly
         let payload = try JSONCoding.decode([String: String].self, from: data)
-        
+
         guard let privateKey = payload["privateKey"] else {
             throw NDKSignerRegistryError.deserializationError("Missing or invalid privateKey")
         }
