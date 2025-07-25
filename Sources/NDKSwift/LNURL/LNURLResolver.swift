@@ -69,7 +69,7 @@ public class LNURLResolver: LNURLResolving {
     private func resolveLUD16(_ address: String) throws -> URL {
         let parts = address.split(separator: "@")
         guard parts.count == 2 else {
-            throw LNURLError.invalidFormat("Invalid LUD16 format")
+            throw LNURLError.invalidFormat(ErrorMessageConstants.invalid("LUD16 format"))
         }
 
         let username = String(parts[0])
@@ -114,7 +114,7 @@ public class LNURLResolver: LNURLResolving {
     /// Parse metadata JSON string into structured entries
     private func parseMetadata(_ metadataString: String) throws -> [LNURLMetadataEntry] {
         guard let data = metadataString.data(using: .utf8) else {
-            throw LNURLError.decodingError("Invalid metadata string")
+            throw LNURLError.decodingError(ErrorMessageConstants.invalid("metadata string"))
         }
 
         do {

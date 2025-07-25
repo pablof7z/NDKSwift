@@ -120,7 +120,7 @@ public enum ZapError: LocalizedError {
         case .noLNURL:
             return "Recipient has no Lightning address configured"
         case .invalidLNURL(let details):
-            return "Invalid LNURL: \(details)"
+            return ErrorMessageConstants.withContext(ErrorMessageConstants.invalid("LNURL"), context: details)
         case .invoiceFetchFailed(let reason):
             return ErrorMessageConstants.operationFailed("fetch invoice", reason: reason)
         case .lnurlProviderError(let message):
@@ -130,9 +130,9 @@ public enum ZapError: LocalizedError {
         case .invalidMint:
             return "No valid mint found"
         case .invalidPaymentRequest:
-            return "Invalid payment request"
+            return ErrorMessageConstants.invalid("payment request")
         case .invalidPaymentConfirmation:
-            return "Invalid payment confirmation"
+            return ErrorMessageConstants.invalid("payment confirmation")
         case .noWalletConfigured:
             return "No wallet configured for payment"
         case .paymentFailed(let reason):
@@ -140,7 +140,7 @@ public enum ZapError: LocalizedError {
         case .timeoutWaitingForReceipt:
             return "Timeout waiting for zap receipt"
         case .invalidZapReceipt:
-            return "Invalid zap receipt"
+            return ErrorMessageConstants.invalid("zap receipt")
         case .mintConnectionFailed(let mint, let reason):
             return ErrorMessageConstants.operationFailed("connect to mint \(mint)", reason: reason)
         case .mintQuoteFailed(let mint, let reason):

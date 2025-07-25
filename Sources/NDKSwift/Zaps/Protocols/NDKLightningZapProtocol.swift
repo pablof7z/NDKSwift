@@ -233,12 +233,12 @@ public class NDKLightningZapProtocol: NDKZapProtocol {
             // Lightning address format
             let parts = lnurlString.split(separator: "@")
             guard parts.count == 2 else {
-                throw ZapError.invalidLNURL("Invalid lightning address format")
+                throw ZapError.invalidLNURL(ErrorMessageConstants.invalid("lightning address format"))
             }
             let username = String(parts[0])
             let domain = String(parts[1])
             guard let lnurlURL = URL(string: "https://\(domain)\(WellKnownPath.lnurlp)\(username)") else {
-                throw ZapError.invalidLNURL("Failed to construct LNURL")
+                throw ZapError.invalidLNURL(ErrorMessageConstants.failedTo("construct LNURL"))
             }
             url = lnurlURL
         } else if lnurlString.lowercased().starts(with: Bech32HRP.lnurl) {
@@ -246,23 +246,23 @@ public class NDKLightningZapProtocol: NDKZapProtocol {
             do {
                 let decoded = try Bech32.decode(lnurlString)
                 guard decoded.hrp == Bech32HRP.lnurl else {
-                    throw ZapError.invalidLNURL("Invalid LNURL bech32 format")
+                    throw ZapError.invalidLNURL(ErrorMessageConstants.invalid("LNURL bech32 format"))
                 }
 
                 // Convert data to string
                 let data = Data(decoded.data)
                 guard let decodedString = String(data: data, encoding: .utf8),
                       let lnurlURL = URL(string: decodedString) else {
-                    throw ZapError.invalidLNURL("Invalid LNURL data")
+                    throw ZapError.invalidLNURL(ErrorMessageConstants.invalid("LNURL data"))
                 }
                 url = lnurlURL
             } catch {
-                throw ZapError.invalidLNURL("Failed to decode LNURL: \(error.localizedDescription)")
+                throw ZapError.invalidLNURL(ErrorMessageConstants.operationFailed("decode LNURL", reason: error.localizedDescription))
             }
         } else {
             // Assume it's already a URL
             guard let lnurlURL = URL(string: lnurlString) else {
-                throw ZapError.invalidLNURL("Invalid URL")
+                throw ZapError.invalidLNURL(ErrorMessageConstants.invalid("URL"))
             }
             url = lnurlURL
         }
@@ -275,7 +275,7 @@ public class NDKLightningZapProtocol: NDKZapProtocol {
 
         guard let httpResponse = response as? HTTPURLResponse,
               (200...299).contains(httpResponse.statusCode) else {
-            throw ZapError.invalidLNURL("Failed to fetch LNURL metadata")
+            throw ZapError.invalidLNURL(ErrorMessageConstants.failedTo("fetch LNURL metadata"))
         }
 
         // Parse response
@@ -293,7 +293,7 @@ public class NDKLightningZapProtocol: NDKZapProtocol {
         let lnurlResponse = try JSONCoding.decode(LNURLResponse.self, from: data)
 
         guard let callbackURL = URL(string: lnurlResponse.callback) else {
-            throw ZapError.invalidLNURL("Invalid callback URL")
+            throw ZapError.invalidLNURL(ErrorMessageConstants.invalid("callback URL"))
         }
 
         return LNURLPayEndpoint(
@@ -318,7 +318,7 @@ public class NDKLightningZapProtocol: NDKZapProtocol {
         // Build callback URL with parameters
         guard let callbackURL = URL(string: endpoint.callback),
               var components = URLComponents(url: callbackURL, resolvingAgainstBaseURL: false) else {
-            throw ZapError.invoiceFetchFailed("Invalid callback URL: \(endpoint.callback)")
+            throw ZapError.invoiceFetchFailed(ErrorMessageConstants.withContext(ErrorMessageConstants.invalid("callback URL"), context: endpoint.callback))
         }
         
         components.queryItems = [
@@ -331,7 +331,7 @@ public class NDKLightningZapProtocol: NDKZapProtocol {
         }
 
         guard let url = components.url else {
-            throw ZapError.invoiceFetchFailed("Failed to construct callback URL")
+            throw ZapError.invoiceFetchFailed(ErrorMessageConstants.failedTo("construct callback URL"))
         }
 
         // Fetch invoice
