@@ -49,9 +49,6 @@ public enum RelayConstants {
 
     // MARK: - Specialized Relays
 
-    /// Purple Pages relay - Default outbox relay
-    public static let purplePages = "wss://purplepag.es"
-
     // MARK: - Documentation Examples
 
     /// Example relay URL for documentation and examples
@@ -91,6 +88,6 @@ public enum RelayConstants {
 
     /// Default outbox relays
     public static let defaultOutboxRelays: Set<String> = [
-        purplePages
+        "wss://relay.nostr.band"
     ]
 }

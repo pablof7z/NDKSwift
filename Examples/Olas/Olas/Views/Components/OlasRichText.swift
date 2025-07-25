@@ -233,7 +233,7 @@ struct OlasRichText: View {
                 group.addTask {
                     // Use observe to get reactive updates
                     var profile: NDKUserProfile?
-                    for await p in await profileManager.observe(for: pubkey) {
+                    for await p in await profileManager.observe(for: pubkey, maxAge: TimeConstants.hour) {
                         profile = p
                         break // Just get the first one for now
                     }

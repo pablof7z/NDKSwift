@@ -79,7 +79,6 @@ public final class NDK {
     internal var _relayRanker: NDKRelayRanker?
     internal var _relaySelector: NDKRelaySelector?
     internal var _publishingStrategy: NDKPublishingStrategy?
-    internal var _fetchingStrategy: NDKFetchingStrategy?
     internal var _nip05Manager: NIP05Manager?
 
     // MARK: - Computed Properties
@@ -97,12 +96,6 @@ public final class NDK {
     internal var relaySelector: NDKRelaySelector {
         lazyInit(&_relaySelector) {
             NDKRelaySelector(ndk: self, tracker: outboxTracker, ranker: relayRanker)
-        }
-    }
-
-    private var fetchingStrategy: NDKFetchingStrategy {
-        lazyInit(&_fetchingStrategy) {
-            NDKFetchingStrategy(ndk: self, selector: self.relaySelector)
         }
     }
 
@@ -295,24 +288,21 @@ public final class NDK {
     /// Initiates WebSocket connections to all relays in the pool.
     /// Connections are managed automatically with reconnection logic.
     public func connect() async {
-        // MARK: - OUTBOX_DEBUG_HOOK
-        await NDKDebugHooks.emit(.flowStep(description: "NDK.connect() called - initializing relay connections"))
-        
         // Ensure initial relays are added first
         if !initialRelayUrls.isEmpty {
-            await NDKDebugHooks.emit(.flowStep(description: "Adding \(initialRelayUrls.count) initial relay(s) from configuration"))
+            NDKLogger.log(.info, category: .relay, "Adding \(initialRelayUrls.count) initial relay(s) from configuration")
             await initializeRelays()
         }
 
         // Add outbox relays from config
         if !outboxConfig.outboxRelays.isEmpty {
-            await NDKDebugHooks.emit(.flowStep(description: "Adding \(outboxConfig.outboxRelays.count) outbox relay(s) from configuration"))
+            NDKLogger.log(.info, category: .relay, "Adding \(outboxConfig.outboxRelays.count) outbox relay(s) from configuration")
             for relayUrl in outboxConfig.outboxRelays {
                 await pool.addRelay(relayUrl, origin: .outboxConfig)
             }
         }
 
-        await NDKDebugHooks.emit(.flowStep(description: "Connecting to all relays in pool"))
+        NDKLogger.log(.info, category: .relay, "Connecting to all relays in pool")
         await pool.connectAll()
     }
 
@@ -442,8 +432,12 @@ public final class NDK {
         cachePolicy: CachePolicy = .cacheWithNetwork,
         relays: Set<RelayURL>? = nil,
         exclusiveRelays: Bool = false,
-        subscriptionId: String? = nil
+        subscriptionId: String? = nil,
+        closeOnEose: Bool? = nil
     ) -> NDKDataSource<NDKEvent> {
+        // Smart default: close on EOSE if maxAge > 0, otherwise stay open
+        let shouldCloseOnEose = closeOnEose ?? (maxAge > 0)
+        
         return NDKDataSource(
             ndk: self,
             filter: filter,
@@ -451,7 +445,8 @@ public final class NDK {
             cachePolicy: cachePolicy,
             relays: relays,
             exclusiveRelays: exclusiveRelays,
-            subscriptionId: subscriptionId
+            subscriptionId: subscriptionId,
+            closeOnEose: shouldCloseOnEose
         )
     }
 
@@ -462,8 +457,12 @@ public final class NDK {
         relays: Set<RelayURL>? = nil,
         exclusiveRelays: Bool = false,
         subscriptionId: String? = nil,
+        closeOnEose: Bool? = nil,
         transform: @escaping (NDKEvent) -> T?
     ) -> NDKDataSource<T> {
+        // Smart default: close on EOSE if maxAge > 0, otherwise stay open
+        let shouldCloseOnEose = closeOnEose ?? (maxAge > 0)
+        
         return NDKDataSource(
             ndk: self,
             filter: filter,
@@ -472,6 +471,7 @@ public final class NDK {
             relays: relays,
             exclusiveRelays: exclusiveRelays,
             subscriptionId: subscriptionId,
+            closeOnEose: shouldCloseOnEose,
             transform: transform
         )
     }
@@ -518,6 +518,15 @@ public final class NDK {
     // MARK: - Internal Methods (for relay communication)
 
     func processEvent(_ event: NDKEvent, subscriptionId: String, from relay: RelayProtocol) async {
+        // Track that we've seen this event on this relay
+        // If this is the first time we see this event, also set it as the source relay
+        let seenRelays = await eventTracker.getSeenOnRelays(eventId: event.id)
+        if seenRelays.isEmpty {
+            await eventTracker.setSourceRelay(eventId: event.id, relay: relay.url)
+        } else {
+            await eventTracker.markSeen(eventId: event.id, relay: relay.url)
+        }
+        
         // Process event through cache for observation
         do {
             try await cache.processEvent(event, from: relay.url, subscriptionId: subscriptionId)

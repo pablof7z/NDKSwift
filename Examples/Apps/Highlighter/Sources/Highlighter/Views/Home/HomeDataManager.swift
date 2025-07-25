@@ -102,6 +102,7 @@ class HomeDataManager: ObservableObject {
                                     } else {
                                         highlightsByArticle[ref] = [highlight]
                                     }
+                                    print("DEBUG: Added highlight reference: \(ref)")
                                 }
                             }
                         }
@@ -212,15 +213,18 @@ class HomeDataManager: ObservableObject {
                 let parts = reference.split(separator: ":")
                 if parts.count >= 3,
                    let kind = Int(parts[0]) {
+                    let dTag = parts[2...].joined(separator: ":") // Handle d-tags with colons
                     articleFilters.append(NDKFilter(
                         authors: [String(parts[1])],
                         kinds: [kind],
-                        tags: ["d": Set([String(parts[2])])]
+                        tags: ["d": Set([dTag])]
                     ))
+                    print("DEBUG: Creating filter for article - kind: \(kind), author: \(parts[1]), d-tag: \(dTag)")
                 }
             } else {
                 // This is an "e" tag reference (event ID)
                 articleFilters.append(NDKFilter(ids: [reference]))
+                print("DEBUG: Creating filter for event ID: \(reference)")
             }
         }
         
@@ -235,22 +239,30 @@ class HomeDataManager: ObservableObject {
                 
                 for await event in dataSource.events {
                     if event.kind == 30023,
-                       let article = try? Article(from: event),
-                       let highlights = highlightsByArticle[event.id] ?? highlightsByArticle["\(event.kind):\(event.pubkey):\(article.identifier ?? "")"] {
+                       let article = try? Article(from: event) {
+                        // Check both formats: event ID and "a" tag format
+                        let aTagReference = "\(event.kind):\(event.pubkey):\(article.identifier ?? "")"
+                        let highlights = highlightsByArticle[event.id] ?? highlightsByArticle[aTagReference]
                         
-                        let lastHighlight = highlights.max(by: { $0.createdAt < $1.createdAt })
+                        print("DEBUG: Found article - ID: \(event.id), identifier: \(article.identifier ?? "nil"), aTagReference: \(aTagReference)")
+                        print("DEBUG: Looking for highlights with keys: \(event.id) or \(aTagReference)")
+                        print("DEBUG: Available highlight keys: \(highlightsByArticle.keys)")
                         
-                        await MainActor.run {
-                            withAnimation(DesignSystem.Animation.quick) {
-                                let highlightedArticle = HighlightedArticle(
-                                    article: article,
-                                    highlights: highlights,
-                                    lastHighlightTime: lastHighlight?.createdAt ?? Date()
-                                )
-                                
-                                if !highlightedArticles.contains(where: { $0.article.id == article.id }) {
-                                    highlightedArticles.append(highlightedArticle)
-                                    highlightedArticles.sort { $0.lastHighlightTime > $1.lastHighlightTime }
+                        if let highlights = highlights {
+                            let lastHighlight = highlights.max(by: { $0.createdAt < $1.createdAt })
+                            
+                            await MainActor.run {
+                                withAnimation(DesignSystem.Animation.quick) {
+                                    let highlightedArticle = HighlightedArticle(
+                                        article: article,
+                                        highlights: highlights,
+                                        lastHighlightTime: lastHighlight?.createdAt ?? Date()
+                                    )
+                                    
+                                    if !highlightedArticles.contains(where: { $0.article.id == article.id }) {
+                                        highlightedArticles.append(highlightedArticle)
+                                        highlightedArticles.sort { $0.lastHighlightTime > $1.lastHighlightTime }
+                                    }
                                 }
                             }
                         }

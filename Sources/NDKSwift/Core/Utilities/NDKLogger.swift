@@ -15,7 +15,7 @@ public enum NDKLogLevel: Int, Comparable {
 }
 
 /// Categories for NDK logging
-public enum NDKLogCategory: String {
+public enum NDKLogCategory: String, CaseIterable {
     case network = "NETWORK"
     case relay = "RELAY"
     case subscription = "SUBSCRIPTION"
@@ -37,10 +37,6 @@ public enum NDKLogCategory: String {
 
 /// NDK Logger for configurable logging
 public enum NDKLogger {
-    // MARK: - OUTBOX_DEBUG_HOOK
-    /// Disable all logging (for debugging tools)
-    public static var isEnabled: Bool = true
-    
     /// Current log level
     public static var logLevel: NDKLogLevel = {
         #if DEBUG
@@ -55,6 +51,11 @@ public enum NDKLogger {
 
     /// Enable/disable pretty printing for network messages
     public static var prettyPrintNetworkMessages: Bool = true
+    
+    /// Check if logging is enabled (log level is not off)
+    public static var isEnabled: Bool {
+        return logLevel != .off
+    }
 
     /// Categories to log - default excludes noisiest categories for better experience
     public static var enabledCategories: Set<NDKLogCategory> = {
@@ -64,14 +65,29 @@ public enum NDKLogger {
         categories.remove(.performance)
         return categories
     }()
+    
+    /// Configure the logger
+    public static func configure(
+        logLevel: NDKLogLevel? = nil,
+        enabledCategories: Set<NDKLogCategory>? = nil,
+        logNetworkTraffic: Bool? = nil
+    ) {
+        if let level = logLevel {
+            self.logLevel = level
+        }
+        if let categories = enabledCategories {
+            self.enabledCategories = categories
+        }
+        if let traffic = logNetworkTraffic {
+            self.logNetworkTraffic = traffic
+        }
+    }
 
     /// Log a message at the specified level
     public static func log(_ level: NDKLogLevel, category: NDKLogCategory, _ message: String) {
-        // MARK: - OUTBOX_DEBUG_HOOK
-        guard isEnabled else { return }
         guard level <= logLevel else { return }
         guard enabledCategories.contains(category) else { return }
-
+        
         let timestamp = DateFormatters.iso8601.string(from: Date())
         let emoji = NDKLogFormatter.emojiForCategory(category)
         print("[\(timestamp)] [\(category.rawValue)] [\(level)] \(emoji) \(message)")
@@ -125,8 +141,7 @@ public enum NDKLogger {
 
 }
 
-// Extension to make NDKLogCategory conform to CaseIterable
-extension NDKLogCategory: CaseIterable {}
+// CaseIterable conformance already added to the enum declaration
 
 // Extension for NDKLogLevel string representation
 extension NDKLogLevel: CustomStringConvertible {

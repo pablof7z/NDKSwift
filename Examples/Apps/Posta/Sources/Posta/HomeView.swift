@@ -526,7 +526,7 @@ struct ChatRowView: View {
             // Start observing profile if we don't have it yet
             if profile == nil, let ndk = ndkManager.ndk {
                 profileTask = Task {
-                    let profileStream = await ndk.profileManager.observe(for: event.pubkey)
+                    let profileStream = await ndk.profileManager.observe(for: event.pubkey, maxAge: TimeConstants.hour)
                     
                     for await profileUpdate in profileStream {
                         if let profile = profileUpdate {

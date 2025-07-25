@@ -1,7 +1,30 @@
 import Foundation
 
+/// Event emitted when relay information is discovered for a user
+public struct RelayDiscoveryEvent: Sendable {
+    public let pubkey: String
+    public let readRelays: Set<RelayURL>
+    public let writeRelays: Set<RelayURL>
+    public let source: RelayListSource
+    public let timestamp: Date
+    
+    public init(
+        pubkey: String,
+        readRelays: Set<RelayURL>,
+        writeRelays: Set<RelayURL>,
+        source: RelayListSource,
+        timestamp: Date = Date()
+    ) {
+        self.pubkey = pubkey
+        self.readRelays = readRelays
+        self.writeRelays = writeRelays
+        self.source = source
+        self.timestamp = timestamp
+    }
+}
+
 /// Tracks relay information for users to implement the outbox model
-actor NDKOutboxTracker {
+public actor NDKOutboxTracker {
     /// Default TTL for positive cache entries (24 hours)
     static let positiveEntryTTL: TimeInterval = TimeConstants.day
 
@@ -17,6 +40,10 @@ actor NDKOutboxTracker {
 
     /// Track pending fetches to avoid duplicate requests
     private var pendingFetches: [String: Task<NDKOutboxItem?, Error>] = [:]
+    
+    /// Stream of relay discoveries
+    public let relayDiscoveries: AsyncStream<RelayDiscoveryEvent>
+    private let relayDiscoveryContinuation: AsyncStream<RelayDiscoveryEvent>.Continuation
 
     /// Cached relay preference with metadata
     private struct CachedRelayPreference {
@@ -34,6 +61,13 @@ actor NDKOutboxTracker {
         self.ndk = ndk
         self.memoryCache = LRUCache(capacity: capacity, defaultTTL: Self.positiveEntryTTL)
         self.blacklistedRelays = blacklistedRelays
+        
+        // Initialize AsyncStream for relay discoveries
+        var continuation: AsyncStream<RelayDiscoveryEvent>.Continuation!
+        self.relayDiscoveries = AsyncStream { cont in
+            continuation = cont
+        }
+        self.relayDiscoveryContinuation = continuation
     }
 
     /// Get relay information for a user
@@ -90,7 +124,7 @@ actor NDKOutboxTracker {
     }
 
     /// Get relay information synchronously from cache only
-    func getRelaysSyncFor(
+    public func getRelaysSyncFor(
         pubkey: String,
         type: RelayListType = .both
     ) async -> NDKOutboxItem? {
@@ -122,14 +156,17 @@ actor NDKOutboxTracker {
         pubkey: String,
         readRelays: Set<String> = [],
         writeRelays: Set<String> = [],
-        source: RelayListSource = .manual
+        source: RelayListSource = .manual,
+        emitDiscoveryEvent: Bool = true
     ) async {
-        let readRelayInfos = readRelays
-            .subtracting(blacklistedRelays)
+        // Filter out blacklisted relays
+        let filteredReadRelays = readRelays.subtracting(blacklistedRelays)
+        let filteredWriteRelays = writeRelays.subtracting(blacklistedRelays)
+        
+        let readRelayInfos = filteredReadRelays
             .map { RelayInfo(url: $0) }
 
-        let writeRelayInfos = writeRelays
-            .subtracting(blacklistedRelays)
+        let writeRelayInfos = filteredWriteRelays
             .map { RelayInfo(url: $0) }
 
         let item = NDKOutboxItem(
@@ -145,6 +182,19 @@ actor NDKOutboxTracker {
             expiresAt: Date().addingTimeInterval(Self.positiveEntryTTL),
             checkedRelays: nil
         ))
+        
+        // Emit discovery event only if requested
+        if emitDiscoveryEvent {
+            let discoveryEvent = RelayDiscoveryEvent(
+                pubkey: pubkey,
+                readRelays: filteredReadRelays,
+                writeRelays: filteredWriteRelays,
+                source: source
+            )
+            relayDiscoveryContinuation.yield(discoveryEvent)
+            
+            NDKLogger.log(.debug, category: .outbox, "📡 Emitted relay discovery for \(pubkey.prefix(8)): \(filteredReadRelays.count) read, \(filteredWriteRelays.count) write relays")
+        }
     }
 
     /// Update relay metadata (e.g., health scores)
@@ -331,12 +381,33 @@ actor NDKOutboxTracker {
             kinds: [EventKind.relayList]
         )
 
-        // Use configured outbox relays
+        // Determine which relays to use for fetching relay lists
+        let relaysToUse: Set<String>
+        
+        // Check if outbox relays are connected
+        let connectedRelays = await ndk.pool.connectedRelayURLs
+        let connectedOutboxRelays = ndk.outboxConfig.outboxRelays.intersection(connectedRelays)
+        
+        if !connectedOutboxRelays.isEmpty {
+            // Use connected outbox relays
+            relaysToUse = connectedOutboxRelays
+            NDKLogger.log(.debug, category: .outbox, "📡 Using \(connectedOutboxRelays.count) connected outbox relays for relay list fetch")
+        } else if !connectedRelays.isEmpty {
+            // Fall back to any connected relays
+            relaysToUse = connectedRelays
+            NDKLogger.log(.warning, category: .outbox, "⚠️ No outbox relays connected, falling back to \(connectedRelays.count) explicit relays")
+        } else {
+            // No relays connected at all
+            NDKLogger.log(.error, category: .outbox, "❌ No relays connected for relay list fetch")
+            return (nil, Set())
+        }
+
+        // Use determined relays
         let dataSource = ndk.observe(
             filter: filter,
             maxAge: 0,
             cachePolicy: .networkOnly,
-            relays: ndk.outboxConfig.outboxRelays
+            relays: relaysToUse
         )
 
         // Process both events and relay updates with timeout
@@ -396,181 +467,6 @@ actor NDKOutboxTracker {
         return (item, eoseRelays)
     }
 
-    private func fetchRelayList(for pubkey: String) async throws -> NDKOutboxItem? {
-        // First try NIP-65 (kind 10002)
-        if let nip65Item = try await fetchNIP65RelayList(for: pubkey) {
-            return nip65Item
-        }
-
-        // Fallback to contact list (kind 3)
-        return try await fetchContactListRelays(for: pubkey)
-    }
-
-    private func fetchNIP65RelayList(for pubkey: String) async throws -> NDKOutboxItem? {
-        var filter = NDKFilter()
-        filter.authors = [pubkey]
-        filter.kinds = [NDKRelayList.kind]
-
-        // Use a direct subscription to avoid recursive outbox calls
-        let subscriptionId = "outbox_fetch_\(UUID().uuidString)"
-
-        // IMPORTANT: We must specify relays here to prevent outbox recursion
-        // Use all currently connected relays
-        let currentRelays = await ndk.pool.connectedRelays().map { $0.url }
-
-        let subscription = await ndk.internalSubscriptionManager.createSubscription(
-            id: subscriptionId,
-            filters: [filter],
-            relays: Set(currentRelays) // Use all connected relays to prevent recursion
-        )
-
-
-        var latestEvent: NDKEvent?
-        var didReceiveEvent = false
-
-        // Set up EOSE handler
-        await subscription.onEOSE { _ in
-            didReceiveEvent = true
-        }
-
-        // Listen for events with a timeout
-        let eventTask = Task {
-            for await (event, _) in await subscription.events {
-                NDKLogger.log(.debug, category: .outbox, "🔍 fetchNIP65RelayList: Event received! ID: \(event.id)")
-                latestEvent = event
-                didReceiveEvent = true
-                break // We only need the first event
-            }
-        }
-
-        // Wait for event or timeout
-        NDKLogger.log(.trace, category: .outbox, "🔍 fetchNIP65RelayList: Starting timeout task (2 seconds)")
-        let timeoutTask = Task {
-            try await Task.sleep(nanoseconds: 2 * TimeConstants.nanosecondsPerSecond) // 2 second timeout
-            NDKLogger.log(.debug, category: .outbox, "🔍 fetchNIP65RelayList: Timeout reached")
-            didReceiveEvent = true
-        }
-
-        // Wait until we receive an event or timeout
-        NDKLogger.log(.trace, category: .outbox, "🔍 fetchNIP65RelayList: Waiting for event or timeout...")
-        while !didReceiveEvent {
-            try? await Task.sleep(nanoseconds: 100 * TimeConstants.nanosecondsPerMillisecond) // 100ms
-        }
-
-        NDKLogger.log(.trace, category: .outbox, "🔍 fetchNIP65RelayList: Done waiting, cancelling tasks")
-
-        // Cancel tasks
-        eventTask.cancel()
-        timeoutTask.cancel()
-
-        // Close the subscription
-        NDKLogger.log(.trace, category: .outbox, "🔍 fetchNIP65RelayList: Closing subscription")
-        await ndk.internalSubscriptionManager.closeSubscription(id: subscriptionId)
-
-        guard let event = latestEvent else {
-            return nil
-        }
-
-        let relayList = NDKRelayList.fromEvent(event)
-
-        let readRelayUrls = Set(relayList.readRelays.map { $0.url })
-        let readRelays = readRelayUrls
-            .subtracting(blacklistedRelays)
-            .map { RelayInfo(url: $0) }
-
-        let writeRelayUrls = Set(relayList.writeRelays.map { $0.url })
-        let writeRelays = writeRelayUrls
-            .subtracting(blacklistedRelays)
-            .map { RelayInfo(url: $0) }
-
-        // Find relays that support both read and write
-        let bothRelayUrls = readRelayUrls.intersection(writeRelayUrls)
-        let bothRelays = bothRelayUrls
-            .subtracting(blacklistedRelays)
-            .map { RelayInfo(url: $0) }
-
-        return NDKOutboxItem(
-            pubkey: pubkey,
-            readRelays: Set(readRelays).union(Set(bothRelays)),
-            writeRelays: Set(writeRelays).union(Set(bothRelays)),
-            source: .nip65
-        )
-    }
-
-    private func fetchContactListRelays(for pubkey: String) async throws -> NDKOutboxItem? {
-        var filter = NDKFilter()
-        filter.authors = [pubkey]
-        filter.kinds = [EventKind.contacts]
-
-        // Use a direct subscription to avoid recursive outbox calls
-        let subscriptionId = "outbox_fetch_contacts_\(UUID().uuidString)"
-        // IMPORTANT: We must specify relays here to prevent outbox recursion
-        // Use all currently connected relays
-        let currentRelays = await ndk.pool.connectedRelays().map { $0.url }
-        NDKLogger.log(.debug, category: .outbox, "🔍 fetchNIP65RelayList: Using \(currentRelays.count) connected relays to avoid outbox recursion")
-
-        let subscription = await ndk.internalSubscriptionManager.createSubscription(
-            id: subscriptionId,
-            filters: [filter],
-            relays: Set(currentRelays) // Use all connected relays to prevent recursion
-        )
-
-        var latestEvent: NDKEvent?
-        var didReceiveEvent = false
-
-        // Set up EOSE handler
-        await subscription.onEOSE { _ in
-            didReceiveEvent = true
-        }
-
-        // Listen for events with a timeout
-        let eventTask = Task {
-            for await (event, _) in await subscription.events {
-                latestEvent = event
-                didReceiveEvent = true
-                break // We only need the first event
-            }
-        }
-
-        // Wait for event or timeout
-        let timeoutTask = Task {
-            try await Task.sleep(nanoseconds: 2 * TimeConstants.nanosecondsPerSecond) // 2 second timeout
-            didReceiveEvent = true
-        }
-
-        // Wait until we receive an event or timeout
-        while !didReceiveEvent {
-            try? await Task.sleep(nanoseconds: 100 * TimeConstants.nanosecondsPerMillisecond) // 100ms
-        }
-
-        // Cancel tasks
-        eventTask.cancel()
-        timeoutTask.cancel()
-
-        // Close the subscription
-        await ndk.internalSubscriptionManager.closeSubscription(id: subscriptionId)
-
-        guard let event = latestEvent else {
-            return nil
-        }
-
-        let contactList = NDKContactList.fromEvent(event)
-
-        // Extract relay URLs from contact entries
-        let relayUrls = Set(contactList.contacts.compactMap { $0.relayURL })
-        let relays = relayUrls
-            .subtracting(blacklistedRelays)
-            .map { RelayInfo(url: $0) }
-
-        // For contact lists, use same relays for both read and write
-        return NDKOutboxItem(
-            pubkey: pubkey,
-            readRelays: Set(relays),
-            writeRelays: Set(relays),
-            source: .contactList
-        )
-    }
-
     private func filterByType(_ item: NDKOutboxItem, type: RelayListType) -> NDKOutboxItem {
         switch type {
         case .read:
@@ -596,7 +492,7 @@ actor NDKOutboxTracker {
 }
 
 /// Type of relay list to fetch
-enum RelayListType {
+public enum RelayListType {
     case read
     case write
     case both

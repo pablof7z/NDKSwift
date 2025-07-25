@@ -187,7 +187,7 @@ struct RichTextView: View {
         trackedPubkeys.insert(pubkey)
         
         let task = Task {
-            let profileStream = await ndk.profileManager.observe(for: pubkey)
+            let profileStream = await ndk.profileManager.observe(for: pubkey, maxAge: TimeConstants.hour)
             
             for await profile in profileStream {
                 if let profile = profile {
@@ -411,7 +411,7 @@ struct RichTextInline: View {
         trackedPubkeys.insert(pubkey)
         
         let task = Task {
-            let profileStream = await ndk.profileManager.observe(for: pubkey)
+            let profileStream = await ndk.profileManager.observe(for: pubkey, maxAge: TimeConstants.hour)
             
             for await profile in profileStream {
                 if let profile = profile {

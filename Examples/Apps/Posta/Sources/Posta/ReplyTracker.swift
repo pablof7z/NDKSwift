@@ -65,7 +65,7 @@ class ReplyTracker {
                         seenRepliers.insert(reply.pubkey)
                         
                         // Fetch profile (with caching via profileManager)
-                        let profileStream = await ndk.profileManager.observe(for: reply.pubkey)
+                        let profileStream = await ndk.profileManager.observe(for: reply.pubkey, maxAge: TimeConstants.hour)
                         for await profile in profileStream {
                             if let profile = profile {
                                 followingReplierProfiles.append(profile)

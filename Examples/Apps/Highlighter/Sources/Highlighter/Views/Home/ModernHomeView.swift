@@ -6,6 +6,7 @@ struct ModernHomeView: View {
     @StateObject private var dataManager: HomeDataManager
     @Binding var tabBarVisible: Bool
     @State private var scrollOffset: CGFloat = 0
+    @State private var showArticleList = false
     
     init(tabBarVisible: Binding<Bool>) {
         self._tabBarVisible = tabBarVisible
@@ -25,7 +26,10 @@ struct ModernHomeView: View {
                             .parallax(offset: scrollOffset, multiplier: 0.5)
                         
                         // Recently Highlighted Articles Section
-                        RecentlyHighlightedArticlesSection(articles: dataManager.highlightedArticles)
+                        RecentlyHighlightedArticlesSection(
+                            articles: dataManager.highlightedArticles,
+                            onSeeAll: { showArticleList = true }
+                        )
                         
                         // Featured highlight - if user has recent highlights
                         if !dataManager.userHighlights.isEmpty {
@@ -68,6 +72,10 @@ struct ModernHomeView: View {
                 }
             )
             .navigationBarHidden(true)
+            .navigationDestination(isPresented: $showArticleList) {
+                ArticleListView()
+                    .environmentObject(appState)
+            }
         }
         .onAppear {
             // Properly initialize data manager with the current app state
@@ -282,13 +290,14 @@ struct TrendingItemCard: View {
 
 struct RecentlyHighlightedArticlesSection: View {
     let articles: [HomeDataManager.HighlightedArticle]
+    let onSeeAll: () -> Void
     
     var body: some View {
         if !articles.isEmpty {
             VStack(spacing: .ds.itemSpacing) {
                 ModernSectionHeader(
                     title: "Recently Highlighted Articles",
-                    action: {},
+                    action: onSeeAll,
                     actionTitle: "See All"
                 )
                 

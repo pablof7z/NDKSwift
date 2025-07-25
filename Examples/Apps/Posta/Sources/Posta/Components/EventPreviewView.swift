@@ -214,7 +214,7 @@ struct TextNotePreview: View {
         guard let ndk = ndkManager.ndk else { return }
         
         profileTask = Task {
-            let profileStream = await ndk.profileManager.observe(for: event.pubkey)
+            let profileStream = await ndk.profileManager.observe(for: event.pubkey, maxAge: TimeConstants.hour)
             
             for await profile in profileStream {
                 if let profile = profile {

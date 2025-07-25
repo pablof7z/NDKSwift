@@ -6,7 +6,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- Incoming events from relays are now tracked in NDKEventTracker with `markSeen` when received
+- First relay to deliver an event is automatically set as the source relay in NDKEventTracker
+
+### Fixed
+- Fixed outbox subscriptions not connecting to all NIP-65 relays
+  - `InternalSubscription` now uses `prepareRelays` with `autoConnect: true` to ensure relays are connected before sending REQ messages
+  - This ensures all discovered relays from NIP-65 outbox model receive subscription requests
+- Fixed race condition where events arrive before subscription consumers are ready
+  - Added `autoStart` parameter to `InternalSubscriptionManager.createSubscription()`
+  - `DataRequirement` now starts subscriptions after setting up event stream consumption
+  - This prevents events from being lost when they arrive immediately after subscription creation
+- Fixed CLOSE messages being sent to relays that never received REQ
+  - `InternalSubscription` now tracks which relays successfully received REQ messages
+  - CLOSE messages are only sent to relays that were actually active in the subscription
+  - This eliminates unnecessary error logs for failed relay connections
+- Improved relay connection handling for subscriptions
+  - Subscriptions no longer attempt to send REQ to disconnected relays
+  - REQ messages are automatically sent when relays connect via the replay mechanism
+  - The replay mechanism now properly updates the active relay tracking
+  - Closed subscriptions are properly removed and won't be replayed to newly connected relays
+
 ### Changed
+- Optimized relay connection handling from O(n) to O(1) for subscription replay
+  - Added relay-to-subscription mapping in `InternalSubscriptionManager` for direct lookups
+  - Separated universal subscriptions (no relay targets) from relay-specific subscriptions
+  - When a relay connects, only relevant subscriptions are replayed without iterating through all active subscriptions
+  - This significantly improves performance when managing many concurrent subscriptions
 - Replaced hardcoded tag string literals with `NostrConstants` throughout codebase
   - Tag names like "p", "e", "a", "k" now use `NostrConstants.TagName` constants
   - Marker strings like "reply", "root", "redeemed" now use `NostrConstants.Marker` constants
@@ -31,6 +58,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 - Replaced force unwrap with safer `compactMap` in `IDGenerator.randomId()`
   - While the force unwrap was technically safe, using `compactMap` follows best practices
+- Fixed subscription ID length issues causing "subscription id too long" errors from relays
+  - Shortened relay discovery subscription IDs from ~195 to ~21 characters
+  - Replaced UUID-based subscription IDs with shorter random IDs (6-8 characters)
+  - Updated NDKOutboxManager, NDKOutboxTracker, and NDK+Session to use compact IDs
+  - Added tests to ensure subscription IDs stay under 32 characters
 
 ## [0.1.4] - 2025-07-25
 

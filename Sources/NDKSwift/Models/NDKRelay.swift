@@ -782,9 +782,6 @@ public final class NDKRelay: RelayProtocol, Hashable, Equatable, @unchecked Send
 extension NDKRelay: NDKRelayConnectionDelegate {
     public func relayConnectionDidConnect(_: NDKRelayConnection) {
         Task {
-            // MARK: - OUTBOX_DEBUG_HOOK
-            await NDKDebugHooks.emit(.poolConnected(relay: url))
-            
             await stateActor.updateStats {
                 $0.connectedAt = Date()
                 $0.successfulConnections += 1
@@ -801,9 +798,6 @@ extension NDKRelay: NDKRelayConnectionDelegate {
 
     public func relayConnectionDidDisconnect(_: NDKRelayConnection, error: Error?) {
         Task {
-            // MARK: - OUTBOX_DEBUG_HOOK
-            await NDKDebugHooks.emit(.poolDisconnected(relay: url, error: error))
-            
             // Clear all subscriptions when disconnected
             await stateActor.clearAllSubscriptions()
 

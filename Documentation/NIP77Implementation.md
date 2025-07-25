@@ -348,7 +348,7 @@ extension NDKRelay {
         do {
             let testFilter = NDKFilter(kinds: [1], limit: 1)
             let message = NIP77Message.open(
-                subscriptionId: "test-\(UUID().uuidString)",
+                subscriptionId: "test_\(IDGenerator.randomId(length: 8))",
                 filter: testFilter,
                 initialMessage: Data([0x61]) // Minimal message
             )

@@ -18,7 +18,7 @@ struct BunkerURLParser {
     ///   - secret: Connection secret for authentication (optional)
     func parse() -> (bunkerPubkey: String?, userPubkey: String?, relays: [String], secret: String?) {
         guard let url = URL(string: urlString),
-              url.scheme == "bunker"
+              url.scheme == BunkerConstants.urlScheme
         else {
             NDKLogger.log(.error, category: .auth, "\(logPrefix) \(ErrorMessageConstants.invalid("bunker URL format"))")
             return (nil, nil, [], nil)
@@ -106,7 +106,7 @@ public actor NDKBunkerSigner: NDKSigner, Sendable {
         var rawValue: String {
             switch self {
             case .bunker:
-                return "bunker"
+                return BunkerConstants.urlScheme
             case .nostrConnect:
                 return "nostrConnect"
             case .nip05:
@@ -343,7 +343,7 @@ public actor NDKBunkerSigner: NDKSigner, Sendable {
         )
 
         guard let response = response else {
-            throw NDKError.connectionLost(relay: "bunker", message: "No response received")
+            throw NDKError.connectionLost(relay: BunkerConstants.relayName, message: "No response received")
         }
 
         if response.result == "ack" {
@@ -356,7 +356,7 @@ public actor NDKBunkerSigner: NDKSigner, Sendable {
             NDKLogger.log(.info, category: .auth, "\(logPrefix) Successfully connected as \(pubkey)")
             return user
         } else {
-            let error = NDKError.networkError(for: "bunker", operation: "connect", error: NSError(domain: "BunkerError", code: -1, userInfo: [NSLocalizedDescriptionKey: response.error ?? ErrorMessageConstants.Messages.connectionFailed]))
+            let error = NDKError.networkError(for: BunkerConstants.relayName, operation: "connect", error: NSError(domain: BunkerConstants.errorDomain, code: -1, userInfo: [NSLocalizedDescriptionKey: response.error ?? ErrorMessageConstants.Messages.connectionFailed]))
             throw error
         }
     }
@@ -461,7 +461,7 @@ public actor NDKBunkerSigner: NDKSigner, Sendable {
         }
 
         guard let bunkerPubkey = bunkerPubkey else {
-            throw NDKError.connectionLost(relay: "bunker", message: ErrorMessageConstants.Messages.notConnected)
+            throw NDKError.connectionLost(relay: BunkerConstants.relayName, message: ErrorMessageConstants.Messages.notConnected)
         }
 
         let response = try await rpcClient?.sendRequest(
@@ -473,7 +473,7 @@ public actor NDKBunkerSigner: NDKSigner, Sendable {
         guard let response = response,
               response.error == nil
         else {
-            throw NDKError.cryptoOperation("get public key", nip: CryptoConstants.NIP.nip46, error: NSError(domain: "BunkerError", code: -1, userInfo: [NSLocalizedDescriptionKey: response?.error ?? ErrorMessageConstants.failedTo("get public key")]))
+            throw NDKError.cryptoOperation("get public key", nip: CryptoConstants.NIP.nip46, error: NSError(domain: BunkerConstants.errorDomain, code: -1, userInfo: [NSLocalizedDescriptionKey: response?.error ?? ErrorMessageConstants.failedTo("get public key")]))
         }
 
         return response.result
@@ -481,7 +481,7 @@ public actor NDKBunkerSigner: NDKSigner, Sendable {
 
     private func performCrypto(method: String, params: [String], errorMessage: String) async throws -> String {
         guard let bunkerPubkey = bunkerPubkey else {
-            throw NDKError.connectionLost(relay: "bunker", message: ErrorMessageConstants.Messages.notConnected)
+            throw NDKError.connectionLost(relay: BunkerConstants.relayName, message: ErrorMessageConstants.Messages.notConnected)
         }
 
         let response = try await rpcClient?.sendRequest(
@@ -493,7 +493,7 @@ public actor NDKBunkerSigner: NDKSigner, Sendable {
         guard let response = response,
               response.error == nil
         else {
-            throw NDKError.cryptoOperation(method, nip: CryptoConstants.NIP.nip46, error: NSError(domain: "BunkerError", code: -1, userInfo: [NSLocalizedDescriptionKey: response?.error ?? errorMessage]))
+            throw NDKError.cryptoOperation(method, nip: CryptoConstants.NIP.nip46, error: NSError(domain: BunkerConstants.errorDomain, code: -1, userInfo: [NSLocalizedDescriptionKey: response?.error ?? errorMessage]))
         }
 
         return response.result
@@ -535,7 +535,7 @@ public actor NDKBunkerSigner: NDKSigner, Sendable {
     // MARK: - Serialization (NDKSigner Protocol)
 
     public static var signerType: String {
-        return "bunker"
+        return BunkerConstants.urlScheme
     }
 
     public func serialize() async throws -> Data {
@@ -573,9 +573,9 @@ public actor NDKBunkerSigner: NDKSigner, Sendable {
         // Create appropriate connection type
         let connectionType: ConnectionType
         switch connectionTypeRaw {
-        case "bunker":
+        case BunkerConstants.urlScheme:
             // Reconstruct bunker URL
-            let bunkerUrl = "bunker://\(bunkerPubkey)?pubkey=\(userPubkey)&secret=\(secret)" +
+            let bunkerUrl = "\(BunkerConstants.urlScheme)://\(bunkerPubkey)?pubkey=\(userPubkey)&secret=\(secret)" +
                            relayUrls.map { "&relay=\($0)" }.joined()
             connectionType = .bunker(bunkerUrl)
         case "nostrConnect":

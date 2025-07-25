@@ -13,22 +13,6 @@ public protocol NDKRelayConnectionDelegate: AnyObject {
 /// WebSocket connection to a Nostr relay using actor for thread safety
 public actor NDKRelayConnection {
     private let url: URL
-    
-    // MARK: - OUTBOX_DEBUG_HOOK
-    /// Hook for monitoring relay activity (for debugging tools)
-    public typealias RelayActivityHook = (URL, RelayActivityEvent) async -> Void
-    public enum RelayActivityEvent {
-        case connected
-        case disconnected(Error?)
-        case messageSent(String)
-        case messageReceived(String)
-        case eventPublished(EventID, Bool, String?)
-    }
-    private static var activityHook: RelayActivityHook?
-    
-    public static func setActivityHook(_ hook: RelayActivityHook?) {
-        activityHook = hook
-    }
 
     #if os(iOS) || os(macOS) || os(watchOS) || os(tvOS)
         private var webSocketTask: URLSessionWebSocketTask?
@@ -104,6 +88,7 @@ public actor NDKRelayConnection {
         }
 
         // Mark that we're connecting
+        NDKLogger.log(.info, category: .connection, "🔌 Attempting to connect to \(url)")
         isConnecting = true
 
         do {
@@ -314,13 +299,8 @@ public actor NDKRelayConnection {
         #endif
 
         messagesSent += 1
-        
-        // MARK: - OUTBOX_DEBUG_HOOK
-        if let hook = Self.activityHook {
-            await hook(url, .messageSent(json))
-        }
     }
-
+    
     #if os(iOS) || os(macOS) || os(watchOS) || os(tvOS)
     private func receiveMessages() async {
         guard let task = webSocketTask else {
@@ -359,11 +339,6 @@ public actor NDKRelayConnection {
     #endif
 
     private func handleReceivedMessage(_ json: String) async {
-        // MARK: - OUTBOX_DEBUG_HOOK
-        if let hook = Self.activityHook {
-            await hook(url, .messageReceived(json))
-        }
-        
         // Validate input
         guard !json.isEmpty else {
             NDKLogger.log(.warning, category: .relay, "Received empty message from relay \(url)")
@@ -375,14 +350,14 @@ public actor NDKRelayConnection {
 
             // Log received message
             NDKNetworkLogger.logNetworkReceive(from: url, message: json, parsed: message)
+            
+            // Log EVENT messages specifically
+            if case let .event(subscriptionId, event) = message {
+                NDKLogger.log(.info, category: .subscription, "📨 EVENT from \(url): kind \(event.kind), id \(String(event.id.prefix(10))), subscription: \(subscriptionId ?? "none")")
+            }
 
             // Handle OK messages for pending events
             if case let .ok(eventId, accepted, errorMessage) = message {
-                // MARK: - OUTBOX_DEBUG_HOOK
-                if let hook = Self.activityHook {
-                    await hook(url, .eventPublished(eventId, accepted, errorMessage))
-                }
-                
                 if let continuation = pendingEvents.removeValue(forKey: eventId) {
                     if accepted {
                         continuation.resume(returning: true)
@@ -493,13 +468,8 @@ public actor NDKRelayConnection {
         await notifyDelegate { delegate in
             delegate.relayConnectionDidConnect(self)
         }
-        
-        // MARK: - OUTBOX_DEBUG_HOOK
-        if let hook = Self.activityHook {
-            await hook(url, .connected)
-        }
     }
-
+    
     private func resumeContinuationWithError(_ error: Error) async {
         // Resume all waiting continuations with error
         for continuation in connectionContinuations {
@@ -530,11 +500,6 @@ public actor NDKRelayConnection {
             delegate.relayConnectionDidDisconnect(self, error: error)
         }
         
-        // MARK: - OUTBOX_DEBUG_HOOK
-        if let hook = Self.activityHook {
-            await hook(url, .disconnected(error))
-        }
-
         // Only schedule reconnection if this wasn't an initial connection attempt
         if !isInitialConnection {
             NDKLogger.log(.debug, category: .connection, "🔁 Will attempt reconnection (not initial connection)")

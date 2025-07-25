@@ -18,14 +18,14 @@ The caching system consists of:
 The memory cache and database are updated atomically when new profile events arrive:
 - Profile updates from relays update both caches simultaneously
 - There's no scenario where the database has newer data than memory cache
-- No "staleness" exists between cache layers
+- The cache is never "stale" relative to the database
 
 ### LRU Memory Cache
 
 The in-memory cache uses LRU (Least Recently Used) eviction:
 
 ```swift
-// Simple cache entry without staleness tracking
+// Simple cache entry - no staleness tracking needed
 private struct ProfileCacheEntry {
     let profile: NDKUserProfile
 }
@@ -59,25 +59,25 @@ The cache stores parsed `NDKUserProfile` objects to avoid repeated JSON decoding
    - Update database
    - Notify all active observers
 
-### The `forceNetworkFetch` Parameter
+### The `maxAge` Parameter
 
-The `observe` method accepts a `forceNetworkFetch` parameter that controls network behavior:
+The `observe` method accepts a `maxAge` parameter that controls relay subscription behavior (consistent with `ndk.observe`):
 
 ```swift
-// Use cached data if available (default)
-for await profile in profileManager.observe(for: pubkey) {
-    // Returns cached profile immediately, then updates
+// Use cached data, keep subscription open for updates
+for await profile in profileManager.observe(for: pubkey, maxAge: TimeConstants.hour) {
+    // Returns cached profile immediately, subscription closes after 1 hour
 }
 
-// Force checking relays for updates
-for await profile in profileManager.observe(for: pubkey, forceNetworkFetch: true) {
-    // Checks relays even if profile is cached
+// Always get real-time updates
+for await profile in profileManager.observe(for: pubkey, maxAge: 0) {
+    // Returns cached profile immediately, keeps subscription open
 }
 ```
 
-This parameter only affects **network fetching**, not cache usage:
-- `false` (default): Return cached data immediately if available
-- `true`: Always check relays for updates (useful for profile pages)
+The `maxAge` parameter is passed directly to the underlying `NDKDataSource`:
+- `maxAge: 0` - Keep subscription open for real-time updates
+- `maxAge: >0` - Use cache if available, close subscription after EOSE if data is fresh enough
 
 ## Implementation Details
 
@@ -136,18 +136,18 @@ private func updateCacheOrder(for pubkey: PublicKey) {
 ### Feed View (Many Profiles)
 
 ```swift
-// Use cached data, don't force network checks
-for await profile in profileManager.observe(for: pubkey) {
+// Use cached data, close subscription after 1 hour
+for await profile in profileManager.observe(for: pubkey, maxAge: TimeConstants.hour) {
     // Display profile
     break // If you only need one value
 }
 ```
 
-### Profile Page (Focused View)
+### Profile Page (Real-time Updates)
 
 ```swift
-// Force network check to ensure fresh data
-for await profile in profileManager.observe(for: pubkey, forceNetworkFetch: true) {
+// Keep subscription open for real-time updates
+for await profile in profileManager.observe(for: pubkey, maxAge: 0) {
     // Display and react to updates
 }
 ```
@@ -158,8 +158,8 @@ for await profile in profileManager.observe(for: pubkey, forceNetworkFetch: true
 // Load multiple profiles efficiently
 for pubkey in pubkeys {
     Task {
-        for await profile in profileManager.observe(for: pubkey) {
-            // Cache will prevent redundant fetches
+        for await profile in profileManager.observe(for: pubkey, maxAge: TimeConstants.hour) {
+            // Cache prevents redundant fetches
             updateUI(pubkey: pubkey, profile: profile)
             break
         }
