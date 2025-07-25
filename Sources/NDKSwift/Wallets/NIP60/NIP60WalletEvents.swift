@@ -41,11 +41,9 @@ public final class NIP60WalletEventStream: AsyncSequence {
     private let continuation: AsyncStream<NIP60WalletEvent>.Continuation
 
     init() {
-        var savedContinuation: AsyncStream<NIP60WalletEvent>.Continuation?
-        self.stream = AsyncStream { continuation in
-            savedContinuation = continuation
-        }
-        self.continuation = savedContinuation!
+        let (stream, continuation) = AsyncStream<NIP60WalletEvent>.makeStream()
+        self.stream = stream
+        self.continuation = continuation
     }
 
     public func makeAsyncIterator() -> AsyncStream<NIP60WalletEvent>.AsyncIterator {
