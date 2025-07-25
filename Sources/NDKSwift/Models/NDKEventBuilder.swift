@@ -105,20 +105,20 @@ public final class NDKEventBuilder {
             builder.kind(EventKind.textNote)
 
             // Standard NIP-10 reply tags
-            if event.tags.contains(where: { $0.first == "e" }) {
+            if event.tags.contains(where: { $0.first == NostrConstants.TagName.event }) {
                 // Copy existing e-tags and p-tags
                 for tag in event.tags {
-                    if tag.first == "e" || tag.first == "p" {
+                    if tag.first == NostrConstants.TagName.event || tag.first == NostrConstants.TagName.pubkey {
                         builder.tag(tag)
                     }
                 }
                 // Add reference to the event we're replying to
-                builder.tag(["e", event.id, "", "reply"])
-                builder.tag(["p", event.pubkey])
+                builder.tag([NostrConstants.TagName.event, event.id, "", NostrConstants.Marker.reply])
+                builder.tag([NostrConstants.TagName.pubkey, event.pubkey])
             } else {
                 // This is a root event, tag it as such
-                builder.tag(["e", event.id, "", "root"])
-                builder.tag(["p", event.pubkey])
+                builder.tag([NostrConstants.TagName.event, event.id, "", NostrConstants.Marker.root])
+                builder.tag([NostrConstants.TagName.pubkey, event.pubkey])
             }
         } else {
             // NIP-22 generic reply for all other kinds
@@ -154,13 +154,13 @@ public final class NDKEventBuilder {
             builder.tag(parentReference)
 
             // Add k tag for parent kind
-            builder.tag(["k", String(event.kind)])
+            builder.tag([NostrConstants.TagName.kind, String(event.kind)])
 
             // Add p tag for parent author
-            builder.tag(["p", event.pubkey])
+            builder.tag([NostrConstants.TagName.pubkey, event.pubkey])
 
             // Carry over all p tags from parent
-            for tag in event.tags where tag.first == "p" {
+            for tag in event.tags where tag.first == NostrConstants.TagName.pubkey {
                 if tag.count > 1 && tag[1] != event.pubkey {
                     builder.tag(tag)
                 }
@@ -249,7 +249,7 @@ public final class NDKEventBuilder {
     ///   - relay: Optional relay hint
     @discardableResult
     public func tagUser(_ pubkey: PublicKey, marker: String? = nil, relay: String? = nil) async -> NDKEventBuilder {
-        var tag = ["p", pubkey]
+        var tag = [NostrConstants.TagName.pubkey, pubkey]
 
         // Determine relay hint
         let relayHint: String
@@ -333,7 +333,7 @@ public final class NDKEventBuilder {
             relay = ""
         }
 
-        var tag = ["e", event.id]
+        var tag = [NostrConstants.TagName.event, event.id]
 
         // Add relay hint (or empty string if we need to add marker/pubkey)
         if !relay.isEmpty {
@@ -475,7 +475,7 @@ public final class NDKEventBuilder {
             } else if bech32String.hasPrefix(NostrConstants.notePrefix) {
                 // Decode note to get event ID
                 let eventId = try Bech32.eventId(from: bech32String)
-                return self.tag(["e", eventId])
+                return self.tag([NostrConstants.TagName.event, eventId])
 
             } else if bech32String.hasPrefix(NostrConstants.naddrPrefix) {
                 // For naddr, we need to parse the TLV data manually
@@ -525,7 +525,7 @@ public final class NDKEventBuilder {
                 // Build the coordinate
                 if let author = author, let kind = kind {
                     let coordinate = "\(kind):\(author):\(identifier ?? "")"
-                    var tag = ["a", coordinate]
+                    var tag = [NostrConstants.TagName.address, coordinate]
                     if let firstRelay = relays.first {
                         tag.append(firstRelay)
                     } else {
@@ -578,7 +578,7 @@ public final class NDKEventBuilder {
 
                 // Build the e tag
                 if let eventId = eventId {
-                    var tag = ["e", eventId]
+                    var tag = [NostrConstants.TagName.event, eventId]
 
                     // Add relay hint
                     if let firstRelay = relays.first {
@@ -638,7 +638,7 @@ public final class NDKEventBuilder {
 
                 // Build the p tag
                 if let pubkey = pubkey {
-                    var tag = ["p", pubkey]
+                    var tag = [NostrConstants.TagName.pubkey, pubkey]
                     if let firstRelay = relays.first {
                         tag.append(firstRelay)
                     }
@@ -669,7 +669,7 @@ public final class NDKEventBuilder {
         if event.isReplaceable || event.isParameterizedReplaceable {
             // Build the coordinate (address)
             let coordinate = event.tagAddress
-            var tag = ["a", coordinate]
+            var tag = [NostrConstants.TagName.address, coordinate]
 
             // Determine relay hint
             let relay: String
@@ -733,7 +733,7 @@ public final class NDKEventBuilder {
                 await self.tagUser(pubkey)
             case .eventMention(let eventId):
                 // These are already handled by #[index] references in tags
-                self.tag(["e", eventId])
+                self.tag([NostrConstants.TagName.event, eventId])
             case .text(_), .url(_):
                 // These don't generate tags
                 break

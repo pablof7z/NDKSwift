@@ -35,7 +35,7 @@ actor StartupNutzapRedemption {
     func processSpendingHistory(_ event: NDKEvent) {
         // Check for redeemed nutzap events in the clear tags
         for tag in event.tags {
-            if tag.count >= 4 && tag[0] == "e" && tag[3] == "redeemed" {
+            if tag.count >= 4 && tag[0] == NostrConstants.TagName.event && tag[3] == NostrConstants.Marker.redeemed {
                 let redeemedNutzapId = tag[1]
                 NDKLogger.log(.info, category: .wallet, "📝 Marking nutzap \(redeemedNutzapId) as already redeemed from history")
                 nutzapsMarkedRedeemed.insert(redeemedNutzapId)

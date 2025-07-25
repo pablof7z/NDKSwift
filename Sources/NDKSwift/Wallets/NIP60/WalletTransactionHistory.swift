@@ -66,7 +66,7 @@ public actor WalletTransactionHistory {
 
         let nutzapFilter = NDKFilter(
             kinds: [EventKind.nutzap],
-            tags: ["p": Set([userPubkey])]
+            tags: [NostrConstants.TagName.pubkey: Set([userPubkey])]
         )
 
         // Create data sources

@@ -289,7 +289,7 @@ public actor NDKBunkerSigner: NDKSigner, Sendable {
 
         let filter = NDKFilter(
             kinds: [EventKind.nostrConnect], // NostrConnect kind
-            tags: ["p": [localPubkey]]
+            tags: [NostrConstants.TagName.pubkey: [localPubkey]]
         )
 
         // Create subscription with specific relays if available
