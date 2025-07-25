@@ -70,10 +70,7 @@ public enum StringFormatHelpers {
     /// Format Unix timestamp for display
     public static func formatTimestamp(_ timestamp: Timestamp) -> String {
         let date = Date(nostrTimestamp: timestamp)
-        let formatter = DateFormatter()
-        formatter.dateStyle = .medium
-        formatter.timeStyle = .short
-        return formatter.string(from: date)
+        return DateFormatters.display.string(from: date)
     }
     
     /// Format time interval for display (e.g., "5 minutes", "2 hours")

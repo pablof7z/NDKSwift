@@ -66,7 +66,7 @@ public enum NDKLogger {
         guard level <= logLevel else { return }
         guard enabledCategories.contains(category) else { return }
         
-        let timestamp = ISO8601DateFormatter().string(from: Date())
+        let timestamp = DateFormatters.iso8601.string(from: Date())
         let emoji = emojiForCategory(category)
         print("[\(timestamp)] [\(category.rawValue)] [\(level)] \(emoji) \(message)")
     }
