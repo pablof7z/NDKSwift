@@ -61,7 +61,7 @@ public enum CrossMintTransfer {
         targetMint: String,
         mints: MintManager,
         proofStateManager: ProofStateManager,
-        feeBuffer: Int64 = 1000,
+        feeBuffer: Int64 = PaymentConstants.defaultCashuFeeBuffer,
         blacklistedMints: Set<String> = []
     ) async -> String? {
         let requiredAmount = amount + feeBuffer
@@ -119,7 +119,7 @@ public enum CrossMintTransfer {
                 targetMint: targetMint,
                 mints: mints,
                 proofStateManager: proofStateManager,
-                feeBuffer: 1000,
+                feeBuffer: PaymentConstants.defaultCashuFeeBuffer,
                 blacklistedMints: blacklistedMints
             ) {
                 // Estimate fees for the transfer

@@ -19,7 +19,7 @@ public actor IDGenerator {
     /// Generate a random ID (for cases where sequential IDs are not suitable)
     public static func randomId(prefix: String = "", length: Int = 8) -> String {
         let characters = "abcdefghijklmnopqrstuvwxyz0123456789"
-        let randomString = String((0..<length).map { _ in characters.randomElement()! })
+        let randomString = String((0..<length).compactMap { _ in characters.randomElement() })
         return prefix.isEmpty ? randomString : "\(prefix)_\(randomString)"
     }
 }

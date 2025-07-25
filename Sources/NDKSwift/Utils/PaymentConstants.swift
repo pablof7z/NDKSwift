@@ -31,6 +31,11 @@ public enum PaymentConstants {
     /// Default timeout for waiting for zap receipts (in seconds)
     public static let zapReceiptTimeout: TimeInterval = 30
 
+    // MARK: - Cashu Constants
+
+    /// Default fee buffer for cross-mint transfers (in satoshis)
+    public static let defaultCashuFeeBuffer: Int64 = 1000
+
     // MARK: - Lightning Invoice Multipliers
 
     /// Multipliers for different Lightning invoice denominations
