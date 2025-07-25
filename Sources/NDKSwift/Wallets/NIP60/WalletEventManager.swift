@@ -278,7 +278,7 @@ public actor WalletEventManager {
             event: event,
             sender: event.pubkey,
             amount: totalAmount,
-            comment: event.content.isEmpty ? nil : event.content,
+            comment: event.content.nilIfEmpty,
             createdAt: event.createdAt,
             mint: mint,
             status: status

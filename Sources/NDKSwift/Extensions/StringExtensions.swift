@@ -3,6 +3,11 @@ import Foundation
 // MARK: - String Extensions for Common Operations
 
 public extension String {
+    /// Returns nil if the string is empty, otherwise returns the string itself
+    var nilIfEmpty: String? {
+        return isEmpty ? nil : self
+    }
+    
     /// Returns true if string has content after trimming whitespace
     var hasContent: Bool {
         return ValidationHelpers.hasContent(self)
@@ -60,5 +65,21 @@ public extension String {
     /// Convert an npub to hex pubkey
     static func fromNpub(_ npub: String) throws -> String? {
         return try Bech32.pubkey(from: npub)
+    }
+}
+
+// MARK: - Collection Extensions
+
+public extension Collection {
+    /// Returns nil if the collection is empty, otherwise returns the collection itself
+    var nilIfEmpty: Self? {
+        return isEmpty ? nil : self
+    }
+}
+
+public extension Collection where Element == String {
+    /// Returns nil if the collection is empty, otherwise returns a Set of the elements
+    var setOrNil: Set<String>? {
+        return isEmpty ? nil : Set(self)
     }
 }

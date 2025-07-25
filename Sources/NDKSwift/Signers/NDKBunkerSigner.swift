@@ -299,7 +299,7 @@ public actor NDKBunkerSigner: NDKSigner, Sendable {
             filter: filter,
             maxAge: 0, // Always fresh for real-time bunker communication
             cachePolicy: .networkOnly, // Skip cache for bunker messages
-            relays: relayUrls.isEmpty ? nil : Set(relayUrls)
+            relays: relayUrls.setOrNil
         )
 
         // DataSource created

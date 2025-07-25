@@ -160,7 +160,7 @@ public actor NIP60Wallet: NDKPaymentProvider {
                 ]
 
                 // Use wallet-specific relays if configured from 17375 event
-                let relayUrls: Set<String>? = walletConfigRelays.isEmpty ? nil : Set(walletConfigRelays)
+                let relayUrls: Set<String>? = walletConfigRelays.setOrNil
 
                 NDKLogger.log(.debug, category: .wallet, "📡 Starting wallet event subscription with \(walletConfigRelays.isEmpty ? "default" : "\(walletConfigRelays.count) configured") relays")
 
