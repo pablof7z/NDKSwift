@@ -669,7 +669,7 @@ public struct NDKCashuMintList: NDKPublishableEvent {
 
         // Add P2PK pubkey tag if provided (required for nutzaps per NIP-61)
         if let p2pkPubkey = p2pkPubkey {
-            _ = builder.tag(["pubkey", p2pkPubkey])
+            _ = builder.tag([NostrConstants.TagName.pubkey, p2pkPubkey])
         }
 
         // Add relay tags if provided (recommended for nutzaps per NIP-61)
