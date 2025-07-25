@@ -568,14 +568,6 @@ struct CreatePostView: View {
     #endif
 }
 
-// MARK: - Extensions
-
-extension Array {
-    subscript(safe index: Index) -> Element? {
-        return indices.contains(index) ? self[index] : nil
-    }
-}
-
 // MARK: - Preview
 
 struct CreatePostView_Previews: PreviewProvider {
