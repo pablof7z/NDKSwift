@@ -352,7 +352,7 @@ public actor NIP60Wallet: NDKPaymentProvider {
                 
                 await mints.addMintURL(url: url)
                 successfullyAddedMints.insert(mintURL)
-                NDKLogger.log(.debug, category: .wallet, "✅ Added mint URL: \(mintURL)")
+                NDKLogger.log(.debug, category: .wallet, LoggingConstants.Messages.success("Added mint URL", details: mintURL))
             }
             
             // Get the actual current mints from MintManager after updates
@@ -377,13 +377,13 @@ public actor NIP60Wallet: NDKPaymentProvider {
                 }
             }
             
-            NDKLogger.log(.debug, category: .wallet, "✅ Wallet configuration updated:")
+            NDKLogger.log(.debug, category: .wallet, LoggingConstants.Messages.success("Wallet configuration updated"))
             NDKLogger.log(.debug, category: .wallet, "  - Requested mints: \(mintURLs.count)")
             NDKLogger.log(.debug, category: .wallet, "  - Successfully added: \(successfullyAddedMints.count)")
             NDKLogger.log(.debug, category: .wallet, "  - Total active mints: \(actualCurrentMints.count)")
             NDKLogger.log(.debug, category: .wallet, "  - Active mint URLs: \(actualCurrentMints)")
         } catch {
-            NDKLogger.log(.debug, category: .wallet, "❌ Failed to parse wallet configuration: \(error)")
+            NDKLogger.log(.debug, category: .wallet, LoggingConstants.Messages.error("Failed to parse wallet configuration", details: error.localizedDescription))
         }
     }
     
@@ -953,7 +953,7 @@ public actor NIP60Wallet: NDKPaymentProvider {
                     switch status {
                     case .minted:
                         // Success - delete the quote event
-                        NDKLogger.log(.debug, category: .wallet, "✅ Quote \(quote.quoteId) successfully minted - deleting quote event")
+                        NDKLogger.log(.debug, category: .wallet, LoggingConstants.Messages.success("Quote successfully minted - deleting quote event", details: quote.quoteId))
                         try? await self.eventManager.deleteQuoteEvent(eventId: event.id, signer: self.signer)
                         await self.clearQuoteMonitor(quoteId: quote.quoteId)
                         return
