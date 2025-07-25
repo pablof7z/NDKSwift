@@ -83,18 +83,26 @@ public enum URLNormalizer {
         removeDefaultPorts(&components)
     }
     
+    // URL normalization constants
+    private enum NormalizationConstants {
+        static let wwwPrefix = "www."
+        static let wwwPrefixLength = 4
+        static let defaultWSPort = 80
+        static let defaultWSSPort = 443
+    }
+    
     /// Removes www. prefix from hostname if present
     private static func removeWWWPrefix(_ components: inout URLComponents) {
-        if let host = components.host, host.hasPrefix("www.") {
-            components.host = String(host.dropFirst(4))
+        if let host = components.host, host.hasPrefix(NormalizationConstants.wwwPrefix) {
+            components.host = String(host.dropFirst(NormalizationConstants.wwwPrefixLength))
         }
     }
     
     /// Removes default ports (80 for ws, 443 for wss)
     private static func removeDefaultPorts(_ components: inout URLComponents) {
         if let port = components.port {
-            if (components.scheme == "ws" && port == 80) ||
-                (components.scheme == "wss" && port == 443) {
+            if (components.scheme == "ws" && port == NormalizationConstants.defaultWSPort) ||
+                (components.scheme == "wss" && port == NormalizationConstants.defaultWSSPort) {
                 components.port = nil
             }
         }
