@@ -6,34 +6,31 @@ extension NDK {
 
     /// Outbox tracker for relay information
     var outboxTracker: NDKOutboxTracker {
-        if _outboxTracker == nil {
-            _outboxTracker = NDKOutboxTracker(
+        lazyInit(&_outboxTracker) {
+            NDKOutboxTracker(
                 ndk: self,
                 blacklistedRelays: outboxConfig.blacklistedRelays
             )
         }
-        return _outboxTracker!
     }
 
     /// Relay ranker for intelligent selection
     var relayRanker: NDKRelayRanker {
-        if _relayRanker == nil {
-            _relayRanker = NDKRelayRanker(ndk: self, tracker: outboxTracker)
+        lazyInit(&_relayRanker) {
+            NDKRelayRanker(ndk: self, tracker: outboxTracker)
         }
-        return _relayRanker!
     }
 
 
     /// Publishing strategy for outbox model
     var publishingStrategy: NDKPublishingStrategy {
-        if _publishingStrategy == nil {
-            _publishingStrategy = NDKPublishingStrategy(
+        lazyInit(&_publishingStrategy) {
+            NDKPublishingStrategy(
                 ndk: self,
                 selector: relaySelector,
                 tracker: outboxTracker
             )
         }
-        return _publishingStrategy!
     }
 
 }
