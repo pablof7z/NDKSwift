@@ -1,11 +1,15 @@
 import Foundation
 import NDKSwift
 
-struct SwarmHighlight: Identifiable {
+struct SwarmHighlight: Identifiable, Equatable {
     let id = UUID()
     let text: String
     let range: NSRange
     let highlights: [HighlightInfo]
+    
+    static func == (lhs: SwarmHighlight, rhs: SwarmHighlight) -> Bool {
+        lhs.id == rhs.id
+    }
     
     var totalZaps: Int {
         highlights.reduce(0) { $0 + $1.zapCount }
@@ -16,9 +20,14 @@ struct SwarmHighlight: Identifiable {
     }
     
     var intensity: Double {
-        let baseIntensity = Double(totalHighlighters) / 10.0
-        let zapBoost = Double(totalZaps) / 100.0
-        return min(baseIntensity + zapBoost, 1.0)
+        // Constants for intensity calculation
+        let highlighterDivisor = 10.0  // Each 10 highlighters = 1.0 base intensity
+        let zapDivisor = 100.0         // Each 100 zaps = 1.0 zap boost
+        let maxIntensity = 1.0         // Maximum intensity value
+        
+        let baseIntensity = Double(totalHighlighters) / highlighterDivisor
+        let zapBoost = Double(totalZaps) / zapDivisor
+        return min(baseIntensity + zapBoost, maxIntensity)
     }
     
     struct HighlightInfo: Identifiable {
@@ -124,9 +133,12 @@ class SwarmHighlightManager: ObservableObject {
         
         let dataSource = await ndk.outbox.observe(filter: filter, maxAge: 3600, cachePolicy: .cacheWithNetwork)
         var count = 0
+        // Limit zap count to prevent excessive API calls
+        let maxZapCount = 100
+        
         for await _ in dataSource.events {
             count += 1
-            if count > 100 { break } // Limit to avoid too many zaps
+            if count > maxZapCount { break }
         }
         return count
     }
