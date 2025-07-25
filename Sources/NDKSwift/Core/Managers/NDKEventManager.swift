@@ -163,6 +163,14 @@ public actor NDKEventManager {
     /// Publish queued events for a specific relay (called by NDKPool when relay connects)
     internal func publishQueuedEvents(for relay: NDKRelay) async {
         let unpublishedEvents = await cache.getUnpublishedEvents(maxAge: TimeConstants.hour, limit: nil)
+        
+        // Count events targeted for this relay
+        let eventsForRelay = unpublishedEvents.filter { $0.targetRelays.contains(relay.url) }
+        
+        // Only log if there are events to publish
+        if !eventsForRelay.isEmpty {
+            NDKLogger.log(.debug, category: .relay, "📤 Publishing \(eventsForRelay.count) queued events for newly connected relay: \(relay.url)")
+        }
 
         for (event, targetRelayUrls) in unpublishedEvents {
             if targetRelayUrls.contains(relay.url) {

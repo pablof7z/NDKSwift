@@ -234,7 +234,7 @@ struct HashtagView: View {
               let profileManager = appState.profileManager else { return }
         
         Task {
-            for await profile in await profileManager.observe(for: pubkey) {
+            for await profile in await profileManager.observe(for: pubkey, maxAge: TimeConstants.hour) {
                 await MainActor.run {
                     profiles[pubkey] = profile
                 }

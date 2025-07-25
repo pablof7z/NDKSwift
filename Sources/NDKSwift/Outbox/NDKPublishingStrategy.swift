@@ -15,17 +15,16 @@ actor NDKPublishingStrategy {
     /// Active publishing tasks
     private var activeTasks: [String: Task<Void, Never>] = [:]
 
-    init(ndk: NDK, selector: NDKRelaySelector, tracker: NDKOutboxTracker) {
+    init(ndk: NDK, selector: NDKRelaySelector, ranker: NDKRelayRanker) {
         self.ndk = ndk
         self.selector = selector
-        self.ranker = NDKRelayRanker(ndk: ndk, tracker: tracker)
+        self.ranker = ranker
     }
 
     /// Publish an event using the outbox model
     @discardableResult
     func publish(
         _ event: NDKEvent,
-        config: OutboxPublishConfig = .default,
         customStrategy: RelaySelectionStrategy? = nil
     ) async throws -> PublishResult {
         // Select target relays
@@ -39,8 +38,7 @@ actor NDKPublishingStrategy {
             )
         } else {
             selection = await selector.selectRelaysForPublishing(
-                event: event,
-                config: config.selectionConfig
+                event: event
             )
         }
 
@@ -48,7 +46,6 @@ actor NDKPublishingStrategy {
         let item = OutboxItem(
             event: event,
             targetRelays: selection.relays,
-            config: config,
             selectionMethod: selection.selectionMethod,
             eventTracker: ndk.eventTracker
         )
@@ -57,30 +54,40 @@ actor NDKPublishingStrategy {
         let eventId = event.id
         outboxItems[eventId] = item
 
-        // Start publishing
+        // Start publishing to initial relays
         let task = Task {
             await publishOutboxItem(item)
         }
         activeTasks[eventId] = task
 
-        // Wait for initial results if not background
-        if !config.publishInBackground {
-            await task.value
+        // If we have missing relay info, spawn background task to wait for discovery
+        if !selection.missingRelayInfoPubkeys.isEmpty && OutboxConstants.republishOnRelayDiscovery {
+            Task {
+                await waitForRelayDiscoveryAndPublish(
+                    event: event,
+                    missingPubkeys: selection.missingRelayInfoPubkeys,
+                    alreadyPublishedTo: selection.relays
+                )
+            }
         }
 
+        // Always wait for initial results (publishInBackground removed)
+        await task.value
+
         // Return current status
-        return await getPublishResult(for: eventId)
+        return await getPublishResult(for: eventId, missingRelayInfoPubkeys: selection.missingRelayInfoPubkeys)
     }
 
     /// Get the current status of a publishing operation
-    func getPublishResult(for eventId: String) async -> PublishResult {
+    func getPublishResult(for eventId: String, missingRelayInfoPubkeys: Set<String> = []) async -> PublishResult {
         guard let item = outboxItems[eventId] else {
             return PublishResult(
                 eventId: eventId,
                 overallStatus: .unknown,
                 relayStatuses: [:],
                 successCount: 0,
-                failureCount: 0
+                failureCount: 0,
+                missingRelayInfoPubkeys: missingRelayInfoPubkeys
             )
         }
 
@@ -89,7 +96,8 @@ actor NDKPublishingStrategy {
             overallStatus: await item.overallStatus,
             relayStatuses: await item.relayStatuses,
             successCount: await item.successCount,
-            failureCount: await item.failureCount
+            failureCount: await item.failureCount,
+            missingRelayInfoPubkeys: missingRelayInfoPubkeys
         )
     }
 
@@ -153,10 +161,9 @@ actor NDKPublishingStrategy {
 
     private func publishToRelay(item: OutboxItem, relayURL: String) async {
         var attempts = 0
-        let config = item.config
-        var backoffInterval: TimeInterval = config.initialBackoffInterval
+        var backoffInterval: TimeInterval = OutboxConstants.initialBackoffInterval
 
-        while attempts < config.maxRetries {
+        while attempts < OutboxConstants.publishRetries {
             attempts += 1
 
             // Check if cancelled
@@ -196,7 +203,7 @@ actor NDKPublishingStrategy {
                 await item.updateRelayStatus(relayURL, status: .rateLimited)
                 // Exponential backoff
                 try? await Task.sleep(nanoseconds: UInt64(backoffInterval) * TimeConstants.nanosecondsPerSecond)
-                backoffInterval *= config.backoffMultiplier
+                backoffInterval *= OutboxConstants.backoffMultiplier
 
             case .authRequired:
                 // Attempt NIP-42 auth
@@ -214,10 +221,10 @@ actor NDKPublishingStrategy {
                 return
 
             case .temporaryFailure:
-                if attempts < config.maxRetries {
+                if attempts < OutboxConstants.publishRetries {
                     await item.updateRelayStatus(relayURL, status: .retrying(attempt: attempts))
                     try? await Task.sleep(nanoseconds: UInt64(backoffInterval) * TimeConstants.nanosecondsPerSecond)
-                    backoffInterval *= config.backoffMultiplier
+                    backoffInterval *= OutboxConstants.backoffMultiplier
                 } else {
                     await item.updateRelayStatus(relayURL, status: .failed(.maxRetriesExceeded))
                     await ranker.updateRelayPerformance(relayURL, success: false)
@@ -292,53 +299,95 @@ actor NDKPublishingStrategy {
         await item.setSuccessCount(successCount)
         await item.setFailureCount(failureCount)
 
-        let config = item.config
-        if successCount >= config.minSuccessfulRelays {
+        if successCount >= OutboxConstants.minSuccessfulPublishes {
             await item.setOverallStatus(.succeeded)
-        } else if pendingCount == 0, successCount < config.minSuccessfulRelays {
+        } else if pendingCount == 0, successCount < OutboxConstants.minSuccessfulPublishes {
             await item.setOverallStatus(.failed)
         }
 
         await item.setLastUpdated(Date())
     }
 
+    // MARK: - Relay Discovery
+
+    /// Wait for relay discovery and publish to newly discovered relays
+    private func waitForRelayDiscoveryAndPublish(
+        event: NDKEvent,
+        missingPubkeys: Set<String>,
+        alreadyPublishedTo: Set<String>
+    ) async {
+        NDKLogger.log(.info, category: .outbox, "🔍 Waiting for relay discovery for \(missingPubkeys.count) pubkeys for event \(event.id.prefix(8))")
+        
+        // Create a timeout task
+        let timeoutTask = Task {
+            try? await Task.sleep(nanoseconds: UInt64(OutboxConstants.relayDiscoveryTimeout * Double(TimeConstants.nanosecondsPerSecond)))
+        }
+        
+        // Track which pubkeys we still need
+        var remainingPubkeys = missingPubkeys
+        var discoveredRelays = Set<String>()
+        
+        // Listen for discoveries
+        let tracker = ndk.outboxTracker
+        
+        let discoveryTask = Task {
+            for await discovery in tracker.relayDiscoveries {
+                // Check if this is one of our missing pubkeys
+                if remainingPubkeys.contains(discovery.pubkey) {
+                    NDKLogger.log(.debug, category: .outbox, "📡 Found relay info for \(discovery.pubkey.prefix(8))")
+                    
+                    // Add write relays (for publishing)
+                    discoveredRelays.formUnion(discovery.writeRelays)
+                    
+                    // Remove from remaining
+                    remainingPubkeys.remove(discovery.pubkey)
+                    
+                    // If we found all pubkeys, we're done
+                    if remainingPubkeys.isEmpty {
+                        break
+                    }
+                }
+            }
+        }
+        
+        // Wait for either timeout or discovery completion
+        await withTaskGroup(of: Void.self) { group in
+            group.addTask { await timeoutTask.value }
+            group.addTask { await discoveryTask.value }
+            
+            // Wait for first to complete
+            await group.next()
+            group.cancelAll()
+        }
+        
+        // Filter out relays we already published to
+        let newRelays = discoveredRelays.subtracting(alreadyPublishedTo)
+        
+        if !newRelays.isEmpty {
+            NDKLogger.log(.info, category: .outbox, "📤 Publishing event \(event.id.prefix(8)) to \(newRelays.count) newly discovered relays")
+            
+            // Publish to the new relays
+            for relayURL in newRelays {
+                await publishToRelay(item: OutboxItem(
+                    event: event,
+                    targetRelays: [relayURL],
+                    selectionMethod: .outbox,
+                    eventTracker: ndk.eventTracker
+                ), relayURL: relayURL)
+            }
+        } else if !remainingPubkeys.isEmpty {
+            NDKLogger.log(.warning, category: .outbox, "⏱️ Relay discovery timed out for \(remainingPubkeys.count) pubkeys")
+        }
+    }
+
 }
 
 // MARK: - Supporting Types
-
-/// Configuration for outbox publishing
-public struct OutboxPublishConfig: Sendable {
-    public let selectionConfig: PublishingConfig
-    public let minSuccessfulRelays: Int
-    public let maxRetries: Int
-    public let initialBackoffInterval: TimeInterval
-    public let backoffMultiplier: Double
-    public let publishInBackground: Bool
-
-    public init(
-        selectionConfig: PublishingConfig = .default,
-        minSuccessfulRelays: Int = 1,
-        maxRetries: Int = 3,
-        initialBackoffInterval: TimeInterval = 1.0,
-        backoffMultiplier: Double = 2.0,
-        publishInBackground: Bool = false
-    ) {
-        self.selectionConfig = selectionConfig
-        self.minSuccessfulRelays = minSuccessfulRelays
-        self.maxRetries = maxRetries
-        self.initialBackoffInterval = initialBackoffInterval
-        self.backoffMultiplier = backoffMultiplier
-        self.publishInBackground = publishInBackground
-    }
-
-    public static let `default` = OutboxPublishConfig()
-}
 
 /// An item in the outbox queue
 actor OutboxItem {
     public let event: NDKEvent
     public let targetRelays: Set<String>
-    public let config: OutboxPublishConfig
     public let selectionMethod: SelectionMethod
     public var relayStatuses: [String: RelayPublishStatus] = [:]
     public var overallStatus: PublishStatus = .pending
@@ -350,13 +399,11 @@ actor OutboxItem {
     init(
         event: NDKEvent,
         targetRelays: Set<String>,
-        config: OutboxPublishConfig,
         selectionMethod: SelectionMethod,
         eventTracker: NDKEventTracker
     ) {
         self.event = event
         self.targetRelays = targetRelays
-        self.config = config
         self.selectionMethod = selectionMethod
         self.eventTracker = eventTracker
 
@@ -550,6 +597,7 @@ public struct PublishResult: Sendable {
     public let relayStatuses: [String: RelayPublishStatus]
     public let successCount: Int
     public let failureCount: Int
+    public let missingRelayInfoPubkeys: Set<String>
 
     public var isComplete: Bool {
         overallStatus == .succeeded || overallStatus == .failed || overallStatus == .cancelled
@@ -562,5 +610,9 @@ public struct PublishResult: Sendable {
             }
             return nil
         })
+    }
+    
+    public var willRepublishOnDiscovery: Bool {
+        !missingRelayInfoPubkeys.isEmpty
     }
 }

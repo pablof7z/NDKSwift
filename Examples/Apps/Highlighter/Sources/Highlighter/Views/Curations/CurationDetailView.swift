@@ -190,7 +190,7 @@ struct CurationDetailView: View {
     private func loadCurator() async {
         guard let ndk = appState.ndk else { return }
         
-        for await profile in await ndk.profileManager.observe(for: curation.author) {
+        for await profile in await ndk.profileManager.observe(for: curation.author, maxAge: TimeConstants.hour) {
             await MainActor.run {
                 self.curator = profile
             }
@@ -450,7 +450,7 @@ struct LoadedArticleCard: View {
     private func loadAuthor() async {
         guard let ndk = appState.ndk else { return }
         
-        for await profile in await ndk.profileManager.observe(for: article.author) {
+        for await profile in await ndk.profileManager.observe(for: article.author, maxAge: TimeConstants.hour) {
             await MainActor.run {
                 self.author = profile
             }

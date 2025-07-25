@@ -287,7 +287,7 @@ class NostrManager {
         // Start observing user profile using NDKProfileManager
         profileObservationTask = Task { @MainActor in
             // Use maxAge of 3600 (1 hour) for the profile in settings
-            for await profile in await ndk.profileManager.observe(for: pubkey) {
+            for await profile in await ndk.profileManager.observe(for: pubkey, maxAge: TimeConstants.hour) {
                 self.currentUserProfile = profile
             }
         }

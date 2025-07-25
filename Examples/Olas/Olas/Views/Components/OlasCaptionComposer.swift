@@ -208,7 +208,7 @@ struct OlasCaptionComposer: View {
         for user in suggestedUsers {
             if suggestedProfiles[user.pubkey] == nil {
                 Task {
-                    for await profile in await profileManager.observe(for: user.pubkey) {
+                    for await profile in await profileManager.observe(for: user.pubkey, maxAge: TimeConstants.hour) {
                         await MainActor.run {
                             suggestedProfiles[user.pubkey] = profile
                         }

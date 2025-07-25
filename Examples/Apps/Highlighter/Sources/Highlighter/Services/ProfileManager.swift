@@ -49,7 +49,7 @@ class ProfileManager: ObservableObject {
         
         // Use profile manager for efficient caching
         let profileTask = Task {
-            for await profile in await ndk.profileManager.observe(for: pubkey) {
+            for await profile in await ndk.profileManager.observe(for: pubkey, maxAge: TimeConstants.hour) {
                 await MainActor.run {
                     self.currentUserProfile = profile
                     self.cachedProfiles[pubkey] = profile
@@ -73,7 +73,7 @@ class ProfileManager: ObservableObject {
         // Load from network
         return await withCheckedContinuation { continuation in
             let task = Task {
-                for await profile in await ndk.profileManager.observe(for: pubkey) {
+                for await profile in await ndk.profileManager.observe(for: pubkey, maxAge: TimeConstants.hour) {
                     await MainActor.run {
                         self.cachedProfiles[pubkey] = profile
                     }

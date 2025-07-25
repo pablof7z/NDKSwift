@@ -674,7 +674,7 @@ struct NIP60WalletREPL {
             var recipientName = recipientUser.npub
             
             // Use profile manager to get profile data
-            for await profile in await ndk.profileManager.observe(for: recipientUser.pubkey) {
+            for await profile in await ndk.profileManager.observe(for: recipientUser.pubkey, maxAge: TimeConstants.hour) {
                 if let profile = profile {
                     recipientName = profile.displayName ?? profile.name ?? recipientUser.npub
                     break // Only need first value

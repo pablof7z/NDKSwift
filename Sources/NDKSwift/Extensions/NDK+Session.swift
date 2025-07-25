@@ -63,7 +63,7 @@ extension NDK {
         }
 
         // Generate unique ID for tracking
-        let subscriptionId = UUID().uuidString
+        let subscriptionId = "reactive_\(IDGenerator.randomId(length: 8))"
         NDKLogger.log(.debug, category: .subscription, "🔍 [ReactiveFilter] Created subscription ID: \(subscriptionId)")
 
         Task {

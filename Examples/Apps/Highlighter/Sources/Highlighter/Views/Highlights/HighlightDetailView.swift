@@ -261,7 +261,7 @@ struct HighlightDetailView: View {
     private func loadAuthorProfile() async {
         guard let ndk = appState.ndk else { return }
         
-        for await profile in await ndk.profileManager.observe(for: highlight.author) {
+        for await profile in await ndk.profileManager.observe(for: highlight.author, maxAge: TimeConstants.hour) {
             await MainActor.run {
                 self.author = profile
             }

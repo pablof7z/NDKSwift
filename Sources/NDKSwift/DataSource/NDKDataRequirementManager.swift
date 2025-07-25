@@ -26,6 +26,11 @@ actor NDKDataRequirementManager {
         Task {
             await startPeriodicCleanup()
         }
+        
+        // Listen for relay discoveries
+        Task {
+            await listenForRelayDiscoveries()
+        }
     }
 
     /// Periodic cleanup of stale handles and requirements
@@ -66,16 +71,14 @@ actor NDKDataRequirementManager {
         cachePolicy: CachePolicy = .cacheWithNetwork,
         relays: Set<RelayURL>? = nil,
         exclusiveRelays: Bool = false,
-        subscriptionId: String? = nil
+        subscriptionId: String? = nil,
+        closeOnEose: Bool? = nil
     ) async -> DataRequirementHandle {
         let requirementId = RequirementID()
         let correlationId = requirementId.uuidString.prefix(8)
 
         NDKLogger.log(.info, category: .subscription, "📥 [DataReqManager] registerRequirement - filter: \(filter), maxAge: \(maxAge), policy: \(cachePolicy), subscriptionId: \(subscriptionId ?? "auto")", correlationId: String(correlationId))
         
-        // MARK: - OUTBOX_DEBUG_HOOK
-        await NDKDebugHooks.emit(.flowStep(description: "DataRequirementManager registering requirement for filter"))
-
         // IMMEDIATELY register cache observer to deliver existing events
         // This happens before any delay, giving instant cache hits
         var cacheObservationHandle: ObservationHandle?
@@ -124,7 +127,8 @@ actor NDKDataRequirementManager {
             relays: relays,
             exclusiveRelays: exclusiveRelays,
             subscriptionId: subscriptionId,
-            cacheObservationHandle: cacheObservationHandle
+            cacheObservationHandle: cacheObservationHandle,
+            closeOnEose: closeOnEose
         )
 
         // Add to pending queue
@@ -213,7 +217,8 @@ actor NDKDataRequirementManager {
 
             // Determine if this group needs a live subscription
             let maxAge = lifecycleGroup.first?.maxAge ?? 0
-            let closeOnEose = maxAge > 0
+            // Use explicit closeOnEose if provided, otherwise default based on maxAge
+            let closeOnEose = lifecycleGroup.first?.closeOnEose ?? (maxAge > 0)
             let cachePolicy = lifecycleGroup.first?.cachePolicy ?? .cacheWithNetwork
 
             // Check cache freshness if maxAge > 0 and cachePolicy allows it
@@ -269,11 +274,6 @@ actor NDKDataRequirementManager {
 
                 // Handle outbox model filter decomposition
                 if relays == nil && ndk.outboxEnabled && optimizedFilter.authors != nil {
-                    NDKLogger.log(.info, category: .subscription, "[DataReqManager] Using outbox strategy for filter")
-                    
-                    // MARK: - OUTBOX_DEBUG_HOOK
-                    await NDKDebugHooks.emit(.flowStep(description: "DataRequirementManager requesting outbox strategy"))
-                    
                     let outboxStrategy = await ndk.outbox.getOutboxStrategy(for: optimizedFilter)
 
                     // Start background discovery if needed
@@ -284,27 +284,10 @@ actor NDKDataRequirementManager {
                         }
                     }
 
-                    // Register subscription for relay updates if there are unknown authors
-                    if !outboxStrategy.unknownAuthors.isEmpty && !closeOnEose {
-                        // Prefer custom subscription IDs, but add relay suffix for outbox queries
-                        let baseSubscriptionId = lifecycleGroup.compactMap { $0.subscriptionId }.first ?? generateSubscriptionId(for: optimizedFilter)
-                        let mainSubscriptionId = baseSubscriptionId
-                        await ndk.outbox.registerSubscriptionForUpdates(
-                            id: mainSubscriptionId,
-                            filter: optimizedFilter,
-                            unknownAuthors: outboxStrategy.unknownAuthors
-                        )
-                        NDKLogger.log(.info, category: .subscription, "📡 [DataReqManager] Registered subscription '\(mainSubscriptionId)' for relay updates")
-                    }
+                    // TODO: Will handle relay discovery through AsyncStream instead
 
                     // If we have relay-specific filters, create multiple subscriptions
                     if outboxStrategy.hasRelaySpecificFilters {
-                        NDKLogger.log(.info, category: .subscription, "📊 [DataReqManager] Creating \(outboxStrategy.filtersByRelay.count) relay-specific subscriptions")
-                        
-                        // MARK: - OUTBOX_DEBUG_HOOK
-                        await NDKDebugHooks.emit(.flowStep(description: "Creating \(outboxStrategy.filtersByRelay.count) relay-specific subscriptions"))
-                        await NDKDebugHooks.emit(.outboxStrategyComputed(relays: outboxStrategy.filtersByRelay.mapValues { $0.authors ?? [] }))
-
                         // Track all requirements created for this group
                         var createdRequirements: [DataRequirement] = []
 
@@ -323,13 +306,28 @@ actor NDKDataRequirementManager {
                             // For relay-specific subscriptions, add relay suffix to custom IDs
                             let baseId = lifecycleGroup.compactMap { $0.subscriptionId }.first ?? generateSubscriptionId(for: relaySpecificFilter)
                             let subscriptionId = "\(baseId)_\(shortRelayHost)"
+                            
+                            // Ensure subscription ID doesn't exceed relay limits
+                            let safeSubscriptionId = NDKSubscriptionIDGenerator.generateRelayID(from: subscriptionId)
 
                             NDKLogger.log(.trace, category: .subscription, "📡 [DataReqManager] Creating subscription for \(relay): \(relaySpecificFilter.authors?.count ?? 0) authors")
+                            
+                            // Calculate fingerprint for this filter set
+                            let fingerprint = [relaySpecificFilter].toFingerprint(closeOnEose: closeOnEose)
 
                             let internalSubscription = await ndk.internalSubscriptionManager.createSubscription(
-                                id: subscriptionId,
+                                id: safeSubscriptionId,
                                 filters: [relaySpecificFilter],
-                                relays: [relay]
+                                relays: [relay],
+                                fingerprint: fingerprint,
+                                closeOnEose: closeOnEose,
+                                autoStart: false
+                            )
+                            
+                            // Register the relay-specific ID mapping
+                            await ndk.internalSubscriptionManager.registerRelayIdMapping(
+                                relayId: safeSubscriptionId,
+                                fingerprint: fingerprint
                             )
 
                             // Create data requirement for this relay
@@ -374,6 +372,8 @@ actor NDKDataRequirementManager {
                         for requirement in createdRequirements {
                             Task {
                                 await requirement.startProcessing()
+                                // Start the subscription after processing is set up
+                                await requirement.internalSubscription.start()
                             }
                         }
 
@@ -407,7 +407,9 @@ actor NDKDataRequirementManager {
                 let internalSubscription = await ndk.internalSubscriptionManager.createSubscription(
                     id: subscriptionId,
                     filters: [optimizedFilter],
-                    relays: relays
+                    relays: relays,
+                    closeOnEose: closeOnEose,
+                    autoStart: false
                 )
                 NDKLogger.log(.trace, category: .subscription, "✅ [DataReqManager] Internal subscription created")
 
@@ -449,6 +451,8 @@ actor NDKDataRequirementManager {
                 // Start processing events
                 Task {
                     await requirement.startProcessing()
+                    // Start the subscription after processing is set up
+                    await requirement.internalSubscription.start()
 
                     // Record fetch time after processing starts
                     await ndk.cache.recordFetchTime(for: aggregatedFilter, timestamp: Date())
@@ -757,6 +761,119 @@ actor NDKDataRequirementManager {
 
         return descriptions.joined(separator: "")
     }
+    
+    // MARK: - Relay Discovery Handling
+    
+    /// Listen for relay discoveries and create new requirements as needed
+    private func listenForRelayDiscoveries() async {
+        let tracker = ndk.outboxTracker
+        
+        for await discovery in tracker.relayDiscoveries {
+            await handleRelayDiscovery(discovery)
+        }
+    }
+    
+    /// Handle a relay discovery event by creating new requirements
+    private func handleRelayDiscovery(_ event: RelayDiscoveryEvent) async {
+        NDKLogger.log(.info, category: .outbox, "🔔 Handling relay discovery for \(event.pubkey.prefix(8))")
+        
+        // Find all active requirements that might be interested in this author
+        var interestedRequirements: [(RequirementID, DataRequirement, NDKFilter)] = []
+        
+        for (id, requirement) in activeRequirements {
+            // Check if this requirement's filter includes this author
+            if let authors = requirement.filter.authors,
+               authors.contains(event.pubkey) {
+                // Get the individual filters for this requirement
+                for (observerId, _) in await requirement.observers {
+                    if let individualFilter = await requirement.individualFilters[observerId],
+                       let filterAuthors = individualFilter.authors,
+                       filterAuthors.contains(event.pubkey) {
+                        interestedRequirements.append((id, requirement, individualFilter))
+                    }
+                }
+            }
+        }
+        
+        guard !interestedRequirements.isEmpty else {
+            NDKLogger.log(.debug, category: .outbox, "📭 No active requirements interested in \(event.pubkey.prefix(8))")
+            return
+        }
+        
+        NDKLogger.log(.info, category: .outbox, "📢 Found \(interestedRequirements.count) requirements interested in \(event.pubkey.prefix(8))")
+        
+        // Determine target relays (prefer read relays)
+        let targetRelays = !event.readRelays.isEmpty ? event.readRelays : event.writeRelays
+        
+        guard !targetRelays.isEmpty else {
+            NDKLogger.log(.warning, category: .outbox, "⚠️ No relays in discovery event for \(event.pubkey.prefix(8))")
+            return
+        }
+        
+        // Create new requirements for each interested requirement
+        for (_, originalRequirement, individualFilter) in interestedRequirements {
+            // Create filter for just this author
+            var authorFilter = individualFilter
+            authorFilter.authors = [event.pubkey]
+            
+            // Create subscription ID with relay suffix
+            let updateSubscriptionId = "\(originalRequirement.subscriptionId)_discovery_\(event.pubkey.prefix(8))_\(Int(Date().timeIntervalSince1970))"
+            
+            // Ensure subscription ID doesn't exceed relay limits
+            let safeUpdateSubscriptionId = NDKSubscriptionIDGenerator.generateRelayID(from: updateSubscriptionId)
+            
+            NDKLogger.log(.debug, category: .outbox, "📡 Creating discovery subscription '\(safeUpdateSubscriptionId)' for \(targetRelays.count) relays")
+            
+            // Use the same fingerprint as the original requirement
+            let fingerprint = [authorFilter].toFingerprint(closeOnEose: originalRequirement.closeOnEose)
+            
+            // Create the subscription
+            let internalSubscription = await ndk.internalSubscriptionManager.createSubscription(
+                id: safeUpdateSubscriptionId,
+                filters: [authorFilter],
+                relays: targetRelays,
+                fingerprint: fingerprint,
+                closeOnEose: originalRequirement.closeOnEose,
+                autoStart: false
+            )
+            
+            // Register mapping
+            await ndk.internalSubscriptionManager.registerRelayIdMapping(
+                relayId: safeUpdateSubscriptionId,
+                fingerprint: fingerprint
+            )
+            
+            // Create new data requirement
+            let requirement = DataRequirement(
+                filter: authorFilter,
+                subscriptionId: internalSubscription.id,
+                internalSubscription: internalSubscription,
+                cache: ndk.cache,
+                ndk: ndk,
+                relays: targetRelays,
+                exclusiveRelays: originalRequirement.exclusiveRelays,
+                closeOnEose: originalRequirement.closeOnEose
+            )
+            
+            // Copy observers from original requirement
+            for (observerId, observer) in await originalRequirement.observers {
+                if let individualFilter = await originalRequirement.individualFilters[observerId],
+                   let filterAuthors = individualFilter.authors,
+                   filterAuthors.contains(event.pubkey) {
+                    await requirement.addObserver(observer, id: observerId, individualFilter: individualFilter)
+                }
+            }
+            
+            // Start processing
+            Task {
+                await requirement.startProcessing()
+                // Start the subscription after processing is set up
+                await requirement.internalSubscription.start()
+            }
+            
+            NDKLogger.log(.info, category: .outbox, "✅ Created discovery requirement for \(event.pubkey.prefix(8)) on \(targetRelays.count) relays")
+        }
+    }
 }
 
 // MARK: - Supporting Types
@@ -774,6 +891,7 @@ struct PendingRequirement {
     let exclusiveRelays: Bool
     let subscriptionId: String?
     let cacheObservationHandle: ObservationHandle?
+    let closeOnEose: Bool?
 }
 
 /// Manages a single data requirement - events flow ONLY through cache
@@ -783,11 +901,12 @@ actor DataRequirement {
     let internalSubscription: InternalSubscription
     private let cache: NDKCache?
     private weak var ndk: NDK?
-    private let closeOnEose: Bool
+    let closeOnEose: Bool
     private var observerHandles: [RequirementID: ObservationHandle] = [:]
-    private var observers: [RequirementID: CacheObserver] = [:]  // Track observers for relay updates
+    var observers: [RequirementID: CacheObserver] = [:]  // Track observers for relay updates
+    var individualFilters: [RequirementID: NDKFilter] = [:]  // Track individual filters per observer
     private let relays: Set<RelayURL>?
-    private let exclusiveRelays: Bool
+    let exclusiveRelays: Bool
 
     var observerCount: Int { observerHandles.count }
 
@@ -807,6 +926,8 @@ actor DataRequirement {
 
         // Store observer reference for relay updates
         observers[id] = observer
+        // Store individual filter
+        individualFilters[id] = individualFilter
 
         // Register observer with cache - cache is the single source of truth
         if let cache = cache {
@@ -825,6 +946,7 @@ actor DataRequirement {
             await handle.cancel()
         }
         observers.removeValue(forKey: id)
+        individualFilters.removeValue(forKey: id)
     }
 
     func includesFilter(_ filter: NDKFilter) -> Bool {
@@ -897,8 +1019,8 @@ actor DataRequirement {
             return
         }
 
-        // The subscription is already started by InternalSubscriptionManager.createSubscription()
-        NDKLogger.log(.trace, category: .subscription, "📋 [DataRequirement] Processing events from internal subscription...")
+        // The subscription will be started by the caller after this method returns
+        NDKLogger.log(.trace, category: .subscription, "📋 [DataRequirement] Setting up event processing for subscription...")
 
         // Track received event IDs if this filter is for specific IDs
         let requestedIds = filter.ids
@@ -915,7 +1037,7 @@ actor DataRequirement {
 
             // Close subscription if closeOnEose is set OR if we have all requested event IDs
             let shouldClose = self.closeOnEose ||
-                (requestedIds.map { Set($0) } == receivedIds)
+                (requestedIds != nil && requestedIds.map { Set($0) } == receivedIds)
 
             if shouldClose {
                 Task {

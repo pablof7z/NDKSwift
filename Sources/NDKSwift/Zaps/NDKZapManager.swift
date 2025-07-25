@@ -601,7 +601,7 @@ public actor NDKZapManager {
 
         // Try to get provider pubkey from recipient's profile
         var providerPubkey: String?
-        for await profile in await ndk.profileManager.observe(for: recipientPubkey) {
+        for await profile in await ndk.profileManager.observe(for: recipientPubkey, maxAge: TimeConstants.hour) {
             if let profile = profile {
                 // Try to resolve LNURL to get provider pubkey
                 if let lnurlAddress = profile.lud16 ?? profile.lud06 {

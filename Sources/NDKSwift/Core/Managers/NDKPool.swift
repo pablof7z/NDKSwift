@@ -164,9 +164,6 @@ public actor NDKPool {
             return blockedRelay
         }
 
-        // MARK: - OUTBOX_DEBUG_HOOK
-        await NDKDebugHooks.emit(.poolConnecting(relay: normalizedUrl))
-        
         // Create new relay
         let relay = NDKRelay(url: normalizedUrl)
         if let ndk = ndk {
@@ -386,7 +383,6 @@ public actor NDKPool {
             NDKLogger.log(.warning, category: .relay, "⚠️ No NDK instance to handle relay connection")
             return
         }
-        NDKLogger.log(.debug, category: .relay, "📤 Publishing queued events for newly connected relay: \(relay.url)")
         await ndk.eventManager.publishQueuedEvents(for: relay)
     }
 

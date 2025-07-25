@@ -134,7 +134,7 @@ struct PostDetailView: View {
     private func loadProfile() async {
         guard let profileManager = appState.profileManager else { return }
         
-        for await profile in await profileManager.observe(for: event.pubkey) {
+        for await profile in await profileManager.observe(for: event.pubkey, maxAge: TimeConstants.hour) {
             await MainActor.run {
                 self.profile = profile
             }

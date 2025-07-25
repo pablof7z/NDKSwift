@@ -25,20 +25,20 @@ private struct ProfileCacheEntry {
 /// synchronized with the database. When profile updates arrive from relays, both the
 /// memory cache and database are updated together.
 ///
-/// Use the forceNetworkFetch parameter to control network behavior:
-/// - forceNetworkFetch: false (default) - Return cached data immediately if available
-/// - forceNetworkFetch: true - Always check relays for updates (useful for profile pages)
+/// Use the maxAge parameter to control network behavior (consistent with ndk.observe):
+/// - maxAge: 0 - Always check relays for real-time updates
+/// - maxAge: >0 - Return cached data immediately if available
 ///
 /// Example usage:
 /// ```swift
 /// // Feed view - many profiles, use cache
-/// for await profile in profileManager.observe(for: pubkey) {
+/// for await profile in profileManager.observe(for: pubkey, maxAge: TimeConstants.hour, maxAge: TimeConstants.hour) {
 ///     // Use profile (may be nil if not found)
 ///     break // If you only need one value
 /// }
 ///
-/// // Profile page - want to check for updates
-/// for await profile in profileManager.observe(for: pubkey, forceNetworkFetch: true) {
+/// // Profile page - want real-time updates
+/// for await profile in profileManager.observe(for: pubkey, maxAge: 0, maxAge: TimeConstants.hour) {
 ///     // Handle profile updates
 /// }
 /// ```
@@ -72,8 +72,8 @@ public actor NDKProfileManager {
     ///
     /// - Parameters:
     ///   - pubkey: The public key to observe
-    ///   - forceNetworkFetch: If true, always check relays for updates even if cached
-    public func observe(for pubkey: PublicKey, forceNetworkFetch: Bool = false) -> AsyncStream<NDKUserProfile?> {
+    ///   - maxAge: Maximum age of cached data in seconds (0 = always get real-time updates)
+    public func observe(for pubkey: PublicKey, maxAge: TimeInterval = TimeConstants.hour) -> AsyncStream<NDKUserProfile?> {
         AsyncStream { continuation in
             Task {
                 // Add continuation to active observations
@@ -83,8 +83,8 @@ public actor NDKProfileManager {
                 }
                 activeObservations[pubkey]?.append(wrapper)
 
-                // Yield cached profile immediately if available and not forcing network fetch
-                if !forceNetworkFetch, let cached = getCachedProfile(for: pubkey) {
+                // Yield cached profile immediately if available and maxAge allows it
+                if maxAge > 0, let cached = getCachedProfile(for: pubkey) {
                     continuation.yield(cached)
                 }
 
@@ -101,8 +101,8 @@ public actor NDKProfileManager {
                 )
 
                 // Use NDKDataSource for profile updates
-                // When forceNetworkFetch is true, we want to check relays immediately
-                let dataSource = ndk.observe(filter: filter, maxAge: 0)
+                // Pass maxAge through to control subscription behavior
+                let dataSource = ndk.observe(filter: filter, maxAge: maxAge)
 
                 // Process events from data source
                 for await event in dataSource.events {

@@ -132,7 +132,7 @@ public actor BlossomClient {
                 )
 
             case HTTPStatusCode.unauthorized:
-                throw NDKError.unauthorized(relay: serverURL, message: "Blossom authorization failed")
+                throw NDKError.unauthorized(relay: serverURL, message: ErrorMessageConstants.Messages.blossomAuthorizationFailed)
 
             case HTTPStatusCode.payloadTooLarge:
                 throw NDKError.fileTooLarge(maxSize: descriptor?.maxUploadSize ?? Int64.max)
@@ -209,7 +209,7 @@ public actor BlossomClient {
                 }
 
             case HTTPStatusCode.unauthorized:
-                throw NDKError.unauthorized(relay: serverURL, message: "Blossom authorization failed")
+                throw NDKError.unauthorized(relay: serverURL, message: ErrorMessageConstants.Messages.blossomAuthorizationFailed)
 
             default:
                 throw createServerError(response: httpResponse, data: data, serverURL: serverURL)
@@ -249,7 +249,7 @@ public actor BlossomClient {
                 return
 
             case HTTPStatusCode.unauthorized:
-                throw NDKError.unauthorized(relay: serverURL, message: "Blossom authorization failed")
+                throw NDKError.unauthorized(relay: serverURL, message: ErrorMessageConstants.Messages.blossomAuthorizationFailed)
 
             case HTTPStatusCode.notFound:
                 throw NDKError.blobNotFound(sha256: sha256)

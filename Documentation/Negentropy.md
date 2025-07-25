@@ -99,7 +99,7 @@ let initialMessage = try await reconciler.initiate()
 
 // Send to relay via NIP-77 NEG-OPEN message
 let negOpen = NIP77Message.open(
-    subscriptionId: "sync-\(UUID().uuidString)",
+    subscriptionId: "sync_\(IDGenerator.randomId(length: 8))",
     filter: filter,
     initialMessage: initialMessage
 )

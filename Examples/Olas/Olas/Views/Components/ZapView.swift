@@ -172,7 +172,7 @@ struct ZapView: View {
               let profileManager = ndk.profileManager else { return }
         
         // Observe profile
-        for await profile in await profileManager.observe(for: event.pubkey) {
+        for await profile in await profileManager.observe(for: event.pubkey, maxAge: TimeConstants.hour) {
             await MainActor.run {
                 recipientProfile = profile
                 

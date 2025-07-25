@@ -24,7 +24,7 @@ struct ProfileLoader<Content: View>: View {
         guard let ndk = ndkManager.ndk else { return }
         
         profileTask = Task {
-            let profileStream = await ndk.profileManager.observe(for: pubkey)
+            let profileStream = await ndk.profileManager.observe(for: pubkey, maxAge: TimeConstants.hour)
             
             for await profile in profileStream {
                 if let profile = profile {

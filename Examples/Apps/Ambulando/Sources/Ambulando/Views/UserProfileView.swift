@@ -158,7 +158,7 @@ struct UserProfileView: View {
         Task {
             guard let ndk = nostrManager.ndk else { return }
             
-            for await profile in ndk.profileManager.observe(for: pubkey) {
+            for await profile in ndk.profileManager.observe(for: pubkey, maxAge: TimeConstants.hour) {
                 await MainActor.run {
                     self.profile = profile
                 }

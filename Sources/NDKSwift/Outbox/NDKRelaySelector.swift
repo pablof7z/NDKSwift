@@ -23,8 +23,7 @@ actor NDKRelaySelector {
 
     /// Select relays for publishing an event
     public func selectRelaysForPublishing(
-        event: NDKEvent,
-        config: PublishingConfig = .default
+        event: NDKEvent
     ) async -> RelaySelectionResult {
         let correlationId = event.id.prefix(8)
 
@@ -42,7 +41,7 @@ actor NDKRelaySelector {
             let writeRelays = userItem.writeRelays.map { $0.url }
             targetRelays.formUnion(writeRelays)
             NDKLogger.log(.debug, category: .outbox, "📝 Added \(writeRelays.count) write relays for author", correlationId: String(correlationId))
-        } else if config.includeUserReadRelays,
+        } else if OutboxConstants.includeUserReadRelaysForPublish,
                   let userItem = await tracker.getRelaysSyncFor(pubkey: event.pubkey, type: .read) {
             // Fallback to read relays if no write relays
             let readRelays = userItem.readRelays.map { $0.url }
@@ -66,10 +65,10 @@ actor NDKRelaySelector {
         }
 
         // 4. Apply fallback if needed
-        if targetRelays.count < config.minRelayCount {
+        if targetRelays.count < OutboxConstants.minPublishRelays {
             let fallbackRelays = await selectFallbackRelays(
                 currentCount: targetRelays.count,
-                targetCount: config.minRelayCount,
+                targetCount: OutboxConstants.minPublishRelays,
                 excludeRelays: targetRelays
             )
             targetRelays.formUnion(fallbackRelays)
@@ -82,13 +81,19 @@ actor NDKRelaySelector {
         let rankedRelays = await ranker.rankRelays(
             Array(filteredRelays),
             for: [event.pubkey] + event.pTags,
-            preferences: config.rankingPreferences
+            preferences: .default
         )
 
-        let selectedRelays = Array(rankedRelays.prefix(config.maxRelayCount))
+        let selectedRelays = Array(rankedRelays.prefix(OutboxConstants.maxPublishRelays))
             .map { $0.url }
 
         let selectionMethod = determineSelectionMethod(filteredRelays)
+
+        // 7. If we have missing relay info for p-tagged users, trigger discovery
+        if !missingRelayPubkeys.isEmpty {
+            NDKLogger.log(.info, category: .outbox, "🔍 Triggering relay discovery for \(missingRelayPubkeys.count) p-tagged users", correlationId: String(correlationId))
+            await ndk.outbox.discoverRelaysInBackground(for: missingRelayPubkeys)
+        }
 
         return RelaySelectionResult(
             relays: Set(selectedRelays),
@@ -99,8 +104,7 @@ actor NDKRelaySelector {
 
     /// Select relays for fetching events
     public func selectRelaysForFetching(
-        filter: NDKFilter,
-        config: FetchingConfig = .default
+        filter: NDKFilter
     ) async -> RelaySelectionResult {
 
         var sourceRelays = Set<String>()
@@ -118,7 +122,7 @@ actor NDKRelaySelector {
             let authorRelays = await selectRelaysForAuthors(
                 authors,
                 type: .read,
-                preferWriteRelaysIfNoRead: config.preferWriteRelaysIfNoRead
+                preferWriteRelaysIfNoRead: OutboxConstants.preferWriteRelaysIfNoRead
             )
             sourceRelays.formUnion(authorRelays.relays)
             missingRelayPubkeys.formUnion(authorRelays.missingPubkeys)
@@ -130,10 +134,10 @@ actor NDKRelaySelector {
         missingRelayPubkeys.formUnion(contextualRelays.missingPubkeys)
 
         // 4. Apply fallback if needed
-        if sourceRelays.count < config.minRelayCount {
+        if sourceRelays.count < OutboxConstants.minFetchRelays {
             let fallbackRelays = await selectFallbackRelays(
                 currentCount: sourceRelays.count,
-                targetCount: config.minRelayCount,
+                targetCount: OutboxConstants.minFetchRelays,
                 excludeRelays: sourceRelays
             )
             sourceRelays.formUnion(fallbackRelays)
@@ -150,10 +154,10 @@ actor NDKRelaySelector {
         let rankedRelays = await ranker.rankRelays(
             Array(filteredRelays),
             for: allRelevantPubkeys,
-            preferences: config.rankingPreferences
+            preferences: .default
         )
 
-        let selectedRelays = Array(rankedRelays.prefix(config.maxRelayCount))
+        let selectedRelays = Array(rankedRelays.prefix(OutboxConstants.maxFetchRelays))
             .map { $0.url }
 
         let selectionMethod = determineSelectionMethod(filteredRelays)
@@ -168,15 +172,14 @@ actor NDKRelaySelector {
     /// Select relays for a list of public keys
     func selectRelays(for pubkey: String, count: Int = 5) async -> [String] {
         let filter = NDKFilter(authors: [pubkey])
-        let result = await selectRelaysForFetching(filter: filter, config: FetchingConfig(maxRelayCount: count))
-        return Array(result.relays)
+        let result = await selectRelaysForFetching(filter: filter)
+        return Array(result.relays.prefix(count))
     }
 
     /// Choose relay combination for multiple pubkeys (optimized for minimal connections)
     public func chooseRelayCombinationForPubkeys(
         _ pubkeys: [String],
-        type: RelayListType,
-        config: CombinationConfig = .default
+        type: RelayListType
     ) async -> RelayToPubkeysMap {
         var relayToPubkeys = RelayToPubkeysMap()
         let connectedRelays = await ndk.pool.connectedRelays()
@@ -214,13 +217,13 @@ actor NDKRelaySelector {
 
         for pubkey in pubkeys {
             let currentCount = pubkeyRelayCount[pubkey, default: 0]
-            if currentCount >= config.relaysPerAuthor { continue }
+            if currentCount >= 2 { continue } // 2 relays per author
 
             guard let relays = pubkeyRelayInfo.pubkeysToRelays[pubkey] else { continue }
 
             // Add relays until we reach the target
             for relayURL in sortedRelays {
-                if currentCount >= config.relaysPerAuthor { break }
+                if currentCount >= 2 { break } // 2 relays per author
                 if !relays.contains(relayURL) { continue }
 
                 // Skip blocked relays
@@ -239,7 +242,7 @@ actor NDKRelaySelector {
         // Third pass: Add fallback relays for pubkeys with no relays
         let fallbackRelays = await selectFallbackRelays(currentCount: 0, targetCount: 2)
         for pubkey in pubkeyRelayInfo.authorsMissingRelays {
-            for relayURL in fallbackRelays.prefix(config.relaysPerAuthor) {
+            for relayURL in fallbackRelays.prefix(2) { // 2 relays per author
                 // Skip blocked relays
                 let normalizedUrl = URLNormalizer.tryNormalizeRelayUrl(relayURL) ?? relayURL
                 if blockedRelays.contains(normalizedUrl) { continue }
@@ -496,61 +499,8 @@ actor NDKRelaySelector {
 
 // MARK: - Configuration Types
 
-/// Configuration for publishing events
-public struct PublishingConfig: Sendable {
-    public let minRelayCount: Int
-    public let maxRelayCount: Int
-    public let includeUserReadRelays: Bool
-    public let rankingPreferences: RelayPreferences
-
-    public init(
-        minRelayCount: Int = 2,
-        maxRelayCount: Int = 10,
-        includeUserReadRelays: Bool = true,
-        rankingPreferences: RelayPreferences = .default
-    ) {
-        self.minRelayCount = minRelayCount
-        self.maxRelayCount = maxRelayCount
-        self.includeUserReadRelays = includeUserReadRelays
-        self.rankingPreferences = rankingPreferences
-    }
-
-    public static let `default` = PublishingConfig()
-}
-
-/// Configuration for fetching events
-public struct FetchingConfig: Sendable {
-    public let minRelayCount: Int
-    public let maxRelayCount: Int
-    public let preferWriteRelaysIfNoRead: Bool
-    public let rankingPreferences: RelayPreferences
-
-    public init(
-        minRelayCount: Int = 2,
-        maxRelayCount: Int = 15,
-        preferWriteRelaysIfNoRead: Bool = true,
-        rankingPreferences: RelayPreferences = .default
-    ) {
-        self.minRelayCount = minRelayCount
-        self.maxRelayCount = maxRelayCount
-        self.preferWriteRelaysIfNoRead = preferWriteRelaysIfNoRead
-        self.rankingPreferences = rankingPreferences
-    }
-
-    public static let `default` = FetchingConfig()
-}
 
 /// Configuration for relay combination selection
-struct CombinationConfig: Sendable {
-    public let relaysPerAuthor: Int
-
-    public init(relaysPerAuthor: Int = 2) {
-        self.relaysPerAuthor = relaysPerAuthor
-    }
-
-    public static let `default` = CombinationConfig()
-}
-
 // MARK: - Result Types
 
 /// Result of relay selection

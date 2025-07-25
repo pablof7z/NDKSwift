@@ -77,6 +77,11 @@ public enum ErrorMessageConstants {
         public static let requestFailed = "Request failed"
         public static let timeout = "Request timed out"
         public static let serverError = "Server error"
+        
+        /// Blossom-specific errors
+        public static let blossomAuthorizationFailed = "Blossom authorization failed"
+        public static let blossomServerNotResponding = "Blossom server not responding"
+        public static let blossomInvalidResponse = "Invalid Blossom server response"
 
         /// Authentication errors
         public static let authenticationFailed = "Authentication failed"

@@ -83,7 +83,7 @@ class OutboxDebugViewModel: ObservableObject {
         let user = ndk.getUser(pubkey)
         
         // Attempt to get profile from cache (don't fetch if not available)
-        for await profile in await ndk.profileManager.observe(for: pubkey) {
+        for await profile in await ndk.profileManager.observe(for: pubkey, maxAge: TimeConstants.hour) {
             return profile.name ?? profile.displayName
         }
         
