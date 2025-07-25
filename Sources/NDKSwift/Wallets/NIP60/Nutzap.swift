@@ -364,7 +364,7 @@ public enum Nutzap {
 
         // Create spending history for received nutzap
         // The comment is in the content field per NIP-61
-        let nutzapComment = event.content.isEmpty ? nil : event.content
+        let nutzapComment = event.content.nilIfEmpty
 
         try await eventManager.createSpendingHistoryEvent(
             direction: .in,

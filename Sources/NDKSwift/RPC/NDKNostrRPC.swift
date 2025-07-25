@@ -126,7 +126,7 @@ public actor NDKNostrRPC {
         NDKLogger.log(.debug, category: .auth, "Created and signed event - id: \(event.id)")
 
         // Prepare target relays
-        let targetRelayUrls = relayUrls.isEmpty ? nil : Set(relayUrls)
+        let targetRelayUrls = relayUrls.setOrNil
 
         // Publish event
         let publishDescription = targetRelayUrls != nil ? "to specific relays: \(relayUrls)" : "to all connected relays"
