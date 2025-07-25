@@ -43,7 +43,7 @@ struct MarkdownParser {
             let line = lines[index]
             
             // Skip empty lines between blocks
-            if line.trimmingCharacters(in: .whitespaces).isEmpty {
+            if line.trimmed.isEmpty {
                 index += 1
                 continue
             }
@@ -70,9 +70,9 @@ struct MarkdownParser {
                     blocks.append(list)
                 }
                 index = newIndex
-            } else if line.trimmingCharacters(in: .whitespaces) == "---" ||
-                      line.trimmingCharacters(in: .whitespaces) == "***" ||
-                      line.trimmingCharacters(in: .whitespaces) == "___" {
+            } else if line.trimmed == "---" ||
+                      line.trimmed == "***" ||
+                      line.trimmed == "___" {
                 blocks.append(.horizontalRule)
                 index += 1
             } else {
@@ -91,7 +91,7 @@ struct MarkdownParser {
     // MARK: - Block Parsers
     
     private static func parseHeading(_ line: String) -> MarkdownBlock? {
-        let trimmed = line.trimmingCharacters(in: .whitespaces)
+        let trimmed = line.trimmed
         
         if trimmed.starts(with: "#") {
             var level = 0
@@ -104,7 +104,7 @@ struct MarkdownParser {
             
             if level > 0 && level <= 6 && index < trimmed.endIndex && trimmed[index] == " " {
                 let text = String(trimmed[trimmed.index(after: index)...])
-                    .trimmingCharacters(in: .whitespaces)
+                    .trimmed
                 return .heading(level: level, text: text)
             }
         }
@@ -118,7 +118,7 @@ struct MarkdownParser {
         }
         
         let firstLine = lines[startIndex]
-        let language = String(firstLine.dropFirst(3)).trimmingCharacters(in: .whitespaces)
+        let language = String(firstLine.dropFirst(3)).trimmed
         
         var codeLines: [String] = []
         var index = startIndex + 1
@@ -142,7 +142,7 @@ struct MarkdownParser {
         var index = startIndex
         
         while index < lines.count && lines[index].starts(with: ">") {
-            let content = lines[index].dropFirst().trimmingCharacters(in: .whitespaces)
+            let content = String(lines[index].dropFirst()).trimmed
             quoteLines.append(String(content))
             index += 1
         }
@@ -157,7 +157,7 @@ struct MarkdownParser {
     }
     
     private static func isListItem(_ line: String) -> Bool {
-        let trimmed = line.trimmingCharacters(in: .whitespaces)
+        let trimmed = line.trimmed
         
         // Unordered list
         if trimmed.starts(with: "- ") || trimmed.starts(with: "* ") || trimmed.starts(with: "+ ") {
@@ -180,7 +180,7 @@ struct MarkdownParser {
             return (nil, startIndex + 1)
         }
         
-        let firstLine = lines[startIndex].trimmingCharacters(in: .whitespaces)
+        let firstLine = lines[startIndex].trimmed
         let isOrdered = !firstLine.starts(with: "-") && !firstLine.starts(with: "*") && !firstLine.starts(with: "+")
         
         var items: [MarkdownList.Item] = []
@@ -188,7 +188,7 @@ struct MarkdownParser {
         
         while index < lines.count {
             let line = lines[index]
-            let trimmed = line.trimmingCharacters(in: .whitespaces)
+            let trimmed = line.trimmed
             
             if trimmed.isEmpty {
                 // Check if next line continues the list
@@ -235,7 +235,7 @@ struct MarkdownParser {
         
         while index < lines.count {
             let line = lines[index]
-            let trimmed = line.trimmingCharacters(in: .whitespaces)
+            let trimmed = line.trimmed
             
             // Stop at empty lines or block markers
             if trimmed.isEmpty ||

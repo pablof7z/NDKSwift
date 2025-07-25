@@ -22,8 +22,7 @@ final class LNURLResolverTests: XCTestCase {
             nostrPubkey: nil
         )
         
-        let encoder = JSONEncoder()
-        let mockData = try encoder.encode(mockResponse)
+        let mockData = try JSONCoding.encoder.encode(mockResponse)
         
         mockFetcher.data = mockData
         mockFetcher.response = HTTPURLResponse(
@@ -62,8 +61,7 @@ final class LNURLResolverTests: XCTestCase {
             nostrPubkey: "a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2"
         )
         
-        let encoder = JSONEncoder()
-        let mockData = try encoder.encode(mockResponse)
+        let mockData = try JSONCoding.encoder.encode(mockResponse)
         
         mockFetcher.data = mockData
         mockFetcher.response = HTTPURLResponse(
@@ -132,8 +130,7 @@ final class LNURLResolverTests: XCTestCase {
             nostrPubkey: nil
         )
         
-        let encoder = JSONEncoder()
-        let mockData = try encoder.encode(mockResponse)
+        let mockData = try JSONCoding.encoder.encode(mockResponse)
         
         mockFetcher.data = mockData
         mockFetcher.response = HTTPURLResponse(

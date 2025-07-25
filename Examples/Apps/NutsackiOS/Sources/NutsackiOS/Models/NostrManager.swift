@@ -109,7 +109,7 @@ class NostrManager {
         let signer = try NDKPrivateKeySigner(privateKey: privateKey)
         
         // Start session with mute list support
-        let sessionData = try await ndk.startSession(
+        try await ndk.startSession(
             signer: signer,
             config: NDKSessionConfiguration(
                 dataRequirements: [.followList, .muteList],
@@ -141,7 +141,7 @@ class NostrManager {
         
         // Start session with mute list support
         print("🏚️ [NostrManager] Starting session...")
-        let sessionData = try await ndk.startSession(
+        try await ndk.startSession(
             signer: signer,
             config: NDKSessionConfiguration(
                 dataRequirements: [.followList, .muteList],
@@ -242,7 +242,7 @@ class NostrManager {
         let signer = try NDKPrivateKeySigner(nsec: nsec)
         
         // Start session with mute list support
-        let sessionData = try await ndk.startSession(
+        try await ndk.startSession(
             signer: signer,
             config: NDKSessionConfiguration(
                 dataRequirements: [.followList, .muteList],

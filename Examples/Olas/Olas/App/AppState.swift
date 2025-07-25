@@ -149,7 +149,7 @@ class AppState: ObservableObject {
                 )
                 
                 // Publish profile event
-                let profileData = try JSONEncoder().encode(profile)
+                let profileData = try JSONCoding.encoder.encode(profile)
                 let metadataEvent = try await NDKEventBuilder(ndk: ndk)
                     .content(String(data: profileData, encoding: .utf8) ?? "{}")
                     .kind(EventKind.metadata)
@@ -194,7 +194,7 @@ class AppState: ObservableObject {
         )
         
         // Publish profile event
-        let profileData = try JSONEncoder().encode(profile)
+        let profileData = try JSONCoding.encoder.encode(profile)
         let metadataEvent = try await NDKEventBuilder(ndk: ndk)
             .content(String(data: profileData, encoding: .utf8) ?? "{}")
             .kind(EventKind.metadata)

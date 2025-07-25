@@ -20,10 +20,7 @@ struct TransactionDetailDrawer: View {
     @State private var loadedNostrEvent: NDKEvent?
     
     private var formattedDate: String {
-        let formatter = DateFormatter()
-        formatter.dateStyle = .medium
-        formatter.timeStyle = .short
-        return formatter.string(from: transaction.createdAt)
+        DateFormatters.display.string(from: transaction.createdAt)
     }
     
     private var statusColor: Color {
@@ -223,7 +220,7 @@ struct TransactionDetailDrawer: View {
                         }
                         
                         // Nostr Event
-                        if let eventID = transaction.nostrEventID {
+                        if transaction.nostrEventID != nil {
                             HStack {
                                 TransactionInfoRow(
                                     label: "Nostr Event",

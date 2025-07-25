@@ -213,7 +213,7 @@ struct TokenConfirmationView: View {
     }
     
     private func shareToken() {
-        guard let token = token else { return }
+        guard token != nil else { return }
         
         #if os(iOS)
         showShareSheet = true
