@@ -1312,7 +1312,7 @@ public actor NIP60Wallet: NDKPaymentProvider {
         let backupEvent = try await NDKCashuWalletBackupEvent.createAndPublish(
             ndk: ndk,
             mints: currentMints,
-            relays: currentRelays.isEmpty ? nil : currentRelays,
+            relays: currentRelays.nilIfEmpty,
             p2pkPrivateKey: p2pkPrivateKey,
             signer: signer
         )
