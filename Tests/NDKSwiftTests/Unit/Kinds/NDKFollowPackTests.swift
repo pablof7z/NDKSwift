@@ -17,21 +17,6 @@ final class NDKFollowPackTests: XCTestCase {
         signer = nil
     }
     
-    // Helper to create a test event
-    private func createTestEvent(kind: Kind = EventKind.followPack, tags: [Tag] = [], content: String = "") -> NDKEvent {
-        // Use a fixed test pubkey instead of trying to get it from signer
-        let testPubkey = "1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef"
-        return NDKEvent(
-            id: "test_id_32bytes_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-            pubkey: testPubkey,
-            createdAt: Timestamp(Date().timeIntervalSince1970),
-            kind: kind,
-            tags: tags,
-            content: content,
-            sig: "test_signature_64bytes_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
-        )
-    }
-    
     // MARK: - Kind Handling Tests
     
     func testDefaultKind() async throws {
@@ -111,15 +96,18 @@ final class NDKFollowPackTests: XCTestCase {
         XCTAssertTrue(followPack.event.tags.contains(["image", imeta.url!]))
     }
     
-    func testImagePreferenceImetaOverImageTag() throws {
+    func testImagePreferenceImetaOverImageTag() async throws {
         let imetaURL = "https://example.com/image.png"
         let imeta = NDKImetaTag(url: imetaURL)
         
         // Create event with both image and imeta tags
-        let event = createTestEvent(tags: [
-            ["image", "https://fallback.com/image.png"],
-            ImetaUtils.imetaTagToTag(imeta)
-        ])
+        let event = try await createTestEvent(
+            tags: [
+                ["image", "https://fallback.com/image.png"],
+                ImetaUtils.imetaTagToTag(imeta)
+            ],
+            pubkey: "1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef"
+        )
         
         let followPack = NDKFollowPack(event: event, ndk: ndk)
         
@@ -170,11 +158,14 @@ final class NDKFollowPackTests: XCTestCase {
         XCTAssertFalse(followPack.containsPubkey("pk4"))
     }
     
-    func testContainsPubkey() throws {
-        let event = createTestEvent(tags: [
-            ["p", "pk1"],
-            ["p", "pk2"]
-        ])
+    func testContainsPubkey() async throws {
+        let event = try await createTestEvent(
+            tags: [
+                ["p", "pk1"],
+                ["p", "pk2"]
+            ],
+            pubkey: "1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef"
+        )
         let followPack = NDKFollowPack(event: event, ndk: ndk)
         
         XCTAssertTrue(followPack.containsPubkey("pk1"))
@@ -203,9 +194,10 @@ final class NDKFollowPackTests: XCTestCase {
         XCTAssertTrue(followPack.event.tags.contains(["p", "pk2"]))
     }
     
-    func testFromEvent() throws {
-        let event = createTestEvent(
+    func testFromEvent() async throws {
+        let event = try await createTestEvent(
             kind: EventKind.mediaFollowPack,
+            content: "Media content",
             tags: [
                 ["title", "Media Pack"],
                 ["description", "Media follow pack"],
@@ -214,7 +206,7 @@ final class NDKFollowPackTests: XCTestCase {
                 ["p", "pk2"],
                 ["image", "https://example.com/media.jpg"]
             ],
-            content: "Media content"
+            pubkey: "1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef"
         )
         
         let followPack = NDKFollowPack.from(event: event, ndk: ndk)
@@ -230,13 +222,16 @@ final class NDKFollowPackTests: XCTestCase {
     
     // MARK: - Edge Cases
     
-    func testMalformedTags() throws {
-        let event = createTestEvent(tags: [
-            ["p"],  // Missing pubkey
-            ["title"],  // Missing value
-            ["imeta"],  // Missing value
-            ["p", ""],  // Empty pubkey
-        ])
+    func testMalformedTags() async throws {
+        let event = try await createTestEvent(
+            tags: [
+                ["p"],  // Missing pubkey
+                ["title"],  // Missing value
+                ["imeta"],  // Missing value
+                ["p", ""],  // Empty pubkey
+            ],
+            pubkey: "1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef"
+        )
         
         let followPack = NDKFollowPack(event: event, ndk: ndk)
         
