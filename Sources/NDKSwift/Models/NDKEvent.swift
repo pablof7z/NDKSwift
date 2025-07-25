@@ -307,13 +307,13 @@ public struct NDKEvent: Codable, Equatable, Hashable, Sendable {
     /// This matches the rawEvent() method from @ndk/ndk-core
     public func rawEvent() -> [String: Any] {
         return [
-            "id": id,
-            "pubkey": pubkey,
-            "created_at": createdAt,
-            "kind": kind,
-            "tags": tags,
-            "content": content,
-            "sig": sig
+            NostrEventKeys.id: id,
+            NostrEventKeys.pubkey: pubkey,
+            NostrEventKeys.createdAt: createdAt,
+            NostrEventKeys.kind: kind,
+            NostrEventKeys.tags: tags,
+            NostrEventKeys.content: content,
+            NostrEventKeys.sig: sig
         ]
     }
 
