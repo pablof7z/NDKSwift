@@ -103,7 +103,7 @@ actor NDKRelayRanker {
 
         return successRate * recencyFactor
     }
-    
+
     /// Get score for a relay and pubkey combination
     func getScore(relay: String, pubkey: String) async -> Double {
         let preferences = RelayPreferences.default

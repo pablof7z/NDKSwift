@@ -8,7 +8,7 @@ import UIKit
 
 /// Centralized color definitions for NDKSwiftUI components
 extension Color {
-    
+
     /// Background colors for different component contexts
     static var ndkPrimaryBackground: Color {
         #if canImport(UIKit)
@@ -17,7 +17,7 @@ extension Color {
         return Color(red: 1.0, green: 1.0, blue: 1.0)
         #endif
     }
-    
+
     static var ndkSecondaryBackground: Color {
         #if canImport(UIKit)
         return Color(UIColor.secondarySystemBackground)
@@ -25,7 +25,7 @@ extension Color {
         return Color.gray.opacity(OpacityConstants.light)
         #endif
     }
-    
+
     static var ndkTertiaryBackground: Color {
         #if canImport(UIKit)
         return Color(UIColor.tertiarySystemBackground)
@@ -33,7 +33,7 @@ extension Color {
         return Color.gray.opacity(OpacityConstants.ultraLight)
         #endif
     }
-    
+
     static var ndkGray5: Color {
         #if canImport(UIKit)
         return Color(UIColor.systemGray5)
@@ -41,7 +41,7 @@ extension Color {
         return Color.gray.opacity(OpacityConstants.medium)
         #endif
     }
-    
+
     static var ndkSeparator: Color {
         #if canImport(UIKit)
         return Color(UIColor.separator)

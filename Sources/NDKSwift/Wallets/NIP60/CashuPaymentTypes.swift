@@ -6,13 +6,13 @@ import Foundation
 public enum PaymentRoute {
     /// Direct payment using a mint that both parties accept
     case direct(mint: String)
-    
+
     /// Cross-mint transfer required
     case crossMint(sourceMint: String, targetMint: String, estimatedFee: Int64?)
-    
+
     /// Payment is impossible
     case impossible(reason: String)
-    
+
     /// Check if this route requires a cross-mint transfer
     public var requiresTransfer: Bool {
         if case .crossMint = self {
@@ -20,7 +20,7 @@ public enum PaymentRoute {
         }
         return false
     }
-    
+
     /// Get the mint to use for payment (nil if impossible)
     public var paymentMint: String? {
         switch self {
@@ -41,7 +41,7 @@ public struct TransferResult {
     public let preimage: String
     public let sourceMint: URL
     public let destinationMint: URL
-    
+
     public init(amountTransferred: Int64, feePaid: Int64, preimage: String, sourceMint: URL, destinationMint: URL) {
         self.amountTransferred = amountTransferred
         self.feePaid = feePaid

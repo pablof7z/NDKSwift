@@ -6,28 +6,28 @@ public actor NIP05Manager {
     private let cache: NDKCache
     private let memoryCache: LRUCache<String, NIP05CacheEntry>
     private let domainRateLimiter: LRUCache<String, Date>
-    
+
     /// In-flight requests to prevent duplicate network calls
     private var inFlightRequests: [String: Task<NDKUser?, Error>] = [:]
-    
+
     /// Default TTL for cache entries (24 hours)
     public static let defaultTTL: TimeInterval = TimeConstants.nip05CacheTTL
-    
+
     /// Rate limit per domain (10 requests per hour)
     private static let domainRateLimit: TimeInterval = NetworkConstants.nip05RateLimit
-    
+
     /// Maximum response size to prevent DoS (1MB)
     private static let maxResponseSize = NetworkConstants.maxNIP05ResponseSize
-    
+
     public init(ndk: NDK) {
         self.ndk = ndk
         self.cache = ndk.cache
         self.memoryCache = LRUCache(capacity: NetworkConstants.nip05CacheCapacity, defaultTTL: TimeConstants.hour)
         self.domainRateLimiter = LRUCache(capacity: NetworkConstants.domainRateLimiterCapacity, defaultTTL: TimeConstants.hour)
     }
-    
+
     // MARK: - Public API
-    
+
     /// Resolve a NIP-05 identifier to a user
     /// - Parameters:
     ///   - identifier: The NIP-05 identifier (e.g., "alice@example.com")
@@ -40,13 +40,13 @@ public actor NIP05Manager {
         maxAge: TimeInterval = defaultTTL
     ) async throws -> NDKUser? {
         let normalizedIdentifier = identifier.normalized
-        
+
         // Check if there's already an in-flight request
         if let existingTask = inFlightRequests[normalizedIdentifier] {
             NDKLogger.log(.debug, category: .general, "🔄 NIP-05: Using existing in-flight request for \(normalizedIdentifier)")
             return try await existingTask.value
         }
-        
+
         // Create new task for this request
         let task = Task<NDKUser?, Error> {
             try await performResolveUser(
@@ -55,18 +55,18 @@ public actor NIP05Manager {
                 maxAge: maxAge
             )
         }
-        
+
         // Store the task to prevent duplicate requests
         inFlightRequests[normalizedIdentifier] = task
-        
+
         // Clean up the task when done
         defer {
             inFlightRequests.removeValue(forKey: normalizedIdentifier)
         }
-        
+
         return try await task.value
     }
-    
+
     /// Search for NIP-05 identifiers by prefix
     /// - Parameters:
     ///   - query: The search query
@@ -77,28 +77,28 @@ public actor NIP05Manager {
         limit: Int = 10
     ) async -> [NIP05CacheEntry] {
         let normalizedQuery = query.lowercased()
-        
+
         // First check memory cache for exact matches or prefixes
         let memoryResults = await memoryCache.allItems()
             .compactMap { _, entry in entry }
             .filter { $0.identifier.lowercased().hasPrefix(normalizedQuery) }
             .prefix(limit)
-        
+
         if memoryResults.count >= limit {
             return Array(memoryResults)
         }
-        
+
         // Fall back to database for more results
         let dbResults = await cache.searchNIP05(normalizedQuery, limit: limit - memoryResults.count)
-        
+
         // Combine results, removing duplicates
         var combined = Array(memoryResults)
         let existingIdentifiers = Set(combined.map { $0.identifier })
         combined.append(contentsOf: dbResults.filter { !existingIdentifiers.contains($0.identifier) })
-        
+
         return Array(combined.prefix(limit))
     }
-    
+
     /// Verify a NIP-05 identifier for a specific user
     /// - Parameters:
     ///   - identifier: The NIP-05 identifier
@@ -115,7 +115,7 @@ public actor NIP05Manager {
         }
         return user.pubkey == expectedPubkey
     }
-    
+
     /// Process a metadata event to extract NIP-05 identifier
     /// - Parameters:
     ///   - event: The kind:0 metadata event
@@ -126,16 +126,16 @@ public actor NIP05Manager {
     ) async {
         guard let nip05 = profile.nip05,
               !nip05.isEmpty else { return }
-        
+
         let normalizedNip05 = nip05.lowercased()
-        
+
         // Check if we already have this in memory cache
         if let existing = await memoryCache.get(normalizedNip05),
            existing.pubkey == event.pubkey,
            existing.status == .verified {
             return
         }
-        
+
         // Create unverified entry for proactive caching
         let entry = NIP05CacheEntry(
             identifier: normalizedNip05,
@@ -144,14 +144,14 @@ public actor NIP05Manager {
             nip46Relays: nil,
             claimedAt: Date()
         )
-        
+
         // Save to both caches
         await memoryCache.set(normalizedNip05, value: entry)
         try? await cache.saveNIP05Claim(normalizedNip05, pubkey: event.pubkey, retrievedAt: Date())
-        
+
         NDKLogger.log(.debug, category: .general, "📝 NIP-05: Cached unverified entry for \(normalizedNip05)")
     }
-    
+
     /// Batch verify stale NIP-05 entries
     /// - Parameter limit: Maximum number of entries to verify
     public func batchVerifyStaleEntries(limit: Int = 10) async {
@@ -159,7 +159,7 @@ public actor NIP05Manager {
         let unverifiedEntries = await cache.searchNIP05("", limit: limit)
             .filter { $0.status == .unverified }
             .prefix(limit)
-        
+
         await withTaskGroup(of: Void.self) { group in
             for entry in unverifiedEntries {
                 group.addTask {
@@ -175,7 +175,7 @@ public actor NIP05Manager {
             }
         }
     }
-    
+
     /// Clear cache entries
     public func clearCache(onlyInvalid: Bool = false) async throws {
         if onlyInvalid {
@@ -190,10 +190,10 @@ public actor NIP05Manager {
             // Clear all entries
             await memoryCache.clear()
         }
-        
+
         // Note: Database clearing should be done through NDKCache protocol
     }
-    
+
     /// Get cache statistics
     public func getCacheStatistics() async -> NIP05CacheStatistics {
         let memoryItems = await memoryCache.allItems()
@@ -201,7 +201,7 @@ public actor NIP05Manager {
         let unverified = memoryItems.values.filter { $0.status == .unverified }.count
         let invalid = memoryItems.values.filter { $0.status == .invalid }.count
         let failed = memoryItems.values.filter { $0.status == .failed }.count
-        
+
         return NIP05CacheStatistics(
             totalEntries: memoryItems.count,
             verifiedEntries: verified,
@@ -211,9 +211,9 @@ public actor NIP05Manager {
             memoryHitRate: await memoryCache.getHitRate()
         )
     }
-    
+
     // MARK: - Private Implementation
-    
+
     private func performResolveUser(
         identifier: String,
         forceVerify: Bool,
@@ -231,13 +231,13 @@ public actor NIP05Manager {
                 }
             }
         }
-        
+
         // Step 2: Check database cache
         if !forceVerify {
             if let cached = await checkDatabaseCache(identifier: identifier, maxAge: maxAge) {
                 // Update memory cache
                 await memoryCache.set(identifier, value: cached)
-                
+
                 if cached.status == .verified, let user = cached.toUser(ndk: ndk) {
                     NDKLogger.log(.debug, category: .general, "✅ NIP-05: Database cache hit for \(identifier)")
                     return user
@@ -247,39 +247,39 @@ public actor NIP05Manager {
                 }
             }
         }
-        
+
         // Step 3: Perform network verification
         return try await performNetworkVerification(identifier: identifier)
     }
-    
+
     private func checkMemoryCache(
         identifier: String,
         maxAge: TimeInterval
     ) async -> NIP05CacheEntry? {
         guard let cached = await memoryCache.get(identifier) else { return nil }
-        
+
         // Check if needs verification
         if await cache.needsNIP05Verification(identifier, maxAge: maxAge) {
             return nil
         }
-        
+
         return cached
     }
-    
+
     private func checkDatabaseCache(
         identifier: String,
         maxAge: TimeInterval
     ) async -> NIP05CacheEntry? {
         guard let cached = await cache.getNIP05Entry(identifier) else { return nil }
-        
+
         // Check if needs verification
         if await cache.needsNIP05Verification(identifier, maxAge: maxAge) {
             return nil
         }
-        
+
         return cached
     }
-    
+
     private func performNetworkVerification(
         identifier: String
     ) async throws -> NDKUser? {
@@ -288,40 +288,40 @@ public actor NIP05Manager {
         guard parts.count == 2 else {
             throw NDKError.invalidDataFormat("NIP-05 identifier", details: "Expected format: name@domain")
         }
-        
+
         let name = String(parts[0])
         let domain = String(parts[1])
-        
+
         // Check rate limiting
         let canCheck = await cache.canVerifyDomain(domain)
         if !canCheck {
             throw NDKError.rateLimited(message: "Too many requests to \(domain)")
         }
-        
+
         // Record domain check
         await cache.recordDomainVerificationAttempt(domain)
-        
+
         // Construct URL
         let normalizedName = name == "_" ? "" : name
         let urlString = "https://\(domain)\(WellKnownPath.nostrJson)?name=\(normalizedName)"
         guard let url = URL(string: urlString) else {
             throw NDKError.invalidDataFormat("NIP-05 identifier", details: "Expected format: name@domain")
         }
-        
+
         NDKLogger.log(.info, category: .general, "🌐 NIP-05: Fetching \(urlString)")
-        
+
         // Perform network request
         var request = URLRequest(url: url)
         request.timeoutInterval = NetworkConstants.timeoutRelayInfo
         request.setValue(HTTPConstants.userAgentNDKSwift, forHTTPHeaderField: HTTPConstants.headerUserAgent)
-        
+
         let (data, response) = try await URLSession.shared.data(for: request)
-        
+
         // Check response size
         guard data.count <= Self.maxResponseSize else {
             throw NDKError.invalidResponse(from: "NIP-05 response too large")
         }
-        
+
         // Check HTTP status
         let httpResponse = response as? HTTPURLResponse
         let statusCode = httpResponse?.statusCode ?? 0
@@ -340,10 +340,10 @@ public actor NIP05Manager {
             )
             await memoryCache.set(identifier, value: failedEntry)
             try? await cache.saveNIP05Resolution(failedEntry)
-            
+
             throw NDKError.serverError(relay: domain, code: statusCode, message: "HTTP \(statusCode)")
         }
-        
+
         // Parse JSON response
         guard let json = try? JSONCoding.parseDictionary(from: data),
               let names = json["names"] as? [String: String],
@@ -361,13 +361,13 @@ public actor NIP05Manager {
             )
             await memoryCache.set(identifier, value: invalidEntry)
             try? await cache.saveNIP05Resolution(invalidEntry)
-            
+
             throw NDKError.invalidResponse(from: "NIP-05 name not found")
         }
-        
+
         // Extract NIP-46 relays if present
         let nip46Relays = (json["nip46"] as? [String: [String]])?[pubkey]
-        
+
         // Create verified entry
         let verifiedEntry = NIP05CacheEntry(
             identifier: identifier,
@@ -379,13 +379,13 @@ public actor NIP05Manager {
             lastCheckAt: Date(),
             httpStatusCode: HTTPStatusCode.ok
         )
-        
+
         // Save to both caches
         await memoryCache.set(identifier, value: verifiedEntry)
         try? await cache.saveNIP05Resolution(verifiedEntry)
-        
+
         NDKLogger.log(.info, category: .general, "✅ NIP-05: Verified \(identifier) -> \(pubkey)")
-        
+
         // Create and return user
         let user = NDKUser(pubkey: pubkey)
         user.ndk = ndk
@@ -416,7 +416,7 @@ extension NIP05CacheEntry {
 // MARK: - Additional Error Helpers
 
 extension NDKError {
-    static let invalidNIP05Format = { (identifier: String) in 
+    static let invalidNIP05Format = { (identifier: String) in
         NDKError.invalidDataFormat("NIP-05 identifier", details: "Invalid format: \(identifier)")
     }
     static let invalidNIP05Response = NDKError.invalidResponse(from: "NIP-05")

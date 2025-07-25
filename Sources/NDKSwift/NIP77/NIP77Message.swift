@@ -48,9 +48,9 @@ public struct NIP77Message {
     public let data: Data?
     public let filter: NDKFilter?
     public let error: String?
-    
+
     // MARK: - Constructors
-    
+
     /// Creates a NEG-OPEN message to initiate synchronization.
     ///
     /// - Parameters:
@@ -67,7 +67,7 @@ public struct NIP77Message {
             error: nil
         )
     }
-    
+
     /// Create a NEG-MSG message
     public static func message(subscriptionId: String, data: Data) -> NIP77Message {
         return NIP77Message(
@@ -78,7 +78,7 @@ public struct NIP77Message {
             error: nil
         )
     }
-    
+
     /// Create a NEG-CLOSE message
     public static func close(subscriptionId: String) -> NIP77Message {
         return NIP77Message(
@@ -89,7 +89,7 @@ public struct NIP77Message {
             error: nil
         )
     }
-    
+
     /// Create a NEG-ERR message
     public static func error(subscriptionId: String, error: String) -> NIP77Message {
         return NIP77Message(
@@ -100,57 +100,57 @@ public struct NIP77Message {
             error: error
         )
     }
-    
+
     // MARK: - Encoding
-    
+
     /// Encode to JSON array format for Nostr
     public func toJSON() throws -> String {
         var array: [Any] = [type.rawValue, subscriptionId]
-        
+
         switch type {
         case .negOpen:
             if let filter = filter, let data = data {
                 array.append(filter.toDictionary())
                 array.append(data.hexString)
             }
-            
+
         case .negMsg:
             if let data = data {
                 array.append(data.hexString)
             }
-            
+
         case .negErr:
             if let error = error {
                 array.append(error)
             }
-            
+
         case .negClose:
             break // No additional data
         }
-        
+
         let jsonData = try JSONSerialization.data(withJSONObject: array)
         return String(data: jsonData, encoding: .utf8) ?? ""
     }
-    
+
     // MARK: - Decoding
-    
+
     /// Decode from JSON array
     public static func fromJSON(_ json: String) throws -> NIP77Message {
         guard let data = json.data(using: .utf8) else {
             throw NIP77Error.invalidMessage
         }
-        
+
         guard let array = try JSONSerialization.jsonObject(with: data) as? [Any],
               array.count >= 2 else {
             throw NIP77Error.invalidMessage
         }
-        
+
         guard let typeString = array[0] as? String,
               let messageType = NIP77MessageType(rawValue: typeString),
               let subscriptionId = array[1] as? String else {
             throw NIP77Error.invalidMessage
         }
-        
+
         switch messageType {
         case .negOpen:
             guard array.count >= 4,
@@ -159,7 +159,7 @@ public struct NIP77Message {
                   let messageData = hexData.hexDecoded() else {
                 throw NIP77Error.invalidMessage
             }
-            
+
             let filter = try NDKFilter.fromDictionary(filterDict)
             return NIP77Message(
                 type: .negOpen,
@@ -168,14 +168,14 @@ public struct NIP77Message {
                 filter: filter,
                 error: nil
             )
-            
+
         case .negMsg:
             guard array.count >= 3,
                   let hexData = array[2] as? String,
                   let messageData = hexData.hexDecoded() else {
                 throw NIP77Error.invalidMessage
             }
-            
+
             return NIP77Message(
                 type: .negMsg,
                 subscriptionId: subscriptionId,
@@ -183,13 +183,13 @@ public struct NIP77Message {
                 filter: nil,
                 error: nil
             )
-            
+
         case .negErr:
             guard array.count >= 3,
                   let error = array[2] as? String else {
                 throw NIP77Error.invalidMessage
             }
-            
+
             return NIP77Message(
                 type: .negErr,
                 subscriptionId: subscriptionId,
@@ -197,7 +197,7 @@ public struct NIP77Message {
                 filter: nil,
                 error: error
             )
-            
+
         case .negClose:
             return NIP77Message(
                 type: .negClose,
@@ -217,7 +217,7 @@ public enum NIP77Error: LocalizedError {
     case relayError(String)
     case unsupportedByRelay
     case timeout(String)
-    
+
     public var errorDescription: String? {
         switch self {
         case .invalidMessage:
@@ -238,7 +238,7 @@ public enum NIP77Error: LocalizedError {
 extension NDKFilter {
     func toDictionary() -> [String: Any] {
         var dict: [String: Any] = [:]
-        
+
         if let ids = ids {
             dict["ids"] = ids
         }
@@ -264,13 +264,13 @@ extension NDKFilter {
         if let limit = limit {
             dict["limit"] = limit
         }
-        
+
         return dict
     }
-    
+
     static func fromDictionary(_ dict: [String: Any]) throws -> NDKFilter {
         var filter = NDKFilter()
-        
+
         if let ids = dict["ids"] as? [String] {
             filter.ids = ids
         }
@@ -289,7 +289,7 @@ extension NDKFilter {
         if let limit = dict["limit"] as? Int {
             filter.limit = limit
         }
-        
+
         // Parse tags
         var tags: [String: Set<String>] = [:]
         for (key, value) in dict {
@@ -299,7 +299,7 @@ extension NDKFilter {
                 tags[tagName] = Set(values)
             }
         }
-        
+
         // Create filter with tags if needed
         if !tags.isEmpty {
             filter = NDKFilter(
@@ -314,7 +314,7 @@ extension NDKFilter {
                 tags: tags
             )
         }
-        
+
         return filter
     }
 }

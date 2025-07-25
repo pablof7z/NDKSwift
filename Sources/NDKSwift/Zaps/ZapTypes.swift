@@ -22,7 +22,7 @@ public struct LightningInvoiceRequest: PaymentRequest {
     public let amountSats: Int64
     public let recipient: String // For display/logging
     public let comment: String?
-    
+
     public init(invoice: String, amountSats: Int64, recipient: String, comment: String? = nil) {
         self.invoice = invoice
         self.amountSats = amountSats
@@ -38,7 +38,7 @@ public struct NutzapPaymentRequest: PaymentRequest {
     public let recipientP2PK: String    // P2PK key for locking proofs
     public let acceptedMints: [URL]     // All mints the recipient accepts
     public let comment: String?
-    
+
     public init(amountSats: Int64, recipientPubkey: String, recipientP2PK: String, acceptedMints: [URL], comment: String? = nil) {
         self.amountSats = amountSats
         self.recipientPubkey = recipientPubkey  // Nostr pubkey
@@ -63,7 +63,7 @@ public struct LightningPaymentConfirmation: PaymentConfirmation {
     public let preimage: String
     public let paymentHash: String?
     public let feePaid: Int64?
-    
+
     public init(amountSats: Int64, timestamp: Date, preimage: String, paymentHash: String? = nil, feePaid: Int64? = nil) {
         self.amountSats = amountSats
         self.timestamp = timestamp
@@ -79,7 +79,7 @@ public struct NutzapConfirmation: PaymentConfirmation {
     public let timestamp: Date
     public let nutzapEvent: NDKEvent
     public let mintUsed: URL
-    
+
     public init(amountSats: Int64, timestamp: Date, nutzapEvent: NDKEvent, mintUsed: URL) {
         self.amountSats = amountSats
         self.timestamp = timestamp
@@ -112,7 +112,7 @@ public enum ZapError: LocalizedError {
     case endpointDoesNotSupportZaps
     case amountOutOfRange(min: Int64, max: Int64)
     case signerNotAvailable
-    
+
     public var errorDescription: String? {
         switch self {
         case .recipientDoesNotSupportZaps:
@@ -167,7 +167,7 @@ public struct ZapResult {
     public let amountSats: Int64
     public let receiptEvent: NDKEvent?
     public let nutzapEvent: NDKEvent?
-    
+
     public init(
         type: ZapType,
         amountSats: Int64,

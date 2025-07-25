@@ -29,22 +29,22 @@ import UIKit
 ///     .onTapGesture { /* handle tap */ }
 /// ```
 public struct NDKProfilePicture: View {
-    
+
     // MARK: - Properties
-    
+
     private let pubkey: String
     private let size: CGFloat
     private let cornerRadius: CGFloat?
     private let borderColor: Color?
     private let borderWidth: CGFloat
     private var tapAction: (() -> Void)?
-    
+
     @Environment(\.ndk) private var ndk
     @State private var profile: NDKUserProfile?
     @State private var profileTask: Task<Void, Never>?
-    
+
     // MARK: - Initialization
-    
+
     /// Initialize with a public key
     /// - Parameters:
     ///   - pubkey: The user's public key (hex format)
@@ -64,16 +64,16 @@ public struct NDKProfilePicture: View {
         self.cornerRadius = cornerRadius
         self.borderColor = borderColor
         self.borderWidth = borderWidth
-        
+
         // Profile will be loaded in onAppear when we have access to the environment NDK
     }
-    
+
     /// Initialize with an NDKUser
     /// - Parameters:
     ///   - user: The NDKUser instance
     ///   - size: The size of the profile picture (default: 40)
     ///   - cornerRadius: Custom corner radius (default: circular)
-    ///   - borderColor: Optional border color  
+    ///   - borderColor: Optional border color
     ///   - borderWidth: Border width (default: 0)
     public init(
         user: NDKUser,
@@ -90,9 +90,9 @@ public struct NDKProfilePicture: View {
             borderWidth: borderWidth
         )
     }
-    
+
     // MARK: - Body
-    
+
     public var body: some View {
         Group {
             if let pictureURL = pictureURL {
@@ -128,9 +128,9 @@ public struct NDKProfilePicture: View {
             loadProfile()
         }
     }
-    
+
     // MARK: - Private Views
-    
+
     private var placeholderView: some View {
         RoundedRectangle(cornerRadius: effectiveCornerRadius)
             .fill(Color.ndkGray5)
@@ -141,16 +141,16 @@ public struct NDKProfilePicture: View {
                     .foregroundStyle(.secondary)
             )
     }
-    
+
     private var effectiveCornerRadius: CGFloat {
         cornerRadius ?? (size / 2) // Default to circular
     }
-    
+
     private var pictureURL: URL? {
         guard let picture = profile?.picture, !picture.isEmpty else { return nil }
         return URL(string: picture)
     }
-    
+
     private var displayName: String {
         if let displayName = profile?.displayName, !displayName.isEmpty {
             return displayName
@@ -161,14 +161,14 @@ public struct NDKProfilePicture: View {
         // Fallback to shortened pubkey
         return String(pubkey.prefix(8)) + "..."
     }
-    
+
     // MARK: - Private Methods
-    
+
     private func loadProfile() {
         profileTask?.cancel()
-        
+
         guard let ndk = ndk else { return }
-        
+
         profileTask = Task {
             for await profile in await ndk.profileManager.observe(for: pubkey, maxAge: TimeConstants.hour) {
                 await MainActor.run {
@@ -178,9 +178,9 @@ public struct NDKProfilePicture: View {
             }
         }
     }
-    
+
     // MARK: - Modifiers
-    
+
     /// Add a tap gesture to the profile picture
     public func onTapGesture(perform action: @escaping () -> Void) -> NDKProfilePicture {
         var copy = self
@@ -202,7 +202,7 @@ struct NDKProfilePicture_Previews: PreviewProvider {
                 NDKProfilePicture(pubkey: "sample_pubkey", size: UIConstants.ProfilePictureSize.medium)
                 NDKProfilePicture(pubkey: "sample_pubkey", size: UIConstants.ProfilePictureSize.large)
             }
-            
+
             // With border
             NDKProfilePicture(
                 pubkey: "sample_pubkey",
@@ -210,7 +210,7 @@ struct NDKProfilePicture_Previews: PreviewProvider {
                 borderColor: .blue,
                 borderWidth: 2
             )
-            
+
             // Square with custom corner radius
             NDKProfilePicture(
                 pubkey: "sample_pubkey",

@@ -21,29 +21,29 @@ public enum URLNormalizer {
         // Step 1: Clean and validate input
         let cleanedURL = url.trimmed
         try validateURLString(cleanedURL)
-        
+
         // Step 2: Ensure WebSocket scheme
         let urlWithScheme = ensureWebSocketScheme(cleanedURL)
-        
+
         // Step 3: Parse and validate components
         var urlComponents = try parseURLComponents(urlWithScheme)
-        
+
         // Step 4: Normalize components
         normalizeComponents(&urlComponents)
-        
+
         // Step 5: Build final URL with trailing slash
         return try buildNormalizedURL(from: urlComponents)
     }
-    
+
     // MARK: - Private Helper Methods
-    
+
     /// Validates that the URL string meets basic requirements
     private static func validateURLString(_ url: String) throws {
         if url.contains(" ") || url.isEmpty || url.hasPrefix("://") {
             throw URLNormalizationError.invalidURL(url)
         }
     }
-    
+
     /// Ensures the URL has a WebSocket scheme (ws:// or wss://)
     private static func ensureWebSocketScheme(_ url: String) -> String {
         if RelayConstants.WebSocketScheme.isWebSocketURL(url) {
@@ -52,7 +52,7 @@ public enum URLNormalizer {
         // Default to wss:// for security
         return "\(RelayConstants.WebSocketScheme.secure)\(url)"
     }
-    
+
     /// Parses URL string into components and validates structure
     private static func parseURLComponents(_ url: String) throws -> URLComponents {
         guard let urlComponents = URLComponents(string: url),
@@ -62,27 +62,27 @@ public enum URLNormalizer {
         }
         return urlComponents
     }
-    
+
     /// Normalizes URL components in place
     private static func normalizeComponents(_ components: inout URLComponents) {
         // Convert to lowercase
         components.scheme = components.scheme?.lowercased()
         components.host = components.host?.lowercased()
-        
+
         // Remove authentication
         components.user = nil
         components.password = nil
-        
+
         // Remove fragment
         components.fragment = nil
-        
+
         // Remove www. prefix
         removeWWWPrefix(&components)
-        
+
         // Remove default ports
         removeDefaultPorts(&components)
     }
-    
+
     // URL normalization constants
     private enum NormalizationConstants {
         static let wwwPrefix = "www."
@@ -90,14 +90,14 @@ public enum URLNormalizer {
         static let defaultWSPort = 80
         static let defaultWSSPort = 443
     }
-    
+
     /// Removes www. prefix from hostname if present
     private static func removeWWWPrefix(_ components: inout URLComponents) {
         if let host = components.host, host.hasPrefix(NormalizationConstants.wwwPrefix) {
             components.host = String(host.dropFirst(NormalizationConstants.wwwPrefixLength))
         }
     }
-    
+
     /// Removes default ports (80 for ws, 443 for wss)
     private static func removeDefaultPorts(_ components: inout URLComponents) {
         if let port = components.port {
@@ -107,34 +107,34 @@ public enum URLNormalizer {
             }
         }
     }
-    
+
     /// Builds the final normalized URL with proper trailing slash
     private static func buildNormalizedURL(from components: URLComponents) throws -> String {
         guard let url = components.url else {
             throw URLNormalizationError.invalidURL("")
         }
-        
+
         var normalizedURL = url.absoluteString
-        
+
         // Ensure trailing slash, handling query parameters correctly
         normalizedURL = ensureTrailingSlash(normalizedURL)
-        
+
         return normalizedURL
     }
-    
+
     /// Ensures the URL has a trailing slash, properly handling query parameters
     private static func ensureTrailingSlash(_ url: String) -> String {
         if let queryRange = url.range(of: "?") {
             let beforeQuery = String(url[..<queryRange.lowerBound])
             let queryAndAfter = String(url[queryRange.lowerBound...])
-            
+
             if !beforeQuery.hasSuffix("/") {
                 return beforeQuery + "/" + queryAndAfter
             }
         } else if !url.hasSuffix("/") {
             return url + "/"
         }
-        
+
         return url
     }
 
@@ -152,7 +152,7 @@ public enum URLNormalizer {
 
         return Array(normalized).sorted()
     }
-    
+
     /// Converts WebSocket schemes to HTTP schemes for non-WebSocket operations
     /// - Parameter url: URL to convert
     /// - Returns: URL with ws:// converted to http:// and wss:// converted to https://
@@ -160,7 +160,7 @@ public enum URLNormalizer {
         guard var components = URLComponents(url: url, resolvingAgainstBaseURL: false) else {
             return nil
         }
-        
+
         switch components.scheme {
         case "ws":
             components.scheme = "http"
@@ -169,7 +169,7 @@ public enum URLNormalizer {
         default:
             return url // Return original URL if not a WebSocket scheme
         }
-        
+
         return components.url
     }
 }

@@ -32,7 +32,7 @@ public actor NDKSignatureVerificationSampler {
     public func verifyEvent(_ event: NDKEvent, from relay: RelayProtocol, stats: inout NDKRelaySignatureStats) async -> NDKSignatureVerificationResult {
         let eventId = event.id
         let signature = event.sig
-        
+
         guard !eventId.isEmpty, !signature.isEmpty else {
             return .invalid
         }
@@ -155,7 +155,7 @@ public actor NDKSignatureVerificationSampler {
     private func verifySignature(event: NDKEvent) async -> Bool {
         let eventId = event.id
         let signature = event.sig
-        
+
         guard !eventId.isEmpty, !signature.isEmpty else {
             return false
         }
@@ -210,12 +210,12 @@ public actor NDKSignatureVerificationSampler {
             }
         }
     }
-    
+
     /// Check if a relay is blacklisted
     public func isRelayBlacklisted(_ relayUrl: String) -> Bool {
         return blacklistedRelays.contains(relayUrl)
     }
-    
+
     /// Calculate the event ID according to NIP-01
     private func calculateEventID(
         pubkey: String,
@@ -238,7 +238,7 @@ public actor NDKSignatureVerificationSampler {
         guard let jsonString = String(data: data, encoding: .utf8) else {
             throw NDKError.encodingError("Failed to serialize event for ID generation")
         }
-        
+
         let hash = jsonString.data(using: .utf8)!.sha256()
         return hash.hexString
     }

@@ -1,7 +1,7 @@
 import Foundation
 
 /// Common encryption protocols and types for NDKSwift
-/// 
+///
 /// This module provides unified interfaces for encryption functionality
 /// in Nostr applications, supporting both NIP-04 (deprecated) and NIP-44
 /// encryption standards.
@@ -15,7 +15,7 @@ public protocol NDKEncryption {
     ///   - pubkey: Recipient's public key (hex)
     /// - Returns: Encrypted message string
     func encrypt(message: String, privateKey: PrivateKey, pubkey: PublicKey) throws -> String
-    
+
     /// Decrypt a message
     /// - Parameters:
     ///   - encrypted: The encrypted message
@@ -31,7 +31,7 @@ public enum NDKEncryptionError: LocalizedError {
     case decryptionFailed(String)
     case unsupportedVersion
     case invalidFormat
-    
+
     public var errorDescription: String? {
         switch self {
         case .encryptionFailed(let message):
@@ -49,11 +49,11 @@ public enum NDKEncryptionError: LocalizedError {
 /// NIP-04 encryption implementation (deprecated)
 public struct NIP04Encryption: NDKEncryption {
     public init() {}
-    
+
     public func encrypt(message: String, privateKey: PrivateKey, pubkey: PublicKey) throws -> String {
         return try Crypto.nip04Encrypt(message: message, privateKey: privateKey, pubkey: pubkey)
     }
-    
+
     public func decrypt(encrypted: String, privateKey: PrivateKey, pubkey: PublicKey) throws -> String {
         return try Crypto.nip04Decrypt(encrypted: encrypted, privateKey: privateKey, pubkey: pubkey)
     }
@@ -62,11 +62,11 @@ public struct NIP04Encryption: NDKEncryption {
 /// NIP-44 encryption implementation (recommended)
 public struct NIP44Encryption: NDKEncryption {
     public init() {}
-    
+
     public func encrypt(message: String, privateKey: PrivateKey, pubkey: PublicKey) throws -> String {
         return try Crypto.nip44Encrypt(message: message, privateKey: privateKey, pubkey: pubkey)
     }
-    
+
     public func decrypt(encrypted: String, privateKey: PrivateKey, pubkey: PublicKey) throws -> String {
         return try Crypto.nip44Decrypt(encrypted: encrypted, privateKey: privateKey, pubkey: pubkey)
     }
@@ -94,18 +94,18 @@ public extension NDKEvent {
     ) async throws -> NDKEvent {
         let user = NDKUser(pubkey: recipientPubkey)
         let scheme: NDKEncryptionScheme = useNIP44 ? .nip44 : .nip04
-        
+
         let encryptedContent = try await signer.encrypt(recipient: user, value: content, scheme: scheme)
-        
+
         let event = try await NDKEventBuilder(ndk: ndk)
             .content(encryptedContent)
             .kind(4) // Encrypted Direct Message
             .tags([["p", recipientPubkey]])
             .build(signer: signer)
-        
+
         return event
     }
-    
+
     /// Decrypt the content of an encrypted direct message
     /// - Parameters:
     ///   - signer: The signer to use for decryption
@@ -116,16 +116,16 @@ public extension NDKEvent {
         guard kind == EventKind.encryptedDirectMessage else {
             throw NDKEncryptionError.invalidFormat
         }
-        
+
         // Get viewer pubkey for cache
         let viewerPubkey = try await signer.pubkey
-        
+
         // Check cache first (if available)
         if let cache = ndk?.cache,
            let cached = await cache.getDecryptedContent(for: id, viewerPubkey: viewerPubkey) {
             return cached
         }
-        
+
         let pubkey: PublicKey
         if let senderPubkey = senderPubkey {
             pubkey = senderPubkey
@@ -133,7 +133,7 @@ public extension NDKEvent {
             pubkey = self.pubkey
         }
         let sender = NDKUser(pubkey: pubkey)
-        
+
         // Try to detect the encryption scheme based on content format
         let scheme: NDKEncryptionScheme
         if content.contains("?iv=") {
@@ -141,14 +141,14 @@ public extension NDKEvent {
         } else {
             scheme = .nip44
         }
-        
+
         let decrypted = try await signer.decrypt(sender: sender, value: content, scheme: scheme)
-        
+
         // Store in cache (if available)
         if let cache = ndk?.cache {
             await cache.storeDecryptedContent(decrypted, for: id, viewerPubkey: viewerPubkey)
         }
-        
+
         return decrypted
     }
 }

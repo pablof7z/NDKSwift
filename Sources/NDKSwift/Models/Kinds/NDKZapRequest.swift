@@ -5,11 +5,11 @@ import Foundation
 /// lightning wallet callback URL to request an invoice.
 public struct NDKZapRequest {
     public let event: NDKEvent
-    
+
     public init(event: NDKEvent) {
         self.event = event
     }
-    
+
     /// Create a new zap request
     public static func create(
         ndk: NDK,
@@ -22,12 +22,12 @@ public struct NDKZapRequest {
         zappedEventCoordinate: String? = nil
     ) async throws -> NDKZapRequest {
         var tags: [[String]] = []
-        
+
         // Required tags
         tags.append([NostrConstants.TagName.pubkey, recipient.pubkey])
         tags.append(["relays"] + relays)
         tags.append([NostrConstants.TagName.amount, String(amountMillisats)])
-        
+
         // Optional: lnurl tag
         for await profile in await ndk.profileManager.observe(for: recipient.pubkey, maxAge: TimeConstants.hour) {
             if let profile = profile,
@@ -37,69 +37,69 @@ public struct NDKZapRequest {
             }
             break // Only need first value
         }
-        
+
         // Optional: zapped event
         if let zappedEvent = zappedEvent {
             let eventId = zappedEvent.id
             tags.append([NostrConstants.TagName.event, eventId])
         }
-        
+
         // Optional: zapped event coordinate (for addressable events)
         if let coordinate = zappedEventCoordinate {
             tags.append([NostrConstants.TagName.address, coordinate])
         }
-        
+
         let event = try await NDKEventBuilder(ndk: ndk)
             .content(comment ?? "")
             .kind(EventKind.zapRequest)
             .tags(tags)
             .build(signer: signer)
-        
+
         return NDKZapRequest(event: event)
     }
-    
+
     // MARK: - Computed Properties
-    
+
     /// Amount in millisatoshis
     public var amountMillisats: Int64? {
         return event.tags.first(where: { $0.first == NostrConstants.TagName.amount })?[safe: 1].flatMap { Int64($0) }
     }
-    
+
     /// Amount in satoshis
     public var amountSats: Int64? {
         return amountMillisats.map { PaymentConstants.millisatsToSats($0) }
     }
-    
+
     /// Optional comment
     public var comment: String? {
         return event.content.isEmpty ? nil : event.content
     }
-    
+
     /// Recipient's pubkey
     public var recipientPubkey: String? {
         return event.tags.first(where: { $0.first == NostrConstants.TagName.pubkey })?[safe: 1]
     }
-    
+
     /// Relays where the zap receipt should be published
     public var relays: [String] {
         return event.tags.first(where: { $0.first == "relays" })?.dropFirst().map { String($0) } ?? []
     }
-    
+
     /// LNURL if present
     public var lnurl: String? {
         return event.tags.first(where: { $0.first == "lnurl" })?[safe: 1]
     }
-    
+
     /// Zapped event ID if this is zapping an event
     public var zappedEventId: String? {
         return event.tags.first(where: { $0.first == "e" })?[safe: 1]
     }
-    
+
     /// Zapped event coordinate for addressable events
     public var zappedEventCoordinate: String? {
         return event.tags.first(where: { $0.first == "a" })?[safe: 1]
     }
-    
+
     /// Encode as JSON for sending to LNURL callback
     public func encodeForCallback() throws -> String {
         return try JSONCoding.encodeToString(event)
@@ -122,19 +122,19 @@ private func encodeLNURL(_ input: String) throws -> String {
         let username = String(parts[0])
         let domain = String(parts[1])
         let url = "https://\(domain)\(WellKnownPath.lnurlp)\(username)"
-        
+
         // Encode to bech32
         guard let data = url.data(using: .utf8) else {
             throw NDKError.invalidInput(message: "Failed to encode URL")
         }
-        
+
         return try Bech32.encode(hrp: Bech32HRP.lnurl, data: Array(data))
     } else {
         // Assume it's a URL that needs encoding
         guard let data = input.data(using: .utf8) else {
             throw NDKError.invalidInput(message: "Failed to encode URL")
         }
-        
+
         return try Bech32.encode(hrp: Bech32HRP.lnurl, data: Array(data))
     }
 }

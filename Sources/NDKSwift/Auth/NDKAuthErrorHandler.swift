@@ -4,14 +4,14 @@ import LocalAuthentication
 /// Centralized error handler for authentication-related errors
 /// Provides user-friendly error messages and proper error type handling
 public struct NDKAuthErrorHandler {
-    
+
     /// Categorizes an error and provides user-friendly messaging
     public struct ErrorInfo {
         public let title: String
         public let message: String
         public let isRecoverable: Bool
         public let suggestedAction: SuggestedAction?
-        
+
         public enum SuggestedAction {
             case retry
             case removeAccount
@@ -19,26 +19,26 @@ public struct NDKAuthErrorHandler {
             case contactSupport
         }
     }
-    
+
     /// Analyze an error and return appropriate user-facing information
     public static func analyze(_ error: Error) -> ErrorInfo {
         // First check for NDKAuthError
         if let authError = error as? NDKAuthError {
             return handleAuthError(authError)
         }
-        
+
         // Check for keychain errors
         if let keychainError = error as? NDKKeychainError {
             return handleKeychainError(keychainError)
         }
-        
+
         // Check for LAError (biometric errors)
         #if !os(watchOS)
         if let laError = error as? LAError {
             return handleBiometricError(laError)
         }
         #endif
-        
+
         // Check for decoding errors (corrupted data)
         if error is DecodingError {
             return ErrorInfo(
@@ -48,12 +48,12 @@ public struct NDKAuthErrorHandler {
                 suggestedAction: .removeAccount
             )
         }
-        
+
         // Check for network errors
         if let urlError = error as? URLError {
             return handleNetworkError(urlError)
         }
-        
+
         // Default error handling
         return ErrorInfo(
             title: "Authentication Error",
@@ -62,9 +62,9 @@ public struct NDKAuthErrorHandler {
             suggestedAction: .retry
         )
     }
-    
+
     // MARK: - Specific Error Handlers
-    
+
     private static func handleAuthError(_ error: NDKAuthError) -> ErrorInfo {
         switch error {
         case .noActiveSession:
@@ -74,7 +74,7 @@ public struct NDKAuthErrorHandler {
                 isRecoverable: true,
                 suggestedAction: .reauthenticate
             )
-            
+
         case .sessionNotFound:
             return ErrorInfo(
                 title: "Session Not Found",
@@ -82,7 +82,7 @@ public struct NDKAuthErrorHandler {
                 isRecoverable: true,
                 suggestedAction: .reauthenticate
             )
-            
+
         case .signerCreationFailed:
             return ErrorInfo(
                 title: "Authentication Failed",
@@ -90,7 +90,7 @@ public struct NDKAuthErrorHandler {
                 isRecoverable: true,
                 suggestedAction: .retry
             )
-            
+
         case .biometricAuthenticationFailed:
             return ErrorInfo(
                 title: "Biometric Authentication Failed",
@@ -98,11 +98,11 @@ public struct NDKAuthErrorHandler {
                 isRecoverable: true,
                 suggestedAction: .retry
             )
-            
+
         case .keychainError(let underlyingError):
             // Delegate to keychain error handler
             return analyze(underlyingError)
-            
+
         case .invalidSession:
             return ErrorInfo(
                 title: "Invalid Session",
@@ -110,7 +110,7 @@ public struct NDKAuthErrorHandler {
                 isRecoverable: true,
                 suggestedAction: .reauthenticate
             )
-            
+
         case .sessionExpired:
             return ErrorInfo(
                 title: "Session Expired",
@@ -118,7 +118,7 @@ public struct NDKAuthErrorHandler {
                 isRecoverable: true,
                 suggestedAction: .reauthenticate
             )
-            
+
         case .corruptedSessionData:
             return ErrorInfo(
                 title: "Corrupted Session Data",
@@ -128,7 +128,7 @@ public struct NDKAuthErrorHandler {
             )
         }
     }
-    
+
     private static func handleKeychainError(_ error: NDKKeychainError) -> ErrorInfo {
         switch error {
         case .storageError(let status):
@@ -138,15 +138,15 @@ public struct NDKAuthErrorHandler {
                 isRecoverable: true,
                 suggestedAction: .retry
             )
-            
+
         case .retrievalError(let status):
             return ErrorInfo(
-                title: "Retrieval Error", 
+                title: "Retrieval Error",
                 message: "Failed to retrieve credentials (code: \(status)). Please sign in again.",
                 isRecoverable: true,
                 suggestedAction: .reauthenticate
             )
-            
+
         case .deletionError(let status):
             return ErrorInfo(
                 title: "Deletion Error",
@@ -154,7 +154,7 @@ public struct NDKAuthErrorHandler {
                 isRecoverable: true,
                 suggestedAction: .retry
             )
-            
+
         case .accessControlError:
             return ErrorInfo(
                 title: "Access Control Error",
@@ -162,7 +162,7 @@ public struct NDKAuthErrorHandler {
                 isRecoverable: true,
                 suggestedAction: .retry
             )
-            
+
         case .itemNotFound:
             return ErrorInfo(
                 title: "Credentials Not Found",
@@ -170,7 +170,7 @@ public struct NDKAuthErrorHandler {
                 isRecoverable: true,
                 suggestedAction: .reauthenticate
             )
-            
+
         case .invalidData:
             return ErrorInfo(
                 title: "Invalid Credentials",
@@ -178,7 +178,7 @@ public struct NDKAuthErrorHandler {
                 isRecoverable: true,
                 suggestedAction: .reauthenticate
             )
-            
+
         case .userCancelled:
             return ErrorInfo(
                 title: "Authentication Cancelled",
@@ -186,7 +186,7 @@ public struct NDKAuthErrorHandler {
                 isRecoverable: true,
                 suggestedAction: nil
             )
-            
+
         case .authenticationFailed:
             return ErrorInfo(
                 title: "Authentication Failed",
@@ -194,7 +194,7 @@ public struct NDKAuthErrorHandler {
                 isRecoverable: true,
                 suggestedAction: .retry
             )
-            
+
         case .biometricNotAvailable:
             return ErrorInfo(
                 title: "Biometrics Unavailable",
@@ -202,7 +202,7 @@ public struct NDKAuthErrorHandler {
                 isRecoverable: true,
                 suggestedAction: nil
             )
-            
+
         case .biometricNotEnrolled:
             return ErrorInfo(
                 title: "Biometrics Not Set Up",
@@ -212,7 +212,7 @@ public struct NDKAuthErrorHandler {
             )
         }
     }
-    
+
     #if !os(watchOS)
     private static func handleBiometricError(_ error: LAError) -> ErrorInfo {
         let errorMappings: [LAError.Code: (title: String, message: String, isRecoverable: Bool, suggestedAction: ErrorInfo.SuggestedAction?)] = [
@@ -265,7 +265,7 @@ public struct NDKAuthErrorHandler {
                 nil
             )
         ]
-        
+
         if let mapping = errorMappings[error.code] {
             return ErrorInfo(
                 title: mapping.title,
@@ -283,7 +283,7 @@ public struct NDKAuthErrorHandler {
         }
     }
     #endif
-    
+
     private static func handleNetworkError(_ error: URLError) -> ErrorInfo {
         switch error.code {
         case .notConnectedToInternet:
@@ -293,7 +293,7 @@ public struct NDKAuthErrorHandler {
                 isRecoverable: true,
                 suggestedAction: .retry
             )
-            
+
         case .timedOut:
             return ErrorInfo(
                 title: "Request Timed Out",
@@ -301,7 +301,7 @@ public struct NDKAuthErrorHandler {
                 isRecoverable: true,
                 suggestedAction: .retry
             )
-            
+
         case .cannotFindHost, .cannotConnectToHost:
             return ErrorInfo(
                 title: "Connection Failed",
@@ -309,7 +309,7 @@ public struct NDKAuthErrorHandler {
                 isRecoverable: true,
                 suggestedAction: .retry
             )
-            
+
         default:
             return ErrorInfo(
                 title: "Network Error",

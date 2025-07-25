@@ -122,7 +122,7 @@ actor NDKPublishingStrategy {
         for (key, item) in outboxItems {
             let status = await item.getOverallStatus()
             let lastUpdated = await item.getLastUpdated()
-            
+
             // Keep if not completed or recent
             if status != .succeeded && status != .failed {
                 itemsToKeep[key] = item
@@ -265,7 +265,7 @@ actor NDKPublishingStrategy {
 
     private func getOrConnectRelay(url: String) async -> NDKRelay? {
         let normalizedUrl = URLNormalizer.tryNormalizeRelayUrl(url) ?? url
-        
+
         // First check if already connected
         if let relay = await ndk.pool.getRelay(for: normalizedUrl) {
             return relay
@@ -373,36 +373,36 @@ actor OutboxItem {
         // Also update the event's relay status via the event tracker
         await eventTracker.updatePublishStatus(eventId: event.id, relay: relay, status: status)
     }
-    
+
     func setOverallStatus(_ status: PublishStatus) {
         overallStatus = status
     }
-    
+
     func getOverallStatus() -> PublishStatus {
         return overallStatus
     }
-    
+
     func getLastUpdated() -> Date {
         return lastUpdated
     }
-    
+
     func incrementSuccessCount() {
         successCount += 1
     }
-    
+
     func incrementFailureCount() {
         failureCount += 1
     }
-    
+
     func setSuccessCount(_ count: Int) {
         successCount = count
     }
-    
+
     func setFailureCount(_ count: Int) {
         failureCount = count
     }
-    
-    
+
+
     func setLastUpdated(_ date: Date) {
         lastUpdated = date
     }
@@ -554,7 +554,7 @@ public struct PublishResult: Sendable {
     public var isComplete: Bool {
         overallStatus == .succeeded || overallStatus == .failed || overallStatus == .cancelled
     }
-    
+
     public var successfulRelayUrls: Set<String> {
         Set(relayStatuses.compactMap { url, status in
             if case .succeeded = status {

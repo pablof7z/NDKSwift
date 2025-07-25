@@ -72,7 +72,7 @@ public enum ImetaUtils {
                 components.append("fallback \(fallbackUrl)")
             }
         }
-        
+
         // Handle user annotations
         if let annotations = imeta.userAnnotations {
             for annotation in annotations {

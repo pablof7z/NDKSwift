@@ -29,16 +29,16 @@ import Foundation
 public class NDKSignerRegistry {
     /// Shared registry instance
     public static let shared = NDKSignerRegistry()
-    
+
     /// Thread-safe storage for registered signer types
     private var registeredSigners: [String: any NDKSigner.Type] = [:]
     private let queue = DispatchQueue(label: "com.ndkswift.signerregistry", attributes: .concurrent)
-    
+
     private init() {
         // Register built-in signer types
         registerBuiltInSigners()
     }
-    
+
     /// Register a signer type with the registry
     /// - Parameter signerType: The signer type to register
     public func register<T: NDKSigner>(_ signerType: T.Type) {
@@ -46,7 +46,7 @@ public class NDKSignerRegistry {
             self?.registeredSigners[T.signerType] = signerType
         }
     }
-    
+
     /// Get a registered signer type by identifier
     /// - Parameter identifier: The signer type identifier
     /// - Returns: The signer type, or nil if not found
@@ -55,7 +55,7 @@ public class NDKSignerRegistry {
             registeredSigners[identifier]
         }
     }
-    
+
     /// Create a signer instance from serialized data
     /// - Parameters:
     ///   - data: The serialized signer data
@@ -63,29 +63,29 @@ public class NDKSignerRegistry {
     /// - Returns: A reconstructed signer instance
     /// - Throws: Deserialization errors if the data is invalid or the signer type is not registered
     public func createSigner(from data: Data, ndk: NDK? = nil) throws -> any NDKSigner {
-        
+
         // Parse the outer container to get the signer type
         let container: SignerContainer
         do {
             container = try JSONCoding.decode(SignerContainer.self, from: data)
         } catch {
-            
+
             throw error
         }
-        
-        
+
+
         // Get the registered signer type
         guard let signerType = getSignerType(for: container.type) else {
             throw NDKSignerRegistryError.unknownSignerType(container.type)
         }
-        
+
         // Extract the payload data
         let payloadData = try JSONCoding.encode(container.payload)
-        
+
         // Deserialize the signer
         return try signerType.deserialize(payloadData, ndk: ndk)
     }
-    
+
     /// Get all registered signer type identifiers
     /// - Returns: Array of registered signer type identifiers
     public func getRegisteredSignerTypes() -> [String] {
@@ -93,16 +93,16 @@ public class NDKSignerRegistry {
             Array(registeredSigners.keys)
         }
     }
-    
+
     /// Register built-in signer types
     private func registerBuiltInSigners() {
-        
+
         // Register NDKPrivateKeySigner
         register(NDKPrivateKeySigner.self)
-        
+
         // Register NDKBunkerSigner
         register(NDKBunkerSigner.self)
-        
+
         // Future signers will be registered here automatically
     }
 }
@@ -116,7 +116,7 @@ public class NDKSignerRegistry {
 struct SignerContainer: Codable {
     /// The signer type identifier
     let type: String
-    
+
     /// The serialized signer payload
     let payload: [String: AnyCodable]
 }
@@ -131,7 +131,7 @@ public enum NDKSignerRegistryError: LocalizedError {
     case serializationError(String)
     case deserializationError(String)
     case invalidData
-    
+
     public var errorDescription: String? {
         switch self {
         case .unknownSignerType(let type):
@@ -162,7 +162,7 @@ public enum NDKSignerSerialization {
         )
         return try JSONCoding.encode(container)
     }
-    
+
     /// Extract payload from serialized container
     /// - Parameter data: The serialized container data
     /// - Returns: The signer type and payload

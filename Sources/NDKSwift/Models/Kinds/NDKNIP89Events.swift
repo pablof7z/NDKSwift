@@ -6,7 +6,7 @@ import Foundation
 public enum NIP89Kind: Kind {
     /// Recommendation event (kind 31989)
     case recommendation = 31989
-    
+
     /// Handler information event (kind 31990)
     case handlerInfo = 31990
 }
@@ -17,16 +17,16 @@ public enum NIP89Kind: Kind {
 public struct NIP89HandlerInfo {
     /// The supported event kinds
     public let supportedKinds: [Kind]
-    
+
     /// The handler URLs by platform
     public let handlerURLs: [String: String]
-    
+
     /// Optional metadata about the handler
     public let metadata: NIP89HandlerMetadata?
-    
+
     /// The d-tag identifier for this handler
     public let identifier: String
-    
+
     public init(supportedKinds: [Kind], handlerURLs: [String: String], metadata: NIP89HandlerMetadata? = nil, identifier: String) {
         self.supportedKinds = supportedKinds
         self.handlerURLs = handlerURLs
@@ -39,19 +39,19 @@ public struct NIP89HandlerInfo {
 public struct NIP89HandlerMetadata: Codable {
     /// Application name
     public let name: String?
-    
+
     /// Application description
     public let about: String?
-    
+
     /// Application icon URL
     public let picture: String?
-    
+
     /// Application website
     public let website: String?
-    
+
     /// Lightning address for the application
     public let lud16: String?
-    
+
     public init(name: String? = nil, about: String? = nil, picture: String? = nil, website: String? = nil, lud16: String? = nil) {
         self.name = name
         self.about = about
@@ -67,10 +67,10 @@ public struct NIP89HandlerMetadata: Codable {
 public struct NIP89Recommendation {
     /// The event kind being recommended
     public let eventKind: Kind
-    
+
     /// The recommended handlers
     public let handlers: [NIP89HandlerReference]
-    
+
     public init(eventKind: Kind, handlers: [NIP89HandlerReference]) {
         self.eventKind = eventKind
         self.handlers = handlers
@@ -81,13 +81,13 @@ public struct NIP89Recommendation {
 public struct NIP89HandlerReference {
     /// The handler address (31990:pubkey:identifier)
     public let address: String
-    
+
     /// Optional relay hint
     public let relay: String?
-    
+
     /// Platform this handler is for
     public let platform: String?
-    
+
     public init(address: String, relay: String? = nil, platform: String? = nil) {
         self.address = address
         self.relay = relay
@@ -99,20 +99,20 @@ public struct NIP89HandlerReference {
 
 extension NDKEvent {
     /// Parse this event as a NIP-89 handler information event
-    /// 
+    ///
     /// - Returns: Handler information if this is a valid kind 31990 event
     public func asNIP89HandlerInfo() -> NIP89HandlerInfo? {
         guard kind == NIP89Kind.handlerInfo.rawValue else { return nil }
-        
+
         // Get the d-tag identifier
         guard let identifier = tagValue("d") else { return nil }
-        
+
         // Parse supported kinds from k tags
         let supportedKinds = tags(withName: "k").compactMap { tag -> Kind? in
             guard tag.count >= 2, let kind = Kind(tag[1]) else { return nil }
             return kind
         }
-        
+
         // Parse handler URLs from platform tags
         var handlerURLs: [String: String] = [:]
         for tag in tags where tag.count >= 2 && tag[0] != "k" && tag[0] != "d" {
@@ -120,7 +120,7 @@ extension NDKEvent {
             let url = tag[1]
             handlerURLs[platform] = url
         }
-        
+
         // Parse metadata from content if present
         let metadata: NIP89HandlerMetadata?
         if !content.isEmpty {
@@ -128,7 +128,7 @@ extension NDKEvent {
         } else {
             metadata = nil
         }
-        
+
         return NIP89HandlerInfo(
             supportedKinds: supportedKinds,
             handlerURLs: handlerURLs,
@@ -136,27 +136,27 @@ extension NDKEvent {
             identifier: identifier
         )
     }
-    
+
     /// Parse this event as a NIP-89 recommendation event
-    /// 
+    ///
     /// - Returns: Recommendation information if this is a valid kind 31989 event
     public func asNIP89Recommendation() -> NIP89Recommendation? {
         guard kind == NIP89Kind.recommendation.rawValue else { return nil }
-        
+
         // Get the event kind from d-tag
         guard let dTag = tagValue("d"), let eventKind = Kind(dTag) else { return nil }
-        
+
         // Parse handler references from a tags
         let handlers = tags(withName: "a").compactMap { tag -> NIP89HandlerReference? in
             guard tag.count >= 2 else { return nil }
-            
+
             let address = tag[1]
             let relay = tag.count >= 3 ? tag[2] : nil
             let platform = tag.count >= 4 ? tag[3] : nil
-            
+
             return NIP89HandlerReference(address: address, relay: relay, platform: platform)
         }
-        
+
         return NIP89Recommendation(eventKind: eventKind, handlers: handlers)
     }
 }
@@ -165,13 +165,13 @@ extension NDKEvent {
 
 extension NDKEventBuilder {
     /// Create a NIP-89 handler information event (kind 31990)
-    /// 
+    ///
     /// - Parameters:
     ///   - identifier: Unique identifier for this handler
     ///   - supportedKinds: List of event kinds this handler supports
     ///   - handlerURLs: Dictionary mapping platform names to handler URLs
     ///   - metadata: Optional metadata about the handler
-    /// 
+    ///
     /// - Returns: Self for chaining
     @discardableResult
     public func nip89HandlerInfo(
@@ -193,13 +193,13 @@ extension NDKEventBuilder {
             })
             .content(metadata?.toJSON() ?? "")
     }
-    
+
     /// Create a NIP-89 recommendation event (kind 31989)
-    /// 
+    ///
     /// - Parameters:
     ///   - eventKind: The event kind being recommended
     ///   - handlers: List of handler references
-    /// 
+    ///
     /// - Returns: Self for chaining
     @discardableResult
     public func nip89Recommendation(

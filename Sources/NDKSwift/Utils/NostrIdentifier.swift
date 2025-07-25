@@ -1,6 +1,6 @@
 /// Utilities for working with Nostr identifiers (hex and bech32)
 public enum NostrIdentifier {
-    
+
     /// Create a filter from a hex ID or bech32 identifier
     /// - Parameter identifier: A hex event ID or bech32 encoded string (note1..., nevent1..., naddr1...)
     /// - Returns: An NDKFilter configured to fetch the specified event
@@ -9,14 +9,14 @@ public enum NostrIdentifier {
         // Check if it's a bech32 string
         if Bech32.isBech32(identifier) {
             let decoded = try ContentTagger.decodeNostrEntity(identifier)
-            
+
             switch decoded.type {
             case "note", "nevent":
                 guard let eventId = decoded.eventId else {
                     throw NDKError.invalidDataFormat(decoded.type, details: "Missing event ID")
                 }
                 return NDKFilter(ids: [eventId])
-                
+
             case "naddr":
                 guard let pubkey = decoded.pubkey,
                       let kind = decoded.kind,
@@ -28,7 +28,7 @@ public enum NostrIdentifier {
                     kinds: [kind],
                     tags: ["d": Set([dTag])]
                 )
-                
+
             default:
                 throw NDKError.invalidDataFormat("bech32", details: "Unsupported type: \(decoded.type)")
             }

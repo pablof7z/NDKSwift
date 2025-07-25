@@ -4,11 +4,11 @@ import Foundation
 public protocol NDKZapProtocol {
     /// The type of zap this protocol handles
     var type: ZapType { get }
-    
+
     /// Check if this protocol can zap the given recipient info
     /// This is now a simple check based on pre-fetched data
     func canZap(recipientInfo: RecipientZapInfo) -> Bool
-    
+
     /// Prepare the zap using pre-fetched recipient information
     /// - Parameters:
     ///   - event: Optional event being zapped
@@ -22,7 +22,7 @@ public protocol NDKZapProtocol {
         amountSats: Int64,
         comment: String?
     ) async throws -> PreparedZap
-    
+
     /// Complete the zap after payment confirmation
     /// - Parameters:
     ///   - prepared: The prepared zap data
@@ -38,19 +38,19 @@ public protocol NDKZapProtocol {
 public struct PreparedZap {
     /// The payment request to be fulfilled
     public let paymentRequest: PaymentRequest
-    
+
     /// The recipient user
     public let recipient: NDKUser
-    
+
     /// Optional event being zapped
     public let zappedEvent: NDKEvent?
-    
+
     /// Comment for the zap
     public let comment: String?
-    
+
     /// Protocol-specific metadata
     public let metadata: [String: Any]
-    
+
     public init(
         paymentRequest: PaymentRequest,
         recipient: NDKUser,

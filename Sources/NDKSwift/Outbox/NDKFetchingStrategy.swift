@@ -177,11 +177,11 @@ actor NDKFetchingStrategy {
         // Sort events by timestamp
         let eventsArray = Array(collectedEvents.values)
         var eventSnapshots: [(event: NDKEvent, createdAt: Timestamp)] = []
-        
+
         for event in eventsArray {
             eventSnapshots.append((event, event.createdAt))
         }
-        
+
         return eventSnapshots
             .sorted { $0.createdAt > $1.createdAt }
             .map { $0.event }
@@ -193,7 +193,7 @@ actor NDKFetchingStrategy {
         config: OutboxFetchConfig
     ) async -> FetchResult {
         do {
-            // Get or connect to relay  
+            // Get or connect to relay
             guard await getOrConnectRelay(url: relayURL) != nil else {
                 return .failure(FetchError.relayError(relayURL, ErrorMessageConstants.Messages.connectionFailed))
             }
@@ -207,7 +207,7 @@ actor NDKFetchingStrategy {
                 cachePolicy: .networkOnly, // Skip cache for relay-specific queries
                 relays: relaySet
             )
-            
+
             // Fetch events with timeout
             let events = try await withTimeout(seconds: config.timeoutInterval) {
                 await dataSource.collect(timeout: config.timeoutInterval)
@@ -256,7 +256,7 @@ actor NDKFetchingStrategy {
 
         // Create data source for this specific relay
         let relaySet = Set([relayURL])
-        
+
         // Create data sources for each filter
         var dataSources: [NDKDataSource<NDKEvent>] = []
         for filter in subscription.filters {
@@ -273,7 +273,7 @@ actor NDKFetchingStrategy {
         // Start async event handling
         Task { [weak subscription] in
             guard let subscription = subscription else { return }
-            
+
             // Process events from all data sources
             await withTaskGroup(of: Void.self) { group in
                 for dataSource in dataSources {
@@ -301,7 +301,7 @@ actor NDKFetchingStrategy {
 
     private func getOrConnectRelay(url: String) async -> NDKRelay? {
         let normalizedUrl = URLNormalizer.tryNormalizeRelayUrl(url) ?? url
-        
+
         // First check if already connected
         if let relay = await ndk.pool.getRelay(for: normalizedUrl) {
             return relay

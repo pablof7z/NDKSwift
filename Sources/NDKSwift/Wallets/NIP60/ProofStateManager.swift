@@ -13,13 +13,13 @@ extension CashuSwift.Proof: @retroactive Hashable {
 /// This includes tracking availability, reservations for concurrent operations, and selection algorithms
 public actor ProofStateManager {
     // MARK: - Types
-    
+
     public enum ProofState: Equatable {
         case available
         case reserved   // For concurrent operations
         case deleted    // Spent proofs
     }
-    
+
     public struct ProofEntry {
         public let proof: CashuSwift.Proof
         public var state: ProofState
@@ -27,13 +27,13 @@ public actor ProofStateManager {
         public var ownerEventId: String? // Which event currently owns this proof
         public var ownerTimestamp: Timestamp? // Timestamp of the owner event
     }
-    
+
     // MARK: - Properties
-    
+
     private var proofState: [String: ProofEntry] = [:] // proof.C -> entry
-    
+
     // MARK: - Public Methods
-    
+
     /// Add a proof to the state manager
     func addProof(_ proof: CashuSwift.Proof, mint: String, state: ProofState = .available, eventId: String? = nil, timestamp: Timestamp? = nil) {
         // Check if proof already exists
@@ -50,13 +50,13 @@ public actor ProofStateManager {
                     return
                 }
             }
-            
+
             // If we're here, the new event is newer or same age but different state, so update the proof
             NDKLogger.log(.debug, category: .wallet, "ProofStateManager.addProof - Updating existing proof \(proof.C) from state \(existing.state) to \(state), owner: \(existing.ownerEventId ?? "none") -> \(eventId ?? "none")")
         } else {
             NDKLogger.log(.debug, category: .wallet, "ProofStateManager.addProof - Adding new proof \(proof.C) with state \(state), owner: \(eventId ?? "none")")
         }
-        
+
         proofState[proof.C] = ProofEntry(
             proof: proof,
             state: state,
@@ -64,10 +64,10 @@ public actor ProofStateManager {
             ownerEventId: eventId,
             ownerTimestamp: timestamp
         )
-        
+
         NDKLogger.log(.debug, category: .wallet, "ProofStateManager.addProof - Added/Updated proof C: \(proof.C), amount: \(proof.amount), state: \(state), mint: \(mint), eventId: \(eventId ?? "none")")
     }
-    
+
     /// Update the state of a proof
     func updateProofState(_ proofC: String, state: ProofState) {
         if var entry = proofState[proofC] {
@@ -75,7 +75,7 @@ public actor ProofStateManager {
             proofState[proofC] = entry
         }
     }
-    
+
     /// Update ownership of existing proofs to a new event
     func updateProofOwnership(_ proofs: [CashuSwift.Proof], eventId: String, timestamp: Timestamp) {
         for proof in proofs {
@@ -96,46 +96,46 @@ public actor ProofStateManager {
             }
         }
     }
-    
+
     /// Get all available proofs
     func getAvailableProofs() -> [CashuSwift.Proof] {
         return proofState.values
             .filter { $0.state == .available }
             .map { $0.proof }
     }
-    
+
     /// Get available proofs for a specific mint
     func getAvailableProofs(mint: String) -> [CashuSwift.Proof] {
         return proofState.values
             .filter { $0.state == .available && $0.mint == mint }
             .map { $0.proof }
     }
-    
+
     /// Get all proofs grouped by mint
     func getAvailableProofsByMint() -> [String: [CashuSwift.Proof]] {
         var result: [String: [CashuSwift.Proof]] = [:]
-        
+
         for entry in proofState.values where entry.state == .available {
             result[entry.mint, default: []].append(entry.proof)
         }
-        
+
         return result
     }
-    
+
     /// Get total balance
     func getTotalBalance() -> Int64 {
         let availableProofs = proofState.values.filter { $0.state == .available }
         let totalBalance = availableProofs.reduce(0) { $0 + Int64($1.proof.amount) }
-        
+
         NDKLogger.log(.debug, category: .wallet, "ProofStateManager.getTotalBalance() - Total proofs: \(proofState.count), Available: \(availableProofs.count), Balance: \(totalBalance)")
-        
+
         if proofState.count > 0 && availableProofs.isEmpty {
             NDKLogger.log(.warning, category: .wallet, "⚠️ Have \(proofState.count) proofs but none are available! States: \(proofState.values.map { $0.state }.reduce(into: [:]) { counts, state in counts[String(describing: state), default: 0] += 1 })")
         }
-        
+
         return totalBalance
     }
-    
+
     /// Get balance for a specific mint
     func getBalance(mint: String) -> Int64 {
         let availableProofs = proofState.values
@@ -144,12 +144,12 @@ public actor ProofStateManager {
         NDKLogger.log(.trace, category: .wallet, "ProofStateManager.getBalance(mint: \(mint)) - found \(availableProofs.count) available proofs, balance: \(balance)")
         return balance
     }
-    
+
     /// Get all mints that have sufficient balance for the given amount
     /// Returns mints sorted by balance (highest first)
     func getMintsWithSufficientBalance(amount: Int64) -> [String] {
         let availableProofsByMint = getAvailableProofsByMint()
-        
+
         return availableProofsByMint
             .compactMap { (mintURL, proofs) in
                 let balance = proofs.reduce(0) { $0 + Int64($1.amount) }
@@ -158,21 +158,21 @@ public actor ProofStateManager {
             .sorted { $0.balance > $1.balance }
             .map { $0.mint }
     }
-    
+
     /// Select proofs for a given amount from a specific mint
     /// Uses a greedy algorithm to minimize the number of proofs and change
     func selectProofs(amount: Int64, mint: String) -> [CashuSwift.Proof] {
         var selected: [CashuSwift.Proof] = []
         var total: Int64 = 0
-        
+
         // Get available proofs from state, filtered by mint
         let availableProofs = proofState.values
             .filter { $0.state == .available && $0.mint == mint }
             .map { $0.proof }
-        
+
         // Sort proofs by amount (ascending) to minimize change
         let sortedProofs = availableProofs.sorted { $0.amount < $1.amount }
-        
+
         for proof in sortedProofs {
             if total >= amount {
                 break
@@ -180,10 +180,10 @@ public actor ProofStateManager {
             selected.append(proof)
             total += Int64(proof.amount)
         }
-        
+
         return total >= amount ? selected : []
     }
-    
+
     /// Reserve proofs for concurrent operations
     func reserveProofs(_ proofs: [CashuSwift.Proof]) throws {
         for proof in proofs {
@@ -201,7 +201,7 @@ public actor ProofStateManager {
             proofState[proof.C] = entry
         }
     }
-    
+
     /// Release reserved proofs back to available
     func releaseProofs(_ proofs: [CashuSwift.Proof]) {
         for proof in proofs {
@@ -211,7 +211,7 @@ public actor ProofStateManager {
             }
         }
     }
-    
+
     /// Mark proofs as deleted/spent
     func markProofsAsDeleted(_ proofs: [CashuSwift.Proof]) {
         for proof in proofs {
@@ -221,11 +221,11 @@ public actor ProofStateManager {
             }
         }
     }
-    
+
     /// Mark proofs owned by a deleted event as deleted
     func markProofsOwnedByEventAsDeleted(_ eventId: String) -> [CashuSwift.Proof] {
         var deletedProofs: [CashuSwift.Proof] = []
-        
+
         for (proofC, entry) in proofState {
             // Only delete if this event still owns the proof
             if entry.ownerEventId == eventId && entry.state != .deleted {
@@ -235,35 +235,35 @@ public actor ProofStateManager {
                 deletedProofs.append(entry.proof)
             }
         }
-        
+
         return deletedProofs
     }
-    
+
     /// Remove deleted proofs from state
     func pruneDeletedProofs() {
         proofState = proofState.filter { $0.value.state != .deleted }
     }
-    
+
     /// Clear all proof state
     func clear() {
         proofState.removeAll()
     }
-    
+
     /// Get proof state for debugging
     func getProofState(for proofC: String) -> ProofState? {
         return proofState[proofC]?.state
     }
-    
+
     /// Get all proof entries (for reconciliation)
     public func getAllEntries() -> [ProofEntry] {
         return Array(proofState.values)
     }
-    
+
     /// Get proof entries for a specific mint
     public func getEntries(mint: String) -> [ProofEntry] {
         return proofState.values.filter { $0.mint == mint }
     }
-    
+
     /// Reconcile proof states after checking with mint
     func reconcileProofStates(spentProofCs: Set<String>) {
         for proofC in spentProofCs {
@@ -273,33 +273,33 @@ public actor ProofStateManager {
             }
         }
     }
-    
+
     /// Get the owner event ID for a single proof
     /// Returns the event ID that owns this proof, or nil if no owner
     func getOwnerEventId(for proof: CashuSwift.Proof) -> String? {
         return proofState[proof.C]?.ownerEventId
     }
-    
+
     /// Get the mint for a proof
     func getMintForProof(_ proof: CashuSwift.Proof) -> String? {
         return proofState[proof.C]?.mint
     }
-    
+
     /// Get the owner event IDs for a set of proofs
     /// Returns a set of event IDs that previously owned these proofs
     func getOwnerEventIds(for proofs: [CashuSwift.Proof]) -> Set<String> {
         var ownerIds = Set<String>()
-        
+
         for proof in proofs {
             if let entry = proofState[proof.C],
                let ownerEventId = entry.ownerEventId {
                 ownerIds.insert(ownerEventId)
             }
         }
-        
+
         return ownerIds
     }
-    
+
     /// Get all proofs (available and reserved) that belong to a specific event
     /// This is crucial for proper proof rollover when creating new token events
     func getProofsForEvent(_ eventId: String) -> [CashuSwift.Proof] {
@@ -311,7 +311,7 @@ public actor ProofStateManager {
         NDKLogger.log(.trace, category: .wallet, "ProofStateManager.getProofsForEvent(\(eventId)) - Found \(proofs.count) proofs")
         return proofs
     }
-    
+
     /// Get all available proofs that belong to a specific event
     func getAvailableProofsForEvent(_ eventId: String) -> [CashuSwift.Proof] {
         let proofs = proofState.values
@@ -331,7 +331,7 @@ public actor ProofStateManager {
 
 enum ProofStateError: LocalizedError {
     case proofNotAvailable(proofC: String)
-    
+
     var errorDescription: String? {
         switch self {
         case .proofNotAvailable(let proofC):

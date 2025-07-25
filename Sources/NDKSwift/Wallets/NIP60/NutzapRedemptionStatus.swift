@@ -6,7 +6,7 @@ public enum NutzapRedemptionStatus: Sendable, Codable, Equatable {
     case pending
     case redeemed(at: Timestamp, proofsCount: Int)
     case failed(error: NutzapRedemptionError, attempts: Int, lastAttempt: Timestamp)
-    
+
     private enum CodingKeys: String, CodingKey {
         case type
         case redeemedAt
@@ -15,11 +15,11 @@ public enum NutzapRedemptionStatus: Sendable, Codable, Equatable {
         case attempts
         case lastAttempt
     }
-    
+
     public init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         let type = try container.decode(String.self, forKey: .type)
-        
+
         switch type {
         case "pending":
             self = .pending
@@ -36,10 +36,10 @@ public enum NutzapRedemptionStatus: Sendable, Codable, Equatable {
             throw DecodingError.dataCorruptedError(forKey: .type, in: container, debugDescription: "Unknown status type")
         }
     }
-    
+
     public func encode(to encoder: Encoder) throws {
         var container = encoder.container(keyedBy: CodingKeys.self)
-        
+
         switch self {
         case .pending:
             try container.encode("pending", forKey: .type)
@@ -65,15 +65,15 @@ public enum NutzapRedemptionError: Error, Sendable, Codable, Equatable {
     case dleqVerificationFailed
     case invalidEventSignature
     case insufficientAmount(expected: Int64, actual: Int64)
-    
+
     // Transient errors (retryable)
     case mintUnavailable(mint: String, error: String)
     case networkError(String)
     case temporaryMintError(String)
-    
+
     // Other
     case unknownError(String)
-    
+
     /// Whether this error is worth retrying
     public var isRetryable: Bool {
         switch self {
@@ -83,7 +83,7 @@ public enum NutzapRedemptionError: Error, Sendable, Codable, Equatable {
             return false
         }
     }
-    
+
     /// User-friendly error message
     public var userFriendlyMessage: String {
         switch self {
@@ -109,7 +109,7 @@ public enum NutzapRedemptionError: Error, Sendable, Codable, Equatable {
             return "Unknown error: \(message)"
         }
     }
-    
+
     private enum CodingKeys: String, CodingKey {
         case type
         case reason
@@ -121,11 +121,11 @@ public enum NutzapRedemptionError: Error, Sendable, Codable, Equatable {
         case expected
         case actual
     }
-    
+
     public init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         let type = try container.decode(String.self, forKey: .type)
-        
+
         switch type {
         case "invalidProofs":
             let reason = try container.decode(String.self, forKey: .reason)
@@ -162,10 +162,10 @@ public enum NutzapRedemptionError: Error, Sendable, Codable, Equatable {
             throw DecodingError.dataCorruptedError(forKey: .type, in: container, debugDescription: "Unknown error type")
         }
     }
-    
+
     public func encode(to encoder: Encoder) throws {
         var container = encoder.container(keyedBy: CodingKeys.self)
-        
+
         switch self {
         case .invalidProofs(let reason):
             try container.encode("invalidProofs", forKey: .type)
@@ -208,7 +208,7 @@ public struct NutzapRedemptionResult: Sendable {
     public let proofsRedeemed: [CashuSwift.Proof]?
     public let error: NutzapRedemptionError?
     public let amount: Int64
-    
+
     public init(success: Bool, proofsRedeemed: [CashuSwift.Proof]?, error: NutzapRedemptionError?, amount: Int64) {
         self.success = success
         self.proofsRedeemed = proofsRedeemed

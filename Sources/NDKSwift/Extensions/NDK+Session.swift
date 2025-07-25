@@ -12,60 +12,60 @@ extension NDK {
         config: NDKSessionConfiguration = NDKSessionConfiguration()
     ) async throws -> NDKSessionData {
         NDKLogger.log(.info, category: .subscription, "🚀 [startSession] Starting session with strategy: \(config.preloadStrategy)")
-        
+
         // Set the signer
         self.signer = signer
-        
+
         // Get public key
         let pubkey = try await signer.pubkey
         NDKLogger.log(.info, category: .subscription, "🔑 [startSession] Got pubkey: \(pubkey.prefix(8))...")
-        
+
         // Create session data
         let sessionData = NDKSessionData(pubkey: pubkey, ndk: self)
-        
+
         // Store session data on NDK instance
         self.sessionData = sessionData
         NDKLogger.log(.info, category: .subscription, "💾 [startSession] Stored session data on NDK instance")
-        
+
         // Load required data based on strategy
         switch config.preloadStrategy {
         case .blocking:
             // Wait for all data before returning
             NDKLogger.log(.info, category: .subscription, "⏳ [startSession] Loading data with blocking strategy")
             await sessionData.load(config.dataRequirements)
-            
+
         case .progressive:
             // Load from cache immediately, then update from network in background
             NDKLogger.log(.info, category: .subscription, "⏳ [startSession] Loading data with progressive strategy")
             await sessionData.load(config.dataRequirements)
-            
+
         case .lazy:
             // Don't load anything yet
             NDKLogger.log(.info, category: .subscription, "💤 [startSession] Lazy strategy - not loading data yet")
             break
         }
-        
+
         NDKLogger.log(.info, category: .subscription, "✅ [startSession] Session ready - follows: \(sessionData.followList.count)")
         NDKLogger.log(.info, category: .subscription, "🏁 [startSession] Returning sessionData to caller")
-        
+
         return sessionData
     }
-    
+
     /// Observe events with a reactive filter
     /// - Parameter reactiveFilter: Filter that updates with dependencies
     /// - Returns: AsyncStream of events
     public func observe(_ reactiveFilter: ReactiveFilter) -> AsyncStream<NDKEvent> {
         NDKLogger.log(.debug, category: .subscription, "🔍 [ReactiveFilter] Starting observe with dependencies: \(reactiveFilter.dependencies)")
-        
+
         var continuation: AsyncStream<NDKEvent>.Continuation!
         let stream = AsyncStream<NDKEvent> { cont in
             continuation = cont
         }
-        
+
         // Generate unique ID for tracking
         let subscriptionId = UUID().uuidString
         NDKLogger.log(.debug, category: .subscription, "🔍 [ReactiveFilter] Created subscription ID: \(subscriptionId)")
-        
+
         Task {
             await withTaskCancellationHandler {
                 // Use stored session data if available
@@ -74,24 +74,24 @@ extension NDK {
                     continuation.finish()
                     return
                 }
-                
+
                 NDKLogger.log(.debug, category: .subscription, "🔍 [ReactiveFilter] Using session data for pubkey: \(sessionData.pubkey.prefix(8))...")
                 NDKLogger.log(.info, category: .subscription, "🔍 [ReactiveFilter] Session data state - follows: \(sessionData.followList.count), mutes: \(sessionData.muteList.count), followListState: \(sessionData.followListState)")
-                
+
                 // Ensure required dependencies are loaded
                 var requiredData = reactiveFilter.dependencies
                 requiredData.insert(.muteList)  // Always load mute list for filtering
-                
+
                 NDKLogger.log(.debug, category: .subscription, "🔍 [ReactiveFilter] Ensuring dependencies are loaded: \(requiredData)")
                 await sessionData.load(requiredData)
-                
+
                 // Log the state after loading
                 NDKLogger.log(.info, category: .subscription, "🔍 [ReactiveFilter] After load - follows: \(sessionData.followList.count), followListState: \(sessionData.followListState)")
-                
+
                 // Build initial filter
                 let filter = reactiveFilter.builder(sessionData)
                 NDKLogger.log(.info, category: .subscription, "🔍 [ReactiveFilter] Built filter with \(filter.authors?.count ?? 0) authors, kinds: \(filter.kinds ?? [])")
-                
+
                 // Create data source with meaningful subscription ID
                 NDKLogger.log(.info, category: .subscription, "🔍 [ReactiveFilter] Creating NDKDataSource...")
                 // Create a description based on dependencies
@@ -113,7 +113,7 @@ extension NDK {
                 NDKLogger.log(.info, category: .subscription, "🔍 [ReactiveFilter] Creating NDKDataSource with subscriptionId: \(subscriptionId), filter: \(filter)")
                 let dataSource = NDKDataSource<NDKEvent>(ndk: self, filter: filter, subscriptionId: subscriptionId)
                 NDKLogger.log(.info, category: .subscription, "✅ [ReactiveFilter] NDKDataSource created successfully")
-                
+
                 // Register with swap manager
                 NDKLogger.log(.debug, category: .subscription, "🔍 [ReactiveFilter] Registering with SubscriptionSwapManager...")
                 await SubscriptionSwapManager.shared.register(
@@ -123,22 +123,22 @@ extension NDK {
                     sessionData: sessionData
                 )
                 NDKLogger.log(.info, category: .subscription, "✅ [ReactiveFilter] Registered with SubscriptionSwapManager")
-                
+
                 NDKLogger.log(.debug, category: .subscription, "🔍 [ReactiveFilter] Starting to iterate over dataSource.events...")
                 var eventCount = 0
-                
+
                 // Stream events with mute and optional WOT filtering
                 NDKLogger.log(.info, category: .subscription, "🔍 [ReactiveFilter] Starting to iterate dataSource.events...")
                 for await event in dataSource.events {
                     eventCount += 1
                     NDKLogger.log(.info, category: .subscription, "🔍 [ReactiveFilter] Received event #\(eventCount) from \(event.pubkey.prefix(8))...")
-                    
+
                     // Skip muted pubkeys
                     if sessionData.isMuted(event.pubkey) {
                         NDKLogger.log(.debug, category: .subscription, "🔍 [ReactiveFilter] Skipping muted pubkey: \(event.pubkey.prefix(8))...")
                         continue
                     }
-                    
+
                     // Apply WOT filter if configured
                     if let wotConfig = reactiveFilter.wotConfig {
                         guard sessionData.passesWOTFilter(
@@ -149,12 +149,12 @@ extension NDK {
                             continue
                         }
                     }
-                    
+
                     NDKLogger.log(.info, category: .subscription, "🔍 [ReactiveFilter] Yielding event to stream")
                     continuation.yield(event)
                 }
                 NDKLogger.log(.info, category: .subscription, "🔍 [ReactiveFilter] Finished iterating dataSource.events")
-                
+
                 NDKLogger.log(.debug, category: .subscription, "🔍 [ReactiveFilter] Event stream finished")
                 continuation.finish()
             } onCancel: {
@@ -164,7 +164,7 @@ extension NDK {
                 }
             }
         }
-        
+
         return stream
     }
 }

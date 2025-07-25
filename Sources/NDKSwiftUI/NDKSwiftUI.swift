@@ -4,10 +4,10 @@ import NDKSwift
 // MARK: - NDKSwiftUI Main Export
 
 /// NDKSwiftUI provides SwiftUI components and data sources for building Nostr applications.
-/// 
+///
 /// This module follows these core principles:
 /// - **Composable, not prescriptive**: Provides building blocks, not complete screens
-/// - **Data-driven**: Components react to NDK's data streams  
+/// - **Data-driven**: Components react to NDK's data streams
 /// - **Customizable**: Easy to style and extend
 /// - **Progressive disclosure**: Simple defaults, advanced customization available
 /// - **Streaming data**: No blocking UI, best-effort rendering as data arrives
@@ -21,12 +21,12 @@ import NDKSwift
 /// struct ContentView: View {
 ///     let ndk: NDK
 ///     let pubkey: String
-///     
+///
 ///     var body: some View {
 ///         VStack {
 ///             NDKProfilePicture(pubkey: pubkey)
 ///             NDKDisplayName(pubkey: pubkey)
-///             
+///
 ///             HStack {
 ///                 NDKReactionButton.like(event: event)
 ///                 NDKZapButton(event: event)

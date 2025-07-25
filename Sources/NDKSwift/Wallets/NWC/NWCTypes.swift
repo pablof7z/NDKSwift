@@ -31,7 +31,7 @@ public protocol NWCRequest: Codable {
 public struct NWCRequestEnvelope<T: Encodable>: Encodable {
     public let method: String
     public let params: T
-    
+
     public init(method: String, params: T) {
         self.method = method
         self.params = params
@@ -42,7 +42,7 @@ public struct NWCResponse<T: Decodable>: Decodable {
     public let resultType: String
     public let error: NWCResponseError?
     public let result: T?
-    
+
     enum CodingKeys: String, CodingKey {
         case resultType = "result_type"
         case error
@@ -60,7 +60,7 @@ public struct NWCResponseError: Codable {
 public struct PayInvoiceRequest: Codable {
     public let invoice: String
     public let amount: Int64?
-    
+
     public init(invoice: String, amount: Int64? = nil) {
         self.invoice = invoice
         self.amount = amount
@@ -70,7 +70,7 @@ public struct PayInvoiceRequest: Codable {
 public struct PayInvoiceResponse: Codable {
     public let preimage: String
     public let feesPaid: Int64?
-    
+
     enum CodingKeys: String, CodingKey {
         case preimage
         case feesPaid = "fees_paid"
@@ -81,19 +81,19 @@ public struct PayInvoiceResponse: Codable {
 
 public struct MultiPayInvoiceRequest: Codable {
     public let invoices: [PayableInvoice]
-    
+
     public struct PayableInvoice: Codable {
         public let id: String?
         public let invoice: String
         public let amount: Int64?
-        
+
         public init(id: String? = nil, invoice: String, amount: Int64? = nil) {
             self.id = id
             self.invoice = invoice
             self.amount = amount
         }
     }
-    
+
     public init(invoices: [PayableInvoice]) {
         self.invoices = invoices
     }
@@ -106,24 +106,24 @@ public struct PayKeysendRequest: Codable {
     public let pubkey: String
     public let preimage: String?
     public let tlvRecords: [TLVRecord]?
-    
+
     public struct TLVRecord: Codable {
         public let type: Int
         public let value: String
-        
+
         public init(type: Int, value: String) {
             self.type = type
             self.value = value
         }
     }
-    
+
     enum CodingKeys: String, CodingKey {
         case amount
         case pubkey
         case preimage
         case tlvRecords = "tlv_records"
     }
-    
+
     public init(amount: Int64, pubkey: String, preimage: String? = nil, tlvRecords: [TLVRecord]? = nil) {
         self.amount = amount
         self.pubkey = pubkey
@@ -135,7 +135,7 @@ public struct PayKeysendRequest: Codable {
 public struct PayKeysendResponse: Codable {
     public let preimage: String
     public let feesPaid: Int64?
-    
+
     enum CodingKeys: String, CodingKey {
         case preimage
         case feesPaid = "fees_paid"
@@ -146,14 +146,14 @@ public struct PayKeysendResponse: Codable {
 
 public struct MultiPayKeysendRequest: Codable {
     public let keysends: [PayableKeysend]
-    
+
     public struct PayableKeysend: Codable {
         public let id: String?
         public let pubkey: String
         public let amount: Int64
         public let preimage: String?
         public let tlvRecords: [PayKeysendRequest.TLVRecord]?
-        
+
         enum CodingKeys: String, CodingKey {
             case id
             case pubkey
@@ -161,7 +161,7 @@ public struct MultiPayKeysendRequest: Codable {
             case preimage
             case tlvRecords = "tlv_records"
         }
-        
+
         public init(id: String? = nil, pubkey: String, amount: Int64, preimage: String? = nil, tlvRecords: [PayKeysendRequest.TLVRecord]? = nil) {
             self.id = id
             self.pubkey = pubkey
@@ -170,7 +170,7 @@ public struct MultiPayKeysendRequest: Codable {
             self.tlvRecords = tlvRecords
         }
     }
-    
+
     public init(keysends: [PayableKeysend]) {
         self.keysends = keysends
     }
@@ -183,14 +183,14 @@ public struct MakeInvoiceRequest: Codable {
     public let description: String?
     public let descriptionHash: String?
     public let expiry: Int?
-    
+
     enum CodingKeys: String, CodingKey {
         case amount
         case description
         case descriptionHash = "description_hash"
         case expiry
     }
-    
+
     public init(amount: Int64? = nil, description: String? = nil, descriptionHash: String? = nil, expiry: Int? = nil) {
         self.amount = amount
         self.description = description
@@ -211,7 +211,7 @@ public struct MakeInvoiceResponse: Codable {
     public let createdAt: Int64
     public let expiresAt: Int64?
     public let metadata: [String: AnyCodable]?
-    
+
     enum CodingKeys: String, CodingKey {
         case type
         case invoice
@@ -232,12 +232,12 @@ public struct MakeInvoiceResponse: Codable {
 public struct LookupInvoiceRequest: Codable {
     public let paymentHash: String?
     public let invoice: String?
-    
+
     enum CodingKeys: String, CodingKey {
         case paymentHash = "payment_hash"
         case invoice
     }
-    
+
     public init(paymentHash: String? = nil, invoice: String? = nil) {
         self.paymentHash = paymentHash
         self.invoice = invoice
@@ -253,7 +253,7 @@ public struct ListTransactionsRequest: Codable {
     public let offset: Int?
     public let unpaid: Bool?
     public let type: TransactionType?
-    
+
     public init(from: Int64? = nil, until: Int64? = nil, limit: Int? = nil, offset: Int? = nil, unpaid: Bool? = nil, type: TransactionType? = nil) {
         self.from = from
         self.until = until
@@ -281,7 +281,7 @@ public struct Transaction: Codable {
     public let expiresAt: Int64?
     public let settledAt: Int64?
     public let metadata: [String: AnyCodable]?
-    
+
     enum CodingKeys: String, CodingKey {
         case type
         case invoice
@@ -329,7 +329,7 @@ public struct GetInfoResponse: Codable {
     public let blockHash: String?
     public let methods: [String]
     public let notifications: [String]?
-    
+
     enum CodingKeys: String, CodingKey {
         case alias
         case color
@@ -352,7 +352,7 @@ public enum NWCNotificationType: String {
 public struct NWCNotification<T: Decodable>: Decodable {
     public let notificationType: String
     public let notification: T
-    
+
     enum CodingKeys: String, CodingKey {
         case notificationType = "notification_type"
         case notification
@@ -372,7 +372,7 @@ public struct PaymentNotification: Codable {
     public let expiresAt: Int64?
     public let settledAt: Int64
     public let metadata: [String: AnyCodable]?
-    
+
     enum CodingKeys: String, CodingKey {
         case type
         case invoice
@@ -393,14 +393,14 @@ public struct PaymentNotification: Codable {
 
 public struct AnyCodable: Codable, @unchecked Sendable {
     let value: Any
-    
+
     public init(_ value: Any) {
         self.value = value
     }
-    
+
     public init(from decoder: Decoder) throws {
         let container = try decoder.singleValueContainer()
-        
+
         if let value = try? container.decode(Bool.self) {
             self.value = value
         } else if let value = try? container.decode(Int64.self) {
@@ -419,10 +419,10 @@ public struct AnyCodable: Codable, @unchecked Sendable {
             throw DecodingError.dataCorruptedError(in: container, debugDescription: "Cannot decode value")
         }
     }
-    
+
     public func encode(to encoder: Encoder) throws {
         var container = encoder.singleValueContainer()
-        
+
         switch value {
         case let value as Bool:
             try container.encode(value)

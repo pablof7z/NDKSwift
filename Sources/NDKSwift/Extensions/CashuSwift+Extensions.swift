@@ -20,7 +20,7 @@ public enum CashuHelpers {
             return false
         }
     }
-    
+
     /// Filter proofs that are locked to a specific public key
     /// - Parameters:
     ///   - proofs: Array of proofs to filter

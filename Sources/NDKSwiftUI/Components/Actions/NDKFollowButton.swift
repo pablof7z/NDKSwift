@@ -33,29 +33,29 @@ import UIKit
 ///     .showFollowText(false)
 /// ```
 public struct NDKFollowButton: View {
-    
+
     // MARK: - Properties
-    
+
     private let pubkey: String
     private let style: ButtonStyle
     private let showFollowText: Bool
     private let confirmUnfollow: Bool
     private var onFollowChanged: ((Bool) -> Void)?
-    
+
     @Environment(\.ndk) private var ndk
     @StateObject private var followState: FollowState
     @State private var showUnfollowConfirmation = false
-    
+
     // MARK: - Supporting Types
-    
+
     public enum ButtonStyle {
         case standard       // Full button with text
         case compact        // Icon-based button
         case minimal        // Text-only button
     }
-    
+
     // MARK: - Initialization
-    
+
     /// Initialize a follow button
     /// - Parameters:
     ///   - pubkey: The public key of the user to follow/unfollow
@@ -72,13 +72,13 @@ public struct NDKFollowButton: View {
         self.style = style
         self.showFollowText = showFollowText
         self.confirmUnfollow = confirmUnfollow
-        
+
         // Initialize follow state
         self._followState = StateObject(wrappedValue: FollowState(targetPubkey: pubkey))
     }
-    
+
     // MARK: - Body
-    
+
     public var body: some View {
         Button(action: handleFollowTap) {
             HStack(spacing: buttonSpacing) {
@@ -86,7 +86,7 @@ public struct NDKFollowButton: View {
                 Image(systemName: followState.isFollowing ? "person.fill.checkmark" : "person.badge.plus")
                     .font(iconFont)
                     .foregroundStyle(iconColor)
-                
+
                 // Text (if enabled)
                 if showFollowText {
                     Text(followState.isFollowing ? "Following" : "Follow")
@@ -94,7 +94,7 @@ public struct NDKFollowButton: View {
                         .fontWeight(.medium)
                         .foregroundStyle(textColor)
                 }
-                
+
                 // Loading indicator
                 if followState.isLoading {
                     ProgressView()
@@ -125,29 +125,29 @@ public struct NDKFollowButton: View {
             setupFollowObservation()
         }
     }
-    
+
     // MARK: - Private Methods
-    
+
     private func handleFollowTap() {
         if followState.isFollowing && confirmUnfollow {
             showUnfollowConfirmation = true
         } else {
             executeToggleFollow()
         }
-        
+
         // Haptic feedback
         #if canImport(UIKit)
         let impact = UIImpactFeedbackGenerator(style: .medium)
         impact.impactOccurred()
         #endif
     }
-    
+
     private func executeUnfollow() {
         Task {
             guard let ndk = ndk else { return }
             await followState.unfollowUser(ndk: ndk)
             onFollowChanged?(followState.isFollowing)
-            
+
             // Success haptic
             #if canImport(UIKit)
             let feedback = UINotificationFeedbackGenerator()
@@ -155,13 +155,13 @@ public struct NDKFollowButton: View {
             #endif
         }
     }
-    
+
     private func executeToggleFollow() {
         Task {
             guard let ndk = ndk else { return }
             await followState.toggleFollow(ndk: ndk)
             onFollowChanged?(followState.isFollowing)
-            
+
             // Success haptic
             #if canImport(UIKit)
             let feedback = UINotificationFeedbackGenerator()
@@ -169,17 +169,17 @@ public struct NDKFollowButton: View {
             #endif
         }
     }
-    
+
     private func setupFollowObservation() {
         guard let ndk = ndk else { return }
-        
+
         Task {
             await followState.startObserving(ndk: ndk)
         }
     }
-    
+
     // MARK: - Style Properties
-    
+
     private var buttonSpacing: CGFloat {
         switch style {
         case .standard: return 6
@@ -187,7 +187,7 @@ public struct NDKFollowButton: View {
         case .minimal: return 4
         }
     }
-    
+
     private var iconFont: Font {
         switch style {
         case .standard: return .body
@@ -195,7 +195,7 @@ public struct NDKFollowButton: View {
         case .minimal: return .body
         }
     }
-    
+
     private var textFont: Font {
         switch style {
         case .standard: return .body
@@ -203,7 +203,7 @@ public struct NDKFollowButton: View {
         case .minimal: return .body
         }
     }
-    
+
     private var buttonPadding: EdgeInsets {
         switch style {
         case .standard: return EdgeInsets(top: 8, leading: 12, bottom: 8, trailing: 12)
@@ -211,7 +211,7 @@ public struct NDKFollowButton: View {
         case .minimal: return EdgeInsets(top: 4, leading: 6, bottom: 4, trailing: 6)
         }
     }
-    
+
     private var backgroundColor: Color {
         switch style {
         case .standard:
@@ -222,7 +222,7 @@ public struct NDKFollowButton: View {
             return Color.clear
         }
     }
-    
+
     private var borderOverlay: some View {
         Group {
             if style == .standard || (style == .compact && followState.isFollowing) {
@@ -234,7 +234,7 @@ public struct NDKFollowButton: View {
             }
         }
     }
-    
+
     private var cornerRadius: CGFloat {
         switch style {
         case .standard: return 20
@@ -242,7 +242,7 @@ public struct NDKFollowButton: View {
         case .minimal: return 8
         }
     }
-    
+
     private var iconColor: Color {
         if followState.isFollowing {
             return .secondary
@@ -250,7 +250,7 @@ public struct NDKFollowButton: View {
             return style == .standard ? .white : .accentColor
         }
     }
-    
+
     private var textColor: Color {
         if followState.isFollowing {
             return .primary
@@ -258,9 +258,9 @@ public struct NDKFollowButton: View {
             return style == .standard ? .white : .accentColor
         }
     }
-    
+
     // MARK: - Modifiers
-    
+
     /// Handle follow state changes
     public func onFollowChanged(_ action: @escaping (Bool) -> Void) -> NDKFollowButton {
         var copy = self
@@ -274,60 +274,60 @@ public struct NDKFollowButton: View {
 /// Observable state for managing follow relationships and contact list updates
 @MainActor
 private class FollowState: ObservableObject {
-    
+
     @Published var isFollowing: Bool = false
     @Published var isLoading: Bool = false
     @Published var error: Error?
-    
+
     private let targetPubkey: String
     private var currentContactList: [String] = []
     private var currentContactListEvent: NDKEvent?
     private var observationTask: Task<Void, Never>?
-    
+
     init(targetPubkey: String) {
         self.targetPubkey = targetPubkey
     }
-    
+
     deinit {
         observationTask?.cancel()
     }
-    
+
     func startObserving(ndk: NDK) async {
         // Cancel existing observation
         observationTask?.cancel()
-        
+
         guard let signer = ndk.signer,
               let userPubkey = try? await signer.pubkey else { return }
-        
+
         observationTask = Task { [weak self] in
             await self?.observeContactList(ndk: ndk, userPubkey: userPubkey)
         }
     }
-    
+
     private func observeContactList(ndk: NDK, userPubkey: String) async {
         // Create filter for user's contact list (kind:3)
         let filter = NDKFilter(
             authors: [userPubkey],
             kinds: [3]
         )
-        
+
         let dataSource = ndk.observe(
             filter: filter,
             maxAge: 0, // Real-time
             cachePolicy: .cacheWithNetwork
         )
-        
+
         // Process contact list events
         for await events in dataSource.$data.values {
             await updateFollowState(from: events)
         }
     }
-    
+
     private func updateFollowState(from events: [NDKEvent]) async {
         // Get the most recent contact list event
         let sortedEvents = events.sorted { $0.createdAt > $1.createdAt }
         guard let latestEvent = sortedEvents.first else { return }
-        
+
         // Parse contact list
         var contacts: [String] = []
         for tag in latestEvent.tags {
@@ -335,7 +335,7 @@ private class FollowState: ObservableObject {
                 contacts.append(tag[1])
             }
         }
-        
+
         // Update state
         await MainActor.run {
             self.currentContactList = contacts
@@ -343,7 +343,7 @@ private class FollowState: ObservableObject {
             self.isFollowing = contacts.contains(self.targetPubkey)
         }
     }
-    
+
     func toggleFollow(ndk: NDK) async {
         if isFollowing {
             await unfollowUser(ndk: ndk)
@@ -351,79 +351,79 @@ private class FollowState: ObservableObject {
             await followUser(ndk: ndk)
         }
     }
-    
+
     func followUser(ndk: NDK) async {
         guard let signer = ndk.signer else { return }
-        
+
         isLoading = true
         error = nil
         defer { isLoading = false }
-        
+
         do {
             // Add to contact list
             var newContactList = currentContactList
             if !newContactList.contains(targetPubkey) {
                 newContactList.append(targetPubkey)
             }
-            
+
             // Create new contact list event
             let contactListEvent = try await buildContactListEvent(
                 ndk: ndk,
                 signer: signer,
                 contacts: newContactList
             )
-            
+
             // Publish the updated contact list
             _ = try await ndk.publish(contactListEvent)
-            
+
         } catch {
             self.error = error
             NDKLogger.log(.error, category: .general, "Failed to follow user: \(error)")
         }
     }
-    
+
     func unfollowUser(ndk: NDK) async {
         guard let signer = ndk.signer else { return }
-        
+
         isLoading = true
         error = nil
         defer { isLoading = false }
-        
+
         do {
             // Remove from contact list
             let newContactList = currentContactList.filter { $0 != targetPubkey }
-            
+
             // Create new contact list event
             let contactListEvent = try await buildContactListEvent(
                 ndk: ndk,
                 signer: signer,
                 contacts: newContactList
             )
-            
+
             // Publish the updated contact list
             _ = try await ndk.publish(contactListEvent)
-            
+
         } catch {
             self.error = error
             NDKLogger.log(.error, category: .general, "Failed to unfollow user: \(error)")
         }
     }
-    
+
     private func buildContactListEvent(
         ndk: NDK,
         signer: NDKSigner,
         contacts: [String]
     ) async throws -> NDKEvent {
-        
+
         let eventBuilder = NDKEventBuilder(ndk: ndk)
             .kind(3) // Contact list
             .content(currentContactListEvent?.content ?? "") // Preserve existing content
-        
+
         // Add contact tags
         for contact in contacts {
             eventBuilder.tag(["p", contact])
         }
-        
+
         // Preserve other non-p tags from the current contact list
         if let currentEvent = currentContactListEvent {
             for tag in currentEvent.tags {
@@ -432,7 +432,7 @@ private class FollowState: ObservableObject {
                 }
             }
         }
-        
+
         return try await eventBuilder.build(signer: signer)
     }
 }
@@ -440,12 +440,12 @@ private class FollowState: ObservableObject {
 // MARK: - Convenience Extensions
 
 public extension NDKFollowButton {
-    
+
     /// Create a compact follow button (icon only)
     static func compact(pubkey: String) -> NDKFollowButton {
         NDKFollowButton(pubkey: pubkey, style: .compact, showFollowText: false)
     }
-    
+
     /// Create a minimal follow button (text only)
     static func minimal(pubkey: String) -> NDKFollowButton {
         NDKFollowButton(pubkey: pubkey, style: .minimal)
@@ -462,30 +462,30 @@ struct NDKFollowButton_Previews: PreviewProvider {
             VStack(alignment: .leading, spacing: 12) {
                 Text("Standard Styles")
                     .font(.headline)
-                
+
                 HStack(spacing: 16) {
                     NDKFollowButton(pubkey: "mock_pubkey", style: .standard)
                     NDKFollowButton(pubkey: "mock_pubkey", style: .compact)
                     NDKFollowButton(pubkey: "mock_pubkey", style: .minimal)
                 }
             }
-            
+
             // Compact variations
             VStack(alignment: .leading, spacing: 12) {
                 Text("Compact Variations")
                     .font(.headline)
-                
+
                 HStack(spacing: 16) {
                     NDKFollowButton.compact(pubkey: "mock_pubkey")
                     NDKFollowButton(pubkey: "mock_pubkey", style: .compact, showFollowText: true)
                 }
             }
-            
+
             // Different states (would need state management for proper preview)
             VStack(alignment: .leading, spacing: 12) {
                 Text("Different States")
                     .font(.headline)
-                
+
                 HStack(spacing: 16) {
                     NDKFollowButton(pubkey: "mock_pubkey") // Not following
                     // NDKFollowButton(pubkey: "mock_pubkey") // Following (would need state)

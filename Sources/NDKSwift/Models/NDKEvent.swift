@@ -2,12 +2,12 @@ import CryptoSwift
 import Foundation
 
 /// Represents a Nostr event
-/// 
+///
 /// This is an immutable struct that represents a signed Nostr event. Once created,
 /// all properties are read-only and access is synchronous.
-/// 
+///
 /// Use `NDKEventBuilder` to create and sign new events.
-/// 
+///
 /// **Value Semantics**: This struct uses value semantics for equality comparisons.
 /// Two events with the same Nostr ID will be considered equal.
 public struct NDKEvent: Codable, Equatable, Hashable, Sendable {
@@ -31,7 +31,7 @@ public struct NDKEvent: Codable, Equatable, Hashable, Sendable {
 
     /// Event signature
     public let sig: Signature
-    
+
 
     // MARK: - Initialization
 
@@ -61,21 +61,21 @@ public struct NDKEvent: Codable, Equatable, Hashable, Sendable {
 
     public init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
-        
+
         guard let id = try container.decodeIfPresent(String.self, forKey: .id) else {
             throw NDKError.invalidEventID("Event ID is required")
         }
-        
+
         let pubkey = try container.decode(String.self, forKey: .pubkey)
         let createdAt = try container.decode(Timestamp.self, forKey: .createdAt)
         let kind = try container.decode(Kind.self, forKey: .kind)
         let tags = try container.decode([[String]].self, forKey: .tags)
         let content = try container.decode(String.self, forKey: .content)
-        
+
         guard let sig = try container.decodeIfPresent(String.self, forKey: .sig) else {
             throw NDKError.invalidSignature("Event signature is required")
         }
-        
+
         self.init(
             id: id,
             pubkey: pubkey,
@@ -86,7 +86,7 @@ public struct NDKEvent: Codable, Equatable, Hashable, Sendable {
             sig: sig
         )
     }
-    
+
     public func encode(to encoder: Encoder) throws {
         var container = encoder.container(keyedBy: CodingKeys.self)
         try container.encode(id, forKey: .id)
@@ -99,7 +99,7 @@ public struct NDKEvent: Codable, Equatable, Hashable, Sendable {
     }
 
     // MARK: - Equatable & Hashable
-    
+
     /// Compares events by their Nostr ID
     public static func == (lhs: NDKEvent, rhs: NDKEvent) -> Bool {
         return lhs.id == rhs.id
@@ -192,29 +192,29 @@ public struct NDKEvent: Codable, Equatable, Hashable, Sendable {
         let foundTag = tag(withName: name)
         return foundTag?.count ?? 0 > 1 ? foundTag?[1] : nil
     }
-    
+
     /// Get the client tag information if present (NIP-89)
-    /// 
+    ///
     /// - Returns: A tuple containing (name, address, relay) or nil if no client tag exists
     public var clientTag: (name: String, address: String?, relay: String?)? {
         guard let tag = tag(withName: "client"), tag.count >= 2 else { return nil }
-        
+
         let name = tag[1]
         let address = tag.count >= 3 && !tag[2].isEmpty ? tag[2] : nil
         let relay = tag.count >= 4 && !tag[3].isEmpty ? tag[3] : nil
-        
+
         return (name: name, address: address, relay: relay)
     }
 
     // MARK: - Signing
-    
+
     /// Verify the signature of this event
     /// - Returns: true if the signature is valid, false otherwise
     public func verifySignature() -> Bool {
         do {
             let calculatedID = try calculateID()
             guard calculatedID == id else { return false }
-            
+
             // Use crypto utilities to verify signature
             let messageData = Data(hexString: id) ?? Data()
             return try Crypto.verify(signature: sig, message: messageData, pubkey: pubkey)
@@ -222,7 +222,7 @@ public struct NDKEvent: Codable, Equatable, Hashable, Sendable {
             return false
         }
     }
-    
+
 
     // MARK: - Convenience
 
@@ -264,7 +264,7 @@ public struct NDKEvent: Codable, Equatable, Hashable, Sendable {
     public var isParameterizedReplaceable: Bool {
         return kind >= 30000 && kind < 40000
     }
-    
+
     /// Check if this event is protected (NIP-70)
     /// - Returns: true if the event contains a '-' tag indicating it's protected
     /// - Note: Protected events should not be deleted by relays even when requested
@@ -285,7 +285,7 @@ public struct NDKEvent: Codable, Equatable, Hashable, Sendable {
             return id
         }
     }
-    
+
     /// Get the appropriate tag reference for this event
     /// Returns a tag array suitable for referencing this event in other events
     public func tagReference() -> Tag {
@@ -328,7 +328,7 @@ public struct NDKEvent: Codable, Equatable, Hashable, Sendable {
     }
 
     // MARK: - Event Reactions
-    
+
     /// Get mentions from this event
     public var mentions: [PublicKey] {
         return referencedPubkeys
@@ -380,5 +380,5 @@ public struct NDKEvent: Codable, Equatable, Hashable, Sendable {
         // Use nevent if the event has non-standard kind or has important tags
         return kind != EventKind.textNote || !referencedEventIds.isEmpty || !referencedPubkeys.isEmpty
     }
-    
+
 }

@@ -8,7 +8,7 @@ public enum LNURLError: LocalizedError {
     case decodingError(String)
     case unsupportedProtocol
     case noProviderPubkey
-    
+
     public var errorDescription: String? {
         switch self {
         case .invalidFormat(let detail):
@@ -31,25 +31,25 @@ public enum LNURLError: LocalizedError {
 public struct LNURLPayResponse: Codable {
     /// URL to make the payment request to
     public let callback: String
-    
+
     /// Maximum sendable amount in millisatoshis
     public let maxSendable: Int64
-    
+
     /// Minimum sendable amount in millisatoshis
     public let minSendable: Int64
-    
+
     /// Metadata about the payment
     public let metadata: String
-    
+
     /// Comment allowed length (optional)
     public let commentAllowed: Int?
-    
+
     /// Tag indicating this is a payRequest
     public let tag: String
-    
+
     /// Whether this service allows Nostr integration
     public let allowsNostr: Bool?
-    
+
     /// Nostr pubkey of the provider (optional)
     public let nostrPubkey: String?
 }
@@ -64,10 +64,10 @@ public struct LNURLMetadataEntry {
 public struct LNURLResolutionResult {
     /// The provider's Nostr pubkey if available
     public let providerPubkey: String?
-    
+
     /// The full LNURL pay response
     public let payResponse: LNURLPayResponse
-    
+
     /// Parsed metadata entries
     public let metadata: [LNURLMetadataEntry]
 }

@@ -29,31 +29,31 @@ import Combine
 /// ```
 @MainActor
 public final class NDKContactsDataSource: ObservableObject {
-    
+
     // MARK: - Published Properties
-    
+
     /// Array of contact public keys
     @Published public private(set) var contactPubkeys: Set<String> = []
-    
+
     /// Profile metadata for contacts
     @Published public private(set) var contactProfiles: [String: NDKUserProfile] = [:]
-    
+
     /// Whether the data source is currently loading
     @Published public private(set) var isLoading = false
-    
+
     /// Any error that occurred during loading
     @Published public private(set) var error: Error?
-    
+
     // MARK: - Private Properties
-    
+
     private let ndk: NDK
     private let userPubkey: String
     private let contactListDataSource: NDKDataSource<NDKEvent>
     private var profilesDataSource: NDKDataSource<NDKEvent>?
     private var cancellables = Set<AnyCancellable>()
-    
+
     // MARK: - Initialization
-    
+
     /// Initialize a contacts data source for a specific user
     /// - Parameters:
     ///   - ndk: The NDK instance to use for data fetching
@@ -62,7 +62,7 @@ public final class NDKContactsDataSource: ObservableObject {
     public init(ndk: NDK, userPubkey: String, maxAge: TimeInterval = TimeConstants.hour) {
         self.ndk = ndk
         self.userPubkey = userPubkey
-        
+
         // Create data source for contact list events (kind:3)
         self.contactListDataSource = ndk.observe(
             filter: NDKFilter(
@@ -72,13 +72,13 @@ public final class NDKContactsDataSource: ObservableObject {
             maxAge: maxAge,
             cachePolicy: .cacheWithNetwork
         )
-        
+
         // Start observing contact list
         observeContactList()
     }
-    
+
     // MARK: - Private Methods
-    
+
     private func observeContactList() {
         // Parse contact list from events
         contactListDataSource.$data
@@ -95,34 +95,34 @@ public final class NDKContactsDataSource: ObservableObject {
                 self?.loadContactProfiles(for: pubkeys)
             }
             .store(in: &cancellables)
-        
+
         // Map loading state
         contactListDataSource.$isLoading
             .receive(on: DispatchQueue.main)
             .assign(to: &$isLoading)
-        
-        // Map error state  
+
+        // Map error state
         contactListDataSource.$error
             .receive(on: DispatchQueue.main)
             .assign(to: &$error)
     }
-    
+
     private func parseContactPubkeys(from event: NDKEvent) -> Set<String> {
         var pubkeys = Set<String>()
-        
+
         for tag in event.tags {
             // Look for 'p' tags containing public keys
             if tag.count >= 2 && tag[0] == "p" {
                 pubkeys.insert(tag[1])
             }
         }
-        
+
         return pubkeys
     }
-    
+
     private func loadContactProfiles(for pubkeys: Set<String>) {
         guard !pubkeys.isEmpty else { return }
-        
+
         // Create data source for contact profiles (kind:0)
         profilesDataSource = ndk.observe(
             filter: NDKFilter(
@@ -132,7 +132,7 @@ public final class NDKContactsDataSource: ObservableObject {
             maxAge: TimeConstants.hour, // Cache profiles for 1 hour
             cachePolicy: .cacheWithNetwork
         )
-        
+
         // Parse profiles from events
         profilesDataSource?.$data
             .map { [weak self] events in
@@ -141,42 +141,42 @@ public final class NDKContactsDataSource: ObservableObject {
             .receive(on: DispatchQueue.main)
             .assign(to: &$contactProfiles)
     }
-    
+
     private func parseContactProfiles(from events: [NDKEvent]) -> [String: NDKUserProfile] {
         var profiles: [String: NDKUserProfile] = [:]
-        
+
         // Group events by author and get the most recent profile for each
         let eventsByAuthor = Dictionary(grouping: events) { $0.pubkey }
-        
+
         for (pubkey, authorEvents) in eventsByAuthor {
             if let latestEvent = authorEvents.sorted(by: { $0.createdAt > $1.createdAt }).first,
                let profile = JSONCoding.safeDecode(NDKUserProfile.self, from: latestEvent.content.data(using: .utf8) ?? Data()) {
                 profiles[pubkey] = profile
             }
         }
-        
+
         return profiles
     }
-    
+
     // MARK: - Public Methods
-    
+
     /// Get a profile for a specific contact
     public func profile(for pubkey: String) -> NDKUserProfile? {
         contactProfiles[pubkey]
     }
-    
+
     /// Check if a user is in the contact list
     public func isFollowing(_ pubkey: String) -> Bool {
         contactPubkeys.contains(pubkey)
     }
-    
+
     /// Get all contacts with their profiles
     public var contacts: [(pubkey: String, profile: NDKUserProfile?)] {
         contactPubkeys.map { pubkey in
             (pubkey: pubkey, profile: contactProfiles[pubkey])
         }
     }
-    
+
     /// Get the number of contacts
     public var contactCount: Int {
         contactPubkeys.count

@@ -4,7 +4,7 @@ import CashuSwift
 // MARK: - Helper Extensions for NDKCashuSpendingHistory
 
 extension NDKCashuSpendingHistory {
-    
+
     /// Extract decrypted spending history data
     public func decryptedHistoryData(signer: NDKSigner) async throws -> HistoryData {
         // Decrypt the content
@@ -14,13 +14,13 @@ extension NDKCashuSpendingHistory {
             value: event.content,
             scheme: .nip44
         )
-        
+
         // Parse tags from decrypted content
         guard let tagsData = decryptedContent.data(using: .utf8),
               let tags = try? JSONCoding.decode([[String]].self, from: tagsData) else {
             throw NDKError.invalidContent("Failed to parse history event tags")
         }
-        
+
         var direction: SpendingDirection?
         var amount: Int64?
         var memo: String?
@@ -28,7 +28,7 @@ extension NDKCashuSpendingHistory {
         var token: String?
         var createdEventIds: [String] = []
         var destroyedEventIds: [String] = []
-        
+
         // Extract data from encrypted tags
         for tag in tags {
             guard tag.count >= 2 else { continue }
@@ -62,11 +62,11 @@ extension NDKCashuSpendingHistory {
                 break
             }
         }
-        
+
         // Extract data from clear tags
         var redeemedEventId: String?
         var nutzapSender: String?
-        
+
         for tag in event.tags {
             if tag.count >= 4 && tag[0] == "e" && tag[3] == "redeemed" {
                 redeemedEventId = tag[1]
@@ -75,7 +75,7 @@ extension NDKCashuSpendingHistory {
                 }
             }
         }
-        
+
         return HistoryData(
             direction: direction,
             amount: amount ?? 0,
@@ -88,7 +88,7 @@ extension NDKCashuSpendingHistory {
             nutzapSender: nutzapSender
         )
     }
-    
+
     /// Structure containing decrypted history data
     public struct HistoryData {
         public let direction: SpendingDirection?
@@ -100,17 +100,17 @@ extension NDKCashuSpendingHistory {
         public let destroyedEventIds: [String]
         public let redeemedEventId: String?
         public let nutzapSender: String?
-        
+
         /// Determine transaction type based on the history data
         public var transactionType: TransactionType {
             // Nutzap is identified by redeemed event
             if redeemedEventId != nil {
                 return .nutzap
             }
-            
+
             // Otherwise determine by direction
             guard let dir = direction else { return .unknown }
-            
+
             switch dir {
             case .in:
                 // Check if it's a mint (from Lightning) or receive (from ecash)
@@ -128,13 +128,13 @@ extension NDKCashuSpendingHistory {
                 return .send
             }
         }
-        
+
         /// Get a default memo if none is provided
         public var defaultMemo: String {
             if let memo = memo, !memo.isEmpty {
                 return memo
             }
-            
+
             switch transactionType {
             case .mint:
                 return StringConstants.Transactions.lightningDeposit
@@ -154,7 +154,7 @@ extension NDKCashuSpendingHistory {
             }
         }
     }
-    
+
     public enum TransactionType {
         case mint    // Lightning -> ecash
         case melt    // ecash -> Lightning

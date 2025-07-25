@@ -3,9 +3,9 @@ import CashuSwift
 
 /// Functions for handling cross-mint transfers and payment routing
 public enum CrossMintTransfer {
-    
+
     // MARK: - Mint Finding
-    
+
     /// Find a mint that has sufficient balance and is in the intersection of accepted mints
     public static func findMintWithSufficientBalance(
         acceptedMints: Set<String>,
@@ -17,14 +17,14 @@ public enum CrossMintTransfer {
         // Get mints that actually have proofs
         let proofsByMint = await proofStateManager.getAvailableProofsByMint()
         let ourMints = Set(proofsByMint.keys)
-        
+
         // Find intersection and exclude blacklisted mints
         let commonMints = ourMints.intersection(acceptedMints).subtracting(blacklistedMints)
         NDKLogger.log(.debug, category: .general, "CrossMintTransfer.findMintWithSufficientBalance - ourMints: \(ourMints)")
         NDKLogger.log(.debug, category: .general, "CrossMintTransfer.findMintWithSufficientBalance - acceptedMints: \(acceptedMints)")
         NDKLogger.log(.debug, category: .general, "CrossMintTransfer.findMintWithSufficientBalance - blacklistedMints: \(blacklistedMints)")
         NDKLogger.log(.debug, category: .general, "CrossMintTransfer.findMintWithSufficientBalance - commonMints: \(commonMints)")
-        
+
         // Get mints with sufficient balance, then find first one in accepted mints
         let mintsWithBalance = await proofStateManager.getMintsWithSufficientBalance(amount: requiredAmount)
         NDKLogger.log(.debug, category: .general, "CrossMintTransfer.findMintWithSufficientBalance - mintsWithBalance: \(mintsWithBalance)")
@@ -32,7 +32,7 @@ public enum CrossMintTransfer {
         NDKLogger.log(.debug, category: .general, "CrossMintTransfer.findMintWithSufficientBalance - result: \(String(describing: result))")
         return result
     }
-    
+
     /// Find all mints that have sufficient balance and are in the intersection of accepted mints
     public static func findAllMintsWithSufficientBalance(
         acceptedMints: Set<String>,
@@ -44,17 +44,17 @@ public enum CrossMintTransfer {
         // Get mints that actually have proofs
         let proofsByMint = await proofStateManager.getAvailableProofsByMint()
         let ourMints = Set(proofsByMint.keys)
-        
+
         // Find intersection and exclude blacklisted mints
         let commonMints = ourMints.intersection(acceptedMints).subtracting(blacklistedMints)
-        
+
         // Get all mints with sufficient balance, then filter by accepted mints
         let mintsWithBalance = await proofStateManager.getMintsWithSufficientBalance(amount: requiredAmount)
         let sortedMints = mintsWithBalance.filter { commonMints.contains($0) }
-        
+
         return sortedMints
     }
-    
+
     /// Find the best source mint for a cross-mint transfer
     public static func findSourceMintForTransfer(
         amount: Int64,
@@ -65,17 +65,17 @@ public enum CrossMintTransfer {
         blacklistedMints: Set<String> = []
     ) async -> String? {
         let requiredAmount = amount + feeBuffer
-        
+
         // Get mints that actually have proofs, not just configured mints
         let proofsByMint = await proofStateManager.getAvailableProofsByMint()
-        
+
         // Find mint with highest balance that can cover the transfer
         var bestMint: (url: String, balance: Int64)? = nil
-        
+
         for (mintURL, proofs) in proofsByMint {
             // Skip the target mint (no self-transfer) and blacklisted mints
             if mintURL == targetMint || blacklistedMints.contains(mintURL) { continue }
-            
+
             let balance = proofs.reduce(0) { $0 + Int64($1.amount) }
             if balance >= requiredAmount {
                 if bestMint == nil || balance > bestMint!.balance {
@@ -83,12 +83,12 @@ public enum CrossMintTransfer {
                 }
             }
         }
-        
+
         return bestMint?.url
     }
-    
+
     // MARK: - Smart Payment Routing
-    
+
     /// Find the best payment route (direct or cross-mint transfer)
     public static func findBestPaymentRoute(
         amount: Int64,
@@ -110,7 +110,7 @@ public enum CrossMintTransfer {
         ) {
             return .direct(mint: directMint)
         }
-        
+
         // No direct payment possible, try cross-mint transfer routes for all accepted mints
         for targetMint in acceptedMints where !blacklistedMints.contains(targetMint) {
             // Find source mint with sufficient balance for transfer + fees
@@ -149,7 +149,7 @@ public enum CrossMintTransfer {
                 }
             }
         }
-        
+
         // If no routes work, check why
         let totalBalance = await getTotalBalance(
             mints: mints,
@@ -162,9 +162,9 @@ public enum CrossMintTransfer {
             return .impossible(reason: "Insufficient balance in any single mint for transfer with fees")
         }
     }
-    
+
     // MARK: - Transfer Operations
-    
+
     /// Transfer funds between mints using Lightning as a bridge
     public static func transferBetweenMints(
         amount: Int64,
@@ -184,7 +184,7 @@ public enum CrossMintTransfer {
         guard allMints[destinationMintURL.absoluteString] != nil else {
             throw NDKError.invalidRequest("Destination mint not found in wallet")
         }
-        
+
         // Execute transfer through Payment static functions
         let result = try await Payment.transferBetweenMints(
             wallet: wallet,
@@ -196,7 +196,7 @@ public enum CrossMintTransfer {
             eventManager: eventManager,
             signer: signer
         )
-        
+
         return TransferResult(
             amountTransferred: amount,
             feePaid: result.feePaid,
@@ -205,7 +205,7 @@ public enum CrossMintTransfer {
             destinationMint: destinationMintURL
         )
     }
-    
+
     /// Estimate fees for a cross-mint transfer
     public static func estimateTransferFees(
         amount: Int64,
@@ -219,13 +219,13 @@ public enum CrossMintTransfer {
         guard let sourceMint = allMints[sourceMintURL.absoluteString] else {
             throw NDKError.invalidRequest("Source mint not found in wallet")
         }
-        
+
         // Request a mint quote to get the Lightning invoice
         let quoteResponse = try await mints.requestMintQuote(
             amount: amount,
             mintURL: destinationMintURL.absoluteString
         )
-        
+
         let mintQuote = CashuMintQuote(
             quoteId: quoteResponse.quote,
             mintURL: destinationMintURL.absoluteString,
@@ -234,37 +234,37 @@ public enum CrossMintTransfer {
             expiry: Date(),
             requestedAt: Date()
         )
-        
+
         // Create melt quote request to estimate fees
         let quoteRequest = CashuSwift.Bolt11.RequestMeltQuote(
             unit: "sat",
             request: mintQuote.invoice,
             options: nil
         )
-        
+
         // Get melt quote from source mint
         let meltResponse = try await CashuSwift.getQuote(
             mint: sourceMint,
             quoteRequest: quoteRequest
         )
-        
+
         guard let meltQuote = meltResponse as? CashuSwift.Bolt11.MeltQuote else {
             throw NDKError.walletError(message: "Unexpected melt quote response type")
         }
-        
+
         // Get available proofs for fee calculation
         let availableProofs = await proofStateManager.getAvailableProofs(mint: sourceMintURL.absoluteString)
-        
+
         // Calculate fees
         let lightningFee = Int64(meltQuote.feeReserve)
         let inputFee = try CashuSwift.calculateFee(for: availableProofs, of: sourceMint)
         let totalFee = lightningFee + Int64(inputFee)
-        
+
         return (lightningFee: lightningFee, inputFee: Int64(inputFee), totalFee: totalFee)
     }
-    
+
     // MARK: - Helper Functions
-    
+
     /// Get total balance across all mints that actually have proofs
     private static func getTotalBalance(
         mints: MintManager,
@@ -274,14 +274,14 @@ public enum CrossMintTransfer {
         let proofsByMint = await proofStateManager.getAvailableProofsByMint()
         let mintsWithProofs = Array(proofsByMint.keys)
         NDKLogger.log(.debug, category: .general, "CrossMintTransfer.getTotalBalance - checking balance for \(mintsWithProofs.count) mints with proofs: \(mintsWithProofs)")
-        
+
         var total: Int64 = 0
         for (mint, proofs) in proofsByMint {
             let balance = proofs.reduce(0) { $0 + Int64($1.amount) }
             NDKLogger.log(.debug, category: .wallet, "CrossMintTransfer.getTotalBalance - mint: \(mint), balance: \(balance)")
             total += balance
         }
-        
+
         NDKLogger.log(.debug, category: .wallet, "CrossMintTransfer.getTotalBalance - total balance: \(total)")
         return total
     }

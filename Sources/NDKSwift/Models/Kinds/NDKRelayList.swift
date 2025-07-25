@@ -269,14 +269,14 @@ public extension NDK {
     /// Fetch the relay list for a specific user
     func fetchRelayList(for user: NDKUser) async throws -> NDKRelayList? {
         let filter = NDKFilter(authors: [user.pubkey], kinds: [EventKind.relayList], limit: 1)
-        
+
         // Use NDKDataSource with long maxAge for relay lists
         let dataSource = NDKDataSource(
             ndk: self,
             filter: filter,
             maxAge: TimeConstants.day // 24 hours - relay lists rarely change
         )
-        
+
         // Collect all relay list events and use the most recent
         let events = await dataSource.collect(timeout: NetworkConstants.timeoutDataCollectionMedium)
         guard let event = events.mostRecent else { return nil }

@@ -1,7 +1,7 @@
 import Foundation
 
 /// URL utility functions for common URL operations
-/// 
+///
 /// This utility provides generic URL validation for any URL type.
 /// For Nostr relay-specific URL normalization (ws://, wss://), use URLNormalizer instead.
 public enum URLUtils {
@@ -15,7 +15,7 @@ public enum URLUtils {
         }
         return url
     }
-    
+
     /// Safely creates a URL from a string, returning nil if invalid
     /// - Parameter urlString: The URL string to convert
     /// - Returns: A URL instance or nil if invalid

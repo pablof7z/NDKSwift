@@ -17,26 +17,26 @@ extension NDKSQLiteCache {
                 t.column("http_status_code", .integer)
                 t.primaryKey(["identifier", "pubkey"])
             }
-            
+
             // Create indexes for efficient queries
-            try db.create(index: "idx_nip05_pubkey", 
-                         on: "nip05_cache", 
-                         columns: ["pubkey"], 
+            try db.create(index: "idx_nip05_pubkey",
+                         on: "nip05_cache",
+                         columns: ["pubkey"],
                          ifNotExists: true)
-            
-            try db.create(index: "idx_nip05_identifier", 
-                         on: "nip05_cache", 
-                         columns: ["identifier"], 
+
+            try db.create(index: "idx_nip05_identifier",
+                         on: "nip05_cache",
+                         columns: ["identifier"],
                          ifNotExists: true)
-            
-            try db.create(index: "idx_nip05_status", 
-                         on: "nip05_cache", 
-                         columns: ["status"], 
+
+            try db.create(index: "idx_nip05_status",
+                         on: "nip05_cache",
+                         columns: ["status"],
                          ifNotExists: true)
-            
+
             // Case-insensitive search index for autocomplete
             try db.execute(sql: "CREATE INDEX IF NOT EXISTS idx_nip05_search ON nip05_cache(identifier COLLATE NOCASE)")
-            
+
             // Create rate limiting table
             try db.create(table: "nip05_rate_limit", ifNotExists: true) { t in
                 t.column("domain", .text).primaryKey()

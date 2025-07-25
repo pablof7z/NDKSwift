@@ -6,7 +6,7 @@ public protocol NDKPublishableEvent {
 
 /// Generic helper to eliminate duplicate createAndPublish patterns
 public enum EventPublishingHelper {
-    
+
     /// Generic createAndPublish method that works with any NDKPublishableEvent
     /// - Parameters:
     ///   - type: The type of event to create
@@ -22,13 +22,13 @@ public enum EventPublishingHelper {
         createClosure: () async throws -> T
     ) async throws -> T {
         let createdEvent = try await createClosure()
-        
+
         let publishedRelays = try await ndk.publish(createdEvent.event)
         NDKLogger.log(.info, category: .event, "\(logPrefix) - Published to \(publishedRelays.count) relays")
-        
+
         return createdEvent
     }
-    
+
     /// Variant that logs the event ID
     @discardableResult
     public static func createAndPublishWithId<T: NDKPublishableEvent>(
@@ -38,10 +38,10 @@ public enum EventPublishingHelper {
         createClosure: () async throws -> T
     ) async throws -> T {
         let createdEvent = try await createClosure()
-        
+
         _ = try await ndk.publish(createdEvent.event)
         NDKLogger.log(.info, category: .event, "\(logPrefix) - Published event: \(createdEvent.event.id)")
-        
+
         return createdEvent
     }
 }

@@ -11,7 +11,7 @@ public struct CashuMintQuote: Codable {
     public let invoice: String
     public let expiry: Date
     public let requestedAt: Date
-    
+
     public init(quoteId: String, mintURL: String, amount: Int64, invoice: String, expiry: Date, requestedAt: Date) {
         self.quoteId = quoteId
         self.mintURL = mintURL
@@ -36,7 +36,7 @@ extension NDKError {
     static func invalidProof(_ message: String) -> NDKError {
         return NDKError.walletError(message: "Invalid proof: \(message)")
     }
-    
+
     static func depositNotReady(_ message: String) -> NDKError {
         return NDKError.walletError(message: "Deposit not ready: \(message)")
     }
