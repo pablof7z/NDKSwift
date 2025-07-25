@@ -35,4 +35,13 @@ public enum CryptoConstants {
         /// NIP-46 remote signer standard
         public static let nip46 = "NIP-46"
     }
+    
+    /// Key format constants
+    public enum KeyFormat {
+        /// Length of a compressed secp256k1 public key in hex format (33 bytes * 2)
+        public static let compressedPublicKeyHexLength = 66
+        
+        /// Valid prefixes for compressed secp256k1 public keys
+        public static let compressedPublicKeyPrefixes = ["02", "03"]
+    }
 }

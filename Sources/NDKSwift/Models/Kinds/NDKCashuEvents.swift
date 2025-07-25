@@ -1013,7 +1013,7 @@ public struct NDKMintRecommendation {
         var tags: [[String]] = []
 
         // Add k tag (specifying event kind being recommended)
-        tags.append(["k", "38172"])
+        tags.append(["k", String(EventKind.cashuMintAnnouncement)])
 
         // Add d tag (event identifier from the announcement)
         if let dTagValue = mintAnnouncementEvent.event.tags.firstTagValue(named: NostrConstants.TagName.identifier) {

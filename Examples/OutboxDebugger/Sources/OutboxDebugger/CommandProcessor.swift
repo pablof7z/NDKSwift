@@ -5,10 +5,15 @@ class CommandProcessor {
     private let ndk: NDK
     private let signer: NDKPrivateKeySigner
     private var publishResults: [String: [String: (accepted: Bool, message: String?)]] = [:] // eventId -> [relayUrl -> result]
+    private weak var renderer: TerminalRenderer?
     
     init(ndk: NDK, signer: NDKPrivateKeySigner) {
         self.ndk = ndk
         self.signer = signer
+    }
+    
+    func setRenderer(_ renderer: TerminalRenderer) {
+        self.renderer = renderer
     }
     
     // Called by OutboxDebugger when OK messages are received
@@ -145,9 +150,15 @@ class CommandProcessor {
         var output = ""
         var debugProgress: [String] = []
         var lastDebugTime = Date()
+        var liveOutput = "🔄 Starting request processing...\n"
+        
+        // Update display immediately
+        if let renderer = renderer {
+            await renderer.render(inputBuffer: "", output: liveOutput)
+        }
         
         // Set up debug hook to capture internal progress
-        NDKDebugHooks.setDebugHook { event in
+        NDKDebugHooks.setDebugHook { [weak self] event in
             let elapsed = Date().timeIntervalSince(lastDebugTime)
             lastDebugTime = Date()
             let timing = elapsed > 0.01 ? " (+\(String(format: "%.2f", elapsed))s)" : ""
@@ -155,53 +166,97 @@ class CommandProcessor {
             switch event {
             case .flowStep(let description):
                 debugProgress.append("⚙️  \(description)\(timing)")
+                liveOutput += "⚙️  \(description)\(timing)\n"
             case .outboxStrategyRequested(let filter):
                 let authorCount = filter.authors?.count ?? 0
-                debugProgress.append("🔍 Requesting outbox strategy for \(authorCount) author(s)\(timing)")
+                let msg = "🔍 Requesting outbox strategy for \(authorCount) author(s)\(timing)"
+                debugProgress.append(msg)
+                liveOutput += msg + "\n"
             case .outboxLookupStarted(let pubkey):
                 let npub = (try? String.toNpub(pubkey)) ?? pubkey.prefix(8) + "..."
-                debugProgress.append("  → Looking up outbox for \(npub)\(timing)")
+                let msg = "  → Looking up outbox for \(npub)\(timing)"
+                debugProgress.append(msg)
+                liveOutput += msg + "\n"
             case .outboxLookupCompleted(let pubkey, let found):
                 let npub = (try? String.toNpub(pubkey)) ?? pubkey.prefix(8) + "..."
                 let status = found ? "found" : "not found"
-                debugProgress.append("  ✓ Outbox for \(npub): \(status)\(timing)")
+                let msg = "  ✓ Outbox for \(npub): \(status)\(timing)"
+                debugProgress.append(msg)
+                liveOutput += msg + "\n"
             case .outboxStrategyComputed(let relayToAuthors):
-                debugProgress.append("📊 Outbox strategy computed: \(relayToAuthors.count) relays\(timing)")
+                let msg = "📊 Outbox strategy computed: \(relayToAuthors.count) relays\(timing)"
+                debugProgress.append(msg)
+                liveOutput += msg + "\n"
                 for (relay, authors) in relayToAuthors.prefix(5) {
-                    debugProgress.append("  → \(relay): \(authors.count) author(s)")
+                    let relayMsg = "  → \(relay): \(authors.count) author(s)"
+                    debugProgress.append(relayMsg)
+                    liveOutput += relayMsg + "\n"
                 }
                 if relayToAuthors.count > 5 {
-                    debugProgress.append("  → ... and \(relayToAuthors.count - 5) more relays")
+                    let moreMsg = "  → ... and \(relayToAuthors.count - 5) more relays"
+                    debugProgress.append(moreMsg)
+                    liveOutput += moreMsg + "\n"
                 }
             case .dataSourceCreated(let filter, let relays):
-                debugProgress.append("📝 DataSource created with filter:\(timing)")
+                let msg = "📝 DataSource created with filter:\(timing)"
+                debugProgress.append(msg)
+                liveOutput += msg + "\n"
                 if let authors = filter.authors {
-                    debugProgress.append("  → Authors: \(authors.count)")
+                    let authMsg = "  → Authors: \(authors.count)"
+                    debugProgress.append(authMsg)
+                    liveOutput += authMsg + "\n"
                 }
                 if let relays = relays {
-                    debugProgress.append("  → Specific relays: \(relays.count)")
+                    let relayMsg = "  → Specific relays: \(relays.count)"
+                    debugProgress.append(relayMsg)
+                    liveOutput += relayMsg + "\n"
                 }
             case .subscriptionCreated(let id, let filter):
-                debugProgress.append("🆕 Subscription created: \(id.prefix(8))...\(timing)")
+                let msg = "🆕 Subscription created: \(id.prefix(8))...\(timing)"
+                debugProgress.append(msg)
+                liveOutput += msg + "\n"
                 if let kinds = filter.kinds {
-                    debugProgress.append("  → Kinds: \(kinds)")
+                    let kindMsg = "  → Kinds: \(kinds)"
+                    debugProgress.append(kindMsg)
+                    liveOutput += kindMsg + "\n"
                 }
             case .subscriptionStarting(let id, let relays):
-                debugProgress.append("🚀 Starting subscription \(id.prefix(8))... on \(relays.count) relay(s)\(timing)")
+                let msg = "🚀 Starting subscription \(id.prefix(8))... on \(relays.count) relay(s)\(timing)"
+                debugProgress.append(msg)
+                liveOutput += msg + "\n"
             case .subscriptionReceived(let id, let relay, let event):
-                debugProgress.append("📨 Event received from \(relay) for sub \(id.prefix(8))...\(timing)")
-                debugProgress.append("  → Kind: \(event.kind), Author: \(event.pubkey.prefix(8))...")
+                let msg = "📨 Event received from \(relay) for sub \(id.prefix(8))...\(timing)"
+                debugProgress.append(msg)
+                liveOutput += msg + "\n"
+                let detailMsg = "  → Kind: \(event.kind), Author: \(event.pubkey.prefix(8))..."
+                debugProgress.append(detailMsg)
+                liveOutput += detailMsg + "\n"
             case .subscriptionEose(let id, let relay):
-                debugProgress.append("📦 EOSE from \(relay) for sub \(id.prefix(8))...\(timing)")
+                let msg = "📦 EOSE from \(relay) for sub \(id.prefix(8))...\(timing)"
+                debugProgress.append(msg)
+                liveOutput += msg + "\n"
             case .poolConnecting(let relay):
-                debugProgress.append("🔌 Connecting to \(relay)...\(timing)")
+                let msg = "🔌 Connecting to \(relay)...\(timing)"
+                debugProgress.append(msg)
+                liveOutput += msg + "\n"
             case .poolConnected(let relay):
-                debugProgress.append("✅ Connected to \(relay)\(timing)")
+                let msg = "✅ Connected to \(relay)\(timing)"
+                debugProgress.append(msg)
+                liveOutput += msg + "\n"
             case .poolDisconnected(let relay, let error):
                 let errorMsg = error != nil ? " (error)" : ""
-                debugProgress.append("❌ Disconnected from \(relay)\(errorMsg)\(timing)")
+                let msg = "❌ Disconnected from \(relay)\(errorMsg)\(timing)"
+                debugProgress.append(msg)
+                liveOutput += msg + "\n"
             default:
                 break
+            }
+            
+            // Update display in real-time
+            if let renderer = self?.renderer {
+                Task {
+                    await renderer.render(inputBuffer: "", output: liveOutput)
+                }
             }
         }
         
@@ -226,7 +281,12 @@ class CommandProcessor {
             limit: 1
         )
         
-        output += Terminal.bold("Fetching recent kind:1 events for \(pubkeys.count) user(s):\n\n")
+        liveOutput += "\n" + Terminal.bold("Fetching recent kind:1 events for \(pubkeys.count) user(s):") + "\n\n"
+        
+        // Update display
+        if let renderer = renderer {
+            await renderer.render(inputBuffer: "", output: liveOutput)
+        }
         
         // Clear debug progress and set start time
         debugProgress.removeAll()
@@ -260,15 +320,15 @@ class CommandProcessor {
         let startTime = Date()
         let timeout: TimeInterval = 10.0
         
-        // Show debug progress before waiting
-        output += Terminal.bold("Internal Progress:\n")
-        for step in debugProgress {
-            output += Terminal.dim(step) + "\n"
-        }
-        output += "\n"
+        // Add relay query info to live output
+        liveOutput += "\n" + Terminal.bold("Query Summary:") + "\n"
+        liveOutput += "Will query \(relayQueries.count) relay(s)\n\n"
+        liveOutput += Terminal.dim("Waiting for responses (timeout: \(Int(timeout))s)...") + "\n"
         
-        output += "Will query \(relayQueries.count) relay(s)\n\n"
-        output += Terminal.dim("Waiting for responses (timeout: \(Int(timeout))s)...\n")
+        // Update display
+        if let renderer = renderer {
+            await renderer.render(inputBuffer: "", output: liveOutput)
+        }
         
         // Track progress
         for relay in relayQueries.keys {
@@ -281,23 +341,39 @@ class CommandProcessor {
                 case .event(let event, let relay):
                     events.append(event)
                     relayStatuses[relay] = "received event"
-                    output += Terminal.color("  • \(relay): Got event from \(event.pubkey.prefix(8))...\n", .green)
+                    let msg = Terminal.color("  • \(relay): Got event from \(event.pubkey.prefix(8))...", .green)
+                    liveOutput += msg + "\n"
+                    if let renderer = self.renderer {
+                        await renderer.render(inputBuffer: "", output: liveOutput)
+                    }
                 case .eose(let relay):
                     relayStatuses[relay] = "eose"
-                    output += Terminal.color("  • \(relay): End of stored events\n", .blue)
+                    let msg = Terminal.color("  • \(relay): End of stored events", .blue)
+                    liveOutput += msg + "\n"
+                    if let renderer = self.renderer {
+                        await renderer.render(inputBuffer: "", output: liveOutput)
+                    }
                     // Check if all relays have sent EOSE
                     if relayStatuses.values.allSatisfy({ $0 == "eose" || $0.contains("error") }) {
                         break
                     }
                 case .closed(let relay):
                     relayStatuses[relay] = "closed"
-                    output += Terminal.color("  • \(relay): Connection closed\n", .red)
+                    let msg = Terminal.color("  • \(relay): Connection closed", .red)
+                    liveOutput += msg + "\n"
+                    if let renderer = self.renderer {
+                        await renderer.render(inputBuffer: "", output: liveOutput)
+                    }
                     break
                 }
                 
                 // Check timeout
                 if Date().timeIntervalSince(startTime) > timeout {
-                    output += Terminal.color("\n⏱️ Timeout reached!\n", .yellow)
+                    let msg = Terminal.color("\n⏱️ Timeout reached!", .yellow)
+                    liveOutput += msg + "\n"
+                    if let renderer = self.renderer {
+                        await renderer.render(inputBuffer: "", output: liveOutput)
+                    }
                     break
                 }
             }
@@ -310,7 +386,8 @@ class CommandProcessor {
         // Clear debug hook
         NDKDebugHooks.setDebugHook(nil)
         
-        output += "\n"
+        // Now build the final output with all results
+        output = liveOutput + "\n\n"
         
         // Show relay usage
         output += Terminal.bold("Relay queries:\n")

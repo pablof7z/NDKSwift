@@ -35,6 +35,7 @@ actor DebuggerCLI {
         
         // Create command processor first
         self.commandProcessor = CommandProcessor(ndk: ndk, signer: signer)
+        self.commandProcessor.setRenderer(renderer)
         
         // Set up combined relay activity hook that handles both relay monitoring and command processor needs
         NDKRelayConnection.setActivityHook { [weak self] url, event in
