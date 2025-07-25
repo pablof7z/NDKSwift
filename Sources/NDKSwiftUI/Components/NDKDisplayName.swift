@@ -94,13 +94,13 @@ public struct NDKDisplayName: View {
     private var displayText: String {
         // Try display name first
         if let displayName = profileDataSource.profile?.displayName,
-           !displayName.trimmingCharacters(in: .whitespaces).isEmpty {
+           displayName.hasContent {
             return displayName
         }
         
         // Try regular name
         if let name = profileDataSource.profile?.name,
-           !name.trimmingCharacters(in: .whitespaces).isEmpty {
+           name.hasContent {
             return name
         }
         
@@ -179,13 +179,13 @@ public struct NDKUsername: View {
     private var usernameText: String {
         // Try regular name first (usually the username)
         if let name = profileDataSource.profile?.name,
-           !name.trimmingCharacters(in: .whitespaces).isEmpty {
+           name.hasContent {
             return "@\(name)"
         }
         
         // Fall back to display name
         if let displayName = profileDataSource.profile?.displayName,
-           !displayName.trimmingCharacters(in: .whitespaces).isEmpty {
+           displayName.hasContent {
             return "@\(displayName)"
         }
         

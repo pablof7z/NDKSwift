@@ -6,9 +6,7 @@ import XCTest
 
 /// Formats current time as HH:mm:ss.SSS for test logging
 func timestamp() -> String {
-    let formatter = DateFormatter()
-    formatter.dateFormat = "HH:mm:ss.SSS"
-    return formatter.string(from: Date())
+    return DateFormatters.custom(format: "HH:mm:ss.SSS").string(from: Date())
 }
 
 /// Creates a delay for the specified number of seconds
@@ -65,5 +63,52 @@ struct TestUser {
         let pubkey = try await signer.pubkey
         return TestUser(signer: signer, pubkey: pubkey)
     }
+}
+
+// MARK: - Test Event Creation
+
+/// Creates a test event with common defaults
+/// - Parameters:
+///   - kind: The event kind (default: 1)
+///   - content: The event content
+///   - tags: Event tags
+///   - pubkey: Optional pubkey (generates random if not provided)
+///   - createdAt: Optional timestamp (uses current time if not provided)
+///   - signer: Optional signer for the event
+/// - Returns: A signed or unsigned NDKEvent
+func createTestEvent(
+    kind: Kind = 1,
+    content: String = "Test event",
+    tags: [Tag] = [],
+    pubkey: String? = nil,
+    createdAt: Timestamp? = nil,
+    signer: NDKSigner? = nil
+) async throws -> NDKEvent {
+    let actualPubkey = pubkey ?? try generateRandomHex(32)
+    let actualCreatedAt = createdAt ?? Timestamp(Date().timeIntervalSince1970)
+    
+    let event = NDKEvent(
+        pubkey: actualPubkey,
+        kind: kind,
+        content: content,
+        tags: tags,
+        createdAt: actualCreatedAt
+    )
+    
+    if let signer = signer {
+        _ = try await event.sign(with: signer)
+    }
+    
+    return event
+}
+
+/// Generates a random hex string of specified byte length
+func generateRandomHex(_ byteCount: Int) throws -> String {
+    var bytes = [UInt8](repeating: 0, count: byteCount)
+    let result = SecRandomCopyBytes(kSecRandomDefault, byteCount, &bytes)
+    guard result == errSecSuccess else {
+        throw TestError.invalidResponse("Failed to generate random bytes")
+    }
+    return bytes.map { String(format: "%02x", $0) }.joined()
 }
 

@@ -69,12 +69,10 @@ final class BlossomBlobTests: XCTestCase {
         )
         
         // Encode
-        let encoder = JSONEncoder()
-        let data = try encoder.encode(originalBlob)
+        let data = try JSONCoding.encoder.encode(originalBlob)
         
         // Decode
-        let decoder = JSONDecoder()
-        let decodedBlob = try decoder.decode(BlossomBlob.self, from: data)
+        let decodedBlob = try JSONCoding.decoder.decode(BlossomBlob.self, from: data)
         
         // Verify all fields match
         XCTAssertEqual(decodedBlob.sha256, originalBlob.sha256)
@@ -104,12 +102,10 @@ final class BlossomBlobTests: XCTestCase {
         )
         
         // Encode
-        let encoder = JSONEncoder()
-        let data = try encoder.encode(originalBlob)
+        let data = try JSONCoding.encoder.encode(originalBlob)
         
         // Decode
-        let decoder = JSONDecoder()
-        let decodedBlob = try decoder.decode(BlossomBlob.self, from: data)
+        let decodedBlob = try JSONCoding.decoder.decode(BlossomBlob.self, from: data)
         
         // Verify required fields
         XCTAssertEqual(decodedBlob.sha256, originalBlob.sha256)

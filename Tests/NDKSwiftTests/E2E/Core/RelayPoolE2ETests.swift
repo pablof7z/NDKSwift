@@ -243,8 +243,6 @@ final class RelayPoolE2ETests: XCTestCase {
     }
     
     private func timestamp() -> String {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "HH:mm:ss.SSS"
-        return formatter.string(from: Date())
+        return DateFormatters.custom(format: "HH:mm:ss.SSS").string(from: Date())
     }
 }

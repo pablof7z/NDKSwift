@@ -11,6 +11,9 @@ struct ArticleView: View {
     @State private var author: NDKUserProfile?
     @State private var isBookmarked = false
     @State private var showShareSheet = false
+    @State private var showSwarmOverlay = false
+    @State private var swarmPulseAnimation = false
+    @StateObject private var swarmManager = SwarmHighlightManager(ndk: NDK(relayUrls: []))
     @Environment(\.dismiss) var dismiss
     
     var body: some View {
@@ -132,27 +135,44 @@ struct ArticleView: View {
                         
                         // Article Content with markdown rendering and text selection
                         if let ndk = appState.ndk {
-                            SelectableMarkdownRenderer(
-                                content: article.content,
-                                ndk: ndk,
-                                onTextSelected: { text, range in
-                                    selectedText = text
-                                    highlightRange = range
-                                    showHighlightOptions = true
-                                    HapticManager.shared.triggerSelection()
+                            ZStack {
+                                SelectableMarkdownRenderer(
+                                    content: article.content,
+                                    ndk: ndk,
+                                    onTextSelected: { text, range in
+                                        selectedText = text
+                                        highlightRange = range
+                                        showHighlightOptions = true
+                                        HapticManager.shared.triggerSelection()
+                                    }
+                                )
+                                .markdownStyle(articleMarkdownStyle())
+                                .onNostrEntityTap { entity in
+                                    handleNostrEntityTap(entity)
                                 }
-                            )
-                            .markdownStyle(articleMarkdownStyle())
-                            .onNostrEntityTap { entity in
-                                handleNostrEntityTap(entity)
+                                .onHashtagTap { tag in
+                                    handleHashtagTap(tag)
+                                }
+                                .onLinkTap { url in
+                                    handleLinkTap(url)
+                                }
+                                .padding(.bottom, .ds.xl)
+                                .opacity(showSwarmOverlay ? 0 : 1)
+                                
+                                // Swarm Overlay
+                                if showSwarmOverlay {
+                                    SwarmOverlayView(
+                                        text: article.content,
+                                        swarmManager: swarmManager
+                                    )
+                                    .padding(.horizontal, .ds.large)
+                                    .padding(.bottom, .ds.xl)
+                                    .transition(.asymmetric(
+                                        insertion: .opacity.combined(with: .scale(scale: 0.95)),
+                                        removal: .opacity
+                                    ))
+                                }
                             }
-                            .onHashtagTap { tag in
-                                handleHashtagTap(tag)
-                            }
-                            .onLinkTap { url in
-                                handleLinkTap(url)
-                            }
-                            .padding(.bottom, .ds.xl)
                         }
                     }
                 }
@@ -167,6 +187,39 @@ struct ArticleView: View {
                 
                 ToolbarItem(placement: .navigationBarTrailing) {
                     HStack(spacing: .ds.medium) {
+                        // Swarm Overlay Toggle with animation
+                        Button(action: { 
+                            withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                                showSwarmOverlay.toggle()
+                            }
+                            HapticManager.shared.impact(.light)
+                            if showSwarmOverlay {
+                                let articleUrl = article.tags.first(where: { $0.first == "r" })?[safe: 1]
+                                swarmManager.loadSwarmHighlights(
+                                    for: articleUrl,
+                                    articleEvent: article.identifier
+                                )
+                            }
+                        }) {
+                            ZStack {
+                                Image(systemName: "person.2.fill")
+                                    .foregroundColor(showSwarmOverlay ? .highlighterOrange : .highlighterPurple)
+                                    .scaleEffect(swarmPulseAnimation ? 1.1 : 1.0)
+                                
+                                if swarmManager.swarmHighlights.count > 0 {
+                                    Circle()
+                                        .fill(Color.highlighterOrange)
+                                        .frame(width: 8, height: 8)
+                                        .offset(x: 8, y: -8)
+                                }
+                            }
+                        }
+                        .onAppear {
+                            withAnimation(.easeInOut(duration: 1.5).repeatForever(autoreverses: true)) {
+                                swarmPulseAnimation = true
+                            }
+                        }
+                        
                         Button(action: { 
                             isBookmarked.toggle()
                             HapticManager.shared.impact(.light)
@@ -205,6 +258,17 @@ struct ArticleView: View {
         }
         .task {
             await loadAuthor()
+        }
+        .onAppear {
+            // Initialize swarm manager with the actual NDK instance
+            if let ndk = appState.ndk {
+                swarmManager.ndk = ndk
+                let articleUrl = article.tags.first(where: { $0.first == "r" })?[safe: 1]
+                swarmManager.loadSwarmHighlights(
+                    for: articleUrl,
+                    articleEvent: article.identifier
+                )
+            }
         }
     }
     

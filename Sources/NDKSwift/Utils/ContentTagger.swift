@@ -1,5 +1,9 @@
 import Foundation
 
+/// Utilities for working with Nostr event tags
+/// 
+/// This file provides extensions and helpers for validating and extracting
+/// information from Nostr event tags according to various NIPs.
 
 // MARK: - Tag Validation
 
