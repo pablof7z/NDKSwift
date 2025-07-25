@@ -24,23 +24,15 @@ class CacheFirstTests: XCTestCase {
         try await super.tearDown()
     }
     
-    // Helper to create test events
-    func createTestEvent(content: String, kind: Int = 1) -> NDKEvent {
-        return NDKEvent(
-            id: "test_\(UUID().uuidString)",
-            pubkey: "test_pubkey",
-            createdAt: Timestamp(Date().timeIntervalSince1970),
-            kind: kind,
-            tags: [],
-            content: content,
-            sig: "test_sig"
-        )
-    }
-    
     func testImmediateCacheHit() async throws {
         // Arrange: Pre-populate cache with some events
-        let events = (0..<5).map { createTestEvent(content: "Test event \($0)") }
-        for event in events {
+        var events: [NDKEvent] = []
+        for i in 0..<5 {
+            let event = try await createTestEvent(
+                content: "Test event \(i)",
+                pubkey: "test_pubkey"
+            )
+            events.append(event)
             try await cache.saveEvent(event)
         }
         
@@ -85,8 +77,13 @@ class CacheFirstTests: XCTestCase {
         await cache.recordFetchTime(for: filter, timestamp: Date())
         
         // Pre-populate with events
-        let events = (0..<3).map { createTestEvent(content: "Fresh event \($0)") }
-        for event in events {
+        var events: [NDKEvent] = []
+        for i in 0..<3 {
+            let event = try await createTestEvent(
+                content: "Fresh event \(i)",
+                pubkey: "test_pubkey"
+            )
+            events.append(event)
             try await cache.saveEvent(event)
         }
         
@@ -125,8 +122,13 @@ class CacheFirstTests: XCTestCase {
         await cache.recordFetchTime(for: filter, timestamp: oldDate)
         
         // Pre-populate with events
-        let events = (0..<2).map { createTestEvent(content: "Stale event \($0)") }
-        for event in events {
+        var events: [NDKEvent] = []
+        for i in 0..<2 {
+            let event = try await createTestEvent(
+                content: "Stale event \(i)",
+                pubkey: "test_pubkey"
+            )
+            events.append(event)
             try await cache.saveEvent(event)
         }
         
@@ -160,8 +162,11 @@ class CacheFirstTests: XCTestCase {
     
     func testNetworkOnlyPolicy() async throws {
         // Arrange: Pre-populate cache
-        let events = (0..<3).map { createTestEvent(content: "Cached event \($0)") }
-        for event in events {
+        for i in 0..<3 {
+            let event = try await createTestEvent(
+                content: "Cached event \(i)",
+                pubkey: "test_pubkey"
+            )
             try await cache.saveEvent(event)
         }
         
@@ -192,8 +197,13 @@ class CacheFirstTests: XCTestCase {
     
     func testCacheOnlyPolicy() async throws {
         // Arrange: Pre-populate cache
-        let events = (0..<4).map { createTestEvent(content: "Cache only event \($0)") }
-        for event in events {
+        var events: [NDKEvent] = []
+        for i in 0..<4 {
+            let event = try await createTestEvent(
+                content: "Cache only event \(i)",
+                pubkey: "test_pubkey"
+            )
+            events.append(event)
             try await cache.saveEvent(event)
         }
         
