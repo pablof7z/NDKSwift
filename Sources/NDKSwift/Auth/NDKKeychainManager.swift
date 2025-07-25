@@ -472,23 +472,23 @@ public enum NDKKeychainError: LocalizedError {
     public var errorDescription: String? {
         switch self {
         case .storageError(let status):
-            return "Failed to store item in keychain: \(status)"
+            return ErrorMessageConstants.withContext(ErrorMessageConstants.failedTo("store item in keychain"), context: "\(status)")
         case .retrievalError(let status):
-            return "Failed to retrieve item from keychain: \(status)"
+            return ErrorMessageConstants.withContext(ErrorMessageConstants.failedTo("retrieve item from keychain"), context: "\(status)")
         case .deletionError(let status):
-            return "Failed to delete item from keychain: \(status)"
+            return ErrorMessageConstants.withContext(ErrorMessageConstants.failedTo("delete item from keychain"), context: "\(status)")
         case .accessControlError(let error):
-            return "Failed to create access control: \(error?.localizedDescription ?? "Unknown error")"
+            return ErrorMessageConstants.withContext(ErrorMessageConstants.failedTo("create access control"), context: error?.localizedDescription ?? ErrorMessageConstants.Messages.unknownError)
         case .itemNotFound:
-            return "Item not found in keychain"
+            return ErrorMessageConstants.notFound("Item in keychain")
         case .invalidData:
-            return "Invalid data retrieved from keychain"
+            return ErrorMessageConstants.invalid("data retrieved from keychain")
         case .userCancelled:
-            return "User cancelled authentication"
+            return ErrorMessageConstants.Messages.cancelled
         case .authenticationFailed:
-            return "Authentication failed"
+            return ErrorMessageConstants.Messages.authenticationFailed
         case .biometricNotAvailable:
-            return "Biometric authentication not available"
+            return ErrorMessageConstants.notFound("Biometric authentication")
         case .biometricNotEnrolled:
             return "Biometric authentication not enrolled"
         }
