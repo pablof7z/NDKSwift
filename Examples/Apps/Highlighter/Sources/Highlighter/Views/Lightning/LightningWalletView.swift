@@ -156,65 +156,34 @@ struct LightningWalletView: View {
         .modernCard()
     }
     
-    @ViewBuilder
     private var balanceCard: some View {
-        VStack(spacing: .ds.medium) {
+        let balanceView = VStack(alignment: .leading, spacing: .ds.micro) {
+            Text("Balance")
+                .font(.ds.caption)
+                .foregroundColor(.ds.textSecondary)
+            
+            HStack(alignment: .firstTextBaseline, spacing: .ds.micro) {
+                Text("\(lightning.balance.formatted())")
+                    .font(.system(size: 36, weight: .bold, design: .rounded))
+                    .foregroundColor(.ds.text)
+                
+                Text("sats")
+                    .font(.ds.body)
+                    .foregroundColor(.ds.textSecondary)
+            }
+        }
+        
+        let lightningIcon = Image(systemName: "bolt.fill")
+            .font(.system(size: 30))
+            .foregroundColor(.orange)
+        
+        return VStack(spacing: .ds.medium) {
             HStack {
-                VStack(alignment: .leading, spacing: .ds.micro) {
-                    Text("Balance")
-                        .font(.ds.caption)
-                        .foregroundColor(.ds.textSecondary)
-                    
-                    HStack(alignment: .firstTextBaseline, spacing: .ds.micro) {
-                        Text("\(lightning.balance.formatted())")
-                            .font(.system(size: 36, weight: .bold, design: .rounded))
-                            .foregroundColor(.ds.text)
-                            .contentTransition(.numericText())
-                            .scaleEffect(balanceRevealAnimation ? 1 : 0.8)
-                            .opacity(balanceRevealAnimation ? 1 : 0)
-                            .onAppear {
-                                withAnimation(.spring(response: 0.5, dampingFraction: 0.7)) {
-                                    balanceRevealAnimation = true
-                                }
-                            }
-                        
-                        Text("sats")
-                            .font(.ds.body)
-                            .foregroundColor(.ds.textSecondary)
-                    }
-                }
+                balanceView
                 
                 Spacer()
                 
-                // Lightning bolt animation
-                ZStack {
-                    ForEach(0..<3) { i in
-                        Image(systemName: "bolt.fill")
-                            .font(.system(size: 30))
-                            .foregroundStyle(
-                                LinearGradient(
-                                    colors: [.yellow, .orange],
-                                    startPoint: .topLeading,
-                                    endPoint: .bottomTrailing
-                                )
-                            )
-                            .opacity(0.3 - Double(i) * 0.1)
-                            .scaleEffect(1 + CGFloat(i) * 0.2)
-                            .rotationEffect(.degrees(Double(i) * 15))
-                            .blur(radius: CGFloat(i) * 2)
-                    }
-                    
-                    Image(systemName: "bolt.fill")
-                        .font(.system(size: 30))
-                        .foregroundStyle(
-                            LinearGradient(
-                                colors: [.yellow, .orange],
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
-                            )
-                        )
-                }
-                .magneticHover()
+                lightningIcon
             }
         }
         .padding(.ds.large)
@@ -229,7 +198,7 @@ struct LightningWalletView: View {
             )
         )
         .clipShape(RoundedRectangle(cornerRadius: .ds.large, style: .continuous))
-        .morphingCard()
+        .modernCard()
     }
     
     @ViewBuilder
