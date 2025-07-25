@@ -84,32 +84,33 @@ public final class NDK {
     
     // MARK: - Computed Properties
     
-    internal var relaySelector: NDKRelaySelector {
-        if let existing = _relaySelector {
+    /// Helper to lazily initialize properties
+    internal func lazyInit<T>(_ storage: inout T?, creator: () -> T) -> T {
+        if let existing = storage {
             return existing
         }
-        let selector = NDKRelaySelector(ndk: self, tracker: outboxTracker, ranker: relayRanker)
-        _relaySelector = selector
-        return selector
+        let newValue = creator()
+        storage = newValue
+        return newValue
+    }
+    
+    internal var relaySelector: NDKRelaySelector {
+        lazyInit(&_relaySelector) {
+            NDKRelaySelector(ndk: self, tracker: outboxTracker, ranker: relayRanker)
+        }
     }
     
     private var fetchingStrategy: NDKFetchingStrategy {
-        if let existing = _fetchingStrategy {
-            return existing
+        lazyInit(&_fetchingStrategy) {
+            NDKFetchingStrategy(ndk: self, selector: self.relaySelector)
         }
-        let strategy = NDKFetchingStrategy(ndk: self, selector: self.relaySelector)
-        _fetchingStrategy = strategy
-        return strategy
     }
     
     /// NIP-05 manager for efficient resolution and caching
     public var nip05Manager: NIP05Manager {
-        if let existing = _nip05Manager {
-            return existing
+        lazyInit(&_nip05Manager) {
+            NIP05Manager(ndk: self)
         }
-        let manager = NIP05Manager(ndk: self)
-        _nip05Manager = manager
-        return manager
     }
     
     // MARK: - Initialization
