@@ -18,6 +18,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Replaced magic numbers with named constants
   - Added `defaultCashuFeeBuffer` constant to `PaymentConstants`
   - Replaced hardcoded fee buffer values (1000) with the constant
+- Consolidated error messages into `ErrorMessageConstants`
+  - Added NDK-specific error messages: `ndkInstanceNotSet`, `ndkNotAvailable`, `ndkReferenceLost`
+  - Replaced 12 hardcoded error messages across 5 files
+- Created `ValidationConstants` for consistent validation messages
+  - Added constants for hex validation requirements (64 character hex, Expected 32 bytes)
+  - Replaced hardcoded validation strings in NDKPrivateKeySigner, NWCConnectionURI, and ContentTagger
+- Applied `nilIfEmpty` extension across the codebase
+  - Replaced 6 instances of `.isEmpty ? nil : value` pattern
+  - Updated ContentTagger, Bech32, and NDKCashuEvents for cleaner code
 
 ### Fixed
 - Replaced force unwrap with safer `compactMap` in `IDGenerator.randomId()`
