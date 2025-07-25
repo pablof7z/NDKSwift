@@ -129,7 +129,7 @@ public actor ProofStateManager {
 
         NDKLogger.log(.debug, category: .wallet, "ProofStateManager.getTotalBalance() - Total proofs: \(proofState.count), Available: \(availableProofs.count), Balance: \(totalBalance)")
 
-        if proofState.count > 0 && availableProofs.isEmpty {
+        if !proofState.isEmpty && availableProofs.isEmpty {
             NDKLogger.log(.warning, category: .wallet, "⚠️ Have \(proofState.count) proofs but none are available! States: \(proofState.values.map { $0.state }.reduce(into: [:]) { counts, state in counts[String(describing: state), default: 0] += 1 })")
         }
 
