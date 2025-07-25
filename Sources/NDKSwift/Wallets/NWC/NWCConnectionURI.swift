@@ -41,9 +41,9 @@ public struct NWCConnectionURI {
             pubkey = path.hasPrefix("/") ? String(path.dropFirst()) : path
         }
 
-        // Validate pubkey format (64 character hex)
+        // Validate pubkey format
         guard HexValidator.isValid32ByteHex(pubkey) else {
-            throw NDKError.invalidDataFormat("wallet public key", details: "Expected 64 character hex, got \(pubkey.count)")
+            throw NDKError.invalidDataFormat("wallet public key", details: ValidationConstants.expectedHex64Got(pubkey.count))
         }
         self.walletPubkey = pubkey.lowercased()
 
@@ -72,9 +72,9 @@ public struct NWCConnectionURI {
             throw NDKError.missingRequired(NostrConstants.JSONField.secret, in: "NWC URI")
         }
 
-        // Validate secret format (64 character hex)
+        // Validate secret format
         guard HexValidator.isValid32ByteHex(secret) else {
-            throw NDKError.invalidDataFormat("client secret", details: "Expected 64 hex characters, got \(secret.count)")
+            throw NDKError.invalidDataFormat("client secret", details: ValidationConstants.expectedHex64Got(secret.count))
         }
         self.secret = secret.lowercased()
 
@@ -86,11 +86,11 @@ public struct NWCConnectionURI {
     public init(walletPubkey: String, relayURLs: [String], secret: String, lud16: String? = nil) throws {
         // Validate inputs
         guard HexValidator.isValid32ByteHex(walletPubkey) else {
-            throw NDKError.invalidDataFormat("wallet public key", details: "Expected 64 character hex")
+            throw NDKError.invalidDataFormat("wallet public key", details: ValidationConstants.publicKeyRequirement)
         }
 
         guard HexValidator.isValid32ByteHex(secret) else {
-            throw NDKError.invalidDataFormat("client secret", details: "Expected 64 character hex")
+            throw NDKError.invalidDataFormat("client secret", details: ValidationConstants.publicKeyRequirement)
         }
 
         guard !relayURLs.isEmpty else {
