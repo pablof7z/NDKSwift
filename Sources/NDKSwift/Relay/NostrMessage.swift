@@ -36,7 +36,7 @@ public enum NostrMessage {
 
     /// Create an invalid message error with consistent formatting
     private static func invalidMessageError(for messageType: String) -> NDKError {
-        return .invalidMessage("Invalid \(messageType) message")
+        return .invalidMessage(ErrorMessageConstants.invalid("\(messageType) message"))
     }
 
     /// Parse a message from relay
@@ -62,7 +62,7 @@ public enum NostrMessage {
             let eventIndex = subscriptionId != nil ? 2 : 1
 
             guard let eventDict = array[eventIndex] as? [String: Any] else {
-                throw NDKError.parseError(for: "EVENT message", details: "Invalid event data structure")
+                throw NDKError.parseError(for: "EVENT message", details: ErrorMessageConstants.invalid("event data structure"))
             }
 
             let event = try JSONCoding.decodeFromDictionary(NDKEvent.self, from: eventDict)
