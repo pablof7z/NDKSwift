@@ -144,17 +144,17 @@ public struct BlossomAuth {
         expiration: Date? = nil
     ) async throws -> BlossomAuth {
         var tags: [[String]] = [
-            [NostrTagConstants.TagName.hashtag, NostrTagConstants.BlossomTag.upload],
-            [NostrTagConstants.BlossomTag.hash, sha256],
-            [NostrTagConstants.BlossomTag.size, String(size)]
+            [NostrConstants.TagName.hashtag, NostrConstants.BlossomTag.upload],
+            [NostrConstants.BlossomTag.hash, sha256],
+            [NostrConstants.BlossomTag.size, String(size)]
         ]
 
         if let mimeType = mimeType {
-            tags.append([NostrTagConstants.BlossomTag.type, mimeType])
+            tags.append([NostrConstants.BlossomTag.type, mimeType])
         }
 
         if let expiration = expiration {
-            tags.append([NostrTagConstants.BlossomTag.expiration, String(Timestamp.from(expiration))])
+            tags.append([NostrConstants.BlossomTag.expiration, String(Timestamp.from(expiration))])
         }
 
         let event = try await NDKEventBuilder(ndk: ndk)
@@ -174,8 +174,8 @@ public struct BlossomAuth {
         reason: String? = nil
     ) async throws -> BlossomAuth {
         let tags: [[String]] = [
-            [NostrTagConstants.TagName.hashtag, NostrTagConstants.BlossomTag.delete],
-            [NostrTagConstants.BlossomTag.hash, sha256]
+            [NostrConstants.TagName.hashtag, NostrConstants.BlossomTag.delete],
+            [NostrConstants.BlossomTag.hash, sha256]
         ]
 
         let event = try await NDKEventBuilder(ndk: ndk)
@@ -195,7 +195,7 @@ public struct BlossomAuth {
         until: Date? = nil
     ) async throws -> BlossomAuth {
         var tags: [[String]] = [
-            [NostrTagConstants.TagName.hashtag, NostrTagConstants.BlossomTag.list]
+            [NostrConstants.TagName.hashtag, NostrConstants.BlossomTag.list]
         ]
 
         if let since = since {

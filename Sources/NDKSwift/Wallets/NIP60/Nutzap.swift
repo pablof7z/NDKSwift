@@ -224,7 +224,7 @@ public enum Nutzap {
         }
         
         // Extract proofs from proof tags
-        let proofTags = event.tags.filter { $0.count >= 2 && $0[0] == NostrTagConstants.TagName.proof }
+        let proofTags = event.tags.filter { $0.count >= 2 && $0[0] == NostrConstants.TagName.proof }
         guard !proofTags.isEmpty else {
             NDKLogger.log(.error, category: .wallet, "🎯 No proofs in nutzap")
             throw NutzapRedemptionError.invalidProofs(reason: "No proofs in nutzap event")
@@ -247,7 +247,7 @@ public enum Nutzap {
             if let secretData = proof.secret.data(using: .utf8),
                let secret = try? JSONSerialization.jsonObject(with: secretData, options: []) as? [[String: Any]] {
                 for condition in secret {
-                    if condition[NostrJSONConstants.kind] as? String == "P2PK",
+                    if condition[NostrConstants.JSONField.kind] as? String == "P2PK",
                        let data = condition["data"] as? String {
                         p2pkInfo = data
                         
@@ -285,7 +285,7 @@ public enum Nutzap {
             if let firstProof = allProofs.first,
                let secretData = firstProof.secret.data(using: .utf8),
                let secret = try? JSONSerialization.jsonObject(with: secretData, options: []) as? [[String: Any]],
-               let p2pkCondition = secret.first(where: { $0[NostrJSONConstants.kind] as? String == "P2PK" }),
+               let p2pkCondition = secret.first(where: { $0[NostrConstants.JSONField.kind] as? String == "P2PK" }),
                let data = p2pkCondition["data"] as? String {
                 expectedPubkey = data
             }
@@ -426,7 +426,7 @@ public enum Nutzap {
                 object: nil,
                 userInfo: [
                     "event": event,
-                    NostrJSONConstants.amount: amount
+                    NostrConstants.JSONField.amount: amount
                 ]
             )
         }

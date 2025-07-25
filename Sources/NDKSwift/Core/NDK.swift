@@ -563,19 +563,19 @@ public final class NDK {
         do {
             let authEvent = try await NDKEventBuilder(ndk: self)
                 .kind(EventKind.clientAuthentication)
-                .tag([NostrTagConstants.TagName.challenge, challenge])
-                .tag([NostrTagConstants.TagName.relay, relay.url])
+                .tag([NostrConstants.TagName.challenge, challenge])
+                .tag([NostrConstants.TagName.relay, relay.url])
                 .build(signer: signer)
             
             // Create auth message manually for now
             let eventDict: [String: Any] = [
-                NostrJSONConstants.id: authEvent.id,
-                NostrJSONConstants.pubkey: authEvent.pubkey,
-                NostrJSONConstants.createdAt: authEvent.createdAt,
-                NostrJSONConstants.kind: authEvent.kind,
-                NostrJSONConstants.tags: authEvent.tags,
-                NostrJSONConstants.content: authEvent.content,
-                NostrJSONConstants.sig: authEvent.sig
+                NostrConstants.JSONField.id: authEvent.id,
+                NostrConstants.JSONField.pubkey: authEvent.pubkey,
+                NostrConstants.JSONField.createdAt: authEvent.createdAt,
+                NostrConstants.JSONField.kind: authEvent.kind,
+                NostrConstants.JSONField.tags: authEvent.tags,
+                NostrConstants.JSONField.content: authEvent.content,
+                NostrConstants.JSONField.sig: authEvent.sig
             ]
             let authMessage: [Any] = ["AUTH", eventDict]
             let jsonData = try JSONSerialization.data(withJSONObject: authMessage, options: [.withoutEscapingSlashes])

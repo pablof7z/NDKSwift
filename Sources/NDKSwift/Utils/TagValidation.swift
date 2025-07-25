@@ -41,21 +41,21 @@ public extension Array where Element == [String] {
     
     /// Extracts event reference tags ("e" tags)
     var eventTags: [[String]] {
-        extractTags(named: NostrTagConstants.TagName.event)
+        extractTags(named: NostrConstants.TagName.event)
     }
     
     /// Extracts pubkey reference tags ("p" tags)
     var pubkeyTags: [[String]] {
-        extractTags(named: NostrTagConstants.TagName.pubkey)
+        extractTags(named: NostrConstants.TagName.pubkey)
     }
     
     /// Extracts all event IDs from "e" tags
     var eventIds: [String] {
-        tagValues(named: NostrTagConstants.TagName.event)
+        tagValues(named: NostrConstants.TagName.event)
     }
     
     /// Extracts all pubkeys from "p" tags
     var pubkeys: [String] {
-        tagValues(named: NostrTagConstants.TagName.pubkey)
+        tagValues(named: NostrConstants.TagName.pubkey)
     }
 }

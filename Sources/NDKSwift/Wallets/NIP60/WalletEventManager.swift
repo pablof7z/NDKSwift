@@ -256,14 +256,14 @@ public actor WalletEventManager {
         var mint = ""
         
         for tag in event.tags {
-            if tag.count >= 2 && tag[0] == NostrTagConstants.TagName.proof {
+            if tag.count >= 2 && tag[0] == NostrConstants.TagName.proof {
                 if let proofData = tag[1].data(using: .utf8),
                    let proof = try? JSONCoding.decode(CashuSwift.Proof.self, from: proofData) {
                     totalAmount += Int64(proof.amount)
                 }
             }
             // Extract mint from tags
-            if tag.count >= 2 && tag[0] == NostrTagConstants.TagName.url {
+            if tag.count >= 2 && tag[0] == NostrConstants.TagName.url {
                 mint = tag[1]
             }
         }
