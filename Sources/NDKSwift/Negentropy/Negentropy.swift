@@ -596,7 +596,7 @@ func compareData(_ a: Data, _ b: Data) -> Int {
     if b.isEmpty { return 1 }
 
     // Ensure we have valid data
-    guard a.count > 0 && b.count > 0 else {
+    guard !a.isEmpty && !b.isEmpty else {
         return a.count - b.count
     }
 
