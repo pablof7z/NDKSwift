@@ -79,7 +79,7 @@ public class LNURLResolver: LNURLResolving {
         let urlString = "https://\(domain)\(WellKnownPath.lnurlp)\(username)"
 
         guard let url = URL(string: urlString) else {
-            throw LNURLError.invalidFormat("Failed to construct URL from LUD16")
+            throw LNURLError.invalidFormat(ErrorMessageConstants.failedTo("construct URL from LUD16"))
         }
 
         return url
@@ -131,7 +131,7 @@ public class LNURLResolver: LNURLResolving {
             } ?? []
 
         } catch {
-            throw LNURLError.decodingError("Failed to parse metadata JSON: \(error)")
+            throw LNURLError.decodingError(ErrorMessageConstants.failedTo("parse metadata JSON") + ": \(error)")
         }
     }
 
