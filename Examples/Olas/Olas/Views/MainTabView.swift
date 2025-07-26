@@ -9,25 +9,32 @@ struct MainTabView: View {
     @State private var showCreatePost = false
     @State private var tabBarOpacity = 1.0
     @State private var tabBarOffset: CGFloat = 0
+    @State private var unreadMessages = 0
     
     var body: some View {
         TabView(selection: $selectedTab) {
-            FeedView()
-                .tabItem {
-                    Label("Feed", systemImage: "photo.stack")
-                }
-                .tag(0)
+            // Home Feed
+            NavigationStack {
+                FeedView()
+            }
+            .tabItem {
+                Label("Home", systemImage: selectedTab == 0 ? "house.fill" : "house")
+            }
+            .tag(0)
             
-            ExploreView()
-                .tabItem {
-                    Label("Explore", systemImage: "magnifyingglass")
-                }
-                .tag(1)
+            // Explore/Search
+            NavigationStack {
+                ExploreView()
+            }
+            .tabItem {
+                Label("Explore", systemImage: selectedTab == 1 ? "magnifyingglass.circle.fill" : "magnifyingglass")
+            }
+            .tag(1)
             
             // Create Post - presented as sheet
             Color.clear
                 .tabItem {
-                    Label("Create", systemImage: "plus.app")
+                    Label("Create", systemImage: "plus.square")
                 }
                 .tag(2)
                 .onAppear {
@@ -38,35 +45,38 @@ struct MainTabView: View {
                     }
                 }
             
-            // Wallet Tab
-            OlasWalletView(nostrManager: nostrManager)
-                .tabItem {
-                    Label("Wallet", systemImage: "bolt.circle")
-                }
-                .tag(3)
+            // Messages
+            NavigationStack {
+                MessagesListView()
+            }
+            .tabItem {
+                Label("Messages", systemImage: selectedTab == 3 ? "paperplane.fill" : "paperplane")
+            }
+            .tag(3)
+            .badge(unreadMessages > 0 ? "\(unreadMessages)" : nil)
             
-            // Profile Tab
+            // Profile Tab with Wallet Access
             Group {
                 if let session = nostrManager.authManager.activeSession {
                     NavigationStack {
                         ProfileView(pubkey: session.pubkey)
+                            .toolbar {
+                                ToolbarItem(placement: .navigationBarTrailing) {
+                                    NavigationLink(destination: OlasWalletView(nostrManager: nostrManager)) {
+                                        Image(systemName: "bolt.circle")
+                                            .foregroundStyle(OlasDesign.Colors.primary)
+                                    }
+                                }
+                            }
                     }
                 } else {
                     Text("Profile")
                 }
             }
             .tabItem {
-                Label("Profile", systemImage: "person.circle")
+                Label("Profile", systemImage: selectedTab == 4 ? "person.circle.fill" : "person.circle")
             }
             .tag(4)
-            
-            NavigationStack {
-                SettingsView()
-            }
-            .tabItem {
-                Label("Settings", systemImage: "gear")
-            }
-            .tag(5)
         }
         .tint(OlasDesign.Colors.primary)
         .onChange(of: selectedTab) { oldValue, newValue in
@@ -79,5 +89,18 @@ struct MainTabView: View {
                 .environmentObject(appState)
                 .environment(nostrManager)
         }
+        .onAppear {
+            setupTabBarAppearance()
+        }
+    }
+    
+    private func setupTabBarAppearance() {
+        let appearance = UITabBarAppearance()
+        appearance.configureWithOpaqueBackground()
+        appearance.backgroundColor = UIColor(OlasDesign.Colors.background)
+        appearance.shadowColor = UIColor(OlasDesign.Colors.divider)
+        
+        UITabBar.appearance().standardAppearance = appearance
+        UITabBar.appearance().scrollEdgeAppearance = appearance
     }
 }

@@ -318,8 +318,8 @@ struct PostaBackgroundView: View {
                         .frame(width: 300, height: 300)
                         .blur(radius: 40)
                         .offset(
-                            x: cos(animationPhase + Double(index) * 2) * geometry.size.width * 0.3,
-                            y: sin(animationPhase + Double(index) * 2) * geometry.size.height * 0.3
+                            x: Foundation.cos(animationPhase + Double(index) * 2) * geometry.size.width * 0.3,
+                            y: Foundation.sin(animationPhase + Double(index) * 2) * geometry.size.height * 0.3
                         )
                 }
             }
@@ -348,8 +348,8 @@ struct ElectricField: Shape {
         for i in 0..<points {
             let angle = Double(i) * (2 * .pi / Double(points))
             let endPoint = CGPoint(
-                x: center.x + cos(angle) * rect.width * 0.4,
-                y: center.y + sin(angle) * rect.height * 0.4
+                x: center.x + Foundation.cos(angle) * rect.width * 0.4,
+                y: center.y + Foundation.sin(angle) * rect.height * 0.4
             )
             
             path.move(to: center)

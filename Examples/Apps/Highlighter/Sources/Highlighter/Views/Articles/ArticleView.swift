@@ -287,8 +287,13 @@ struct ArticleView: View {
                     }
                 }
             } else {
-                ArticleAnimatedGradientBackground()
-                    .frame(width: geometry.size.width, height: 400)
+                if #available(iOS 18.0, *) {
+                    ArticleAnimatedGradientBackground()
+                        .frame(width: geometry.size.width, height: 400)
+                } else {
+                    ArticleGradientPlaceholder()
+                        .frame(width: geometry.size.width, height: 400)
+                }
             }
             
             // Enhanced gradient overlay
@@ -601,21 +606,18 @@ struct ArticleView: View {
         highlights = [
             HighlightEvent(
                 content: "This is a powerful insight that resonates deeply with the fundamental principles we've been exploring.",
-                articleId: article.id,
-                author: "mock-pubkey-1",
-                context: "In the broader context of human knowledge and understanding..."
+                context: "In the broader context of human knowledge and understanding...",
+                author: "mock-pubkey-1"
             ),
             HighlightEvent(
                 content: "The implications of this cannot be overstated, especially when we consider the long-term ramifications.",
-                articleId: article.id,
-                author: "mock-pubkey-2",
-                context: "When we consider the full scope of what's being proposed here..."
+                context: "When we consider the full scope of what's being proposed here...",
+                author: "mock-pubkey-2"
             ),
             HighlightEvent(
                 content: "A brilliantly articulated point that cuts through the noise and gets to the heart of the matter.",
-                articleId: article.id,
-                author: "mock-pubkey-3",
-                context: "This section particularly stands out for its clarity and precision..."
+                context: "This section particularly stands out for its clarity and precision...",
+                author: "mock-pubkey-3"
             )
         ]
     }
@@ -634,11 +636,7 @@ struct AmbientBackground: View {
                 DesignSystem.Colors.background
             ]
             
-            let gradient = LinearGradient(
-                colors: colors,
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            )
+            let gradient = Gradient(colors: colors)
             
             context.fill(
                 Path(CGRect(origin: .zero, size: size)),
@@ -676,6 +674,7 @@ struct ArticleGradientPlaceholder: View {
     }
 }
 
+@available(iOS 18.0, *)
 struct ArticleAnimatedGradientBackground: View {
     @State private var animationPhase = 0.0
     
@@ -685,7 +684,7 @@ struct ArticleAnimatedGradientBackground: View {
             height: 3,
             points: [
                 [0, 0], [0.5, 0], [1, 0],
-                [0, 0.5], [0.5 + sin(animationPhase) * 0.1, 0.5], [1, 0.5],
+                [0, 0.5], [Float(0.5 + sin(animationPhase) * 0.1), 0.5], [1, 0.5],
                 [0, 1], [0.5, 1], [1, 1]
             ],
             colors: [
@@ -866,48 +865,57 @@ struct ArticleEnhancedHighlightCard: View {
     @State private var isPressed = false
     
     var body: some View {
+        let baseSpacing = CGFloat.ds.base
+        let smallSpacing = CGFloat.ds.small
+        let mediumPadding = CGFloat.ds.medium
+        let largeRadius = CGFloat.ds.large
+        let textColor = Color.ds.text
+        let captionFont = Font.ds.caption
+        let tertiaryColor = Color.ds.textTertiary
+        let secondaryColor = Color.ds.textSecondary
+        
         Button(action: onTap) {
-            VStack(alignment: .leading, spacing: .ds.base) {
+            VStack(alignment: .leading, spacing: baseSpacing) {
                 Text("\"\(highlight.content)\"")
                     .font(.system(size: 16, weight: .regular, design: .serif))
-                    .foregroundColor(.ds.text)
+                    .foregroundColor(textColor)
                     .italic()
                     .multilineTextAlignment(.leading)
                 
                 if let context = highlight.context {
                     Text(context)
-                        .font(.ds.caption)
-                        .foregroundColor(.ds.textTertiary)
+                        .font(captionFont)
+                        .foregroundColor(tertiaryColor)
                         .lineLimit(2)
                 }
                 
                 HStack {
-                    HStack(spacing: .ds.small) {
+                    HStack(spacing: smallSpacing) {
                         Circle()
                             .fill(DesignSystem.Colors.surfaceSecondary)
                             .frame(width: 20, height: 20)
                             .overlay(
                                 Text(PubkeyFormatter.formatForAvatar(highlight.author))
                                     .font(.system(size: 10, weight: .medium))
-                                    .foregroundColor(.ds.text)
+                                    .foregroundColor(textColor)
                             )
                         
                         Text(PubkeyFormatter.formatShort(highlight.author))
-                            .font(.ds.caption)
-                            .foregroundColor(.ds.textSecondary)
+                            .font(captionFont)
+                            .foregroundColor(secondaryColor)
                     }
                     
                     Spacer()
                     
-                    ZapButton(amount: 21)
+                    ZapButton(event: highlight.event, size: .small)
                 }
             }
-            .padding(.ds.medium)
+            .padding(mediumPadding)
             .background(
-                RoundedRectangle(cornerRadius: .ds.large, style: .continuous)
+                RoundedRectangle(cornerRadius: largeRadius, style: .continuous)
                     .fill(DesignSystem.Colors.highlightSubtle)
                     .overlay(
-                        RoundedRectangle(cornerRadius: .ds.large, style: .continuous)
+                        RoundedRectangle(cornerRadius: largeRadius, style: .continuous)
                             .stroke(DesignSystem.Colors.secondary.opacity(0.2), lineWidth: 1)
                     )
             )
@@ -1201,9 +1209,8 @@ struct EnhancedCreateHighlightView: View {
         
         let highlight = HighlightEvent(
             content: selectedText,
-            articleId: articleId,
-            author: "current-user", // TODO: Use actual user pubkey
             context: contextText,
+            author: "current-user", // TODO: Use actual user pubkey
             comment: comment.isEmpty ? nil : comment
         )
         
@@ -1341,7 +1348,7 @@ struct ArticleHighlightDetailView: View {
                         .padding(.vertical, .ds.small)
                         .background(
                             Capsule()
-                                .fill(.ds.secondary)
+                                .fill(Color.ds.secondary)
                         )
                     }
                 }

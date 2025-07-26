@@ -238,65 +238,7 @@ extension View {
 }
 
 // MARK: - Custom Components
-
-struct OlasButton: View {
-    let title: String
-    let action: () -> Void
-    var style: ButtonStyle = .primary
-    var isLoading: Bool = false
-    
-    enum ButtonStyle {
-        case primary, secondary, ghost
-    }
-    
-    var body: some View {
-        Button(action: {
-            #if os(iOS)
-            OlasDesign.Haptic.impact(.light)
-            #else
-            OlasDesign.Haptic.impact(0)
-            #endif
-            action()
-        }) {
-            HStack(spacing: OlasDesign.Spacing.sm) {
-                if isLoading {
-                    ProgressView()
-                        .progressViewStyle(CircularProgressViewStyle(tint: .white))
-                        .scaleEffect(0.8)
-                } else {
-                    Text(title)
-                        .font(OlasDesign.Typography.bodyMedium)
-                }
-            }
-            .foregroundColor(.white)
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, OlasDesign.Spacing.md)
-            .background(backgroundView)
-            .clipShape(RoundedRectangle(cornerRadius: OlasDesign.CornerRadius.md))
-            .olasShadow(OlasDesign.Shadow.medium())
-        }
-        .disabled(isLoading)
-        .scaleEffect(isLoading ? 0.95 : 1.0)
-        .animation(OlasDesign.Animation.spring, value: isLoading)
-    }
-    
-    @ViewBuilder
-    private var backgroundView: some View {
-        switch style {
-        case .primary:
-            OlasDesign.currentGradient
-        case .secondary:
-            OlasDesign.Colors.surface
-                .background(.ultraThinMaterial)
-        case .ghost:
-            Color.clear
-                .overlay(
-                    RoundedRectangle(cornerRadius: OlasDesign.CornerRadius.md)
-                        .stroke(OlasDesign.Colors.divider, lineWidth: 1)
-                )
-        }
-    }
-}
+// Note: OlasButton is defined in Views/Components/OlasButton.swift
 
 struct OlasTextField: View {
     @Binding var text: String

@@ -115,14 +115,16 @@ struct Article: Identifiable, Equatable {
             tags.append(["t", hashtag])
         }
         
+        // Create the event with all required parameters
         let event = NDKEvent(
+            id: id,
+            pubkey: author,
+            createdAt: createdAt,
             kind: 30023,
+            tags: tags,
             content: content,
-            tags: tags
+            sig: "" // Empty signature for mock events
         )
-        event.id = id
-        event.pubkey = author
-        event.createdAt = createdAt
         self.event = event
     }
 }

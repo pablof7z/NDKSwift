@@ -5,7 +5,6 @@ struct ExploreView: View {
     @Environment(NostrManager.self) private var nostrManager
     @EnvironmentObject var appState: AppState
     @StateObject private var viewModel = ExploreViewModel()
-    @State private var searchText = ""
     @State private var selectedCategory: ExploreCategory = .trending
     @State private var showingHashtagView = false
     @State private var selectedHashtag = ""
@@ -70,11 +69,13 @@ struct ExploreView: View {
                 
                 ScrollView {
                     VStack(spacing: 0) {
-                        // Search bar
-                        searchBar
-                            .padding(.horizontal, OlasDesign.Spacing.md)
-                            .padding(.top, OlasDesign.Spacing.sm)
-                            .padding(.bottom, OlasDesign.Spacing.md)
+                        // Search bar - navigates to dedicated search view
+                        NavigationLink(destination: SearchView()) {
+                            searchBarButton
+                        }
+                        .padding(.horizontal, OlasDesign.Spacing.md)
+                        .padding(.top, OlasDesign.Spacing.sm)
+                        .padding(.bottom, OlasDesign.Spacing.md)
                         
                         // Category pills
                         categoryPills
@@ -122,19 +123,17 @@ struct ExploreView: View {
     // MARK: - Views
     
     @ViewBuilder
-    private var searchBar: some View {
+    private var searchBarButton: some View {
         HStack(spacing: OlasDesign.Spacing.sm) {
             Image(systemName: "magnifyingglass")
                 .foregroundColor(OlasDesign.Colors.textSecondary)
                 .font(.body)
             
-            TextField("Search posts, hashtags, or users", text: $searchText)
+            Text("Search posts, hashtags, or users")
                 .font(OlasDesign.Typography.body)
-                .foregroundColor(OlasDesign.Colors.text)
-                .submitLabel(.search)
-                .onSubmit {
-                    OlasDesign.Haptic.selection()
-                }
+                .foregroundColor(OlasDesign.Colors.textSecondary)
+            
+            Spacer()
         }
         .padding(OlasDesign.Spacing.md)
         .background(OlasDesign.Colors.surface)
@@ -250,14 +249,7 @@ struct ExploreView: View {
     // MARK: - Data
     
     private var filteredPosts: [ExploreItem] {
-        viewModel.items.filter { item in
-            // Filter by search text
-            if !searchText.isEmpty {
-                let searchLower = searchText.lowercased()
-                return item.event.content.lowercased().contains(searchLower)
-            }
-            return true
-        }
+        viewModel.items
     }
     
     // Random heights for masonry effect
