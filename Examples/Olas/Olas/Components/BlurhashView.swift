@@ -221,9 +221,6 @@ struct OlasProgressiveImage: View {
             
             #if os(iOS)
             if let image = UIImage(data: data) {
-            #else
-            if let image = NSImage(data: data) {
-            #endif
                 let resized = await resizeImage(image, to: targetSize)
                 
                 await MainActor.run {
@@ -231,6 +228,16 @@ struct OlasProgressiveImage: View {
                     self.phase = .lowQuality
                 }
             }
+            #else
+            if let image = NSImage(data: data) {
+                let resized = await resizeImage(image, to: targetSize)
+                
+                await MainActor.run {
+                    self.lowQualityImage = resized
+                    self.phase = .lowQuality
+                }
+            }
+            #endif
         } catch {
             print("Failed to load low quality image: \(error)")
         }
@@ -242,9 +249,6 @@ struct OlasProgressiveImage: View {
             
             #if os(iOS)
             if let image = UIImage(data: data) {
-            #else
-            if let image = NSImage(data: data) {
-            #endif
                 let resized = await resizeImage(image, to: targetSize)
                 
                 await MainActor.run {
@@ -257,6 +261,21 @@ struct OlasProgressiveImage: View {
                     }
                 }
             }
+            #else
+            if let image = NSImage(data: data) {
+                let resized = await resizeImage(image, to: targetSize)
+                
+                await MainActor.run {
+                    self.highQualityImage = resized
+                    self.phase = .highQuality
+                    
+                    // Smooth transition
+                    withAnimation(.easeOut(duration: 0.5)) {
+                        self.showHighQuality = true
+                    }
+                }
+            }
+            #endif
         } catch {
             print("Failed to load high quality image: \(error)")
         }

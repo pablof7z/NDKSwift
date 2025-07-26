@@ -28,7 +28,16 @@ struct FeedView: View {
                 } else {
                     // Feed content
                     ScrollView {
-                        LazyVStack(spacing: 0) {
+                        LazyVStack(spacing: 0, pinnedViews: [.sectionHeaders]) {
+                            // Stories section
+                            Section {
+                                // Empty section content
+                            } header: {
+                                StoriesView()
+                                    .background(OlasDesign.Colors.background)
+                            }
+                            
+                            // Feed items
                             ForEach(Array(viewModel.items.enumerated()), id: \.element.id) { index, item in
                                 FeedItemView(item: item)
                                     .id(item.id)
@@ -51,7 +60,7 @@ struct FeedView: View {
                                 }
                             }
                         }
-                        .padding(.top, OlasDesign.Spacing.sm)
+                        .padding(.top, 0)
                     }
                 }
             }
@@ -65,11 +74,11 @@ struct FeedView: View {
                 #else
                 ToolbarItem(placement: .automatic) {
                 #endif
-                    Button {
-                        OlasDesign.Haptic.selection()
-                        // TODO: Navigate to create post
-                    } label: {
+                    NavigationLink(destination: CreatePostView()) {
                         Image(systemName: "camera.fill")
+                            .onTapGesture {
+                                OlasDesign.Haptic.selection()
+                            }
                             .foregroundStyle(
                                 LinearGradient(
                                     colors: OlasDesign.Colors.primaryGradient,
