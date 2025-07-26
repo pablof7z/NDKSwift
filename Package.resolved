@@ -46,6 +46,15 @@
       }
     },
     {
+      "identity" : "cashuswift",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/zeugmaster/CashuSwift.git",
+      "state" : {
+        "branch" : "main",
+        "revision" : "d703a9b2035d1240e4476d3c37d2cd967f0c3d75"
+      }
+    },
+    {
       "identity" : "cryptoswiftwrapper",
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/anquii/CryptoSwiftWrapper.git",

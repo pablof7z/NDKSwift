@@ -1,6 +1,8 @@
 import Foundation
 
 // MARK: - Data extensions for hex conversion
+// These extensions were previously provided by the CashuSwift fork
+// but are now implemented directly in NDKSwift
 
 public extension Data {
     /// Initialize Data from hex string
