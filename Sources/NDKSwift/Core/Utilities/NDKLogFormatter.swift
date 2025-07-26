@@ -75,6 +75,7 @@ public enum NDKLogFormatter {
         case .performance: return "⚡"
         case .security: return "🛡️"
         case .database: return "🗄️"
+        case .signature: return "🔏"
         }
     }
 }

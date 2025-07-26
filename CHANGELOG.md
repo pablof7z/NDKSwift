@@ -6,6 +6,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- URLSessionProtocol to enable proper testing of BlossomClient
+- Missing tests for NDKAuthManager.restoreSession() method
+- Comprehensive documentation for AsyncSequence API usage
+- Migration guide from callback-based to AsyncSequence patterns
+
+### Changed
+- BlossomClient now accepts URLSessionProtocol instead of concrete URLSession
+- SimpleMockURLSession now conforms to URLSessionProtocol for testing
+
+### Fixed
+- Re-enabled BlossomClient metadata tests that were previously disabled
+- Improved error logging in NDKSignatureVerificationSampler for better debugging
+
+### Improved
+- API documentation now includes detailed AsyncSequence examples
+- Better migration guidance for developers moving from callbacks to modern patterns
+
 ## [0.1.5] - 2025-01-26
 
 ### Added

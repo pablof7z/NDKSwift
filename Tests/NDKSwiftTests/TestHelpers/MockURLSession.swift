@@ -1,4 +1,5 @@
 import Foundation
+@testable import NDKSwift
 
 /// Mock URLSession for testing network requests
 class MockURLSession: URLProtocol {
@@ -44,7 +45,7 @@ class MockURLSession: URLProtocol {
 }
 
 /// Simple mock for testing
-class SimpleMockURLSession {
+final class SimpleMockURLSession: URLSessionProtocol, @unchecked Sendable {
     var data: Data?
     var response: URLResponse?
     var error: Error?
@@ -63,6 +64,12 @@ class SimpleMockURLSession {
         )!
         
         return (data, response)
+    }
+    
+    func data(from url: URL) async throws -> (Data, URLResponse) {
+        var request = URLRequest(url: url)
+        request.httpMethod = "GET"
+        return try await data(for: request)
     }
     
     func upload(for request: URLRequest, from bodyData: Data) async throws -> (Data, URLResponse) {

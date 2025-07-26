@@ -398,4 +398,61 @@ final class NDKAuthManagerTests: XCTestCase {
         
         XCTAssertNil(ndk.signer)
     }
+    
+    // MARK: - Session Restoration Tests
+    
+    func testRestoreSession() async throws {
+        // Skip test in CI environment where keychain access is restricted
+        #if os(macOS) || os(iOS)
+        guard ProcessInfo.processInfo.environment["CI"] == nil else {
+            throw XCTSkip("Skipping keychain test in CI environment")
+        }
+        #endif
+        
+        // Create a session first
+        let privateKey = "8f40e50a84a7462e2b8d24c28898ef0ce0d0113a0a2ce9648e6006b79c7e5185"
+        let session = try await authManager.createSession(withPrivateKey: privateKey, saveToKeychain: true)
+        
+        // Verify session is active
+        XCTAssertTrue(authManager.isAuthenticated)
+        XCTAssertNotNil(authManager.activeSession)
+        XCTAssertEqual(authManager.activeSession?.id, session.id)
+        
+        // Clear current session to simulate app restart
+        authManager.logout()
+        
+        // Verify logged out
+        XCTAssertFalse(authManager.isAuthenticated)
+        XCTAssertNil(authManager.activeSession)
+        
+        // Restore session
+        authManager.restoreSession()
+        
+        // Give it a moment to restore asynchronously
+        try await Task.sleep(nanoseconds: 100_000_000) // 0.1 seconds
+        
+        // Should now be authenticated with the same session
+        XCTAssertTrue(authManager.isAuthenticated)
+        XCTAssertNotNil(authManager.activeSession)
+        XCTAssertEqual(authManager.activeSession?.pubkey, session.pubkey)
+        
+        // Clean up
+        try await authManager.deleteSession(authManager.activeSession!)
+    }
+    
+    func testRestoreSessionWithNoSavedSessions() async throws {
+        // Ensure no sessions exist
+        authManager.logout()
+        
+        // Restore session should not crash and should remain unauthenticated
+        authManager.restoreSession()
+        
+        // Give it a moment to complete
+        try await Task.sleep(nanoseconds: 50_000_000) // 0.05 seconds
+        
+        // Should still be unauthenticated
+        XCTAssertFalse(authManager.isAuthenticated)
+        XCTAssertNil(authManager.activeSession)
+        XCTAssertEqual(authManager.authenticationState, .unauthenticated)
+    }
 }

@@ -179,6 +179,7 @@ public actor NDKSignatureVerificationSampler {
             let messageData = Data(hexString: eventId) ?? Data()
             return try Crypto.verify(signature: signature, message: messageData, pubkey: event.pubkey)
         } catch {
+            NDKLogger.log(.debug, category: .signature, "Signature verification failed for event \(event.id): \(error)")
             return false
         }
     }

@@ -556,4 +556,4 @@ class MessagesViewModel: ObservableObject {
         
         conversations.insert(conversation, at: 0)
     }
-}
+}}

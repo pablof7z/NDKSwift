@@ -497,10 +497,98 @@ public var eoseReceived: Bool { get async }      // End of stored events receive
 
 #### AsyncSequence Conformance
 
+NDKSubscription conforms to AsyncSequence, providing a modern Swift pattern for streaming events:
+
 ```swift
-// Use in async for-await loop
+// Basic usage - iterate over events as they arrive
+let subscription = ndk.subscribe(filter: myFilter)
 for try await event in subscription {
-    // Process each event
+    print("Received event: \(event.content)")
+}
+
+// The subscription automatically starts when iteration begins
+// and closes when the loop exits (break, return, throw, or scope end)
+```
+
+##### Advanced AsyncSequence Usage
+
+```swift
+// Limit number of events
+let subscription = ndk.subscribe(filter: myFilter)
+for try await event in subscription.prefix(100) {
+    // Process only first 100 events
+}
+
+// Transform events
+let contentStream = subscription.map { event in
+    event.content
+}
+for try await content in contentStream {
+    print("Content: \(content)")
+}
+
+// Filter events
+let dmEvents = subscription.filter { event in
+    event.kind == 4
+}
+for try await dm in dmEvents {
+    processDM(dm)
+}
+
+// Combine with other async operations
+let subscription = ndk.subscribe(filter: myFilter)
+for try await event in subscription {
+    // Process event
+    if shouldStop(event) {
+        break  // Subscription closes automatically
+    }
+}
+```
+
+##### Error Handling
+
+```swift
+do {
+    let subscription = ndk.subscribe(filter: myFilter)
+    for try await event in subscription {
+        processEvent(event)
+    }
+} catch {
+    print("Subscription error: \(error)")
+}
+```
+
+##### Lifecycle Management
+
+```swift
+// Subscription starts when iteration begins
+let subscription = ndk.subscribe(filter: myFilter)
+
+// Option 1: Let it run until natural completion or scope exit
+Task {
+    for try await event in subscription {
+        processEvent(event)
+    }
+    // Subscription closed automatically when loop exits
+}
+
+// Option 2: Manual cancellation
+let task = Task {
+    for try await event in subscription {
+        processEvent(event)
+    }
+}
+// Later...
+task.cancel()  // Cancels iteration and closes subscription
+
+// Option 3: Explicit close
+Task {
+    for try await event in subscription {
+        processEvent(event)
+        if shouldStop {
+            await subscription.close()  // Ends iteration
+        }
+    }
 }
 ```
 
@@ -1287,18 +1375,125 @@ See [NetworkLoggingDemo.swift](../Examples/NetworkLoggingDemo.swift) for a compl
 
 ## Migration from Callbacks
 
-If migrating from older callback-based code:
+### Why AsyncSequence?
+
+The AsyncSequence pattern provides several advantages over callbacks:
+- **Automatic lifecycle management** - No need to manually start/stop subscriptions
+- **Natural error propagation** - Errors flow through try/await
+- **Composability** - Use Swift's sequence operators (map, filter, prefix, etc.)
+- **Cancellation support** - Integrates with Task cancellation
+- **Sequential processing** - Events are processed in order
+
+### Migration Examples
+
+#### Basic Event Handling
 
 ```swift
 // Old pattern (deprecated)
+let subscription = ndk.subscribe(filter: filter)
 subscription.onEvent { event in
-    // Handle event
+    handleEvent(event)
+}
+subscription.onEose {
+    print("End of stored events")
 }
 subscription.start()
+// Later: subscription.close()
 
 // New pattern (recommended)
-for await event in subscription {
-    // Handle event
+Task {
+    let subscription = ndk.subscribe(filter: filter)
+    for try await event in subscription {
+        handleEvent(event)
+    }
+    // Subscription closes automatically
+}
+```
+
+#### Error Handling
+
+```swift
+// Old pattern (deprecated)
+subscription.onError { error in
+    print("Error: \(error)")
+}
+
+// New pattern (recommended)
+Task {
+    do {
+        for try await event in subscription {
+            handleEvent(event)
+        }
+    } catch {
+        print("Error: \(error)")
+    }
+}
+```
+
+#### Combining Multiple Subscriptions
+
+```swift
+// Old pattern (complex with callbacks)
+let sub1 = ndk.subscribe(filter: filter1)
+let sub2 = ndk.subscribe(filter: filter2)
+var allEvents: [NDKEvent] = []
+
+sub1.onEvent { event in
+    allEvents.append(event)
+}
+sub2.onEvent { event in
+    allEvents.append(event)
+}
+sub1.start()
+sub2.start()
+
+// New pattern (clean with async/await)
+Task {
+    async let events1 = Array(subscription1.prefix(100))
+    async let events2 = Array(subscription2.prefix(100))
+    
+    let allEvents = try await events1 + events2
+    processEvents(allEvents)
+}
+```
+
+#### Lifecycle Management
+
+```swift
+// Old pattern (manual management)
+class EventHandler {
+    var subscription: NDKSubscription?
+    
+    func startListening() {
+        subscription = ndk.subscribe(filter: filter)
+        subscription?.onEvent { [weak self] event in
+            self?.handleEvent(event)
+        }
+        subscription?.start()
+    }
+    
+    func stopListening() {
+        subscription?.close()
+        subscription = nil
+    }
+}
+
+// New pattern (automatic with Task)
+class EventHandler {
+    var listeningTask: Task<Void, Error>?
+    
+    func startListening() {
+        listeningTask = Task { [weak self] in
+            let subscription = ndk.subscribe(filter: filter)
+            for try await event in subscription {
+                self?.handleEvent(event)
+            }
+        }
+    }
+    
+    func stopListening() {
+        listeningTask?.cancel()  // Automatically closes subscription
+    }
 }
 ```
 
