@@ -124,8 +124,8 @@ struct CurationManagementView: View {
                             }
                             .padding(.horizontal, 12)
                             .padding(.vertical, 10)
-                            .background(Color.highlighterCardBackground)
-                            .cornerRadius(12)
+                            .background(DesignSystem.Colors.surface)
+                            .cornerRadius(DesignSystem.CornerRadius.medium)
                             .overlay(
                                 RoundedRectangle(cornerRadius: 12)
                                     .stroke(Color.gray.opacity(0.2), lineWidth: 1)
@@ -188,7 +188,7 @@ struct CurationManagementView: View {
                             }
                         }
                         .padding(4)
-                        .background(Color.highlighterCardBackground)
+                        .background(DesignSystem.Colors.surface)
                         .cornerRadius(14)
                         .padding(.horizontal)
                         .opacity(headerAnimation ? 1 : 0)
@@ -562,7 +562,7 @@ struct CarouselView: View {
                                 .fill(index == currentIndex ? Color.highlighterPurple : Color.gray.opacity(0.3))
                                 .frame(width: 8, height: 8)
                                 .scaleEffect(index == currentIndex ? 1.2 : 1)
-                                .animation(.spring(response: 0.3, dampingFraction: 0.7), value: currentIndex)
+                                .animation(DesignSystem.Animation.springSnappy, value: currentIndex)
                         }
                     }
                     .padding(.bottom, 20)
@@ -694,12 +694,10 @@ struct CurationGridItem: View {
             .padding(.horizontal, 12)
             .padding(.bottom, 12)
         }
-        .background(Color.highlighterCardBackground)
-        .cornerRadius(12)
-        .shadow(color: .black.opacity(0.05), radius: 8, y: 4)
+        .modernCard()
         .scaleEffect(isSelected || isHovered ? 0.95 : 1)
-        .animation(.spring(response: 0.3, dampingFraction: 0.7), value: isSelected)
-        .animation(.spring(response: 0.3, dampingFraction: 0.7), value: isHovered)
+        .animation(DesignSystem.Animation.springSnappy, value: isSelected)
+        .animation(DesignSystem.Animation.springSnappy, value: isHovered)
         .onAppear {
             if isHovered {
                 withAnimation(.easeInOut(duration: 0.8).repeatForever(autoreverses: true)) {
@@ -723,7 +721,7 @@ struct CurationListRow: View {
                 Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
                     .font(.title3)
                     .foregroundColor(isSelected ? .highlighterPurple : .gray)
-                    .animation(.spring(response: 0.3, dampingFraction: 0.7), value: isSelected)
+                    .animation(DesignSystem.Animation.springSnappy, value: isSelected)
             }
             
             // Thumbnail
@@ -788,14 +786,14 @@ struct CurationListRow: View {
         .padding()
         .background(
             RoundedRectangle(cornerRadius: 12)
-                .fill(Color.highlighterCardBackground)
+                .fill(DesignSystem.Colors.surface)
                 .overlay(
                     RoundedRectangle(cornerRadius: 12)
                         .stroke(isHovered ? Color.highlighterPurple : Color.clear, lineWidth: 2)
                 )
         )
         .scaleEffect(isHovered ? 1.02 : 1)
-        .animation(.spring(response: 0.3, dampingFraction: 0.7), value: isHovered)
+        .animation(DesignSystem.Animation.springSnappy, value: isHovered)
     }
 }
 
@@ -866,7 +864,7 @@ struct CurationManagementCarouselCard: View {
             .frame(maxHeight: .infinity)
         }
         .frame(width: geometry.size.width * 0.8)
-        .background(Color.highlighterCardBackground)
+        .background(DesignSystem.Colors.surface)
         .cornerRadius(20)
         .shadow(
             color: .black.opacity(index == currentIndex ? 0.2 : 0.1),

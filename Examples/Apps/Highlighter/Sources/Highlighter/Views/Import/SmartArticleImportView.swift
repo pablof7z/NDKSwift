@@ -1510,7 +1510,7 @@ struct LiveArticlePreview: View {
         .background(
             RoundedRectangle(cornerRadius: .ds.large, style: .continuous)
                 .fill(DesignSystem.Colors.surface)
-                .shadow(color: .black.opacity(0.05), radius: 20, x: 0, y: 10)
+                .shadow(color: DesignSystem.Shadow.elevated.color, radius: DesignSystem.Shadow.elevated.radius, x: DesignSystem.Shadow.elevated.x, y: DesignSystem.Shadow.elevated.y)
         )
     }
     
@@ -1627,7 +1627,7 @@ struct ArticleMetricsCard: View {
         .background(
             RoundedRectangle(cornerRadius: .ds.medium, style: .continuous)
                 .fill(DesignSystem.Colors.surface)
-                .shadow(color: .black.opacity(0.05), radius: 10, x: 0, y: 5)
+                .shadow(color: DesignSystem.Shadow.medium.color, radius: DesignSystem.Shadow.medium.radius, x: DesignSystem.Shadow.medium.x, y: DesignSystem.Shadow.medium.y)
         )
         .onAppear {
             withAnimation(.spring(response: 0.5, dampingFraction: 0.8).delay(0.2)) {
@@ -1797,7 +1797,7 @@ struct EnhancedSuggestionCard: View {
                             .fill(.white)
                             .frame(width: 18, height: 18)
                             .offset(x: isSelected ? 8 : -8)
-                            .shadow(color: .black.opacity(0.1), radius: 2, x: 0, y: 1)
+                            .shadow(color: DesignSystem.Shadow.subtle.color, radius: DesignSystem.Shadow.subtle.radius, x: DesignSystem.Shadow.subtle.x, y: DesignSystem.Shadow.subtle.y)
                     }
                     
                     Text(isSelected ? "Selected" : "Select")

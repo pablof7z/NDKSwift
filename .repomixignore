@@ -1,43 +1,26 @@
-# Ignore build directories
+# Build directories
 .build/
-build/
 DerivedData/
+build/
+
+# Package dependencies
 .swiftpm/
+SourcePackages/
+checkouts/
 
-# Ignore large test files
-*.test
-**/test_vectors/
-**/Test Vectors/
-**/*test*.json
-**/*Test*.json
-**/Tests/**
+# Large test files
+**/Test Vectors/**
+**/test/**
+**/tests/**
 
-# Ignore documentation that's not essential
-docs/
-Documentation/
-
-# Ignore example apps (except the one we're working on)
-Examples/Apps/
-Examples/Features/
-Examples/GettingStarted/
-Examples/Test*.swift
-Examples/Debug*.swift
-
-# Keep only the NIP60Wallet example
-!Examples/NIP60Wallet.swiftExamples
-
-# Exclude vendor dependencies  
-Libraries/
-Sources/*/checkouts/
-Packages/
-Package.resolved
-
-# Exclude IDE files
-*.xcworkspace/
+# Xcode
 *.xcodeproj/
+*.xcworkspace/
 *.xcuserdata/
 
-# Exclude specific large files that appear in checkouts
-**/p256-nistz-table.h
-**/CCryptoBoringSSL/**
-**/GRDB.swift/SQLiteCustom/**
+# Other
+.DS_Store
+*.swp
+*.orig
+node_modules/
+EOF < /dev/null

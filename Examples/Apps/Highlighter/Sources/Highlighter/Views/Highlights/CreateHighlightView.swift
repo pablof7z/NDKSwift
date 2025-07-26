@@ -114,7 +114,7 @@ struct CreateHighlightView: View {
                                     )
                                 )
                                 .clipShape(RoundedRectangle(cornerRadius: 16))
-                                .shadow(color: Color.orange.opacity(0.3), radius: 8, y: 4)
+                                .shadow(color: DesignSystem.Colors.secondary.opacity(0.3), radius: DesignSystem.Shadow.small.radius, x: DesignSystem.Shadow.small.x, y: DesignSystem.Shadow.small.y)
                             }
                             .padding(.horizontal)
                             .padding(.bottom, 32)
@@ -425,8 +425,8 @@ struct HighlightModeCard: View {
                     )
             )
             .shadow(
-                color: isSelected ? Color.orange.opacity(0.2) : Color.black.opacity(0.05),
-                radius: isSelected ? 12 : 4,
+                color: isSelected ? DesignSystem.Colors.secondary.opacity(0.2) : DesignSystem.Shadow.small.color,
+                radius: isSelected ? DesignSystem.Shadow.medium.radius : DesignSystem.Shadow.small.radius,
                 y: isSelected ? 4 : 2
             )
         }
@@ -596,7 +596,7 @@ struct AIAnalysisCard: View {
                 .padding(.vertical, 16)
             }
             .frame(height: 88)
-            .shadow(color: Color.purple.opacity(glowing ? 0.6 : 0.3), radius: glowing ? 20 : 10, y: 5)
+            .shadow(color: DesignSystem.Colors.primary.opacity(glowing ? 0.6 : 0.3), radius: glowing ? DesignSystem.Shadow.elevated.radius : DesignSystem.Shadow.medium.radius, x: 0, y: DesignSystem.Shadow.medium.y)
             .scaleEffect(glowing ? 1.02 : 1.0)
         }
         .buttonStyle(.plain)

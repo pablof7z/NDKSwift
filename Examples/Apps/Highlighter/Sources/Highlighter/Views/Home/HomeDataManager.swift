@@ -88,14 +88,20 @@ class HomeDataManager: ObservableObject {
             limit: 100
         )
         
-        let subscription = ndk.subscribe(filter: highlightFilter, closeOnEose: true)
+        let dataSource = NDKDataSource(
+            ndk: ndk,
+            filter: highlightFilter,
+            maxAge: 0,
+            cachePolicy: .networkOnly,
+            closeOnEose: true
+        )
         
         var articleReferences: Set<String> = []
         var highlightsByArticle: [String: [HighlightEvent]] = [:]
         var allHighlights: [HighlightEvent] = []
         
         // Collect all highlights until EOSE
-        for await event in subscription {
+        for await event in dataSource.events {
             if let highlight = try? HighlightEvent(from: event) {
                 allHighlights.append(highlight)
                 
@@ -290,9 +296,15 @@ class HomeDataManager: ObservableObject {
         
         // Fetch articles for each filter
         for filter in articleFilters {
-            let subscription = ndk.subscribe(filter: filter, closeOnEose: true)
+            let dataSource = NDKDataSource(
+                ndk: ndk,
+                filter: filter,
+                maxAge: 0,
+                cachePolicy: .networkOnly,
+                closeOnEose: true
+            )
             
-            for await event in subscription {
+            for await event in dataSource.events {
                 if event.kind == 30023,
                    let article = try? Article(from: event) {
                     // Check both formats: event ID and "a" tag format
@@ -333,8 +345,8 @@ class HomeDataManager: ObservableObject {
     
     // MARK: - Cleanup
     deinit {
-        Task { @MainActor in
-            stopAllStreams()
+        Task { @MainActor [weak self] in
+            self?.stopAllStreams()
         }
     }
 }

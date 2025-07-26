@@ -12,19 +12,23 @@ struct SimplifiedHybridFeedView: View {
     @State private var headerOpacity: Double = 1
     @State private var highlightEngagements: [String: EngagementService.EngagementMetrics] = [:]
     @State private var discussionEngagements: [String: EngagementService.EngagementMetrics] = [:]
+    @State private var isRefreshing = false
+    @State private var refreshProgress: CGFloat = 0
+    @State private var showFloatingElements = true
+    @State private var contentAppeared = false
     
     // Dynamic gradient colors that shift based on time of day
     private var gradientColors: [Color] {
         let hour = Calendar.current.component(.hour, from: Date())
         switch hour {
-        case 5..<12: // Morning
-            return [Color(hex: "FFE5B4"), Color(hex: "FFD700").opacity(0.3)]
-        case 12..<17: // Afternoon
-            return [Color(hex: "87CEEB").opacity(0.3), Color(hex: "4682B4").opacity(0.2)]
-        case 17..<21: // Evening
-            return [Color(hex: "FF6B6B").opacity(0.3), Color(hex: "FF8E53").opacity(0.2)]
-        default: // Night
-            return [Color(hex: "2C3E50").opacity(0.3), Color(hex: "34495E").opacity(0.2)]
+        case 5..<12: // Morning - warm orange tones
+            return [DesignSystem.Colors.secondary.opacity(0.2), DesignSystem.Colors.secondaryLight.opacity(0.1)]
+        case 12..<17: // Afternoon - purple to orange blend
+            return [DesignSystem.Colors.primary.opacity(0.15), DesignSystem.Colors.secondary.opacity(0.1)]
+        case 17..<21: // Evening - deeper purple tones
+            return [DesignSystem.Colors.primary.opacity(0.2), DesignSystem.Colors.primaryDark.opacity(0.15)]
+        default: // Night - subtle dark purple
+            return [DesignSystem.Colors.primaryDark.opacity(0.15), DesignSystem.Colors.primary.opacity(0.08)]
         }
     }
     
@@ -52,29 +56,45 @@ struct SimplifiedHybridFeedView: View {
     var body: some View {
         NavigationStack {
             ZStack(alignment: .top) {
-                // Animated gradient background
-                LinearGradient(
-                    colors: gradientColors,
-                    startPoint: .topLeading,
-                    endPoint: .bottomTrailing
-                )
-                .ignoresSafeArea()
-                .opacity(0.3)
-                .animation(.easeInOut(duration: 3), value: gradientColors)
+                // Animated gradient background with floating elements
+                ZStack {
+                    LinearGradient(
+                        colors: gradientColors,
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                    .ignoresSafeArea()
+                    .opacity(0.3)
+                    .animation(.easeInOut(duration: 3), value: gradientColors)
+                    
+                    // Floating ambient elements
+                    if showFloatingElements {
+                        FloatingAmbientView()
+                            .ignoresSafeArea()
+                            .opacity(contentAppeared ? 1 : 0)
+                            .animation(.easeIn(duration: 1.5), value: contentAppeared)
+                    }
+                }
+                
+                // Custom refresh indicator
+                RefreshIndicatorView(progress: refreshProgress, isRefreshing: isRefreshing)
+                    .offset(y: -80 + (scrollOffset > 0 ? scrollOffset * 0.5 : 0))
+                    .opacity(scrollOffset > 10 ? 1 : 0)
+                    .animation(.spring(response: 0.3), value: scrollOffset)
                 
                 ScrollViewReader { scrollProxy in
                     ScrollView(.vertical, showsIndicators: false) {
                         VStack(spacing: 0) {
                             // Parallax header with live indicator
                             headerView
-                                .padding(.horizontal, 20)
-                                .padding(.top, 16)
+                                .padding(.horizontal, DesignSystem.Spacing.large)
+                                .padding(.top, DesignSystem.Spacing.medium)
                                 .offset(y: scrollOffset * 0.5)
                                 .opacity(headerOpacity)
                                 .id("header")
                             
                             
-                            VStack(spacing: 32) {
+                            VStack(spacing: DesignSystem.Spacing.xxl) {
                                 // Recently Highlighted Articles
                                 if !dataManager.highlightedArticles.isEmpty {
                                     recentlyHighlightedSection
@@ -103,9 +123,9 @@ struct SimplifiedHybridFeedView: View {
                                     enhancedDiscussionsSection
                                 }
                             }
-                            .padding(.top, 24)
+                            .padding(.top, DesignSystem.Spacing.xl)
                         }
-                        .padding(.bottom, 100)
+                        .padding(.bottom, DesignSystem.Spacing.huge * 2.5)
                         .background(GeometryReader { geo in
                             Color.clear.preference(
                                 key: ScrollOffsetPreferenceKey.self,
@@ -122,7 +142,13 @@ struct SimplifiedHybridFeedView: View {
                     }
                     .refreshable {
                         HapticManager.shared.impact(.medium)
+                        withAnimation(.spring(response: 0.5, dampingFraction: 0.6)) {
+                            isRefreshing = true
+                        }
                         await dataManager.refresh()
+                        withAnimation(.spring(response: 0.5, dampingFraction: 0.8)) {
+                            isRefreshing = false
+                        }
                     }
                 }
             }
@@ -130,16 +156,19 @@ struct SimplifiedHybridFeedView: View {
         }
         .onAppear {
             dataManager.appState = appState
+            withAnimation(.easeInOut(duration: 0.8).delay(0.3)) {
+                contentAppeared = true
+            }
         }
         .task {
             await dataManager.startStreaming()
         }
-        .onChange(of: dataManager.userHighlights) { _ in
+        .onChange(of: dataManager.userHighlights) {
             Task {
                 await fetchHighlightEngagements()
             }
         }
-        .onChange(of: dataManager.discussions) { _ in
+        .onChange(of: dataManager.discussions) {
             Task {
                 await fetchDiscussionEngagements()
             }
@@ -148,30 +177,30 @@ struct SimplifiedHybridFeedView: View {
     
     private var headerView: some View {
         HStack {
-            VStack(alignment: .leading, spacing: 8) {
-                HStack(spacing: 12) {
+            VStack(alignment: .leading, spacing: DesignSystem.Spacing.small) {
+                HStack(spacing: DesignSystem.Spacing.base) {
                     Text(GreetingFormatter.timeBasedGreeting())
                         .font(.system(size: 34, weight: .bold, design: .rounded))
-                        .foregroundColor(.ds.text)
+                        .foregroundColor(DesignSystem.Colors.text)
                     
                     // Time-based emoji without pulsing animation
                     Text(timeBasedEmoji)
                         .font(.system(size: 28))
                 }
                 
-                HStack(spacing: 6) {
+                HStack(spacing: DesignSystem.Spacing.mini) {
                     Text(GreetingFormatter.formattedDate())
                         .font(.ds.footnote)
-                        .foregroundColor(.ds.textSecondary)
+                        .foregroundColor(DesignSystem.Colors.textSecondary)
                     
                     Circle()
-                        .fill(Color.green)
+                        .fill(DesignSystem.Colors.success)
                         .frame(width: 6, height: 6)
                     
                     Text("Live")
                         .font(.ds.caption)
                         .fontWeight(.medium)
-                        .foregroundColor(.green)
+                        .foregroundColor(DesignSystem.Colors.success)
                 }
             }
             
@@ -201,30 +230,30 @@ struct SimplifiedHybridFeedView: View {
         icon: String? = nil,
         @ViewBuilder content: @escaping (Item) -> Content
     ) -> some View {
-        VStack(alignment: .leading, spacing: 20) {
-            VStack(alignment: .leading, spacing: 6) {
-                HStack(spacing: 8) {
+        VStack(alignment: .leading, spacing: DesignSystem.Spacing.large) {
+            VStack(alignment: .leading, spacing: DesignSystem.Spacing.mini) {
+                HStack(spacing: DesignSystem.Spacing.small) {
                     if let icon = icon {
                         Image(systemName: icon)
                             .font(.system(size: 20, weight: .semibold))
-                            .foregroundColor(.ds.primary)
+                            .foregroundColor(DesignSystem.Colors.primary)
                     }
                     
                     Text(title)
                         .font(.system(size: 24, weight: .bold, design: .rounded))
-                        .foregroundColor(.ds.text)
+                        .foregroundColor(DesignSystem.Colors.text)
                 }
                 
                 if let subtitle = subtitle {
                     Text(subtitle)
                         .font(.ds.footnote)
-                        .foregroundColor(.ds.textSecondary)
+                        .foregroundColor(DesignSystem.Colors.textSecondary)
                 }
             }
-            .padding(.horizontal, 20)
+            .padding(.horizontal, DesignSystem.Spacing.large)
             
             ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 20) {
+                HStack(spacing: DesignSystem.Spacing.large) {
                     ForEach(items) { item in
                         content(item)
                             .frame(width: 300)
@@ -234,48 +263,55 @@ struct SimplifiedHybridFeedView: View {
                             ))
                     }
                 }
-                .padding(.horizontal, 20)
-                .padding(.vertical, 4) // For shadows
+                .padding(.horizontal, DesignSystem.Spacing.large)
+                .padding(.vertical, DesignSystem.Spacing.micro) // For shadows
             }
         }
     }
     
     private func carouselLoadingState(title: String) -> some View {
-        VStack(alignment: .leading, spacing: 20) {
+        VStack(alignment: .leading, spacing: DesignSystem.Spacing.large) {
             Text(title)
                 .font(.system(size: 24, weight: .bold, design: .rounded))
-                .foregroundColor(.ds.text)
-                .padding(.horizontal, 20)
+                .foregroundColor(DesignSystem.Colors.text)
+                .padding(.horizontal, DesignSystem.Spacing.large)
             
             ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 20) {
-                    ForEach(0..<3, id: \.self) { _ in
-                        RoundedRectangle(cornerRadius: 20)
-                            .fill(Color.ds.surfaceSecondary)
+                HStack(spacing: DesignSystem.Spacing.large) {
+                    ForEach(0..<3, id: \.self) { index in
+                        SkeletonHighlightCard()
                             .frame(width: 300, height: 200)
-                            .shimmer()
+                            .transition(.asymmetric(
+                                insertion: .scale(scale: 0.8).combined(with: .opacity),
+                                removal: .scale(scale: 1.2).combined(with: .opacity)
+                            ))
+                            .animation(
+                                .spring(response: 0.5, dampingFraction: 0.7)
+                                .delay(Double(index) * 0.1),
+                                value: dataManager.userHighlights.isEmpty
+                            )
                     }
                 }
-                .padding(.horizontal, 20)
+                .padding(.horizontal, DesignSystem.Spacing.large)
             }
         }
     }
     
     private var recentlyHighlightedSection: some View {
-        VStack(alignment: .leading, spacing: 20) {
-            VStack(alignment: .leading, spacing: 6) {
+        VStack(alignment: .leading, spacing: DesignSystem.Spacing.large) {
+            VStack(alignment: .leading, spacing: DesignSystem.Spacing.mini) {
                 Text("Recently Highlighted")
                     .font(.system(size: 28, weight: .bold, design: .rounded))
-                    .foregroundColor(.ds.text)
+                    .foregroundColor(DesignSystem.Colors.text)
                 
                 Text("Articles you might enjoy")
                     .font(.ds.body)
-                    .foregroundColor(.ds.textSecondary)
+                    .foregroundColor(DesignSystem.Colors.textSecondary)
             }
-            .padding(.horizontal, 20)
+            .padding(.horizontal, DesignSystem.Spacing.large)
             
             ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 16) {
+                HStack(spacing: DesignSystem.Spacing.medium) {
                     ForEach(dataManager.highlightedArticles.prefix(5), id: \.article.id) { highlightedArticle in
                         NavigationLink(destination: ArticleView(article: highlightedArticle.article)) {
                             RecentlyHighlightedArticleCard(highlightedArticle: highlightedArticle)
@@ -284,34 +320,34 @@ struct SimplifiedHybridFeedView: View {
                         .buttonStyle(PlainButtonStyle())
                     }
                 }
-                .padding(.horizontal, 20)
+                .padding(.horizontal, DesignSystem.Spacing.large)
                 .padding(.vertical, 4)
             }
         }
     }
     
     private var enhancedDiscussionsSection: some View {
-        VStack(alignment: .leading, spacing: 20) {
+        VStack(alignment: .leading, spacing: DesignSystem.Spacing.large) {
             HStack {
-                VStack(alignment: .leading, spacing: 6) {
-                    HStack(spacing: 8) {
+                VStack(alignment: .leading, spacing: DesignSystem.Spacing.mini) {
+                    HStack(spacing: DesignSystem.Spacing.small) {
                         Image(systemName: "bubble.left.and.bubble.right.fill")
                             .font(.system(size: 20, weight: .semibold))
-                            .foregroundColor(.ds.primary)
+                            .foregroundColor(DesignSystem.Colors.primary)
                         
                         Text("Active Discussions")
                             .font(.system(size: 24, weight: .bold, design: .rounded))
-                            .foregroundColor(.ds.text)
+                            .foregroundColor(DesignSystem.Colors.text)
                     }
                     
                     Text("\(dataManager.discussions.count) conversations happening now")
                         .font(.ds.footnote)
-                        .foregroundColor(.ds.textSecondary)
+                        .foregroundColor(DesignSystem.Colors.textSecondary)
                 }
                 
                 Spacer()
             }
-            .padding(.horizontal, 20)
+            .padding(.horizontal, DesignSystem.Spacing.large)
             
             VStack(spacing: 0) {
                 ForEach(dataManager.discussions.prefix(5), id: \.id) { event in
@@ -322,17 +358,17 @@ struct SimplifiedHybridFeedView: View {
                     
                     if event.id != dataManager.discussions.prefix(5).last?.id {
                         Divider()
-                            .background(Color.ds.divider)
-                            .padding(.leading, 60)
+                            .background(DesignSystem.Colors.divider)
+                            .padding(.leading, DesignSystem.Spacing.huge + DesignSystem.Spacing.large)
                     }
                 }
             }
             .background(
-                RoundedRectangle(cornerRadius: 20, style: .continuous)
-                    .fill(Color.ds.surfaceSecondary)
-                    .shadow(color: Color.black.opacity(0.05), radius: 10, y: 5)
+                RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.xl, style: .continuous)
+                    .fill(DesignSystem.Colors.surfaceSecondary)
+                    .shadow(color: DesignSystem.Shadow.medium.color, radius: DesignSystem.Shadow.medium.radius, x: DesignSystem.Shadow.medium.x, y: DesignSystem.Shadow.medium.y)
             )
-            .padding(.horizontal, 20)
+            .padding(.horizontal, DesignSystem.Spacing.large)
         }
     }
 }
@@ -344,32 +380,71 @@ struct EnhancedHighlightCard: View {
     let engagement: EngagementService.EngagementMetrics
     @State private var isPressed = false
     @State private var showingDetail = false
+    @State private var isHovered = false
+    @State private var glowAnimation = false
     
     var body: some View {
         Button(action: { showingDetail = true }) {
             ZStack {
-                // Gradient background
-                LinearGradient(
-                    colors: [
-                        Color.ds.primary.opacity(0.15),
-                        Color.ds.primary.opacity(0.05)
-                    ],
-                    startPoint: .topLeading,
-                    endPoint: .bottomTrailing
-                )
+                // Glass morphism background
+                RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.xl, style: .continuous)
+                    .fill(.ultraThinMaterial)
+                    .overlay(
+                        LinearGradient(
+                            colors: [
+                                DesignSystem.Colors.primary.opacity(0.12),
+                                DesignSystem.Colors.secondary.opacity(0.05)
+                            ],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+                    .overlay(
+                        RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.xl, style: .continuous)
+                            .stroke(
+                                LinearGradient(
+                                    colors: [
+                                        Color.white.opacity(0.5),
+                                        Color.white.opacity(0.1)
+                                    ],
+                                    startPoint: .topLeading,
+                                    endPoint: .bottomTrailing
+                                ),
+                                lineWidth: 1
+                            )
+                    )
                 
-                VStack(alignment: .leading, spacing: 16) {
+                // Glow effect when hovered
+                if isHovered {
+                    RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.xl, style: .continuous)
+                        .stroke(
+                            LinearGradient(
+                                colors: [
+                                    DesignSystem.Colors.primary.opacity(0.6),
+                                    DesignSystem.Colors.secondary.opacity(0.4)
+                                ],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            ),
+                            lineWidth: 2
+                        )
+                        .blur(radius: 4)
+                        .opacity(glowAnimation ? 0.8 : 0.4)
+                        .animation(.easeInOut(duration: 1.5).repeatForever(autoreverses: true), value: glowAnimation)
+                }
+                
+                VStack(alignment: .leading, spacing: DesignSystem.Spacing.medium) {
                     // Source info if available
                     if let url = highlight.url {
-                        HStack(spacing: 8) {
+                        HStack(spacing: DesignSystem.Spacing.small) {
                             Image(systemName: "link.circle.fill")
                                 .font(.system(size: 16))
-                                .foregroundColor(.ds.primary)
+                                .foregroundColor(DesignSystem.Colors.primary)
                             
                             Text(ContentFormatter.extractDomain(from: url))
                                 .font(.ds.caption)
                                 .fontWeight(.medium)
-                                .foregroundColor(.ds.primary)
+                                .foregroundColor(DesignSystem.Colors.primary)
                                 .lineLimit(1)
                             
                             Spacer()
@@ -380,12 +455,12 @@ struct EnhancedHighlightCard: View {
                     HStack(alignment: .top, spacing: 12) {
                         Text("\"")
                             .font(.system(size: 36, weight: .black, design: .serif))
-                            .foregroundColor(.ds.primary.opacity(0.3))
+                            .foregroundColor(DesignSystem.Colors.primary.opacity(0.3))
                             .offset(y: -8)
                         
                         Text(highlight.content)
                             .font(.system(size: 18, weight: .medium, design: .rounded))
-                            .foregroundColor(.ds.text)
+                            .foregroundColor(DesignSystem.Colors.text)
                             .lineLimit(4)
                             .multilineTextAlignment(.leading)
                         
@@ -397,38 +472,48 @@ struct EnhancedHighlightCard: View {
                     // Footer with interactions
                     HStack {
                         // Time and author
-                        HStack(spacing: 8) {
+                        HStack(spacing: DesignSystem.Spacing.small) {
                             Circle()
-                                .fill(Color.ds.primary.opacity(0.2))
+                                .fill(DesignSystem.Colors.primary.opacity(0.2))
                                 .frame(width: 24, height: 24)
                                 .overlay(
                                     Text(PubkeyFormatter.formatForAvatar(highlight.author))
                                         .font(.system(size: 10, weight: .bold))
-                                        .foregroundColor(.ds.primary)
+                                        .foregroundColor(DesignSystem.Colors.primary)
                                 )
                             
-                            Text(RelativeTimeFormatter.relativeTime(from: highlight.createdAt ?? Date()))
+                            Text(RelativeTimeFormatter.relativeTime(from: highlight.createdAt))
                                 .font(.ds.caption)
-                                .foregroundColor(.ds.textSecondary)
+                                .foregroundColor(DesignSystem.Colors.textSecondary)
                         }
                         
                         Spacer()
                         
                         // Interaction buttons
-                        HStack(spacing: 16) {
+                        HStack(spacing: DesignSystem.Spacing.medium) {
                             InteractionButton(icon: "heart", count: engagement.likes)
                             InteractionButton(icon: "bubble.right", count: engagement.comments)
-                            InteractionButton(icon: "bolt.fill", count: engagement.zaps, color: .orange)
+                            InteractionButton(icon: "bolt.fill", count: engagement.zaps, color: DesignSystem.Colors.secondary)
                         }
                     }
                 }
-                .padding(24)
+                .padding(DesignSystem.Spacing.xl)
             }
             .frame(height: 220)
-            .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
-            .shadow(color: Color.black.opacity(0.08), radius: 16, y: 8)
-            .scaleEffect(isPressed ? 0.95 : 1)
-            .animation(.spring(response: 0.3, dampingFraction: 0.7), value: isPressed)
+            .clipShape(RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.xl, style: .continuous))
+            .shadow(
+                color: isHovered ? DesignSystem.Colors.primary.opacity(0.3) : DesignSystem.Shadow.large.color,
+                radius: isHovered ? 20 : DesignSystem.Shadow.large.radius,
+                x: 0,
+                y: isHovered ? 12 : DesignSystem.Shadow.large.y
+            )
+            .scaleEffect(isPressed ? 0.93 : (isHovered ? 1.02 : 1))
+            .rotation3DEffect(
+                .degrees(isHovered ? 2 : 0),
+                axis: (x: 1, y: 0, z: 0)
+            )
+            .animation(.spring(response: 0.4, dampingFraction: 0.7), value: isPressed)
+            .animation(.spring(response: 0.5, dampingFraction: 0.8), value: isHovered)
         }
         .buttonStyle(PlainButtonStyle())
         .onLongPressGesture(minimumDuration: 0.1, maximumDistance: .infinity, pressing: { pressing in
@@ -437,8 +522,21 @@ struct EnhancedHighlightCard: View {
                 HapticManager.shared.impact(.light)
             }
         }, perform: {})
+        .onHover { hovering in
+            withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                isHovered = hovering
+            }
+            if hovering {
+                glowAnimation = true
+            }
+        }
         .sheet(isPresented: $showingDetail) {
             HighlightDetailView(highlight: highlight)
+        }
+        .onAppear {
+            if isHovered {
+                glowAnimation = true
+            }
         }
     }
 }
@@ -453,59 +551,59 @@ struct EnhancedDiscussionRow: View {
         HStack(alignment: .top, spacing: 12) {
             // Avatar with online indicator
             ZStack(alignment: .bottomTrailing) {
-                AsyncProfileImage(pubkey: event.pubkey, size: 44)
+                EnhancedAsyncProfileImage(pubkey: event.pubkey, size: 44)
                 
                 Circle()
-                    .fill(Color.green)
+                    .fill(DesignSystem.Colors.success)
                     .frame(width: 12, height: 12)
                     .overlay(
                         Circle()
-                            .stroke(Color.ds.background, lineWidth: 2)
+                            .stroke(DesignSystem.Colors.background, lineWidth: 2)
                     )
             }
             
-            VStack(alignment: .leading, spacing: 6) {
+            VStack(alignment: .leading, spacing: DesignSystem.Spacing.mini) {
                 HStack {
                     Text(author?.displayName ?? PubkeyFormatter.formatCompact(event.pubkey))
                         .font(.system(size: 15, weight: .semibold))
-                        .foregroundColor(.ds.text)
+                        .foregroundColor(DesignSystem.Colors.text)
                     
                     Text("·")
-                        .foregroundColor(.ds.textTertiary)
+                        .foregroundColor(DesignSystem.Colors.textTertiary)
                     
                     Text(RelativeTimeFormatter.shortRelativeTime(from: event.createdAt))
                         .font(.ds.caption)
-                        .foregroundColor(.ds.textTertiary)
+                        .foregroundColor(DesignSystem.Colors.textTertiary)
                     
                     Spacer()
                     
                     if Bool.random() {
                         Image(systemName: "checkmark.seal.fill")
                             .font(.system(size: 14))
-                            .foregroundColor(.blue)
+                            .foregroundColor(DesignSystem.Colors.primary)
                     }
                 }
                 
                 Text(event.content)
                     .font(.system(size: 14))
-                    .foregroundColor(.ds.text)
+                    .foregroundColor(DesignSystem.Colors.text)
                     .lineLimit(2)
                     .fixedSize(horizontal: false, vertical: true)
                 
                 // Engagement row with real metrics
-                HStack(spacing: 20) {
+                HStack(spacing: DesignSystem.Spacing.large) {
                     EngagementButton(icon: "bubble.right", count: engagement.comments)
                     EngagementButton(icon: "arrow.2.squarepath", count: engagement.reposts)
                     EngagementButton(icon: "heart", count: engagement.likes)
-                    EngagementButton(icon: "bolt.fill", count: engagement.zaps, color: .orange)
+                    EngagementButton(icon: "bolt.fill", count: engagement.zaps, color: DesignSystem.Colors.secondary)
                 }
                 .padding(.top, 4)
             }
             
             Spacer(minLength: 0)
         }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 12)
+        .padding(.horizontal, DesignSystem.Spacing.medium)
+        .padding(.vertical, DesignSystem.Spacing.base)
     }
 }
 
@@ -532,8 +630,8 @@ struct RecentlyHighlightedArticleCard: View {
                         case .empty, .failure:
                             LinearGradient(
                                 colors: [
-                                    Color.ds.primary.opacity(0.8),
-                                    Color.ds.primary.opacity(0.4)
+                                    DesignSystem.Colors.primary.opacity(0.8),
+                                    DesignSystem.Colors.primary.opacity(0.4)
                                 ],
                                 startPoint: .topLeading,
                                 endPoint: .bottomTrailing
@@ -546,8 +644,8 @@ struct RecentlyHighlightedArticleCard: View {
                 } else {
                     LinearGradient(
                         colors: [
-                            Color.ds.primary.opacity(0.8),
-                            Color.ds.primary.opacity(0.4)
+                            DesignSystem.Colors.primary.opacity(0.8),
+                            DesignSystem.Colors.primary.opacity(0.4)
                         ],
                         startPoint: .topLeading,
                         endPoint: .bottomTrailing
@@ -566,7 +664,7 @@ struct RecentlyHighlightedArticleCard: View {
                 )
                 
                 // Article title
-                VStack(alignment: .leading, spacing: 8) {
+                VStack(alignment: .leading, spacing: DesignSystem.Spacing.small) {
                     Text(highlightedArticle.article.title)
                         .font(.system(size: 18, weight: .bold, design: .rounded))
                         .foregroundColor(.white)
@@ -581,46 +679,46 @@ struct RecentlyHighlightedArticleCard: View {
                             .multilineTextAlignment(.leading)
                     }
                 }
-                .padding(16)
+                .padding(DesignSystem.Spacing.medium)
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
             .frame(height: 180)
             
             // Bottom metadata
-            VStack(alignment: .leading, spacing: 12) {
+            VStack(alignment: .leading, spacing: DesignSystem.Spacing.base) {
                 // Author and time
-                HStack(spacing: 8) {
-                    AsyncProfileImage(pubkey: highlightedArticle.article.author, size: 24)
+                HStack(spacing: DesignSystem.Spacing.small) {
+                    EnhancedAsyncProfileImage(pubkey: highlightedArticle.article.author, size: 24)
                     
                     Text(PubkeyFormatter.formatCompact(highlightedArticle.article.author))
                         .font(.ds.caption)
                         .fontWeight(.medium)
-                        .foregroundColor(.ds.text)
+                        .foregroundColor(DesignSystem.Colors.text)
                     
                     Spacer()
                     
                     Text(highlightedArticle.article.estimatedReadingTime > 0 ? "\(highlightedArticle.article.estimatedReadingTime) min read" : "Quick read")
                         .font(.ds.caption)
-                        .foregroundColor(.ds.textSecondary)
+                        .foregroundColor(DesignSystem.Colors.textSecondary)
                 }
                 
                 // Highlight count and sample
-                VStack(alignment: .leading, spacing: 6) {
-                    HStack(spacing: 6) {
+                VStack(alignment: .leading, spacing: DesignSystem.Spacing.mini) {
+                    HStack(spacing: DesignSystem.Spacing.mini) {
                         Image(systemName: "highlighter")
                             .font(.system(size: 12))
-                            .foregroundColor(.orange)
+                            .foregroundColor(DesignSystem.Colors.secondary)
                         
                         Text("\(highlightedArticle.highlights.count) highlight\(highlightedArticle.highlights.count == 1 ? "" : "s")")
                             .font(.system(size: 12, weight: .medium))
-                            .foregroundColor(.orange)
+                            .foregroundColor(DesignSystem.Colors.secondary)
                         
                         Text("·")
-                            .foregroundColor(.ds.textTertiary)
+                            .foregroundColor(DesignSystem.Colors.textTertiary)
                         
                         Text(RelativeTimeFormatter.shortRelativeTime(from: highlightedArticle.lastHighlightTime))
                             .font(.system(size: 12))
-                            .foregroundColor(.ds.textTertiary)
+                            .foregroundColor(DesignSystem.Colors.textTertiary)
                     }
                     
                     // Show a preview of the most recent highlight
@@ -628,28 +726,28 @@ struct RecentlyHighlightedArticleCard: View {
                         Text("\"\(latestHighlight.content.prefix(80))...\"")
                             .font(.system(size: 13, design: .serif))
                             .italic()
-                            .foregroundColor(.ds.textSecondary)
+                            .foregroundColor(DesignSystem.Colors.textSecondary)
                             .lineLimit(2)
-                            .padding(.horizontal, 8)
-                            .padding(.vertical, 6)
+                            .padding(.horizontal, DesignSystem.Spacing.small)
+                            .padding(.vertical, DesignSystem.Spacing.mini)
                             .background(
-                                RoundedRectangle(cornerRadius: 8)
-                                    .fill(Color.ds.highlightSubtle.opacity(0.5))
+                                RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.small)
+                                    .fill(DesignSystem.Colors.highlightSubtle.opacity(0.5))
                             )
                     }
                 }
             }
-            .padding(16)
-            .background(Color.ds.surface)
+            .padding(DesignSystem.Spacing.medium)
+            .background(DesignSystem.Colors.surface)
         }
-        .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
-        .shadow(color: Color.black.opacity(0.1), radius: 12, y: 6)
+        .clipShape(RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.xl, style: .continuous))
+        .shadow(color: DesignSystem.Shadow.medium.color, radius: DesignSystem.Shadow.medium.radius, x: DesignSystem.Shadow.medium.x, y: DesignSystem.Shadow.medium.y)
         .overlay(
-            RoundedRectangle(cornerRadius: 20, style: .continuous)
-                .strokeBorder(Color.ds.divider.opacity(0.5), lineWidth: 0.5)
+            RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.xl, style: .continuous)
+                .strokeBorder(DesignSystem.Colors.divider.opacity(0.5), lineWidth: 0.5)
         )
         .scaleEffect(isPressed ? 0.97 : 1)
-        .animation(.spring(response: 0.3, dampingFraction: 0.7), value: isPressed)
+        .animation(DesignSystem.Animation.springSnappy, value: isPressed)
         .onLongPressGesture(minimumDuration: 0.1, maximumDistance: .infinity, pressing: { pressing in
             isPressed = pressing
             if pressing {
@@ -667,7 +765,7 @@ struct ActivityRing: View {
     var body: some View {
         ZStack {
             Circle()
-                .stroke(Color.ds.surfaceSecondary, lineWidth: 4)
+                .stroke(DesignSystem.Colors.surfaceSecondary, lineWidth: 4)
             
             Circle()
                 .trim(from: 0, to: progress)
@@ -686,10 +784,10 @@ struct ActivityRing: View {
             VStack(spacing: 0) {
                 Text("\(Int(progress * 100))")
                     .font(.system(size: 16, weight: .bold, design: .rounded))
-                    .foregroundColor(.ds.primary)
+                    .foregroundColor(DesignSystem.Colors.primary)
                 Text("%")
                     .font(.system(size: 10, weight: .medium))
-                    .foregroundColor(.ds.textSecondary)
+                    .foregroundColor(DesignSystem.Colors.textSecondary)
             }
         }
         .onAppear {
@@ -705,7 +803,7 @@ struct InteractionButton: View {
     var color: Color = .ds.textSecondary
     
     var body: some View {
-        HStack(spacing: 4) {
+        HStack(spacing: DesignSystem.Spacing.micro) {
             Image(systemName: icon)
                 .font(.system(size: 14))
             if count > 0 {
@@ -730,7 +828,7 @@ struct EngagementButton: View {
     var color: Color = .ds.textSecondary
     
     var body: some View {
-        HStack(spacing: 4) {
+        HStack(spacing: DesignSystem.Spacing.micro) {
             Image(systemName: icon)
                 .font(.system(size: 12))
             if count > 0 {
@@ -747,48 +845,234 @@ struct MetricPill: View {
     let value: String
     
     var body: some View {
-        HStack(spacing: 4) {
+        HStack(spacing: DesignSystem.Spacing.micro) {
             Image(systemName: icon)
                 .font(.system(size: 12))
             Text(value)
                 .font(.system(size: 12, weight: .medium))
         }
-        .foregroundColor(.ds.textSecondary)
+        .foregroundColor(DesignSystem.Colors.textSecondary)
         .padding(.horizontal, 8)
         .padding(.vertical, 4)
         .background(
             Capsule()
-                .fill(Color.ds.surfaceSecondary)
+                .fill(DesignSystem.Colors.surfaceSecondary)
         )
     }
 }
 
-struct AsyncProfileImage: View {
-    let pubkey: String
-    let size: CGFloat
+
+
+// MARK: - Custom Components
+
+struct FloatingAmbientView: View {
+    @State private var particles: [FloatingParticle] = []
     
     var body: some View {
-        // Placeholder implementation - would load actual profile image
-        Circle()
-            .fill(
-                LinearGradient(
-                    colors: [
-                        Color.ds.primary.opacity(0.6),
-                        Color.ds.secondary.opacity(0.6)
-                    ],
-                    startPoint: .topLeading,
-                    endPoint: .bottomTrailing
-                )
+        GeometryReader { geometry in
+            ForEach(particles) { particle in
+                Circle()
+                    .fill(
+                        RadialGradient(
+                            colors: [
+                                DesignSystem.Colors.primary.opacity(particle.opacity),
+                                DesignSystem.Colors.primary.opacity(0)
+                            ],
+                            center: .center,
+                            startRadius: 0,
+                            endRadius: particle.size / 2
+                        )
+                    )
+                    .frame(width: particle.size, height: particle.size)
+                    .position(x: particle.x, y: particle.y)
+                    .blur(radius: particle.blur)
+                    .animation(
+                        .linear(duration: particle.duration).repeatForever(autoreverses: false),
+                        value: particle.y
+                    )
+            }
+        }
+        .onAppear {
+            generateParticles()
+        }
+    }
+    
+    private func generateParticles() {
+        particles = (0..<8).map { _ in
+            FloatingParticle(
+                size: CGFloat.random(in: 40...120),
+                opacity: Double.random(in: 0.05...0.15),
+                blur: CGFloat.random(in: 5...15),
+                duration: Double.random(in: 20...40)
             )
-            .frame(width: size, height: size)
-            .overlay(
-                Text(PubkeyFormatter.formatForAvatar(pubkey))
-                    .font(.system(size: size * 0.4, weight: .semibold))
-                    .foregroundColor(.white)
-            )
+        }
     }
 }
 
+struct FloatingParticle: Identifiable {
+    let id = UUID()
+    let size: CGFloat
+    let opacity: Double
+    let blur: CGFloat
+    let duration: Double
+    var x: CGFloat = CGFloat.random(in: 0...UIScreen.main.bounds.width)
+    var y: CGFloat = CGFloat.random(in: 0...UIScreen.main.bounds.height)
+}
+
+struct RefreshIndicatorView: View {
+    let progress: CGFloat
+    let isRefreshing: Bool
+    @State private var rotation: Double = 0
+    
+    var body: some View {
+        ZStack {
+            // Background circle
+            Circle()
+                .stroke(DesignSystem.Colors.primary.opacity(0.2), lineWidth: 3)
+                .frame(width: 40, height: 40)
+            
+            // Progress circle
+            Circle()
+                .trim(from: 0, to: isRefreshing ? 0.8 : progress)
+                .stroke(
+                    LinearGradient(
+                        colors: [DesignSystem.Colors.primary, DesignSystem.Colors.secondary],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    ),
+                    style: StrokeStyle(lineWidth: 3, lineCap: .round)
+                )
+                .frame(width: 40, height: 40)
+                .rotationEffect(.degrees(rotation))
+                .animation(isRefreshing ? .linear(duration: 1).repeatForever(autoreverses: false) : .spring(), value: rotation)
+            
+            // Center icon
+            Image(systemName: "arrow.clockwise")
+                .font(.system(size: 16, weight: .semibold))
+                .foregroundColor(DesignSystem.Colors.primary)
+                .rotationEffect(.degrees(isRefreshing ? rotation : 0))
+                .scaleEffect(isRefreshing ? 1.1 : 1.0)
+                .animation(.spring(response: 0.5, dampingFraction: 0.6), value: isRefreshing)
+        }
+        .scaleEffect(0.8 + (progress * 0.2))
+        .opacity(progress > 0.1 ? 1 : 0)
+        .onChange(of: isRefreshing) { _, newValue in
+            if newValue {
+                rotation = 360
+            } else {
+                rotation = 0
+            }
+        }
+    }
+}
+
+struct SkeletonHighlightCard: View {
+    @State private var shimmerOffset: CGFloat = -200
+    
+    var body: some View {
+        ZStack {
+            RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.xl, style: .continuous)
+                .fill(DesignSystem.Colors.surfaceSecondary)
+            
+            VStack(alignment: .leading, spacing: DesignSystem.Spacing.medium) {
+                // Mock header
+                RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.small)
+                    .fill(DesignSystem.Colors.textTertiary.opacity(0.2))
+                    .frame(width: 120, height: 16)
+                
+                // Mock content lines
+                VStack(alignment: .leading, spacing: DesignSystem.Spacing.small) {
+                    RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.small)
+                        .fill(DesignSystem.Colors.textTertiary.opacity(0.15))
+                        .frame(height: 20)
+                    
+                    RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.small)
+                        .fill(DesignSystem.Colors.textTertiary.opacity(0.15))
+                        .frame(height: 20)
+                    
+                    RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.small)
+                        .fill(DesignSystem.Colors.textTertiary.opacity(0.15))
+                        .frame(width: 200, height: 20)
+                }
+                
+                Spacer()
+                
+                // Mock footer
+                HStack {
+                    RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.small)
+                        .fill(DesignSystem.Colors.textTertiary.opacity(0.2))
+                        .frame(width: 80, height: 14)
+                    
+                    Spacer()
+                    
+                    HStack(spacing: DesignSystem.Spacing.small) {
+                        ForEach(0..<3, id: \.self) { _ in
+                            Circle()
+                                .fill(DesignSystem.Colors.textTertiary.opacity(0.2))
+                                .frame(width: 24, height: 24)
+                        }
+                    }
+                }
+            }
+            .padding(DesignSystem.Spacing.xl)
+            
+            // Shimmer effect
+            LinearGradient(
+                colors: [
+                    Color.clear,
+                    Color.white.opacity(0.3),
+                    Color.clear
+                ],
+                startPoint: .leading,
+                endPoint: .trailing
+            )
+            .frame(width: 100)
+            .offset(x: shimmerOffset)
+            .mask(
+                RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.xl, style: .continuous)
+            )
+        }
+        .onAppear {
+            withAnimation(
+                .linear(duration: 1.5)
+                .repeatForever(autoreverses: false)
+            ) {
+                shimmerOffset = 300
+            }
+        }
+    }
+}
+
+struct ShimmeringOverlay: View {
+    @State private var shimmerPosition: CGFloat = -1
+    
+    var body: some View {
+        GeometryReader { geometry in
+            LinearGradient(
+                colors: [
+                    Color.clear,
+                    Color.white.opacity(0.3),
+                    Color.clear
+                ],
+                startPoint: .leading,
+                endPoint: .trailing
+            )
+            .frame(width: geometry.size.width * 0.3)
+            .offset(x: geometry.size.width * shimmerPosition)
+            .onAppear {
+                withAnimation(
+                    .linear(duration: 2)
+                    .repeatForever(autoreverses: false)
+                ) {
+                    shimmerPosition = 2
+                }
+            }
+        }
+        .mask(Rectangle())
+    }
+}
+
+// EnhancedAsyncProfileImage is now in its own file
 
 #Preview {
     SimplifiedHybridFeedView()

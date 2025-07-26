@@ -714,15 +714,6 @@ struct ScaleButtonStyle: ButtonStyle {
     }
 }
 
-// MARK: - Preference Keys
-
-struct ScrollOffsetPreferenceKey: PreferenceKey {
-    static var defaultValue: CGFloat = 0
-    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
-        value = nextValue()
-    }
-}
-
 // MARK: - Empty State Views
 
 struct HighlightsEmptyStateView: View {

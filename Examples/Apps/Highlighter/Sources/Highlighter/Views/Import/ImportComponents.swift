@@ -816,7 +816,7 @@ struct ImportFloatingActionButton: View {
                 )
             )
             .clipShape(Capsule())
-            .shadow(color: .orange.opacity(0.3), radius: 10, x: 0, y: 5)
+            .shadow(color: DesignSystem.Colors.secondary.opacity(0.3), radius: DesignSystem.Shadow.medium.radius, x: 0, y: DesignSystem.Shadow.medium.y)
             .scaleEffect(isPressed ? 0.95 : 1)
             .opacity(selectedCount > 0 ? 1 : 0.5)
         }
