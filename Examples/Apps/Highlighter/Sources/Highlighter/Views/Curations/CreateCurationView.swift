@@ -31,7 +31,7 @@ struct CreateCurationView: View {
     @State private var descriptionFieldFocused = false
     @Namespace private var animation
     
-    let gradientColors = [
+    let gradientColors: [[Color]] = [
         [Color.highlighterPurple, Color.highlighterOrange],
         [Color.blue, Color.purple],
         [Color.pink, Color.orange],
