@@ -119,7 +119,7 @@ struct LightningPaymentFlowView: View {
             LinearGradient(
                 colors: [
                     Color.ds.background,
-                    Color.ds.accent.opacity(0.05)
+                    Color.ds.primary.opacity(0.05)
                 ],
                 startPoint: .topLeading,
                 endPoint: .bottomTrailing
@@ -128,7 +128,7 @@ struct LightningPaymentFlowView: View {
             // Animated gradient overlay
             RadialGradient(
                 colors: [
-                    Color.ds.accent.opacity(glowIntensity * 0.3),
+                    Color.ds.primary.opacity(glowIntensity * 0.3),
                     Color.clear
                 ],
                 center: .center,
@@ -195,7 +195,7 @@ struct LightningPaymentFlowView: View {
                 .padding(.vertical, 8)
                 .background(
                     Capsule()
-                        .fill(Color.ds.tertiaryBackground)
+                        .fill(Color.ds.backgroundSecondary)
                         .overlay(
                             Capsule()
                                 .strokeBorder(Color.ds.border, lineWidth: 1)
@@ -212,7 +212,7 @@ struct LightningPaymentFlowView: View {
         VStack(spacing: 24) {
             Text("Select Amount")
                 .font(.ds.headline)
-                .foregroundColor(.ds.secondaryText)
+                .foregroundColor(.ds.textSecondary)
             
             // Predefined amounts grid
             LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible()), GridItem(.flexible())], spacing: 16) {
@@ -235,7 +235,7 @@ struct LightningPaymentFlowView: View {
             VStack(spacing: 12) {
                 Text("Or enter custom amount")
                     .font(.ds.caption)
-                    .foregroundColor(.ds.secondaryText)
+                    .foregroundColor(.ds.textSecondary)
                 
                 HStack {
                     TextField("Amount in sats", text: $customAmount)
@@ -249,13 +249,13 @@ struct LightningPaymentFlowView: View {
                     
                     Text("sats")
                         .font(.ds.callout)
-                        .foregroundColor(.ds.secondaryText)
+                        .foregroundColor(.ds.textSecondary)
                 }
             }
             .padding()
             .background(
                 RoundedRectangle(cornerRadius: 12)
-                    .fill(Color.ds.tertiaryBackground)
+                    .fill(Color.ds.backgroundSecondary)
             )
         }
         .padding(.vertical)
@@ -267,7 +267,7 @@ struct LightningPaymentFlowView: View {
         VStack(spacing: 24) {
             Text("Configure Payment Splits")
                 .font(.ds.headline)
-                .foregroundColor(.ds.secondaryText)
+                .foregroundColor(.ds.textSecondary)
             
             // Split configuration options
             VStack(spacing: 12) {
@@ -311,40 +311,7 @@ struct LightningPaymentFlowView: View {
     @ViewBuilder
     private var processingView: some View {
         VStack(spacing: 32) {
-            // Animated lightning bolt
-            ZStack {
-                ForEach(0..<3) { index in
-                    Circle()
-                        .stroke(
-                            LinearGradient(
-                                colors: [.orange, .yellow],
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
-                            ),
-                            lineWidth: 2
-                        )
-                        .frame(width: 100 + CGFloat(index) * 40, height: 100 + CGFloat(index) * 40)
-                        .scaleEffect(flowAnimation)
-                        .opacity(1 - (flowAnimation * 0.3))
-                        .animation(
-                            .easeOut(duration: 1.5)
-                            .repeatForever(autoreverses: false)
-                            .delay(Double(index) * 0.3),
-                            value: flowAnimation
-                        )
-                }
-                
-                Image(systemName: "bolt.circle.fill")
-                    .font(.system(size: 80))
-                    .foregroundStyle(
-                        LinearGradient(
-                            colors: [.orange, .yellow],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        )
-                    )
-                    .rotationEffect(.degrees(rotationAngle))
-            }
+            animatedLightningBolt
             
             Text("Processing Payment")
                 .font(.ds.title3)
@@ -357,6 +324,56 @@ struct LightningPaymentFlowView: View {
         .onAppear {
             processPayment()
         }
+    }
+    
+    @ViewBuilder
+    private var animatedLightningBolt: some View {
+        ZStack {
+            animatedCircles
+            lightningBoltIcon
+        }
+    }
+    
+    @ViewBuilder
+    private var animatedCircles: some View {
+        ForEach(0..<3) { index in
+            animatedCircle(for: index)
+        }
+    }
+    
+    @ViewBuilder
+    private func animatedCircle(for index: Int) -> some View {
+        Circle()
+            .stroke(lightningGradient, lineWidth: 2)
+            .frame(width: circleSize(for: index), height: circleSize(for: index))
+            .scaleEffect(flowAnimation)
+            .opacity(Double(1 - (flowAnimation * 0.3)))
+            .animation(circleAnimation(for: index), value: flowAnimation)
+    }
+    
+    private var lightningBoltIcon: some View {
+        Image(systemName: "bolt.circle.fill")
+            .font(.system(size: 80))
+            .foregroundStyle(lightningGradient)
+            .rotationEffect(.degrees(rotationAngle))
+    }
+    
+    private var lightningGradient: LinearGradient {
+        LinearGradient(
+            colors: [.orange, .yellow],
+            startPoint: .topLeading,
+            endPoint: .bottomTrailing
+        )
+    }
+    
+    private func circleSize(for index: Int) -> CGFloat {
+        100 + CGFloat(index) * 40
+    }
+    
+    private func circleAnimation(for index: Int) -> Animation {
+        .easeOut(duration: 1.5)
+            .repeatForever(autoreverses: false)
+            .delay(Double(index) * 0.3)
     }
     
     // MARK: - Split Visualization
@@ -377,7 +394,7 @@ struct LightningPaymentFlowView: View {
             // Split progress indicators
             if let payment = activePayment {
                 VStack(spacing: 16) {
-                    ForEach(payment.splits) { split in
+                    ForEach(Array(payment.splits.enumerated()), id: \.element.recipientPubkey) { index, split in
                         SplitProgressRow(
                             split: split,
                             animationProgress: splitAnimations[split.id.uuidString] ?? 0
@@ -392,7 +409,7 @@ struct LightningPaymentFlowView: View {
                 .padding()
                 .background(
                     RoundedRectangle(cornerRadius: 16)
-                        .fill(Color.ds.tertiaryBackground)
+                        .fill(Color.ds.backgroundSecondary)
                 )
             }
         }
@@ -442,7 +459,7 @@ struct LightningPaymentFlowView: View {
             Button(action: shareTransaction) {
                 Label("Share Transaction", systemImage: "square.and.arrow.up")
             }
-            .buttonStyle(ModernButtonStyle(style: .secondary))
+            .buttonStyle(ModernSecondaryButton())
         }
         .padding(.vertical)
         .onAppear {
@@ -462,7 +479,7 @@ struct LightningPaymentFlowView: View {
                     HapticManager.shared.impact(.light)
                     dismiss()
                 }
-                .buttonStyle(ModernButtonStyle(style: .secondary))
+                .buttonStyle(ModernSecondaryButton())
             }
             
             switch currentPaymentStep {
@@ -474,7 +491,7 @@ struct LightningPaymentFlowView: View {
                     }
                     HapticManager.shared.impact(.medium)
                 }
-                .buttonStyle(ModernButtonStyle(style: .primary))
+                .buttonStyle(ModernPrimaryButton())
                 .disabled(selectedAmount < 1)
             
             case .configureSplits:
@@ -484,7 +501,7 @@ struct LightningPaymentFlowView: View {
                     }
                     HapticManager.shared.impact(.medium)
                 }
-                .buttonStyle(ModernButtonStyle(style: .primary))
+                .buttonStyle(ModernPrimaryButton())
             
             case .processingPayment, .visualizingSplits:
                 EmptyView()
@@ -494,7 +511,7 @@ struct LightningPaymentFlowView: View {
                     HapticManager.shared.impact(.light)
                     dismiss()
                 }
-                .buttonStyle(ModernButtonStyle(style: .primary))
+                .buttonStyle(ModernPrimaryButton())
             }
         }
         .padding(.vertical)
@@ -519,7 +536,7 @@ struct LightningPaymentFlowView: View {
     private func processPayment() {
         Task {
             // Create mock payment
-            let config = selectedSplitConfiguration == 3 ? customSplitConfig : splitConfigurations[selectedSplitConfiguration].1
+            _ = selectedSplitConfiguration == 3 ? customSplitConfig : splitConfigurations[selectedSplitConfiguration].1
             let payment = await lightningService.generateMockPayment()
             
             await MainActor.run {
@@ -598,13 +615,13 @@ struct AmountButton: View {
                 
                 Text("sats")
                     .font(.ds.caption)
-                    .foregroundColor(isSelected ? .white.opacity(0.8) : .ds.secondaryText)
+                    .foregroundColor(isSelected ? .white.opacity(0.8) : .ds.textSecondary)
             }
             .frame(maxWidth: .infinity)
             .padding(.vertical, 16)
             .background(
                 RoundedRectangle(cornerRadius: 12)
-                    .fill(isSelected ? Color.ds.accent : Color.ds.tertiaryBackground)
+                    .fill(isSelected ? Color.ds.primary : Color.ds.backgroundSecondary)
                     .overlay(
                         RoundedRectangle(cornerRadius: 12)
                             .strokeBorder(
@@ -693,13 +710,13 @@ struct SplitConfigurationCard: View {
                 } else {
                     Text("Tap to customize split percentages")
                         .font(.ds.caption)
-                        .foregroundColor(isSelected ? .white.opacity(0.8) : .ds.secondaryText)
+                        .foregroundColor(isSelected ? .white.opacity(0.8) : .ds.textSecondary)
                 }
             }
             .padding()
             .background(
                 RoundedRectangle(cornerRadius: 16)
-                    .fill(isSelected ? Color.ds.accent : Color.ds.tertiaryBackground)
+                    .fill(isSelected ? Color.ds.primary : Color.ds.backgroundSecondary)
                     .overlay(
                         RoundedRectangle(cornerRadius: 16)
                             .strokeBorder(
@@ -736,10 +753,10 @@ struct SplitRow: View {
             
             Text("\(Int(percentage * 100))%")
                 .font(.ds.caption.monospacedDigit())
-                .foregroundColor(isSelected ? .white.opacity(0.8) : .ds.secondaryText)
+                .foregroundColor(isSelected ? .white.opacity(0.8) : .ds.textSecondary)
             
             Text("·")
-                .foregroundColor(isSelected ? .white.opacity(0.5) : .ds.tertiaryText)
+                .foregroundColor(isSelected ? .white.opacity(0.5) : .ds.textTertiary)
             
             Text("\(amount) sats")
                 .font(.ds.caption.monospacedDigit())
@@ -758,7 +775,7 @@ struct SplitPreviewVisualization: View {
             ZStack {
                 // Background circle
                 Circle()
-                    .fill(Color.ds.tertiaryBackground)
+                    .fill(Color.ds.backgroundSecondary)
                     .overlay(
                         Circle()
                             .strokeBorder(Color.ds.border, lineWidth: 1)
@@ -809,7 +826,7 @@ struct SplitPreviewVisualization: View {
                         .monospacedDigit()
                     Text("sats")
                         .font(.ds.caption)
-                        .foregroundColor(.ds.secondaryText)
+                        .foregroundColor(.ds.textSecondary)
                 }
                 .scaleEffect(animationProgress)
             }
@@ -874,7 +891,7 @@ struct PaymentStatusIndicator: View {
                 
                 Text(statusText)
                     .font(.ds.callout)
-                    .foregroundColor(.ds.secondaryText)
+                    .foregroundColor(.ds.textSecondary)
             }
             
             if case .processing = payment.status {
@@ -908,6 +925,12 @@ struct PaymentStatusIndicator: View {
         case .failed:
             Image(systemName: "xmark.circle.fill")
                 .foregroundColor(.red)
+        case .preparing:
+            Image(systemName: "gearshape.fill")
+                .foregroundColor(.gray)
+        case .sending:
+            Image(systemName: "paperplane.fill")
+                .foregroundColor(.blue)
         }
     }
     
@@ -923,6 +946,10 @@ struct PaymentStatusIndicator: View {
             return "Payment complete!"
         case .failed:
             return "Payment failed"
+        case .preparing:
+            return "Preparing transaction..."
+        case .sending:
+            return "Sending payment..."
         }
     }
 }
@@ -991,7 +1018,7 @@ struct SplitFlowVisualization: View {
         // This would show animated paths from the source to each recipient
         Text("Split Flow Visualization")
             .font(.ds.caption)
-            .foregroundColor(.ds.secondaryText)
+            .foregroundColor(.ds.textSecondary)
     }
 }
 
@@ -1013,7 +1040,7 @@ struct SplitProgressRow: View {
                 
                 Text("\(split.amount) sats (\(Int(split.percentage * 100))%)")
                     .font(.ds.caption)
-                    .foregroundColor(.ds.secondaryText)
+                    .foregroundColor(.ds.textSecondary)
             }
             
             Spacer()
@@ -1023,7 +1050,7 @@ struct SplitProgressRow: View {
         .padding()
         .background(
             RoundedRectangle(cornerRadius: 12)
-                .fill(Color.ds.quaternaryBackground)
+                .fill(Color.ds.surface.opacity(0.5))
                 .opacity(animationProgress)
         )
     }
@@ -1062,7 +1089,7 @@ struct TransactionSummaryCard: View {
                 
                 Text(payment.timestamp.formatted(.relative(presentation: .named)))
                     .font(.ds.caption)
-                    .foregroundColor(.ds.secondaryText)
+                    .foregroundColor(.ds.textSecondary)
             }
             
             Divider()
@@ -1071,11 +1098,11 @@ struct TransactionSummaryCard: View {
             HStack {
                 Text("Total Amount")
                     .font(.ds.callout)
-                    .foregroundColor(.ds.secondaryText)
+                    .foregroundColor(.ds.textSecondary)
                 
                 Spacer()
                 
-                Text("\(payment.amount) sats")
+                Text("\(payment.totalAmount) sats")
                     .font(.ds.callout)
                     .fontWeight(.medium)
                     .monospacedDigit()
@@ -1104,7 +1131,7 @@ struct TransactionSummaryCard: View {
         .padding()
         .background(
             RoundedRectangle(cornerRadius: 16)
-                .fill(Color.ds.tertiaryBackground)
+                .fill(Color.ds.backgroundSecondary)
         )
     }
 }
@@ -1271,10 +1298,11 @@ struct LightningPaymentFlowView_Previews: PreviewProvider {
     static var previews: some View {
         LightningPaymentFlowView(
             highlight: HighlightEvent(
-                id: "test",
                 content: "Test highlight",
+                context: nil,
+                source: nil,
                 author: "author_pubkey",
-                createdAt: Date()
+                comment: nil
             ),
             authorProfile: nil,
             highlighterProfile: nil,

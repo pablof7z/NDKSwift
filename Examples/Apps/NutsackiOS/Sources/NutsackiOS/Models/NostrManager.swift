@@ -126,7 +126,7 @@ class NostrManager {
         await initializeDataSources(for: publicKey)
     }
     
-    func createNewAccount(displayName: String, about: String? = nil) async throws -> NDKSession {
+    func createNewAccount(displayName: String, about: String? = nil, picture: String? = nil) async throws -> NDKSession {
         print("🏚️ [NostrManager] createNewAccount() called with displayName: \(displayName)")
         print("🏚️ [NostrManager] NDK instance: \(ndk != nil ? "exists" : "nil")")
         print("🏚️ [NostrManager] Is connected: \(isConnected)")
@@ -162,7 +162,8 @@ class NostrManager {
         let metadata = NDKUserProfile(
             name: displayName,
             displayName: displayName,
-            about: about ?? "Nutsack wallet user"
+            about: about ?? "Nutsack wallet user",
+            picture: picture
         )
         
         if ndkAuthManager.isAuthenticated {

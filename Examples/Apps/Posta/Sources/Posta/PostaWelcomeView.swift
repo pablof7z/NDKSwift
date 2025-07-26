@@ -15,9 +15,7 @@ struct PostaWelcomeView: View {
     @State private var titleOpacity: Double = 0
     @State private var sloganOpacity: Double = 0
     @State private var sloganScale: CGFloat = 0.8
-    @State private var pulseScale: CGFloat = 1
-    @State private var glowOpacity: Double = 0
-    @State private var electricityOffset: CGFloat = -100
+    @State private var contentOpacity: Double = 0
     
     // Button animation states
     @State private var buttonsOffset: CGFloat = 100
@@ -35,6 +33,9 @@ struct PostaWelcomeView: View {
     @State private var showCreateAccount = false
     @State private var showImportAccount = false
     
+    // Logo animation
+    @State private var showAnimatedLogo = false
+    
     enum LoginMethod: String, CaseIterable {
         case privateKey = "Private Key"
         case nip46 = "NIP-46 (Bunker)"
@@ -51,120 +52,26 @@ struct PostaWelcomeView: View {
     
     var body: some View {
         ZStack {
-            // Dark gradient background
-            LinearGradient(
-                gradient: Gradient(colors: [
-                    Color(red: 0.05, green: 0.02, blue: 0.08),
-                    Color(red: 0.02, green: 0.01, blue: 0.03),
-                    Color.black
-                ]),
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            )
-            .ignoresSafeArea()
-            
-            // Electric field effect
-            ForEach(0..<5) { index in
-                ElectricArc(
-                    startPoint: CGPoint(x: 0.5, y: 0.5),
-                    endPoint: CGPoint(
-                        x: 0.5 + cos(Double(index) * .pi / 2.5) * 0.4,
-                        y: 0.5 + sin(Double(index) * .pi / 2.5) * 0.4
-                    )
-                )
-                .stroke(
-                    LinearGradient(
-                        gradient: Gradient(colors: [
-                            Color.orange.opacity(0.6),
-                            Color.purple.opacity(0.3),
-                            Color.clear
-                        ]),
-                        startPoint: .center,
-                        endPoint: .bottom
-                    ),
-                    lineWidth: 2
-                )
-                .blur(radius: 3)
-                .opacity(glowOpacity)
-                .offset(y: electricityOffset)
-                .animation(
-                    .easeInOut(duration: 2)
-                    .delay(Double(index) * 0.1)
-                    .repeatForever(autoreverses: true),
-                    value: electricityOffset
-                )
-            }
+            // Animated background
+            AnimatedBackgroundView()
             
             VStack(spacing: 40) {
                 Spacer()
                 
-                // Logo container
-                ZStack {
-                    // Outer pulsing glow
-                    Circle()
-                        .fill(
-                            RadialGradient(
-                                gradient: Gradient(colors: [
-                                    Color.orange.opacity(0.8),
-                                    Color.purple.opacity(0.4),
-                                    Color.clear
-                                ]),
-                                center: .center,
-                                startRadius: 10,
-                                endRadius: 120
-                            )
-                        )
-                        .frame(width: 280, height: 280)
-                        .blur(radius: 30)
-                        .scaleEffect(pulseScale)
-                        .opacity(logoOpacity * 0.7)
-                    
-                    // Inner glow
-                    Circle()
-                        .fill(
-                            RadialGradient(
-                                gradient: Gradient(colors: [
-                                    Color.orange,
-                                    Color.orange.opacity(0.3),
-                                    Color.clear
-                                ]),
-                                center: .center,
-                                startRadius: 5,
-                                endRadius: 80
-                            )
-                        )
-                        .frame(width: 200, height: 200)
-                        .blur(radius: 20)
-                        .opacity(logoOpacity)
-                    
-                    // Logo background circle
-                    Circle()
-                        .fill(
-                            LinearGradient(
-                                gradient: Gradient(colors: [
-                                    Color.orange,
-                                    Color.orange.opacity(0.9),
-                                    Color(red: 0.8, green: 0.4, blue: 0.1)
-                                ]),
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
-                            )
-                        )
-                        .frame(width: 140, height: 140)
-                        .shadow(color: Color.orange.opacity(0.5), radius: 20, x: 0, y: 5)
+                // Animated Logo
+                if showAnimatedLogo {
+                    AnimatedEnvelopeView(size: 140, color: .purple)
                         .scaleEffect(logoScale)
                         .opacity(logoOpacity)
                         .rotationEffect(.degrees(logoRotation))
-                    
-                    // Lightning bolt icon
-                    Image(systemName: "bolt.fill")
-                        .font(.system(size: 80, weight: .bold))
-                        .foregroundColor(.white)
+                        .frame(height: 200)
+                } else {
+                    PostaLogoView(size: 140, color: .purple)
                         .scaleEffect(logoScale)
                         .opacity(logoOpacity)
                         .rotationEffect(.degrees(logoRotation))
+                        .frame(height: 200)
                 }
-                .frame(height: 200)
                 
                 // Title and slogan
                 VStack(spacing: 20) {
@@ -181,11 +88,12 @@ struct PostaWelcomeView: View {
                                 endPoint: .bottom
                             )
                         )
-                        .shadow(color: Color.orange.opacity(0.3), radius: 10, x: 0, y: 2)
+                        .shadow(color: Color.purple.opacity(0.3), radius: 10, x: 0, y: 2)
                         .offset(y: titleOffset)
                         .opacity(titleOpacity)
+                        .shimmer()
                     
-                    Text("POWERED BY NOSTR")
+                    Text("SECURE MESSAGING ON NOSTR")
                         .font(.system(size: 16, weight: .medium, design: .monospaced))
                         .tracking(2)
                         .foregroundColor(Color.white.opacity(0.7))
@@ -198,34 +106,22 @@ struct PostaWelcomeView: View {
                 // Auth buttons that slide in
                 if showButtons {
                     VStack(spacing: 16) {
-                        // Create new wallet button
+                        // Create new account button
                         Button(action: {
                             withAnimation(.spring()) {
                                 showCreateAccount = true
                             }
                         }) {
                             HStack {
-                                Image(systemName: "bolt.fill")
+                                Image(systemName: "envelope.badge.fill")
                                     .font(.system(size: 20))
-                                Text("Create New Wallet")
-                                    .font(.system(size: 18, weight: .semibold))
+                                Text("Create New Account")
                             }
-                            .frame(maxWidth: .infinity)
-                            .frame(height: 56)
-                            .background(
-                                LinearGradient(
-                                    gradient: Gradient(colors: [
-                                        Color.orange,
-                                        Color(red: 0.9, green: 0.5, blue: 0.1)
-                                    ]),
-                                    startPoint: .leading,
-                                    endPoint: .trailing
-                                )
-                            )
-                            .foregroundColor(.white)
-                            .clipShape(RoundedRectangle(cornerRadius: 16))
-                            .shadow(color: Color.orange.opacity(0.3), radius: 10, x: 0, y: 4)
                         }
+                        .buttonStyle(GradientButtonStyle(
+                            colors: [Color.purple, Color(red: 0.7, green: 0.3, blue: 0.9)],
+                            shadowColor: .purple
+                        ))
                         
                         // Import existing account button
                         Button(action: {
@@ -237,21 +133,12 @@ struct PostaWelcomeView: View {
                                 Image(systemName: "key.fill")
                                     .font(.system(size: 20))
                                 Text("Import Existing")
-                                    .font(.system(size: 18, weight: .semibold))
                             }
-                            .frame(maxWidth: .infinity)
-                            .frame(height: 56)
-                            .background(Color.white.opacity(0.1))
-                            .foregroundColor(.white)
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 16)
-                                    .stroke(Color.white.opacity(0.3), lineWidth: 1)
-                            )
-                            .clipShape(RoundedRectangle(cornerRadius: 16))
                         }
+                        .buttonStyle(OutlineButtonStyle(color: .white))
                         
                         // Info text
-                        Text("Your keys, your coins")
+                        Text("Your keys, your messages")
                             .font(.system(size: 14, weight: .medium))
                             .foregroundColor(Color.white.opacity(0.4))
                             .padding(.top, 8)
@@ -284,14 +171,11 @@ struct PostaWelcomeView: View {
             logoRotation = 0
         }
         
-        // Glow effects
-        withAnimation(.easeInOut(duration: 1.5).delay(0.2)) {
-            glowOpacity = 0.8
-        }
-        
-        // Start electricity animation
-        withAnimation(.easeInOut(duration: 2).delay(0.5).repeatForever(autoreverses: true)) {
-            electricityOffset = 100
+        // Show animated logo after initial animation
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
+            withAnimation(.easeInOut(duration: 0.5)) {
+                showAnimatedLogo = true
+            }
         }
         
         // Title animation
@@ -306,9 +190,9 @@ struct PostaWelcomeView: View {
             sloganScale = 1
         }
         
-        // Pulse animation
-        withAnimation(.easeInOut(duration: 1.5).delay(1).repeatForever(autoreverses: true)) {
-            pulseScale = 1.1
+        // Content fade in
+        withAnimation(.easeInOut(duration: 0.8).delay(1.5)) {
+            contentOpacity = 1
         }
         
         // Show and animate buttons after the main animation
@@ -329,54 +213,106 @@ struct CreateAccountSheet: View {
     @Environment(\.dismiss) private var dismiss
     @State private var isLoading = false
     @State private var errorMessage: String?
+    @State private var showSuccess = false
     
     var body: some View {
         NavigationView {
-            VStack(spacing: 20) {
-                Text("Create New Wallet")
-                    .font(.largeTitle)
-                    .fontWeight(.bold)
-                    .padding(.top, 20)
+            ZStack {
+                // Background gradient
+                LinearGradient(
+                    gradient: Gradient(colors: [
+                        Color.purple.opacity(0.05),
+                        Color.black.opacity(0.02)
+                    ]),
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
+                .ignoresSafeArea()
                 
-                Text("We'll generate a new private key for you")
-                    .font(.subheadline)
-                    .foregroundColor(.secondary)
-                
-                Spacer()
-                
-                if let errorMessage = errorMessage {
-                    Text(errorMessage)
-                        .foregroundColor(.red)
-                        .font(.caption)
-                }
-                
-                Button(action: {
-                    Task {
-                        await createAccount()
+                VStack(spacing: 30) {
+                    // Header with icon
+                    VStack(spacing: 20) {
+                        ZStack {
+                            Circle()
+                                .fill(Color.purple.opacity(0.1))
+                                .frame(width: 80, height: 80)
+                            
+                            Image(systemName: "envelope.badge.fill")
+                                .font(.system(size: 40))
+                                .foregroundColor(.purple)
+                                .symbolEffect(.bounce, value: showSuccess)
+                        }
+                        .padding(.top, 20)
+                        
+                        Text("Create New Account")
+                            .font(.system(size: 28, weight: .bold))
+                        
+                        Text("We'll generate a secure private key for you")
+                            .font(.subheadline)
+                            .foregroundColor(.secondary)
+                            .multilineTextAlignment(.center)
+                            .padding(.horizontal)
                     }
-                }) {
-                    if isLoading {
-                        ProgressView()
-                            .progressViewStyle(CircularProgressViewStyle())
-                            .scaleEffect(0.8)
-                    } else {
-                        Text("Create Account")
-                            .fontWeight(.semibold)
+                    
+                    Spacer()
+                    
+                    // Features list
+                    VStack(alignment: .leading, spacing: 16) {
+                        FeatureRow(icon: "lock.shield.fill", text: "End-to-end encrypted messages", color: .purple)
+                        FeatureRow(icon: "key.fill", text: "Your keys stay on your device", color: .blue)
+                        FeatureRow(icon: "globe", text: "Decentralized communication", color: .green)
                     }
+                    .padding(.horizontal, 32)
+                    
+                    Spacer()
+                    
+                    // Error message
+                    if let errorMessage = errorMessage {
+                        HStack {
+                            Image(systemName: "exclamationmark.circle.fill")
+                                .foregroundColor(.red)
+                            Text(errorMessage)
+                                .font(.caption)
+                                .foregroundColor(.red)
+                        }
+                        .padding(.horizontal)
+                    }
+                    
+                    // Create button
+                    Button(action: {
+                        Task {
+                            await createAccount()
+                        }
+                    }) {
+                        if isLoading {
+                            LoadingDots(dotSize: 10, color: .white)
+                        } else {
+                            HStack {
+                                Image(systemName: "plus.circle.fill")
+                                Text("Create Account")
+                                    .fontWeight(.semibold)
+                            }
+                        }
+                    }
+                    .buttonStyle(GradientButtonStyle(
+                        colors: [Color.purple, Color(red: 0.7, green: 0.3, blue: 0.9)],
+                        shadowColor: .purple
+                    ))
+                    .disabled(isLoading)
+                    .padding(.horizontal, 32)
+                    .padding(.bottom, 20)
                 }
-                .frame(maxWidth: .infinity)
-                .padding()
-                .background(Color.orange)
-                .foregroundColor(.white)
-                .cornerRadius(10)
-                .disabled(isLoading)
-                
-                Spacer()
             }
-            .padding()
-            .navigationBarItems(
-                leading: Button("Cancel") { dismiss() }
-            )
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarLeading) {
+                    Button(action: { dismiss() }) {
+                        Image(systemName: "xmark.circle.fill")
+                            .font(.title2)
+                            .foregroundColor(.secondary)
+                    }
+                }
+            }
         }
     }
     
@@ -387,11 +323,34 @@ struct CreateAccountSheet: View {
         do {
             let signer = try NDKPrivateKeySigner.generate()
             _ = try await authManager.createSession(with: signer)
+            showSuccess = true
         } catch {
             errorMessage = "Failed to create account: \(error.localizedDescription)"
         }
         
         isLoading = false
+    }
+}
+
+// MARK: - Feature Row Component
+struct FeatureRow: View {
+    let icon: String
+    let text: String
+    let color: Color
+    
+    var body: some View {
+        HStack(spacing: 16) {
+            Image(systemName: icon)
+                .font(.system(size: 24))
+                .foregroundColor(color)
+                .frame(width: 40)
+            
+            Text(text)
+                .font(.system(size: 16))
+                .foregroundColor(.primary)
+            
+            Spacer()
+        }
     }
 }
 
@@ -404,63 +363,138 @@ struct ImportAccountSheet: View {
     @State private var loginInput: String = ""
     @State private var isLoading = false
     @State private var errorMessage: String?
+    @State private var showingPassword = false
     
     var body: some View {
         NavigationView {
-            VStack(spacing: 20) {
-                Text("Import Existing Account")
-                    .font(.largeTitle)
-                    .fontWeight(.bold)
-                    .padding(.top, 20)
+            ZStack {
+                // Background gradient
+                LinearGradient(
+                    gradient: Gradient(colors: [
+                        Color.purple.opacity(0.05),
+                        Color.black.opacity(0.02)
+                    ]),
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
+                .ignoresSafeArea()
                 
-                // Login method picker
-                Picker("Login Method", selection: $loginMethod) {
-                    ForEach(PostaWelcomeView.LoginMethod.allCases, id: \.self) { method in
-                        Text(method.rawValue).tag(method)
+                VStack(spacing: 24) {
+                    // Header with icon
+                    VStack(spacing: 20) {
+                        ZStack {
+                            Circle()
+                                .fill(Color.blue.opacity(0.1))
+                                .frame(width: 80, height: 80)
+                            
+                            Image(systemName: "key.fill")
+                                .font(.system(size: 40))
+                                .foregroundColor(.blue)
+                        }
+                        .padding(.top, 20)
+                        
+                        Text("Import Account")
+                            .font(.system(size: 28, weight: .bold))
+                        
+                        Text("Enter your private key or bunker URL")
+                            .font(.subheadline)
+                            .foregroundColor(.secondary)
+                            .multilineTextAlignment(.center)
+                            .padding(.horizontal)
                     }
-                }
-                .pickerStyle(SegmentedPickerStyle())
-                .padding(.horizontal)
-                
-                // Input field based on login method
-                TextField(loginMethod.placeholder, text: $loginInput)
-                    .textFieldStyle(RoundedBorderTextFieldStyle())
-                    .autocapitalization(.none)
-                    .disableAutocorrection(true)
-                
-                if let errorMessage = errorMessage {
-                    Text(errorMessage)
-                        .foregroundColor(.red)
-                        .font(.caption)
-                }
-                
-                Spacer()
-                
-                Button(action: {
-                    Task {
-                        await performLogin()
+                    
+                    // Login method picker
+                    Picker("Login Method", selection: $loginMethod) {
+                        ForEach(PostaWelcomeView.LoginMethod.allCases, id: \.self) { method in
+                            Text(method.rawValue).tag(method)
+                        }
                     }
-                }) {
-                    if isLoading {
-                        ProgressView()
-                            .progressViewStyle(CircularProgressViewStyle())
-                            .scaleEffect(0.8)
-                    } else {
-                        Text("Import")
-                            .fontWeight(.semibold)
+                    .pickerStyle(SegmentedPickerStyle())
+                    .padding(.horizontal, 32)
+                    
+                    // Input field
+                    VStack(alignment: .leading, spacing: 8) {
+                        HStack {
+                            if loginMethod == .privateKey && !showingPassword {
+                                SecureField(loginMethod.placeholder, text: $loginInput)
+                                    .textFieldStyle(PlainTextFieldStyle())
+                            } else {
+                                TextField(loginMethod.placeholder, text: $loginInput)
+                                    .textFieldStyle(PlainTextFieldStyle())
+                                    .autocapitalization(.none)
+                                    .disableAutocorrection(true)
+                            }
+                            
+                            if loginMethod == .privateKey {
+                                Button(action: { showingPassword.toggle() }) {
+                                    Image(systemName: showingPassword ? "eye.slash.fill" : "eye.fill")
+                                        .font(.system(size: 16))
+                                        .foregroundColor(.secondary)
+                                }
+                            }
+                        }
+                        .padding()
+                        .background(Color(.systemGray6))
+                        .cornerRadius(12)
+                        
+                        if loginMethod == .privateKey {
+                            Text("Accepts hex format or nsec")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                                .padding(.horizontal, 8)
+                        }
                     }
+                    .padding(.horizontal, 32)
+                    
+                    // Error message
+                    if let errorMessage = errorMessage {
+                        HStack {
+                            Image(systemName: "exclamationmark.circle.fill")
+                                .foregroundColor(.red)
+                            Text(errorMessage)
+                                .font(.caption)
+                                .foregroundColor(.red)
+                        }
+                        .padding(.horizontal, 32)
+                    }
+                    
+                    Spacer()
+                    
+                    // Import button
+                    Button(action: {
+                        Task {
+                            await performLogin()
+                        }
+                    }) {
+                        if isLoading {
+                            LoadingDots(dotSize: 10, color: .white)
+                        } else {
+                            HStack {
+                                Image(systemName: "arrow.down.circle.fill")
+                                Text("Import Account")
+                                    .fontWeight(.semibold)
+                            }
+                        }
+                    }
+                    .buttonStyle(GradientButtonStyle(
+                        colors: [Color.blue, Color.blue.opacity(0.8)],
+                        shadowColor: .blue
+                    ))
+                    .disabled(isLoading || loginInput.isEmpty)
+                    .padding(.horizontal, 32)
+                    .padding(.bottom, 20)
                 }
-                .frame(maxWidth: .infinity)
-                .padding()
-                .background(Color.blue)
-                .foregroundColor(.white)
-                .cornerRadius(10)
-                .disabled(isLoading || loginInput.isEmpty)
             }
-            .padding()
-            .navigationBarItems(
-                leading: Button("Cancel") { dismiss() }
-            )
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarLeading) {
+                    Button(action: { dismiss() }) {
+                        Image(systemName: "xmark.circle.fill")
+                            .font(.title2)
+                            .foregroundColor(.secondary)
+                    }
+                }
+            }
         }
     }
     

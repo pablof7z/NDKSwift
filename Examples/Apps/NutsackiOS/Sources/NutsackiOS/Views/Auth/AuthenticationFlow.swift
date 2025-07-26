@@ -7,10 +7,6 @@ struct AuthenticationFlow: View {
     @Environment(WalletManager.self) private var walletManager
     @Environment(\.dismiss) private var dismiss
     
-    // Flow states
-    @State private var flowState: FlowState = .splash
-    @State private var authMode: AuthMode = .none
-    
     // Shared animation values for smooth transitions
     @State private var logoSize: CGFloat = 140
     @State private var logoOpacity: Double = 0
@@ -20,7 +16,7 @@ struct AuthenticationFlow: View {
     
     @State private var titleText = "NUTSACK"
     @State private var titleOpacity: Double = 0
-    @State private var titleOffset: CGFloat = 50
+    @State private var titleOffset: CGFloat = 0
     @State private var titleSize: CGFloat = 52
     
     @State private var sloganOpacity: Double = 0
@@ -32,31 +28,9 @@ struct AuthenticationFlow: View {
     @State private var pulseScale: CGFloat = 1
     @State private var electricityOffset: CGFloat = -100
     
-    // Form states
-    @State private var displayName = ""
-    @State private var about = ""
-    @State private var nsecInput = ""
-    @State private var showPassword = false
-    @State private var isProcessing = false
-    @State private var showError = false
-    @State private var errorMessage = ""
-    @State private var showScanner = false
-    
     // Wallet onboarding sheet
     @State private var showWalletOnboarding = false
     @State private var walletOnboardingAuthMode: WalletOnboardingView.AuthMode = .none
-    
-    enum FlowState {
-        case splash
-        case auth
-        case complete
-    }
-    
-    enum AuthMode {
-        case none
-        case create
-        case `import`
-    }
     
     var body: some View {
         ZStack {
@@ -64,9 +38,11 @@ struct AuthenticationFlow: View {
             backgroundGradient
             electricEffects
             
-            // Main content
-            VStack(spacing: 0) {
-                // Animated header that adapts based on state
+            // Main content - centered vertically
+            VStack(spacing: 40) {
+                Spacer()
+                
+                // Animated header
                 AnimatedHeader(
                     logoSize: logoSize,
                     logoOpacity: logoOpacity,
@@ -78,35 +54,22 @@ struct AuthenticationFlow: View {
                     titleOffset: titleOffset,
                     titleSize: titleSize,
                     sloganOpacity: sloganOpacity,
-                    showSlogan: flowState == .splash && authMode == .none,
+                    showSlogan: true,
                     glowOpacity: glowOpacity,
                     pulseScale: pulseScale
                 )
-                .frame(height: headerHeight)
-                .animation(.spring(response: 0.8, dampingFraction: 0.8), value: flowState)
-                .animation(.spring(response: 0.8, dampingFraction: 0.8), value: authMode)
                 
-                // Content area
-                contentView
+                // Auth buttons
+                authButtons
                     .opacity(contentOpacity)
                     .animation(.easeInOut(duration: 0.4), value: contentOpacity)
                 
-                Spacer(minLength: 0)
+                Spacer()
             }
+            .padding(.vertical, 40)
         }
         .onAppear {
             startSplashAnimation()
-        }
-        .alert("Error", isPresented: $showError) {
-            Button("OK") { }
-        } message: {
-            Text(errorMessage)
-        }
-        .sheet(isPresented: $showScanner) {
-            QRScannerView { scannedValue in
-                nsecInput = scannedValue
-                showScanner = false
-            }
         }
         .fullScreenCover(isPresented: $showWalletOnboarding) {
             WalletOnboardingView(authMode: walletOnboardingAuthMode)
@@ -121,39 +84,13 @@ struct AuthenticationFlow: View {
         }
     }
     
-    // MARK: - Computed Properties
-    
-    private var headerHeight: CGFloat {
-        switch flowState {
-        case .splash:
-            return authMode == .none ? 400 : 120
-        case .auth:
-            return 120
-        case .complete:
-            return 0
-        }
-    }
-    
-    @ViewBuilder
-    private var contentView: some View {
-        switch flowState {
-        case .splash:
-            if authMode == .none {
-                authButtons
-            } else {
-                authForms
-            }
-        case .auth:
-            authForms
-        case .complete:
-            EmptyView()
-        }
-    }
-    
     @ViewBuilder
     private var authButtons: some View {
         VStack(spacing: 16) {
-            Button(action: { selectAuthMode(.create) }) {
+            Button(action: { 
+                walletOnboardingAuthMode = .create
+                showWalletOnboarding = true
+            }) {
                 HStack {
                     Image(systemName: "bolt.fill")
                         .font(.system(size: 20))
@@ -177,7 +114,10 @@ struct AuthenticationFlow: View {
                 .shadow(color: Color.orange.opacity(0.3), radius: 10, x: 0, y: 4)
             }
             
-            Button(action: { selectAuthMode(.import) }) {
+            Button(action: { 
+                walletOnboardingAuthMode = .import
+                showWalletOnboarding = true
+            }) {
                 HStack {
                     Image(systemName: "key.fill")
                         .font(.system(size: 20))
@@ -203,224 +143,6 @@ struct AuthenticationFlow: View {
         .padding(.horizontal, 32)
         .opacity(buttonsOpacity)
     }
-    
-    @ViewBuilder
-    private var authForms: some View {
-        VStack(spacing: 30) {
-            if authMode == .create {
-                createAccountForm
-            } else if authMode == .import {
-                importAccountForm
-            }
-        }
-        .padding(.horizontal, 32)
-        .padding(.top, 20)
-    }
-    
-    @ViewBuilder
-    private var createAccountForm: some View {
-        VStack(spacing: 20) {
-            // Back button
-            HStack {
-                Button(action: { selectAuthMode(.none) }) {
-                    HStack(spacing: 8) {
-                        Image(systemName: "chevron.left")
-                            .font(.system(size: 18, weight: .medium))
-                        Text("Back")
-                            .font(.system(size: 16, weight: .medium))
-                    }
-                    .foregroundColor(Color.orange)
-                }
-                Spacer()
-            }
-            
-            // Form fields
-            VStack(spacing: 20) {
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("Display Name")
-                        .font(.system(size: 14, weight: .medium))
-                        .foregroundColor(Color.white.opacity(0.8))
-                    
-                    TextField("", text: $displayName)
-                        .textFieldStyle(DarkTextFieldStyle())
-                        .textContentType(.name)
-                }
-                
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("About (optional)")
-                        .font(.system(size: 14, weight: .medium))
-                        .foregroundColor(Color.white.opacity(0.8))
-                    
-                    TextField("", text: $about, axis: .vertical)
-                        .textFieldStyle(DarkTextFieldStyle())
-                        .lineLimit(3...6)
-                }
-                
-                Text("This information will be public on Nostr")
-                    .font(.system(size: 12))
-                    .foregroundColor(Color.white.opacity(0.4))
-                    .frame(maxWidth: .infinity, alignment: .leading)
-            }
-            
-            // Create button
-            Button(action: createAccount) {
-                if isProcessing {
-                    ProgressView()
-                        .progressViewStyle(CircularProgressViewStyle(tint: .white))
-                } else {
-                    HStack {
-                        Image(systemName: "bolt.fill")
-                        Text("Create Wallet")
-                            .fontWeight(.semibold)
-                    }
-                }
-            }
-            .frame(maxWidth: .infinity)
-            .frame(height: 56)
-            .background(
-                LinearGradient(
-                    gradient: Gradient(colors: [
-                        displayName.isEmpty ? Color.gray : Color.orange,
-                        displayName.isEmpty ? Color.gray.opacity(0.8) : Color(red: 0.9, green: 0.5, blue: 0.1)
-                    ]),
-                    startPoint: .leading,
-                    endPoint: .trailing
-                )
-            )
-            .foregroundColor(.white)
-            .clipShape(RoundedRectangle(cornerRadius: 16))
-            .shadow(color: displayName.isEmpty ? Color.clear : Color.orange.opacity(0.3), radius: 10, x: 0, y: 4)
-            .disabled(displayName.isEmpty || isProcessing)
-        }
-    }
-    
-    @ViewBuilder
-    private var importAccountForm: some View {
-        VStack(spacing: 20) {
-            // Back button
-            HStack {
-                Button(action: { selectAuthMode(.none) }) {
-                    HStack(spacing: 8) {
-                        Image(systemName: "chevron.left")
-                            .font(.system(size: 18, weight: .medium))
-                        Text("Back")
-                            .font(.system(size: 16, weight: .medium))
-                    }
-                    .foregroundColor(Color.orange)
-                }
-                Spacer()
-            }
-            
-            // Form fields
-            VStack(spacing: 20) {
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("Private Key")
-                        .font(.system(size: 14, weight: .medium))
-                        .foregroundColor(Color.white.opacity(0.8))
-                    
-                    HStack(spacing: 12) {
-                        HStack {
-                            if showPassword {
-                                TextField("nsec1...", text: $nsecInput)
-                                    .textContentType(.password)
-                                    #if os(iOS)
-                                    .textInputAutocapitalization(.never)
-                                    #endif
-                                    .font(.system(.body, design: .monospaced))
-                            } else {
-                                SecureField("nsec1...", text: $nsecInput)
-                                    .textContentType(.password)
-                                    #if os(iOS)
-                                    .textInputAutocapitalization(.never)
-                                    #endif
-                                    .font(.system(.body, design: .monospaced))
-                            }
-                            
-                            Button(action: { showPassword.toggle() }) {
-                                Image(systemName: showPassword ? "eye.slash.fill" : "eye.fill")
-                                    .font(.callout)
-                                    .foregroundColor(Color.white.opacity(0.6))
-                            }
-                        }
-                        .padding(16)
-                        .background(Color.white.opacity(0.08))
-                        .foregroundColor(.white)
-                        .accentColor(.orange)
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 12)
-                                .stroke(Color.white.opacity(0.2), lineWidth: 1)
-                        )
-                        .clipShape(RoundedRectangle(cornerRadius: 12))
-                        
-                        Button(action: { showScanner = true }) {
-                            ZStack {
-                                RoundedRectangle(cornerRadius: 12)
-                                    .fill(Color.white.opacity(0.08))
-                                    .frame(width: 50, height: 50)
-                                    .overlay(
-                                        RoundedRectangle(cornerRadius: 12)
-                                            .stroke(Color.white.opacity(0.2), lineWidth: 1)
-                                    )
-                                
-                                Image(systemName: "qrcode.viewfinder")
-                                    .font(.title2)
-                                    .foregroundColor(.orange)
-                            }
-                        }
-                    }
-                    
-                    HStack {
-                        Image(systemName: "lock.shield.fill")
-                            .font(.caption)
-                            .foregroundColor(Color.white.opacity(0.4))
-                        
-                        Text("Your key is stored securely on this device")
-                            .font(.caption)
-                            .foregroundColor(Color.white.opacity(0.4))
-                    }
-                    .padding(.top, 4)
-                }
-                
-                // Login button
-                Button(action: importAccount) {
-                    if isProcessing {
-                        HStack(spacing: 12) {
-                            ProgressView()
-                                .progressViewStyle(CircularProgressViewStyle(tint: .white))
-                                .scaleEffect(0.9)
-                            
-                            Text("Logging in...")
-                                .fontWeight(.semibold)
-                        }
-                    } else {
-                        HStack {
-                            Image(systemName: "arrow.right.circle.fill")
-                            Text("Log In")
-                                .fontWeight(.semibold)
-                        }
-                    }
-                }
-                .foregroundColor(.white)
-                .frame(maxWidth: .infinity)
-                .frame(height: 56)
-                .background(
-                    LinearGradient(
-                        gradient: Gradient(colors: [
-                            nsecInput.isEmpty ? Color.gray : Color.orange,
-                            nsecInput.isEmpty ? Color.gray.opacity(0.8) : Color(red: 0.9, green: 0.5, blue: 0.1)
-                        ]),
-                        startPoint: .leading,
-                        endPoint: .trailing
-                    )
-                )
-                .clipShape(RoundedRectangle(cornerRadius: 16))
-                .shadow(color: nsecInput.isEmpty ? Color.clear : Color.orange.opacity(0.3), radius: 10, x: 0, y: 4)
-                .disabled(nsecInput.isEmpty || isProcessing)
-            }
-        }
-    }
-    
-    
     
     // MARK: - Background Views
     
@@ -503,11 +225,12 @@ struct AuthenticationFlow: View {
             electricityOffset = 100
         }
         
-        // Title animation
+        // Title animation - no offset change to prevent bouncing
         withAnimation(.easeOut(duration: 0.8).delay(0.8)) {
-            titleOffset = 0
             titleOpacity = 1
         }
+        // Set titleOffset to 0 immediately without animation
+        titleOffset = 0
         
         // Slogan animation
         withAnimation(.easeOut(duration: 0.8).delay(1.2)) {
@@ -523,132 +246,6 @@ struct AuthenticationFlow: View {
         withAnimation(.spring(response: 0.8, dampingFraction: 0.8).delay(2.0)) {
             buttonsOpacity = 1
             contentOpacity = 1
-        }
-    }
-    
-    private func selectAuthMode(_ mode: AuthMode) {
-        withAnimation(.spring(response: 0.6, dampingFraction: 0.8)) {
-            authMode = mode
-            
-            if mode != .none {
-                // Transition to welcome state
-                flowState = .auth
-                logoSize = 60
-                logoPosition = CGPoint(x: -UIScreen.main.bounds.width/2 + 80, y: 0)
-                titleText = "WELCOME"
-                titleSize = 40
-                sloganOpacity = 0
-                
-                // Fade in content
-                withAnimation(.easeIn(duration: 0.3).delay(0.3)) {
-                    contentOpacity = 1
-                }
-            } else {
-                // Reset to splash
-                flowState = .splash
-                logoSize = 140
-                logoPosition = CGPoint(x: 0, y: 0)
-                titleText = "NUTSACK"
-                titleSize = 52
-                titleOffset = 0  // Reset title offset
-                sloganOpacity = 1
-                contentOpacity = 0
-                
-                // Clear form data
-                displayName = ""
-                about = ""
-                nsecInput = ""
-                showPassword = false
-            }
-        }
-    }
-    
-    
-    // MARK: - Action Methods
-    
-    private func createAccount() {
-        guard !displayName.isEmpty else { return }
-        
-        isProcessing = true
-        
-        Task {
-            do {
-                _ = try await nostrManager.createNewAccount(
-                    displayName: displayName,
-                    about: about.isEmpty ? nil : about
-                )
-                
-                await MainActor.run {
-                    isProcessing = false
-                    // Open wallet onboarding
-                    walletOnboardingAuthMode = .create
-                    showWalletOnboarding = true
-                }
-            } catch {
-                await MainActor.run {
-                    errorMessage = error.localizedDescription
-                    showError = true
-                    isProcessing = false
-                }
-            }
-        }
-    }
-    
-    private func importAccount() {
-        isProcessing = true
-        
-        Task {
-            do {
-                let signer = try NDKPrivateKeySigner(nsec: nsecInput)
-                let pubkey = try await signer.pubkey
-                
-                var displayName = "Nostr User"
-                
-                if let ndk = nostrManager.ndk {
-                    let profileDataSource = ndk.observe(
-                        filter: NDKFilter(
-                            authors: [pubkey],
-                            kinds: [0]
-                        ),
-                        maxAge: 3600,
-                        cachePolicy: .cacheWithNetwork
-                    )
-                    
-                    for await event in profileDataSource.events {
-                        if let profileData = event.content.data(using: .utf8),
-                           let profile = JSONCoding.safeDecode(NDKUserProfile.self, from: profileData) {
-                            displayName = profile.displayName ?? profile.name ?? "Nostr User"
-                            break
-                        }
-                    }
-                }
-                
-                let _ = try await nostrManager.createAccountFromNsec(
-                    nsecInput,
-                    displayName: displayName
-                )
-                
-                await MainActor.run {
-                    isProcessing = false
-                    // Open wallet onboarding
-                    walletOnboardingAuthMode = .import
-                    showWalletOnboarding = true
-                }
-            } catch {
-                await MainActor.run {
-                    errorMessage = error.localizedDescription
-                    showError = true
-                    isProcessing = false
-                }
-            }
-        }
-    }
-    
-    
-    private func logout() {
-        Task {
-            nostrManager.logout()
-            dismiss()
         }
     }
 }
@@ -670,7 +267,7 @@ struct AnimatedHeader: View {
     let pulseScale: CGFloat
     
     var body: some View {
-        HStack(alignment: .center, spacing: 0) {
+        VStack(spacing: 20) {
             // Logo
             ZStack {
                 // Outer pulsing glow
@@ -747,9 +344,6 @@ struct AnimatedHeader: View {
                         .transition(.opacity.combined(with: .scale))
                 }
             }
-            .padding(.leading, logoPosition.x != 0 ? 20 : 0)
-            
-            Spacer()
         }
         .padding(.horizontal, 32)
     }

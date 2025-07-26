@@ -47,6 +47,11 @@ struct WalletOnboardingView: View {
     @State private var showScanner = false
     @State private var authError: String?
     @State private var showAuthError = false
+    @State private var loginStatus = ""
+    
+    // Avatar states
+    @State private var avatarSeed = UUID().uuidString
+    @State private var selectedAvatar = ""
     
     init(authMode: AuthMode = .none) {
         self.authMode = authMode
@@ -527,6 +532,55 @@ struct WalletOnboardingView: View {
     @ViewBuilder
     private var createAccountForm: some View {
         VStack(spacing: 20) {
+            // Avatar selection
+            VStack(spacing: 12) {
+                Text("Choose Your Avatar")
+                    .font(.system(size: 14, weight: .medium))
+                    .foregroundColor(Color.white.opacity(0.8))
+                
+                Button(action: randomizeAvatar) {
+                    ZStack {
+                        Circle()
+                            .fill(Color.white.opacity(0.1))
+                            .frame(width: 120, height: 120)
+                            .overlay(
+                                Circle()
+                                    .stroke(Color.orange.opacity(0.5), lineWidth: 2)
+                            )
+                        
+                        if !selectedAvatar.isEmpty {
+                            AsyncImage(url: URL(string: selectedAvatar)) { image in
+                                image
+                                    .resizable()
+                                    .aspectRatio(contentMode: .fit)
+                                    .clipShape(Circle())
+                            } placeholder: {
+                                ProgressView()
+                                    .progressViewStyle(CircularProgressViewStyle(tint: .orange))
+                            }
+                            .frame(width: 110, height: 110)
+                        } else {
+                            Image(systemName: "person.crop.circle.fill")
+                                .font(.system(size: 60))
+                                .foregroundColor(Color.white.opacity(0.3))
+                        }
+                        
+                        // Refresh icon overlay
+                        Image(systemName: "arrow.triangle.2.circlepath")
+                            .font(.system(size: 20, weight: .semibold))
+                            .foregroundColor(.white)
+                            .padding(8)
+                            .background(Circle().fill(Color.orange))
+                            .offset(x: 40, y: 40)
+                    }
+                }
+                .buttonStyle(PlainButtonStyle())
+                
+                Text("Tap to generate a new avatar")
+                    .font(.system(size: 12))
+                    .foregroundColor(Color.white.opacity(0.4))
+            }
+            
             // Form fields
             VStack(spacing: 20) {
                 VStack(alignment: .leading, spacing: 8) {
@@ -586,6 +640,17 @@ struct WalletOnboardingView: View {
             .clipShape(RoundedRectangle(cornerRadius: 16))
             .shadow(color: displayName.isEmpty ? Color.clear : Color.orange.opacity(0.3), radius: 10, x: 0, y: 4)
             .disabled(displayName.isEmpty || isProcessing)
+            
+            // Cancel button
+            Button(action: { dismiss() }) {
+                Text("Cancel")
+                    .font(.system(size: 16, weight: .medium))
+                    .foregroundColor(Color.white.opacity(0.6))
+            }
+            .padding(.top, 8)
+        }
+        .onAppear {
+            generateInitialAvatar()
         }
     }
     
@@ -673,7 +738,7 @@ struct WalletOnboardingView: View {
                             .progressViewStyle(CircularProgressViewStyle(tint: .white))
                             .scaleEffect(0.9)
                         
-                        Text("Logging in...")
+                        Text(loginStatus.isEmpty ? "Logging in..." : loginStatus)
                             .fontWeight(.semibold)
                     }
                 } else {
@@ -700,6 +765,14 @@ struct WalletOnboardingView: View {
             .clipShape(RoundedRectangle(cornerRadius: 16))
             .shadow(color: nsecInput.isEmpty ? Color.clear : Color.orange.opacity(0.3), radius: 10, x: 0, y: 4)
             .disabled(nsecInput.isEmpty || isProcessing)
+            
+            // Cancel button
+            Button(action: { dismiss() }) {
+                Text("Cancel")
+                    .font(.system(size: 16, weight: .medium))
+                    .foregroundColor(Color.white.opacity(0.6))
+            }
+            .padding(.top, 8)
         }
     }
     
@@ -714,7 +787,8 @@ struct WalletOnboardingView: View {
             do {
                 _ = try await nostrManager.createNewAccount(
                     displayName: displayName,
-                    about: about.isEmpty ? nil : about
+                    about: about.isEmpty ? nil : about,
+                    picture: selectedAvatar.isEmpty ? nil : selectedAvatar
                 )
                 
                 await MainActor.run {
@@ -735,53 +809,147 @@ struct WalletOnboardingView: View {
         }
     }
     
+    // MARK: - Avatar Methods
+    
+    private func generateInitialAvatar() {
+        avatarSeed = UUID().uuidString
+        selectedAvatar = generateDicebearURL(seed: avatarSeed)
+    }
+    
+    private func randomizeAvatar() {
+        withAnimation(.easeInOut(duration: 0.2)) {
+            avatarSeed = UUID().uuidString
+            selectedAvatar = generateDicebearURL(seed: avatarSeed)
+        }
+    }
+    
+    private func generateDicebearURL(seed: String) -> String {
+        // Using bottts style for a fun robot-like avatar
+        // You can change the style to: adventurer, avataaars, big-ears, big-smile, bottts, croodles, fun-emoji, lorelei, micah, miniavs, open-peeps, personas, pixel-art
+        let style = "bottts"
+        let size = 200
+        return "https://api.dicebear.com/7.x/\(style)/png?seed=\(seed)&size=\(size)"
+    }
+    
     private func importAccount() {
         isProcessing = true
+        loginStatus = "Authenticating..."
         
         Task {
             do {
+                // Step 1: Create signer and authenticate
                 let signer = try NDKPrivateKeySigner(nsec: nsecInput)
                 let pubkey = try await signer.pubkey
                 
-                var displayName = "Nostr User"
+                await MainActor.run {
+                    loginStatus = "Finding your relays..."
+                }
                 
-                if let ndk = nostrManager.ndk {
-                    let profileDataSource = ndk.observe(
-                        filter: NDKFilter(
-                            authors: [pubkey],
-                            kinds: [0]
-                        ),
-                        maxAge: 3600,
-                        cachePolicy: .cacheWithNetwork
-                    )
-                    
-                    for await event in profileDataSource.events {
-                        if let profileData = event.content.data(using: .utf8),
-                           let profile = JSONCoding.safeDecode(NDKUserProfile.self, from: profileData) {
-                            displayName = profile.displayName ?? profile.name ?? "Nostr User"
-                            break
-                        }
+                // Step 2: Create session (this starts the outbox relay discovery)
+                let _ = try await nostrManager.createAccountFromNsec(
+                    nsecInput,
+                    displayName: "Loading..." // We'll update this later
+                )
+                
+                guard let ndk = nostrManager.ndk else {
+                    throw NostrError.ndkNotInitialized
+                }
+                
+                // Step 3: Use outbox to track user and find their relays
+                let relayTracker = ndk.outbox
+                await relayTracker.track(pubkey)
+                
+                // Wait for relay discovery (with timeout)
+                var retries = 0
+                while await relayTracker.getRelays(for: pubkey).isEmpty && retries < 30 {
+                    try await Task.sleep(nanoseconds: 100_000_000) // 100ms
+                    retries += 1
+                }
+                
+                let userRelays = await relayTracker.getRelays(for: pubkey)
+                print("Found \(userRelays.count) relays for user")
+                
+                await MainActor.run {
+                    loginStatus = "Importing wallet..."
+                }
+                
+                // Step 4: Check for existing wallet (kind 17375)
+                let walletFilter = NDKFilter(
+                    authors: [pubkey],
+                    kinds: [EventKind.cashuWalletConfig], // NIP-60 wallet configuration
+                    limit: 1
+                )
+                
+                var walletFound = false
+                let walletDataSource = ndk.observe(
+                    filter: walletFilter,
+                    maxAge: 0, // Force network fetch
+                    cachePolicy: .network
+                )
+                
+                // Wait for EOSE to ensure we've checked all relays
+                for await event in walletDataSource.events {
+                    if event.kind == EventKind.cashuWalletConfig {
+                        walletFound = true
+                        print("Found existing wallet configuration")
+                        break
                     }
                 }
                 
-                let _ = try await nostrManager.createAccountFromNsec(
-                    nsecInput,
-                    displayName: displayName
+                // Also fetch profile while we're at it
+                var displayName = "Nostr User"
+                let profileDataSource = ndk.observe(
+                    filter: NDKFilter(
+                        authors: [pubkey],
+                        kinds: [0]
+                    ),
+                    maxAge: 3600,
+                    cachePolicy: .cacheWithNetwork
                 )
+                
+                for await event in profileDataSource.events {
+                    if let profileData = event.content.data(using: .utf8),
+                       let profile = JSONCoding.safeDecode(NDKUserProfile.self, from: profileData) {
+                        displayName = profile.displayName ?? profile.name ?? "Nostr User"
+                        break
+                    }
+                }
                 
                 await MainActor.run {
                     isProcessing = false
-                    // Transition to welcome step
-                    withAnimation(.spring(response: 0.8, dampingFraction: 0.8)) {
-                        currentStep = 0
+                    loginStatus = ""
+                    
+                    if walletFound {
+                        // Step 5: Go directly to main screen if wallet exists
+                        // Load the wallet before dismissing
+                        Task {
+                            do {
+                                try await walletManager.loadWalletForCurrentUser()
+                                await MainActor.run {
+                                    dismiss()
+                                }
+                            } catch {
+                                print("Failed to load wallet: \(error)")
+                                // Still dismiss but wallet loading failed
+                                await MainActor.run {
+                                    dismiss()
+                                }
+                            }
+                        }
+                    } else {
+                        // Go to wallet setup if no wallet found
+                        withAnimation(.spring(response: 0.8, dampingFraction: 0.8)) {
+                            currentStep = 0
+                        }
+                        setupMintDiscovery()
                     }
-                    setupMintDiscovery()
                 }
             } catch {
                 await MainActor.run {
                     authError = error.localizedDescription
                     showAuthError = true
                     isProcessing = false
+                    loginStatus = ""
                 }
             }
         }

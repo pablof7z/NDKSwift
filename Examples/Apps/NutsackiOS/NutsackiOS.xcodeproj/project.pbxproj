@@ -15,8 +15,10 @@
 		2203216B7A95C7061968E7D3 /* MintBalanceLegend.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6BEE0E04E0712D430ADCD91E /* MintBalanceLegend.swift */; };
 		23B67F4F4DAA880850CD9A2F /* AppState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8B052F81B7B409EB3A7F20DE /* AppState.swift */; };
 		276233E0707E1C816CA5CFC5 /* WalletEventsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 29F689EC6224FF420AB39B5C /* WalletEventsView.swift */; };
+		2911E0567CF5492C8C86A9BB /* WalletOnboardingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2911E0557CF5492C8C86A9BA /* WalletOnboardingView.swift */; };
 		2B958B8F7F7AF6395F8D66BC /* NutsackApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7E5246359CDA91D9B7847663 /* NutsackApp.swift */; };
 		2BC4F751066C9A3FF8097E62 /* RelayHealthView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3AFA24434F57D28213E47F35 /* RelayHealthView.swift */; };
+		2FFC12AEC5DD4BA4B13B7564 /* BlacklistedMintsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B32D1DA28D6F49BC91E2BAC4 /* BlacklistedMintsView.swift */; };
 		37A06CA0B6A4D33F210E8FE8 /* ReceivedNutzapsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9C0816FCB2308D992EAD2413 /* ReceivedNutzapsView.swift */; };
 		39CD315ACA254FDC07076930 /* ReceiveView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 29823E16BE363E01B66A8DE5 /* ReceiveView.swift */; };
 		3AE0DBFC1CA063A6AC21FD56 /* MintDiscoveryManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 89F70690BBEA51B2AC1E862F /* MintDiscoveryManager.swift */; };
@@ -41,6 +43,7 @@
 		A2AA28006473A0599859D159 /* WalletView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 389ADC0012575F359B468F0D /* WalletView.swift */; };
 		A30E03D3719F1A46F36595C3 /* UserProfileViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 83C0ABB1873A67C266D19106 /* UserProfileViews.swift */; };
 		A3F5D391D9E9635B38003B40 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 54A896A6ACDEC934DB872783 /* Assets.xcassets */; };
+		AF12345678901234567890AC /* AuthenticationFlow.swift in Sources */ = {isa = PBXBuildFile; fileRef = AF12345678901234567890AB /* AuthenticationFlow.swift */; };
 		BFEA02908127F7398C6C37FE /* RelayStatusIndicator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 20CD4E4BCD9A73999656B525 /* RelayStatusIndicator.swift */; };
 		C5EC808ACA739B02BF4058EA /* WalletManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 139C4ED82E0344CDED10AAA3 /* WalletManager.swift */; };
 		C96FFE635505C91094E445EA /* NostrDataSources.swift in Sources */ = {isa = PBXBuildFile; fileRef = 82C1BE0D91363F5EBE756682 /* NostrDataSources.swift */; };
@@ -48,8 +51,6 @@
 		D044EAC14B431980BDE9CA63 /* MintsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4CB9DD7CBBD58218E4C4FC34 /* MintsView.swift */; };
 		D546387471DFA74D85055166 /* RecentTransactionsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E0B1C99B01866B00245F62DE /* RecentTransactionsView.swift */; };
 		D68171CBFD774613B6FC79BD /* WalletSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 06737C2A632A68CE0C55183C /* WalletSettingsView.swift */; };
-		DC55894F1FA07AC597FE8FB2 /* ImportAccountView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FD1FAFE4A7259CADFAF7276C /* ImportAccountView.swift */; };
-		AF12345678901234567890AC /* AuthenticationFlow.swift in Sources */ = {isa = PBXBuildFile; fileRef = AF12345678901234567890AB /* AuthenticationFlow.swift */; };
 		DCC506C626DDA40899916653 /* MintDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0091AA5BFE07C9D49369C9FA /* MintDetailView.swift */; };
 		DDFC271E78ACBA1BAE003854 /* ProofManagementView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 816546EBC30AFC0F9FA87E2A /* ProofManagementView.swift */; };
 		DE2555469F21E1A95181AE75 /* ContactsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7260E070B2366527CE8E93CF /* ContactsView.swift */; };
@@ -60,13 +61,10 @@
 		F4D2CEAE92BF3D746AE2E29A /* SwapView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0118B4914C3C24FF6C27D362 /* SwapView.swift */; };
 		FE9B372405B563AA3EC15B71 /* QRCodeGenerator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 67721329672986338EBD9E47 /* QRCodeGenerator.swift */; };
 		FF0BA0A02D4987F500000002 /* NutLogoView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FF0BA09F2D4987F500000002 /* NutLogoView.swift */; };
-		2911E0567CF5492C8C86A9BB /* WalletOnboardingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2911E0557CF5492C8C86A9BA /* WalletOnboardingView.swift */; };
-		2FFC12AEC5DD4BA4B13B7564 /* BlacklistedMintsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B32D1DA28D6F49BC91E2BAC4 /* BlacklistedMintsView.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
 		0091AA5BFE07C9D49369C9FA /* MintDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MintDetailView.swift; sourceTree = "<group>"; };
-		B32D1DA28D6F49BC91E2BAC4 /* BlacklistedMintsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BlacklistedMintsView.swift; sourceTree = "<group>"; };
 		0118B4914C3C24FF6C27D362 /* SwapView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SwapView.swift; sourceTree = "<group>"; };
 		0474797B3D70A3F5E50DE4E0 /* NostrManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NostrManager.swift; sourceTree = "<group>"; };
 		055295357886CE289C42C9DD /* NutzapView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NutzapView.swift; sourceTree = "<group>"; };
@@ -74,6 +72,7 @@
 		139C4ED82E0344CDED10AAA3 /* WalletManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WalletManager.swift; sourceTree = "<group>"; };
 		179914F131C3EA8E9C86C2DF /* RelayConnectionViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RelayConnectionViews.swift; sourceTree = "<group>"; };
 		20CD4E4BCD9A73999656B525 /* RelayStatusIndicator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RelayStatusIndicator.swift; sourceTree = "<group>"; };
+		2911E0557CF5492C8C86A9BA /* WalletOnboardingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = WalletOnboardingView.swift; path = ../WalletOnboardingView.swift; sourceTree = "<group>"; };
 		29823E16BE363E01B66A8DE5 /* ReceiveView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReceiveView.swift; sourceTree = "<group>"; };
 		29DD716C975387491C98884E /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
 		29F689EC6224FF420AB39B5C /* WalletEventsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WalletEventsView.swift; sourceTree = "<group>"; };
@@ -105,6 +104,8 @@
 		9D5B9AA3E71133AA8A3EA248 /* WalletEventInfo.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WalletEventInfo.swift; sourceTree = "<group>"; };
 		A49674C9600E7CD952A38521 /* RelativeTimeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RelativeTimeView.swift; sourceTree = "<group>"; };
 		A9C1DE3157B002CB979102D6 /* NutsackiOS.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = NutsackiOS.xcconfig; sourceTree = "<group>"; };
+		AF12345678901234567890AB /* AuthenticationFlow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuthenticationFlow.swift; sourceTree = "<group>"; };
+		B32D1DA28D6F49BC91E2BAC4 /* BlacklistedMintsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BlacklistedMintsView.swift; sourceTree = "<group>"; };
 		B43D3EE06E7A1612A33CC851 /* AsyncContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AsyncContentView.swift; sourceTree = "<group>"; };
 		BFD3618F6ACCDFC05E146B73 /* MintView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MintView.swift; sourceTree = "<group>"; };
 		C53A61281693438AA3C00939 /* BalanceCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BalanceCard.swift; sourceTree = "<group>"; };
@@ -119,10 +120,7 @@
 		F7ACD26D8FA1630E42EFEC94 /* SendView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SendView.swift; sourceTree = "<group>"; };
 		FA415E993BB5A7710A803BD9 /* PaymentReceivedAnimation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PaymentReceivedAnimation.swift; sourceTree = "<group>"; };
 		FBFB09E012F47FEE3902D70C /* TransactionDetailDrawer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TransactionDetailDrawer.swift; sourceTree = "<group>"; };
-		FD1FAFE4A7259CADFAF7276C /* ImportAccountView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImportAccountView.swift; sourceTree = "<group>"; };
-		AF12345678901234567890AB /* AuthenticationFlow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuthenticationFlow.swift; sourceTree = "<group>"; };
 		FF0BA09F2D4987F500000002 /* NutLogoView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NutLogoView.swift; sourceTree = "<group>"; };
-		2911E0557CF5492C8C86A9BA /* WalletOnboardingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = WalletOnboardingView.swift; path = ../WalletOnboardingView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -226,7 +224,6 @@
 		89D520A27A28FB620595C7DA /* Auth */ = {
 			isa = PBXGroup;
 			children = (
-				FD1FAFE4A7259CADFAF7276C /* ImportAccountView.swift */,
 				AF12345678901234567890AB /* AuthenticationFlow.swift */,
 			);
 			path = Auth;
@@ -392,7 +389,6 @@
 				6BA1850F5A5A565895F45E8D /* DataModels.swift in Sources */,
 				E3F84D954FEDA2D5C0A6C584 /* DebugLoggingView.swift in Sources */,
 				578BFBDCED5863A68DA9A05D /* DiscoveredMintsView.swift in Sources */,
-				DC55894F1FA07AC597FE8FB2 /* ImportAccountView.swift in Sources */,
 				AF12345678901234567890AC /* AuthenticationFlow.swift in Sources */,
 				7EA1E6F16B65DDEA250DC8C5 /* MintAllocationPieChart.swift in Sources */,
 				2203216B7A95C7061968E7D3 /* MintBalanceLegend.swift in Sources */,

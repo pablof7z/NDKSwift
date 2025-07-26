@@ -8,26 +8,28 @@ struct HomeView: View {
     @State private var selectedThread: NDKEvent?
     @State private var replyTracker: ReplyTracker?
     
-    // Simplified state management
-    @State private var notes: [NDKEvent] = []
-    @State private var isSyncing: Bool = false
-    @State private var syncStatus: String = ""
-    @State private var error: Error?
+    // Data source for notes
+    @StateObject private var notesDataSource: SessionNotesDataSource
     @State private var newNotesCount: Int = 0
-    @State private var notesTask: Task<Void, Never>?
+    @State private var showContent = false
+    
+    init() {
+        // Initialize data source with a placeholder - will be updated when NDK is available
+        _notesDataSource = StateObject(wrappedValue: SessionNotesDataSource(ndk: NDK(relayUrls: [])))
+    }
     
     var body: some View {
         NavigationView {
             ZStack {
-                // Subtle gradient background
+                // Animated gradient background
                 LinearGradient(
-                    gradient: Gradient(stops: [
-                        .init(color: Color(.systemBackground), location: 0),
-                        .init(color: Color(.systemBackground).opacity(0.98), location: 0.2),
-                        .init(color: Color(.secondarySystemBackground).opacity(0.2), location: 1)
+                    gradient: Gradient(colors: [
+                        Color(.systemBackground),
+                        Color.purple.opacity(0.02),
+                        Color(.systemBackground)
                     ]),
-                    startPoint: .top,
-                    endPoint: .bottom
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
                 )
                 .ignoresSafeArea()
                 
@@ -36,10 +38,23 @@ struct HomeView: View {
                     headerView
                     
                     // Main content
-                    if notes.isEmpty {
+                    if notesDataSource.notes.isEmpty && !notesDataSource.isLoading {
                         emptyStateView
                     } else {
                         chatListView
+                    }
+                }
+                
+                // Floating compose button
+                VStack {
+                    Spacer()
+                    HStack {
+                        Spacer()
+                        FloatingActionButton(icon: "square.and.pencil") {
+                            // TODO: Show compose view
+                        }
+                        .padding(.trailing, 20)
+                        .padding(.bottom, 20)
                     }
                 }
             }
@@ -56,55 +71,95 @@ struct HomeView: View {
             print("📦 [HomeView] ndkManager.ndk = \(ndkManager.ndk != nil ? "Available" : "NIL")")
             if let ndk = ndkManager.ndk {
                 print("📦 [HomeView] ndk.signer = \(ndk.signer != nil ? "Available" : "NIL")")
+                // Recreate data source with actual NDK instance
+                if notesDataSource.ndk !== ndk {
+                    Task {
+                        await MainActor.run {
+                            self._notesDataSource.wrappedValue = SessionNotesDataSource(ndk: ndk)
+                        }
+                    }
+                }
             }
-            startNotesStream()
+        }
+        .onChange(of: notesDataSource.sessionData) { _, sessionData in
+            // Initialize reply tracker when session data is available
+            if let sessionData = sessionData, replyTracker == nil {
+                replyTracker = ReplyTracker(ndk: notesDataSource.ndk, following: sessionData.followList)
+                print("📝 [HomeView] Reply tracker initialized")
+            }
         }
         .onDisappear {
-            notesTask?.cancel()
             replyTracker?.stopAllTracking()
         }
     }
     
     private var headerView: some View {
         ZStack {
+            // Animated header background
+            AnimatedHeaderBackground()
+            
             // Subtle background blur effect
             VisualEffectBlur(blurStyle: .systemUltraThinMaterial)
                 .opacity(0.8)
             
             VStack(spacing: 0) {
                 HStack(spacing: 12) {
-                    Text("Messages")
-                        .font(.system(size: 28, weight: .semibold, design: .default))
-                        .foregroundColor(.primary)
+                    HStack(spacing: 12) {
+                        PostaLogoView(size: 32, color: .purple)
+                        
+                        Text("Messages")
+                            .font(.system(size: 28, weight: .bold, design: .rounded))
+                            .foregroundStyle(
+                                LinearGradient(
+                                    gradient: Gradient(colors: [
+                                        Color.primary,
+                                        Color.primary.opacity(0.8)
+                                    ]),
+                                    startPoint: .topLeading,
+                                    endPoint: .bottomTrailing
+                                )
+                            )
+                    }
                     
                     Spacer()
                     
-                    // Sync button
+                    // Sync button with animation
                     Button(action: {
-                        triggerSync()
+                        Task {
+                            await notesDataSource.refresh()
+                        }
                     }) {
                         ZStack {
                             Circle()
-                                .fill(Color(.quaternarySystemFill))
-                                .frame(width: 36, height: 36)
+                                .fill(
+                                    LinearGradient(
+                                        gradient: Gradient(colors: [
+                                            Color.purple.opacity(0.1),
+                                            Color.purple.opacity(0.05)
+                                        ]),
+                                        startPoint: .topLeading,
+                                        endPoint: .bottomTrailing
+                                    )
+                                )
+                                .frame(width: 40, height: 40)
                             
-                            if isSyncing {
+                            if notesDataSource.isLoading {
                                 ProgressView()
-                                    .scaleEffect(0.65)
-                                    .tint(.secondary)
+                                    .scaleEffect(0.7)
+                                    .tint(.purple)
                             } else {
                                 Image(systemName: "arrow.clockwise")
-                                    .font(.system(size: 15, weight: .medium))
-                                    .foregroundColor(.secondary)
+                                    .font(.system(size: 16, weight: .medium))
+                                    .foregroundColor(.purple)
+                                    .rotationEffect(.degrees(notesDataSource.isLoading ? 360 : 0))
                             }
                         }
                     }
-                    .disabled(isSyncing)
-                    .opacity(isSyncing ? 1 : 0.9)
-                    .scaleEffect(isSyncing ? 1 : 1)
-                    .animation(.easeInOut(duration: 0.15), value: isSyncing)
+                    .disabled(notesDataSource.isLoading)
+                    .scaleEffect(notesDataSource.isLoading ? 0.95 : 1)
+                    .animation(.easeInOut(duration: 0.2), value: notesDataSource.isLoading)
                     
-                    // Profile button
+                    // Profile button with gradient
                     Button(action: {
                         if let activeSession = authManager.activeSession {
                             selectedProfile = activeSession.pubkey
@@ -112,12 +167,21 @@ struct HomeView: View {
                     }) {
                         ZStack {
                             Circle()
-                                .fill(Color(.quaternarySystemFill))
-                                .frame(width: 36, height: 36)
+                                .fill(
+                                    LinearGradient(
+                                        gradient: Gradient(colors: [
+                                            Color.purple.opacity(0.1),
+                                            Color.purple.opacity(0.05)
+                                        ]),
+                                        startPoint: .topLeading,
+                                        endPoint: .bottomTrailing
+                                    )
+                                )
+                                .frame(width: 40, height: 40)
                             
                             Image(systemName: "person.circle.fill")
-                                .font(.system(size: 18, weight: .regular))
-                                .foregroundColor(.secondary)
+                                .font(.system(size: 20, weight: .regular))
+                                .foregroundColor(.purple)
                         }
                     }
                 }
@@ -126,42 +190,71 @@ struct HomeView: View {
                 .padding(.bottom, 10)
                 
                 // Connection status
-                if let error = error {
+                if let error = notesDataSource.error {
                     ErrorBanner(error: error)
                         .padding(.horizontal, 16)
                         .padding(.bottom, 6)
                 }
                 
                 // Sync status
-                if !syncStatus.isEmpty {
-                    Text(syncStatus)
+                if notesDataSource.hasEOSE {
+                    Text("Synced")
                         .font(.caption2)
                         .foregroundColor(.secondary)
                         .padding(.bottom, 6)
                 }
             }
         }
-        .frame(height: error != nil ? 90 : 70)
+        .frame(height: notesDataSource.error != nil ? 90 : 70)
         .shadow(color: Color.black.opacity(0.03), radius: 3, x: 0, y: 1)
     }
     
     private var emptyStateView: some View {
-        VStack(spacing: 16) {
-            Image(systemName: "bubble.left.and.bubble.right")
-                .font(.system(size: 48))
-                .foregroundColor(.secondary.opacity(0.4))
+        VStack(spacing: 24) {
+            ZStack {
+                Circle()
+                    .fill(
+                        LinearGradient(
+                            gradient: Gradient(colors: [
+                                Color.purple.opacity(0.1),
+                                Color.purple.opacity(0.05)
+                            ]),
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+                    .frame(width: 120, height: 120)
+                    .blur(radius: 20)
+                
+                Image(systemName: "envelope.open")
+                    .font(.system(size: 56))
+                    .foregroundStyle(
+                        LinearGradient(
+                            gradient: Gradient(colors: [
+                                Color.purple,
+                                Color.purple.opacity(0.7)
+                            ]),
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+                    .symbolEffect(.bounce, value: true)
+            }
             
-            Text("No messages yet")
-                .font(.headline)
-                .fontWeight(.medium)
-            
-            Text("Messages from people you follow will appear here")
-                .font(.subheadline)
-                .foregroundColor(.secondary)
-                .multilineTextAlignment(.center)
-                .padding(.horizontal, 32)
+            VStack(spacing: 12) {
+                Text("No messages yet")
+                    .font(.system(size: 22, weight: .semibold))
+                    .foregroundColor(.primary)
+                
+                Text("Messages from people you follow\nwill appear here")
+                    .font(.system(size: 16))
+                    .foregroundColor(.secondary)
+                    .multilineTextAlignment(.center)
+                    .lineSpacing(4)
+            }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .offset(y: -40)
     }
     
     private var chatListView: some View {
@@ -180,7 +273,7 @@ struct HomeView: View {
                                 }
                             }
                         
-                        ForEach(notes, id: \.id) { event in
+                        ForEach(Array(notesDataSource.notes.enumerated()), id: \.element.id) { index, event in
                             ChatRowView(
                                 event: event,
                                 replyTracker: replyTracker,
@@ -191,11 +284,7 @@ struct HomeView: View {
                                     selectedProfile = event.pubkey
                                 }
                             )
-                            
-                            if event.id != notes.last?.id {
-                                Divider()
-                                    .padding(.leading, 76)
-                            }
+                            .animation(.spring(response: 0.5, dampingFraction: 0.8).delay(Double(index) * 0.05), value: showContent)
                         }
                     }
                 }
@@ -239,142 +328,6 @@ struct HomeView: View {
     
     // MARK: - Helper Methods
     
-    private func startNotesStream() {
-        guard let ndk = ndkManager.ndk,
-              let signer = ndk.signer else { 
-            print("❌ [HomeView] No NDK or signer available")
-            return 
-        }
-        
-        if let existingTask = notesTask {
-            NDKLogger.log(.info, category: .subscription, "🚫 [HomeView] Cancelling existing notesTask")
-            existingTask.cancel()
-        }
-        notesTask = Task {
-            NDKLogger.log(.info, category: .subscription, "🎬 [HomeView] Task started - isCancelled: \(Task.isCancelled)")
-            do {
-                print("🚀 [HomeView] Starting notes stream...")
-                
-                // Start session with explicit configuration
-                let config = NDKSessionConfiguration(
-                    dataRequirements: [.followList, .muteList],
-                    preloadStrategy: .progressive
-                )
-                print("📋 [HomeView] Calling startSession with config: \(config)")
-                
-                let sessionData: NDKSessionData
-                do {
-                    NDKLogger.log(.info, category: .subscription, "🎯 [HomeView] About to call startSession... Task.isCancelled: \(Task.isCancelled)")
-                    sessionData = try await ndk.startSession(signer: signer, config: config)
-                    NDKLogger.log(.info, category: .subscription, "✅ [HomeView] Session started successfully - Task.isCancelled: \(Task.isCancelled)")
-                } catch {
-                    NDKLogger.log(.error, category: .subscription, "❌ [HomeView] Failed to start session: \(error)")
-                    throw error
-                }
-                
-                NDKLogger.log(.info, category: .subscription, "📦 [HomeView] SessionData received - pubkey: \(sessionData.pubkey.prefix(8))...")
-                NDKLogger.log(.info, category: .subscription, "📦 [HomeView] Follow list count: \(sessionData.followList.count)")
-                NDKLogger.log(.info, category: .subscription, "📦 [HomeView] First 3 follows: \(Array(sessionData.followList.prefix(3)).map { $0.prefix(8) })")
-                
-                // Check if we actually have follows
-                if sessionData.followList.isEmpty {
-                    NDKLogger.log(.warning, category: .subscription, "⚠️ [HomeView] No follows found! Cannot create reactive filter.")
-                    return
-                }
-                
-                // Initialize reply tracker
-                await MainActor.run {
-                    if replyTracker == nil {
-                        replyTracker = ReplyTracker(ndk: ndk, following: sessionData.followList)
-                        print("📝 [HomeView] Reply tracker initialized")
-                    }
-                }
-                
-                NDKLogger.log(.info, category: .subscription, "🔍 [HomeView] Creating reactive filter for notes...")
-                // Create reactive filter for notes from followed users
-                let filter = ReactiveFilter(
-                    dependencies: [.followList],
-                    builder: { sessionData in
-                        NDKLogger.log(.info, category: .subscription, "🏗️ [HomeView] ReactiveFilter builder called - follows: \(sessionData.followList.count)")
-                        let filter = NDKFilter(
-                            authors: Array(sessionData.followList),
-                            kinds: [1],
-                            limit: 100  // Add limit to prevent overwhelming the UI
-                        )
-                        print("📋 [HomeView] Built filter: authors=\(filter.authors?.count ?? 0), kinds=\(filter.kinds ?? [])")
-                        return filter
-                    }
-                )
-                
-                print("🎯 [HomeView] Calling ndk.observe with reactive filter...")
-                // Use observe to get a stream of notes - this handles all the complexity
-                let stream = ndk.observe(filter)
-                print("📡 [HomeView] Got stream, starting to iterate...")
-                
-                var seenIds = Set<String>()
-                var notesList: [NDKEvent] = []
-                var iterationStarted = false
-                
-                for await event in stream {
-                    if !iterationStarted {
-                        print("🎳 [HomeView] First iteration of stream - events are flowing!")
-                        iterationStarted = true
-                    }
-                    guard !Task.isCancelled else { 
-                        print("⚠️ [HomeView] Task cancelled, breaking from stream")
-                        break 
-                    }
-                    
-                    if !seenIds.contains(event.id) {
-                        print("📨 [HomeView] New event received: \(event.id) from \(event.pubkey.prefix(8))")
-                        seenIds.insert(event.id)
-                        notesList.append(event)
-                        
-                        // Sort by timestamp descending
-                        notesList.sort { $0.createdAt > $1.createdAt }
-                        
-                        await MainActor.run {
-                            // Update new notes count if we have existing notes
-                            if !notes.isEmpty && event.createdAt > (notes.first?.createdAt ?? 0) {
-                                newNotesCount += 1
-                            }
-                            
-                            notes = notesList
-                        }
-                    }
-                }
-                print("🔚 [HomeView] Stream ended - iterationStarted: \(iterationStarted)")
-                if !iterationStarted {
-                    print("⚠️ [HomeView] Stream ended without any events!")
-                }
-            } catch {
-                print("❌ [HomeView] Error in startNotesStream: \(error)")
-                print("🔥 [HomeView] Error type: \(type(of: error))")
-                print("🔥 [HomeView] Error description: \(String(describing: error))")
-                await MainActor.run {
-                    self.error = error
-                }
-            }
-        }
-        print("🎯 [HomeView] notesTask created and started")
-    }
-    
-    private func triggerSync() {
-        // Restart the notes stream to get fresh data
-        isSyncing = true
-        syncStatus = "Syncing..."
-        
-        startNotesStream()
-        
-        Task {
-            try? await Task.sleep(nanoseconds: 2_000_000_000) // 2 seconds
-            await MainActor.run {
-                isSyncing = false
-                syncStatus = ""
-            }
-        }
-    }
-    
     private func resetNewNotesCount() {
         newNotesCount = 0
     }
@@ -392,62 +345,60 @@ struct ChatRowView: View {
     @State private var profileTask: Task<Void, Never>?
     @State private var replyInfo: ReplyTracker.ReplyInfo?
     @State private var pollingTask: Task<Void, Never>?
+    @State private var showContent = false
     
     var body: some View {
-        HStack(alignment: .top, spacing: 0) {
-            // Avatar section
-            Button(action: onAvatarTap) {
-                ZStack {
-                    if let avatarURL = profile?.picture, let url = URL(string: avatarURL) {
-                        AsyncImage(url: url) { image in
-                            image
-                                .resizable()
-                                .aspectRatio(contentMode: .fill)
-                        } placeholder: {
-                            Circle()
-                                .fill(Color(.quaternarySystemFill))
-                        }
-                        .frame(width: 48, height: 48)
-                        .clipShape(Circle())
-                    } else {
-                        Circle()
-                            .fill(Color(.quaternarySystemFill))
-                            .frame(width: 48, height: 48)
-                            .overlay(
-                                Text(String(profile?.name?.prefix(1) ?? "?").uppercased())
-                                    .font(.system(size: 18, weight: .medium))
-                                    .foregroundColor(.secondary)
-                            )
-                    }
-                }
-            }
-            .buttonStyle(PlainButtonStyle())
-            .padding(.leading, 16)
-            .padding(.trailing, 12)
+        ZStack {
+            // Card background
+            MessageCard(
+                isPressed: isPressed,
+                hasUnread: false
+            )
+            .padding(.horizontal, 12)
+            .padding(.vertical, 4)
             
-            // Content section
-            VStack(alignment: .leading, spacing: 2) {
-                HStack(alignment: .firstTextBaseline, spacing: 6) {
-                    Text(profile?.displayName ?? profile?.name ?? "Unknown")
-                        .font(.system(size: 15, weight: .semibold))
-                        .lineLimit(1)
-                        .layoutPriority(1)
-                    
-                    Text(event.createdAt.formatted)
-                        .font(.system(size: 12))
-                        .foregroundColor(.secondary)
-                    
-                    Spacer(minLength: 0)
+            HStack(alignment: .top, spacing: 0) {
+                // Avatar section
+                Button(action: onAvatarTap) {
+                    EnhancedAvatarView(
+                        url: profile?.picture.flatMap { URL(string: $0) },
+                        size: 52,
+                        fallbackText: String(profile?.name?.prefix(1) ?? "?").uppercased(),
+                        showOnlineIndicator: false
+                    )
                 }
-                
-                RichTextInline(
-                    content: event.content,
-                    tags: event.tags,
-                    currentUser: nil
-                )
-                .font(.system(size: 14))
-                .lineLimit(2)
-                .foregroundColor(.primary.opacity(0.85))
+                .buttonStyle(PlainButtonStyle())
+                .padding(.leading, 20)
+                .padding(.trailing, 12)
+            
+                // Content section
+                VStack(alignment: .leading, spacing: 4) {
+                    HStack(alignment: .firstTextBaseline, spacing: 8) {
+                        Text(profile?.displayName ?? profile?.name ?? "Unknown")
+                            .font(.system(size: 16, weight: .semibold))
+                            .foregroundColor(.primary)
+                            .lineLimit(1)
+                            .layoutPriority(1)
+                        
+                        Text("·")
+                            .font(.system(size: 14))
+                            .foregroundColor(.secondary)
+                        
+                        Text(event.createdAt.formatted)
+                            .font(.system(size: 13))
+                            .foregroundColor(.secondary)
+                        
+                        Spacer(minLength: 0)
+                    }
+                    
+                    RichTextInline(
+                        content: event.content,
+                        tags: event.tags,
+                        currentUser: nil
+                    )
+                    .font(.system(size: 15))
+                    .lineLimit(2)
+                    .foregroundColor(.primary.opacity(0.9))
                 
                 // Reply info section
                 if let info = replyInfo, (info.totalCount > 0 || !info.followingRepliers.isEmpty) {
@@ -501,19 +452,19 @@ struct ChatRowView: View {
                     }
                     .padding(.top, 4)
                 }
+                }
+                .padding(.trailing, 20)
+                .padding(.vertical, 14)
             }
-            .padding(.trailing, 16)
-            .padding(.vertical, 10)
         }
-        .background(
-            Color.primary.opacity(isPressed ? 0.05 : 0)
-        )
         .contentShape(Rectangle())
+        .opacity(showContent ? 1 : 0)
+        .scaleEffect(showContent ? 1 : 0.95)
         .onTapGesture {
             onTap()
         }
-        .scaleEffect(isPressed ? 0.98 : 1)
-        .animation(.easeInOut(duration: 0.1), value: isPressed)
+        .scaleEffect(isPressed ? 0.97 : 1)
+        .animation(.spring(response: 0.3, dampingFraction: 0.7), value: isPressed)
         .onLongPressGesture(
             minimumDuration: 0,
             maximumDistance: .infinity,
@@ -523,6 +474,11 @@ struct ChatRowView: View {
             perform: { }
         )
         .onAppear {
+            // Animate content appearance
+            withAnimation(.spring(response: 0.5, dampingFraction: 0.8).delay(0.05)) {
+                showContent = true
+            }
+            
             // Start observing profile if we don't have it yet
             if profile == nil, let ndk = ndkManager.ndk {
                 profileTask = Task {

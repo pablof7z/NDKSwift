@@ -30,24 +30,19 @@ class OutboxDebugViewModel: ObservableObject {
         isLoading = true
         errorMessage = nil
         
-        do {
-            // Get current outbox statistics
-            let stats = await ndk.outbox.getRelayUpdateStats()
-            
-            // Get all tracked outbox items
-            let outboxItems = await getAllOutboxItems()
-            
-            // Process entries and calculate summary
-            let entries = await processOutboxItems(outboxItems)
-            let summaryData = calculateSummary(from: entries, stats: stats)
-            
-            // Update UI
-            self.outboxEntries = entries
-            self.summary = summaryData
-            
-        } catch {
-            errorMessage = "Failed to load outbox data: \(error.localizedDescription)"
-        }
+        // Get current outbox statistics
+        let stats = await ndk.outbox.getRelayUpdateStats()
+        
+        // Get all tracked outbox items
+        let outboxItems = await getAllOutboxItems()
+        
+        // Process entries and calculate summary
+        let entries = await processOutboxItems(outboxItems)
+        let summaryData = calculateSummary(from: entries, stats: stats)
+        
+        // Update UI
+        self.outboxEntries = entries
+        self.summary = summaryData
         
         isLoading = false
         
@@ -79,12 +74,11 @@ class OutboxDebugViewModel: ObservableObject {
     private func getDisplayName(for pubkey: String) async -> String? {
         guard let ndk = ndk else { return nil }
         
-        // Try to get cached profile
-        let user = ndk.getUser(pubkey)
-        
         // Attempt to get profile from cache (don't fetch if not available)
         for await profile in await ndk.profileManager.observe(for: pubkey, maxAge: TimeConstants.hour) {
-            return profile.name ?? profile.displayName
+            if let profile = profile {
+                return profile.name ?? profile.displayName
+            }
         }
         
         return nil
@@ -113,7 +107,7 @@ class OutboxDebugViewModel: ObservableObject {
         
         relayUpdateTask?.cancel()
         relayUpdateTask = Task {
-            for await update in ndk.outbox.relayUpdates {
+            for await update in await ndk.outbox.relayUpdates {
                 await handleRelayUpdate(update)
             }
         }
@@ -244,31 +238,31 @@ extension OutboxDebugViewModel {
         writeRelays: [String]
     ) -> OutboxEntry {
         let readRelayInfos = readRelays.map { url in
-            RelayDisplayInfo(from: RelayInfo(url: url, metadata: RelayMetadata(
+            RelayInfo(url: url, metadata: RelayMetadata(
                 score: Double.random(in: 0.3...0.9),
                 lastConnectedAt: Date().addingTimeInterval(-Double.random(in: 0...3600)),
                 avgResponseTime: Double.random(in: 100...500),
                 failureCount: Int.random(in: 0...5),
                 authRequired: Bool.random(),
                 paymentRequired: Bool.random()
-            )))
+            ))
         }
         
         let writeRelayInfos = writeRelays.map { url in
-            RelayDisplayInfo(from: RelayInfo(url: url, metadata: RelayMetadata(
+            RelayInfo(url: url, metadata: RelayMetadata(
                 score: Double.random(in: 0.3...0.9),
                 lastConnectedAt: Date().addingTimeInterval(-Double.random(in: 0...3600)),
                 avgResponseTime: Double.random(in: 100...500),
                 failureCount: Int.random(in: 0...5),
                 authRequired: Bool.random(),
                 paymentRequired: Bool.random()
-            )))
+            ))
         }
         
         let mockItem = NDKOutboxItem(
             pubkey: pubkey,
-            readRelays: Set(readRelays.map { RelayInfo(url: $0, metadata: nil) }),
-            writeRelays: Set(writeRelays.map { RelayInfo(url: $0, metadata: nil) }),
+            readRelays: Set(readRelayInfos),
+            writeRelays: Set(writeRelayInfos),
             fetchedAt: Date().addingTimeInterval(-Double.random(in: 0...86400)),
             source: .nip65
         )

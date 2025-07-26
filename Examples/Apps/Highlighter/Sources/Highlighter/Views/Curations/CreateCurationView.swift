@@ -214,7 +214,7 @@ struct CreateCurationView: View {
                                             
                                             if !curationName.isEmpty {
                                                 Text("\(curationName.count)/50")
-                                                    .font(.ds.small)
+                                                    .font(.ds.footnote)
                                                     .foregroundColor(curationName.count > 50 ? .red : .highlighterSecondaryText)
                                             }
                                         }
@@ -665,7 +665,7 @@ struct FeatureBadge: View {
             }
             
             Text(text)
-                .font(.ds.small)
+                .font(.ds.footnote)
                 .foregroundColor(.highlighterSecondaryText)
         }
         .onAppear {

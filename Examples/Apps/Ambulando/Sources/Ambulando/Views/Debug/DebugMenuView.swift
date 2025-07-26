@@ -95,7 +95,7 @@ struct DebugMenuView: View {
     }
     
     private func getActiveRelayCount() -> String {
-        guard let ndk = nostrManager.ndk else { return "0" }
+        guard nostrManager.ndk != nil else { return "0" }
         // This would ideally come from relay pool
         return "\(nostrManager.defaultRelays.count + nostrManager.userAddedRelays.count)"
     }
