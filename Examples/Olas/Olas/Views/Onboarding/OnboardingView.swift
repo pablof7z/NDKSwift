@@ -25,8 +25,10 @@ struct OnboardingView: View {
                 SecurityEducationView()
                     .tag(3)
             }
+            #if os(iOS)
             .tabViewStyle(.page)
             .indexViewStyle(.page(backgroundDisplayMode: .always))
+            #endif
             
             // Skip button
             if currentPage < 2 {
@@ -393,7 +395,11 @@ struct KeyGenerationView: View {
                 VStack(spacing: OlasDesign.Spacing.md) {
                     Button {
                         showMnemonic = true
-                        HapticManager.impact(.medium)
+                        #if os(iOS)
+                        OlasDesign.Haptic.impact(.medium)
+                        #else
+                        OlasDesign.Haptic.impact(0)
+                        #endif
                     } label: {
                         HStack {
                             Image(systemName: "lock.shield.fill")
@@ -495,7 +501,7 @@ struct KeyGenerationView: View {
             animate = true
         }
         
-        HapticManager.notification(.success)
+        OlasDesign.Haptic.success()
     }
     
     private func generateRandomKey() -> String {
@@ -674,13 +680,17 @@ struct MnemonicBackupView: View {
                             isCopied: copiedWords.contains(index)
                         ) {
                             copiedWords.insert(index)
-                            HapticManager.impact(.light)
+                            #if os(iOS)
+                            OlasDesign.Haptic.impact(.light)
+                            #else
+                            OlasDesign.Haptic.impact(0)
+                            #endif
                             
                             if copiedWords.count == words.count {
                                 withAnimation(.spring()) {
                                     allCopied = true
                                 }
-                                HapticManager.notification(.success)
+                                OlasDesign.Haptic.success()
                             }
                         }
                     }
@@ -692,7 +702,11 @@ struct MnemonicBackupView: View {
                 // Action buttons
                 VStack(spacing: OlasDesign.Spacing.md) {
                     Button {
-                        HapticManager.impact(.medium)
+                        #if os(iOS)
+                        OlasDesign.Haptic.impact(.medium)
+                        #else
+                        OlasDesign.Haptic.impact(0)
+                        #endif
                         onComplete()
                     } label: {
                         Text(allCopied ? "I've Saved My Words" : "Copy All Words First")

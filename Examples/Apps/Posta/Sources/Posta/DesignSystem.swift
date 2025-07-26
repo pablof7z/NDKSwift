@@ -376,3 +376,52 @@ struct ElectricField: Shape {
         return path
     }
 }
+
+// MARK: - Electric Field View
+struct ElectricFieldView: View {
+    @State private var regenerateTrigger = false
+    @State private var opacity: Double = 0
+    
+    var body: some View {
+        TimelineView(.animation(minimumInterval: 0.5)) { timeline in
+            Canvas { context, size in
+                for _ in 0..<3 {
+                    var electricPath = Path()
+                    let field = ElectricField(points: Int.random(in: 4...7))
+                    electricPath = field.path(in: CGRect(x: 0, y: 0, width: size.width, height: size.height))
+                    
+                    context.stroke(
+                        electricPath,
+                        with: .linearGradient(
+                            Gradient(colors: [
+                                PostaColors.electricPurple,
+                                PostaColors.glowPink,
+                                PostaColors.neonBlue
+                            ]),
+                            startPoint: CGPoint(x: 0, y: 0),
+                            endPoint: CGPoint(x: size.width, y: size.height)
+                        ),
+                        lineWidth: 2
+                    )
+                }
+            }
+            .blur(radius: 3)
+            .opacity(opacity)
+            .onAppear {
+                withAnimation(.easeIn(duration: 0.3)) {
+                    opacity = 1
+                }
+            }
+            .onChange(of: timeline.date) { _ in
+                withAnimation(.easeOut(duration: 0.2)) {
+                    opacity = 0
+                }
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+                    withAnimation(.easeIn(duration: 0.3)) {
+                        opacity = 1
+                    }
+                }
+            }
+        }
+    }
+}

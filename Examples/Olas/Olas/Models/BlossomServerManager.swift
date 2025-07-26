@@ -82,7 +82,7 @@ class BlossomServerManager: ObservableObject {
     }
     
     func uploadToSelectedServers(data: Data, mimeType: String) async throws -> [BlossomUploadResult] {
-        guard let ndk = ndk, let signer = ndk.signer else {
+        guard let ndk = ndk, ndk.signer != nil else {
             throw BlossomError.notAuthenticated
         }
         
@@ -95,18 +95,22 @@ class BlossomServerManager: ObservableObject {
         
         for serverURL in selectedServerURLs {
             do {
-                let url = try await ndk.uploadBlossom(
+                let blobs = try await ndk.uploadToBlossom(
                     data: data,
-                    server: serverURL,
-                    mimeType: mimeType
+                    mimeType: mimeType,
+                    servers: [serverURL]
                 )
                 
-                results.append(BlossomUploadResult(
-                    serverURL: serverURL,
-                    fileURL: url,
-                    success: true,
-                    error: nil
-                ))
+                if let firstBlob = blobs.first {
+                    results.append(BlossomUploadResult(
+                        serverURL: serverURL,
+                        fileURL: firstBlob.url,
+                        success: true,
+                        error: nil
+                    ))
+                } else {
+                    throw BlossomError.uploadFailed("No blob returned from server")
+                }
             } catch {
                 results.append(BlossomUploadResult(
                     serverURL: serverURL,
@@ -148,6 +152,7 @@ enum BlossomError: LocalizedError {
     case notAuthenticated
     case noServersSelected
     case allUploadsFailed([BlossomUploadResult])
+    case uploadFailed(String)
     
     var errorDescription: String? {
         switch self {
@@ -158,6 +163,8 @@ enum BlossomError: LocalizedError {
         case .allUploadsFailed(let results):
             let errors = results.compactMap { $0.error?.localizedDescription }.joined(separator: ", ")
             return "All uploads failed: \(errors)"
+        case .uploadFailed(let message):
+            return message
         }
     }
 }

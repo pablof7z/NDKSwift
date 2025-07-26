@@ -12,11 +12,9 @@ struct ContentView: View {
                 if nostrManager.isAuthenticated && appState.isAuthenticated {
                     // Authenticated content
                     MainTabView()
-                        .environment(\.ndk, ndk)
                 } else {
                     // Authentication screen
                     AuthenticationView()
-                        .environment(\.ndk, ndk)
                 }
             } else {
                 // Show loading or splash screen while NDK initializes

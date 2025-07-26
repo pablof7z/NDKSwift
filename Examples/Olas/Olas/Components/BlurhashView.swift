@@ -1,15 +1,26 @@
 import SwiftUI
+#if os(iOS)
+import UIKit
+#endif
 
 // MARK: - Blurhash View
 struct BlurhashView: View {
     let hash: String
+    #if os(iOS)
     @State private var image: UIImage?
+    #else
+    @State private var image: NSImage?
+    #endif
     @State private var opacity: Double = 1.0
     
     var body: some View {
         ZStack {
             if let image = image {
+                #if os(iOS)
                 Image(uiImage: image)
+                #else
+                Image(nsImage: image)
+                #endif
                     .resizable()
                     .aspectRatio(contentMode: .fill)
                     .opacity(opacity)
@@ -47,9 +58,14 @@ struct BlurhashView: View {
         }
     }
     
+    #if os(iOS)
     private func createPlaceholderImage(from hash: String) -> UIImage? {
+    #else
+    private func createPlaceholderImage(from hash: String) -> NSImage? {
+    #endif
         // Create a gradient placeholder based on hash
         let size = CGSize(width: 32, height: 32)
+        #if os(iOS)
         let renderer = UIGraphicsImageRenderer(size: size)
         
         return renderer.image { context in
@@ -74,6 +90,24 @@ struct BlurhashView: View {
                 options: []
             )
         }
+        #else
+        // macOS implementation
+        let image = NSImage(size: size)
+        image.lockFocus()
+        
+        let hashValue = hash.hashValue
+        let hue1 = CGFloat(abs(hashValue % 360)) / 360.0
+        let hue2 = CGFloat(abs((hashValue >> 8) % 360)) / 360.0
+        
+        let color1 = NSColor(hue: hue1, saturation: 0.5, brightness: 0.8, alpha: 1.0)
+        let color2 = NSColor(hue: hue2, saturation: 0.5, brightness: 0.6, alpha: 1.0)
+        
+        let gradient = NSGradient(colors: [color1, color2])
+        gradient?.draw(in: NSRect(origin: .zero, size: size), angle: 45)
+        
+        image.unlockFocus()
+        return image
+        #endif
     }
 }
 
@@ -82,8 +116,13 @@ struct OlasProgressiveImage: View {
     let imageURL: String
     let blurhash: String?
     @State private var phase: ImagePhase = .empty
+    #if os(iOS)
     @State private var lowQualityImage: UIImage?
     @State private var highQualityImage: UIImage?
+    #else
+    @State private var lowQualityImage: NSImage?
+    @State private var highQualityImage: NSImage?
+    #endif
     @State private var progress: Double = 0
     @State private var showHighQuality = false
     
@@ -110,7 +149,11 @@ struct OlasProgressiveImage: View {
                 
                 // Layer 2: Low quality image
                 if let lowQualityImage = lowQualityImage {
+                    #if os(iOS)
                     Image(uiImage: lowQualityImage)
+                    #else
+                    Image(nsImage: lowQualityImage)
+                    #endif
                         .resizable()
                         .aspectRatio(contentMode: .fill)
                         .opacity(phase == .lowQuality && !showHighQuality ? 1 : 0)
@@ -120,7 +163,11 @@ struct OlasProgressiveImage: View {
                 
                 // Layer 3: High quality image
                 if let highQualityImage = highQualityImage {
+                    #if os(iOS)
                     Image(uiImage: highQualityImage)
+                    #else
+                    Image(nsImage: highQualityImage)
+                    #endif
                         .resizable()
                         .aspectRatio(contentMode: .fill)
                         .opacity(showHighQuality ? 1 : 0)
@@ -172,7 +219,11 @@ struct OlasProgressiveImage: View {
         do {
             let (data, _) = try await URLSession.shared.data(from: url)
             
+            #if os(iOS)
             if let image = UIImage(data: data) {
+            #else
+            if let image = NSImage(data: data) {
+            #endif
                 let resized = await resizeImage(image, to: targetSize)
                 
                 await MainActor.run {
@@ -187,57 +238,50 @@ struct OlasProgressiveImage: View {
     
     private func loadHighQuality(from url: URL, targetSize: CGSize) async {
         do {
-            // Create a data task to monitor progress
-            let task = URLSession.shared.dataTask(with: url) { data, response, error in
-                guard let data = data, error == nil else { return }
+            let (data, _) = try await URLSession.shared.data(from: url)
+            
+            #if os(iOS)
+            if let image = UIImage(data: data) {
+            #else
+            if let image = NSImage(data: data) {
+            #endif
+                let resized = await resizeImage(image, to: targetSize)
                 
-                Task {
-                    if let image = UIImage(data: data) {
-                        let resized = await resizeImage(image, to: targetSize)
-                        
-                        await MainActor.run {
-                            self.highQualityImage = resized
-                            self.phase = .highQuality
-                            
-                            // Smooth transition
-                            withAnimation(.easeOut(duration: 0.5)) {
-                                self.showHighQuality = true
-                            }
-                        }
+                await MainActor.run {
+                    self.highQualityImage = resized
+                    self.phase = .highQuality
+                    
+                    // Smooth transition
+                    withAnimation(.easeOut(duration: 0.5)) {
+                        self.showHighQuality = true
                     }
                 }
             }
-            
-            // Monitor progress
-            let observation = task.progress.observe(\.fractionCompleted) { progress, _ in
-                Task { @MainActor in
-                    self.progress = progress.fractionCompleted
-                }
-            }
-            
-            task.resume()
-            
-            // Clean up observation when done
-            _ = await withCheckedContinuation { continuation in
-                Task {
-                    while task.state != .completed {
-                        try? await Task.sleep(nanoseconds: 100_000_000) // 0.1 second
-                    }
-                    observation.invalidate()
-                    continuation.resume()
-                }
-            }
+        } catch {
+            print("Failed to load high quality image: \(error)")
         }
     }
     
+    #if os(iOS)
     private func resizeImage(_ image: UIImage, to size: CGSize) async -> UIImage? {
+    #else
+    private func resizeImage(_ image: NSImage, to size: CGSize) async -> NSImage? {
+    #endif
         return await withCheckedContinuation { continuation in
             DispatchQueue.global(qos: .userInitiated).async {
+                #if os(iOS)
                 let renderer = UIGraphicsImageRenderer(size: size)
                 let resized = renderer.image { context in
                     image.draw(in: CGRect(origin: .zero, size: size))
                 }
                 continuation.resume(returning: resized)
+                #else
+                let resized = NSImage(size: size)
+                resized.lockFocus()
+                image.draw(in: NSRect(origin: .zero, size: size))
+                resized.unlockFocus()
+                continuation.resume(returning: resized)
+                #endif
             }
         }
     }
@@ -248,7 +292,11 @@ struct OlasProgressiveImage: View {
 class ImageCacheManager {
     static let shared = ImageCacheManager()
     
+    #if os(iOS)
     private let memoryCache = NSCache<NSString, UIImage>()
+    #else
+    private let memoryCache = NSCache<NSString, NSImage>()
+    #endif
     private let diskCacheURL: URL
     private let maxMemoryCacheSize = 50 * 1024 * 1024 // 50MB
     private let maxDiskCacheSize = 100 * 1024 * 1024 // 100MB
@@ -268,7 +316,11 @@ class ImageCacheManager {
         cleanOldCache()
     }
     
+    #if os(iOS)
     func getCachedImage(for url: String) -> UIImage? {
+    #else
+    func getCachedImage(for url: String) -> NSImage? {
+    #endif
         let key = NSString(string: url)
         
         // Check memory cache first
@@ -279,7 +331,11 @@ class ImageCacheManager {
         // Check disk cache
         let fileURL = diskCacheURL.appendingPathComponent(url.sha256Hash)
         if let data = try? Data(contentsOf: fileURL),
+           #if os(iOS)
            let image = UIImage(data: data) {
+           #else
+           let image = NSImage(data: data) {
+           #endif
             // Add to memory cache
             memoryCache.setObject(image, forKey: key, cost: data.count)
             return image
@@ -288,11 +344,21 @@ class ImageCacheManager {
         return nil
     }
     
+    #if os(iOS)
     func cacheImage(_ image: UIImage, for url: String) {
+    #else
+    func cacheImage(_ image: NSImage, for url: String) {
+    #endif
         let key = NSString(string: url)
         
         // Add to memory cache
+        #if os(iOS)
         if let data = image.jpegData(compressionQuality: 0.8) {
+        #else
+        if let tiffData = image.tiffRepresentation,
+           let bitmap = NSBitmapImageRep(data: tiffData),
+           let data = bitmap.representation(using: .jpeg, properties: [.compressionFactor: 0.8]) {
+        #endif
             memoryCache.setObject(image, forKey: key, cost: data.count)
             
             // Save to disk

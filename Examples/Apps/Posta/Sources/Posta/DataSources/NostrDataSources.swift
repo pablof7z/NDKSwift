@@ -373,6 +373,8 @@ public class SessionNotesDataSource: ObservableObject {
                     print("📱 [SessionNotesDataSource] EOSE received from relay: \(relay)")
                 case .event(let event, let relay):
                     print("📱 [SessionNotesDataSource] Event received from \(relay): kind=\(event.kind), content=\(String(event.content.prefix(50)))...")
+                case .closed(let relay):
+                    print("📱 [SessionNotesDataSource] Subscription closed on relay: \(relay)")
                 }
             }
         }

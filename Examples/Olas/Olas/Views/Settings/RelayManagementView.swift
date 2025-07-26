@@ -264,7 +264,9 @@ struct RelayManagementView: View {
                                 RoundedRectangle(cornerRadius: 8)
                                     .stroke(OlasDesign.Colors.border, lineWidth: 1)
                             )
+                            #if os(iOS)
                             .autocapitalization(.none)
+                            #endif
                             .disableAutocorrection(true)
                     }
                     

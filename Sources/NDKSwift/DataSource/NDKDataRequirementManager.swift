@@ -284,8 +284,6 @@ actor NDKDataRequirementManager {
                         }
                     }
 
-                    // TODO: Will handle relay discovery through AsyncStream instead
-
                     // If we have relay-specific filters, create multiple subscriptions
                     if outboxStrategy.hasRelaySpecificFilters {
                         // Track all requirements created for this group
