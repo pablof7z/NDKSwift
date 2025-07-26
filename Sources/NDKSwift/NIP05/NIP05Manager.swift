@@ -287,7 +287,7 @@ public actor NIP05Manager {
         // Parse identifier
         let parts = identifier.split(separator: "@")
         guard parts.count == 2 else {
-            throw NDKError.invalidDataFormat("NIP-05 identifier", details: "Expected format: name@domain")
+            throw NDKError.invalidDataFormat("NIP-05 identifier", details: NostrConstants.NIP05.expectedFormat)
         }
 
         let name = String(parts[0])
@@ -306,7 +306,7 @@ public actor NIP05Manager {
         let normalizedName = name == "_" ? "" : name
         let urlString = "https://\(domain)\(WellKnownPath.nostrJson)?name=\(normalizedName)"
         guard let url = URL(string: urlString) else {
-            throw NDKError.invalidDataFormat("NIP-05 identifier", details: "Expected format: name@domain")
+            throw NDKError.invalidDataFormat("NIP-05 identifier", details: NostrConstants.NIP05.expectedFormat)
         }
 
         NDKLogger.log(.info, category: .general, "🌐 NIP-05: Fetching \(urlString)")
@@ -320,7 +320,7 @@ public actor NIP05Manager {
 
         // Check response size
         guard data.count <= Self.maxResponseSize else {
-            throw NDKError.invalidResponse(from: "NIP-05 response too large")
+            throw NDKError.invalidResponse(from: NostrConstants.NIP05.responseTooLarge)
         }
 
         // Check HTTP status
@@ -363,7 +363,7 @@ public actor NIP05Manager {
             await memoryCache.set(identifier, value: invalidEntry)
             try? await cache.saveNIP05Resolution(invalidEntry)
 
-            throw NDKError.invalidResponse(from: "NIP-05 name not found")
+            throw NDKError.invalidResponse(from: NostrConstants.NIP05.nameNotFound)
         }
 
         // Extract NIP-46 relays if present
