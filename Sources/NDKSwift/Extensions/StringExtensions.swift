@@ -66,6 +66,11 @@ public extension String {
     static func fromNpub(_ npub: String) throws -> String? {
         return try Bech32.pubkey(from: npub)
     }
+    
+    /// Attempts to normalize a relay URL, returning the original string if normalization fails
+    var normalizedRelayURL: String {
+        URLNormalizer.tryNormalizeRelayUrl(self) ?? self
+    }
 }
 
 // MARK: - Collection Extensions

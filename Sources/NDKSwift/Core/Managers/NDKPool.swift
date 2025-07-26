@@ -119,9 +119,7 @@ public actor NDKPool {
         NDKLogger.log(.info, category: .general, "Processing blocked relay list update")
 
         let blockedRelayList = NDKList.from(event, ndk: ndk)
-        let newBlockedRelays = Set(blockedRelayList.blockedRelays.map { url in
-            URLNormalizer.tryNormalizeRelayUrl(url) ?? url
-        })
+        let newBlockedRelays = Set(blockedRelayList.blockedRelays.map { $0.normalizedRelayURL })
         let oldBlockedRelays = cachedBlockedRelays
 
         cachedBlockedRelays = newBlockedRelays
@@ -148,7 +146,7 @@ public actor NDKPool {
     /// Add a relay to the pool
     @discardableResult
     public func addRelay(_ url: RelayURL, origin: NDKRelayOrigin = .explicit) async -> NDKRelay {
-        let normalizedUrl = URLNormalizer.tryNormalizeRelayUrl(url) ?? url
+        let normalizedUrl = url.normalizedRelayURL
 
         // Check if already exists
         if let existing = relayMap[normalizedUrl] {
@@ -210,7 +208,7 @@ public actor NDKPool {
 
     /// Remove a relay from the pool
     public func removeRelay(_ url: RelayURL) async {
-        let normalizedUrl = URLNormalizer.tryNormalizeRelayUrl(url) ?? url
+        let normalizedUrl = url.normalizedRelayURL
         NDKLogger.log(.debug, category: .relay, "➖ Removing relay from pool: \(normalizedUrl)")
 
         if let relay = relayMap.removeValue(forKey: normalizedUrl) {
@@ -260,7 +258,7 @@ public actor NDKPool {
 
     /// Get a specific relay by URL
     public func getRelay(for url: RelayURL) async -> NDKRelay? {
-        let normalizedUrl = URLNormalizer.tryNormalizeRelayUrl(url) ?? url
+        let normalizedUrl = url.normalizedRelayURL
         return relayMap[normalizedUrl]
     }
 
