@@ -295,9 +295,8 @@ struct TimelineEventCard: View {
                     )
                     
                     TimelineEngagementButton(
-                        icon: engagement.isLiked ? "heart.fill" : "heart",
+                        icon: "heart",
                         count: engagement.likes,
-                        color: engagement.isLiked ? .red : .primary,
                         action: {}
                     )
                     
@@ -312,9 +311,9 @@ struct TimelineEventCard: View {
                     
                     // Bookmark button
                     Button(action: {}) {
-                        Image(systemName: engagement.isBookmarked ? "bookmark.fill" : "bookmark")
+                        Image(systemName: "bookmark")
                             .font(.system(size: 16))
-                            .foregroundColor(engagement.isBookmarked ? .ds.primary : .primary.opacity(0.6))
+                            .foregroundColor(.primary.opacity(0.6))
                     }
                     .padding(.trailing, DesignSystem.Spacing.medium)
                 }
@@ -664,7 +663,8 @@ class FeedDataManager: ObservableObject {
     
     weak var appState: AppState?
     private var activeFilter: TimelineFeedView.FeedFilter = .all
-    private var subscription: Any? // NDKSubscription
+    private var dataSource: NDKDataSource<NDKEvent>?
+    private var streamTask: Task<Void, Never>?
     
     func startStreaming(filter: TimelineFeedView.FeedFilter) async {
         guard let appState = appState, let ndk = appState.ndk else { return }
@@ -672,27 +672,31 @@ class FeedDataManager: ObservableObject {
         isLoading = true
         activeFilter = filter
         
-        // Cancel existing subscription
-        subscription?.cancel()
+        // Cancel existing stream
+        streamTask?.cancel()
+        streamTask = nil
         
         // Create filter based on selection
         let filter = createFilter(for: filter)
         
-        // Subscribe to events
-        subscription = await ndk.subscribe(filters: [filter])
+        // Create data source for observing events
+        dataSource = await ndk.outbox.observe(
+            filter: filter,
+            maxAge: 0,  // Real-time updates
+            cachePolicy: .cacheWithNetwork
+        )
         
-        // Process incoming events
-        if let subscription = subscription {
-            Task {
-                for await event in subscription {
-                    addEvent(event)
-                }
+        // Start streaming events
+        streamTask = Task {
+            guard let dataSource = dataSource else { return }
+            
+            // Stream events (includes cached events first)
+            for await event in dataSource.events {
+                guard !Task.isCancelled else { break }
+                addEvent(event)
             }
         }
         
-        // Initial fetch
-        let events = await ndk.fetchEvents(filter: filter, limit: 50)
-        timelineEvents = events.sorted { $0.createdAt > $1.createdAt }
         isLoading = false
     }
     

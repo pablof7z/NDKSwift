@@ -10,4 +10,3 @@ public extension NDK {
         return signer
     }
 }
-

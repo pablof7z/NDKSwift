@@ -99,8 +99,7 @@ struct LibraryView: View {
                     }
                 }
                 .refreshable {
-                    HapticManager.shared.impact(.medium)
-                    // Refresh library content
+                    await refreshLibrary()
                 }
             }
             .navigationTitle("Library")
@@ -151,6 +150,33 @@ struct LibraryView: View {
         .sheet(isPresented: $showCurationManagement) {
             CurationManagementView()
                 .environmentObject(appState)
+        }
+    }
+    
+    private func refreshLibrary() async {
+        // Haptic feedback for pull-to-refresh
+        await MainActor.run {
+            HapticManager.shared.impact(.medium)
+        }
+        
+        // Simulate refreshing library data
+        // In a real app, this would reload highlights, curations, etc. from the network
+        try? await Task.sleep(nanoseconds: 1_000_000_000) // 1 second delay for demo
+        
+        // TODO: Implement actual refresh logic
+        // - Reload highlights from network
+        // - Refresh curations
+        // - Update follow packs
+        // - Fetch latest articles
+        
+        await MainActor.run {
+            // Force UI update after refresh
+            showStats = false
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                withAnimation(.spring(response: 0.5, dampingFraction: 0.8)) {
+                    self.showStats = true
+                }
+            }
         }
     }
     

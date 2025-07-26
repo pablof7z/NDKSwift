@@ -46,11 +46,13 @@ struct HighlightsFeedView: View {
                     EmptyHighlightsView()
                         .transition(.scale.combined(with: .opacity))
                 } else {
-                    // Enhanced Highlights Stack with gestures
-                    ZStack {
-                        ForEach(Array(highlights.enumerated()), id: \.element.id) { index, highlight in
-                            if index >= currentIndex - 1 && index <= currentIndex + 1 {
-                                HighlightFeedItemView(
+                    // Wrap in ScrollView for pull-to-refresh
+                    ScrollView(.vertical, showsIndicators: false) {
+                        // Enhanced Highlights Stack with gestures
+                        ZStack {
+                            ForEach(Array(highlights.enumerated()), id: \.element.id) { index, highlight in
+                                if index >= currentIndex - 1 && index <= currentIndex + 1 {
+                                    HighlightFeedItemView(
                                     highlight: highlight,
                                     author: authorProfiles[highlight.author],
                                     article: articleForHighlight(highlight),
@@ -85,22 +87,28 @@ struct HighlightsFeedView: View {
                         }
                     }
                     .gesture(createDragGesture())
-                    
-                    // Progress indicator
-                    if highlights.count > 1 {
-                        VStack {
-                            HighlightProgressIndicator(
-                                currentIndex: currentIndex,
-                                total: highlights.count
-                            )
-                            .padding(.top, geometry.safeAreaInsets.top + 20)
-                            .padding(.horizontal, 20)
-                            
-                            Spacer()
-                        }
-                        .transition(.move(edge: .top).combined(with: .opacity))
-                    }
+                    .frame(width: geometry.size.width, height: geometry.size.height)
                 }
+                .refreshable {
+                    await refreshFeed()
+                }
+                
+                // Progress indicator - moved outside ScrollView
+                if !highlights.isEmpty && highlights.count > 1 {
+                    VStack {
+                        HighlightProgressIndicator(
+                            currentIndex: currentIndex,
+                            total: highlights.count
+                        )
+                        .padding(.top, geometry.safeAreaInsets.top + 20)
+                        .padding(.horizontal, 20)
+                        
+                        Spacer()
+                    }
+                    .transition(.move(edge: .top).combined(with: .opacity))
+                    .allowsHitTesting(false)
+                }
+            }
             }
         }
         .onAppear {
@@ -241,17 +249,23 @@ struct HighlightsFeedView: View {
         }
     }
     
-    private func refreshFeed() {
-        HapticManager.shared.impact(.light)
-        // Clear existing data to show fresh content
-        highlights.removeAll()
-        authorProfiles.removeAll()
-        articleCache.removeAll()
-        articleImages.removeAll()
-        
-        Task {
-            await loadHighlights()
+    private func refreshFeed() async {
+        // Haptic feedback for pull-to-refresh
+        await MainActor.run {
+            HapticManager.shared.impact(.medium)
         }
+        
+        // Clear existing data to show fresh content
+        await MainActor.run {
+            highlights.removeAll()
+            authorProfiles.removeAll()
+            articleCache.removeAll()
+            articleImages.removeAll()
+            currentIndex = 0
+        }
+        
+        // Reload highlights
+        await loadHighlights()
     }
     
     private func showProfile(for pubkey: String) {

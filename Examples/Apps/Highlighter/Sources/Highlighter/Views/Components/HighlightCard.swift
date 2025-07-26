@@ -8,9 +8,18 @@ struct HighlightCard: View {
     @State private var isZapped = false
     @State private var showDetail = false
     @State private var showMiniAudioPlayer = false
+    @State private var isPressed = false
+    @State private var isHovered = false
+    @State private var cardScale: CGFloat = 1.0
+    @State private var shadowRadius: CGFloat = 10
+    @State private var shadowY: CGFloat = 5
+    @State private var glowOpacity: Double = 0
     
     var body: some View {
-        Button(action: { showDetail = true }) {
+        Button(action: { 
+            HapticManager.shared.impact(.light)
+            showDetail = true 
+        }) {
             VStack(alignment: .leading, spacing: 12) {
                 // Quote
                 Text(ContentFormatter.formatHighlight(highlight.content))
@@ -109,7 +118,52 @@ struct HighlightCard: View {
             .padding(.ds.cardPadding)
         }
         .buttonStyle(PlainButtonStyle())
+        .background(
+            // Glow effect on hover/press
+            RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.xl, style: .continuous)
+                .fill(
+                    LinearGradient(
+                        colors: [
+                            DesignSystem.Colors.primary.opacity(glowOpacity * 0.2),
+                            DesignSystem.Colors.secondary.opacity(glowOpacity * 0.1)
+                        ],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                )
+                .blur(radius: 20)
+                .scaleEffect(1.1)
+                .opacity(glowOpacity)
+        )
         .modernCardSelected(isZapped)
+        .scaleEffect(cardScale)
+        .shadow(
+            color: isPressed ? DesignSystem.Colors.primary.opacity(0.3) : Color.black.opacity(0.1),
+            radius: shadowRadius,
+            x: 0,
+            y: shadowY
+        )
+        .animation(.spring(response: 0.3, dampingFraction: 0.7), value: isPressed)
+        .animation(.spring(response: 0.4, dampingFraction: 0.8), value: isHovered)
+        .animation(.spring(response: 0.5, dampingFraction: 0.75), value: isZapped)
+        .onLongPressGesture(minimumDuration: 0.1, maximumDistance: .infinity, pressing: { pressing in
+            withAnimation(.easeInOut(duration: 0.15)) {
+                isPressed = pressing
+                cardScale = pressing ? 0.95 : 1.0
+                shadowRadius = pressing ? 5 : (isHovered ? 15 : 10)
+                shadowY = pressing ? 2 : (isHovered ? 8 : 5)
+            }
+        }, perform: {})
+        .onHover { hovering in
+            withAnimation(.easeInOut(duration: 0.2)) {
+                isHovered = hovering
+                glowOpacity = hovering ? 1 : 0
+                if !isPressed {
+                    shadowRadius = hovering ? 15 : 10
+                    shadowY = hovering ? 8 : 5
+                }
+            }
+        }
         .task {
             await loadAuthor()
         }
@@ -144,9 +198,15 @@ struct HighlightCard: View {
 struct CompactHighlightCardView: View {
     let highlight: HighlightEvent
     @State private var showDetail = false
+    @State private var isPressed = false
+    @State private var cardScale: CGFloat = 1.0
+    @State private var cardRotation: Double = 0
     
     var body: some View {
-        Button(action: { showDetail = true }) {
+        Button(action: { 
+            HapticManager.shared.impact(.light)
+            showDetail = true 
+        }) {
             VStack(alignment: .leading, spacing: .ds.small) {
                 Text(ContentFormatter.formatHighlight(highlight.content))
                     .font(.ds.body)
@@ -177,6 +237,26 @@ struct CompactHighlightCardView: View {
         }
         .buttonStyle(PlainButtonStyle())
         .modernCard()
+        .scaleEffect(cardScale)
+        .rotation3DEffect(
+            .degrees(cardRotation),
+            axis: (x: 0, y: 1, z: 0),
+            perspective: 1
+        )
+        .shadow(
+            color: isPressed ? DesignSystem.Colors.primary.opacity(0.2) : Color.black.opacity(0.08),
+            radius: isPressed ? 4 : 8,
+            x: 0,
+            y: isPressed ? 2 : 4
+        )
+        .animation(.spring(response: 0.3, dampingFraction: 0.8), value: isPressed)
+        .onLongPressGesture(minimumDuration: 0.05, maximumDistance: .infinity, pressing: { pressing in
+            withAnimation(.easeInOut(duration: 0.15)) {
+                isPressed = pressing
+                cardScale = pressing ? 0.97 : 1.0
+                cardRotation = pressing ? 2 : 0
+            }
+        }, perform: {})
         .sheet(isPresented: $showDetail) {
             HighlightDetailView(highlight: highlight)
         }
