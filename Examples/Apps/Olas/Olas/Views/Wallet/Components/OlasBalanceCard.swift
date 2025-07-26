@@ -1,5 +1,4 @@
 import SwiftUI
-import CashuSwift
 
 struct OlasBalanceCard: View {
     @ObservedObject var walletManager: OlasWalletManager
@@ -16,14 +15,15 @@ struct OlasBalanceCard: View {
         Color(red: 0.95, green: 0.77, blue: 0.06), // Yellow
     ]
     
-    private var mintDistribution: [(mint: String, balance: Int, percentage: Double)] {
-        let total = Double(walletManager.totalBalance)
+    private var mintDistribution: [(mint: String, balance: Int64, percentage: Double)] {
+        let total = Double(walletManager.currentBalance)
         guard total > 0 else { return [] }
         
-        return walletManager.mints.compactMap { mint in
-            guard mint.balance > 0 else { return nil }
-            let percentage = (Double(mint.balance) / total) * 100
-            return (mint: mint.name, balance: mint.balance, percentage: percentage)
+        return walletManager.mintBalances.compactMap { (mintURL, balance) in
+            guard balance > 0 else { return nil }
+            let percentage = (Double(balance) / total) * 100
+            let mintName = mintURL.replacingOccurrences(of: "https://", with: "")
+            return (mint: mintName, balance: balance, percentage: percentage)
         }.sorted { $0.balance > $1.balance }
     }
     
@@ -71,26 +71,28 @@ struct OlasBalanceCard: View {
                 // Balance amount
                 VStack(spacing: OlasDesign.Spacing.xs) {
                     HStack(alignment: .firstTextBaseline, spacing: 4) {
-                        Text(formatBalance(walletManager.totalBalance))
+                        Text(formatBalance(walletManager.currentBalance))
                             .font(.system(size: isExpanded ? 42 : 48, weight: .bold, design: .rounded))
                             .foregroundColor(OlasDesign.Colors.text)
                             .contentTransition(.numericText())
-                            .animation(.spring(response: 0.4), value: walletManager.totalBalance)
+                            .animation(.spring(response: 0.4), value: walletManager.currentBalance)
                         
                         Text("sats")
                             .font(.system(size: isExpanded ? 18 : 20, weight: .medium, design: .rounded))
                             .foregroundColor(OlasDesign.Colors.textSecondary)
                     }
                     
-                    // USD equivalent
+                    // USD equivalent - TODO: Add BTC price fetch
+                    /*
                     if let usdPrice = walletManager.btcPrice {
-                        let usdValue = Double(walletManager.totalBalance) * usdPrice / 100_000_000
+                        let usdValue = Double(walletManager.currentBalance) * usdPrice / 100_000_000
                         Text("≈ $\(String(format: "%.2f", usdValue)) USD")
                             .font(.system(size: 16, weight: .medium, design: .rounded))
                             .foregroundColor(OlasDesign.Colors.textTertiary)
                             .contentTransition(.numericText())
                             .animation(.easeInOut, value: usdValue)
                     }
+                    */
                     
                     // Mint distribution indicator
                     if !mintDistribution.isEmpty && !isExpanded {
@@ -208,7 +210,7 @@ struct OlasBalanceCard: View {
         }
     }
     
-    private func formatBalance(_ balance: Int) -> String {
+    private func formatBalance(_ balance: Int64) -> String {
         let formatter = NumberFormatter()
         formatter.numberStyle = .decimal
         formatter.groupingSeparator = ","
@@ -216,7 +218,7 @@ struct OlasBalanceCard: View {
     }
     
     private func startAngle(for index: Int) -> Angle {
-        let total = Double(walletManager.totalBalance)
+        let total = Double(walletManager.currentBalance)
         guard total > 0 else { return .zero }
         
         var angle: Double = -90 // Start from top
@@ -227,7 +229,7 @@ struct OlasBalanceCard: View {
     }
     
     private func endAngle(for index: Int) -> Angle {
-        let total = Double(walletManager.totalBalance)
+        let total = Double(walletManager.currentBalance)
         guard total > 0 else { return .zero }
         
         var angle: Double = -90 // Start from top

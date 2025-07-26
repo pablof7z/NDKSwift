@@ -1099,4 +1099,4 @@ struct LikeAnimationView: View {
             hearts.append(heart)
         }
     }
-}
+}}

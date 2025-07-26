@@ -1,10 +1,6 @@
 import XCTest
 @testable import NDKSwift
 
-// Tests disabled: BlossomClient currently uses concrete URLSession type
-// To enable these tests, BlossomClient would need to accept a URLSessionProtocol
-// This would be a breaking API change and is not a priority at this time
-/*
 final class BlossomClientMetadataTests: XCTestCase {
     var mockURLSession: SimpleMockURLSession!
     var client: BlossomClient!
@@ -13,8 +9,7 @@ final class BlossomClientMetadataTests: XCTestCase {
     override func setUp() async throws {
         try await super.setUp()
         mockURLSession = SimpleMockURLSession()
-        // BlossomClient needs to be updated to accept a protocol instead of URLSession
-        // For now, we'll skip these tests
+        client = BlossomClient(urlSession: mockURLSession)
         signer = try NDKPrivateKeySigner.generate()
     }
     
@@ -237,4 +232,3 @@ final class BlossomClientMetadataTests: XCTestCase {
     }
     #endif
 }
-*/

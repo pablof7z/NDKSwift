@@ -2,12 +2,12 @@ import Foundation
 
 /// Blossom client for interacting with Blossom servers
 public actor BlossomClient {
-    private let urlSession: URLSession
+    private let urlSession: URLSessionProtocol
     private var serverCache: [String: BlossomServerDescriptor] = [:]
 
     // MARK: - Constants
 
-    public init(urlSession: URLSession = .shared) {
+    public init(urlSession: URLSessionProtocol = URLSession.shared) {
         self.urlSession = urlSession
     }
 

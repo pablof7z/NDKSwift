@@ -258,4 +258,4 @@ struct ReceiveView: View {
         return nil
     }
     #endif
-}
+}}

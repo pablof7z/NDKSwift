@@ -25,7 +25,7 @@ struct OlasStoriesView: View {
         }
         .frame(height: 100)
         .fullScreenCover(item: $selectedStoryIndex) { index in
-            StoryViewerView(
+            OlasStoryViewerView(
                 stories: storiesManager.stories,
                 initialIndex: index,
                 onDismiss: {
@@ -186,7 +186,7 @@ struct StoryCircle: View {
 }
 
 // MARK: - Story Viewer
-struct StoryViewerView: View {
+struct OlasStoryViewerView: View {
     let stories: [UserStory]
     let initialIndex: Int
     let onDismiss: () -> Void

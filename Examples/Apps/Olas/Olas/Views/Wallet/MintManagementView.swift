@@ -659,4 +659,5 @@ struct AnimatedMeshGradient: View {
                 animationTrigger = true
             }
     }
-}
+}}}
+

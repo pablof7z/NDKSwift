@@ -822,3 +822,4 @@ struct TransactionQRCodeView: View {
     }
 }
 
+}

@@ -33,6 +33,7 @@ public enum NDKLogCategory: String, CaseIterable {
     case performance = "PERFORMANCE"   // Timing, throughput, latency
     case security = "SECURITY"        // Encryption, key management
     case database = "DATABASE"        // SQL operations, migrations
+    case signature = "SIGNATURE"      // Signature verification
 }
 
 /// NDK Logger for configurable logging

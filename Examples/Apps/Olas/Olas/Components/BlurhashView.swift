@@ -434,16 +434,3 @@ class ImageCacheManager {
         }
     }
 }
-
-#Preview {
-    VStack {
-        OlasProgressiveImage(
-            imageURL: "https://example.com/image.jpg",
-            blurhash: "L6PZfSi_.AyE_3t7t7R**0o#DgR4"
-        )
-        .frame(width: 300, height: 400)
-        .clipShape(RoundedRectangle(cornerRadius: 16))
-    }
-    .padding()
-    .background(Color.black)
-}
