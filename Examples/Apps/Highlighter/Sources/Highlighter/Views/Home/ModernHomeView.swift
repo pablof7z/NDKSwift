@@ -60,7 +60,9 @@ struct ModernHomeView: View {
                     }
                 }
                 .refreshable {
+                    HapticManager.shared.impact(.light)
                     await dataManager.refresh()
+                    HapticManager.shared.notification(.success)
                 }
             }
             .background(
@@ -371,14 +373,7 @@ struct TrendingSection: View {
 }
 
 // MARK: - Preference Keys
-
-struct ScrollOffsetPreferenceKey: PreferenceKey {
-    static var defaultValue: CGFloat = 0
-    
-    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
-        value = nextValue()
-    }
-}
+// ScrollOffsetPreferenceKey is defined in EnhancedProfileView.swift
 
 struct HighlightedArticleCard: View {
     let article: Article
