@@ -1,0 +1,65 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  release:
+    name: Create Release
+    runs-on: macos-14
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Select Xcode
+      run: sudo xcode-select -s /Applications/Xcode_15.4.app
+    
+    - name: Build
+      run: swift build -c release -v
+    
+    - name: Run tests
+      run: swift test -v
+    
+    - name: Get version
+      id: version
+      run: echo "version=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
+    
+    - name: Update version file
+      run: echo "${{ steps.version.outputs.version }}" > VERSION
+    
+    - name: Generate release notes
+      id: release_notes
+      run: |
+        VERSION=${{ steps.version.outputs.version }}
+        NOTES=$(sed -n "/## \[$VERSION\]/,/## \[/p" CHANGELOG.md | sed '$ d')
+        echo "notes<<EOF" >> $GITHUB_OUTPUT
+        echo "$NOTES" >> $GITHUB_OUTPUT
+        echo "EOF" >> $GITHUB_OUTPUT
+    
+    - name: Create GitHub Release
+      uses: actions/create-release@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        tag_name: ${{ github.ref }}
+        release_name: NDKSwift ${{ steps.version.outputs.version }}
+        body: ${{ steps.release_notes.outputs.notes }}
+        draft: false
+        prerelease: false
+
+  publish-cocoapods:
+    name: Publish to CocoaPods
+    runs-on: macos-14
+    needs: release
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Install CocoaPods
+      run: gem install cocoapods
+    
+    - name: Deploy to CocoaPods
+      env:
+        COCOAPODS_TRUNK_TOKEN: ${{ secrets.COCOAPODS_TRUNK_TOKEN }}
+      run: |
+        pod trunk push NDKSwift.podspec --allow-warnings || echo "CocoaPods push failed - podspec might need to be created"
