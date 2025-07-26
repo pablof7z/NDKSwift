@@ -26,14 +26,18 @@ struct BlurhashView: View {
         ZStack {
             if let image = image {
                 #if os(iOS)
-                Image(uiImage: image)
-                #else
-                Image(nsImage: image)
-                #endif
+                SwiftUI.Image(uiImage: image)
                     .resizable()
                     .aspectRatio(contentMode: .fill)
                     .opacity(opacity)
                     .transition(.opacity)
+                #else
+                SwiftUI.Image(nsImage: image)
+                    .resizable()
+                    .aspectRatio(contentMode: .fill)
+                    .opacity(opacity)
+                    .transition(.opacity)
+                #endif
             } else {
                 Rectangle()
                     .fill(
@@ -69,12 +73,8 @@ struct BlurhashView: View {
     
     #if os(iOS)
     private func createPlaceholderImage(from hash: String) -> UIImage? {
-    #else
-    private func createPlaceholderImage(from hash: String) -> NSImage? {
-    #endif
         // Create a gradient placeholder based on hash
         let size = CGSize(width: 32, height: 32)
-        #if os(iOS)
         let renderer = UIGraphicsImageRenderer(size: size)
         
         return renderer.image { context in
@@ -99,8 +99,11 @@ struct BlurhashView: View {
                 options: []
             )
         }
-        #else
+    }
+    #else
+    private func createPlaceholderImage(from hash: String) -> NSImage? {
         // macOS implementation
+        let size = CGSize(width: 32, height: 32)
         let image = NSImage(size: size)
         image.lockFocus()
         
@@ -116,8 +119,8 @@ struct BlurhashView: View {
         
         image.unlockFocus()
         return image
-        #endif
     }
+    #endif
 }
 
 // MARK: - Progressive Image View
@@ -159,28 +162,37 @@ struct OlasProgressiveImage: View {
                 // Layer 2: Low quality image
                 if let lowQualityImage = lowQualityImage {
                     #if os(iOS)
-                    Image(uiImage: lowQualityImage)
-                    #else
-                    Image(nsImage: lowQualityImage)
-                    #endif
+                    SwiftUI.Image(uiImage: lowQualityImage)
                         .resizable()
                         .aspectRatio(contentMode: .fill)
                         .opacity(phase == .lowQuality && !showHighQuality ? 1 : 0)
                         .animation(.easeOut(duration: 0.3), value: phase)
                         .animation(.easeOut(duration: 0.3), value: showHighQuality)
+                    #else
+                    SwiftUI.Image(nsImage: lowQualityImage)
+                        .resizable()
+                        .aspectRatio(contentMode: .fill)
+                        .opacity(phase == .lowQuality && !showHighQuality ? 1 : 0)
+                        .animation(.easeOut(duration: 0.3), value: phase)
+                        .animation(.easeOut(duration: 0.3), value: showHighQuality)
+                    #endif
                 }
                 
                 // Layer 3: High quality image
                 if let highQualityImage = highQualityImage {
                     #if os(iOS)
-                    Image(uiImage: highQualityImage)
-                    #else
-                    Image(nsImage: highQualityImage)
-                    #endif
+                    SwiftUI.Image(uiImage: highQualityImage)
                         .resizable()
                         .aspectRatio(contentMode: .fill)
                         .opacity(showHighQuality ? 1 : 0)
                         .animation(.easeOut(duration: 0.5), value: showHighQuality)
+                    #else
+                    SwiftUI.Image(nsImage: highQualityImage)
+                        .resizable()
+                        .aspectRatio(contentMode: .fill)
+                        .opacity(showHighQuality ? 1 : 0)
+                        .animation(.easeOut(duration: 0.5), value: showHighQuality)
+                    #endif
                 }
                 
                 // Loading progress indicator
@@ -434,3 +446,5 @@ class ImageCacheManager {
         }
     }
 }
+
+// End of BlurhashView.swift

@@ -179,11 +179,13 @@ struct ReceiveView: View {
             .navigationBarTitleDisplayMode(.inline)
             #endif
             .toolbar {
-                #if os(iOS)
-                ToolbarItem(placement: .navigationBarTrailing) {
-                #else
-                ToolbarItem(placement: .automatic) {
-                #endif
+                ToolbarItem(placement: {
+                    #if os(iOS)
+                    .navigationBarTrailing
+                    #else
+                    .automatic
+                    #endif
+                }()) {
                     Button("Done") {
                         dismiss()
                     }
@@ -258,4 +260,6 @@ struct ReceiveView: View {
         return nil
     }
     #endif
-}}
+}
+
+// End of ReceiveView.swift

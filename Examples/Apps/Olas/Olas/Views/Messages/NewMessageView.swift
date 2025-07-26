@@ -394,7 +394,14 @@ class NewMessageViewModel: ObservableObject {
         )
         
         do {
-            let events = try await ndk.fetchEvents(filter: filter)
+            // Create a data source to fetch events
+            let dataSource = ndk.dataSource(filter: filter)
+            
+            var events: [NDKEvent] = []
+            for await event in dataSource.events {
+                events.append(event)
+                if events.count > 50 { break } // Limit results
+            }
             
             var results: [UserSearchResult] = []
             
@@ -434,7 +441,14 @@ class NewMessageViewModel: ObservableObject {
         )
         
         do {
-            let events = try await ndk.fetchEvents(filter: filter)
+            // Create a data source to fetch events
+            let dataSource = ndk.dataSource(filter: filter)
+            
+            var events: [NDKEvent] = []
+            for await event in dataSource.events {
+                events.append(event)
+                if events.count > 20 { break } // Limit results
+            }
             
             let users = events.compactMap { event -> UserSearchResult? in
                 guard let metadata = try? JSONDecoder().decode(NDKUserProfile.self, from: Data(event.content.utf8)) else { return nil }
