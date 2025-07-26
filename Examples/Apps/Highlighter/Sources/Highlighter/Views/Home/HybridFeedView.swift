@@ -449,7 +449,7 @@ struct FeaturedHighlightCarouselCard: View {
             
             // Footer
             HStack {
-                Text(RelativeTimeFormatter.relativeTime(from: highlight.createdAt ?? Date()))
+                Text(RelativeTimeFormatter.relativeTime(from: highlight.createdAt))
                     .font(.ds.caption)
                     .foregroundColor(.ds.textTertiary)
                 

@@ -5,7 +5,13 @@ options:
     iOS: "17.0"
 settings:
   base:
-    DEVELOPMENT_TEAM: ""
+    # Code Signing Settings - Update these with your values
+    DEVELOPMENT_TEAM: "${DEVELOPMENT_TEAM}" # Will use env var or you can hardcode
+    CODE_SIGN_STYLE: Automatic
+    CODE_SIGN_IDENTITY: "Apple Development"
+    PROVISIONING_PROFILE_SPECIFIER: ""
+    
+    # App Settings
     PRODUCT_BUNDLE_IDENTIFIER: com.posta.app
     MARKETING_VERSION: "1.0.0"
     CURRENT_PROJECT_VERSION: "1"

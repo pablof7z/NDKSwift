@@ -291,16 +291,19 @@ class ArticleDiscoveryViewModel: ObservableObject {
         
         filter.limit = 50
         
-        do {
-            let events = try await ndk.fetchEvents(filter)
-            processArticleEvents(events)
-            
-            // Load trending and featured
-            await loadTrendingArticles()
-            await loadFeaturedArticle(category: category)
-        } catch {
-            print("Failed to load articles: \(error)")
+        // Subscribe with closeOnEose to get all matching events then close
+        let subscription = ndk.subscribe(filter: filter, closeOnEose: true)
+        
+        var collectedEvents: [NDKEvent] = []
+        for await event in subscription {
+            collectedEvents.append(event)
         }
+        
+        processArticleEvents(collectedEvents)
+        
+        // Load trending and featured
+        await loadTrendingArticles()
+        await loadFeaturedArticle(category: category)
     }
     
     func searchArticles(query: String, category: EnhancedArticleDiscoveryView.ArticleCategory) async {
@@ -337,17 +340,19 @@ class ArticleDiscoveryViewModel: ObservableObject {
             filter.until = lastTimestamp
         }
         
-        do {
-            let events = try await ndk.fetchEvents(filter)
-            
-            if events.count < 30 {
-                hasMoreArticles = false
-            }
-            
-            processArticleEvents(events)
-        } catch {
-            print("Failed to load more articles: \(error)")
+        // Subscribe with closeOnEose to get all matching events then close
+        let subscription = ndk.subscribe(filter: filter, closeOnEose: true)
+        
+        var collectedEvents: [NDKEvent] = []
+        for await event in subscription {
+            collectedEvents.append(event)
         }
+        
+        if collectedEvents.count < 30 {
+            hasMoreArticles = false
+        }
+        
+        processArticleEvents(collectedEvents)
     }
     
     func refreshArticles() async {

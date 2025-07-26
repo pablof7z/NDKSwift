@@ -426,6 +426,8 @@ class ImageCacheManager {
     }
 }
 
+#endif // Close the conditional compilation block
+
 // MARK: - String Extension for SHA256
 extension String {
     var sha256Hash: String {

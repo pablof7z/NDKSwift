@@ -23,7 +23,13 @@ targets:
         product: NDKSwiftUI
     settings:
       base:
-        DEVELOPMENT_TEAM: ""
+        # Code Signing Settings - Update these with your values
+        DEVELOPMENT_TEAM: "${DEVELOPMENT_TEAM}" # Will use env var or you can hardcode
+        CODE_SIGN_STYLE: Automatic
+        CODE_SIGN_IDENTITY: "Apple Development"
+        PROVISIONING_PROFILE_SPECIFIER: ""
+        
+        # App Settings
         PRODUCT_BUNDLE_IDENTIFIER: com.highlighter.ios
         PRODUCT_NAME: Highlighter
         MARKETING_VERSION: 1.0.0

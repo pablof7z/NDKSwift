@@ -27,8 +27,12 @@ targets:
         PRODUCT_NAME: Ambulando
         PRODUCT_BUNDLE_IDENTIFIER: com.ambulando.app
         INFOPLIST_FILE: Sources/Ambulando/Info.plist
-        DEVELOPMENT_TEAM: ""
+        
+        # Code Signing Settings - Update these with your values
+        DEVELOPMENT_TEAM: "${DEVELOPMENT_TEAM}" # Will use env var or you can hardcode
         CODE_SIGN_STYLE: Automatic
+        CODE_SIGN_IDENTITY: "Apple Development"
+        PROVISIONING_PROFILE_SPECIFIER: ""
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
         TARGETED_DEVICE_FAMILY: "1,2"

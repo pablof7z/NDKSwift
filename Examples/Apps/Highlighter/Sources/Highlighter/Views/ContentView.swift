@@ -27,7 +27,7 @@ struct ContentView: View {
                 Group {
                     switch selectedTab {
                     case .home:
-                        ModernHomeView(tabBarVisible: $tabBarVisible)
+                        SimplifiedHybridFeedView()
                     case .feed:
                         SimplifiedHybridFeedView()
                     case .discover:
