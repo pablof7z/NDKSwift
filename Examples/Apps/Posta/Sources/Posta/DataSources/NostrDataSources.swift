@@ -31,35 +31,32 @@ public class UserProfileDataSource: ObservableObject {
     @Published public private(set) var isLoading = false
     @Published public private(set) var error: Error?
     
-    private let dataSource: NDKDataSource<NDKEvent>
+    private let ndk: NDK
+    private let pubkey: String
+    private var profileTask: Task<Void, Never>?
     
     public init(ndk: NDK, pubkey: String) {
-        self.dataSource = ndk.observe(
-            filter: NDKFilter(
-                authors: [pubkey],
-                kinds: [0]
-            ),
-            maxAge: 0,  // Real-time updates
-            cachePolicy: .cacheWithNetwork
-        )
+        self.ndk = ndk
+        self.pubkey = pubkey
         
-        Task {
+        // Start observing immediately - no loading states
+        profileTask = Task {
             await observeProfile()
         }
     }
     
+    deinit {
+        profileTask?.cancel()
+    }
+    
     private func observeProfile() async {
-        dataSource.$data
-            .compactMap { events in
-                events.sorted { $0.createdAt > $1.createdAt }.first
+        // Use NDKProfileManager for best practices
+        for await profileUpdate in await ndk.profileManager.observe(for: pubkey, maxAge: TimeConstants.hour) {
+            await MainActor.run {
+                self.profile = profileUpdate
+                self.isLoading = false
             }
-            .map { event in
-                JSONCoding.safeDecode(NDKUserProfile.self, from: event.content.data(using: .utf8) ?? Data())
-            }
-            .assign(to: &$profile)
-        
-        dataSource.$isLoading.assign(to: &$isLoading)
-        dataSource.$error.assign(to: &$error)
+        }
     }
 }
 
@@ -246,13 +243,15 @@ public class SessionNotesDataSource: ObservableObject {
     
     private var dataSource: NDKDataSource<NDKEvent>?
     private var eoseTask: Task<Void, Never>?
+    private var signerMonitorTask: Task<Void, Never>?
     public let ndk: NDK
     
     public init(ndk: NDK) {
         self.ndk = ndk
         
-        Task {
-            await setupSession()
+        // Start monitoring for signer availability
+        signerMonitorTask = Task {
+            await monitorSignerAndSetup()
         }
     }
     
@@ -265,26 +264,34 @@ public class SessionNotesDataSource: ObservableObject {
     
     deinit {
         eoseTask?.cancel()
+        signerMonitorTask?.cancel()
+    }
+    
+    private func monitorSignerAndSetup() async {
+        // If signer is already available, set up immediately
+        if ndk.signer != nil {
+            await setupSession()
+            return
+        }
+        
+        // Otherwise, monitor for signer availability
+        // This is a placeholder - ideally NDK would provide a proper async stream for signer changes
+        // For now, we'll check periodically but this should be improved in NDK
+        while ndk.signer == nil {
+            try? await Task.sleep(nanoseconds: 500_000_000) // 500ms
+        }
+        
+        await setupSession()
     }
     
     private func setupSession() async {
         do {
             isLoading = true
             
-            // Wait for authentication to complete
-            // This ensures authManager has restored the session and set the signer
-            if ndk.signer == nil {
-                // Monitor for signer availability
-                for _ in 0..<30 { // Wait up to 3 seconds
-                    try await Task.sleep(nanoseconds: 100_000_000) // 100ms
-                    if ndk.signer != nil {
-                        break
-                    }
-                }
-            }
-            
+            // Properly wait for signer without sleep loops
             guard let signer = ndk.signer else {
-                self.error = NostrError.signerRequired
+                // Don't treat missing signer as an error - just wait for it
+                print("📱 [SessionNotesDataSource] Waiting for authentication...")
                 isLoading = false
                 return
             }

@@ -7,6 +7,7 @@ struct HomeView: View {
     @State private var selectedProfile: String?
     @State private var selectedThread: NDKEvent?
     @State private var replyTracker: ReplyTracker?
+    @State private var showingCompose = false
     
     // Data source for notes
     @State private var notesDataSource: SessionNotesDataSource?
@@ -32,18 +33,11 @@ struct HomeView: View {
                     // Elegant header
                     headerView
                     
-                    // Main content
-                    if let dataSource = notesDataSource {
-                        if dataSource.notes.isEmpty && !dataSource.isLoading {
-                            emptyStateView
-                        } else {
-                            chatListView
-                        }
+                    // Main content - always show UI immediately
+                    if notesDataSource?.notes.isEmpty == true {
+                        emptyStateView
                     } else {
-                        // Show loading while data source initializes
-                        ProgressView()
-                            .scaleEffect(1.5)
-                            .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        chatListView
                     }
                 }
                 
@@ -53,7 +47,7 @@ struct HomeView: View {
                     HStack {
                         Spacer()
                         FloatingActionButton(icon: "square.and.pencil") {
-                            // TODO: Show compose view
+                            showingCompose = true
                         }
                         .padding(.trailing, 20)
                         .padding(.bottom, 20)
@@ -68,20 +62,22 @@ struct HomeView: View {
         .sheet(item: $selectedThread) { event in
             ThreadView(rootEvent: event)
         }
+        .sheet(isPresented: $showingCompose) {
+            ComposeView()
+        }
         .onAppear {
             print("📦 [HomeView] onAppear called")
             print("📦 [HomeView] ndkManager.ndk = \(ndkManager.ndk != nil ? "Available" : "NIL")")
+            
+            // Always show content immediately - no loading states
+            showContent = true
+            
             if let ndk = ndkManager.ndk {
                 print("📦 [HomeView] ndk.signer = \(ndk.signer != nil ? "Available" : "NIL")")
                 // Create data source if not already created
                 if notesDataSource == nil {
                     notesDataSource = SessionNotesDataSource(ndk: ndk)
                 }
-            }
-            
-            // Animate content appearance
-            withAnimation(.spring(response: 0.5, dampingFraction: 0.8).delay(0.1)) {
-                showContent = true
             }
         }
         .task {
@@ -155,16 +151,11 @@ struct HomeView: View {
                                 )
                                 .frame(width: 40, height: 40)
                             
-                            if notesDataSource?.isLoading == true {
-                                ProgressView()
-                                    .scaleEffect(0.7)
-                                    .tint(.purple)
-                            } else {
-                                Image(systemName: "arrow.clockwise")
-                                    .font(.system(size: 16, weight: .medium))
-                                    .foregroundColor(.purple)
-                                    .rotationEffect(.degrees(notesDataSource?.isLoading == true ? 360 : 0))
-                            }
+                            Image(systemName: "arrow.clockwise")
+                                .font(.system(size: 16, weight: .medium))
+                                .foregroundColor(.purple)
+                                .rotationEffect(.degrees(notesDataSource?.isLoading == true ? 360 : 0))
+                                .animation(.linear(duration: 1).repeatForever(autoreverses: false), value: notesDataSource?.isLoading == true)
                         }
                     }
                     .disabled(notesDataSource?.isLoading == true)
@@ -201,11 +192,16 @@ struct HomeView: View {
                 .padding(.top, 12)
                 .padding(.bottom, 10)
                 
-                // Connection status
+                // Connection status - show inline without blocking
                 if let error = notesDataSource?.error {
                     ErrorBanner(error: error)
                         .padding(.horizontal, 16)
                         .padding(.bottom, 6)
+                        .transition(.asymmetric(
+                            insertion: .move(edge: .top).combined(with: .opacity),
+                            removal: .move(edge: .top).combined(with: .opacity)
+                        ))
+                        .animation(.spring(response: 0.3, dampingFraction: 0.8), value: error.localizedDescription)
                 }
                 
                 // Sync status

@@ -8,8 +8,7 @@ struct HighlightDetailView: View {
     
     @State private var isZapped = false
     @State private var showShareSheet = false
-    @State private var showReplyComposer = false
-    @State private var replyText = ""
+    @State private var showComments = false
     @State private var author: NDKUserProfile?
     @State private var showAudioPlayer = false
     
@@ -179,13 +178,16 @@ struct HighlightDetailView: View {
                             )
                         }
                         
-                        Button(action: { showReplyComposer = true }) {
+                        Button(action: { 
+                            // Scroll to comments section
+                            HapticManager.shared.impact(.light)
+                        }) {
                             VStack(spacing: 4) {
                                 Image(systemName: "bubble.left")
                                     .font(.title2)
                                     .foregroundColor(DesignSystem.Colors.textSecondary)
                                 
-                                Text("Reply")
+                                Text("Comments")
                                     .font(DesignSystem.Typography.caption)
                                     .foregroundColor(DesignSystem.Colors.textSecondary)
                             }
@@ -212,6 +214,11 @@ struct HighlightDetailView: View {
                         }
                     }
                     .padding(.horizontal)
+                    
+                    // Comments section
+                    CommentsSection(highlightId: highlight.id)
+                        .environmentObject(appState)
+                        .padding(.top)
                     
                     // Related highlights section
                     VStack(alignment: .leading, spacing: 16) {
@@ -251,10 +258,6 @@ struct HighlightDetailView: View {
         }
         .sheet(isPresented: $showShareSheet) {
             ShareSheet(items: [highlight.content])
-        }
-        .sheet(isPresented: $showReplyComposer) {
-            ReplyComposerView(highlight: highlight, replyText: $replyText)
-                .environmentObject(appState)
         }
     }
     

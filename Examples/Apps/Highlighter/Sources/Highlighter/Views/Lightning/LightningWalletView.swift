@@ -83,7 +83,7 @@ struct LightningWalletView: View {
             TransactionDetailSheet(transaction: transaction)
         }
         .onAppear {
-            lightning.setNDK(appState.ndk!)
+            lightning.setNDK(appState.ndk!, signer: appState.activeSigner)
         }
     }
     

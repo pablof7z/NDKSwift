@@ -23,6 +23,8 @@
 		3DFA64BB9C00F7D7EDBB3E38 /* AudioPlayerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 321C2E8C6CB80D3B280CC5CA /* AudioPlayerView.swift */; };
 		410141EDC0B7B0D01CCE3452 /* ModernStateViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA46623C808023B5D65EB473 /* ModernStateViews.swift */; };
 		43920B59A88E931B495919A8 /* PublishingService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7542540C7ACFB260E24E01B2 /* PublishingService.swift */; };
+		B5A2C1D9A88E931B495919A9 /* BookmarkService.swift in Sources */ = {isa = PBXBuildFile; fileRef = B5A2C1D87ACFB260E24E01B3 /* BookmarkService.swift */; };
+		C3B4D2E9A88E931B495919B9 /* CommentService.swift in Sources */ = {isa = PBXBuildFile; fileRef = C3B4D2E87ACFB260E24E01B4 /* CommentService.swift */; };
 		483E4645826EA9B78961A7BD /* .repomix-output.txt in Resources */ = {isa = PBXBuildFile; fileRef = 923EDFDDF5D99390303E706B /* .repomix-output.txt */; };
 		4B32ABBE29543BA6FCA0605B /* ModernHomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F0F357DAE1A92819205EE9FF /* ModernHomeView.swift */; };
 		4F557938220F55296A4E483F /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 288947C11C084EEA395DB4F3 /* ContentView.swift */; };
@@ -117,6 +119,8 @@
 		68EE862B30307430C752F295 /* SelectableMarkdownRenderer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SelectableMarkdownRenderer.swift; sourceTree = "<group>"; };
 		71A83CD10503C7B187BEE747 /* ArticleView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ArticleView.swift; sourceTree = "<group>"; };
 		7542540C7ACFB260E24E01B2 /* PublishingService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PublishingService.swift; sourceTree = "<group>"; };
+		B5A2C1D87ACFB260E24E01B3 /* BookmarkService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BookmarkService.swift; sourceTree = "<group>"; };
+		C3B4D2E87ACFB260E24E01B4 /* CommentService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CommentService.swift; sourceTree = "<group>"; };
 		83206D6462CF11DCF490672D /* SwarmOverlayView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SwarmOverlayView.swift; sourceTree = "<group>"; };
 		842FF8B20D37A2852B7A0ED9 /* HighlightDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HighlightDetailView.swift; sourceTree = "<group>"; };
 		8C6C4024D5AE536DD3ADC4C4 /* HighlightsFeedView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HighlightsFeedView.swift; sourceTree = "<group>"; };
@@ -393,6 +397,7 @@
 		BAA23907C66EADBD8573C18D /* Components */ = {
 			isa = PBXGroup;
 			children = (
+				D4C5E3F87ACFB260E24E01B5 /* CommentView.swift */,
 				19C631ECAA0313B22AD50212 /* HighlightCard.swift */,
 				06EC35345A13411260DCEEF7 /* MeshGradientBackground.swift */,
 				B4CAEDCB43E983D35EC24C74 /* ModernButtonStyles.swift */,
@@ -453,6 +458,8 @@
 			isa = PBXGroup;
 			children = (
 				A9A59DD7DD81D1FEB67B662D /* AIHighlightEngine.swift */,
+				B5A2C1D87ACFB260E24E01B3 /* BookmarkService.swift */,
+				C3B4D2E87ACFB260E24E01B4 /* CommentService.swift */,
 				47D8FA7B43386CEE13EB7B18 /* DataStreamManager.swift */,
 				5818E9E0A5081751B12C7A05 /* LightningService.swift */,
 				0CD20236BF86EF8694B01BCB /* ProfileManager.swift */,
@@ -603,6 +610,8 @@
 				A14D87798BCA853B8ADB1094 /* ProfileManager.swift in Sources */,
 				762E0B52E6C34458CB162E73 /* ProfileView.swift in Sources */,
 				43920B59A88E931B495919A8 /* PublishingService.swift in Sources */,
+				B5A2C1D9A88E931B495919A9 /* BookmarkService.swift in Sources */,
+				C3B4D2E9A88E931B495919B9 /* CommentService.swift in Sources */,
 				F3882617AB54096ECD0A9CB3 /* SearchView.swift in Sources */,
 				2629890795B6D0A577BF09D3 /* SelectableMarkdownRenderer.swift in Sources */,
 				AB4EF72007DE04801039B67B /* SettingsView.swift in Sources */,
@@ -618,6 +627,7 @@
 				E3A00B68BDE7C21BA3CD80C2 /* UserDiscoveryView.swift in Sources */,
 				8EE197235B1A83A04B155F56 /* VisualEffects.swift in Sources */,
 				B5E8FDE244E748C0EBA0335C /* ZapButton.swift in Sources */,
+				D4C5E3F87ACFB260E24E01B5 /* CommentView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

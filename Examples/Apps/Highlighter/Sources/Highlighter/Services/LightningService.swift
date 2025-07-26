@@ -16,6 +16,7 @@ class LightningService: ObservableObject {
     
     // MARK: - Properties
     private var ndk: NDK?
+    private var signer: NDKSigner?
     private var nwc: NostrWalletConnect?
     private var cancellables = Set<AnyCancellable>()
     
@@ -255,8 +256,9 @@ class LightningService: ObservableObject {
         HapticManager.shared.impact(.light)
     }
     
-    func setNDK(_ ndk: NDK) {
+    func setNDK(_ ndk: NDK, signer: NDKSigner?) {
         self.ndk = ndk
+        self.signer = signer
         
         // Try to reconnect if we have a saved connection
         if let savedConnection = getSavedConnectionString() {
@@ -331,8 +333,10 @@ class LightningService: ObservableObject {
         comment: String?,
         highlightReference: String?
     ) async throws -> NDKEvent {
-        guard let ndk = ndk,
-              let signer = NDKAuthManager.shared.activeSigner else {
+        guard let ndk = ndk else {
+            throw LightningError.ndkNotInitialized
+        }
+        guard let signer = signer else {
             throw LightningError.signerNotAvailable
         }
         
@@ -390,7 +394,7 @@ class LightningService: ObservableObject {
         split: PaymentSplit
     ) async throws {
         guard let ndk = ndk,
-              let signer = NDKAuthManager.shared.activeSigner else { return }
+              let signer = signer else { return }
         
         let tags: [[String]] = [
             ["p", transaction.recipientPubkey],
