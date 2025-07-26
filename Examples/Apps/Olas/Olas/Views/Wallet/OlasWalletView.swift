@@ -3,6 +3,7 @@ import NDKSwift
 
 struct OlasWalletView: View {
     @ObservedObject var walletManager: OlasWalletManager
+    let nostrManager: NostrManager
     @State private var selectedTab = 0
     @State private var showReceive = false
     @State private var showSend = false
@@ -10,45 +11,36 @@ struct OlasWalletView: View {
     @State private var showScanner = false
     @State private var showMintManagement = false
     @State private var refreshRotation: Double = 0
+    @State private var isRefreshing = false
+    @State private var showNutZap = false
+    @State private var nutZapRecipient: String?
     @Environment(\.dismiss) private var dismiss
     
     var body: some View {
         NavigationStack {
             ZStack {
-                // Enhanced gradient background with animated mesh
-                TimeBasedGradient()
-                    .ignoresSafeArea()
-                    .opacity(0.3)
+                // Modern gradient background
+                RadialGradient(
+                    gradient: Gradient(colors: [
+                        OlasDesign.Colors.background,
+                        OlasDesign.Colors.surface.opacity(0.3)
+                    ]),
+                    center: .top,
+                    startRadius: 0,
+                    endRadius: 500
+                )
+                .ignoresSafeArea()
                 
-                ScrollView {
-                    VStack(spacing: OlasDesign.Spacing.lg) {
-                        // Enhanced Balance Card with glassmorphism
-                        GlassmorphicCard {
-                            VStack(spacing: OlasDesign.Spacing.lg) {
-                                // Lightning icon with pulse
-                                PulsingIcon(
-                                    systemName: "bolt.circle.fill",
-                                    size: 80,
-                                    colors: [Color.orange, Color.yellow]
-                                )
-                                
-                                // Animated balance display
-                                AnimatedBalanceDisplay(
-                                    balance: walletManager.currentBalance,
-                                    btcPrice: nil
-                                )
-                                
-                                // Mint distribution preview
-                                if walletManager.mintURLs.count > 1 {
-                                    MintDistributionPreview(walletManager: walletManager)
-                                        .padding(.top, OlasDesign.Spacing.sm)
-                                }
-                            }
-                            .padding(.vertical, OlasDesign.Spacing.xl)
-                            .padding(.horizontal, OlasDesign.Spacing.lg)
-                        }
-                        .padding(.horizontal, OlasDesign.Spacing.md)
-                        .padding(.top, OlasDesign.Spacing.sm)
+                if !walletManager.isWalletConfigured {
+                    // Empty wallet state
+                    emptyWalletView
+                } else {
+                    ScrollView {
+                        VStack(spacing: OlasDesign.Spacing.lg) {
+                            // Enhanced Balance Card with glassmorphism
+                            OlasBalanceCard(walletManager: walletManager)
+                                .padding(.horizontal, OlasDesign.Spacing.md)
+                                .padding(.top, OlasDesign.Spacing.sm)
                         
                         // Quick Stats with glassmorphism
                         quickStats
@@ -58,30 +50,26 @@ struct OlasWalletView: View {
                         modernActionButtons
                             .padding(.horizontal, OlasDesign.Spacing.md)
                         
-                        // Recent Activity with enhanced UI
-                        recentActivity
+                            // Recent Activity with enhanced UI
+                            recentActivity
+                        }
+                        .padding(.bottom, 100)
                     }
-                    .padding(.bottom, 100)
-                }
-                .refreshable {
-                    await refreshWallet()
+                    .refreshable {
+                        await refreshWallet()
+                    }
                 }
             }
-            .navigationTitle("⚡ Wallet")
+            .navigationTitle("Lightning Wallet")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {
                     Button {
-                        withAnimation(.easeInOut(duration: 1)) {
-                            refreshRotation += 360
-                        }
-                        Task {
-                            await refreshWallet()
-                        }
+                        dismiss()
                     } label: {
-                        Image(systemName: "arrow.clockwise")
-                            .foregroundStyle(OlasDesign.Colors.primary)
-                            .rotationEffect(.degrees(refreshRotation))
+                        Image(systemName: "xmark.circle.fill")
+                            .foregroundStyle(OlasDesign.Colors.textSecondary)
+                            .font(.title3)
                     }
                 }
                 
@@ -97,6 +85,12 @@ struct OlasWalletView: View {
                             showAddMint = true
                         } label: {
                             Label("Add Mint", systemImage: "plus.circle")
+                        }
+                        
+                        Button {
+                            showNutZap = true
+                        } label: {
+                            Label("NutZap Someone", systemImage: "bolt.heart")
                         }
                         
                         Divider()
@@ -129,47 +123,115 @@ struct OlasWalletView: View {
             .sheet(isPresented: $showMintManagement) {
                 MintManagementView(walletManager: walletManager)
             }
+            .sheet(isPresented: $showNutZap) {
+                NutZapView(walletManager: walletManager, nostrManager: nostrManager, recipientPubkey: nutZapRecipient)
+            }
             .task {
-                do {
-                    try await walletManager.loadWallet()
-                } catch {
-                    print("Failed to load wallet: \(error)")
+                if walletManager.activeWallet == nil {
+                    do {
+                        try await walletManager.loadWallet()
+                    } catch {
+                        print("Failed to load wallet: \(error)")
+                    }
                 }
             }
         }
     }
     
+    private var emptyWalletView: some View {
+        VStack(spacing: OlasDesign.Spacing.xl) {
+            Spacer()
+            
+            // Lightning bolt icon
+            Image(systemName: "bolt.circle.fill")
+                .font(.system(size: 80))
+                .foregroundStyle(
+                    LinearGradient(
+                        colors: [
+                            OlasDesign.Colors.primary,
+                            OlasDesign.Colors.primary.opacity(0.7)
+                        ],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                )
+                .shadow(color: OlasDesign.Colors.primary.opacity(0.3), radius: 20, x: 0, y: 10)
+            
+            VStack(spacing: OlasDesign.Spacing.sm) {
+                Text("Set Up Your Wallet")
+                    .font(OlasDesign.Typography.title2)
+                    .foregroundStyle(OlasDesign.Colors.text)
+                
+                Text("Add a mint to start using Lightning")
+                    .font(OlasDesign.Typography.body)
+                    .foregroundStyle(OlasDesign.Colors.textSecondary)
+                    .multilineTextAlignment(.center)
+            }
+            
+            Button {
+                showAddMint = true
+                OlasDesign.Haptic.selection()
+            } label: {
+                HStack(spacing: OlasDesign.Spacing.sm) {
+                    Image(systemName: "plus.circle.fill")
+                    Text("Add Your First Mint")
+                }
+                .font(OlasDesign.Typography.bodyMedium)
+                .foregroundColor(.white)
+                .padding(.horizontal, OlasDesign.Spacing.lg)
+                .padding(.vertical, OlasDesign.Spacing.md)
+                .background(
+                    LinearGradient(
+                        colors: OlasDesign.Colors.primaryGradient,
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                )
+                .cornerRadius(OlasDesign.CornerRadius.full)
+                .shadow(color: OlasDesign.Colors.primary.opacity(0.3), radius: 10, x: 0, y: 5)
+            }
+            
+            Spacer()
+            Spacer()
+        }
+        .padding(.horizontal, OlasDesign.Spacing.xl)
+    }
+    
     private var quickStats: some View {
         HStack(spacing: OlasDesign.Spacing.sm) {
             // Total Mints
-            GlassmorphicCard {
-                StatCard(
-                    icon: "server.rack",
-                    value: "\(walletManager.mintURLs.count)",
-                    label: "Mints",
-                    color: .blue
-                )
-            }
+            ModernStatCard(
+                icon: "server.rack",
+                value: "\(walletManager.mintURLs.count)",
+                label: "Mints",
+                gradient: [Color(hex: "3B82F6"), Color(hex: "1E40AF")]
+            )
             
-            // Active Tokens
-            GlassmorphicCard {
-                StatCard(
-                    icon: "ticket.fill",
-                    value: "\(walletManager.activeTokens.count)",
-                    label: "Tokens",
-                    color: .green
-                )
-            }
+            // Active Balance
+            ModernStatCard(
+                icon: "bitcoinsign.circle.fill",
+                value: formatCompactBalance(walletManager.currentBalance),
+                label: "Balance",
+                gradient: [Color(hex: "F97316"), Color(hex: "EA580C")]
+            )
             
             // Today's Activity
-            GlassmorphicCard {
-                StatCard(
-                    icon: "arrow.up.arrow.down",
-                    value: "\(walletManager.recentTransactions.filter { Calendar.current.isDateInToday($0.timestamp) }.count)",
-                    label: "Today",
-                    color: .orange
-                )
-            }
+            ModernStatCard(
+                icon: "arrow.up.arrow.down",
+                value: "\(walletManager.recentTransactions.filter { Calendar.current.isDateInToday($0.timestamp) }.count)",
+                label: "Today",
+                gradient: [Color(hex: "10B981"), Color(hex: "059669")]
+            )
+        }
+    }
+    
+    private func formatCompactBalance(_ sats: Int64) -> String {
+        if sats >= 1_000_000 {
+            return String(format: "%.1fM", Double(sats) / 1_000_000)
+        } else if sats >= 1_000 {
+            return String(format: "%.1fk", Double(sats) / 1_000)
+        } else {
+            return "\(sats)"
         }
     }
     
@@ -212,16 +274,28 @@ struct OlasWalletView: View {
         VStack(alignment: .leading, spacing: OlasDesign.Spacing.md) {
             // Section header
             HStack {
-                Text("Recent Activity")
-                    .font(OlasDesign.Typography.title3)
-                    .foregroundColor(OlasDesign.Colors.text)
+                HStack(spacing: OlasDesign.Spacing.sm) {
+                    Image(systemName: "clock.arrow.circlepath")
+                        .font(.system(size: 16, weight: .medium))
+                        .foregroundStyle(OlasDesign.Colors.primary)
+                    
+                    Text("Recent Activity")
+                        .font(OlasDesign.Typography.title3)
+                        .foregroundStyle(OlasDesign.Colors.text)
+                }
                 
                 Spacer()
                 
-                NavigationLink(destination: Text("Transaction History")) {
-                    Text("See All")
-                        .font(OlasDesign.Typography.caption)
-                        .foregroundColor(OlasDesign.Colors.primary)
+                if !walletManager.recentTransactions.isEmpty {
+                    NavigationLink(destination: Text("Transaction History")) {
+                        HStack(spacing: 4) {
+                            Text("See All")
+                                .font(OlasDesign.Typography.caption)
+                            Image(systemName: "chevron.right")
+                                .font(.system(size: 10, weight: .semibold))
+                        }
+                        .foregroundStyle(OlasDesign.Colors.primary)
+                    }
                 }
             }
             .padding(.horizontal, OlasDesign.Spacing.md)
@@ -230,21 +304,34 @@ struct OlasWalletView: View {
                 EmptyActivityView()
                     .padding(.horizontal, OlasDesign.Spacing.md)
             } else {
-                // Show last 5 transactions
-                VStack(spacing: 0) {
+                // Show last 5 transactions with modern design
+                VStack(spacing: OlasDesign.Spacing.xs) {
                     ForEach(walletManager.recentTransactions.prefix(5)) { transaction in
-                        TransactionRow(transaction: transaction, walletManager: walletManager)
-                            .padding(.horizontal, OlasDesign.Spacing.md)
-                        
-                        if transaction.id != walletManager.recentTransactions.prefix(5).last?.id {
-                            Divider()
-                                .padding(.leading, 60)
-                        }
+                        ModernTransactionRow(transaction: transaction, walletManager: walletManager)
+                            .transition(.asymmetric(
+                                insertion: .push(from: .bottom).combined(with: .opacity),
+                                removal: .push(from: .top).combined(with: .opacity)
+                            ))
                     }
                 }
+                .padding(OlasDesign.Spacing.sm)
                 .background(
                     RoundedRectangle(cornerRadius: OlasDesign.CornerRadius.lg)
-                        .fill(OlasDesign.Colors.surface)
+                        .fill(OlasDesign.Colors.surface.opacity(0.5))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: OlasDesign.CornerRadius.lg)
+                                .stroke(
+                                    LinearGradient(
+                                        colors: [
+                                            Color.white.opacity(0.1),
+                                            Color.white.opacity(0.05)
+                                        ],
+                                        startPoint: .topLeading,
+                                        endPoint: .bottomTrailing
+                                    ),
+                                    lineWidth: 1
+                                )
+                        )
                 )
                 .padding(.horizontal, OlasDesign.Spacing.md)
             }
@@ -329,15 +416,19 @@ struct TransactionRow: View {
     
     private var transactionIcon: String {
         switch transaction.type {
-        case .sent: return "arrow.up.circle.fill"
-        case .received: return "arrow.down.circle.fill"
+        case .sent, .melted: return "arrow.up.circle.fill"
+        case .received, .minted: return "arrow.down.circle.fill"
+        case .zapped, .nutzapped: return "bolt.heart.fill"
+        case .swapped: return "arrow.triangle.swap"
         }
     }
     
     private var transactionColor: Color {
         switch transaction.type {
-        case .sent: return Color.orange
-        case .received: return Color.green
+        case .sent, .melted: return Color.orange
+        case .received, .minted: return Color.green
+        case .zapped, .nutzapped: return Color.purple
+        case .swapped: return Color.blue
         }
     }
     
@@ -395,7 +486,10 @@ struct TransactionRow: View {
                 
                 // Amount
                 VStack(alignment: .trailing, spacing: 2) {
-                    Text("\(transaction.type == .received ? "+" : "-")\(formatAmount(transaction.amount))")
+                    let isIncoming = transaction.direction == .incoming || 
+                        transaction.type == .received || 
+                        transaction.type == .minted
+                    Text("\(isIncoming ? "+" : "-")\(formatAmount(transaction.amount))")
                         .font(.system(size: 16, weight: .semibold, design: .rounded))
                         .foregroundColor(transactionColor)
                     

@@ -1,9 +1,18 @@
 import SwiftUI
 import NDKSwift
 
+// Wrapper for Int to make it Identifiable
+struct StoryIndexWrapper: Identifiable {
+    let id: Int
+    
+    init(_ index: Int) {
+        self.id = index
+    }
+}
+
 struct OlasStoriesView: View {
     @ObservedObject var storiesManager: StoriesManager
-    @State private var selectedStoryIndex: Int?
+    @State private var selectedStoryWrapper: StoryIndexWrapper?
     @State private var showCreateStory = false
     
     var body: some View {
@@ -17,19 +26,22 @@ struct OlasStoriesView: View {
                     StoryCircle(
                         story: storiesManager.stories[index],
                         index: index,
-                        selectedStoryIndex: $selectedStoryIndex
+                        selectedStoryIndex: Binding(
+                            get: { selectedStoryWrapper?.id == index ? index : nil },
+                            set: { _ in selectedStoryWrapper = StoryIndexWrapper(index) }
+                        )
                     )
                 }
             }
             .padding(.horizontal, OlasDesign.Spacing.md)
         }
         .frame(height: 100)
-        .fullScreenCover(item: $selectedStoryIndex) { index in
+        .fullScreenCover(item: $selectedStoryWrapper) { wrapper in
             OlasStoryViewerView(
                 stories: storiesManager.stories,
-                initialIndex: index,
+                initialIndex: wrapper.id,
                 onDismiss: {
-                    selectedStoryIndex = nil
+                    selectedStoryWrapper = nil
                 }
             )
         }
