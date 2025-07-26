@@ -9,13 +9,20 @@ struct ContentView: View {
     @State private var showCreateHighlight = false
     @State private var fabScale: CGFloat = 1.0
     @State private var fabRotation: Double = 0
+    @AppStorage("hasCompletedOnboarding") private var hasCompletedOnboarding = false
     
     enum Tab: CaseIterable {
         case home, feed, discover, library, profile
     }
     
     var body: some View {
-        if authManager.isAuthenticated {
+        if !hasCompletedOnboarding {
+            OnboardingView(hasCompletedOnboarding: $hasCompletedOnboarding)
+                .transition(.asymmetric(
+                    insertion: .opacity,
+                    removal: .move(edge: .leading).combined(with: .opacity)
+                ))
+        } else if authManager.isAuthenticated {
             ZStack(alignment: .bottom) {
                 Group {
                     switch selectedTab {
@@ -28,7 +35,7 @@ struct ContentView: View {
                     case .library:
                         LibraryView()
                     case .profile:
-                        ProfileView()
+                        EnhancedProfileView()
                     }
                 }
                 .animation(DesignSystem.Animation.quick, value: selectedTab)
