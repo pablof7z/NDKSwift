@@ -10,17 +10,17 @@ public extension NDKFilter {
         var keys: [String] = []
         
         // Add keys for each non-nil property
-        if ids != nil { keys.append("ids") }
-        if authors != nil { keys.append("authors") }
-        if kinds != nil { keys.append("kinds") }
+        if ids != nil { keys.append(NostrConstants.JSONField.ids) }
+        if authors != nil { keys.append(NostrConstants.JSONField.authors) }
+        if kinds != nil { keys.append(NostrConstants.JSONField.kinds) }
         if let since = since { 
-            keys.append("since:\(since)")  // Include value for time constraints
+            keys.append("\(NostrConstants.JSONField.since):\(since)")  // Include value for time constraints
         }
         if let until = until { 
-            keys.append("until:\(until)")  // Include value for time constraints
+            keys.append("\(NostrConstants.JSONField.until):\(until)")  // Include value for time constraints
         }
-        if tags != nil { keys.append("tags") }
-        if limit != nil { keys.append("limit") }
+        if tags != nil { keys.append(NostrConstants.JSONField.tags) }
+        if limit != nil { keys.append(NostrConstants.JSONField.limit) }
         
         // Sort alphabetically and join with "-"
         return keys.sorted().joined(separator: "-")

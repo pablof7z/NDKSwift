@@ -83,6 +83,9 @@ public enum NDKLogger {
         }
     }
 
+    /// Custom log handler for external integration
+    public static var logHandler: ((String) -> Void)? = nil
+    
     /// Log a message at the specified level
     public static func log(_ level: NDKLogLevel, category: NDKLogCategory, _ message: String) {
         guard level <= logLevel else { return }
@@ -90,7 +93,15 @@ public enum NDKLogger {
         
         let timestamp = DateFormatters.iso8601.string(from: Date())
         let emoji = NDKLogFormatter.emojiForCategory(category)
-        print("[\(timestamp)] [\(category.rawValue)] [\(level)] \(emoji) \(message)")
+        let formattedMessage = "[\(timestamp)] [\(category.rawValue)] [\(level)] \(emoji) \(message)"
+        
+        if let handler = logHandler {
+            handler(formattedMessage)
+        } else {
+            #if DEBUG
+            print(formattedMessage)
+            #endif
+        }
     }
 
     /// Log a message with correlation ID for tracking across components

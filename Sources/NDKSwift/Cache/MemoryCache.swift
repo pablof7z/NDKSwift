@@ -19,10 +19,22 @@ public actor MemoryCache: NDKCache {
 
     // Observer tracking
     private var observers: [FilterSignature: Set<WeakObserver>] = [:]
+    
+    // Cleanup task for tombstones
+    private var cleanupTask: Task<Void, Never>?
 
     public init() {
         // Initialize LRU cache with configured item limit for decrypted content
         self.decryptedContent = LRUCache(capacity: NetworkConstants.defaultCacheCapacity)
+        
+        // Start periodic cleanup of expired tombstones
+        Task { [weak self] in
+            await self?.startTombstoneCleanup()
+        }
+    }
+    
+    deinit {
+        cleanupTask?.cancel()
     }
 
     // MARK: - Event Operations
@@ -436,6 +448,41 @@ public actor MemoryCache: NDKCache {
         }
     }
 
+    // MARK: - Tombstone Cleanup
+    
+    private func startTombstoneCleanup() {
+        cleanupTask = Task { [weak self] in
+            while !Task.isCancelled {
+                // Wait for cleanup interval (1 hour)
+                try? await Task.sleep(nanoseconds: UInt64(TimeConstants.hour * 1_000_000_000))
+                
+                guard !Task.isCancelled else { break }
+                
+                // Clean up expired tombstones
+                await self?.cleanupExpiredTombstones()
+            }
+        }
+    }
+    
+    private func cleanupExpiredTombstones() async {
+        let now = Date()
+        var expiredKeys: [String] = []
+        
+        for (eventId, tombstoneDate) in deletionTombstones {
+            if now.timeIntervalSince(tombstoneDate) > tombstoneTTL {
+                expiredKeys.append(eventId)
+            }
+        }
+        
+        for key in expiredKeys {
+            deletionTombstones.removeValue(forKey: key)
+        }
+        
+        if !expiredKeys.isEmpty {
+            NDKLogger.log(.debug, category: .cache, "Cleaned up \(expiredKeys.count) expired tombstones")
+        }
+    }
+    
     // MARK: - Reactive Observation
 
     public func observeEvents(

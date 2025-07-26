@@ -7,11 +7,16 @@ public enum NDKNetworkLogger {
         guard NDKLogger.logNetworkTraffic else { return }
         guard NDKLogger.isEnabled else { return }
         
-        print("\n📤 SENDING TO \(relay.host ?? relay.absoluteString):")
+        let output = "\n📤 SENDING TO \(relay.host ?? relay.absoluteString):\n" +
+                     "   RAW: \(NDKLogFormatter.truncateMessage(message))"
         
-        // Always show raw message, with truncation for large arrays
-        let truncatedMessage = NDKLogFormatter.truncateMessage(message)
-        print("   RAW: \(truncatedMessage)")
+        if let handler = NDKLogger.logHandler {
+            handler(output)
+        } else {
+            #if DEBUG
+            print(output)
+            #endif
+        }
     }
     
     /// Log received network traffic
@@ -19,11 +24,16 @@ public enum NDKNetworkLogger {
         guard NDKLogger.logNetworkTraffic else { return }
         guard NDKLogger.isEnabled else { return }
         
-        print("\n📥 RECEIVED FROM \(relay.host ?? relay.absoluteString):")
+        let output = "\n📥 RECEIVED FROM \(relay.host ?? relay.absoluteString):\n" +
+                     "   RAW: \(NDKLogFormatter.truncateMessage(message))"
         
-        // Always show raw message, with truncation for large arrays
-        let truncatedMessage = NDKLogFormatter.truncateMessage(message)
-        print("   RAW: \(truncatedMessage)")
+        if let handler = NDKLogger.logHandler {
+            handler(output)
+        } else {
+            #if DEBUG
+            print(output)
+            #endif
+        }
     }
     
     /// Log parsing errors
@@ -31,98 +41,116 @@ public enum NDKNetworkLogger {
         guard NDKLogger.logNetworkTraffic else { return }
         guard NDKLogger.isEnabled else { return }
         
-        print("\n📥 RECEIVED FROM \(relay.host ?? relay.absoluteString):")
-        print("   RAW: \(NDKLogFormatter.truncateMessage(message))")
-        print("   ❌ PARSE ERROR: \(error)")
+        let output = "\n📥 RECEIVED FROM \(relay.host ?? relay.absoluteString):\n" +
+                     "   RAW: \(NDKLogFormatter.truncateMessage(message))\n" +
+                     "   ❌ PARSE ERROR: \(error)"
+        
+        if let handler = NDKLogger.logHandler {
+            handler(output)
+        } else {
+            #if DEBUG
+            print(output)
+            #endif
+        }
     }
     
     /// Log parsed message details
     public static func logParsedMessage(_ message: NostrMessage) {
+        var output = ""
+        
         switch message {
         case let .event(subscriptionId, event):
-            print("   TYPE: EVENT")
+            output += "   TYPE: EVENT\n"
             if let subId = subscriptionId {
-                print("   SUBSCRIPTION: \(subId)")
+                output += "   SUBSCRIPTION: \(subId)\n"
             }
-            print("   EVENT ID: \(event.id)")
-            print("   KIND: \(event.kind)")
-            print("   AUTHOR: \(String(event.pubkey.prefix(8)))...")
+            output += "   EVENT ID: \(event.id)\n"
+            output += "   KIND: \(event.kind)\n"
+            output += "   AUTHOR: \(String(event.pubkey.prefix(8)))...\n"
             if !event.content.isEmpty {
                 let preview = event.content.prefix(100)
-                print("   CONTENT: \(preview)\(event.content.count > 100 ? "..." : "")")
+                output += "   CONTENT: \(preview)\(event.content.count > 100 ? "..." : "")"
             }
             
         case let .req(subscriptionId, filters):
-            print("   TYPE: REQ")
-            print("   SUBSCRIPTION: \(subscriptionId)")
-            print("   FILTERS: \(filters.count)")
+            output += "   TYPE: REQ\n"
+            output += "   SUBSCRIPTION: \(subscriptionId)\n"
+            output += "   FILTERS: \(filters.count)\n"
             for (index, filter) in filters.enumerated() {
-                print("     FILTER \(index + 1):")
+                output += "     FILTER \(index + 1):\n"
                 if let kinds = filter.kinds, !kinds.isEmpty {
-                    print("       KINDS: \(kinds)")
+                    output += "       KINDS: \(kinds)\n"
                 }
                 if let authors = filter.authors, !authors.isEmpty {
-                    print("       AUTHORS: \(authors.count) pubkeys")
+                    output += "       AUTHORS: \(authors.count) pubkeys\n"
                 }
                 if let limit = filter.limit {
-                    print("       LIMIT: \(limit)")
+                    output += "       LIMIT: \(limit)\n"
                 }
                 if let since = filter.since {
-                    print("       SINCE: \(Date(nostrTimestamp: since))")
+                    output += "       SINCE: \(Date(nostrTimestamp: since))\n"
                 }
                 if let until = filter.until {
-                    print("       UNTIL: \(Date(nostrTimestamp: until))")
+                    output += "       UNTIL: \(Date(nostrTimestamp: until))"
                 }
             }
             
         case let .close(subscriptionId):
-            print("   TYPE: CLOSE")
-            print("   SUBSCRIPTION: \(subscriptionId)")
+            output += "   TYPE: CLOSE\n"
+            output += "   SUBSCRIPTION: \(subscriptionId)"
             
         case let .eose(subscriptionId):
-            print("   TYPE: EOSE (End of Stored Events)")
-            print("   SUBSCRIPTION: \(subscriptionId)")
+            output += "   TYPE: EOSE (End of Stored Events)\n"
+            output += "   SUBSCRIPTION: \(subscriptionId)"
             
         case let .ok(eventId, accepted, errorMessage):
-            print("   TYPE: OK")
-            print("   EVENT ID: \(eventId)")
-            print("   ACCEPTED: \(accepted)")
+            output += "   TYPE: OK\n"
+            output += "   EVENT ID: \(eventId)\n"
+            output += "   ACCEPTED: \(accepted)"
             if let msg = errorMessage {
-                print("   MESSAGE: \(msg)")
+                output += "\n   MESSAGE: \(msg)"
             }
             
         case let .notice(message):
-            print("   TYPE: NOTICE")
-            print("   MESSAGE: \(message)")
+            output += "   TYPE: NOTICE\n"
+            output += "   MESSAGE: \(message)"
             
         case let .auth(challenge):
-            print("   TYPE: AUTH")
-            print("   CHALLENGE: \(challenge)")
+            output += "   TYPE: AUTH\n"
+            output += "   CHALLENGE: \(challenge)"
             
         case let .count(subscriptionId, count):
-            print("   TYPE: COUNT")
-            print("   SUBSCRIPTION: \(subscriptionId)")
-            print("   COUNT: \(count)")
+            output += "   TYPE: COUNT\n"
+            output += "   SUBSCRIPTION: \(subscriptionId)\n"
+            output += "   COUNT: \(count)"
             
         case let .negOpen(subscriptionId, filter, message):
-            print("   TYPE: NEG-OPEN")
-            print("   SUBSCRIPTION: \(subscriptionId)")
-            print("   FILTER: \(filter)")
-            print("   MESSAGE: \(message)")
+            output += "   TYPE: NEG-OPEN\n"
+            output += "   SUBSCRIPTION: \(subscriptionId)\n"
+            output += "   FILTER: \(filter)\n"
+            output += "   MESSAGE: \(message)"
             
         case let .negMsg(subscriptionId, message):
-            print("   TYPE: NEG-MSG")
-            print("   SUBSCRIPTION: \(subscriptionId)")
-            print("   MESSAGE: \(message)")
+            output += "   TYPE: NEG-MSG\n"
+            output += "   SUBSCRIPTION: \(subscriptionId)\n"
+            output += "   MESSAGE: \(message)"
             
         case let .negClose(subscriptionId):
-            print("   TYPE: NEG-CLOSE")
-            print("   SUBSCRIPTION: \(subscriptionId)")
+            output += "   TYPE: NEG-CLOSE\n"
+            output += "   SUBSCRIPTION: \(subscriptionId)"
             
         case let .negErr(subscriptionId, error):
-            print("   TYPE: NEG-ERR")
-            print("   SUBSCRIPTION: \(subscriptionId)")
-            print("   ERROR: \(error)")
+            output += "   TYPE: NEG-ERR\n"
+            output += "   SUBSCRIPTION: \(subscriptionId)\n"
+            output += "   ERROR: \(error)"
+        }
+        
+        if let handler = NDKLogger.logHandler {
+            handler(output)
+        } else {
+            #if DEBUG
+            print(output)
+            #endif
         }
     }
 }

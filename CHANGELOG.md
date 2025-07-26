@@ -6,6 +6,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.5] - 2025-01-26
+
+### Added
+- Custom log handler support in NDKLogger for external integration
+- Automatic cleanup of expired tombstones in MemoryCache (runs hourly)
+- Comprehensive unit tests for NDKSignatureVerificationCache
+
+### Changed  
+- Replaced direct print statements with conditional logging in NDKLogger and NDKNetworkLogger
+- NDKFilterFingerprint now uses NostrConstants.JSONField constants instead of hardcoded strings
+
+### Improved
+- Logging system now only outputs to console in DEBUG builds unless custom handler is set
+- Memory management in MemoryCache with periodic tombstone cleanup
+- Code consistency by using centralized constants for filter field names
+
 ### Changed
 - Removed TODO comment in NDKDataRequirementManager that was already implemented
 
