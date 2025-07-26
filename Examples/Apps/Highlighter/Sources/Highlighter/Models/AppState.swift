@@ -14,6 +14,7 @@ class AppState: ObservableObject {
     @Published private(set) var dataStreamManager = DataStreamManager()
     @Published private(set) var profileManager = ProfileManager()
     @Published private(set) var publishingService = PublishingService()
+    // @Published private(set) var bookmarkService = BookmarkService() // TODO: Add to Xcode project
     
     // Computed Content State (from services)
     var highlights: [HighlightEvent] { dataStreamManager.highlights }
@@ -59,6 +60,7 @@ class AppState: ObservableObject {
             dataStreamManager.configure(with: ndk!)
             profileManager.configure(with: ndk!)
             publishingService.configure(with: ndk!, signer: authManager.activeSigner)
+            // bookmarkService.configure(with: ndk!, signer: authManager.activeSigner) // TODO: Add to Xcode project
             
             // Connect to relays asynchronously
             Task {
@@ -103,8 +105,9 @@ class AppState: ObservableObject {
         
         try await authManager.switchToSession(session)
         
-        // Update publishing service with new signer
+        // Update services with new signer
         publishingService.configure(with: ndk!, signer: signer)
+        // bookmarkService.configure(with: ndk!, signer: signer) // TODO: Add to Xcode project
         
         // Start streaming data
         await dataStreamManager.startAllStreams()
@@ -120,8 +123,9 @@ class AppState: ObservableObject {
         
         try await authManager.switchToSession(session)
         
-        // Update publishing service with new signer
+        // Update services with new signer
         publishingService.configure(with: ndk!, signer: signer)
+        // bookmarkService.configure(with: ndk!, signer: signer) // TODO: Add to Xcode project
         
         // Start streaming data
         await dataStreamManager.startAllStreams()

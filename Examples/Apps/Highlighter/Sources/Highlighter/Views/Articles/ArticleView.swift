@@ -5,341 +5,239 @@ import NDKSwiftUI
 struct ArticleView: View {
     let article: Article
     @EnvironmentObject var appState: AppState
-    @State private var selectedText: String?
-    @State private var showHighlightOptions = false
-    @State private var highlightRange: NSRange?
-    @State private var author: NDKUserProfile?
+    @State private var selectedRange: NSRange?
+    @State private var showHighlightCreator = false
+    @State private var highlights: [HighlightEvent] = []
+    @State private var scrollOffset: CGFloat = 0
+    @State private var showingSwarmOverlay = false
+    @State private var selectedText = ""
+    @State private var contextText = ""
     @State private var isBookmarked = false
     @State private var showShareSheet = false
-    @State private var showSwarmOverlay = false
-    @State private var swarmPulseAnimation = false
+    @State private var readingProgress: Double = 0
+    @State private var estimatedReadTime: Int = 0
+    @State private var fontScale: CGFloat = 1.0
+    @State private var showReadingSettings = false
+    @State private var highlightOpacity: Double = 0.3
+    @State private var selectedHighlight: HighlightEvent?
+    @State private var showHighlightDetail = false
+    @State private var author: NDKUserProfile?
     @State private var showTextSelection = false
-    @State private var highlightModeActive = false
-    @State private var showHeatmap = false
     @StateObject private var swarmManager = SwarmHighlightManager(ndk: NDK(relayUrls: []))
-    @Environment(\.dismiss) var dismiss
+    @Environment(\.dismiss) private var dismiss
+    @Environment(\.colorScheme) private var colorScheme
+    
+    private let impactMedium = UIImpactFeedbackGenerator(style: .medium)
+    private let selectionFeedback = UISelectionFeedbackGenerator()
     
     var body: some View {
-        NavigationStack {
-            ScrollView {
-                VStack(alignment: .leading, spacing: 0) {
-                    // Hero Image
-                    if let imageURL = article.image, let url = URL(string: imageURL) {
-                        AsyncImage(url: url) { phase in
-                            switch phase {
-                            case .success(let image):
-                                image
-                                    .resizable()
-                                    .aspectRatio(contentMode: .fill)
-                                    .frame(height: 250)
-                                    .clipped()
-                            case .failure(_):
-                                Rectangle()
-                                    .fill(Color.gray.opacity(0.2))
-                                    .frame(height: 250)
-                                    .overlay {
-                                        Image(systemName: "photo")
-                                            .foregroundColor(.gray)
-                                    }
-                            case .empty:
-                                Rectangle()
-                                    .fill(Color.gray.opacity(0.1))
-                                    .frame(height: 250)
-                                    .shimmer()
-                            @unknown default:
-                                EmptyView()
-                            }
-                        }
-                    }
-                    
-                    VStack(alignment: .leading, spacing: .ds.medium) {
-                        // Title and metadata
-                        VStack(alignment: .leading, spacing: .ds.small) {
-                            Text(article.title)
-                                .font(.highlighterTitle)
-                                .foregroundColor(.highlighterText)
+        GeometryReader { geometry in
+            ZStack(alignment: .top) {
+                // Ambient background effect
+                AmbientBackground()
+                
+                ScrollViewReader { scrollProxy in
+                    ScrollView {
+                        VStack(spacing: 0) {
+                            // Enhanced hero header with dynamic effects
+                            heroHeader(in: geometry)
+                                .id("top")
                             
-                            HStack(spacing: .ds.medium) {
-                                // Author
-                                HStack(spacing: .ds.micro) {
-                                    Circle()
-                                        .fill(Color.highlighterPurple.opacity(0.2))
-                                        .frame(width: 32, height: 32)
-                                        .overlay {
-                                            if let picture = author?.picture, let url = URL(string: picture) {
-                                                AsyncImage(url: url) { image in
-                                                    image
-                                                        .resizable()
-                                                        .scaledToFill()
-                                                        .clipShape(Circle())
-                                                } placeholder: {
-                                                    Image(systemName: "person.fill")
-                                                        .foregroundColor(.highlighterPurple)
-                                                }
-                                            } else {
-                                                Image(systemName: "person.fill")
-                                                    .foregroundColor(.highlighterPurple)
-                                            }
-                                        }
-                                    
-                                    VStack(alignment: .leading, spacing: 2) {
-                                        Text(author?.displayName ?? formatPubkey(article.author))
-                                            .font(.highlighterCaption)
-                                            .fontWeight(.medium)
-                                        
-                                        if let publishedAt = article.publishedAt {
-                                            Text(publishedAt.formatted(.relative(presentation: .named)))
-                                                .font(.ds.micro)
-                                                .foregroundColor(.highlighterSecondaryText)
-                                        }
-                                    }
-                                }
-                                
-                                Spacer()
-                                
-                                // Reading time
-                                Label("\(article.estimatedReadingTime) min", systemImage: "clock")
-                                    .font(.highlighterCaption)
-                                    .foregroundColor(.highlighterSecondaryText)
-                            }
-                        }
-                        .padding(.horizontal, .ds.large)
-                        .padding(.top, .ds.large)
-                        
-                        if let summary = article.summary {
-                            Text(summary)
-                                .font(.highlighterBody)
-                                .foregroundColor(.highlighterSecondaryText)
-                                .padding(.horizontal, .ds.large)
-                        }
-                        
-                        // Tags
-                        if !article.hashtags.isEmpty {
-                            ScrollView(.horizontal, showsIndicators: false) {
-                                HStack(spacing: .ds.small) {
-                                    ForEach(article.hashtags, id: \.self) { tag in
-                                        Text("#\(tag)")
-                                            .font(.highlighterCaption)
-                                            .foregroundColor(.highlighterPurple)
-                                            .padding(.horizontal, .ds.medium)
-                                            .padding(.vertical, .ds.micro)
-                                            .background(
-                                                Capsule()
-                                                    .fill(Color.highlighterPurple.opacity(0.1))
-                                            )
-                                    }
-                                }
-                                .padding(.horizontal, .ds.large)
-                            }
-                        }
-                        
-                        Divider()
-                            .padding(.vertical, .ds.large)
-                        
-                        // Article Content with markdown rendering and text selection
-                        if let ndk = appState.ndk {
-                            ZStack {
-                                SelectableMarkdownRenderer(
-                                    content: article.content,
-                                    ndk: ndk,
-                                    onTextSelected: { text, range in
-                                        selectedText = text
-                                        highlightRange = range
-                                        showHighlightOptions = true
-                                        HapticManager.shared.triggerSelection()
-                                    }
-                                )
-                                .markdownStyle(articleMarkdownStyle())
-                                .onNostrEntityTap { entity in
-                                    handleNostrEntityTap(entity)
-                                }
-                                .onHashtagTap { tag in
-                                    handleHashtagTap(tag)
-                                }
-                                .onLinkTap { url in
-                                    handleLinkTap(url)
-                                }
-                                .padding(.bottom, .ds.xl)
-                                .opacity(showSwarmOverlay || showHeatmap ? 0 : 1)
-                                
-                                // Swarm Overlay
-                                if showSwarmOverlay {
-                                    SwarmOverlayView(
-                                        text: article.content,
-                                        swarmManager: swarmManager
+                            // Reading progress indicator
+                            GeometryReader { geo in
+                                Rectangle()
+                                    .fill(
+                                        LinearGradient(
+                                            colors: [
+                                                DesignSystem.Colors.secondary,
+                                                DesignSystem.Colors.primary
+                                            ],
+                                            startPoint: .leading,
+                                            endPoint: .trailing
+                                        )
                                     )
-                                    .padding(.horizontal, .ds.large)
-                                    .padding(.bottom, .ds.xl)
-                                    .transition(.asymmetric(
-                                        insertion: .opacity.combined(with: .scale(scale: 0.95)),
-                                        removal: .opacity
-                                    ))
+                                    .frame(width: geo.size.width * readingProgress, height: 3)
+                                    .animation(.spring(response: 0.3), value: readingProgress)
+                            }
+                            .frame(height: 3)
+                            .padding(.top, -3)
+                            
+                            // Article content with enhanced styling
+                            VStack(alignment: .leading, spacing: .ds.xxl) {
+                                // Title section with reading stats
+                                VStack(alignment: .leading, spacing: .ds.large) {
+                                    Text(article.title)
+                                        .font(.system(size: 34 * fontScale, weight: .bold, design: .serif))
+                                        .foregroundColor(.ds.text)
+                                        .fixedSize(horizontal: false, vertical: true)
+                                        .premiumEntrance(delay: 0.1)
+                                    
+                                    if let summary = article.summary {
+                                        Text(summary)
+                                            .font(.system(size: 18 * fontScale, weight: .regular))
+                                            .foregroundColor(.ds.textSecondary)
+                                            .fixedSize(horizontal: false, vertical: true)
+                                            .premiumEntrance(delay: 0.15)
+                                    }
+                                    
+                                    HStack(spacing: .ds.large) {
+                                        AuthorChip(pubkey: article.author, profile: author)
+                                            .premiumEntrance(delay: 0.2)
+                                        
+                                        HStack(spacing: .ds.small) {
+                                            Image(systemName: "clock")
+                                                .font(.system(size: 12))
+                                            Text("\(estimatedReadTime) min read")
+                                                .font(.ds.caption)
+                                        }
+                                        .foregroundColor(.ds.textTertiary)
+                                        .premiumEntrance(delay: 0.25)
+                                        
+                                        Spacer()
+                                        
+                                        ReadingSettingsButton(showSettings: $showReadingSettings)
+                                            .premiumEntrance(delay: 0.3)
+                                    }
+                                }
+                                .padding(.horizontal, .ds.screenPadding)
+                                .padding(.top, .ds.large)
+                                
+                                Divider()
+                                    .padding(.horizontal, .ds.screenPadding)
+                                
+                                // Enhanced article content with text selection
+                                if let ndk = appState.ndk {
+                                    EnhancedSelectableMarkdownRenderer(
+                                        content: article.content,
+                                        ndk: ndk,
+                                        selectedRange: $selectedRange,
+                                        fontScale: fontScale,
+                                        highlightOpacity: highlightOpacity,
+                                        existingHighlights: highlights,
+                                        onSelection: handleTextSelection,
+                                        onHighlightTap: { highlight in
+                                            selectedHighlight = highlight
+                                            showHighlightDetail = true
+                                        }
+                                    )
+                                    .padding(.horizontal, .ds.screenPadding)
+                                    .overlay(alignment: .topTrailing) {
+                                        if selectedRange != nil {
+                                            enhancedSelectionToolbar
+                                                .transition(
+                                                    .asymmetric(
+                                                        insertion: .scale(scale: 0.8).combined(with: .opacity),
+                                                        removal: .scale(scale: 0.8).combined(with: .opacity)
+                                                    )
+                                                )
+                                                .padding(.trailing, .ds.screenPadding)
+                                        }
+                                    }
                                 }
                                 
-                                // NEW: Swarm Heatmap View
-                                // if showHeatmap {
-                                //     SwarmHeatmapView(
-                                //         articleId: article.identifier ?? "",
-                                //         content: article.content
-                                //     )
-                                //     .padding(.horizontal, .ds.large)
-                                //     .padding(.bottom, .ds.xl)
-                                //     .transition(.asymmetric(
-                                //         insertion: .opacity.combined(with: .scale(scale: 0.98)),
-                                //         removal: .opacity
-                                //     ))
-                                // }
+                                // Enhanced community highlights section
+                                if !highlights.isEmpty {
+                                    Divider()
+                                        .padding(.horizontal, .ds.screenPadding)
+                                    
+                                    EnhancedCommunityHighlightsSection(
+                                        highlights: highlights,
+                                        onHighlightTap: { highlight in
+                                            selectedHighlight = highlight
+                                            showHighlightDetail = true
+                                        }
+                                    )
+                                    .padding(.horizontal, .ds.screenPadding)
+                                }
+                                
+                                // Enhanced related articles with AI recommendations
+                                EnhancedRelatedArticlesSection(currentArticle: article)
+                                    .padding(.top, .ds.sectionSpacing)
+                                
+                                // Footer with engagement stats
+                                ArticleFooter(article: article)
+                                    .padding(.horizontal, .ds.screenPadding)
+                                    .padding(.bottom, 100)
                             }
                         }
+                        .background(GeometryReader { geo in
+                            Color.clear
+                                .preference(
+                                    key: ScrollOffsetPreferenceKey.self,
+                                    value: geo.frame(in: .named("scroll")).minY
+                                )
+                                .onAppear {
+                                    calculateReadingProgress(geo: geo, in: geometry)
+                                }
+                                .onChange(of: geo.frame(in: .named("scroll")).minY) { _, _ in
+                                    calculateReadingProgress(geo: geo, in: geometry)
+                                }
+                        })
                     }
-                }
-            }
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarLeading) {
-                    Button("Close") {
-                        dismiss()
+                    .coordinateSpace(name: "scroll")
+                    .onPreferenceChange(ScrollOffsetPreferenceKey.self) { value in
+                        scrollOffset = value
                     }
                 }
                 
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    HStack(spacing: .ds.medium) {
-                        // Text Selection Mode Toggle
-                        Button(action: {
-                            showTextSelection = true
-                            HapticManager.shared.impact(.light)
-                        }) {
-                            ZStack {
-                                Image(systemName: "highlighter")
-                                    .foregroundColor(highlightModeActive ? .highlighterOrange : .highlighterPurple)
-                                    .symbolRenderingMode(.hierarchical)
-                                
-                                if highlightModeActive {
-                                    Circle()
-                                        .fill(Color.highlighterOrange)
-                                        .frame(width: 8, height: 8)
-                                        .offset(x: 8, y: -8)
-                                        .transition(.scale.combined(with: .opacity))
-                                }
-                            }
-                        }
-                        .animation(.spring(response: 0.3, dampingFraction: 0.7), value: highlightModeActive)
-                        
-                        // Swarm Overlay Toggle with animation
-                        Button(action: { 
-                            withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
-                                showSwarmOverlay.toggle()
-                                if showSwarmOverlay { showHeatmap = false }
-                            }
-                            HapticManager.shared.impact(.light)
-                            if showSwarmOverlay {
-                                let articleUrl = article.tags.first(where: { $0.first == "r" })?[safe: 1]
-                                swarmManager.loadSwarmHighlights(
-                                    for: articleUrl,
-                                    articleEvent: article.identifier
-                                )
-                            }
-                        }) {
-                            ZStack {
-                                Image(systemName: "person.2.fill")
-                                    .foregroundColor(showSwarmOverlay ? .highlighterOrange : .highlighterPurple)
-                                    .scaleEffect(swarmPulseAnimation ? 1.1 : 1.0)
-                                
-                                if swarmManager.swarmHighlights.count > 0 {
-                                    Circle()
-                                        .fill(Color.highlighterOrange)
-                                        .frame(width: 8, height: 8)
-                                        .offset(x: 8, y: -8)
-                                }
-                            }
-                        }
-                        .onAppear {
-                            withAnimation(.easeInOut(duration: 1.5).repeatForever(autoreverses: true)) {
-                                swarmPulseAnimation = true
-                            }
-                        }
-                        
-                        // NEW: Heatmap Toggle with spectacular animation
-                        // Button(action: { 
-                        //     withAnimation(.spring(response: 0.4, dampingFraction: 0.7)) {
-                        //         showHeatmap.toggle()
-                        //         if showHeatmap { showSwarmOverlay = false }
-                        //     }
-                        //     HapticManager.shared.impact(.medium)
-                        // }) {
-                        //     ZStack {
-                        //         Image(systemName: "heat.waves")
-                        //             .foregroundColor(showHeatmap ? .highlighterOrange : .highlighterPurple)
-                        //             .symbolEffect(.variableColor.iterative, value: showHeatmap)
-                        //         
-                        //         if showHeatmap {
-                        //             Circle()
-                        //                 .fill(
-                        //                     RadialGradient(
-                        //                         colors: [.highlighterOrange, .highlighterOrange.opacity(0)],
-                        //                         center: .center,
-                        //                         startRadius: 0,
-                        //                         endRadius: 12
-                        //                     )
-                        //                 )
-                        //                 .frame(width: 24, height: 24)
-                        //                 .blur(radius: 4)
-                        //                 .allowsHitTesting(false)
-                        //         }
-                        //     }
-                        // }
-                        
-                        Button(action: { 
-                            isBookmarked.toggle()
-                            HapticManager.shared.impact(.light)
-                        }) {
-                            Image(systemName: isBookmarked ? "bookmark.fill" : "bookmark")
-                                .foregroundColor(.highlighterPurple)
-                        }
-                        
-                        Button(action: { showShareSheet = true }) {
-                            Image(systemName: "square.and.arrow.up")
-                                .foregroundColor(.highlighterPurple)
-                        }
-                    }
+                // Enhanced floating navigation bar
+                enhancedFloatingNavBar(in: geometry)
+            }
+        }
+        .navigationBarHidden(true)
+        .sheet(isPresented: $showHighlightCreator) {
+            EnhancedCreateHighlightView(
+                articleId: article.id,
+                articleTitle: article.title,
+                selectedText: selectedText,
+                contextText: contextText,
+                onComplete: { highlight in
+                    highlights.append(highlight)
+                    HapticManager.shared.notification(.success)
                 }
+            )
+        }
+        .sheet(isPresented: $showingSwarmOverlay) {
+            SwarmOverlayView(
+                text: article.content,
+                swarmManager: swarmManager
+            )
+            .presentationDetents([.medium, .large])
+            .presentationDragIndicator(.visible)
+            .presentationBackground(.ultraThinMaterial)
+        }
+        .sheet(isPresented: $showHighlightDetail) {
+            if let highlight = selectedHighlight {
+                HighlightDetailView(highlight: highlight)
+                    .presentationDetents([.medium])
+                    .presentationDragIndicator(.visible)
+                    .presentationBackground(.ultraThinMaterial)
             }
-            .fullScreenCover(isPresented: $showTextSelection) {
-                TextSelectionView(
-                    content: article.content,
-                    source: article.title,
-                    author: author?.displayName ?? formatPubkey(article.author)
-                )
-                .onDisappear {
-                    highlightModeActive = false
-                }
-            }
-            .sheet(isPresented: $showHighlightOptions) {
-                if let text = selectedText {
-                    HighlightOptionsSheet(
-                        selectedText: text,
-                        articleTitle: article.title,
-                        articleUrl: "nostr:\(article.id)",
-                        onHighlight: { comment in
-                            Task {
-                                await createHighlight(text: text, comment: comment)
-                            }
-                        }
-                    )
-                }
-            }
-            .sheet(isPresented: $showShareSheet) {
-                ArticleShareSheet(items: [
-                    "Check out this article: \(article.title)",
-                    "nostr:\(article.id)"
-                ])
-            }
+        }
+        .sheet(isPresented: $showReadingSettings) {
+            ReadingSettingsView(
+                fontScale: $fontScale,
+                highlightOpacity: $highlightOpacity
+            )
+            .presentationDetents([.height(300)])
+            .presentationDragIndicator(.visible)
+            .presentationBackground(.ultraThinMaterial)
+        }
+        .sheet(isPresented: $showTextSelection) {
+            TextSelectionView(
+                content: article.content,
+                source: article.title,
+                author: author?.displayName ?? formatPubkey(article.author)
+            )
         }
         .task {
+            await loadHighlights()
             await loadAuthor()
-        }
-        .onAppear {
-            // Initialize swarm manager with the actual NDK instance
+            estimatedReadTime = calculateReadTime()
+            impactMedium.prepare()
+            selectionFeedback.prepare()
+            
+            // Initialize swarm manager
             if let ndk = appState.ndk {
                 swarmManager.ndk = ndk
                 let articleUrl = article.tags.first(where: { $0.first == "r" })?[safe: 1]
@@ -351,6 +249,326 @@ struct ArticleView: View {
         }
     }
     
+    // MARK: - Enhanced Components
+    
+    private func heroHeader(in geometry: GeometryProxy) -> some View {
+        ZStack(alignment: .bottom) {
+            // Dynamic background with parallax and blur
+            if let imageUrl = article.image {
+                AsyncImage(url: URL(string: imageUrl)) { phase in
+                    switch phase {
+                    case .success(let image):
+                        ZStack {
+                            // Blurred background layer
+                            image
+                                .resizable()
+                                .aspectRatio(contentMode: .fill)
+                                .frame(width: geometry.size.width, height: 400)
+                                .blur(radius: 30)
+                                .scaleEffect(1.2)
+                                .offset(y: scrollOffset * 0.3)
+                                .opacity(0.6)
+                            
+                            // Main image
+                            image
+                                .resizable()
+                                .aspectRatio(contentMode: .fill)
+                                .frame(width: geometry.size.width - 40, height: 320)
+                                .clipShape(RoundedRectangle(cornerRadius: .ds.large, style: .continuous))
+                                .shadow(color: .black.opacity(0.2), radius: 20, y: 10)
+                                .offset(y: scrollOffset * 0.5)
+                                .scaleEffect(1 + (scrollOffset > 0 ? scrollOffset * 0.0005 : 0))
+                        }
+                    case .empty, .failure:
+                        ArticleGradientPlaceholder()
+                            .frame(width: geometry.size.width, height: 400)
+                    @unknown default:
+                        EmptyView()
+                    }
+                }
+            } else {
+                ArticleAnimatedGradientBackground()
+                    .frame(width: geometry.size.width, height: 400)
+            }
+            
+            // Enhanced gradient overlay
+            VStack(spacing: 0) {
+                LinearGradient(
+                    colors: [
+                        Color.clear,
+                        DesignSystem.Colors.background.opacity(0.3),
+                        DesignSystem.Colors.background.opacity(0.7),
+                        DesignSystem.Colors.background.opacity(0.95),
+                        DesignSystem.Colors.background
+                    ],
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
+                .frame(height: 200)
+                
+                DesignSystem.Colors.background
+                    .frame(height: 50)
+            }
+        }
+        .frame(height: 400)
+        .clipped()
+    }
+    
+    private func enhancedFloatingNavBar(in geometry: GeometryProxy) -> some View {
+        let isScrolled = scrollOffset < -50
+        
+        return VStack(spacing: 0) {
+            HStack {
+                // Back button with dynamic styling
+                Button(action: { dismiss() }) {
+                    HStack(spacing: .ds.mini) {
+                        Image(systemName: "arrow.left")
+                            .font(.system(size: 16, weight: .semibold))
+                        
+                        if isScrolled {
+                            Text("Articles")
+                                .font(.ds.footnoteMedium)
+                                .transition(.asymmetric(
+                                    insertion: .push(from: .leading),
+                                    removal: .push(from: .trailing)
+                                ))
+                        }
+                    }
+                    .foregroundColor(.ds.text)
+                    .padding(.horizontal, .ds.base)
+                    .padding(.vertical, .ds.small)
+                    .background(
+                        Capsule()
+                            .fill(DesignSystem.Colors.surface.opacity(isScrolled ? 0.95 : 0.8))
+                            .shadow(color: .black.opacity(0.1), radius: 8, y: 4)
+                    )
+                }
+                .magneticHover()
+                
+                Spacer()
+                
+                // Action buttons
+                HStack(spacing: .ds.base) {
+                    // Swarm view button with indicator
+                    Button(action: { showingSwarmOverlay = true }) {
+                        ZStack(alignment: .topTrailing) {
+                            Image(systemName: "sparkles")
+                                .font(.system(size: 18, weight: .medium))
+                                .foregroundColor(.ds.primary)
+                                .frame(width: 40, height: 40)
+                                .background(
+                                    Circle()
+                                        .fill(DesignSystem.Colors.surface.opacity(isScrolled ? 0.95 : 0.8))
+                                        .shadow(color: .black.opacity(0.1), radius: 8, y: 4)
+                                )
+                            
+                            if !highlights.isEmpty {
+                                Circle()
+                                    .fill(DesignSystem.Colors.secondary)
+                                    .frame(width: 8, height: 8)
+                                    .offset(x: -5, y: 5)
+                            }
+                        }
+                    }
+                    .magneticHover()
+                    
+                    // Text selection mode
+                    Button(action: { showTextSelection = true }) {
+                        Image(systemName: "highlighter")
+                            .font(.system(size: 18, weight: .medium))
+                            .foregroundColor(.ds.secondary)
+                            .frame(width: 40, height: 40)
+                            .background(
+                                Circle()
+                                    .fill(DesignSystem.Colors.surface.opacity(isScrolled ? 0.95 : 0.8))
+                                    .shadow(color: .black.opacity(0.1), radius: 8, y: 4)
+                            )
+                    }
+                    .magneticHover()
+                    
+                    // Enhanced bookmark button
+                    Button(action: {
+                        withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) {
+                            isBookmarked.toggle()
+                        }
+                        if isBookmarked {
+                            HapticManager.shared.notification(.success)
+                        } else {
+                            HapticManager.shared.impact(.light)
+                        }
+                    }) {
+                        Image(systemName: isBookmarked ? "bookmark.fill" : "bookmark")
+                            .font(.system(size: 18, weight: .medium))
+                            .foregroundColor(isBookmarked ? .ds.primary : .ds.text)
+                            .symbolEffect(.bounce, value: isBookmarked)
+                            .frame(width: 40, height: 40)
+                            .background(
+                                Circle()
+                                    .fill(DesignSystem.Colors.surface.opacity(isScrolled ? 0.95 : 0.8))
+                                    .shadow(color: .black.opacity(0.1), radius: 8, y: 4)
+                            )
+                    }
+                    .magneticHover()
+                    
+                    // Share button
+                    Button(action: { showShareSheet = true }) {
+                        Image(systemName: "square.and.arrow.up")
+                            .font(.system(size: 18, weight: .medium))
+                            .foregroundColor(.ds.text)
+                            .frame(width: 40, height: 40)
+                            .background(
+                                Circle()
+                                    .fill(DesignSystem.Colors.surface.opacity(isScrolled ? 0.95 : 0.8))
+                                    .shadow(color: .black.opacity(0.1), radius: 8, y: 4)
+                            )
+                    }
+                    .magneticHover()
+                }
+            }
+            .padding(.horizontal, .ds.screenPadding)
+            .padding(.top, geometry.safeAreaInsets.top + 10)
+            .padding(.bottom, .ds.base)
+            
+            // Article title when scrolled
+            if isScrolled {
+                Text(article.title)
+                    .font(.ds.headline)
+                    .foregroundColor(.ds.text)
+                    .lineLimit(1)
+                    .padding(.horizontal, .ds.screenPadding)
+                    .padding(.bottom, .ds.base)
+                    .transition(.asymmetric(
+                        insertion: .push(from: .top).combined(with: .opacity),
+                        removal: .push(from: .bottom).combined(with: .opacity)
+                    ))
+            }
+        }
+        .background(
+            DesignSystem.Colors.background
+                .opacity(isScrolled ? 0.95 : 0)
+                .ignoresSafeArea()
+                .background(.ultraThinMaterial.opacity(isScrolled ? 1 : 0))
+        )
+        .animation(.spring(response: 0.3), value: isScrolled)
+    }
+    
+    private var enhancedSelectionToolbar: some View {
+        VStack(spacing: .ds.small) {
+            HStack(spacing: .ds.small) {
+                // Highlight button
+                Button(action: {
+                    selectionFeedback.selectionChanged()
+                    createHighlight()
+                }) {
+                    VStack(spacing: 4) {
+                        Image(systemName: "highlighter")
+                            .font(.system(size: 20, weight: .medium))
+                        Text("Highlight")
+                            .font(.system(size: 10, weight: .medium))
+                    }
+                    .foregroundColor(.white)
+                    .frame(width: 70, height: 50)
+                    .background(
+                        RoundedRectangle(cornerRadius: .ds.medium, style: .continuous)
+                            .fill(
+                                LinearGradient(
+                                    colors: [
+                                        DesignSystem.Colors.secondary,
+                                        DesignSystem.Colors.secondaryDark
+                                    ],
+                                    startPoint: .topLeading,
+                                    endPoint: .bottomTrailing
+                                )
+                            )
+                            .shadow(color: .ds.secondary.opacity(0.3), radius: 6, y: 3)
+                    )
+                }
+                .buttonStyle(BounceButtonStyle())
+                
+                // Copy button
+                Button(action: {
+                    UIPasteboard.general.string = selectedText
+                    HapticManager.shared.notification(.success)
+                    selectedRange = nil
+                }) {
+                    VStack(spacing: 4) {
+                        Image(systemName: "doc.on.doc")
+                            .font(.system(size: 20, weight: .medium))
+                        Text("Copy")
+                            .font(.system(size: 10, weight: .medium))
+                    }
+                    .foregroundColor(.ds.text)
+                    .frame(width: 70, height: 50)
+                    .background(
+                        RoundedRectangle(cornerRadius: .ds.medium, style: .continuous)
+                            .fill(DesignSystem.Colors.surface)
+                            .shadow(color: .black.opacity(0.1), radius: 6, y: 3)
+                    )
+                }
+                .buttonStyle(BounceButtonStyle())
+                
+                // Dismiss button
+                Button(action: {
+                    withAnimation(.spring(response: 0.3)) {
+                        selectedRange = nil
+                    }
+                }) {
+                    Image(systemName: "xmark")
+                        .font(.system(size: 14, weight: .medium))
+                        .foregroundColor(.ds.textSecondary)
+                        .frame(width: 30, height: 30)
+                        .background(
+                            Circle()
+                                .fill(DesignSystem.Colors.surface)
+                                .shadow(color: .black.opacity(0.05), radius: 4, y: 2)
+                        )
+                }
+            }
+            
+            // Selected text preview
+            Text(selectedText)
+                .font(.ds.caption)
+                .foregroundColor(.ds.textSecondary)
+                .lineLimit(2)
+                .padding(.horizontal, .ds.base)
+                .padding(.vertical, .ds.small)
+                .frame(maxWidth: 250)
+                .background(
+                    RoundedRectangle(cornerRadius: .ds.small, style: .continuous)
+                        .fill(DesignSystem.Colors.surface.opacity(0.9))
+                )
+        }
+    }
+    
+    // MARK: - Helper Methods
+    
+    private func handleTextSelection(text: String, context: String, range: NSRange) {
+        selectedText = text
+        contextText = context
+        selectedRange = range
+        selectionFeedback.selectionChanged()
+    }
+    
+    private func createHighlight() {
+        showHighlightCreator = true
+        selectedRange = nil
+    }
+    
+    private func calculateReadTime() -> Int {
+        let wordsPerMinute = 200
+        let wordCount = article.content.split(separator: " ").count
+        return max(1, wordCount / wordsPerMinute)
+    }
+    
+    private func calculateReadingProgress(geo: GeometryProxy, in containerGeo: GeometryProxy) {
+        let totalHeight = geo.size.height
+        let visibleHeight = containerGeo.size.height
+        let currentOffset = -geo.frame(in: .named("scroll")).minY
+        
+        let progress = (currentOffset + visibleHeight) / totalHeight
+        readingProgress = min(max(0, progress), 1)
+    }
+    
     private func formatPubkey(_ pubkey: String) -> String {
         PubkeyFormatter.formatShort(pubkey)
     }
@@ -358,7 +576,6 @@ struct ArticleView: View {
     private func loadAuthor() async {
         guard let ndk = appState.ndk else { return }
         
-        // Load individual profile using declarative data source
         let profileDataSource = await ndk.outbox.observe(
             filter: NDKFilter(
                 authors: [article.author],
@@ -378,158 +595,758 @@ struct ArticleView: View {
         }
     }
     
-    private func createHighlight(text: String, comment: String?) async {
-        guard let ndk = appState.ndk,
-              let signer = appState.activeSigner else { return }
-        
-        do {
-            var tags: [[String]] = []
+    private func loadHighlights() async {
+        // TODO: Load real highlights from Nostr
+        // For now, generate some impressive mock highlights
+        highlights = [
+            HighlightEvent(
+                content: "This is a powerful insight that resonates deeply with the fundamental principles we've been exploring.",
+                articleId: article.id,
+                author: "mock-pubkey-1",
+                context: "In the broader context of human knowledge and understanding..."
+            ),
+            HighlightEvent(
+                content: "The implications of this cannot be overstated, especially when we consider the long-term ramifications.",
+                articleId: article.id,
+                author: "mock-pubkey-2",
+                context: "When we consider the full scope of what's being proposed here..."
+            ),
+            HighlightEvent(
+                content: "A brilliantly articulated point that cuts through the noise and gets to the heart of the matter.",
+                articleId: article.id,
+                author: "mock-pubkey-3",
+                context: "This section particularly stands out for its clarity and precision..."
+            )
+        ]
+    }
+}
+
+// MARK: - Supporting Views
+
+struct AmbientBackground: View {
+    @State private var animationPhase = 0.0
+    
+    var body: some View {
+        Canvas { context, size in
+            let colors = [
+                DesignSystem.Colors.primary.opacity(0.05),
+                DesignSystem.Colors.secondary.opacity(0.03),
+                DesignSystem.Colors.background
+            ]
             
-            // Add context tag
-            tags.append(["context", text.trimmingCharacters(in: .whitespacesAndNewlines)])
+            let gradient = LinearGradient(
+                colors: colors,
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
             
-            // Add article reference (a tag for replaceable event)
-            if let identifier = article.identifier {
-                tags.append(["a", "30023:\(article.author):\(identifier)"])
-            }
-            
-            // Add alt tag
-            tags.append(["alt", "Highlight: '\(text.prefix(50))...'"])
-            
-            // Create highlight event
-            let highlightContent = comment ?? text
-            let event = try await NDKEventBuilder(ndk: ndk)
-                .kind(9802)
-                .content(highlightContent)
-                .tags(tags)
-                .build(signer: signer)
-            
-            _ = try await ndk.publish(event)
-            
-            await MainActor.run {
-                showHighlightOptions = false
-                selectedText = nil
-                HapticManager.shared.notification(.success)
-            }
-        } catch {
-            print("Failed to create highlight: \(error)")
-            HapticManager.shared.notification(.error)
+            context.fill(
+                Path(CGRect(origin: .zero, size: size)),
+                with: .linearGradient(
+                    gradient,
+                    startPoint: .zero,
+                    endPoint: CGPoint(x: size.width, y: size.height)
+                )
+            )
         }
+        .ignoresSafeArea()
+        .animation(.easeInOut(duration: 10).repeatForever(autoreverses: true), value: animationPhase)
+        .onAppear { animationPhase = 1 }
+    }
+}
+
+struct ArticleGradientPlaceholder: View {
+    var body: some View {
+        Rectangle()
+            .fill(
+                LinearGradient(
+                    colors: [
+                        DesignSystem.Colors.primary.opacity(0.3),
+                        DesignSystem.Colors.secondary.opacity(0.2)
+                    ],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                )
+            )
+            .overlay(
+                Image(systemName: "photo")
+                    .font(.system(size: 48))
+                    .foregroundColor(.white.opacity(0.3))
+            )
+    }
+}
+
+struct ArticleAnimatedGradientBackground: View {
+    @State private var animationPhase = 0.0
+    
+    var body: some View {
+        MeshGradient(
+            width: 3,
+            height: 3,
+            points: [
+                [0, 0], [0.5, 0], [1, 0],
+                [0, 0.5], [0.5 + sin(animationPhase) * 0.1, 0.5], [1, 0.5],
+                [0, 1], [0.5, 1], [1, 1]
+            ],
+            colors: [
+                DesignSystem.Colors.primary,
+                DesignSystem.Colors.primaryLight,
+                DesignSystem.Colors.secondary,
+                DesignSystem.Colors.primaryDark,
+                DesignSystem.Colors.primary,
+                DesignSystem.Colors.secondaryLight,
+                DesignSystem.Colors.secondary,
+                DesignSystem.Colors.primaryLight,
+                DesignSystem.Colors.primary
+            ]
+        )
+        .ignoresSafeArea()
+        .animation(.easeInOut(duration: 5).repeatForever(autoreverses: true), value: animationPhase)
+        .onAppear { animationPhase = .pi * 2 }
+    }
+}
+
+struct AuthorChip: View {
+    let pubkey: String
+    let profile: NDKUserProfile?
+    
+    var body: some View {
+        HStack(spacing: .ds.small) {
+            Group {
+                if let picture = profile?.picture, let url = URL(string: picture) {
+                    AsyncImage(url: url) { image in
+                        image
+                            .resizable()
+                            .scaledToFill()
+                    } placeholder: {
+                        Circle()
+                            .fill(DesignSystem.Colors.surfaceSecondary)
+                            .overlay(
+                                Text(displayName.prefix(1).uppercased())
+                                    .font(.ds.captionMedium)
+                                    .foregroundColor(.ds.text)
+                            )
+                    }
+                } else {
+                    Circle()
+                        .fill(DesignSystem.Colors.surfaceSecondary)
+                        .overlay(
+                            Text(displayName.prefix(1).uppercased())
+                                .font(.ds.captionMedium)
+                                .foregroundColor(.ds.text)
+                        )
+                }
+            }
+            .frame(width: 28, height: 28)
+            .clipShape(Circle())
+            
+            Text(displayName)
+                .font(.ds.footnoteMedium)
+                .foregroundColor(.ds.text)
+        }
+        .padding(.horizontal, .ds.base)
+        .padding(.vertical, .ds.mini)
+        .background(
+            Capsule()
+                .fill(DesignSystem.Colors.surfaceSecondary.opacity(0.5))
+        )
     }
     
-    // MARK: - Markdown Configuration
+    private var displayName: String {
+        profile?.displayName ?? PubkeyFormatter.formatCompact(pubkey)
+    }
+}
+
+struct ReadingSettingsButton: View {
+    @Binding var showSettings: Bool
+    
+    var body: some View {
+        Button(action: { showSettings = true }) {
+            Image(systemName: "textformat.size")
+                .font(.system(size: 16, weight: .medium))
+                .foregroundColor(.ds.text)
+                .frame(width: 32, height: 32)
+                .background(
+                    Circle()
+                        .fill(DesignSystem.Colors.surfaceSecondary.opacity(0.5))
+                )
+        }
+    }
+}
+
+struct BounceButtonStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .scaleEffect(configuration.isPressed ? 0.92 : 1)
+            .animation(.spring(response: 0.2, dampingFraction: 0.6), value: configuration.isPressed)
+    }
+}
+
+// MARK: - Enhanced Supporting Components
+
+struct EnhancedSelectableMarkdownRenderer: View {
+    let content: String
+    let ndk: NDK
+    @Binding var selectedRange: NSRange?
+    let fontScale: CGFloat
+    let highlightOpacity: Double
+    let existingHighlights: [HighlightEvent]
+    let onSelection: (String, String, NSRange) -> Void
+    let onHighlightTap: (HighlightEvent) -> Void
+    
+    var body: some View {
+        SelectableMarkdownRenderer(
+            content: content,
+            ndk: ndk,
+            onTextSelected: { text, range in
+                onSelection(text, extractContext(for: range), range)
+            }
+        )
+        .markdownStyle(articleMarkdownStyle())
+        .scaleEffect(fontScale)
+    }
+    
+    private func extractContext(for range: NSRange) -> String {
+        // Extract surrounding context for the selection
+        let nsString = content as NSString
+        let contextRange = NSRange(
+            location: max(0, range.location - 50),
+            length: min(nsString.length - max(0, range.location - 50), range.length + 100)
+        )
+        return nsString.substring(with: contextRange)
+    }
     
     private func articleMarkdownStyle() -> MarkdownConfiguration {
         var config = MarkdownConfiguration()
         
-        // Colors
-        config.textColor = .highlighterText
-        config.headingColor = .highlighterText
-        config.linkColor = .highlighterPurple
-        config.codeBackgroundColor = Color.gray.opacity(0.1)
-        config.blockquoteColor = .highlighterSecondaryText
-        config.blockquoteBorderColor = .highlighterPurple
-        config.mentionColor = .highlighterPurple
-        config.hashtagColor = .highlighterOrange
-        config.nostrEntityColor = .highlighterPurple
+        config.textColor = .ds.text
+        config.headingColor = .ds.text
+        config.linkColor = .ds.primary
+        config.codeBackgroundColor = DesignSystem.Colors.surfaceSecondary
+        config.blockquoteColor = .ds.textSecondary
+        config.blockquoteBorderColor = .ds.primary
+        config.mentionColor = .ds.primary
+        config.hashtagColor = .ds.secondary
+        config.nostrEntityColor = .ds.primary
         
-        // Fonts
-        config.bodyFont = .highlighterBody
-        config.h1Font = .largeTitle
-        config.h2Font = .title
-        config.h3Font = .title2
+        config.bodyFont = .system(size: 17 * fontScale, weight: .regular, design: .serif)
+        config.h1Font = .system(size: 32 * fontScale, weight: .bold, design: .serif)
+        config.h2Font = .system(size: 26 * fontScale, weight: .semibold, design: .serif)
+        config.h3Font = .system(size: 22 * fontScale, weight: .medium, design: .serif)
         
-        // No content padding since we handle it ourselves
-        config.contentPadding = EdgeInsets(top: 0, leading: .ds.large, bottom: 0, trailing: .ds.large)
+        config.contentPadding = EdgeInsets(top: 0, leading: 0, bottom: 0, trailing: 0)
         
         return config
     }
+}
+
+struct EnhancedCommunityHighlightsSection: View {
+    let highlights: [HighlightEvent]
+    let onHighlightTap: (HighlightEvent) -> Void
     
-    // MARK: - Event Handlers
-    
-    private func handleNostrEntityTap(_ entity: ContentEntity) {
-        switch entity {
-        case .npub(let pubkey), .nprofile(let pubkey), .userMention(let pubkey, _):
-            // Navigate to profile view
-            print("Navigate to profile: \(pubkey)")
-        case .note(let eventId), .nevent(let eventId), .eventMention(let eventId):
-            // Navigate to event/note view
-            print("Navigate to event: \(eventId)")
-        case .naddr(let identifier):
-            // Navigate to parameterized replaceable event
-            print("Navigate to naddr: \(identifier)")
-        default:
-            break
+    var body: some View {
+        VStack(alignment: .leading, spacing: .ds.large) {
+            ModernSectionHeader(title: "Community Highlights")
+            
+            VStack(spacing: .ds.base) {
+                ForEach(highlights.prefix(5), id: \.id) { highlight in
+                    ArticleEnhancedHighlightCard(
+                        highlight: highlight,
+                        onTap: { onHighlightTap(highlight) }
+                    )
+                }
+            }
         }
-    }
-    
-    private func handleHashtagTap(_ tag: String) {
-        // Navigate to hashtag search
-        print("Search for hashtag: #\(tag)")
-    }
-    
-    private func handleLinkTap(_ url: URL) {
-        // Open URL in browser or in-app
-        print("Open URL: \(url)")
     }
 }
 
-// MARK: - Highlight Options Sheet
-
-struct HighlightOptionsSheet: View {
-    let selectedText: String
-    let articleTitle: String
-    let articleUrl: String
-    let onHighlight: (String?) -> Void
-    @State private var comment = ""
-    @Environment(\.dismiss) var dismiss
+struct ArticleEnhancedHighlightCard: View {
+    let highlight: HighlightEvent
+    let onTap: () -> Void
+    @State private var isPressed = false
     
     var body: some View {
-        NavigationStack {
-            VStack(alignment: .leading, spacing: .ds.large) {
-                VStack(alignment: .leading, spacing: .ds.small) {
-                    Text("Selected Text")
-                        .font(.highlighterCaption)
-                        .foregroundColor(.highlighterSecondaryText)
+        Button(action: onTap) {
+            VStack(alignment: .leading, spacing: .ds.base) {
+                Text("\"\(highlight.content)\"")
+                    .font(.system(size: 16, weight: .regular, design: .serif))
+                    .foregroundColor(.ds.text)
+                    .italic()
+                    .multilineTextAlignment(.leading)
+                
+                if let context = highlight.context {
+                    Text(context)
+                        .font(.ds.caption)
+                        .foregroundColor(.ds.textTertiary)
+                        .lineLimit(2)
+                }
+                
+                HStack {
+                    HStack(spacing: .ds.small) {
+                        Circle()
+                            .fill(DesignSystem.Colors.surfaceSecondary)
+                            .frame(width: 20, height: 20)
+                            .overlay(
+                                Text(PubkeyFormatter.formatForAvatar(highlight.author))
+                                    .font(.system(size: 10, weight: .medium))
+                                    .foregroundColor(.ds.text)
+                            )
+                        
+                        Text(PubkeyFormatter.formatShort(highlight.author))
+                            .font(.ds.caption)
+                            .foregroundColor(.ds.textSecondary)
+                    }
                     
-                    Text("\"\(selectedText)\"")
-                        .font(.highlighterQuote)
-                        .foregroundColor(.highlighterText)
-                        .padding()
-                        .background(Color.highlighterOrange.opacity(0.1))
-                        .cornerRadius(12)
+                    Spacer()
+                    
+                    ZapButton(amount: 21)
+                }
+            }
+            .padding(.ds.medium)
+            .background(
+                RoundedRectangle(cornerRadius: .ds.large, style: .continuous)
+                    .fill(DesignSystem.Colors.highlightSubtle)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: .ds.large, style: .continuous)
+                            .stroke(DesignSystem.Colors.secondary.opacity(0.2), lineWidth: 1)
+                    )
+            )
+            .scaleEffect(isPressed ? 0.98 : 1)
+        }
+        .buttonStyle(PlainButtonStyle())
+        .onLongPressGesture(minimumDuration: 0.1, maximumDistance: .infinity, pressing: { pressing in
+            withAnimation(.spring(response: 0.2)) {
+                isPressed = pressing
+            }
+        }, perform: {})
+    }
+}
+
+struct EnhancedRelatedArticlesSection: View {
+    let currentArticle: Article
+    @State private var relatedArticles: [Article] = []
+    
+    var body: some View {
+        if !relatedArticles.isEmpty {
+            VStack(alignment: .leading, spacing: .ds.large) {
+                ModernSectionHeader(title: "You Might Also Like")
+                    .padding(.horizontal, .ds.screenPadding)
+                
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: .ds.medium) {
+                        ForEach(relatedArticles, id: \.id) { article in
+                            EnhancedRelatedArticleCard(article: article)
+                                .frame(width: 300)
+                        }
+                    }
+                    .padding(.horizontal, .ds.screenPadding)
+                }
+            }
+        }
+    }
+    
+    private func loadRelatedArticles() {
+        // TODO: Implement AI-powered article recommendations
+        // For now, return empty
+    }
+}
+
+struct EnhancedRelatedArticleCard: View {
+    let article: Article
+    
+    var body: some View {
+        NavigationLink(destination: ArticleView(article: article)) {
+            VStack(alignment: .leading, spacing: .ds.base) {
+                if let imageUrl = article.image {
+                    AsyncImage(url: URL(string: imageUrl)) { phase in
+                        switch phase {
+                        case .success(let image):
+                            image
+                                .resizable()
+                                .aspectRatio(contentMode: .fill)
+                                .frame(height: 160)
+                                .clipped()
+                                .clipShape(RoundedRectangle(cornerRadius: .ds.medium, style: .continuous))
+                        case .empty, .failure:
+                            RoundedRectangle(cornerRadius: .ds.medium, style: .continuous)
+                                .fill(DesignSystem.Colors.surfaceSecondary)
+                                .frame(height: 160)
+                                .overlay(
+                                    Image(systemName: "photo")
+                                        .font(.system(size: 24))
+                                        .foregroundColor(.ds.textTertiary)
+                                )
+                        @unknown default:
+                            EmptyView()
+                        }
+                    }
                 }
                 
                 VStack(alignment: .leading, spacing: .ds.small) {
-                    Text("Add a comment (optional)")
-                        .font(.highlighterCaption)
-                        .foregroundColor(.highlighterSecondaryText)
+                    Text(article.title)
+                        .font(.ds.headline)
+                        .foregroundColor(.ds.text)
+                        .lineLimit(2)
+                        .multilineTextAlignment(.leading)
                     
-                    TextField("Your thoughts...", text: $comment, axis: .vertical)
-                        .textFieldStyle(RoundedBorderTextFieldStyle())
-                        .lineLimit(3...6)
+                    if let summary = article.summary {
+                        Text(summary)
+                            .font(.ds.callout)
+                            .foregroundColor(.ds.textSecondary)
+                            .lineLimit(2)
+                            .multilineTextAlignment(.leading)
+                    }
+                    
+                    HStack {
+                        Text(PubkeyFormatter.formatShort(article.author))
+                            .font(.ds.caption)
+                            .foregroundColor(.ds.textTertiary)
+                        
+                        Spacer()
+                        
+                        Label("\(article.estimatedReadingTime) min", systemImage: "clock")
+                            .font(.ds.caption)
+                            .foregroundColor(.ds.textTertiary)
+                    }
+                }
+                .padding(.horizontal, .ds.base)
+                .padding(.bottom, .ds.base)
+            }
+        }
+        .modernCard(noPadding: true)
+    }
+}
+
+struct ArticleFooter: View {
+    let article: Article
+    
+    var body: some View {
+        VStack(spacing: .ds.large) {
+            Divider()
+            
+            HStack {
+                VStack(alignment: .leading, spacing: .ds.small) {
+                    Text("Thanks for reading")
+                        .font(.ds.headline)
+                        .foregroundColor(.ds.text)
+                    
+                    Text("Support the author")
+                        .font(.ds.callout)
+                        .foregroundColor(.ds.textSecondary)
                 }
                 
                 Spacer()
                 
-                VStack(spacing: .ds.medium) {
-                    Button(action: {
-                        onHighlight(comment.isEmpty ? nil : comment)
-                        dismiss()
-                    }) {
-                        HStack {
-                            Image(systemName: "highlighter")
-                            Text("Create Highlight")
-                        }
-                        .frame(maxWidth: .infinity)
+                Button(action: {}) {
+                    HStack {
+                        Image(systemName: "bolt.fill")
+                        Text("Zap Author")
                     }
-                    .buttonStyle(ModernPrimaryButton())
+                    .font(.ds.footnoteMedium)
+                    .foregroundColor(.white)
+                    .padding(.horizontal, .ds.medium)
+                    .padding(.vertical, .ds.small)
+                    .background(
+                        Capsule()
+                            .fill(
+                                LinearGradient(
+                                    colors: [.ds.secondary, .ds.secondaryDark],
+                                    startPoint: .topLeading,
+                                    endPoint: .bottomTrailing
+                                )
+                            )
+                    )
+                }
+                .magneticHover()
+            }
+            
+            // Tags
+            if !article.hashtags.isEmpty {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: .ds.small) {
+                        ForEach(article.hashtags, id: \.self) { tag in
+                            Text("#\(tag)")
+                                .font(.ds.caption)
+                                .foregroundColor(.ds.primary)
+                                .padding(.horizontal, .ds.base)
+                                .padding(.vertical, .ds.micro)
+                                .background(
+                                    Capsule()
+                                        .fill(DesignSystem.Colors.primary.opacity(0.1))
+                                )
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+// MARK: - Sheet Views
+
+struct EnhancedCreateHighlightView: View {
+    let articleId: String
+    let articleTitle: String
+    let selectedText: String
+    let contextText: String
+    let onComplete: (HighlightEvent) -> Void
+    
+    @State private var comment = ""
+    @State private var isPublic = true
+    @State private var showSuccess = false
+    @Environment(\.dismiss) private var dismiss
+    
+    var body: some View {
+        NavigationStack {
+            ScrollView {
+                VStack(alignment: .leading, spacing: .ds.large) {
+                    // Selected text preview
+                    VStack(alignment: .leading, spacing: .ds.base) {
+                        Label("Selected Text", systemImage: "text.quote")
+                            .font(.ds.footnoteMedium)
+                            .foregroundColor(.ds.primary)
+                        
+                        Text("\"\(selectedText)\"")
+                            .font(.system(size: 18, weight: .regular, design: .serif))
+                            .italic()
+                            .foregroundColor(.ds.text)
+                            .padding()
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .background(
+                                RoundedRectangle(cornerRadius: .ds.medium, style: .continuous)
+                                    .fill(DesignSystem.Colors.highlightSubtle)
+                                    .overlay(
+                                        RoundedRectangle(cornerRadius: .ds.medium, style: .continuous)
+                                            .stroke(DesignSystem.Colors.secondary.opacity(0.3), lineWidth: 1)
+                                    )
+                            )
+                    }
+                    .premiumEntrance(delay: 0.1)
                     
+                    // Comment field
+                    VStack(alignment: .leading, spacing: .ds.base) {
+                        Label("Add Your Thoughts", systemImage: "bubble.left")
+                            .font(.ds.footnoteMedium)
+                            .foregroundColor(.ds.primary)
+                        
+                        TextField("What makes this passage special?", text: $comment, axis: .vertical)
+                            .textFieldStyle(PlainTextFieldStyle())
+                            .font(.ds.body)
+                            .lineLimit(4...8)
+                            .padding()
+                            .background(
+                                RoundedRectangle(cornerRadius: .ds.medium, style: .continuous)
+                                    .fill(DesignSystem.Colors.surface)
+                                    .overlay(
+                                        RoundedRectangle(cornerRadius: .ds.medium, style: .continuous)
+                                            .stroke(DesignSystem.Colors.border, lineWidth: 1)
+                                    )
+                            )
+                    }
+                    .premiumEntrance(delay: 0.2)
+                    
+                    // Privacy toggle
+                    HStack {
+                        Label(isPublic ? "Public Highlight" : "Private Highlight", 
+                              systemImage: isPublic ? "globe" : "lock")
+                            .font(.ds.footnoteMedium)
+                            .foregroundColor(.ds.text)
+                        
+                        Spacer()
+                        
+                        Toggle("", isOn: $isPublic)
+                            .tint(.ds.primary)
+                    }
+                    .padding()
+                    .background(
+                        RoundedRectangle(cornerRadius: .ds.medium, style: .continuous)
+                            .fill(DesignSystem.Colors.surface)
+                    )
+                    .premiumEntrance(delay: 0.3)
+                    
+                    Spacer()
+                }
+                .padding()
+            }
+            .navigationTitle("Create Highlight")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarLeading) {
                     Button("Cancel") {
                         dismiss()
                     }
-                    .buttonStyle(ModernSecondaryButton())
                 }
+                
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button(action: saveHighlight) {
+                        if showSuccess {
+                            Image(systemName: "checkmark.circle.fill")
+                                .foregroundColor(.ds.success)
+                                .transition(.scale.combined(with: .opacity))
+                        } else {
+                            Text("Save")
+                                .fontWeight(.medium)
+                        }
+                    }
+                    .disabled(showSuccess)
+                }
+            }
+        }
+    }
+    
+    private func saveHighlight() {
+        withAnimation(.spring(response: 0.3)) {
+            showSuccess = true
+        }
+        
+        let highlight = HighlightEvent(
+            content: selectedText,
+            articleId: articleId,
+            author: "current-user", // TODO: Use actual user pubkey
+            context: contextText,
+            comment: comment.isEmpty ? nil : comment
+        )
+        
+        onComplete(highlight)
+        
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+            dismiss()
+        }
+    }
+}
+
+struct ReadingSettingsView: View {
+    @Binding var fontScale: CGFloat
+    @Binding var highlightOpacity: Double
+    
+    var body: some View {
+        NavigationStack {
+            VStack(spacing: .ds.large) {
+                // Font size control
+                VStack(alignment: .leading, spacing: .ds.base) {
+                    Text("Text Size")
+                        .font(.ds.footnoteMedium)
+                        .foregroundColor(.ds.text)
+                    
+                    HStack {
+                        Image(systemName: "textformat.size.smaller")
+                            .foregroundColor(.ds.textSecondary)
+                        
+                        Slider(value: $fontScale, in: 0.8...1.5)
+                            .tint(.ds.primary)
+                        
+                        Image(systemName: "textformat.size.larger")
+                            .foregroundColor(.ds.textSecondary)
+                    }
+                    
+                    Text("The quick brown fox jumps over the lazy dog")
+                        .font(.system(size: 16 * fontScale))
+                        .foregroundColor(.ds.textSecondary)
+                        .padding()
+                        .frame(maxWidth: .infinity)
+                        .background(
+                            RoundedRectangle(cornerRadius: .ds.small, style: .continuous)
+                                .fill(DesignSystem.Colors.surfaceSecondary)
+                        )
+                }
+                
+                // Highlight opacity control
+                VStack(alignment: .leading, spacing: .ds.base) {
+                    Text("Highlight Visibility")
+                        .font(.ds.footnoteMedium)
+                        .foregroundColor(.ds.text)
+                    
+                    HStack {
+                        Image(systemName: "circle")
+                            .foregroundColor(.ds.textSecondary)
+                        
+                        Slider(value: $highlightOpacity, in: 0.1...0.5)
+                            .tint(.ds.secondary)
+                        
+                        Image(systemName: "circle.fill")
+                            .foregroundColor(.ds.textSecondary)
+                    }
+                }
+                
+                Spacer()
+            }
+            .padding()
+            .navigationTitle("Reading Settings")
+            .navigationBarTitleDisplayMode(.inline)
+        }
+    }
+}
+
+struct ArticleHighlightDetailView: View {
+    let highlight: HighlightEvent
+    
+    var body: some View {
+        NavigationStack {
+            VStack(alignment: .leading, spacing: .ds.large) {
+                // Highlight content
+                Text("\"\(highlight.content)\"")
+                    .font(.system(size: 20, weight: .regular, design: .serif))
+                    .italic()
+                    .foregroundColor(.ds.text)
+                    .padding()
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(
+                        RoundedRectangle(cornerRadius: .ds.large, style: .continuous)
+                            .fill(DesignSystem.Colors.highlightSubtle)
+                    )
+                
+                if let comment = highlight.comment {
+                    VStack(alignment: .leading, spacing: .ds.small) {
+                        Text("Comment")
+                            .font(.ds.footnoteMedium)
+                            .foregroundColor(.ds.textSecondary)
+                        
+                        Text(comment)
+                            .font(.ds.body)
+                            .foregroundColor(.ds.text)
+                    }
+                }
+                
+                // Author info
+                HStack {
+                    Circle()
+                        .fill(DesignSystem.Colors.surfaceSecondary)
+                        .frame(width: 40, height: 40)
+                        .overlay(
+                            Text(PubkeyFormatter.formatForAvatar(highlight.author))
+                                .font(.ds.footnoteMedium)
+                                .foregroundColor(.ds.text)
+                        )
+                    
+                    VStack(alignment: .leading) {
+                        Text(PubkeyFormatter.formatCompact(highlight.author))
+                            .font(.ds.footnoteMedium)
+                            .foregroundColor(.ds.text)
+                        
+                        Text("2 hours ago") // TODO: Use actual timestamp
+                            .font(.ds.caption)
+                            .foregroundColor(.ds.textTertiary)
+                    }
+                    
+                    Spacer()
+                    
+                    Button(action: {}) {
+                        HStack {
+                            Image(systemName: "bolt.fill")
+                            Text("21")
+                        }
+                        .font(.ds.footnoteMedium)
+                        .foregroundColor(.white)
+                        .padding(.horizontal, .ds.base)
+                        .padding(.vertical, .ds.small)
+                        .background(
+                            Capsule()
+                                .fill(.ds.secondary)
+                        )
+                    }
+                }
+                
+                Spacer()
             }
             .padding()
             .navigationTitle("Highlight")
@@ -538,34 +1355,53 @@ struct HighlightOptionsSheet: View {
     }
 }
 
-// MARK: - Share Sheet
-
-struct ArticleShareSheet: UIViewControllerRepresentable {
-    let items: [Any]
-    
-    func makeUIViewController(context: Context) -> UIActivityViewController {
-        let controller = UIActivityViewController(activityItems: items, applicationActivities: nil)
-        return controller
+// Add this extension if not already present
+extension Array {
+    subscript(safe index: Index) -> Element? {
+        return indices.contains(index) ? self[index] : nil
     }
-    
-    func updateUIViewController(_ uiViewController: UIActivityViewController, context: Context) {}
 }
 
 #Preview {
-    ArticleView(article: try! Article(
-        from: NDKEvent(
-            id: "test",
-            pubkey: "test",
-            createdAt: 0,
-            kind: 30023,
-            tags: [
-                ["title", "Sample Article"],
-                ["summary", "This is a sample article for preview"],
-                ["published_at", "1234567890"]
-            ],
-            content: "# Sample Article\n\nThis is some **bold** text and some *italic* text.\n\nLorem ipsum dolor sit amet.",
-            sig: ""
-        )
+    ArticleView(article: Article(
+        id: "test",
+        identifier: "test-article",
+        title: "The Future of Knowledge Sharing",
+        summary: "Exploring how decentralized protocols are reshaping the way we share and preserve human knowledge.",
+        content: """
+        # The Future of Knowledge Sharing
+        
+        In an age where information flows freely yet centralized platforms control the narrative, we stand at a crossroads. The question isn't whether we need change, but how quickly we can adapt to a new paradigm.
+        
+        ## The Current Landscape
+        
+        Today's knowledge ecosystem is dominated by gatekeepers. Social media algorithms decide what we see, search engines filter our queries, and content platforms monetize our creations while retaining ownership.
+        
+        This model has served its purpose, but the cracks are showing. Censorship, data breaches, and the loss of digital sovereignty have become commonplace. We've traded convenience for control, and the price is becoming too high to bear.
+        
+        ## Enter Decentralization
+        
+        Imagine a world where your thoughts, insights, and creations belong to you. Where no single entity can silence your voice or erase your contributions. This isn't a utopian dream—it's the promise of decentralized protocols like Nostr.
+        
+        By distributing data across multiple relays and using cryptographic signatures for verification, we create a system that's both resilient and trustworthy. Your content lives on, regardless of any single point of failure.
+        
+        ## The Power of Collective Intelligence
+        
+        But decentralization is just the foundation. The real magic happens when we layer collective intelligence on top. Picture millions of minds collaborating, highlighting the best insights, and building upon each other's work.
+        
+        This is swarm intelligence in action. When readers highlight passages, they're not just bookmarking for themselves—they're signaling value to the entire network. The most resonant ideas naturally rise to the surface, creating a meritocracy of thought.
+        
+        ## Looking Ahead
+        
+        The tools we build today will shape how future generations learn, think, and create. By embracing open protocols and collective curation, we're not just preserving knowledge—we're accelerating its evolution.
+        
+        The future of knowledge sharing isn't about any single platform or technology. It's about creating systems that amplify human potential while respecting individual sovereignty. And that future is being written right now, one highlight at a time.
+        """,
+        author: "npub1example",
+        publishedAt: Date(),
+        image: "https://picsum.photos/800/400",
+        hashtags: ["knowledge", "decentralization", "nostr", "future"],
+        createdAt: Timestamp.now
     ))
     .environmentObject(AppState())
 }

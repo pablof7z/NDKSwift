@@ -72,6 +72,59 @@ struct Article: Identifiable, Equatable {
         let wordCount = content.split(separator: " ").count
         return max(1, wordCount / wordsPerMinute)
     }
+    
+    // Convenience initializer for testing and UI previews
+    init(
+        id: String,
+        identifier: String,
+        title: String,
+        summary: String?,
+        content: String,
+        author: String,
+        publishedAt: Date?,
+        image: String?,
+        hashtags: [String],
+        createdAt: Timestamp
+    ) {
+        self.id = id
+        self.author = author
+        self.createdAt = Date(timeIntervalSince1970: TimeInterval(createdAt))
+        self.title = title
+        self.summary = summary
+        self.content = content
+        self.image = image
+        self.blurhash = nil
+        self.publishedAt = publishedAt
+        self.tags = []
+        
+        // Create a mock event for the convenience init
+        var tags: [[String]] = [
+            ["d", identifier],
+            ["title", title]
+        ]
+        
+        if let summary = summary {
+            tags.append(["summary", summary])
+        }
+        
+        if let image = image {
+            tags.append(["image", image])
+        }
+        
+        for hashtag in hashtags {
+            tags.append(["t", hashtag])
+        }
+        
+        let event = NDKEvent(
+            kind: 30023,
+            content: content,
+            tags: tags
+        )
+        event.id = id
+        event.pubkey = author
+        event.createdAt = createdAt
+        self.event = event
+    }
 }
 
 enum ArticleError: Error {
