@@ -50,13 +50,17 @@ struct ArticleDiscoveryView: View {
         )
         
         for await event in articleSource.events {
-            if let article = try? Article(from: event) {
+            do {
+                let article = try Article(from: event)
+                print("DEBUG: Article loaded - Title: \(article.title), Content length: \(article.content.count)")
                 await MainActor.run {
                     if !articles.contains(where: { $0.id == article.id }) {
                         articles.append(article)
                         articles.sort { $0.createdAt > $1.createdAt }
                     }
                 }
+            } catch {
+                print("DEBUG: Failed to create article from event: \(error)")
             }
         }
     }

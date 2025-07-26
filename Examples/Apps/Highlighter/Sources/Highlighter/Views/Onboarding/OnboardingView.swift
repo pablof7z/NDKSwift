@@ -4,7 +4,10 @@ struct OnboardingView: View {
     @State private var currentPage = 0
     @State private var animateElements = false
     @State private var particleAnimation = false
+    @State private var showImportSheet = false
+    @State private var privateKey = ""
     @Binding var hasCompletedOnboarding: Bool
+    @EnvironmentObject var appState: AppState
     @Namespace private var namespace
     
     let pages = OnboardingPage.allPages
@@ -23,10 +26,10 @@ struct OnboardingView: View {
                 HStack {
                     Spacer()
                     
-                    if currentPage < pages.count - 1 {
+                    if currentPage < pages.count {
                         Button("Skip") {
                             withAnimation(.spring(response: 0.5, dampingFraction: 0.8)) {
-                                currentPage = pages.count - 1
+                                currentPage = pages.count
                             }
                         }
                         .font(.ds.bodyMedium)
@@ -47,6 +50,16 @@ struct OnboardingView: View {
                         )
                         .tag(index)
                     }
+                    
+                    // Authentication page
+                    OnboardingAuthView(
+                        showImportSheet: $showImportSheet,
+                        privateKey: $privateKey,
+                        isActive: currentPage == pages.count,
+                        onComplete: completeOnboarding
+                    )
+                    .tag(pages.count)
+                    .environmentObject(appState)
                 }
                 .tabViewStyle(PageTabViewStyle(indexDisplayMode: .never))
                 .animation(.interactiveSpring(response: 0.5, dampingFraction: 0.8), value: currentPage)
@@ -55,7 +68,7 @@ struct OnboardingView: View {
                 VStack(spacing: 32) {
                     // Page indicators
                     HStack(spacing: 8) {
-                        ForEach(pages.indices, id: \.self) { index in
+                        ForEach(0...pages.count, id: \.self) { index in
                             OnboardingPageIndicator(
                                 isActive: currentPage == index,
                                 index: index,
@@ -70,22 +83,20 @@ struct OnboardingView: View {
                     }
                     .padding(.horizontal)
                     
-                    // Action button
-                    OnboardingActionButton(
-                        title: currentPage == pages.count - 1 ? "Get Started" : "Next",
-                        isLastPage: currentPage == pages.count - 1,
-                        action: {
-                            if currentPage == pages.count - 1 {
-                                completeOnboarding()
-                            } else {
+                    // Action button (hide on auth page)
+                    if currentPage < pages.count {
+                        OnboardingActionButton(
+                            title: currentPage == pages.count - 1 ? "Get Started" : "Next",
+                            isLastPage: currentPage == pages.count - 1,
+                            action: {
                                 withAnimation(.spring(response: 0.5, dampingFraction: 0.8)) {
                                     currentPage += 1
                                     HapticManager.shared.impact(.light)
                                 }
                             }
-                        }
-                    )
-                    .padding(.horizontal, 40)
+                        )
+                        .padding(.horizontal, 40)
+                    }
                 }
                 .padding(.bottom, 50)
             }
@@ -317,6 +328,7 @@ struct OnboardingGradientBackground: View {
         case 1: return [Color.purple.opacity(0.6), Color.blue.opacity(0.4)]
         case 2: return [Color.blue.opacity(0.6), Color.cyan.opacity(0.4)]
         case 3: return [Color.green.opacity(0.6), Color.teal.opacity(0.4)]
+        case 4: return [Color.purple.opacity(0.6), Color.orange.opacity(0.4)]
         default: return [Color.orange.opacity(0.6), Color.pink.opacity(0.4)]
         }
     }
@@ -459,6 +471,347 @@ struct FloatingParticlesView: View {
     }
 }
 
+// MARK: - Authentication Page
+
+struct OnboardingAuthView: View {
+    @Binding var showImportSheet: Bool
+    @Binding var privateKey: String
+    let isActive: Bool
+    let onComplete: () -> Void
+    @EnvironmentObject var appState: AppState
+    @State private var animateContent = false
+    @State private var isCreatingAccount = false
+    
+    var body: some View {
+        VStack(spacing: 48) {
+            Spacer()
+            
+            // Icon and title
+            VStack(spacing: 24) {
+                ZStack {
+                    // Glow effect
+                    Circle()
+                        .fill(Color.purple.opacity(0.3))
+                        .frame(width: 160, height: 160)
+                        .blur(radius: 40)
+                        .scaleEffect(animateContent ? 1.2 : 0.8)
+                        .animation(
+                            .easeInOut(duration: 3)
+                            .repeatForever(autoreverses: true),
+                            value: animateContent
+                        )
+                    
+                    // Icon background
+                    Circle()
+                        .fill(
+                            LinearGradient(
+                                colors: [
+                                    Color.purple.opacity(0.3),
+                                    Color.orange.opacity(0.2)
+                                ],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
+                        .frame(width: 120, height: 120)
+                    
+                    // Key icon
+                    Image(systemName: "key.fill")
+                        .font(.system(size: 56, weight: .medium))
+                        .foregroundColor(.white)
+                        .rotationEffect(.degrees(animateContent ? -5 : 5))
+                        .animation(
+                            .easeInOut(duration: 4)
+                            .repeatForever(autoreverses: true),
+                            value: animateContent
+                        )
+                }
+                .scaleEffect(isActive ? 1.0 : 0.8)
+                .opacity(isActive ? 1.0 : 0.5)
+                .animation(.spring(response: 0.6, dampingFraction: 0.7), value: isActive)
+                
+                VStack(spacing: 16) {
+                    Text("Ready to\nGet Started")
+                        .font(.system(size: 42, weight: .bold, design: .rounded))
+                        .foregroundColor(.white)
+                        .multilineTextAlignment(.center)
+                        .opacity(animateContent ? 1 : 0)
+                        .offset(y: animateContent ? 0 : 20)
+                    
+                    Text("Create your account or sign in to continue")
+                        .font(.ds.body)
+                        .foregroundColor(.white.opacity(0.8))
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal, 40)
+                        .opacity(animateContent ? 1 : 0)
+                        .offset(y: animateContent ? 0 : 20)
+                        .animation(.easeOut(duration: 0.6).delay(0.1), value: animateContent)
+                }
+            }
+            
+            Spacer()
+            
+            // Auth buttons
+            VStack(spacing: 16) {
+                Button(action: createAccount) {
+                    HStack {
+                        Image(systemName: "sparkles")
+                            .font(.system(size: 20, weight: .medium))
+                        Text("Create Account")
+                            .font(.ds.bodyMedium)
+                    }
+                    .foregroundColor(.white)
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 56)
+                    .background(
+                        RoundedRectangle(cornerRadius: 16, style: .continuous)
+                            .fill(
+                                LinearGradient(
+                                    colors: [Color.orange, Color.orange.opacity(0.8)],
+                                    startPoint: .leading,
+                                    endPoint: .trailing
+                                )
+                            )
+                    )
+                    .overlay(
+                        isCreatingAccount ? 
+                        ProgressView()
+                            .tint(.white)
+                            .scaleEffect(0.8)
+                        : nil
+                    )
+                }
+                .disabled(isCreatingAccount)
+                .shadow(color: Color.orange.opacity(0.3), radius: 20, y: 10)
+                
+                Button(action: { showImportSheet = true }) {
+                    Text("I have an account")
+                        .font(.ds.bodyMedium)
+                        .foregroundColor(.white.opacity(0.9))
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 56)
+                        .background(
+                            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                                .fill(Color.white.opacity(0.15))
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 16, style: .continuous)
+                                        .stroke(Color.white.opacity(0.3), lineWidth: 1)
+                                )
+                        )
+                }
+            }
+            .padding(.horizontal, 40)
+            .opacity(animateContent ? 1 : 0)
+            .offset(y: animateContent ? 0 : 20)
+            .animation(.spring(response: 0.5, dampingFraction: 0.7).delay(0.2), value: animateContent)
+            
+            Spacer()
+                .frame(height: 50)
+        }
+        .sheet(isPresented: $showImportSheet) {
+            OnboardingImportSheet(privateKey: $privateKey, onImport: importAccount)
+        }
+        .onAppear {
+            if isActive {
+                withAnimation {
+                    animateContent = true
+                }
+            }
+        }
+        .onChange(of: isActive) { active in
+            if active {
+                withAnimation {
+                    animateContent = true
+                }
+            } else {
+                animateContent = false
+            }
+        }
+    }
+    
+    private func createAccount() {
+        isCreatingAccount = true
+        HapticManager.shared.impact(.medium)
+        
+        Task {
+            do {
+                try await appState.createAccount()
+                await MainActor.run {
+                    HapticManager.shared.notification(.success)
+                    onComplete()
+                }
+            } catch {
+                await MainActor.run {
+                    isCreatingAccount = false
+                    HapticManager.shared.notification(.error)
+                }
+            }
+        }
+    }
+    
+    private func importAccount() {
+        guard !privateKey.isEmpty else { return }
+        
+        HapticManager.shared.impact(.medium)
+        
+        Task {
+            do {
+                try await appState.importAccount(nsec: privateKey)
+                
+                await MainActor.run {
+                    showImportSheet = false
+                    privateKey = ""
+                    HapticManager.shared.notification(.success)
+                    onComplete()
+                }
+            } catch {
+                await MainActor.run {
+                    HapticManager.shared.notification(.error)
+                }
+            }
+        }
+    }
+}
+
+// MARK: - Import Sheet
+
+struct OnboardingImportSheet: View {
+    @Binding var privateKey: String
+    let onImport: () -> Void
+    @Environment(\.dismiss) var dismiss
+    @FocusState private var isTextFieldFocused: Bool
+    
+    var body: some View {
+        NavigationStack {
+            ZStack {
+                // Background gradient
+                LinearGradient(
+                    colors: [Color.purple.opacity(0.8), Color.black],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                )
+                .ignoresSafeArea()
+                
+                VStack(spacing: 24) {
+                    // Header
+                    VStack(spacing: 16) {
+                        Image(systemName: "key.horizontal.fill")
+                            .font(.system(size: 48, weight: .medium))
+                            .foregroundColor(.white)
+                            .padding()
+                            .background(
+                                Circle()
+                                    .fill(Color.white.opacity(0.15))
+                            )
+                        
+                        Text("Import Your Account")
+                            .font(.system(size: 28, weight: .bold, design: .rounded))
+                            .foregroundColor(.white)
+                        
+                        Text("Enter your private key to sign in")
+                            .font(.ds.body)
+                            .foregroundColor(.white.opacity(0.8))
+                    }
+                    .padding(.top, 32)
+                    
+                    // Input section
+                    VStack(alignment: .leading, spacing: 12) {
+                        Text("Private Key")
+                            .font(.ds.footnoteMedium)
+                            .foregroundColor(.white.opacity(0.6))
+                        
+                        SecureField("nsec1...", text: $privateKey)
+                            .font(.system(.body, design: .monospaced))
+                            .padding()
+                            .background(
+                                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                    .fill(Color.white.opacity(0.1))
+                                    .overlay(
+                                        RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                            .stroke(Color.white.opacity(0.2), lineWidth: 1)
+                                    )
+                            )
+                            .foregroundColor(.white)
+                            .tint(.orange)
+                            .focused($isTextFieldFocused)
+                            .textContentType(.password)
+                            .autocapitalization(.none)
+                            .disableAutocorrection(true)
+                    }
+                    .padding(.horizontal, 24)
+                    
+                    // Security note
+                    HStack(spacing: 8) {
+                        Image(systemName: "lock.shield.fill")
+                            .font(.ds.caption)
+                            .foregroundColor(.orange)
+                        
+                        Text("Your key is stored locally and never leaves your device")
+                            .font(.ds.caption)
+                            .foregroundColor(.white.opacity(0.6))
+                    }
+                    .padding(.horizontal, 24)
+                    
+                    Spacer()
+                    
+                    // Action buttons
+                    VStack(spacing: 12) {
+                        Button(action: onImport) {
+                            Text("Import Account")
+                                .font(.ds.bodyMedium)
+                                .foregroundColor(.white)
+                                .frame(maxWidth: .infinity)
+                                .frame(height: 56)
+                                .background(
+                                    RoundedRectangle(cornerRadius: 16, style: .continuous)
+                                        .fill(
+                                            LinearGradient(
+                                                colors: [Color.orange, Color.orange.opacity(0.8)],
+                                                startPoint: .leading,
+                                                endPoint: .trailing
+                                            )
+                                        )
+                                )
+                        }
+                        .disabled(privateKey.isEmpty)
+                        .opacity(privateKey.isEmpty ? 0.6 : 1)
+                        .shadow(color: Color.orange.opacity(0.3), radius: 20, y: 10)
+                        
+                        Button("Cancel") {
+                            dismiss()
+                        }
+                        .font(.ds.bodyMedium)
+                        .foregroundColor(.white.opacity(0.8))
+                        .frame(height: 44)
+                    }
+                    .padding(.horizontal, 24)
+                    .padding(.bottom, 32)
+                }
+            }
+            .preferredColorScheme(.dark)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarLeading) {
+                    Button {
+                        dismiss()
+                    } label: {
+                        Image(systemName: "xmark.circle.fill")
+                            .font(.system(size: 24))
+                            .foregroundColor(.white.opacity(0.3))
+                            .background(
+                                Circle()
+                                    .fill(Color.white.opacity(0.1))
+                            )
+                    }
+                }
+            }
+        }
+        .onAppear {
+            isTextFieldFocused = true
+        }
+    }
+}
+
 #Preview {
     OnboardingView(hasCompletedOnboarding: .constant(false))
+        .environmentObject(AppState())
 }

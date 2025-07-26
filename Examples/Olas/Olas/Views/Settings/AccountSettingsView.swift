@@ -10,6 +10,7 @@ struct AccountSettingsView: View {
     @State private var showBiometricToggle = false
     @State private var biometricEnabled = false
     @State private var showNsecWarning = false
+    @State private var userProfile: NDKUserProfile?
     
     var body: some View {
         ZStack {
@@ -37,6 +38,11 @@ struct AccountSettingsView: View {
         #if os(iOS)
         .navigationBarTitleDisplayMode(.large)
         #endif
+        .task {
+            if let currentUser = appState.currentUser {
+                userProfile = await currentUser.profile
+            }
+        }
         .sheet(isPresented: $showKeyBackup) {
             keyBackupSheet
         }
@@ -62,7 +68,7 @@ struct AccountSettingsView: View {
         VStack(spacing: OlasDesign.Spacing.lg) {
             // Avatar
             if let currentUser = appState.currentUser {
-                AsyncImage(url: URL(string: currentUser.profile?.picture ?? "")) { image in
+                AsyncImage(url: URL(string: userProfile?.picture ?? "")) { image in
                     image
                         .resizable()
                         .scaledToFill()
@@ -85,11 +91,11 @@ struct AccountSettingsView: View {
                 )
                 
                 VStack(spacing: OlasDesign.Spacing.sm) {
-                    Text(currentUser.profile?.displayName ?? currentUser.profile?.name ?? "Unknown")
+                    Text(userProfile?.displayName ?? userProfile?.name ?? "Unknown")
                         .font(OlasDesign.Typography.title2)
                         .foregroundColor(OlasDesign.Colors.text)
                     
-                    if let nip05 = currentUser.profile?.nip05 {
+                    if let nip05 = userProfile?.nip05 {
                         Text(nip05)
                             .font(OlasDesign.Typography.caption)
                             .foregroundColor(OlasDesign.Colors.textSecondary)

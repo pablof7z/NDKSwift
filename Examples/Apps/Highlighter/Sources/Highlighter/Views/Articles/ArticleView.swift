@@ -106,34 +106,38 @@ struct ArticleView: View {
                                     .padding(.horizontal, .ds.screenPadding)
                                 
                                 // Enhanced article content with text selection
-                                if let ndk = appState.ndk {
-                                    EnhancedSelectableMarkdownRenderer(
-                                        content: article.content,
-                                        ndk: ndk,
-                                        selectedRange: $selectedRange,
-                                        fontScale: fontScale,
-                                        highlightOpacity: highlightOpacity,
-                                        existingHighlights: highlights,
-                                        onSelection: handleTextSelection,
-                                        onHighlightTap: { highlight in
-                                            selectedHighlight = highlight
-                                            showHighlightDetail = true
+                                Group {
+                                    if article.content.isEmpty {
+                                        VStack(spacing: 16) {
+                                            Image(systemName: "doc.text")
+                                                .font(.system(size: 48))
+                                                .foregroundColor(.ds.textTertiary)
+                                            
+                                            Text("No content available")
+                                                .font(.ds.headline)
+                                                .foregroundColor(.ds.textSecondary)
+                                            
+                                            Text("This article appears to be empty.")
+                                                .font(.ds.body)
+                                                .foregroundColor(.ds.textTertiary)
                                         }
-                                    )
-                                    .padding(.horizontal, .ds.screenPadding)
-                                    .overlay(alignment: .topTrailing) {
-                                        if selectedRange != nil {
-                                            enhancedSelectionToolbar
-                                                .transition(
-                                                    .asymmetric(
-                                                        insertion: .scale(scale: 0.8).combined(with: .opacity),
-                                                        removal: .scale(scale: 0.8).combined(with: .opacity)
-                                                    )
-                                                )
-                                                .padding(.trailing, .ds.screenPadding)
-                                        }
+                                        .padding(40)
+                                        .frame(maxWidth: .infinity, minHeight: 300)
+                                    } else if let ndk = appState.ndk {
+                                        // Simple text display to verify content exists
+                                        Text(article.content)
+                                            .font(.system(size: 17 * fontScale, weight: .regular))
+                                            .foregroundColor(.ds.text)
+                                            .fixedSize(horizontal: false, vertical: true)
+                                            .frame(maxWidth: .infinity, alignment: .leading)
+                                    } else {
+                                        Text("NDK not initialized")
+                                            .font(.ds.body)
+                                            .foregroundColor(.ds.textSecondary)
+                                            .padding()
                                     }
                                 }
+                                .padding(.horizontal, .ds.screenPadding)
                                 
                                 // Enhanced community highlights section
                                 if !highlights.isEmpty {

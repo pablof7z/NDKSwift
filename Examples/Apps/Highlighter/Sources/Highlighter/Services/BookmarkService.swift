@@ -1,6 +1,5 @@
 import Foundation
 import NDKSwift
-import Combine
 
 @MainActor
 class BookmarkService: ObservableObject {
@@ -11,7 +10,7 @@ class BookmarkService: ObservableObject {
     private var ndk: NDK?
     private var signer: NDKSigner?
     private var currentUserPubkey: String?
-    private var cancellables = Set<AnyCancellable>()
+    private var loadingTask: Task<Void, Never>?
     
     // MARK: - Configuration
     
@@ -21,7 +20,7 @@ class BookmarkService: ObservableObject {
         
         Task {
             if let signer = signer {
-                currentUserPubkey = try? await signer.publicKey(format: .hex)
+                currentUserPubkey = try? await signer.pubkey
                 await loadBookmarks()
             }
         }
@@ -34,7 +33,7 @@ class BookmarkService: ObservableObject {
     }
     
     func toggleArticleBookmark(_ article: Article) async throws {
-        guard let ndk = ndk, let signer = signer else {
+        guard let ndk = ndk, let _ = signer else {
             throw BookmarkError.notConfigured
         }
         
@@ -76,7 +75,7 @@ class BookmarkService: ObservableObject {
     }
     
     func toggleHighlightBookmark(_ highlight: HighlightEvent) async throws {
-        guard let ndk = ndk, let signer = signer else {
+        guard let ndk = ndk, let _ = signer else {
             throw BookmarkError.notConfigured
         }
         
@@ -109,7 +108,7 @@ class BookmarkService: ObservableObject {
     // MARK: - Nostr Publishing
     
     private func publishArticleBookmark(_ article: Article) async throws {
-        guard let ndk = ndk, let signer = signer else { return }
+        guard let ndk = ndk, let _ = signer else { return }
         
         // Create bookmark list event (NIP-51, kind 30001)
         let tags: [[String]] = [
@@ -118,23 +117,23 @@ class BookmarkService: ObservableObject {
             ["a", "\(article.identifier)::\(article.author)", "wss://relay.damus.io", article.title]
         ]
         
-        let content = JSONCoding.encode([
+        let contentDict: [String: Any] = [
             "bookmarked_at": ISO8601DateFormatter().string(from: Date()),
             "note": "Saved for later reading"
-        ])
+        ]
+        let content = (try? JSONSerialization.data(withJSONObject: contentDict)).flatMap { String(data: $0, encoding: .utf8) } ?? ""
         
-        let event = NDKEvent(
-            kind: 30001, // Bookmark list
-            content: content,
-            tags: tags
-        )
+        let event = try await NDKEventBuilder(ndk: ndk)
+            .kind(30001) // Bookmark list
+            .content(content)
+            .tags(tags)
+            .build(signer: signer)
         
-        try await event.sign(with: signer)
-        try await ndk.publish(event)
+        _ = try await ndk.publish(event)
     }
     
     private func publishHighlightBookmark(_ highlight: HighlightEvent) async throws {
-        guard let ndk = ndk, let signer = signer else { return }
+        guard let ndk = ndk, let _ = signer else { return }
         
         let tags: [[String]] = [
             ["d", "highlights"],
@@ -142,32 +141,31 @@ class BookmarkService: ObservableObject {
             ["e", highlight.id, "wss://relay.damus.io", "highlight"]
         ]
         
-        let content = JSONCoding.encode([
+        let contentDict: [String: Any] = [
             "bookmarked_at": ISO8601DateFormatter().string(from: Date()),
             "highlight_content": highlight.content
-        ])
+        ]
+        let content = (try? JSONSerialization.data(withJSONObject: contentDict)).flatMap { String(data: $0, encoding: .utf8) } ?? ""
         
-        let event = NDKEvent(
-            kind: 30001,
-            content: content,
-            tags: tags
-        )
+        let event = try await NDKEventBuilder(ndk: ndk)
+            .kind(30001)
+            .content(content)
+            .tags(tags)
+            .build(signer: signer)
         
-        try await event.sign(with: signer)
-        try await ndk.publish(event)
+        _ = try await ndk.publish(event)
     }
     
     private func publishDeletionEvent(for eventId: String) async throws {
-        guard let ndk = ndk, let signer = signer else { return }
+        guard let ndk = ndk, let _ = signer else { return }
         
-        let event = NDKEvent(
-            kind: 5, // Deletion
-            content: "Removed bookmark",
-            tags: [["e", eventId]]
-        )
+        let event = try await NDKEventBuilder(ndk: ndk)
+            .kind(5) // Deletion
+            .content("Removed bookmark")
+            .tags([["e", eventId]])
+            .build(signer: signer)
         
-        try await event.sign(with: signer)
-        try await ndk.publish(event)
+        _ = try await ndk.publish(event)
     }
     
     // MARK: - Loading
@@ -188,17 +186,23 @@ class BookmarkService: ObservableObject {
             tags: ["d": ["articles", "highlights"]]
         )
         
-        do {
-            let events = try await ndk.fetchEvents(filter)
-            await processBookmarkEvents(events)
-        } catch {
-            print("Failed to load bookmarks: \(error)")
+        // Use outbox to get bookmark events
+        let dataSource = await ndk.outbox.observe(
+            filter: filter,
+            maxAge: 300 // 5 minute cache
+        )
+        
+        var events: [NDKEvent] = []
+        for await event in dataSource.events {
+            events.append(event)
         }
+        
+        await processBookmarkEvents(events)
     }
     
     private func processBookmarkEvents(_ events: [NDKEvent]) async {
         for event in events {
-            guard let dTag = event.tags.first(where: { $0.first == "d" })?.dropFirst().first else {
+            guard let dTag = event.tags.first(where: { $0.count > 1 && $0[0] == "d" })?[1] else {
                 continue
             }
             
@@ -217,9 +221,9 @@ class BookmarkService: ObservableObject {
         let articleTags = event.tags.filter { $0.first == "a" }
         
         for tag in articleTags {
-            guard tag.count >= 4,
-                  let articleData = tag[1].split(separator: ":").map(String.init),
-                  articleData.count >= 2 else {
+            guard tag.count >= 4 else { continue }
+            let articleData = tag[1].split(separator: ":").map(String.init)
+            guard articleData.count >= 2 else {
                 continue
             }
             
@@ -235,7 +239,7 @@ class BookmarkService: ObservableObject {
                 summary: nil,
                 content: "", // Will be loaded when opened
                 author: author,
-                publishedAt: event.createdAt,
+                publishedAt: Date(timeIntervalSince1970: TimeInterval(event.createdAt)),
                 image: nil,
                 hashtags: [],
                 createdAt: event.createdAt
@@ -256,26 +260,29 @@ class BookmarkService: ObservableObject {
             if let ndk = ndk {
                 let filter = NDKFilter(ids: [highlightId])
                 
-                do {
-                    if let highlightEvent = try await ndk.fetchEvent(filter) {
-                        // Convert to HighlightEvent
-                        let highlight = HighlightEvent(
-                            id: highlightId,
-                            event: highlightEvent,
-                            content: highlightEvent.content,
-                            author: highlightEvent.pubkey,
-                            createdAt: highlightEvent.createdAt,
-                            context: nil,
-                            url: highlightEvent.tags.first(where: { $0.first == "r" })?.dropFirst().first,
-                            referencedEvent: highlightEvent.tags.first(where: { $0.first == "e" })?.dropFirst().first,
-                            attributedAuthors: highlightEvent.tags.filter { $0.first == "p" }.compactMap { $0.dropFirst().first },
-                            comment: nil
-                        )
-                        
-                        await addHighlightBookmark(highlight)
-                    }
-                } catch {
-                    print("Failed to fetch highlight: \(error)")
+                // Use observe to get the highlight event
+                let highlightDataSource = await ndk.outbox.observe(
+                    filter: filter,
+                    maxAge: 300 // 5 minute cache
+                )
+                
+                for await highlightEvent in highlightDataSource.events {
+                    // Convert to HighlightEvent
+                    let highlight = HighlightEvent(
+                        id: highlightId,
+                        event: highlightEvent,
+                        content: highlightEvent.content,
+                        author: highlightEvent.pubkey,
+                        createdAt: Date(timeIntervalSince1970: TimeInterval(highlightEvent.createdAt)),
+                        context: nil,
+                        url: highlightEvent.tags.first(where: { $0.first == "r" })?.dropFirst().first,
+                        referencedEvent: highlightEvent.tags.first(where: { $0.first == "e" })?.dropFirst().first,
+                        attributedAuthors: highlightEvent.tags.filter { $0.first == "p" }.compactMap { $0.dropFirst().first },
+                        comment: nil
+                    )
+                    
+                    await addHighlightBookmark(highlight)
+                    break // Only need the first event
                 }
             }
         }
@@ -284,24 +291,29 @@ class BookmarkService: ObservableObject {
     // MARK: - Local Storage
     
     private func saveToLocalStorage() {
-        let bookmarkData = BookmarkData(
-            articles: Array(bookmarkedArticles.values),
-            highlights: Array(bookmarkedHighlights.values)
+        // For now, we'll only save the IDs since Article and HighlightEvent contain NDKEvent which isn't Codable
+        let bookmarkIds = BookmarkIds(
+            articleIds: Array(bookmarkedArticles.keys),
+            highlightIds: Array(bookmarkedHighlights.keys)
         )
         
-        if let encoded = try? JSONEncoder().encode(bookmarkData) {
-            UserDefaults.standard.set(encoded, forKey: "highlighter.bookmarks")
+        if let encoded = try? JSONEncoder().encode(bookmarkIds) {
+            UserDefaults.standard.set(encoded, forKey: "highlighter.bookmarks.ids")
         }
     }
     
     private func loadFromLocalStorage() {
-        guard let data = UserDefaults.standard.data(forKey: "highlighter.bookmarks"),
-              let bookmarkData = try? JSONDecoder().decode(BookmarkData.self, from: data) else {
+        guard let data = UserDefaults.standard.data(forKey: "highlighter.bookmarks.ids"),
+              let _ = try? JSONDecoder().decode(BookmarkIds.self, from: data) else {
             return
         }
         
-        bookmarkedArticles = Dictionary(uniqueKeysWithValues: bookmarkData.articles.map { ($0.id, $0) })
-        bookmarkedHighlights = Dictionary(uniqueKeysWithValues: bookmarkData.highlights.map { ($0.id, $0) })
+        // We'll need to fetch the actual events from the network
+        // For now, just clear the local cache since we can't deserialize the full objects
+        bookmarkedArticles.removeAll()
+        bookmarkedHighlights.removeAll()
+        
+        // TODO: Implement fetching bookmarked items from network using saved IDs
     }
     
     // MARK: - Helpers
@@ -319,10 +331,16 @@ class BookmarkService: ObservableObject {
 
 // MARK: - Supporting Types
 
-private struct BookmarkData: Codable {
-    let articles: [Article]
-    let highlights: [HighlightEvent]
+private struct BookmarkIds: Codable {
+    let articleIds: [String]
+    let highlightIds: [String]
 }
+
+// NOTE: BookmarkData is kept for future use when Article and HighlightEvent are made Codable
+// private struct BookmarkData: Codable {
+//     let articles: [Article]
+//     let highlights: [HighlightEvent]
+// }
 
 enum BookmarkError: LocalizedError {
     case notConfigured

@@ -1,5 +1,8 @@
 import SwiftUI
 import NDKSwift
+#if os(iOS)
+import UIKit
+#endif
 
 struct ConversationView: View {
     let conversation: Conversation
