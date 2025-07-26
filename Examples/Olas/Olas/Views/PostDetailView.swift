@@ -3,6 +3,7 @@ import NDKSwift
 
 struct PostDetailView: View {
     let event: NDKEvent
+    @Environment(NostrManager.self) private var nostrManager
     @EnvironmentObject var appState: AppState
     
     @State private var profile: NDKUserProfile?
@@ -126,15 +127,15 @@ struct PostDetailView: View {
                 .environmentObject(appState)
         }
         .sheet(isPresented: $showingZap) {
-            ZapView(event: event)
+            ZapView(event: event, nostrManager: nostrManager)
                 .environmentObject(appState)
         }
     }
     
     private func loadProfile() async {
-        guard let profileManager = appState.profileManager else { return }
+        guard let profileManager = nostrManager.ndk?.profileManager else { return }
         
-        for await profile in await profileManager.observe(for: event.pubkey, maxAge: TimeConstants.hour) {
+        for await profile in await profileManager.observe(for: event.pubkey, maxAge: 3600) {
             await MainActor.run {
                 self.profile = profile
             }
@@ -143,7 +144,7 @@ struct PostDetailView: View {
     }
     
     private func loadEngagementCounts() async {
-        guard let ndk = appState.ndk else { return }
+        guard let ndk = nostrManager.ndk else { return }
         
         // Load reactions
         let reactionFilter = NDKFilter(
@@ -193,7 +194,7 @@ struct PostDetailView: View {
     }
     
     private func toggleLike() {
-        guard let ndk = appState.ndk,
+        guard let ndk = nostrManager.ndk,
               let signer = NDKAuthManager.shared.activeSigner else { return }
         
         hasLiked.toggle()

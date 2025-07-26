@@ -10,19 +10,25 @@ import AppKit
 
 struct ZapView: View {
     let event: NDKEvent
+    @Environment(NostrManager.self) private var nostrManager
     @EnvironmentObject var appState: AppState
     @Environment(\.dismiss) var dismiss
+    @StateObject private var walletManager: OlasWalletManager
     
     @State private var selectedAmount = 1000
     @State private var customAmount = ""
     @State private var comment = ""
     @State private var isLoading = false
     @State private var errorMessage: String?
-    @State private var lightningInvoice: String?
-    @State private var showingQRCode = false
+    @State private var showingSuccess = false
     @State private var recipientProfile: NDKUserProfile?
     
     let presetAmounts = [100, 500, 1000, 5000, 10000, 50000]
+    
+    init(event: NDKEvent, nostrManager: NostrManager) {
+        self.event = event
+        self._walletManager = StateObject(wrappedValue: OlasWalletManager(nostrManager: nostrManager))
+    }
     
     var body: some View {
         NavigationView {
@@ -123,15 +129,22 @@ struct ZapView: View {
                 // Action buttons
                 VStack(spacing: OlasDesign.Spacing.md) {
                     OlasButton(
-                        title: "Generate Invoice",
+                        title: "Send Zap",
                         action: {
                             Task {
-                                await generateInvoice()
+                                await sendZap()
                             }
                         },
                         style: .primary,
-                        isLoading: isLoading
+                        isLoading: isLoading,
+                        isDisabled: !walletManager.isWalletConfigured || selectedAmount > walletManager.currentBalance
                     )
+                    
+                    if walletManager.isWalletConfigured {
+                        Text("Balance: \(formatSats(walletManager.currentBalance)) sats")
+                            .font(OlasDesign.Typography.caption)
+                            .foregroundStyle(OlasDesign.Colors.textSecondary)
+                    }
                     
                     OlasButton(
                         title: "Cancel",
@@ -150,13 +163,16 @@ struct ZapView: View {
             .toolbar(.hidden)
             #endif
         }
-        .sheet(isPresented: $showingQRCode) {
-            if let invoice = lightningInvoice {
-                QRCodeView(invoice: invoice)
+        .alert("Success", isPresented: $showingSuccess) {
+            Button("OK") {
+                dismiss()
             }
+        } message: {
+            Text("Zap sent successfully!")
         }
         .task {
             await fetchRecipientInfo()
+            await loadWallet()
         }
     }
     
@@ -167,12 +183,19 @@ struct ZapView: View {
         return "\(sats)"
     }
     
+    private func formatSats(_ sats: Int64) -> String {
+        let formatter = NumberFormatter()
+        formatter.numberStyle = .decimal
+        formatter.groupingSeparator = ","
+        return formatter.string(from: NSNumber(value: sats)) ?? "0"
+    }
+    
     private func fetchRecipientInfo() async {
-        guard let ndk = appState.ndk,
+        guard let ndk = nostrManager.ndk,
               let profileManager = ndk.profileManager else { return }
         
         // Observe profile
-        for await profile in await profileManager.observe(for: event.pubkey, maxAge: TimeConstants.hour) {
+        for await profile in await profileManager.observe(for: event.pubkey, maxAge: 3600) {
             await MainActor.run {
                 recipientProfile = profile
                 
@@ -188,9 +211,26 @@ struct ZapView: View {
         }
     }
     
-    private func generateInvoice() async {
-        guard appState.ndk != nil else {
-            errorMessage = "Network not connected"
+    private func loadWallet() async {
+        do {
+            try await walletManager.loadWallet()
+        } catch {
+            await MainActor.run {
+                errorMessage = "Failed to load wallet: \(error.localizedDescription)"
+            }
+        }
+    }
+    
+    private func sendZap() async {
+        guard walletManager.isWalletConfigured else {
+            errorMessage = "Wallet not configured. Go to Wallet tab to set it up."
+            return
+        }
+        
+        let zapAmount = Int64(selectedAmount)
+        guard zapAmount <= walletManager.currentBalance else {
+            errorMessage = "Insufficient balance"
+            OlasDesign.Haptic.error()
             return
         }
         
@@ -199,31 +239,15 @@ struct ZapView: View {
             errorMessage = nil
         }
         
-        // For now, we'll show a message about wallet configuration
-        // In a real implementation, this would use NDKZapManager
-        
-        await MainActor.run {
-            errorMessage = "Lightning wallet not configured. Use a Nostr client with wallet support to send zaps."
-            isLoading = false
-        }
-        
-        // Example of how it would work with a configured wallet:
-        /*
         do {
-            let zapManager = NDKZapManager(ndk: ndk)
-            await zapManager.configureDefaults()
-            
-            let recipient = NDKUser(pubkey: event.pubkey)
-            let result = try await zapManager.zap(
-                event: event,
-                recipient: recipient,
-                amountSats: Int64(selectedAmount),
+            try await walletManager.zapEvent(
+                event,
+                amount: zapAmount,
                 comment: comment.isEmpty ? nil : comment
             )
             
             await MainActor.run {
-                // Success! Close the sheet
-                dismiss()
+                showingSuccess = true
                 OlasDesign.Haptic.success()
             }
         } catch {
@@ -233,7 +257,6 @@ struct ZapView: View {
                 OlasDesign.Haptic.error()
             }
         }
-        */
     }
 }
 
