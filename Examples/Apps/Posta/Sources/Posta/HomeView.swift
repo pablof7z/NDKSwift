@@ -9,14 +9,9 @@ struct HomeView: View {
     @State private var replyTracker: ReplyTracker?
     
     // Data source for notes
-    @StateObject private var notesDataSource: SessionNotesDataSource
+    @State private var notesDataSource: SessionNotesDataSource?
     @State private var newNotesCount: Int = 0
     @State private var showContent = false
-    
-    init() {
-        // Initialize data source with a placeholder - will be updated when NDK is available
-        _notesDataSource = StateObject(wrappedValue: SessionNotesDataSource(ndk: NDK(relayUrls: [])))
-    }
     
     var body: some View {
         NavigationView {
@@ -38,10 +33,17 @@ struct HomeView: View {
                     headerView
                     
                     // Main content
-                    if notesDataSource.notes.isEmpty && !notesDataSource.isLoading {
-                        emptyStateView
+                    if let dataSource = notesDataSource {
+                        if dataSource.notes.isEmpty && !dataSource.isLoading {
+                            emptyStateView
+                        } else {
+                            chatListView
+                        }
                     } else {
-                        chatListView
+                        // Show loading while data source initializes
+                        ProgressView()
+                            .scaleEffect(1.5)
+                            .frame(maxWidth: .infinity, maxHeight: .infinity)
                     }
                 }
                 
@@ -71,21 +73,31 @@ struct HomeView: View {
             print("📦 [HomeView] ndkManager.ndk = \(ndkManager.ndk != nil ? "Available" : "NIL")")
             if let ndk = ndkManager.ndk {
                 print("📦 [HomeView] ndk.signer = \(ndk.signer != nil ? "Available" : "NIL")")
-                // Recreate data source with actual NDK instance
-                if notesDataSource.ndk !== ndk {
-                    Task {
-                        await MainActor.run {
-                            self._notesDataSource.wrappedValue = SessionNotesDataSource(ndk: ndk)
-                        }
-                    }
+                // Create data source if not already created
+                if notesDataSource == nil {
+                    notesDataSource = SessionNotesDataSource(ndk: ndk)
                 }
             }
+            
+            // Animate content appearance
+            withAnimation(.spring(response: 0.5, dampingFraction: 0.8).delay(0.1)) {
+                showContent = true
+            }
         }
-        .onChange(of: notesDataSource.sessionData) { _, sessionData in
-            // Initialize reply tracker when session data is available
-            if let sessionData = sessionData, replyTracker == nil {
-                replyTracker = ReplyTracker(ndk: notesDataSource.ndk, following: sessionData.followList)
-                print("📝 [HomeView] Reply tracker initialized")
+        .task {
+            // Wait for data source to be created
+            while notesDataSource == nil {
+                try? await Task.sleep(nanoseconds: 100_000_000) // 100ms
+            }
+            
+            guard let dataSource = notesDataSource else { return }
+            
+            // Monitor session data changes
+            for await _ in dataSource.$sessionData.values {
+                if let sessionData = dataSource.sessionData, replyTracker == nil {
+                    replyTracker = ReplyTracker(ndk: dataSource.ndk, following: sessionData.followList)
+                    print("📝 [HomeView] Reply tracker initialized")
+                }
             }
         }
         .onDisappear {
@@ -126,7 +138,7 @@ struct HomeView: View {
                     // Sync button with animation
                     Button(action: {
                         Task {
-                            await notesDataSource.refresh()
+                            await notesDataSource?.refresh()
                         }
                     }) {
                         ZStack {
@@ -143,7 +155,7 @@ struct HomeView: View {
                                 )
                                 .frame(width: 40, height: 40)
                             
-                            if notesDataSource.isLoading {
+                            if notesDataSource?.isLoading == true {
                                 ProgressView()
                                     .scaleEffect(0.7)
                                     .tint(.purple)
@@ -151,13 +163,13 @@ struct HomeView: View {
                                 Image(systemName: "arrow.clockwise")
                                     .font(.system(size: 16, weight: .medium))
                                     .foregroundColor(.purple)
-                                    .rotationEffect(.degrees(notesDataSource.isLoading ? 360 : 0))
+                                    .rotationEffect(.degrees(notesDataSource?.isLoading == true ? 360 : 0))
                             }
                         }
                     }
-                    .disabled(notesDataSource.isLoading)
-                    .scaleEffect(notesDataSource.isLoading ? 0.95 : 1)
-                    .animation(.easeInOut(duration: 0.2), value: notesDataSource.isLoading)
+                    .disabled(notesDataSource?.isLoading == true)
+                    .scaleEffect(notesDataSource?.isLoading == true ? 0.95 : 1)
+                    .animation(.easeInOut(duration: 0.2), value: notesDataSource?.isLoading == true)
                     
                     // Profile button with gradient
                     Button(action: {
@@ -190,14 +202,14 @@ struct HomeView: View {
                 .padding(.bottom, 10)
                 
                 // Connection status
-                if let error = notesDataSource.error {
+                if let error = notesDataSource?.error {
                     ErrorBanner(error: error)
                         .padding(.horizontal, 16)
                         .padding(.bottom, 6)
                 }
                 
                 // Sync status
-                if notesDataSource.hasEOSE {
+                if notesDataSource?.hasEOSE == true {
                     Text("Synced")
                         .font(.caption2)
                         .foregroundColor(.secondary)
@@ -205,7 +217,7 @@ struct HomeView: View {
                 }
             }
         }
-        .frame(height: notesDataSource.error != nil ? 90 : 70)
+        .frame(height: notesDataSource?.error != nil ? 90 : 70)
         .shadow(color: Color.black.opacity(0.03), radius: 3, x: 0, y: 1)
     }
     
@@ -273,7 +285,7 @@ struct HomeView: View {
                                 }
                             }
                         
-                        ForEach(Array(notesDataSource.notes.enumerated()), id: \.element.id) { index, event in
+                        ForEach(Array((notesDataSource?.notes ?? []).enumerated()), id: \.element.id) { index, event in
                             ChatRowView(
                                 event: event,
                                 replyTracker: replyTracker,

@@ -256,18 +256,38 @@ public class SessionNotesDataSource: ObservableObject {
         }
     }
     
+    /// Initialize with immediate setup if signer is available
+    public static func createWithSetup(ndk: NDK) async -> SessionNotesDataSource {
+        let dataSource = SessionNotesDataSource(ndk: ndk)
+        await dataSource.setupSession()
+        return dataSource
+    }
+    
     deinit {
         eoseTask?.cancel()
     }
     
     private func setupSession() async {
-        guard let signer = ndk.signer else {
-            self.error = NostrError.signerRequired
-            return
-        }
-        
         do {
             isLoading = true
+            
+            // Wait for authentication to complete
+            // This ensures authManager has restored the session and set the signer
+            if ndk.signer == nil {
+                // Monitor for signer availability
+                for _ in 0..<30 { // Wait up to 3 seconds
+                    try await Task.sleep(nanoseconds: 100_000_000) // 100ms
+                    if ndk.signer != nil {
+                        break
+                    }
+                }
+            }
+            
+            guard let signer = ndk.signer else {
+                self.error = NostrError.signerRequired
+                isLoading = false
+                return
+            }
             
             // Start session with proper configuration
             let config = NDKSessionConfiguration(
@@ -278,8 +298,12 @@ public class SessionNotesDataSource: ObservableObject {
             let sessionData = try await ndk.startSession(signer: signer, config: config)
             self.sessionData = sessionData
             
+            print("📱 [SessionNotesDataSource] Session started for pubkey: \(sessionData.pubkey)")
+            print("📱 [SessionNotesDataSource] Follow list count: \(sessionData.followList.count)")
+            print("📱 [SessionNotesDataSource] First 5 follows: \(Array(sessionData.followList.prefix(5)))")
+            
             // Create reactive filter for notes from followed users
-            let filter = ReactiveFilter(
+            _ = ReactiveFilter(
                 dependencies: [.followList],
                 builder: { sessionData in
                     let follows = Array(sessionData.followList)
@@ -293,10 +317,32 @@ public class SessionNotesDataSource: ObservableObject {
             
             // For now, observe with a static filter based on initial session data
             // TODO: Implement proper reactive filter support in NDK
+            var authors = Array(sessionData.followList) + [sessionData.pubkey]
+            
+            // If user has no follows, add some popular accounts to bootstrap the feed
+            if sessionData.followList.isEmpty {
+                print("📱 [SessionNotesDataSource] User has no follows, adding popular accounts to bootstrap feed")
+                // Add some popular Nostr accounts
+                let popularAccounts = [
+                    "82341f882b6eabcd2ba7f1ef90aad961cf074af15b9ef44a09f9d2a8fbfbe6a2", // jack
+                    "3bf0c63fcb93463407af97a5e5ee64fa883d107ef9e558472c4eb9aaaefa459d", // fiatjaf
+                    "04c915daefee38317fa734444acee390a8269fe5810b2241e5e6dd343dfbecc9", // ODELL
+                    "6e468422dfb74a5738702a8823b9b28168abab8655faacb6853cd0ee15deee93", // Gigi
+                    "e88a691e98d9987c964521dff60025f60700378a4879180dcbbb4a5027850411" // nvk
+                ]
+                authors.append(contentsOf: popularAccounts)
+            }
+            
+            print("📱 [SessionNotesDataSource] Creating filter for \(authors.count) authors")
+            
+            // Fetch notes from the last 24 hours to ensure we get some content
+            let since = Timestamp(Date().timeIntervalSince1970 - 86400) // 24 hours ago
+            
             let initialFilter = NDKFilter(
-                authors: Array(sessionData.followList) + [sessionData.pubkey],
+                authors: authors,
                 kinds: [1], // text notes
-                limit: 100
+                since: since,
+                limit: 200
             )
             
             dataSource = ndk.observe(
@@ -304,6 +350,8 @@ public class SessionNotesDataSource: ObservableObject {
                 maxAge: 0,
                 cachePolicy: .cacheWithNetwork
             )
+            
+            print("📱 [SessionNotesDataSource] Started observing notes with filter")
             
             await observeNotes()
             
@@ -319,15 +367,23 @@ public class SessionNotesDataSource: ObservableObject {
         // Monitor EOSE status
         eoseTask = Task {
             for await update in dataSource.relayUpdates {
-                if case .eose = update {
+                switch update {
+                case .eose(let relay):
                     hasEOSE = true
+                    print("📱 [SessionNotesDataSource] EOSE received from relay: \(relay)")
+                case .event(let event, let relay):
+                    print("📱 [SessionNotesDataSource] Event received from \(relay): kind=\(event.kind), content=\(String(event.content.prefix(50)))...")
                 }
             }
         }
         
         dataSource.$data
             .map { events in
-                events.sorted { $0.createdAt > $1.createdAt }
+                print("📱 [SessionNotesDataSource] Received \(events.count) notes total")
+                if events.isEmpty {
+                    print("📱 [SessionNotesDataSource] No notes found - check if follow list is empty or relays are connected")
+                }
+                return events.sorted { $0.createdAt > $1.createdAt }
             }
             .assign(to: &$notes)
         
@@ -342,10 +398,12 @@ public class SessionNotesDataSource: ObservableObject {
         
         // Force network fetch by recreating the data source
         if let sessionData = sessionData {
+            let since = Timestamp(Date().timeIntervalSince1970 - 86400) // 24 hours ago
             let filter = NDKFilter(
                 authors: Array(sessionData.followList) + [sessionData.pubkey],
                 kinds: [1], // text notes
-                limit: 100
+                since: since,
+                limit: 200
             )
             
             dataSource = ndk.observe(

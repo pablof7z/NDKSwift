@@ -2,6 +2,7 @@ import SwiftUI
 import NDKSwift
 
 struct AuthenticationView: View {
+    @Environment(NostrManager.self) private var nostrManager
     @EnvironmentObject var appState: AppState
     @State private var showOnboarding = false
     @State private var privateKey = ""
@@ -122,6 +123,7 @@ struct AuthenticationView: View {
 
 // MARK: - Login Sheet
 struct LoginSheet: View {
+    @Environment(NostrManager.self) private var nostrManager
     @EnvironmentObject var appState: AppState
     @Environment(\.dismiss) var dismiss
     @State private var privateKey = ""
@@ -274,12 +276,12 @@ struct LoginSheet: View {
         
         Task {
             do {
-                try await appState.login(with: privateKey)
+                try await nostrManager.login(with: privateKey)
                 HapticManager.notification(.success)
                 dismiss()
             } catch {
                 isLoading = false
-                errorMessage = "Invalid private key. Please check and try again."
+                errorMessage = error.localizedDescription
                 showError = true
                 HapticManager.notification(.error)
             }

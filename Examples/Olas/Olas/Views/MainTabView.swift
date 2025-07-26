@@ -2,6 +2,7 @@ import SwiftUI
 import NDKSwift
 
 struct MainTabView: View {
+    @Environment(NostrManager.self) private var nostrManager
     @EnvironmentObject var appState: AppState
     @State private var selectedTab = 0
     @State private var previousTab = 0
@@ -37,9 +38,9 @@ struct MainTabView: View {
             
             // Profile Tab
             Group {
-                if let currentUserPubkey = appState.currentUser?.pubkey {
+                if let session = nostrManager.authManager.activeSession {
                     NavigationStack {
-                        ProfileView(pubkey: currentUserPubkey)
+                        ProfileView(pubkey: session.pubkey)
                     }
                 } else {
                     Text("Profile")
@@ -65,6 +66,7 @@ struct MainTabView: View {
         .sheet(isPresented: $showCreatePost) {
             CreatePostView()
                 .environmentObject(appState)
+                .environment(nostrManager)
         }
     }
 }

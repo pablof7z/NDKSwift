@@ -12,6 +12,7 @@
 		11ACF5202A0A6CD1804D99E2 /* PrivacySettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CABF96A49CF7DCDEA2A81490 /* PrivacySettingsView.swift */; };
 		157D2AFCCAA658DB509E3EA6 /* AnimatedBackgroundView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 41A802FB194F271DB550DC50 /* AnimatedBackgroundView.swift */; };
 		15DF43D8E7C3FFF42A66F674 /* AccountSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA715CB14D15CD0742DCB3F8 /* AccountSettingsView.swift */; };
+		1A1C263ADEC94A9D4EDE9ED5 /* TabButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = 62FD85B77D55CDEA83D2A152 /* TabButton.swift */; };
 		1A774ADE6D76D904F1B29BA8 /* AnimationComponents.swift in Sources */ = {isa = PBXBuildFile; fileRef = 66630FA4E561A8E074D698A7 /* AnimationComponents.swift */; };
 		24EF887905A3990936B4C4DB /* EventPreviewView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2402EEA1C73D8BE080722363 /* EventPreviewView.swift */; };
 		2C05F20FAA0F92B19080AB15 /* ViewModifiers.swift in Sources */ = {isa = PBXBuildFile; fileRef = 87A4E9A5C08A3AD13E3E53CF /* ViewModifiers.swift */; };
@@ -21,6 +22,7 @@
 		4D6ADD01EECC9EA78723EB06 /* ThreadView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DB1F484FFC62DD699207A5BB /* ThreadView.swift */; };
 		5EDEC41B27259D583600D702 /* AsyncContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 328D71639B7B8A43731FD93B /* AsyncContentView.swift */; };
 		64A3B7DBDD29753F0C13F686 /* ProfileLoader.swift in Sources */ = {isa = PBXBuildFile; fileRef = EBEDFAC64ACCBBFE08641C6B /* ProfileLoader.swift */; };
+		6A171B2687E36904E8B9B878 /* DesignSystem.swift in Sources */ = {isa = PBXBuildFile; fileRef = 061B5EF1635DF7ED238B4CBF /* DesignSystem.swift */; };
 		6A1C3CE24E1DE3A27D51523A /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7FC51DF064CDBF43562A49B7 /* ContentView.swift */; };
 		6C97E674C32B0E1C93C8487A /* RelayManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0D7BB846C97E0CE4754F485A /* RelayManager.swift */; };
 		716C31946AD210A3F883C0A6 /* MessageCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = C6ECDBBABE75BAD50D391D63 /* MessageCard.swift */; };
@@ -42,6 +44,7 @@
 		CE9609CFA7A6B69120E33263 /* PostaWelcomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8A99D919DCB38E3E630D88B1 /* PostaWelcomeView.swift */; };
 		CF89F728E5EC4D00152148EE /* PostaLogoView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2283F7EFC771B09FEF1D7751 /* PostaLogoView.swift */; };
 		D0504F3789EF3D2E1D316695 /* AboutView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F262F1D409139EEE06AB75A2 /* AboutView.swift */; };
+		D23E839BA83549F49BDFF9AA /* QRScannerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C417C1B7CE88B5A8165D2D7C /* QRScannerView.swift */; };
 		DBDD47227EA8D7942871F195 /* RelayStatusViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 57DC64B9A06DA00271009471 /* RelayStatusViews.swift */; };
 		DFBE09ED69CC11EA9CC1A798 /* AdvancedSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 22FA6D73D50DF5AF2CCCF558 /* AdvancedSettingsView.swift */; };
 		ED4C661205BEE20D13793DD7 /* PostaApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 91767EC64A1E67DD57D491CA /* PostaApp.swift */; };
@@ -51,6 +54,7 @@
 
 /* Begin PBXFileReference section */
 		01A98A4F92B708F7B99225EB /* NDKSwift-z94ws0 */ = {isa = PBXFileReference; lastKnownFileType = folder; name = "NDKSwift-z94ws0"; path = ../../..; sourceTree = SOURCE_ROOT; };
+		061B5EF1635DF7ED238B4CBF /* DesignSystem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesignSystem.swift; sourceTree = "<group>"; };
 		0D7BB846C97E0CE4754F485A /* RelayManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RelayManager.swift; sourceTree = "<group>"; };
 		0DBD81CB29A5387DD9C8217C /* AppearanceSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppearanceSettingsView.swift; sourceTree = "<group>"; };
 		0E1C662710FBEF7F41C5E825 /* LaunchScreen.storyboard */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; path = LaunchScreen.storyboard; sourceTree = "<group>"; };
@@ -70,6 +74,7 @@
 		57DC64B9A06DA00271009471 /* RelayStatusViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RelayStatusViews.swift; sourceTree = "<group>"; };
 		57E4286C68B29F1067E1E5E9 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
 		5ECF4C7D65C2B2F19A8DB993 /* HapticFeedback.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HapticFeedback.swift; sourceTree = "<group>"; };
+		62FD85B77D55CDEA83D2A152 /* TabButton.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TabButton.swift; sourceTree = "<group>"; };
 		66630FA4E561A8E074D698A7 /* AnimationComponents.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnimationComponents.swift; sourceTree = "<group>"; };
 		723539740E0D28EEC30522D9 /* HomeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeView.swift; sourceTree = "<group>"; };
 		78DBE8E39C609943071FC986 /* URLPreviewView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = URLPreviewView.swift; sourceTree = "<group>"; };
@@ -85,6 +90,7 @@
 		B88397F1C4B9DC130C6BF474 /* VisualEffectBlur.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VisualEffectBlur.swift; sourceTree = "<group>"; };
 		BEDEBABCCA89FA3B2EC9CF49 /* NDKManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NDKManager.swift; sourceTree = "<group>"; };
 		C131650403671166D1B2BD44 /* RichTextView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RichTextView.swift; sourceTree = "<group>"; };
+		C417C1B7CE88B5A8165D2D7C /* QRScannerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QRScannerView.swift; sourceTree = "<group>"; };
 		C6ECDBBABE75BAD50D391D63 /* MessageCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MessageCard.swift; sourceTree = "<group>"; };
 		CABF96A49CF7DCDEA2A81490 /* PrivacySettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PrivacySettingsView.swift; sourceTree = "<group>"; };
 		DB1F484FFC62DD699207A5BB /* ThreadView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ThreadView.swift; sourceTree = "<group>"; };
@@ -142,8 +148,10 @@
 				C6ECDBBABE75BAD50D391D63 /* MessageCard.swift */,
 				2283F7EFC771B09FEF1D7751 /* PostaLogoView.swift */,
 				EBEDFAC64ACCBBFE08641C6B /* ProfileLoader.swift */,
+				C417C1B7CE88B5A8165D2D7C /* QRScannerView.swift */,
 				57DC64B9A06DA00271009471 /* RelayStatusViews.swift */,
 				C131650403671166D1B2BD44 /* RichTextView.swift */,
+				62FD85B77D55CDEA83D2A152 /* TabButton.swift */,
 				78DBE8E39C609943071FC986 /* URLPreviewView.swift */,
 				87A4E9A5C08A3AD13E3E53CF /* ViewModifiers.swift */,
 			);
@@ -175,6 +183,7 @@
 				0DBD81CB29A5387DD9C8217C /* AppearanceSettingsView.swift */,
 				473DF610696C7C8D6BE3D7C9 /* Assets.xcassets */,
 				7FC51DF064CDBF43562A49B7 /* ContentView.swift */,
+				061B5EF1635DF7ED238B4CBF /* DesignSystem.swift */,
 				723539740E0D28EEC30522D9 /* HomeView.swift */,
 				4FFAA2438B334E8D89CA9115 /* Info.plist */,
 				0E1C662710FBEF7F41C5E825 /* LaunchScreen.storyboard */,
@@ -295,6 +304,7 @@
 				A677E223B0C3B07B2A454BD2 /* AppearanceSettingsView.swift in Sources */,
 				5EDEC41B27259D583600D702 /* AsyncContentView.swift in Sources */,
 				6A1C3CE24E1DE3A27D51523A /* ContentView.swift in Sources */,
+				6A171B2687E36904E8B9B878 /* DesignSystem.swift in Sources */,
 				24EF887905A3990936B4C4DB /* EventPreviewView.swift in Sources */,
 				8BE9078F668957CFB492B202 /* FullScreenImageView.swift in Sources */,
 				97F3E22EF9E861D4B667126F /* HapticFeedback.swift in Sources */,
@@ -311,6 +321,7 @@
 				11ACF5202A0A6CD1804D99E2 /* PrivacySettingsView.swift in Sources */,
 				64A3B7DBDD29753F0C13F686 /* ProfileLoader.swift in Sources */,
 				A97DD097A817F1970846D503 /* ProfileView.swift in Sources */,
+				D23E839BA83549F49BDFF9AA /* QRScannerView.swift in Sources */,
 				6C97E674C32B0E1C93C8487A /* RelayManager.swift in Sources */,
 				F5DAE67FEF06F4F2DAE5E957 /* RelaySettingsView.swift in Sources */,
 				DBDD47227EA8D7942871F195 /* RelayStatusViews.swift in Sources */,
@@ -318,6 +329,7 @@
 				A4532FD2AA8BFBDE4B46F4A2 /* RichTextView.swift in Sources */,
 				724D3774AD60E792300AD9A5 /* SettingsView.swift in Sources */,
 				1089942926B933752761F2EF /* SplashView.swift in Sources */,
+				1A1C263ADEC94A9D4EDE9ED5 /* TabButton.swift in Sources */,
 				81A513C4F226861819FD14C8 /* ThemeManager.swift in Sources */,
 				4D6ADD01EECC9EA78723EB06 /* ThreadView.swift in Sources */,
 				3AD0FE7C0FAA4892AD482DC8 /* URLPreviewView.swift in Sources */,

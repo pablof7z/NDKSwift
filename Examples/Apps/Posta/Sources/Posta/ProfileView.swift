@@ -17,6 +17,8 @@ struct ProfileView: View {
     @State private var followerCount: Int?
     @State private var isFollowing = false
     @State private var showingQRCode = false
+    @State private var selectedTab = 0
+    @State private var showContent = false
     
     private var displayPubkey: String {
         pubkey ?? authManager.activeSession?.pubkey ?? ""
@@ -29,15 +31,15 @@ struct ProfileView: View {
     var body: some View {
         NavigationView {
             ZStack {
-                // Sophisticated gradient background
+                // Animated gradient background
                 LinearGradient(
-                    gradient: Gradient(stops: [
-                        .init(color: Color(.systemBackground), location: 0),
-                        .init(color: Color(.systemBackground).opacity(0.97), location: 0.3),
-                        .init(color: Color(.secondarySystemBackground).opacity(0.3), location: 1)
+                    gradient: Gradient(colors: [
+                        Color(.systemBackground),
+                        Color.purple.opacity(0.03),
+                        Color(.systemBackground)
                     ]),
-                    startPoint: .top,
-                    endPoint: .bottom
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
                 )
                 .ignoresSafeArea()
                 
@@ -60,9 +62,24 @@ struct ProfileView: View {
                                 .padding(.horizontal, 20)
                                 .padding(.top, 20)
                             
-                            // Notes section
-                            notesSection
-                                .padding(.top, 32)
+                            // Tab selector
+                            tabSelector
+                                .padding(.top, 24)
+                            
+                            // Content based on selected tab
+                            switch selectedTab {
+                            case 0:
+                                notesSection
+                                    .padding(.top, 8)
+                            case 1:
+                                repliesSection
+                                    .padding(.top, 8)
+                            case 2:
+                                mediaSection
+                                    .padding(.top, 8)
+                            default:
+                                EmptyView()
+                            }
                         }
                     }
                     .ignoresSafeArea(edges: .top)
@@ -96,89 +113,103 @@ struct ProfileView: View {
     
     private var profileHeaderView: some View {
         ZStack(alignment: .bottom) {
-            // Banner
-            if let banner = profile?.banner, let url = URL(string: banner) {
-                AsyncImage(url: url) { image in
-                    image
-                        .resizable()
-                        .aspectRatio(contentMode: .fill)
-                } placeholder: {
-                    Rectangle()
-                        .fill(LinearGradient(
-                            colors: [Color(.systemGray5), Color(.systemGray6)],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        ))
+            // Banner with parallax effect
+            GeometryReader { geometry in
+                if let banner = profile?.banner, let url = URL(string: banner) {
+                    AsyncImage(url: url) { image in
+                        image
+                            .resizable()
+                            .aspectRatio(contentMode: .fill)
+                    } placeholder: {
+                        shimmeringBannerPlaceholder
+                    }
+                    .frame(width: geometry.size.width, height: 250)
+                    .clipped()
+                    .overlay(bannerOverlay)
+                } else {
+                    defaultBanner
+                        .frame(height: 250)
                 }
-                .frame(height: 200)
-                .clipped()
-                .overlay(
-                    LinearGradient(
-                        colors: [Color.black.opacity(0), Color.black.opacity(0.3)],
-                        startPoint: .center,
-                        endPoint: .bottom
-                    )
-                )
-            } else {
-                Rectangle()
-                    .fill(LinearGradient(
-                        colors: [Color(.systemGray5), Color(.systemGray6)],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    ))
-                    .frame(height: 200)
             }
+            .frame(height: 200)
+            .clipped()
             
-            // Avatar
+            // Avatar with animation
             HStack {
                 avatarView
                     .padding(.leading, 20)
                     .padding(.bottom, -50)
+                    .scaleEffect(showContent ? 1 : 0.8)
+                    .opacity(showContent ? 1 : 0)
                 Spacer()
             }
         }
         .frame(height: 200)
+        .onAppear {
+            withAnimation(.spring(response: 0.6, dampingFraction: 0.8).delay(0.2)) {
+                showContent = true
+            }
+        }
+    }
+    
+    private var shimmeringBannerPlaceholder: some View {
+        Rectangle()
+            .fill(Color(.systemGray5))
+            .shimmer()
+    }
+    
+    private var defaultBanner: some View {
+        ZStack {
+            LinearGradient(
+                gradient: Gradient(colors: [
+                    Color.purple.opacity(0.3),
+                    Color.purple.opacity(0.1)
+                ]),
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+            
+            // Animated pattern
+            WaveShape(phase: 0)
+                .fill(Color.purple.opacity(0.1))
+                .offset(y: 50)
+        }
+    }
+    
+    private var bannerOverlay: some View {
+        LinearGradient(
+            colors: [
+                Color.black.opacity(0),
+                Color.black.opacity(0.2),
+                Color.black.opacity(0.4)
+            ],
+            startPoint: .top,
+            endPoint: .bottom
+        )
     }
     
     private var avatarView: some View {
-        Group {
-            if let picture = profile?.picture, let url = URL(string: picture) {
-                AsyncImage(url: url) { image in
-                    image
-                        .resizable()
-                        .aspectRatio(contentMode: .fill)
-                } placeholder: {
-                    Circle()
-                        .fill(Color(.tertiarySystemFill))
-                        .overlay(
-                            Text(avatarInitial)
-                                .font(.system(size: 48, weight: .medium))
-                                .foregroundColor(.secondary)
-                        )
-                }
-                .frame(width: 120, height: 120)
-                .clipShape(Circle())
-                .overlay(
-                    Circle()
-                        .stroke(Color(.systemBackground), lineWidth: 4)
+        EnhancedAvatarView(
+            url: profile?.picture.flatMap { URL(string: $0) },
+            size: 120,
+            fallbackText: avatarInitial,
+            showOnlineIndicator: false
+        )
+        .overlay(
+            Circle()
+                .stroke(
+                    LinearGradient(
+                        gradient: Gradient(colors: [
+                            Color.purple.opacity(0.5),
+                            Color.purple.opacity(0.2)
+                        ]),
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    ),
+                    lineWidth: 3
                 )
-                .shadow(radius: 8)
-            } else {
-                Circle()
-                    .fill(Color(.tertiarySystemFill))
-                    .frame(width: 120, height: 120)
-                    .overlay(
-                        Text(avatarInitial)
-                            .font(.system(size: 48, weight: .medium))
-                            .foregroundColor(.secondary)
-                    )
-                    .overlay(
-                        Circle()
-                            .stroke(Color(.systemBackground), lineWidth: 4)
-                    )
-                    .shadow(radius: 8)
-            }
-        }
+        )
+        .shadow(color: Color.purple.opacity(0.2), radius: 12, x: 0, y: 4)
     }
     
     private var avatarInitial: String {
@@ -227,23 +258,23 @@ struct ProfileView: View {
             HStack(spacing: 12) {
                 if displayPubkey != authManager.activeSession?.pubkey {
                     Button(action: {
+                        HapticFeedback.notification(.success)
                         // Toggle follow
                     }) {
                         HStack {
                             Image(systemName: isFollowing ? "person.badge.minus" : "person.badge.plus")
                             Text(isFollowing ? "Unfollow" : "Follow")
                         }
-                        .font(.system(size: 16, weight: .medium))
-                        .foregroundColor(isFollowing ? .primary : .white)
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 10)
-                        .background(isFollowing ? Color(.tertiarySystemFill) : Color.accentColor)
-                        .cornerRadius(10)
                     }
+                    .buttonStyle(GradientButtonStyle(
+                        colors: isFollowing ? [Color(.tertiarySystemFill), Color(.tertiarySystemFill)] : [Color.purple, Color.purple.opacity(0.8)],
+                        shadowColor: isFollowing ? .clear : .purple
+                    ))
                 }
                 
                 Button(action: {
                     showingQRCode = true
+                    HapticFeedback.impact(.light)
                 }) {
                     Image(systemName: "qrcode")
                         .font(.system(size: 16, weight: .medium))
@@ -252,6 +283,7 @@ struct ProfileView: View {
                         .background(Color(.tertiarySystemFill))
                         .cornerRadius(10)
                 }
+                .buttonStyle(HapticButtonStyle())
             }
         }
     }
@@ -302,13 +334,58 @@ struct ProfileView: View {
     
     private var closeButton: some View {
         Button(action: {
+            HapticFeedback.impact(.light)
             dismiss()
         }) {
-            Image(systemName: "xmark.circle.fill")
-                .font(.title2)
-                .foregroundStyle(.secondary, Color(.tertiarySystemFill))
+            ZStack {
+                VisualEffectBlur(blurStyle: .systemThinMaterial)
+                    .frame(width: 36, height: 36)
+                    .clipShape(Circle())
+                
+                Image(systemName: "xmark")
+                    .font(.system(size: 16, weight: .medium))
+                    .foregroundColor(.primary)
+            }
         }
         .padding()
+    }
+    
+    private var tabSelector: some View {
+        HStack(spacing: 0) {
+            TabButton(title: "Posts", icon: "note.text", isSelected: selectedTab == 0) {
+                selectedTab = 0
+                HapticFeedback.selection()
+            }
+            
+            TabButton(title: "Replies", icon: "bubble.left", isSelected: selectedTab == 1) {
+                selectedTab = 1
+                HapticFeedback.selection()
+            }
+            
+            TabButton(title: "Media", icon: "photo", isSelected: selectedTab == 2) {
+                selectedTab = 2
+                HapticFeedback.selection()
+            }
+        }
+        .padding(.horizontal, 20)
+    }
+    
+    private var repliesSection: some View {
+        VStack {
+            Text("Replies")
+                .font(.title3)
+                .padding()
+            // TODO: Implement replies
+        }
+    }
+    
+    private var mediaSection: some View {
+        VStack {
+            Text("Media")
+                .font(.title3)
+                .padding()
+            // TODO: Implement media grid
+        }
     }
     
     private func loadStats() async {

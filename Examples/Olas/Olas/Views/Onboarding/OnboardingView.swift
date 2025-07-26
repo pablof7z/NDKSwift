@@ -1,6 +1,7 @@
 import SwiftUI
 
 struct OnboardingView: View {
+    @Environment(NostrManager.self) private var nostrManager
     @EnvironmentObject var appState: AppState
     @State private var currentPage = 0
     @State private var animateContent = false
@@ -299,6 +300,7 @@ struct SurroundingNode: View {
 
 // MARK: - Key Generation
 struct KeyGenerationView: View {
+    @Environment(NostrManager.self) private var nostrManager
     @EnvironmentObject var appState: AppState
     @State private var animate = false
     @State private var particles: [Particle] = []
@@ -504,7 +506,14 @@ struct KeyGenerationView: View {
     
     private func completeOnboarding() {
         Task {
-            await appState.createAccount(privateKey: privateKey)
+            do {
+                _ = try await nostrManager.createNewAccount(
+                    displayName: "Olas User",
+                    about: "Visual storyteller on Nostr 📸"
+                )
+            } catch {
+                print("Failed to create account: \(error)")
+            }
         }
     }
 }

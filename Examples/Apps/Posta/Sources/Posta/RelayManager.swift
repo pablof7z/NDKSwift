@@ -9,7 +9,10 @@ class RelayManager {
     var userAddedRelays: Set<String> = []
     
     private let defaultRelays = [
-        RelayConstants.primal
+        RelayConstants.primal,
+        RelayConstants.damus,
+        RelayConstants.nostrBand,
+        RelayConstants.nosLol
     ]
     
     private let userRelaysKey = "user_added_relays"
