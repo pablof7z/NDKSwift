@@ -1,7 +1,7 @@
 import Foundation
 import NDKSwift
 
-struct AudioEvent: Identifiable {
+struct AudioEvent: Identifiable, Equatable {
     let id: String
     let event: NDKEvent
     let author: NDKUser
@@ -18,6 +18,10 @@ struct AudioEvent: Identifiable {
     var likeCount: Int = 0
     var zapCount: Int = 0
     var replyCount: Int = 0
+    
+    static func == (lhs: AudioEvent, rhs: AudioEvent) -> Bool {
+        lhs.id == rhs.id
+    }
     
     var sortScore: Double {
         // Combine recency and web of trust

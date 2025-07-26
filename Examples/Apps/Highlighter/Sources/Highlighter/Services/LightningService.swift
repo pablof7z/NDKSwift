@@ -480,9 +480,44 @@ class LightningService: ObservableObject {
         }
     }
     
+    // MARK: - Mock Payment Generation
+    
+    func generateMockPayment() async -> ActivePayment {
+        let mockSplits = [
+            PaymentSplit(
+                recipientPubkey: "mock_highlighter_pubkey",
+                amount: 300,
+                role: .highlighter,
+                isOriginal: true
+            ),
+            PaymentSplit(
+                recipientPubkey: "mock_author_pubkey",
+                amount: 500,
+                role: .author,
+                isOriginal: false
+            ),
+            PaymentSplit(
+                recipientPubkey: "mock_curator_pubkey",
+                amount: 200,
+                role: .curator,
+                isOriginal: false
+            )
+        ]
+        
+        return ActivePayment(
+            id: UUID(),
+            totalAmount: 1000,
+            splits: mockSplits,
+            highlightId: "mock_highlight_id",
+            comment: "Mock payment for testing",
+            status: .pending,
+            timestamp: Date()
+        )
+    }
+    
     // MARK: - Nested Types
     
-        struct ZapTransaction: Identifiable {
+        struct ZapTransaction: Identifiable, Equatable {
         let id: UUID
         let totalAmount: Int
         let splits: [SubTransaction]
@@ -495,7 +530,7 @@ class LightningService: ObservableObject {
         }
     }
     
-        struct SubTransaction {
+        struct SubTransaction: Equatable {
         let recipientPubkey: String
         let amount: Int
         let role: PaymentRole
@@ -503,17 +538,56 @@ class LightningService: ObservableObject {
         let timestamp: Date
     }
     
-        struct PaymentSplit {
+        struct PaymentSplit: Identifiable {
+        let id = UUID()
         let recipientPubkey: String
         var amount: Int
         let role: PaymentRole
         let isOriginal: Bool // True for the main recipient
+        var type: PaymentRole { role } // Alias for compatibility
+        var status: SplitStatus = .pending
+        
+        var recipientName: String {
+            switch role {
+            case .author: return "Author"
+            case .highlighter: return "Highlighter"
+            case .curator: return "Curator"
+            }
+        }
+        
+        var percentage: Double {
+            // This would be calculated based on total amount in actual usage
+            return 0.33 // Placeholder
+        }
+        
+        enum SplitStatus {
+            case pending
+            case sending
+            case completed
+            case failed
+        }
     }
     
         enum PaymentRole: String {
         case author
         case highlighter
         case curator
+        
+        var icon: String {
+            switch self {
+            case .author: return "person.fill"
+            case .highlighter: return "highlighter"
+            case .curator: return "folder.fill"
+            }
+        }
+        
+        var color: Color {
+            switch self {
+            case .author: return .purple
+            case .highlighter: return .orange
+            case .curator: return .blue
+            }
+        }
     }
     
         struct PendingZap: Identifiable {
@@ -538,8 +612,11 @@ class LightningService: ObservableObject {
         var status: PaymentStatus
         let timestamp: Date
         
-        enum PaymentStatus {
+        enum PaymentStatus: Equatable {
+            case pending
             case preparing
+            case processing
+            case splitting
             case sending
             case completed(ZapTransaction)
             case failed(String)

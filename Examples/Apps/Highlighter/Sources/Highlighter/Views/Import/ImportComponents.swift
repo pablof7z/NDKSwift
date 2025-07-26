@@ -23,7 +23,7 @@ enum HighlightImportance {
     }
 }
 
-struct SuggestedHighlight: Identifiable {
+struct SuggestedHighlight: Identifiable, Equatable {
     let id = UUID()
     let text: String
     let context: String
@@ -37,6 +37,10 @@ struct SuggestedHighlight: Identifiable {
         case 0.6..<0.8: return .medium
         default: return .low
         }
+    }
+    
+    static func == (lhs: SuggestedHighlight, rhs: SuggestedHighlight) -> Bool {
+        lhs.id == rhs.id
     }
 }
 
@@ -163,35 +167,70 @@ struct AnimatedMeshBackground: View {
     var body: some View {
         TimelineView(.animation) { timeline in
             Canvas { context, size in
-                let time = timeline.date.timeIntervalSinceReferenceDate
-                
-                // Create mesh gradient effect
-                for y in stride(from: 0, to: size.height, by: 50) {
-                    for x in stride(from: 0, to: size.width, by: 50) {
-                        let offsetX = sin(time * 0.5 + Double(x) * 0.01) * 20
-                        let offsetY = cos(time * 0.5 + Double(y) * 0.01) * 20
-                        
-                        let color = colors[Int(x + y) % colors.count]
-                        
-                        context.fill(
-                            Circle().path(in: CGRect(
-                                x: x + offsetX,
-                                y: y + offsetY,
-                                width: 80,
-                                height: 80
-                            )),
-                            with: .radialGradient(
-                                Gradient(colors: [color, color.opacity(0)]),
-                                center: .center,
-                                startRadius: 0,
-                                endRadius: 40
-                            )
-                        )
-                    }
-                }
+                drawMeshGradient(context: context, size: size, time: timeline.date.timeIntervalSinceReferenceDate)
             }
         }
         .blur(radius: 30)
+    }
+    
+    private func drawMeshGradient(context: GraphicsContext, size: CGSize, time: TimeInterval) {
+        let gridSpacing: CGFloat = 50
+        let circleSize: CGFloat = 80
+        let animationSpeed: Double = 0.5
+        let waveAmplitude: Double = 20
+        let spatialFrequency: Double = 0.01
+        
+        for y in stride(from: 0, to: size.height, by: gridSpacing) {
+            for x in stride(from: 0, to: size.width, by: gridSpacing) {
+                drawMeshCircle(
+                    context: context,
+                    x: x,
+                    y: y,
+                    time: time,
+                    circleSize: circleSize,
+                    animationSpeed: animationSpeed,
+                    waveAmplitude: waveAmplitude,
+                    spatialFrequency: spatialFrequency
+                )
+            }
+        }
+    }
+    
+    private func drawMeshCircle(
+        context: GraphicsContext,
+        x: CGFloat,
+        y: CGFloat,
+        time: TimeInterval,
+        circleSize: CGFloat,
+        animationSpeed: Double,
+        waveAmplitude: Double,
+        spatialFrequency: Double
+    ) {
+        let offsetX = sin(time * animationSpeed + Double(x) * spatialFrequency) * waveAmplitude
+        let offsetY = cos(time * animationSpeed + Double(y) * spatialFrequency) * waveAmplitude
+        
+        let colorIndex = Int(x + y) % colors.count
+        let color = colors[colorIndex]
+        
+        let circleRect = CGRect(
+            x: x + offsetX,
+            y: y + offsetY,
+            width: circleSize,
+            height: circleSize
+        )
+        
+        let gradient = Gradient(colors: [color, color.opacity(0)])
+        let radialGradient = GraphicsContext.Shading.radialGradient(
+            gradient,
+            center: CGPoint(x: circleRect.midX, y: circleRect.midY),
+            startRadius: 0,
+            endRadius: circleSize / 2
+        )
+        
+        context.fill(
+            Circle().path(in: circleRect),
+            with: radialGradient
+        )
     }
 }
 
@@ -218,12 +257,12 @@ struct ConfettiView: View {
     var body: some View {
         TimelineView(.animation) { timeline in
             Canvas { context, size in
-                let currentTime = timeline.date.timeIntervalSinceReferenceDate
+                _ = timeline.date.timeIntervalSinceReferenceDate
                 
                 for particle in particles {
-                    context.save()
-                    context.translateBy(x: particle.position.x, y: particle.position.y)
-                    context.rotate(by: .degrees(particle.rotation))
+                    var contextCopy = context
+                    contextCopy.translateBy(x: particle.position.x, y: particle.position.y)
+                    contextCopy.rotate(by: .degrees(particle.rotation))
                     
                     let rect = CGRect(
                         x: -particle.size / 2,
@@ -234,9 +273,9 @@ struct ConfettiView: View {
                     
                     switch particle.shape {
                     case .circle:
-                        context.fill(Circle().path(in: rect), with: .color(particle.color))
+                        contextCopy.fill(Circle().path(in: rect), with: .color(particle.color))
                     case .square:
-                        context.fill(Rectangle().path(in: rect), with: .color(particle.color))
+                        contextCopy.fill(Rectangle().path(in: rect), with: .color(particle.color))
                     case .triangle:
                         let path = Path { path in
                             path.move(to: CGPoint(x: rect.midX, y: rect.minY))
@@ -244,10 +283,8 @@ struct ConfettiView: View {
                             path.addLine(to: CGPoint(x: rect.maxX, y: rect.maxY))
                             path.closeSubpath()
                         }
-                        context.fill(path, with: .color(particle.color))
+                        contextCopy.fill(path, with: .color(particle.color))
                     }
-                    
-                    context.restore()
                 }
             }
         }
@@ -526,117 +563,183 @@ struct SuggestionCard: View {
     @State private var glowAnimation = false
     
     var body: some View {
+        mainContent
+            .padding(.ds.medium)
+            .background(cardBackground)
+            .overlay(glowOverlay)
+            .onAppear(perform: startGlowAnimationIfNeeded)
+    }
+    
+    @ViewBuilder
+    private var mainContent: some View {
         VStack(alignment: .leading, spacing: .ds.small) {
             HStack(alignment: .top) {
-                // Selection checkbox with animation
-                Button(action: onToggle) {
-                    ZStack {
-                        RoundedRectangle(cornerRadius: 6)
-                            .fill(suggestion.isSelected ? suggestion.importance.color : Color.clear)
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 6)
-                                    .stroke(suggestion.isSelected ? Color.clear : Color.ds.textTertiary, lineWidth: 2)
-                            )
-                            .frame(width: 24, height: 24)
-                        
-                        if suggestion.isSelected {
-                            Image(systemName: "checkmark")
-                                .font(.system(size: 14, weight: .bold))
-                                .foregroundColor(.white)
-                                .transition(.scale.combined(with: .opacity))
-                        }
-                    }
-                    .animation(.spring(response: 0.3, dampingFraction: 0.6), value: suggestion.isSelected)
-                }
-                .buttonStyle(.plain)
-                
-                VStack(alignment: .leading, spacing: .ds.micro) {
-                    // Importance indicator
-                    HStack(spacing: .ds.micro) {
-                        Image(systemName: suggestion.importance.icon)
-                            .font(.caption)
-                            .foregroundColor(suggestion.importance.color)
-                        
-                        Text("\(Int(suggestion.confidence * 100))% confidence")
-                            .font(.ds.micro)
-                            .foregroundColor(.ds.textSecondary)
-                    }
-                    
-                    // Highlight text
-                    Text(suggestion.text)
-                        .font(.ds.body)
-                        .foregroundColor(.ds.text)
-                        .lineLimit(isExpanded ? nil : 3)
-                        .fixedSize(horizontal: false, vertical: true)
-                    
-                    if !isExpanded && suggestion.text.count > 150 {
-                        Button(action: {
-                            withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
-                                isExpanded = true
-                            }
-                        }) {
-                            Text("Show more")
-                                .font(.ds.caption)
-                                .foregroundColor(.ds.primary)
-                        }
-                    }
-                }
-                
+                selectionCheckbox
+                contentStack
                 Spacer()
             }
             
-            // Context preview (when expanded)
             if isExpanded {
-                VStack(alignment: .leading, spacing: .ds.small) {
-                    Divider()
-                    
-                    Label("Context", systemImage: "text.alignleft")
-                        .font(.ds.footnoteMedium)
-                        .foregroundColor(.ds.textSecondary)
-                    
-                    Text(getContextPreview())
-                        .font(.ds.caption)
-                        .foregroundColor(.ds.textTertiary)
-                        .lineLimit(4)
-                        .padding(.ds.small)
-                        .background(Color.ds.surfaceTertiary)
-                        .clipShape(RoundedRectangle(cornerRadius: .ds.small))
-                }
-                .transition(.move(edge: .top).combined(with: .opacity))
+                expandedContextView
             }
         }
-        .padding(.ds.medium)
-        .background(
-            RoundedRectangle(cornerRadius: .ds.medium, style: .continuous)
-                .fill(suggestion.isSelected ? suggestion.importance.color.opacity(0.05) : Color.ds.surfaceSecondary)
-                .overlay(
-                    RoundedRectangle(cornerRadius: .ds.medium, style: .continuous)
-                        .stroke(
-                            suggestion.isSelected ? suggestion.importance.color.opacity(0.3) : Color.clear,
-                            lineWidth: 1
-                        )
-                )
-        )
-        .overlay(
-            // Glow effect for high importance
-            suggestion.importance == .high && glowAnimation ?
-                RoundedRectangle(cornerRadius: .ds.medium, style: .continuous)
-                    .stroke(
-                        LinearGradient(
-                            colors: [suggestion.importance.color.opacity(0.5), suggestion.importance.color.opacity(0)],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        ),
-                        lineWidth: 2
+    }
+    
+    @ViewBuilder
+    private var selectionCheckbox: some View {
+        Button(action: onToggle) {
+            ZStack {
+                RoundedRectangle(cornerRadius: 6)
+                    .fill(checkboxFillColor)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 6)
+                            .stroke(checkboxStrokeColor, lineWidth: 2)
                     )
-                    .blur(radius: 4)
-                : nil
-        )
-        .onAppear {
-            if suggestion.importance == .high {
-                withAnimation(.easeInOut(duration: 2).repeatForever(autoreverses: true)) {
-                    glowAnimation = true
+                    .frame(width: 24, height: 24)
+                
+                if suggestion.isSelected {
+                    Image(systemName: "checkmark")
+                        .font(.system(size: 14, weight: .bold))
+                        .foregroundColor(.white)
+                        .transition(.scale.combined(with: .opacity))
                 }
+            }
+            .animation(.spring(response: 0.3, dampingFraction: 0.6), value: suggestion.isSelected)
+        }
+        .buttonStyle(.plain)
+    }
+    
+    @ViewBuilder
+    private var contentStack: some View {
+        VStack(alignment: .leading, spacing: .ds.micro) {
+            importanceIndicator
+            highlightText
+            
+            if shouldShowMoreButton {
+                showMoreButton
+            }
+        }
+    }
+    
+    @ViewBuilder
+    private var importanceIndicator: some View {
+        HStack(spacing: .ds.micro) {
+            Image(systemName: suggestion.importance.icon)
+                .font(.caption)
+                .foregroundColor(suggestion.importance.color)
+            
+            Text("\(Int(suggestion.confidence * 100))% confidence")
+                .font(.ds.micro)
+                .foregroundColor(.ds.textSecondary)
+        }
+    }
+    
+    @ViewBuilder
+    private var highlightText: some View {
+        Text(suggestion.text)
+            .font(.ds.body)
+            .foregroundColor(.ds.text)
+            .lineLimit(isExpanded ? nil : 3)
+            .fixedSize(horizontal: false, vertical: true)
+    }
+    
+    @ViewBuilder
+    private var showMoreButton: some View {
+        Button(action: expandContent) {
+            Text("Show more")
+                .font(.ds.caption)
+                .foregroundColor(.ds.primary)
+        }
+    }
+    
+    @ViewBuilder
+    private var expandedContextView: some View {
+        VStack(alignment: .leading, spacing: .ds.small) {
+            Divider()
+            
+            Label("Context", systemImage: "text.alignleft")
+                .font(.ds.footnoteMedium)
+                .foregroundColor(.ds.textSecondary)
+            
+            Text(getContextPreview())
+                .font(.ds.caption)
+                .foregroundColor(.ds.textTertiary)
+                .lineLimit(4)
+                .padding(.ds.small)
+                .background(Color.ds.surfaceSecondary.opacity(0.5))
+                .clipShape(RoundedRectangle(cornerRadius: .ds.small))
+        }
+        .transition(.move(edge: .top).combined(with: .opacity))
+    }
+    
+    @ViewBuilder
+    private var cardBackground: some View {
+        RoundedRectangle(cornerRadius: .ds.medium, style: .continuous)
+            .fill(backgroundFillColor)
+            .overlay(
+                RoundedRectangle(cornerRadius: .ds.medium, style: .continuous)
+                    .stroke(borderStrokeColor, lineWidth: 1)
+            )
+    }
+    
+    @ViewBuilder
+    private var glowOverlay: some View {
+        if shouldShowGlow {
+            RoundedRectangle(cornerRadius: .ds.medium, style: .continuous)
+                .stroke(
+                    LinearGradient(
+                        colors: glowGradientColors,
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    ),
+                    lineWidth: 2
+                )
+                .blur(radius: 4)
+        }
+    }
+    
+    // MARK: - Computed Properties
+    
+    private var checkboxFillColor: Color {
+        suggestion.isSelected ? suggestion.importance.color : Color.clear
+    }
+    
+    private var checkboxStrokeColor: Color {
+        suggestion.isSelected ? Color.clear : Color.ds.textTertiary
+    }
+    
+    private var shouldShowMoreButton: Bool {
+        !isExpanded && suggestion.text.count > 150
+    }
+    
+    private var backgroundFillColor: Color {
+        suggestion.isSelected ? suggestion.importance.color.opacity(0.05) : Color.ds.surfaceSecondary
+    }
+    
+    private var borderStrokeColor: Color {
+        suggestion.isSelected ? suggestion.importance.color.opacity(0.3) : Color.clear
+    }
+    
+    private var shouldShowGlow: Bool {
+        suggestion.importance == .high && glowAnimation
+    }
+    
+    private var glowGradientColors: [Color] {
+        [suggestion.importance.color.opacity(0.5), suggestion.importance.color.opacity(0)]
+    }
+    
+    // MARK: - Helper Methods
+    
+    private func expandContent() {
+        withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+            isExpanded = true
+        }
+    }
+    
+    private func startGlowAnimationIfNeeded() {
+        if suggestion.importance == .high {
+            withAnimation(.easeInOut(duration: 2).repeatForever(autoreverses: true)) {
+                glowAnimation = true
             }
         }
     }
@@ -914,7 +1017,7 @@ struct PopularSourceCard: View {
             .padding(.ds.base)
             .background(
                 RoundedRectangle(cornerRadius: .ds.medium, style: .continuous)
-                    .fill(isHovered ? Color.ds.surfaceTertiary : Color.ds.surfaceSecondary)
+                    .fill(isHovered ? Color.ds.surface : Color.ds.surfaceSecondary)
             )
             .scaleEffect(isHovered ? 1.05 : 1)
         }

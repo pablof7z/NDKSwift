@@ -3,7 +3,7 @@
 	archiveVersion = 1;
 	classes = {
 	};
-	objectVersion = 54;
+	objectVersion = 63;
 	objects = {
 
 /* Begin PBXBuildFile section */
@@ -14,6 +14,8 @@
 		218363F8C03885960CF5D248 /* AppState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E06D1E90D26910A32BBA586 /* AppState.swift */; };
 		2207FFA98AB56815A584DDB4 /* FollowPack.swift in Sources */ = {isa = PBXBuildFile; fileRef = 03DEF9DECD6C6F4D9AF8C400 /* FollowPack.swift */; };
 		2629890795B6D0A577BF09D3 /* SelectableMarkdownRenderer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 68EE862B30307430C752F295 /* SelectableMarkdownRenderer.swift */; };
+		271719F72E34576900D6C9B5 /* NDKSwift in Frameworks */ = {isa = PBXBuildFile; productRef = 271719F62E34576900D6C9B5 /* NDKSwift */; };
+		271719F92E34576900D6C9B5 /* NDKSwiftUI in Frameworks */ = {isa = PBXBuildFile; productRef = 271719F82E34576900D6C9B5 /* NDKSwiftUI */; };
 		31CEBD7F410053E533CDE2BA /* CardSystem.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4E36C3396966D42A6A522C05 /* CardSystem.swift */; };
 		34DF18AC7EC3EE0F46E1A1A3 /* HomeDataManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = F6C338502340BD8BE768794B /* HomeDataManager.swift */; };
 		39ED8F05509F9A4FFF466557 /* LibraryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 552D71BE7E32CED89D35A278 /* LibraryView.swift */; };
@@ -154,6 +156,8 @@
 			files = (
 				DEF4ACD6D408D383F02A9C06 /* NDKSwift in Frameworks */,
 				A511B4B1AC90D691C950B6DC /* NDKSwiftUI in Frameworks */,
+				271719F92E34576900D6C9B5 /* NDKSwiftUI in Frameworks */,
+				271719F72E34576900D6C9B5 /* NDKSwift in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -453,6 +457,8 @@
 			packageProductDependencies = (
 				8F0120155B5FA6FCE7E43793 /* NDKSwift */,
 				066BFE60CA36619DDAF24249 /* NDKSwiftUI */,
+				271719F62E34576900D6C9B5 /* NDKSwift */,
+				271719F82E34576900D6C9B5 /* NDKSwiftUI */,
 			);
 			productName = Highlighter;
 			productReference = FC1A44A034DF17AF520B0742 /* Highlighter.app */;
@@ -483,9 +489,8 @@
 			mainGroup = A041F7C169CA548DDDDDFE27;
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
-				E2A19ADCA3C16B878073A1A5 /* XCLocalSwiftPackageReference "../../..//" */,
+				271719F52E34576900D6C9B5 /* XCLocalSwiftPackageReference "../../../../NDKSwift-z94ws0" */,
 			);
-			preferredProjectObjectVersion = 54;
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
@@ -790,14 +795,22 @@
 /* End XCConfigurationList section */
 
 /* Begin XCLocalSwiftPackageReference section */
-		E2A19ADCA3C16B878073A1A5 /* XCLocalSwiftPackageReference "../../..//" */ = {
+		271719F52E34576900D6C9B5 /* XCLocalSwiftPackageReference "../../../../NDKSwift-z94ws0" */ = {
 			isa = XCLocalSwiftPackageReference;
-			relativePath = "../../..//";
+			relativePath = "../../../../NDKSwift-z94ws0";
 		};
 /* End XCLocalSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
 		066BFE60CA36619DDAF24249 /* NDKSwiftUI */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = NDKSwiftUI;
+		};
+		271719F62E34576900D6C9B5 /* NDKSwift */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = NDKSwift;
+		};
+		271719F82E34576900D6C9B5 /* NDKSwiftUI */ = {
 			isa = XCSwiftPackageProductDependency;
 			productName = NDKSwiftUI;
 		};

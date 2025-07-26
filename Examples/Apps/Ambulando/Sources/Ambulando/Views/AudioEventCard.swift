@@ -30,18 +30,18 @@ struct AudioEventCard: View {
     }
     
     var body: some View {
-        HStack(alignment: .top, spacing: 12) {
+        HStack(alignment: .top, spacing: 13) {
             // Author avatar using NDKSwiftUI component
-            NDKProfilePicture(pubkey: audioEvent.author.pubkey, size: 40)
+            NDKProfilePicture(pubkey: audioEvent.author.pubkey, size: 44)
                 .onTapGesture {
                     showingUserProfile = true
                 }
             
-            VStack(alignment: .leading, spacing: 4) {
+            VStack(alignment: .leading, spacing: 5) {
                 // Author info
                 HStack(spacing: 4) {
                     Text(author?.displayName ?? author?.name ?? String(audioEvent.author.pubkey.prefix(8)))
-                        .font(.system(size: 15, weight: .semibold))
+                        .font(.system(size: 16, weight: .semibold))
                         .foregroundColor(.white)
                         .lineLimit(1)
                         .onTapGesture {
@@ -144,8 +144,8 @@ struct AudioEventCard: View {
                 .padding(.top, 4)
             }
         }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 8)
+        .padding(.horizontal, 18)
+        .padding(.vertical, 9)
         .background(
             isCurrentlyPlaying ? Color.white.opacity(0.03) : Color.clear
         )
@@ -526,9 +526,9 @@ struct AudioPlayerView: View {
                     // Play/Pause button integrated
                     Button(action: onPlayPause) {
                         Image(systemName: isPlaying ? "pause.fill" : "play.fill")
-                            .font(.system(size: 14))
+                            .font(.system(size: 15))
                             .foregroundColor(.white)
-                            .frame(width: 28, height: 28)
+                            .frame(width: 31, height: 31)
                             .background(
                                 Circle()
                                     .fill(Color.black.opacity(0.3))
@@ -565,7 +565,7 @@ struct AudioPlayerView: View {
                     }
             )
         }
-        .frame(height: 36)
+        .frame(height: 40)
     }
 }
 

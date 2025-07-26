@@ -1,5 +1,6 @@
 import SwiftUI
 import NDKSwift
+import NDKSwiftUI
 import AVFoundation
 
 struct HomeFeedView: View {
@@ -744,7 +745,7 @@ struct RecordButton: View {
             if isRecording {
                 Circle()
                     .fill(Color.red.opacity(0.3))
-                    .frame(width: 80, height: 80)
+                    .frame(width: 92, height: 92)
                     .scaleEffect(pulseScale)
                     .opacity(pulseOpacity)
                     .animation(
@@ -774,12 +775,12 @@ struct RecordButton: View {
                                 endPoint: .bottomTrailing
                             )
                         )
-                        .frame(width: 56, height: 56)
+                        .frame(width: 64, height: 64)
                         .shadow(color: isRecording ? Color.red.opacity(0.5) : Color.purple.opacity(0.5), 
                                radius: 15, x: 0, y: 5)
                     
                     Image(systemName: isRecording ? "stop.fill" : "mic.fill")
-                        .font(.system(size: 24))
+                        .font(.system(size: 28))
                         .foregroundColor(.white)
                 }
             }

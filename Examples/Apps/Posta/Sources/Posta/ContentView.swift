@@ -1,5 +1,6 @@
 import SwiftUI
 import NDKSwift
+import NDKSwiftUI
 
 struct ContentView: View {
     @Environment(NDKAuthManager.self) var authManager

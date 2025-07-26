@@ -21,6 +21,8 @@ targets:
     dependencies:
       - package: NDKSwift
         product: NDKSwift
+      - package: NDKSwift
+        product: NDKSwiftUI
     info:
       path: Sources/Posta/Info.plist
       properties:

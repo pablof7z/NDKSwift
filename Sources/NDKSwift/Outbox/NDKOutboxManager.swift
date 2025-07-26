@@ -293,4 +293,41 @@ public actor NDKOutboxManager {
 
         NDKLogger.log(.info, category: .outbox, "✅ Updated relay info for \(event.pubkey.prefix(StringConstants.DisplayFormatting.hexPrefixLength)): \(readRelays.count) read, \(writeRelays.count) write")
     }
+    
+    /// Stop tracking a user for outbox operations
+    /// - Parameter pubkey: The public key of the user to stop tracking
+    public func untrackUser(_ pubkey: String) async {
+        // Remove from tracker cache
+        await tracker.clear() // For now, just clear - in future could implement selective removal
+    }
+    
+    /// Get relay update statistics
+    /// - Returns: Current statistics about relay updates and subscriptions
+    public func getRelayUpdateStats() async -> RelayUpdateStats {
+        // For now, return placeholder stats - this would be implemented with actual tracking
+        return RelayUpdateStats(
+            activeSubscriptions: 0,
+            totalUnknownAuthors: 0,
+            totalUpdateSubscriptions: 0
+        )
+    }
+    
+    /// Stream of relay updates
+    public var relayUpdates: AsyncStream<RelayUpdateEvent> {
+        // Convert RelayDiscoveryEvent to RelayUpdateEvent
+        AsyncStream { continuation in
+            Task {
+                for await discovery in tracker.relayDiscoveries {
+                    let update = RelayUpdateEvent(
+                        pubkey: discovery.pubkey,
+                        relays: (readRelays: discovery.readRelays, writeRelays: discovery.writeRelays),
+                        affectedSubscriptionIds: Set<String>(), // Would need actual subscription tracking
+                        timestamp: discovery.timestamp
+                    )
+                    continuation.yield(update)
+                }
+                continuation.finish()
+            }
+        }
+    }
 }

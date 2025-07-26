@@ -30,13 +30,20 @@ struct PostaApp: App {
             // Initialize with SQLite cache for better performance and negentropy sync support
             let ndkInstance: NDK
             do {
-                let cache = try await NDKSQLiteCache()
+                // Initialize SQLite cache with debug mode for development
+                let cache = try await NDKSQLiteCache(debugMode: false)
                 ndkInstance = NDK(relayUrls: relayUrls, cache: cache)
                 print("PostaApp - NDK initialized with SQLite cache")
             } catch {
                 print("PostaApp - Failed to initialize SQLite cache: \(error). Continuing without cache.")
                 ndkInstance = NDK(relayUrls: relayUrls)
             }
+            
+            // Configure client tag for Posta (NIP-89)
+            ndkInstance.clientTagConfig = NDKClientTagConfig(
+                name: "Posta",
+                autoTag: true
+            )
             
             // Set NDK on managers
             await MainActor.run {
