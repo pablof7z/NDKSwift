@@ -65,22 +65,14 @@ struct SendView: View {
             .navigationBarTitleDisplayMode(.inline)
             #endif
             .toolbar {
-                #if os(iOS)
-                ToolbarItem(placement: .navigationBarTrailing) {
-                #else
-                ToolbarItem(placement: .automatic) {
-                #endif
+                ToolbarItem(placement: .navigationBarLeading) {
                     Button("Cancel") {
                         dismiss()
                     }
                     .foregroundStyle(OlasDesign.Colors.text)
                 }
                 
-                #if os(iOS)
                 ToolbarItem(placement: .navigationBarTrailing) {
-                #else
-                ToolbarItem(placement: .automatic) {
-                #endif
                     Button("Send") {
                         Task {
                             await sendPayment()

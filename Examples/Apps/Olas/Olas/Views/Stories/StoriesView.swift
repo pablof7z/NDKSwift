@@ -500,7 +500,8 @@ struct StoryContentView: View {
 }
 
 // MARK: - Create Story View
-
+// Moved to CreateStoryView.swift
+/*
 struct CreateStoryView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(NostrManager.self) private var nostrManager
@@ -696,9 +697,11 @@ struct CreateStoryView: View {
         isPosting = false
     }
 }
+*/
 
 // MARK: - Image Pickers
-
+// Moved to CreateStoryView.swift
+/*
 struct ImagePicker: UIViewControllerRepresentable {
     @Binding var image: UIImage?
     @Environment(\.dismiss) private var dismiss
@@ -735,6 +738,7 @@ struct ImagePicker: UIViewControllerRepresentable {
         }
     }
 }
+*/
 
 struct CameraPicker: UIViewControllerRepresentable {
     @Binding var image: UIImage?

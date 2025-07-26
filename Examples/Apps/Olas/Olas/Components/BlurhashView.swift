@@ -3,6 +3,15 @@ import SwiftUI
 import UIKit
 #endif
 
+// MARK: - String Extension for SHA256
+extension String {
+    var sha256Hash: String {
+        // Simple hash for demo - in production use CryptoKit
+        let hash = self.hashValue
+        return String(format: "%016llx", Int64(bitPattern: UInt64(bitPattern: Int64(hash))))
+    }
+}
+
 // MARK: - Blurhash View
 struct BlurhashView: View {
     let hash: String
@@ -107,8 +116,8 @@ struct BlurhashView: View {
         
         image.unlockFocus()
         return image
+        #endif
     }
-    #endif
 }
 
 // MARK: - Progressive Image View
@@ -423,17 +432,6 @@ class ImageCacheManager {
                 }
             }
         }
-    }
-}
-
-#endif // Close the conditional compilation block
-
-// MARK: - String Extension for SHA256
-extension String {
-    var sha256Hash: String {
-        // Simple hash for demo - in production use CryptoKit
-        let hash = self.hashValue
-        return String(format: "%016llx", Int64(bitPattern: UInt64(bitPattern: Int64(hash))))
     }
 }
 

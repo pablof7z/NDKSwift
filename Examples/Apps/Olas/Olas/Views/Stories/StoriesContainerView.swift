@@ -1,7 +1,7 @@
 import SwiftUI
 import NDKSwift
 
-struct StoriesView: View {
+struct StoriesContainerView: View {
     @Environment(NostrManager.self) private var nostrManager
     @StateObject private var storiesManager: StoriesManager
     
