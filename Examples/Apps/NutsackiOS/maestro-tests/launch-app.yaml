@@ -1,4 +1,0 @@
-appId: com.nutsack.wallet
----
-- launchApp
-- assertVisible: ".*"

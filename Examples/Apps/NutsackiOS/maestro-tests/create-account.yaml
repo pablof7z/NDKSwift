@@ -1,7 +1,0 @@
-appId: com.nutsack.wallet
----
-- launchApp
-- assertVisible: "Nutsack"
-- assertVisible: "Create Account"
-- tapOn: "Create Account"
-- waitForAnimationToEnd
