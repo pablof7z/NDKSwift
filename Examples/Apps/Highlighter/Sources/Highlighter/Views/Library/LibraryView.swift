@@ -59,7 +59,7 @@ struct LibraryView: View {
                         
                         // Filter tabs
                         ScrollView(.horizontal, showsIndicators: false) {
-                            HStack(spacing: 12) {
+                            HStack(spacing: DesignSystem.Spacing.base) {
                                 ForEach(FilterTab.allCases, id: \.self) { tab in
                                     LibraryFilterChip(
                                         title: tab.rawValue,
@@ -78,7 +78,7 @@ struct LibraryView: View {
                         .padding(.vertical)
                         
                         // Content based on filter
-                        VStack(spacing: 32) {
+                        VStack(spacing: DesignSystem.Spacing.xxl) {
                             switch selectedFilter {
                             case .all:
                                 allContentView
@@ -95,7 +95,7 @@ struct LibraryView: View {
                                 SavedArticlesSection()
                             }
                         }
-                        .padding(.bottom, 32)
+                        .padding(.bottom, DesignSystem.Spacing.xxl)
                     }
                 }
                 .refreshable {
@@ -156,7 +156,7 @@ struct LibraryView: View {
     
     @ViewBuilder
     private var allContentView: some View {
-        VStack(spacing: 32) {
+        VStack(spacing: DesignSystem.Spacing.xxl) {
             // Recent Activity
             RecentActivitySection()
             
@@ -187,7 +187,7 @@ struct LibraryStatsCard: View {
     @State private var animateStats = false
     
     var body: some View {
-        VStack(spacing: 20) {
+        VStack(spacing: DesignSystem.Spacing.large) {
             HStack {
                 Text("Your Library")
                     .font(.system(size: 28, weight: .bold, design: .rounded))
@@ -196,7 +196,7 @@ struct LibraryStatsCard: View {
                 Spacer()
                 
                 // Streak indicator
-                HStack(spacing: 6) {
+                HStack(spacing: DesignSystem.Spacing.mini) {
                     Image(systemName: "flame.fill")
                         .font(.system(size: 16))
                         .foregroundColor(.orange)
@@ -204,8 +204,8 @@ struct LibraryStatsCard: View {
                         .font(.system(size: 14, weight: .medium))
                         .foregroundColor(.orange)
                 }
-                .padding(.horizontal, 12)
-                .padding(.vertical, 6)
+                .padding(.horizontal, DesignSystem.Spacing.base)
+                .padding(.vertical, DesignSystem.Spacing.mini)
                 .background(
                     Capsule()
                         .fill(Color.orange.opacity(0.15))
@@ -239,7 +239,7 @@ struct LibraryStatsCard: View {
                 )
             }
         }
-        .padding(24)
+        .padding(DesignSystem.Spacing.xl)
         .background(
             RoundedRectangle(cornerRadius: 24, style: .continuous)
                 .fill(
@@ -305,15 +305,15 @@ struct LibraryFilterChip: View {
     
     var body: some View {
         Button(action: action) {
-            HStack(spacing: 8) {
+            HStack(spacing: DesignSystem.Spacing.small) {
                 Image(systemName: icon)
                     .font(.system(size: 16, weight: .medium))
                 Text(title)
                     .font(.system(size: 15, weight: .medium))
             }
             .foregroundColor(isSelected ? .white : .ds.text)
-            .padding(.horizontal, 16)
-            .padding(.vertical, 10)
+            .padding(.horizontal, DesignSystem.Spacing.medium)
+            .padding(.vertical, DesignSystem.Spacing.small + DesignSystem.Spacing.nano)
             .background(
                 Capsule()
                     .fill(isSelected ? Color.ds.primary : Color.ds.surfaceSecondary)
@@ -378,7 +378,7 @@ struct RecentActivitySection: View {
             .padding(.horizontal)
             
             ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 16) {
+                HStack(spacing: DesignSystem.Spacing.medium) {
                     ForEach(mockActivities) { activity in
                         ActivityCard(activity: activity)
                     }
@@ -413,7 +413,7 @@ struct ActivityCard: View {
     let activity: RecentActivitySection.ActivityItem
     
     var body: some View {
-        HStack(spacing: 12) {
+        HStack(spacing: DesignSystem.Spacing.base) {
             ZStack {
                 Circle()
                     .fill(activity.type.color.opacity(0.15))
@@ -435,7 +435,7 @@ struct ActivityCard: View {
                     .foregroundColor(.ds.textSecondary)
             }
         }
-        .padding(16)
+        .padding(DesignSystem.Spacing.medium)
         .frame(width: 260)
         .background(
             RoundedRectangle(cornerRadius: 16, style: .continuous)
@@ -477,15 +477,15 @@ struct EnhancedSavedHighlightsSection: View {
                         }
                     }
                 } label: {
-                    HStack(spacing: 6) {
+                    HStack(spacing: DesignSystem.Spacing.mini) {
                         Text(selectedSortOption.rawValue)
                             .font(.system(size: 14, weight: .medium))
                         Image(systemName: "chevron.down")
                             .font(.system(size: 12))
                     }
                     .foregroundColor(.ds.primary)
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 6)
+                    .padding(.horizontal, DesignSystem.Spacing.base)
+                    .padding(.vertical, DesignSystem.Spacing.mini)
                     .background(
                         Capsule()
                             .fill(Color.ds.primary.opacity(0.1))
@@ -505,7 +505,7 @@ struct EnhancedSavedHighlightsSection: View {
                 .padding(.horizontal)
             } else {
                 ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 16) {
+                    HStack(spacing: DesignSystem.Spacing.medium) {
                         ForEach(appState.highlights.prefix(10)) { highlight in
                             LibraryHighlightCard(highlight: highlight)
                         }
@@ -533,7 +533,7 @@ struct LibraryHighlightCard: View {
             VStack(alignment: .leading, spacing: 12) {
                 // Header with source
                 if let url = highlight.url {
-                    HStack(spacing: 8) {
+                    HStack(spacing: DesignSystem.Spacing.small) {
                         Image(systemName: "link.circle.fill")
                             .font(.system(size: 14))
                             .foregroundColor(.ds.primary)
@@ -573,7 +573,7 @@ struct LibraryHighlightCard: View {
                     
                     Spacer()
                     
-                    HStack(spacing: 4) {
+                    HStack(spacing: DesignSystem.Spacing.micro) {
                         Image(systemName: "arrow.right.circle")
                             .font(.system(size: 16))
                         Text("View")
@@ -582,7 +582,7 @@ struct LibraryHighlightCard: View {
                     .foregroundColor(.ds.primary)
                 }
             }
-            .padding(20)
+            .padding(DesignSystem.Spacing.large)
             .frame(width: 280, height: 180)
             .background(
                 RoundedRectangle(cornerRadius: 20, style: .continuous)
@@ -616,7 +616,7 @@ struct ViewAllCard: View {
     
     var body: some View {
         Button(action: action) {
-            VStack(spacing: 16) {
+            VStack(spacing: DesignSystem.Spacing.medium) {
                 ZStack {
                     Circle()
                         .fill(Color.ds.primary.opacity(0.1))
@@ -663,7 +663,7 @@ struct SavedArticlesSection: View {
                 .foregroundColor(.ds.text)
                 .padding(.horizontal)
             
-            LazyVStack(spacing: 16) {
+            LazyVStack(spacing: DesignSystem.Spacing.medium) {
                 ForEach(0..<5, id: \.self) { _ in
                     ArticleRow()
                 }
@@ -675,7 +675,7 @@ struct SavedArticlesSection: View {
 
 struct ArticleRow: View {
     var body: some View {
-        HStack(spacing: 16) {
+        HStack(spacing: DesignSystem.Spacing.medium) {
             RoundedRectangle(cornerRadius: 12)
                 .fill(
                     LinearGradient(
@@ -697,7 +697,7 @@ struct ArticleRow: View {
                     .foregroundColor(.ds.textSecondary)
                     .lineLimit(1)
                 
-                HStack(spacing: 16) {
+                HStack(spacing: DesignSystem.Spacing.medium) {
                     Label("5 min read", systemImage: "clock")
                         .font(.system(size: 12))
                         .foregroundColor(.ds.textTertiary)
@@ -710,7 +710,7 @@ struct ArticleRow: View {
             
             Spacer()
         }
-        .padding(16)
+        .padding(DesignSystem.Spacing.medium)
         .background(
             RoundedRectangle(cornerRadius: 16, style: .continuous)
                 .fill(Color.ds.surface)
@@ -744,7 +744,7 @@ struct EnhancedYourCurationsSection: View {
                 
                 Spacer()
                 
-                HStack(spacing: 12) {
+                HStack(spacing: DesignSystem.Spacing.base) {
                     if !curations.isEmpty {
                         Button(action: { showCurationManagement = true }) {
                             Image(systemName: "folder.badge.gearshape")
@@ -792,7 +792,7 @@ struct EnhancedYourCurationsSection: View {
                 .padding(.horizontal)
             } else {
                 ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 16) {
+                    HStack(spacing: DesignSystem.Spacing.medium) {
                         ForEach(Array(curations.enumerated()), id: \.element.id) { index, curation in
                             EnhancedCurationCard(curation: curation)
                                 .onTapGesture {
@@ -846,15 +846,15 @@ struct EnhancedCurationCard: View {
                 }
                 
                 // Article count badge
-                HStack(spacing: 4) {
+                HStack(spacing: DesignSystem.Spacing.micro) {
                     Image(systemName: "doc.stack.fill")
                         .font(.system(size: 12))
                     Text("\(curation.articles.count)")
                         .font(.system(size: 14, weight: .bold))
                 }
                 .foregroundColor(.white)
-                .padding(.horizontal, 12)
-                .padding(.vertical, 6)
+                .padding(.horizontal, DesignSystem.Spacing.base)
+                .padding(.vertical, DesignSystem.Spacing.mini)
                 .background(
                     Capsule()
                         .fill(Color.black.opacity(0.6))
@@ -882,7 +882,7 @@ struct EnhancedCurationCard: View {
                 }
                 
                 // Tags or metadata
-                HStack(spacing: 8) {
+                HStack(spacing: DesignSystem.Spacing.small) {
                     ForEach(["Featured", "Tech", "Insights"], id: \.self) { tag in
                         Text(tag)
                             .font(.system(size: 11, weight: .medium))
@@ -897,7 +897,7 @@ struct EnhancedCurationCard: View {
                 }
                 .padding(.top, 4)
             }
-            .padding(16)
+            .padding(DesignSystem.Spacing.medium)
         }
         .frame(width: 260)
         .background(
@@ -922,7 +922,7 @@ struct CreateCurationCard: View {
     
     var body: some View {
         Button(action: action) {
-            VStack(spacing: 16) {
+            VStack(spacing: DesignSystem.Spacing.medium) {
                 ZStack {
                     Circle()
                         .strokeBorder(
@@ -999,7 +999,7 @@ struct EnhancedFollowPacksSection: View {
                     Text("Discover")
                         .font(.system(size: 14, weight: .medium))
                         .foregroundColor(.ds.primary)
-                        .padding(.horizontal, 16)
+                        .padding(.horizontal, DesignSystem.Spacing.medium)
                         .padding(.vertical, 8)
                         .background(
                             Capsule()
@@ -1039,7 +1039,7 @@ struct EnhancedFollowPackRow: View {
     @State private var profileImages: [String] = []
     
     var body: some View {
-        HStack(spacing: 16) {
+        HStack(spacing: DesignSystem.Spacing.medium) {
             // Profile stack
             ZStack {
                 ForEach(0..<min(3, followPack.profiles.count), id: \.self) { index in
@@ -1082,7 +1082,7 @@ struct EnhancedFollowPackRow: View {
                     .font(.system(size: 16, weight: .semibold))
                     .foregroundColor(.ds.text)
                 
-                HStack(spacing: 16) {
+                HStack(spacing: DesignSystem.Spacing.medium) {
                     Label("\(followPack.profiles.count) people", systemImage: "person.2")
                         .font(.system(size: 13))
                         .foregroundColor(.ds.textSecondary)
@@ -1102,7 +1102,7 @@ struct EnhancedFollowPackRow: View {
                 .font(.system(size: 14))
                 .foregroundColor(.ds.textTertiary)
         }
-        .padding(20)
+        .padding(DesignSystem.Spacing.large)
         .background(
             RoundedRectangle(cornerRadius: 20, style: .continuous)
                 .fill(Color.ds.surface)

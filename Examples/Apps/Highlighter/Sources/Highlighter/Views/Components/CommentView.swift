@@ -223,218 +223,6 @@ struct AuthorAvatar: View {
 
 // MARK: - Comments Section
 
-struct CommentsSection: View {
-    let highlightId: String
-    @EnvironmentObject var appState: AppState
-    @StateObject private var profileCache = ProfileCacheManager()
-    @State private var isExpanded = false
-    @State private var showingReplyField = false
-    @State private var replyText = ""
-    @State private var replyingTo: Comment?
-    @FocusState private var isReplyFieldFocused: Bool
-    
-    var commentService: CommentService {
-        appState.commentService
-    }
-    
-    var comments: [Comment] {
-        commentService.comments[highlightId] ?? []
-    }
-    
-    var isLoading: Bool {
-        commentService.isLoadingComments[highlightId] ?? false
-    }
-    
-    var body: some View {
-        VStack(alignment: .leading, spacing: .ds.medium) {
-            // Header
-            Button(action: toggleExpanded) {
-                HStack {
-                    Label {
-                        Text("Comments")
-                            .font(.ds.headline)
-                        
-                        if comments.count > 0 {
-                            Text("(\(comments.count))")
-                                .font(.ds.footnoteMedium)
-                                .foregroundColor(.ds.textSecondary)
-                        }
-                    } icon: {
-                        Image(systemName: "bubble.left.and.bubble.right")
-                            .font(.system(size: 16, weight: .medium))
-                    }
-                    .foregroundColor(.ds.text)
-                    
-                    Spacer()
-                    
-                    Image(systemName: isExpanded ? "chevron.up" : "chevron.down")
-                        .font(.system(size: 14, weight: .semibold))
-                        .foregroundColor(.ds.textSecondary)
-                }
-                .padding(.horizontal, .ds.screenPadding)
-            }
-            .buttonStyle(.plain)
-            
-            if isExpanded {
-                VStack(spacing: 0) {
-                    if isLoading && comments.isEmpty {
-                        LoadingCommentsView()
-                            .transition(.opacity)
-                    } else if comments.isEmpty {
-                        EmptyCommentsView(onComment: showReplyField)
-                            .transition(.opacity)
-                    } else {
-                        // Comments list
-                        LazyVStack(spacing: 0) {
-                            ForEach(comments) { comment in
-                                CommentView(
-                                    comment: comment,
-                                    authorProfile: profileCache.profiles[comment.author],
-                                    onReply: {
-                                        replyingTo = comment
-                                        showReplyField()
-                                    },
-                                    onLike: {
-                                        Task {
-                                            try? await commentService.likeComment(comment)
-                                        }
-                                    },
-                                    onDelete: canDelete(comment) ? {
-                                        Task {
-                                            try? await commentService.deleteComment(comment)
-                                        }
-                                    } : nil,
-                                    onAuthorTap: {
-                                        // Navigate to profile
-                                    }
-                                )
-                                .transition(.asymmetric(
-                                    insertion: .push(from: .bottom).combined(with: .opacity),
-                                    removal: .push(from: .top).combined(with: .opacity)
-                                ))
-                                
-                                if comment.id != comments.last?.id {
-                                    Divider()
-                                        .padding(.leading, isReply ? 74 : 56)
-                                }
-                            }
-                        }
-                    }
-                    
-                    // Reply field
-                    if showingReplyField {
-                        CommentInputField(
-                            text: $replyText,
-                            replyingTo: replyingTo,
-                            isLoading: false,
-                            onCancel: {
-                                replyingTo = nil
-                                showingReplyField = false
-                                replyText = ""
-                            },
-                            onSubmit: postComment
-                        )
-                        .focused($isReplyFieldFocused)
-                        .transition(.move(edge: .bottom).combined(with: .opacity))
-                        .onAppear {
-                            isReplyFieldFocused = true
-                        }
-                    } else {
-                        // Add comment button
-                        Button(action: showReplyField) {
-                            HStack {
-                                Image(systemName: "plus.circle.fill")
-                                    .font(.system(size: 20))
-                                Text("Add a comment")
-                                    .font(.ds.callout)
-                                Spacer()
-                            }
-                            .foregroundColor(.ds.primary)
-                            .padding(.horizontal, .ds.screenPadding)
-                            .padding(.vertical, .ds.base)
-                            .background(DesignSystem.Colors.primaryLight.opacity(0.1))
-                        }
-                        .buttonStyle(.plain)
-                    }
-                }
-                .clipShape(RoundedRectangle(cornerRadius: .ds.large, style: .continuous))
-                .overlay(
-                    RoundedRectangle(cornerRadius: .ds.large, style: .continuous)
-                        .stroke(DesignSystem.Colors.border, lineWidth: 0.5)
-                )
-                .padding(.horizontal, .ds.screenPadding)
-            }
-        }
-        .animation(.spring(response: 0.4, dampingFraction: 0.8), value: isExpanded)
-        .animation(.spring(response: 0.3, dampingFraction: 0.8), value: showingReplyField)
-        .task {
-            if isExpanded {
-                await commentService.loadComments(for: highlightId)
-                await loadProfiles()
-            }
-        }
-        .onChange(of: isExpanded) { _, newValue in
-            if newValue {
-                Task {
-                    await commentService.loadComments(for: highlightId)
-                    await loadProfiles()
-                }
-            }
-        }
-    }
-    
-    private func toggleExpanded() {
-        withAnimation {
-            isExpanded.toggle()
-        }
-        HapticManager.shared.impact(.light)
-    }
-    
-    private func showReplyField() {
-        withAnimation {
-            showingReplyField = true
-        }
-    }
-    
-    private func postComment() {
-        let content = replyText.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !content.isEmpty else { return }
-        
-        Task {
-            do {
-                try await commentService.postComment(
-                    on: highlightId,
-                    content: content,
-                    replyingTo: replyingTo
-                )
-                
-                await MainActor.run {
-                    replyText = ""
-                    replyingTo = nil
-                    showingReplyField = false
-                }
-            } catch {
-                print("Failed to post comment: \(error)")
-            }
-        }
-    }
-    
-    private func canDelete(_ comment: Comment) -> Bool {
-        // Check if current user is the author
-        if let signer = appState.activeSigner {
-            Task {
-                let userPubkey = try? await signer.publicKey(format: .hex)
-                return userPubkey == comment.author
-            }
-        }
-        return false
-    }
-    
-    private func loadProfiles() async {
-        let authors = Set(comments.map { $0.author })
-        await profileCache.loadProfiles(for: Array(authors), using: appState.ndk)
-    }
-}
 
 // MARK: - Supporting Views
 
@@ -448,18 +236,21 @@ struct LoadingCommentsView: View {
                     Circle()
                         .fill(DesignSystem.Colors.surfaceSecondary)
                         .frame(width: 40, height: 40)
-                        .shimmer(when: shimmer)
+                        .opacity(shimmer ? 1 : 0.7)
+                        .animation(.easeInOut(duration: 1).repeatForever(autoreverses: true), value: shimmer)
                     
                     VStack(alignment: .leading, spacing: .ds.small) {
                         RoundedRectangle(cornerRadius: 4)
                             .fill(DesignSystem.Colors.surfaceSecondary)
                             .frame(width: 120, height: 14)
-                            .shimmer(when: shimmer)
+                            .opacity(shimmer ? 1 : 0.7)
+                            .animation(.easeInOut(duration: 1).repeatForever(autoreverses: true), value: shimmer)
                         
                         RoundedRectangle(cornerRadius: 4)
                             .fill(DesignSystem.Colors.surfaceSecondary)
                             .frame(width: 200, height: 12)
-                            .shimmer(when: shimmer)
+                            .opacity(shimmer ? 1 : 0.7)
+                            .animation(.easeInOut(duration: 1).repeatForever(autoreverses: true), value: shimmer)
                     }
                     
                     Spacer()
@@ -474,29 +265,6 @@ struct LoadingCommentsView: View {
     }
 }
 
-struct EmptyCommentsView: View {
-    let onComment: () -> Void
-    
-    var body: some View {
-        VStack(spacing: .ds.medium) {
-            Image(systemName: "bubble.left.and.bubble.right")
-                .font(.system(size: 40, weight: .light))
-                .foregroundColor(.ds.textTertiary)
-            
-            Text("No comments yet")
-                .font(.ds.body)
-                .foregroundColor(.ds.textSecondary)
-            
-            Button(action: onComment) {
-                Text("Be the first to comment")
-                    .font(.ds.calloutMedium)
-                    .foregroundColor(.ds.primary)
-            }
-        }
-        .frame(maxWidth: .infinity)
-        .padding(.vertical, .ds.xxl)
-    }
-}
 
 struct CommentInputField: View {
     @Binding var text: String
@@ -593,42 +361,4 @@ class ProfileCacheManager: ObservableObject {
     }
 }
 
-// MARK: - Shimmer Effect
 
-extension View {
-    func shimmer(when isActive: Bool) -> some View {
-        self.modifier(ShimmerModifier(isActive: isActive))
-    }
-}
-
-struct ShimmerModifier: ViewModifier {
-    let isActive: Bool
-    @State private var phase: CGFloat = 0
-    
-    func body(content: Content) -> some View {
-        content
-            .overlay(
-                LinearGradient(
-                    gradient: Gradient(colors: [
-                        Color.white.opacity(0),
-                        Color.white.opacity(0.3),
-                        Color.white.opacity(0)
-                    ]),
-                    startPoint: .leading,
-                    endPoint: .trailing
-                )
-                .offset(x: phase * 200 - 100)
-                .opacity(isActive ? 1 : 0)
-                .animation(
-                    isActive ? .linear(duration: 1.5).repeatForever(autoreverses: false) : .default,
-                    value: phase
-                )
-                .mask(content)
-            )
-            .onAppear {
-                if isActive {
-                    phase = 1
-                }
-            }
-    }
-}

@@ -95,7 +95,7 @@ struct OnboardingView: View {
                                 }
                             }
                         )
-                        .padding(.horizontal, 40)
+                        .padding(.horizontal, DesignSystem.Spacing.huge)
                     }
                 }
                 .padding(.bottom, 50)
@@ -256,7 +256,7 @@ struct OnboardingPageView: View {
                     .font(.ds.body)
                     .foregroundColor(.white.opacity(0.8))
                     .multilineTextAlignment(.center)
-                    .padding(.horizontal, 40)
+                    .padding(.horizontal, DesignSystem.Spacing.huge)
                     .fixedSize(horizontal: false, vertical: true)
                     .opacity(animateContent ? 1 : 0)
                     .offset(y: animateContent ? 0 : 20)
@@ -290,7 +290,7 @@ struct OnboardingPageView: View {
                         )
                     }
                 }
-                .padding(.horizontal, 60)
+                .padding(.horizontal, DesignSystem.Spacing.huge * 1.5)
             }
             
             Spacer()
@@ -542,7 +542,7 @@ struct OnboardingAuthView: View {
                         .font(.ds.body)
                         .foregroundColor(.white.opacity(0.8))
                         .multilineTextAlignment(.center)
-                        .padding(.horizontal, 40)
+                        .padding(.horizontal, DesignSystem.Spacing.huge)
                         .opacity(animateContent ? 1 : 0)
                         .offset(y: animateContent ? 0 : 20)
                         .animation(.easeOut(duration: 0.6).delay(0.1), value: animateContent)
@@ -600,7 +600,7 @@ struct OnboardingAuthView: View {
                         )
                 }
             }
-            .padding(.horizontal, 40)
+            .padding(.horizontal, DesignSystem.Spacing.huge)
             .opacity(animateContent ? 1 : 0)
             .offset(y: animateContent ? 0 : 20)
             .animation(.spring(response: 0.5, dampingFraction: 0.7).delay(0.2), value: animateContent)
@@ -738,7 +738,7 @@ struct OnboardingImportSheet: View {
                             .autocapitalization(.none)
                             .disableAutocorrection(true)
                     }
-                    .padding(.horizontal, 24)
+                    .padding(.horizontal, DesignSystem.Spacing.xl)
                     
                     // Security note
                     HStack(spacing: 8) {
@@ -750,7 +750,7 @@ struct OnboardingImportSheet: View {
                             .font(.ds.caption)
                             .foregroundColor(.white.opacity(0.6))
                     }
-                    .padding(.horizontal, 24)
+                    .padding(.horizontal, DesignSystem.Spacing.xl)
                     
                     Spacer()
                     
@@ -784,7 +784,7 @@ struct OnboardingImportSheet: View {
                         .foregroundColor(.white.opacity(0.8))
                         .frame(height: 44)
                     }
-                    .padding(.horizontal, 24)
+                    .padding(.horizontal, DesignSystem.Spacing.xl)
                     .padding(.bottom, 32)
                 }
             }

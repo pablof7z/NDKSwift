@@ -29,8 +29,8 @@ struct CurationDetailView: View {
                                     .fill(
                                         LinearGradient(
                                             colors: [
-                                                Color.highlighterPurple.opacity(0.3),
-                                                Color.highlighterOrange.opacity(0.3)
+                                                DesignSystem.Colors.primary.opacity(0.3),
+                                                DesignSystem.Colors.secondary.opacity(0.3)
                                             ],
                                             startPoint: .topLeading,
                                             endPoint: .bottomTrailing
@@ -44,8 +44,8 @@ struct CurationDetailView: View {
                                 .fill(
                                     LinearGradient(
                                         colors: [
-                                            Color.highlighterPurple.opacity(0.5),
-                                            Color.highlighterOrange.opacity(0.5)
+                                            DesignSystem.Colors.primary.opacity(0.5),
+                                            DesignSystem.Colors.secondary.opacity(0.5)
                                         ],
                                         startPoint: .topLeading,
                                         endPoint: .bottomTrailing
@@ -64,12 +64,12 @@ struct CurationDetailView: View {
                         // Title overlay
                         VStack(alignment: .leading, spacing: 8) {
                             Text(curation.title)
-                                .font(.highlighterTitle)
+                                .font(DesignSystem.Typography.title)
                                 .foregroundColor(.white)
                             
                             if let description = curation.description {
                                 Text(description)
-                                    .font(.highlighterBody)
+                                    .font(DesignSystem.Typography.body)
                                     .foregroundColor(.white.opacity(0.9))
                                     .lineLimit(2)
                             }
@@ -81,29 +81,29 @@ struct CurationDetailView: View {
                     HStack {
                         Image(systemName: "person.circle.fill")
                             .font(.system(size: 44))
-                            .foregroundColor(.highlighterPurple)
+                            .foregroundColor(DesignSystem.Colors.primary)
                         
                         VStack(alignment: .leading, spacing: 4) {
                             Text(curator?.name ?? curator?.displayName ?? "Curator")
-                                .font(.highlighterBody)
+                                .font(DesignSystem.Typography.body)
                                 .fontWeight(.medium)
                             
                             Text("\(curation.articles.count) articles • Updated \(relativeTime(from: curation.updatedAt))")
-                                .font(.highlighterCaption)
-                                .foregroundColor(.highlighterSecondaryText)
+                                .font(DesignSystem.Typography.caption)
+                                .foregroundColor(DesignSystem.Colors.textSecondary)
                         }
                         
                         Spacer()
                         
                         Button(action: toggleFollow) {
                             Text(isFollowing ? "Following" : "Follow")
-                                .font(.highlighterCaption)
+                                .font(DesignSystem.Typography.caption)
                                 .fontWeight(.medium)
                                 .padding(.horizontal, 20)
                                 .padding(.vertical, 10)
-                                .background(isFollowing ? Color.gray : Color.highlighterPurple)
+                                .background(isFollowing ? Color.gray : DesignSystem.Colors.primary)
                                 .foregroundColor(.white)
-                                .cornerRadius(20)
+                                .cornerRadius(DesignSystem.CornerRadius.xl)
                         }
                     }
                     .padding(.horizontal)
@@ -112,22 +112,22 @@ struct CurationDetailView: View {
                     HStack(spacing: 12) {
                         Button(action: shareCuration) {
                             Label("Share", systemImage: "square.and.arrow.up")
-                                .font(.highlighterCaption)
+                                .font(DesignSystem.Typography.caption)
                                 .frame(maxWidth: .infinity)
-                                .padding(.vertical, 12)
-                                .background(Color.highlighterCardBackground)
-                                .cornerRadius(12)
+                                .padding(.vertical, DesignSystem.Spacing.base)
+                                .background(DesignSystem.Colors.surface)
+                                .cornerRadius(DesignSystem.CornerRadius.medium)
                         }
                         
                         if let userPubkey = currentUserPubkey, curation.author == userPubkey {
                             Button(action: { showAddArticle = true }) {
                                 Label("Add Article", systemImage: "plus.circle")
-                                    .font(.highlighterCaption)
+                                    .font(DesignSystem.Typography.caption)
                                     .frame(maxWidth: .infinity)
                                     .padding(.vertical, 12)
-                                    .background(Color.highlighterPurple)
+                                    .background(DesignSystem.Colors.primary)
                                     .foregroundColor(.white)
-                                    .cornerRadius(12)
+                                    .cornerRadius(DesignSystem.CornerRadius.medium)
                             }
                         }
                     }
@@ -136,7 +136,7 @@ struct CurationDetailView: View {
                     // Articles
                     VStack(alignment: .leading, spacing: 16) {
                         Text("Articles")
-                            .font(.highlighterHeadline)
+                            .font(DesignSystem.Typography.headline)
                             .padding(.horizontal)
                         
                         if loadedArticles.isEmpty && curation.articles.isEmpty {
@@ -161,14 +161,14 @@ struct CurationDetailView: View {
                 }
                 .padding(.bottom)
             }
-            .background(Color.highlighterBackground)
+            .background(DesignSystem.Colors.background)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button("Done") {
                         dismiss()
                     }
-                    .foregroundColor(.highlighterPurple)
+                    .foregroundColor(DesignSystem.Colors.primary)
                 }
             }
         }
@@ -307,27 +307,25 @@ struct ArticleCard: View {
                 HStack {
                     VStack(alignment: .leading, spacing: 8) {
                         Text(URL(string: url)?.host ?? "Article")
-                            .font(.highlighterCaption)
-                            .foregroundColor(.highlighterPurple)
+                            .font(DesignSystem.Typography.caption)
+                            .foregroundColor(DesignSystem.Colors.primary)
                         
                         Text(url)
-                            .font(.highlighterBody)
+                            .font(DesignSystem.Typography.body)
                             .lineLimit(2)
-                            .foregroundColor(.highlighterText)
+                            .foregroundColor(DesignSystem.Colors.text)
                         
                         Text("Added \(relativeTime(from: article.addedAt))")
-                            .font(.highlighterCaption)
-                            .foregroundColor(.highlighterSecondaryText)
+                            .font(DesignSystem.Typography.caption)
+                            .foregroundColor(DesignSystem.Colors.textSecondary)
                     }
                     
                     Spacer()
                     
                     Image(systemName: "arrow.up.right")
-                        .foregroundColor(.highlighterSecondaryText)
+                        .foregroundColor(DesignSystem.Colors.textSecondary)
                 }
-                .padding()
-                .background(Color.highlighterCardBackground)
-                .cornerRadius(12)
+                .modernCard()
                 .onTapGesture {
                     if let url = URL(string: url) {
                         UIApplication.shared.open(url)
@@ -352,18 +350,18 @@ struct EmptyArticlesView: View {
                 .foregroundColor(.highlighterPurple.opacity(0.5))
             
             Text("No articles yet")
-                .font(.highlighterBody)
-                .foregroundColor(.highlighterSecondaryText)
+                .font(DesignSystem.Typography.body)
+                .foregroundColor(DesignSystem.Colors.textSecondary)
             
             Text("Articles added to this curation will appear here")
-                .font(.highlighterCaption)
-                .foregroundColor(.highlighterSecondaryText)
+                .font(DesignSystem.Typography.caption)
+                .foregroundColor(DesignSystem.Colors.textSecondary)
                 .multilineTextAlignment(.center)
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 40)
-        .background(Color.highlighterCardBackground.opacity(0.5))
-        .cornerRadius(12)
+        .background(DesignSystem.Colors.surface.opacity(0.5))
+        .cornerRadius(DesignSystem.CornerRadius.medium)
     }
 }
 
@@ -385,56 +383,54 @@ struct LoadedArticleCard: View {
                                 .aspectRatio(contentMode: .fill)
                         } placeholder: {
                             Rectangle()
-                                .fill(Color.highlighterCardBackground)
+                                .fill(DesignSystem.Colors.surface)
                         }
                         .frame(width: 80, height: 80)
-                        .cornerRadius(8)
+                        .cornerRadius(DesignSystem.CornerRadius.small)
                         .clipped()
                     }
                     
                     VStack(alignment: .leading, spacing: 8) {
                         Text(article.title)
-                            .font(.highlighterBody)
+                            .font(DesignSystem.Typography.body)
                             .fontWeight(.medium)
-                            .foregroundColor(.highlighterText)
+                            .foregroundColor(DesignSystem.Colors.text)
                             .lineLimit(2)
                             .multilineTextAlignment(.leading)
                         
                         if let summary = article.summary {
                             Text(summary)
-                                .font(.highlighterCaption)
-                                .foregroundColor(.highlighterSecondaryText)
+                                .font(DesignSystem.Typography.caption)
+                                .foregroundColor(DesignSystem.Colors.textSecondary)
                                 .lineLimit(2)
                         }
                         
                         HStack(spacing: 8) {
                             if let author = author {
                                 Text(author.name ?? author.displayName ?? "Anonymous")
-                                    .font(.highlighterCaption)
-                                    .foregroundColor(.highlighterPurple)
+                                    .font(DesignSystem.Typography.caption)
+                                    .foregroundColor(DesignSystem.Colors.primary)
                             }
                             
                             Text("•")
-                                .foregroundColor(.highlighterSecondaryText)
+                                .foregroundColor(DesignSystem.Colors.textSecondary)
                             
                             Text(relativeTime(from: article.createdAt))
-                                .font(.highlighterCaption)
-                                .foregroundColor(.highlighterSecondaryText)
+                                .font(DesignSystem.Typography.caption)
+                                .foregroundColor(DesignSystem.Colors.textSecondary)
                             
                             Text("•")
-                                .foregroundColor(.highlighterSecondaryText)
+                                .foregroundColor(DesignSystem.Colors.textSecondary)
                             
                             Text("\(article.estimatedReadingTime) min read")
-                                .font(.highlighterCaption)
-                                .foregroundColor(.highlighterSecondaryText)
+                                .font(DesignSystem.Typography.caption)
+                                .foregroundColor(DesignSystem.Colors.textSecondary)
                         }
                     }
                     
                     Spacer()
                 }
-                .padding()
-                .background(Color.highlighterCardBackground)
-                .cornerRadius(12)
+                .modernCard()
             }
         }
         .buttonStyle(PlainButtonStyle())
@@ -478,11 +474,11 @@ struct AddArticleSheet: View {
         NavigationStack {
             VStack(alignment: .leading, spacing: 24) {
                 Text("Add Article")
-                    .font(.highlighterHeadline)
+                    .font(DesignSystem.Typography.headline)
                 
                 Text("Add an article URL to your curation")
-                    .font(.highlighterBody)
-                    .foregroundColor(.highlighterSecondaryText)
+                    .font(DesignSystem.Typography.body)
+                    .foregroundColor(DesignSystem.Colors.textSecondary)
                 
                 TextField("https://...", text: $articleUrl)
                     .textFieldStyle(RoundedBorderTextFieldStyle())
@@ -496,9 +492,9 @@ struct AddArticleSheet: View {
                     }
                     .frame(maxWidth: .infinity)
                     .padding()
-                    .background(Color.highlighterPurple)
+                    .background(DesignSystem.Colors.primary)
                     .foregroundColor(.white)
-                    .cornerRadius(12)
+                    .cornerRadius(DesignSystem.CornerRadius.medium)
                 }
                 .disabled(articleUrl.isEmpty)
                 

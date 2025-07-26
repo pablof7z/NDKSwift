@@ -86,7 +86,7 @@ struct CreateCurationView: View {
                     .aspectRatio(contentMode: .fill)
                     .frame(height: 220)
                     .clipped()
-                    .cornerRadius(20)
+                    .cornerRadius(DesignSystem.CornerRadius.xl)
                     .transition(.asymmetric(
                         insertion: .scale.combined(with: .opacity),
                         removal: .opacity
@@ -116,7 +116,7 @@ struct CreateCurationView: View {
                         }
                     }
                     .scaleEffect(pulseAnimation ? 1.1 : 1.0)
-                    .padding(12)
+                    .padding(DesignSystem.Spacing.base)
                 }
                 
                 Spacer()
@@ -132,10 +132,10 @@ struct CreateCurationView: View {
                             .font(.highlighterBody.weight(.medium))
                     }
                     .foregroundColor(.white)
-                    .padding(.horizontal, 20)
-                    .padding(.vertical, 10)
+                    .padding(.horizontal, DesignSystem.Spacing.large)
+                    .padding(.vertical, DesignSystem.Spacing.small + DesignSystem.Spacing.nano)
                     .background(.ultraThinMaterial)
-                    .cornerRadius(20)
+                    .cornerRadius(DesignSystem.CornerRadius.xl)
                 }
                 .scaleEffect(animateForm ? 1 : 0.8)
                 .opacity(animateForm ? 1 : 0)
@@ -143,11 +143,11 @@ struct CreateCurationView: View {
             .padding()
         }
         .frame(height: 220)
-        .shadow(color: selectedColor.opacity(0.3), radius: 20, y: 10)
+        .shadow(color: selectedColor.opacity(0.3), radius: DesignSystem.Shadow.elevated.radius, x: DesignSystem.Shadow.elevated.x, y: DesignSystem.Shadow.elevated.y)
         .scaleEffect(animateHeader ? 1 : 0.95)
         .opacity(animateHeader ? 1 : 0)
         .padding(.horizontal)
-        .padding(.top, 16)
+        .padding(.top, DesignSystem.Spacing.medium)
     }
     
     @ViewBuilder
@@ -246,7 +246,7 @@ struct CreateCurationView: View {
                     }
                 }
             }
-            .padding(14)
+            .padding(DesignSystem.Spacing.base + DesignSystem.Spacing.nano)
             .background(
                 RoundedRectangle(cornerRadius: 12)
                     .fill(Color.highlighterCardBackground)
@@ -300,7 +300,7 @@ struct CreateCurationView: View {
                     }
                 }
             }
-            .padding(14)
+            .padding(DesignSystem.Spacing.base + DesignSystem.Spacing.nano)
             .background(
                 RoundedRectangle(cornerRadius: 12)
                     .fill(Color.highlighterCardBackground)
@@ -338,8 +338,8 @@ struct CreateCurationView: View {
                 if description.isEmpty {
                     Text("Describe your curation...")
                         .foregroundColor(.gray.opacity(0.5))
-                        .padding(.horizontal, 4)
-                        .padding(.vertical, 8)
+                        .padding(.horizontal, DesignSystem.Spacing.micro)
+                        .padding(.vertical, DesignSystem.Spacing.small)
                 }
                 
                 TextEditor(text: $description)
@@ -348,7 +348,7 @@ struct CreateCurationView: View {
                     .background(Color.clear)
                     .onTapGesture { descriptionFieldFocused = true }
             }
-            .padding(12)
+            .padding(DesignSystem.Spacing.base)
             .frame(minHeight: 120)
             .background(
                 RoundedRectangle(cornerRadius: 12)
@@ -378,7 +378,7 @@ struct CreateCurationView: View {
                 .textFieldStyle(.plain)
                 .textInputAutocapitalization(.never)
                 .autocorrectionDisabled()
-                .padding(14)
+                .padding(DesignSystem.Spacing.base + DesignSystem.Spacing.nano)
                 .background(
                     RoundedRectangle(cornerRadius: 12)
                         .fill(Color.highlighterCardBackground)
@@ -435,7 +435,7 @@ struct CreateCurationView: View {
                 FeatureBadge(icon: "sparkles", text: "Discover", color: .blue)
             }
         }
-        .padding(20)
+        .padding(DesignSystem.Spacing.large)
         .background(
             RoundedRectangle(cornerRadius: 16)
                 .fill(.ultraThinMaterial)

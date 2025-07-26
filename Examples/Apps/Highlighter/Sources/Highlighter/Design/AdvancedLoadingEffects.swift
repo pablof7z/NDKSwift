@@ -73,33 +73,6 @@ struct PulsingDot: View {
     }
 }
 
-struct LoadingDotsView: View {
-    @State private var animatingDots = [false, false, false]
-    let dotSize: CGFloat = 8
-    let color: Color = .ds.primary
-    
-    var body: some View {
-        HStack(spacing: dotSize / 2) {
-            ForEach(0..<3) { index in
-                Circle()
-                    .fill(color)
-                    .frame(width: dotSize, height: dotSize)
-                    .scaleEffect(animatingDots[index] ? 1.3 : 1)
-                    .animation(
-                        .easeInOut(duration: 0.6)
-                        .repeatForever()
-                        .delay(Double(index) * 0.2),
-                        value: animatingDots[index]
-                    )
-            }
-        }
-        .onAppear {
-            for index in 0..<3 {
-                animatingDots[index] = true
-            }
-        }
-    }
-}
 
 // MARK: - Morphing Progress Indicator
 
@@ -158,7 +131,11 @@ struct MorphingProgressView: View {
                 endPoint: .bottomTrailing
             )
             
-            context.fill(path, with: .linearGradient(gradient, startPoint: .zero, endPoint: CGPoint(x: size.width, y: size.height)))
+            context.fill(path, with: .linearGradient(
+                Gradient(colors: [color, color.opacity(0.3)]),
+                startPoint: .zero,
+                endPoint: CGPoint(x: size.width, y: size.height)
+            ))
         }
         .frame(width: size, height: size)
         .rotationEffect(.degrees(rotation))
@@ -273,7 +250,7 @@ struct WaveShape: Shape {
 // MARK: - Content Loading States
 
 struct ContentLoadingView<Content: View, Empty: View, Error: View>: View {
-    enum LoadingState {
+    enum LoadingState: Equatable {
         case loading
         case empty
         case error(String)
@@ -442,7 +419,7 @@ struct ParticleLoadingView: View {
     var body: some View {
         TimelineView(.animation) { timeline in
             Canvas { context, size in
-                let center = CGPoint(x: size.width / 2, y: size.height / 2)
+                _ = CGPoint(x: size.width / 2, y: size.height / 2)
                 
                 for particle in particles {
                     let rect = CGRect(

@@ -214,7 +214,21 @@ struct EnhancedArticleDiscoveryView: View {
             .padding(.horizontal)
             
             if viewModel.articles.isEmpty && !viewModel.isLoading {
-                EmptyStateView()
+                VStack(spacing: 16) {
+                    Image(systemName: "magnifyingglass")
+                        .font(.system(size: 60))
+                        .foregroundColor(DesignSystem.Colors.textSecondary)
+                    
+                    Text("No articles found")
+                        .font(DesignSystem.Typography.title3)
+                        .foregroundColor(DesignSystem.Colors.textSecondary)
+                    
+                    Text("Try adjusting your search terms")
+                        .font(DesignSystem.Typography.body)
+                        .foregroundColor(DesignSystem.Colors.textSecondary.opacity(0.7))
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .padding()
                     .padding(.horizontal)
                     .padding(.vertical, 60)
             } else {
@@ -286,16 +300,27 @@ class ArticleDiscoveryViewModel: ObservableObject {
         var filter = NDKFilter(kinds: [30023]) // Long-form content
         
         if !category.hashtags.isEmpty {
-            filter.tags = ["t": category.hashtags]
+            // Create a new filter with the category tags
+            filter = NDKFilter(
+                kinds: [30023],
+                limit: 20,
+                tags: ["t": Set(category.hashtags)]
+            )
         }
         
         filter.limit = 50
         
         // Subscribe with closeOnEose to get all matching events then close
-        let subscription = ndk.subscribe(filter: filter, closeOnEose: true)
+        let dataSource = NDKDataSource(
+            ndk: ndk,
+            filter: filter,
+            maxAge: 0,
+            cachePolicy: .networkOnly,
+            closeOnEose: true
+        )
         
         var collectedEvents: [NDKEvent] = []
-        for await event in subscription {
+        for await event in dataSource.events {
             collectedEvents.append(event)
         }
         
@@ -341,10 +366,16 @@ class ArticleDiscoveryViewModel: ObservableObject {
         }
         
         // Subscribe with closeOnEose to get all matching events then close
-        let subscription = ndk.subscribe(filter: filter, closeOnEose: true)
+        let dataSource = NDKDataSource(
+            ndk: ndk,
+            filter: filter,
+            maxAge: 0,
+            cachePolicy: .networkOnly,
+            closeOnEose: true
+        )
         
         var collectedEvents: [NDKEvent] = []
-        for await event in subscription {
+        for await event in dataSource.events {
             collectedEvents.append(event)
         }
         
@@ -418,7 +449,7 @@ class ArticleDiscoveryViewModel: ObservableObject {
         
         return Article(
             id: event.id,
-            identifier: event.identifier ?? event.id,
+            identifier: event.id,
             title: title,
             summary: summary,
             content: event.content,
@@ -799,22 +830,3 @@ struct ArticleGridCard: View {
     }
 }
 
-struct EmptyStateView: View {
-    var body: some View {
-        VStack(spacing: 20) {
-            Image(systemName: "doc.text.magnifyingglass")
-                .font(.system(size: 48))
-                .foregroundColor(.ds.textTertiary)
-            
-            Text("No articles found")
-                .font(.system(size: 20, weight: .semibold))
-                .foregroundColor(.ds.text)
-            
-            Text("Try adjusting your filters or search terms")
-                .font(.system(size: 16))
-                .foregroundColor(.ds.textSecondary)
-                .multilineTextAlignment(.center)
-        }
-        .frame(maxWidth: .infinity)
-    }
-}

@@ -61,11 +61,7 @@ struct AIAnalysisVisualizationView: View {
                         .font(.body)
                         .foregroundColor(.primary)
                         .multilineTextAlignment(.leading)
-                        .padding()
-                        .background(
-                            RoundedRectangle(cornerRadius: 12)
-                                .fill(Color.gray.opacity(0.1))
-                        )
+                        .modernCard()
                 }
                 .frame(maxHeight: 200)
                 .padding(.horizontal)

@@ -21,7 +21,7 @@ struct FollowPackDetailView: View {
                 }
                 .padding(.vertical)
             }
-            .background(Color.highlighterBackground)
+            .background(DesignSystem.Colors.background)
             .navigationTitle("Follow Pack")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -29,7 +29,7 @@ struct FollowPackDetailView: View {
                     Button("Done") {
                         dismiss()
                     }
-                    .foregroundColor(.highlighterPurple)
+                    .foregroundColor(DesignSystem.Colors.primary)
                 }
             }
         }
@@ -44,29 +44,29 @@ struct FollowPackDetailView: View {
             HStack {
                 Image(systemName: "person.3.fill")
                     .font(.system(size: 48))
-                    .foregroundColor(.highlighterPurple)
+                    .foregroundColor(DesignSystem.Colors.primary)
                 
                 Spacer()
                 
                 // Stats
                 VStack(alignment: .trailing, spacing: 4) {
                     Text("\(followPack.profiles.count)")
-                        .font(.highlighterTitle)
-                        .foregroundColor(.highlighterPurple)
+                        .font(DesignSystem.Typography.title)
+                        .foregroundColor(DesignSystem.Colors.primary)
                     Text("Profiles")
-                        .font(.highlighterCaption)
-                        .foregroundColor(.highlighterSecondaryText)
+                        .font(DesignSystem.Typography.caption)
+                        .foregroundColor(DesignSystem.Colors.textSecondary)
                 }
             }
             
             VStack(alignment: .leading, spacing: 8) {
                 Text(followPack.title)
-                    .font(.highlighterHeadline)
+                    .font(DesignSystem.Typography.headline)
                 
                 if let description = followPack.description {
                     Text(description)
-                        .font(.highlighterBody)
-                        .foregroundColor(.highlighterSecondaryText)
+                        .font(DesignSystem.Typography.body)
+                        .foregroundColor(DesignSystem.Colors.textSecondary)
                 }
             }
         }
@@ -77,15 +77,15 @@ struct FollowPackDetailView: View {
         HStack {
             Image(systemName: "person.circle.fill")
                 .font(.system(size: 24))
-                .foregroundColor(.highlighterPurple)
+                .foregroundColor(DesignSystem.Colors.primary)
             
             VStack(alignment: .leading, spacing: 2) {
                 Text("Created by")
-                    .font(.highlighterCaption)
-                    .foregroundColor(.highlighterSecondaryText)
+                    .font(DesignSystem.Typography.caption)
+                    .foregroundColor(DesignSystem.Colors.textSecondary)
                 
                 Text(creator?.name ?? creator?.displayName ?? String(followPack.author.prefix(8)))
-                    .font(.highlighterCaption)
+                    .font(DesignSystem.Typography.caption)
                     .fontWeight(.medium)
             }
             
@@ -95,14 +95,14 @@ struct FollowPackDetailView: View {
         .background(
             LinearGradient(
                 colors: [
-                    Color.highlighterPurple.opacity(0.1),
-                    Color.highlighterOrange.opacity(0.1)
+                    DesignSystem.Colors.primary.opacity(0.1),
+                    DesignSystem.Colors.secondary.opacity(0.1)
                 ],
                 startPoint: .topLeading,
                 endPoint: .bottomTrailing
             )
         )
-        .cornerRadius(16)
+        .cornerRadius(DesignSystem.CornerRadius.large)
         .padding(.horizontal)
     }
     
@@ -122,7 +122,7 @@ struct FollowPackDetailView: View {
                         Color.green
                     } else {
                         LinearGradient(
-                            colors: [.highlighterPurple, .highlighterPurple.opacity(0.8)],
+                            colors: [DesignSystem.Colors.primary, DesignSystem.Colors.primary.opacity(0.8)],
                             startPoint: .leading,
                             endPoint: .trailing
                         )
@@ -130,7 +130,7 @@ struct FollowPackDetailView: View {
                 }
             )
             .foregroundColor(.white)
-            .cornerRadius(12)
+            .cornerRadius(DesignSystem.CornerRadius.medium)
             .disabled(showSuccess)
         }
         .padding(.horizontal)
@@ -140,7 +140,7 @@ struct FollowPackDetailView: View {
     private var profilesSection: some View {
         VStack(alignment: .leading, spacing: 16) {
             Text("Profiles in this pack")
-                .font(.highlighterHeadline)
+                .font(DesignSystem.Typography.headline)
                 .padding(.horizontal)
             
             ForEach(followPack.profiles, id: \.self) { pubkey in
@@ -207,17 +207,17 @@ struct ProfileRow: View {
         HStack {
             Image(systemName: "person.circle.fill")
                 .font(.system(size: 40))
-                .foregroundColor(.highlighterPurple)
+                .foregroundColor(DesignSystem.Colors.primary)
             
             VStack(alignment: .leading, spacing: 4) {
                 Text(profile?.name ?? profile?.displayName ?? String(pubkey.prefix(16)))
-                    .font(.highlighterBody)
+                    .font(DesignSystem.Typography.body)
                     .fontWeight(.medium)
                 
                 if let about = profile?.about {
                     Text(about)
-                        .font(.highlighterCaption)
-                        .foregroundColor(.highlighterSecondaryText)
+                        .font(DesignSystem.Typography.caption)
+                        .foregroundColor(DesignSystem.Colors.textSecondary)
                         .lineLimit(1)
                 }
             }
@@ -226,18 +226,16 @@ struct ProfileRow: View {
             
             Button(action: { isFollowing.toggle() }) {
                 Text(isFollowing ? "Following" : "Follow")
-                    .font(.highlighterCaption)
+                    .font(DesignSystem.Typography.caption)
                     .fontWeight(.medium)
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 6)
-                    .background(isFollowing ? Color.gray : Color.highlighterPurple)
+                    .padding(.horizontal, DesignSystem.Spacing.medium)
+                    .padding(.vertical, DesignSystem.Spacing.mini)
+                    .background(isFollowing ? Color.gray : DesignSystem.Colors.primary)
                     .foregroundColor(.white)
-                    .cornerRadius(16)
+                    .cornerRadius(DesignSystem.CornerRadius.large)
             }
         }
-        .padding()
-        .background(Color.highlighterCardBackground)
-        .cornerRadius(12)
+        .modernCard()
     }
 }
 
