@@ -13,6 +13,7 @@ struct CommentsSection: View {
     @State private var animatedCommentIds = Set<String>()
     @State private var replyingTo: CommentEvent?
     @State private var commentReactions: [String: CommentReactions] = [:]
+    @State private var currentUserPubkey: String = ""
     
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
@@ -73,7 +74,7 @@ struct CommentsSection: View {
                 }
                 
                 HStack(spacing: 12) {
-                    EnhancedAsyncProfileImage(pubkey: appState.activeKeypair?.pubkey ?? "", size: 36)
+                    EnhancedAsyncProfileImage(pubkey: currentUserPubkey, size: 36)
                         .overlay(
                             Circle()
                                 .stroke(
@@ -160,6 +161,7 @@ struct CommentsSection: View {
         }
         .task {
             await loadComments()
+            await loadCurrentUserPubkey()
         }
     }
     
@@ -227,6 +229,16 @@ struct CommentsSection: View {
                 self.commentAuthors[pubkey] = profile
             }
             break
+        }
+    }
+    
+    private func loadCurrentUserPubkey() async {
+        if let signer = appState.activeSigner {
+            if let pubkey = try? await signer.pubkey {
+                await MainActor.run {
+                    self.currentUserPubkey = pubkey
+                }
+            }
         }
     }
     
@@ -551,39 +563,64 @@ struct CommentsList: View {
     let onReact: (CommentEvent, String) -> Void
     
     var body: some View {
-        ScrollViewReader { proxy in
-            ScrollView {
-                LazyVStack(alignment: .leading, spacing: 0) {
-                    ForEach(Array(comments.enumerated()), id: \.element.id) { index, comment in
-                        EnhancedCommentRow(
-                            comment: comment,
-                            author: commentAuthors[comment.author],
-                            reactions: commentReactions[comment.id] ?? CommentReactions(),
-                            isAnimated: animatedCommentIds.contains(comment.id),
-                            onReply: { onReply(comment) },
-                            onReact: { reaction in
-                                onReact(comment, reaction)
-                            }
-                        )
-                        .id(comment.id)
-                        .transition(.asymmetric(
-                            insertion: .push(from: .bottom).combined(with: .opacity),
-                            removal: .push(from: .top).combined(with: .opacity)
-                        ))
-                        .onAppear {
-                            withAnimation(.spring(response: 0.5, dampingFraction: 0.7).delay(Double(index) * 0.05)) {
-                                animatedCommentIds.insert(comment.id)
-                            }
-                        }
-                        
-                        if comment.id != comments.last?.id {
-                            Divider()
-                                .background(DesignSystem.Colors.divider.opacity(0.3))
-                                .padding(.leading, 48)
-                        }
-                    }
+        ScrollView {
+            LazyVStack(alignment: .leading, spacing: 0) {
+                ForEach(comments.indices, id: \.self) { index in
+                    CommentRowWrapper(
+                        comment: comments[index],
+                        author: commentAuthors[comments[index].author],
+                        reactions: commentReactions[comments[index].id] ?? CommentReactions(),
+                        isAnimated: animatedCommentIds.contains(comments[index].id),
+                        index: index,
+                        isLast: index == comments.count - 1,
+                        animatedCommentIds: $animatedCommentIds,
+                        onReply: onReply,
+                        onReact: onReact
+                    )
                 }
-                .padding(.horizontal)
+            }
+            .padding(.horizontal)
+        }
+    }
+}
+
+// Simplified wrapper to reduce complexity
+struct CommentRowWrapper: View {
+    let comment: CommentEvent
+    let author: NDKUserProfile?
+    let reactions: CommentReactions
+    let isAnimated: Bool
+    let index: Int
+    let isLast: Bool
+    @Binding var animatedCommentIds: Set<String>
+    let onReply: (CommentEvent) -> Void
+    let onReact: (CommentEvent, String) -> Void
+    
+    var body: some View {
+        VStack(spacing: 0) {
+            EnhancedCommentRow(
+                comment: comment,
+                author: author,
+                reactions: reactions,
+                isAnimated: isAnimated,
+                onReply: { onReply(comment) },
+                onReact: { reaction in onReact(comment, reaction) }
+            )
+            .id(comment.id)
+            .transition(.asymmetric(
+                insertion: .push(from: .bottom).combined(with: .opacity),
+                removal: .push(from: .top).combined(with: .opacity)
+            ))
+            .onAppear {
+                withAnimation(.spring(response: 0.5, dampingFraction: 0.7).delay(Double(index) * 0.05)) {
+                    _ = animatedCommentIds.insert(comment.id)
+                }
+            }
+            
+            if !isLast {
+                Divider()
+                    .background(DesignSystem.Colors.divider.opacity(0.3))
+                    .padding(.leading, 48)
             }
         }
     }
