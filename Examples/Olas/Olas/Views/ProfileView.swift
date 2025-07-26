@@ -9,6 +9,9 @@ struct ProfileView: View {
     @State private var selectedTab = 0
     @State private var headerHeight: CGFloat = 300
     @State private var scrollOffset: CGFloat = 0
+    @State private var showFollowers = false
+    @State private var showFollowing = false
+    @State private var selectedFollowMode: FollowersListView.FollowMode = .followers
     
     var body: some View {
         ZStack {
@@ -68,6 +71,14 @@ struct ProfileView: View {
             if let ndk = nostrManager.ndk {
                 viewModel.startObserving(pubkey: pubkey, ndk: ndk)
             }
+        }
+        .sheet(isPresented: $showFollowers) {
+            FollowersListView(pubkey: pubkey, mode: .followers)
+                .environment(nostrManager)
+        }
+        .sheet(isPresented: $showFollowing) {
+            FollowersListView(pubkey: pubkey, mode: .following)
+                .environment(nostrManager)
         }
     }
 }
@@ -158,8 +169,22 @@ struct ProfileHeaderView: View {
                 // Stats with animated counting
                 HStack(spacing: OlasDesign.Spacing.xl) {
                     ProfileStatView(value: postsCount, label: "Posts")
-                    ProfileStatView(value: followersCount, label: "Followers")
-                    ProfileStatView(value: followingCount, label: "Following")
+                    
+                    Button {
+                        selectedFollowMode = .followers
+                        showFollowers = true
+                    } label: {
+                        ProfileStatView(value: followersCount, label: "Followers")
+                    }
+                    .buttonStyle(PlainButtonStyle())
+                    
+                    Button {
+                        selectedFollowMode = .following
+                        showFollowing = true
+                    } label: {
+                        ProfileStatView(value: followingCount, label: "Following")
+                    }
+                    .buttonStyle(PlainButtonStyle())
                 }
                 
                 // Follow/Edit Button

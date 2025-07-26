@@ -59,7 +59,7 @@ struct PostaWelcomeView: View {
             PostaBackgroundView()
             
             // Electric field effects
-            ElectricFieldView()
+            WelcomeElectricFieldView()
                 .opacity(glowOpacity * 0.5)
             
             VStack(spacing: 40) {
@@ -259,7 +259,7 @@ struct PostaWelcomeView: View {
 }
 
 // MARK: - Electric Field View
-struct ElectricFieldView: View {
+struct WelcomeElectricFieldView: View {
     @State private var animationPhase: CGFloat = 0
     
     var body: some View {
@@ -269,8 +269,8 @@ struct ElectricFieldView: View {
                     let center = CGPoint(x: geometry.size.width / 2, y: geometry.size.height / 2)
                     let angle = Double(index) * (2 * .pi / 5) + animationPhase
                     let endPoint = CGPoint(
-                        x: center.x + cos(angle) * geometry.size.width * 0.4,
-                        y: center.y + sin(angle) * geometry.size.height * 0.4
+                        x: center.x + Foundation.cos(angle) * geometry.size.width * 0.4,
+                        y: center.y + Foundation.sin(angle) * geometry.size.height * 0.4
                     )
                     
                     path.move(to: center)

@@ -22,7 +22,7 @@ struct WaveShape: Shape {
         
         for x in stride(from: 0, through: width, by: 1) {
             let relativeX = x / wavelength
-            let y = sin(relativeX * .pi * 2 + phase) * 50 + midHeight
+            let y = Foundation.sin(relativeX * .pi * 2 + phase) * 50 + midHeight
             path.addLine(to: CGPoint(x: x, y: y))
         }
         

@@ -30,5 +30,7 @@
 	<array>
 		<string>UIInterfaceOrientationPortrait</string>
 	</array>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Ambulando uses the microphone to record audio for your walking sessions.</string>
 </dict>
 </plist>

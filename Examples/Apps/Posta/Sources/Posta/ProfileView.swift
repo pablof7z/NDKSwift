@@ -155,7 +155,7 @@ struct ProfileView: View {
     private var shimmeringBannerPlaceholder: some View {
         Rectangle()
             .fill(Color(.systemGray5))
-            .shimmer()
+            .postaShimmer()
     }
     
     private var defaultBanner: some View {
@@ -266,10 +266,7 @@ struct ProfileView: View {
                             Text(isFollowing ? "Unfollow" : "Follow")
                         }
                     }
-                    .buttonStyle(GradientButtonStyle(
-                        colors: isFollowing ? [Color(.tertiarySystemFill), Color(.tertiarySystemFill)] : [Color.purple, Color.purple.opacity(0.8)],
-                        shadowColor: isFollowing ? .clear : .purple
-                    ))
+                    .buttonStyle(PostaPrimaryButtonStyle(isEnabled: !isFollowing))
                 }
                 
                 Button(action: {

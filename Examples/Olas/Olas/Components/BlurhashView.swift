@@ -107,8 +107,8 @@ struct BlurhashView: View {
         
         image.unlockFocus()
         return image
-        #endif
     }
+    #endif
 }
 
 // MARK: - Progressive Image View
@@ -283,27 +283,29 @@ struct OlasProgressiveImage: View {
     
     #if os(iOS)
     private func resizeImage(_ image: UIImage, to size: CGSize) async -> UIImage? {
-    #else
-    private func resizeImage(_ image: NSImage, to size: CGSize) async -> NSImage? {
-    #endif
         return await withCheckedContinuation { continuation in
             DispatchQueue.global(qos: .userInitiated).async {
-                #if os(iOS)
                 let renderer = UIGraphicsImageRenderer(size: size)
                 let resized = renderer.image { context in
                     image.draw(in: CGRect(origin: .zero, size: size))
                 }
                 continuation.resume(returning: resized)
-                #else
+            }
+        }
+    }
+    #else
+    private func resizeImage(_ image: NSImage, to size: CGSize) async -> NSImage? {
+        return await withCheckedContinuation { continuation in
+            DispatchQueue.global(qos: .userInitiated).async {
                 let resized = NSImage(size: size)
                 resized.lockFocus()
                 image.draw(in: NSRect(origin: .zero, size: size))
                 resized.unlockFocus()
                 continuation.resume(returning: resized)
-                #endif
             }
         }
     }
+    #endif
 }
 
 
@@ -337,9 +339,6 @@ class ImageCacheManager {
     
     #if os(iOS)
     func getCachedImage(for url: String) -> UIImage? {
-    #else
-    func getCachedImage(for url: String) -> NSImage? {
-    #endif
         let key = NSString(string: url)
         
         // Check memory cache first
@@ -350,11 +349,7 @@ class ImageCacheManager {
         // Check disk cache
         let fileURL = diskCacheURL.appendingPathComponent(url.sha256Hash)
         if let data = try? Data(contentsOf: fileURL),
-           #if os(iOS)
            let image = UIImage(data: data) {
-           #else
-           let image = NSImage(data: data) {
-           #endif
             // Add to memory cache
             memoryCache.setObject(image, forKey: key, cost: data.count)
             return image
@@ -362,22 +357,34 @@ class ImageCacheManager {
         
         return nil
     }
+    #else
+    func getCachedImage(for url: String) -> NSImage? {
+        let key = NSString(string: url)
+        
+        // Check memory cache first
+        if let image = memoryCache.object(forKey: key) {
+            return image
+        }
+        
+        // Check disk cache
+        let fileURL = diskCacheURL.appendingPathComponent(url.sha256Hash)
+        if let data = try? Data(contentsOf: fileURL),
+           let image = NSImage(data: data) {
+            // Add to memory cache
+            memoryCache.setObject(image, forKey: key, cost: data.count)
+            return image
+        }
+        
+        return nil
+    }
+    #endif
     
     #if os(iOS)
     func cacheImage(_ image: UIImage, for url: String) {
-    #else
-    func cacheImage(_ image: NSImage, for url: String) {
-    #endif
         let key = NSString(string: url)
         
         // Add to memory cache
-        #if os(iOS)
         if let data = image.jpegData(compressionQuality: 0.8) {
-        #else
-        if let tiffData = image.tiffRepresentation,
-           let bitmap = NSBitmapImageRep(data: tiffData),
-           let data = bitmap.representation(using: .jpeg, properties: [.compressionFactor: 0.8]) {
-        #endif
             memoryCache.setObject(image, forKey: key, cost: data.count)
             
             // Save to disk
@@ -385,6 +392,22 @@ class ImageCacheManager {
             try? data.write(to: fileURL)
         }
     }
+    #else
+    func cacheImage(_ image: NSImage, for url: String) {
+        let key = NSString(string: url)
+        
+        // Add to memory cache
+        if let tiffData = image.tiffRepresentation,
+           let bitmap = NSBitmapImageRep(data: tiffData),
+           let data = bitmap.representation(using: .jpeg, properties: [.compressionFactor: 0.8]) {
+            memoryCache.setObject(image, forKey: key, cost: data.count)
+            
+            // Save to disk
+            let fileURL = diskCacheURL.appendingPathComponent(url.sha256Hash)
+            try? data.write(to: fileURL)
+        }
+    }
+    #endif
     
     private func cleanOldCache() {
         // Remove files older than 7 days

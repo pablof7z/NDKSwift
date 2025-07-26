@@ -156,7 +156,7 @@ struct EnhancedAvatarView: View {
         Circle()
             .fill(Color(.systemGray5))
             .frame(width: size, height: size)
-            .shimmer()
+            .postaShimmer()
     }
 }
 
@@ -213,8 +213,8 @@ struct AnimatedHeaderBackground: View {
             // Draw animated gradient circles
             for i in 0..<3 {
                 let offset = Double(i) * 120
-                let x = size.width * 0.5 + cos(phase + offset) * 30
-                let y = size.height * 0.5 + sin(phase + offset) * 20
+                let x = size.width * 0.5 + Foundation.cos(phase + offset) * 30
+                let y = size.height * 0.5 + Foundation.sin(phase + offset) * 20
                 
                 let circle = Circle()
                     .path(in: CGRect(
