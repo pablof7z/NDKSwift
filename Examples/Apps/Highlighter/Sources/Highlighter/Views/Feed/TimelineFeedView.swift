@@ -282,26 +282,26 @@ struct TimelineEventCard: View {
                 
                 // Engagement bar
                 HStack(spacing: 0) {
-                    EngagementButton(
+                    TimelineEngagementButton(
                         icon: "bubble.right",
                         count: engagement.comments,
                         action: {}
                     )
                     
-                    EngagementButton(
+                    TimelineEngagementButton(
                         icon: "arrow.2.squarepath",
                         count: engagement.reposts,
                         action: {}
                     )
                     
-                    EngagementButton(
+                    TimelineEngagementButton(
                         icon: engagement.isLiked ? "heart.fill" : "heart",
                         count: engagement.likes,
                         color: engagement.isLiked ? .red : .primary,
                         action: {}
                     )
                     
-                    EngagementButton(
+                    TimelineEngagementButton(
                         icon: "bolt.fill",
                         count: engagement.zaps,
                         color: .ds.secondary,
@@ -392,11 +392,11 @@ struct FilterPill: View {
                     )
             )
         }
-        .buttonStyle(ScaleButtonStyle())
+        .buttonStyle(TimelineScaleButtonStyle())
     }
 }
 
-struct EngagementButton: View {
+struct TimelineEngagementButton: View {
     let icon: String
     let count: Int
     var color: Color = .primary
@@ -416,7 +416,7 @@ struct EngagementButton: View {
             .padding(.horizontal, DesignSystem.Spacing.medium)
             .padding(.vertical, DesignSystem.Spacing.small)
         }
-        .buttonStyle(ScaleButtonStyle(scale: 1.1))
+        .buttonStyle(TimelineScaleButtonStyle(scale: 1.1))
     }
 }
 
@@ -645,7 +645,7 @@ struct FilterSelectionSheet: View {
 
 // MARK: - Button Styles
 
-struct ScaleButtonStyle: ButtonStyle {
+struct TimelineScaleButtonStyle: ButtonStyle {
     var scale: CGFloat = 0.95
     
     func makeBody(configuration: Configuration) -> some View {
@@ -664,7 +664,7 @@ class FeedDataManager: ObservableObject {
     
     weak var appState: AppState?
     private var activeFilter: TimelineFeedView.FeedFilter = .all
-    private var subscription: NDKSubscription?
+    private var subscription: Any? // NDKSubscription
     
     func startStreaming(filter: TimelineFeedView.FeedFilter) async {
         guard let appState = appState, let ndk = appState.ndk else { return }
