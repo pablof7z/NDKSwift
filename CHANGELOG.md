@@ -6,6 +6,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.0] - 2025-01-26
+
+### Added
+- NDKSwiftUI library providing SwiftUI components for Nostr apps
+- Proper CI/CD workflow for automated testing and releases
+- GitHub Actions workflow for release automation
+- Interactive release script for version management
+
+### Changed
+- Updated Swift tools version to 6.0
+- Migrated all example iOS apps to use published NDKSwift versions instead of local paths
+- Separated example iOS apps into individual repositories:
+  - Olas-iOS: Instagram-like social network
+  - Nutsack: Cashu ecash wallet
+  - Highlighter: Nostr highlights reader
+  - Posta: Full-featured Nostr client
+  - Ambulando: Audio walking app
+
+### Fixed
+- CashuSwift dependency issues by using the main branch of the original library
+- Removed forked CashuSwift library from Libraries directory
+
+### Improved
+- Project organization with all iOS apps now in separate repositories
+- Professional setup with proper build scripts and TestFlight deployment
+- Documentation with comprehensive README files for each app
+
 ## [0.2.0] - 2025-01-26
 
 ### Added
