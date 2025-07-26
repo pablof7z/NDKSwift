@@ -115,9 +115,18 @@ struct TextSelectionView: View {
     private var selectionOverlay: some View {
         GeometryReader { geometry in
             ZStack {
-                // Glowing selection rectangle
+                // Enhanced glowing selection rectangle with pulse
                 RoundedRectangle(cornerRadius: 8)
-                    .fill(Color.orange.opacity(0.2))
+                    .fill(
+                        LinearGradient(
+                            colors: [
+                                Color.orange.opacity(0.25),
+                                Color.orange.opacity(0.15)
+                            ],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
                     .frame(width: selectionRect.width, height: selectionRect.height)
                     .position(x: selectionRect.midX, y: selectionRect.midY)
                     .overlay(
@@ -128,13 +137,27 @@ struct TextSelectionView: View {
                                     startPoint: .topLeading,
                                     endPoint: .bottomTrailing
                                 ),
-                                lineWidth: 2
+                                lineWidth: selectionPulse ? 3 : 2
                             )
                             .frame(width: selectionRect.width, height: selectionRect.height)
                             .position(x: selectionRect.midX, y: selectionRect.midY)
                     )
                     .scaleEffect(highlightAnimation ? 1.02 : 1.0)
-                    .shadow(color: Color.orange.opacity(0.3), radius: highlightAnimation ? 15 : 10)
+                    .shadow(color: Color.orange.opacity(selectionGlow), radius: highlightAnimation ? 20 : 10)
+                    .blur(radius: selectionPulse ? 0.5 : 0)
+                
+                // Selection handles at corners
+                Group {
+                    SelectionHandle()
+                        .position(x: selectionRect.minX, y: selectionRect.minY)
+                        .opacity(highlightAnimation ? 1 : 0)
+                        .scaleEffect(selectionPulse ? 1.2 : 1.0)
+                    
+                    SelectionHandle()
+                        .position(x: selectionRect.maxX, y: selectionRect.maxY)
+                        .opacity(highlightAnimation ? 1 : 0)
+                        .scaleEffect(selectionPulse ? 1.2 : 1.0)
+                }
                 
                 // Action buttons
                 if !selectedText.isEmpty {
@@ -142,9 +165,18 @@ struct TextSelectionView: View {
                         Spacer()
                         
                         HStack(spacing: 16) {
-                            // Create highlight button
+                            // Create highlight button with enhanced animation
                             Button(action: {
-                                createHighlight()
+                                impactFeedback.impactOccurred()
+                                withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) {
+                                    buttonScale = 0.9
+                                }
+                                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                                    withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) {
+                                        buttonScale = 1.0
+                                    }
+                                    createHighlight()
+                                }
                             }) {
                                 Label("Create Highlight", systemImage: "highlighter")
                                     .font(.system(size: 14, weight: .semibold))
@@ -161,7 +193,7 @@ struct TextSelectionView: View {
                                     .clipShape(Capsule())
                                     .shadow(color: Color.orange.opacity(0.4), radius: 8, y: 4)
                             }
-                            .scaleEffect(highlightAnimation ? 1.05 : 1.0)
+                            .scaleEffect(buttonScale * (highlightAnimation ? 1.05 : 1.0))
                             
                             // Copy button
                             Button(action: {
@@ -188,12 +220,26 @@ struct TextSelectionView: View {
         selectedText = text
         
         if let range = range, !text.isEmpty {
+            // Haptic feedback on selection
+            selectionFeedback.selectionChanged()
+            
             highlightCreationMode = true
             extractContext(for: range)
             
-            // Start animations
+            // Start multiple coordinated animations
             withAnimation(.easeInOut(duration: 0.3)) {
                 highlightAnimation = true
+                selectionGlow = 0.4
+            }
+            
+            // Pulse animation
+            withAnimation(.easeInOut(duration: 0.6).repeatCount(2, autoreverses: true)) {
+                selectionPulse = true
+            }
+            
+            // Glow animation
+            withAnimation(.easeInOut(duration: 1.0).delay(0.3)) {
+                selectionGlow = 0.6
             }
             
             // Add ripple effect at selection
@@ -577,4 +623,35 @@ struct HighlightPreviewCard: View {
         source: "A Discipline of Programming",
         author: "Edsger W. Dijkstra"
     )
+}
+
+// MARK: - Supporting Components
+
+// Selection handle component for enhanced visual feedback
+struct SelectionHandle: View {
+    var body: some View {
+        ZStack {
+            Circle()
+                .fill(Color.orange)
+                .frame(width: 16, height: 16)
+                .overlay(
+                    Circle()
+                        .stroke(Color.white, lineWidth: 2)
+                )
+                .shadow(color: Color.orange.opacity(0.4), radius: 4, x: 0, y: 2)
+            
+            // Inner glow
+            Circle()
+                .fill(
+                    RadialGradient(
+                        colors: [Color.orange.opacity(0.6), Color.clear],
+                        center: .center,
+                        startRadius: 0,
+                        endRadius: 8
+                    )
+                )
+                .frame(width: 24, height: 24)
+                .allowsHitTesting(false)
+        }
+    }
 }
