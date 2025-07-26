@@ -5,6 +5,15 @@ public enum NostrConstants {
 
     public static let nostrPrefix = "nostr:"
     public static let nostrPrefixLength = 6
+    
+    // MARK: - NIP-05 Constants
+    
+    /// NIP-05 related error messages and formats
+    public enum NIP05 {
+        public static let expectedFormat = "Expected format: name@domain"
+        public static let responseTooLarge = "NIP-05 response too large"
+        public static let nameNotFound = "NIP-05 name not found"
+    }
 
     // MARK: - Bech32 Prefixes
 

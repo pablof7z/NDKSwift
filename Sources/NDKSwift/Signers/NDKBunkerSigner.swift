@@ -326,7 +326,7 @@ public actor NDKBunkerSigner: NDKSigner, Sendable {
     private func connectBunker() async throws -> NDKUser {
         guard let bunkerPubkey = bunkerPubkey else {
             NDKLogger.log(.error, category: .auth, "\(logPrefix) ERROR: Bunker pubkey not set!")
-            throw NDKError.configurationError("Bunker pubkey not set")
+            throw NDKError.configurationError(BunkerConstants.ErrorMessages.pubkeyNotSet)
         }
 
         // According to NIP-46, connect params are: [<remote-signer-pubkey>, <optional_secret>, <optional_requested_permissions>]
@@ -343,7 +343,7 @@ public actor NDKBunkerSigner: NDKSigner, Sendable {
         )
 
         guard let response = response else {
-            throw NDKError.connectionLost(relay: BunkerConstants.relayName, message: "No response received")
+            throw NDKError.connectionLost(relay: BunkerConstants.relayName, message: BunkerConstants.ErrorMessages.noResponseReceived)
         }
 
         if response.result == "ack" {
@@ -429,7 +429,7 @@ public actor NDKBunkerSigner: NDKSigner, Sendable {
 
     private func performSign(_ event: NDKEvent) async throws -> Signature {
         guard let bunkerPubkey = bunkerPubkey else {
-            throw NDKError.missingRequired("bunker connection")
+            throw NDKError.missingRequired(BunkerConstants.ErrorMessages.connectionRequired)
         }
 
         let eventJson = try event.serialize()
@@ -555,7 +555,7 @@ public actor NDKBunkerSigner: NDKSigner, Sendable {
         let payload = try JSONCoding.parseDictionary(from: data)
 
         guard let ndk = ndk else {
-            throw NDKSignerRegistryError.deserializationError("NDK instance required for bunker signer")
+            throw NDKSignerRegistryError.deserializationError(BunkerConstants.ErrorMessages.ndkInstanceRequired)
         }
 
         guard let bunkerPubkey = payload["bunkerPubkey"] as? String,
@@ -564,7 +564,7 @@ public actor NDKBunkerSigner: NDKSigner, Sendable {
               let secret = payload[NostrConstants.JSONField.secret] as? String,
               let localSignerData = payload["localSignerData"] as? Data,
               let connectionTypeRaw = payload["connectionType"] as? String else {
-            throw NDKSignerRegistryError.deserializationError(ErrorMessageConstants.missing("required bunker signer data"))
+            throw NDKSignerRegistryError.deserializationError(ErrorMessageConstants.missing(BunkerConstants.ErrorMessages.requiredDataMissing))
         }
 
         // Deserialize local signer (it also expects just the payload data)
