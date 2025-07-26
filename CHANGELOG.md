@@ -26,6 +26,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Removed force unwrapping in NDKNWCWallet connection handling for safer code
 - Test compilation errors by updating Tag usage to use array syntax
 - TestFactories filter parameter ordering to match NDKFilter constructor
+- Updated README.md to reflect current version (0.1.5)
 
 ### Improved
 - API documentation now includes detailed AsyncSequence examples
@@ -34,6 +35,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - ContentTagger public API documentation with comprehensive doc comments
 - Code organization by removing trailing empty lines
 - Reduced code duplication by creating shared components for example apps
+- Eliminated code duplication in NDKEvent+Interactions deletion methods by refactoring common logic
 
 ## [0.1.5] - 2025-01-26
 

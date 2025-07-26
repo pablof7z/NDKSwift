@@ -98,32 +98,6 @@ public extension NDKEvent {
 
     // MARK: - NIP-09: Event Deletion
 
-    /// Delete this event by creating and publishing a deletion request
-    ///
-    /// - Parameters:
-    ///   - reason: The reason for deletion (optional)
-    ///   - signer: The signer to use
-    ///   - ndk: NDK instance to publish the deletion (required)
-    ///
-    /// - Returns: The published deletion event
-    @discardableResult
-    func delete(reason: String = "", signer: NDKSigner, ndk: NDK) async throws -> NDKEvent {
-
-        // Create deletion event
-        let builder = await NDKEventBuilder(ndk: ndk)
-            .content(reason)
-            .kind(EventKind.deletion)
-            .tag(["k", String(self.kind)])
-            .tagEvent(self)
-
-        let deletionEvent = try await builder.build(signer: signer)
-
-        // Publish the deletion event
-        _ = try await ndk.publish(deletionEvent)
-
-        return deletionEvent
-    }
-
     /// Create a deletion request for this event without publishing
     ///
     /// - Parameters:
@@ -141,5 +115,24 @@ public extension NDKEvent {
             .tagEvent(self)
 
         return try await builder.build(signer: signer)
+    }
+    
+    /// Delete this event by creating and publishing a deletion request
+    ///
+    /// - Parameters:
+    ///   - reason: The reason for deletion (optional)
+    ///   - signer: The signer to use
+    ///   - ndk: NDK instance to publish the deletion (required)
+    ///
+    /// - Returns: The published deletion event
+    @discardableResult
+    func delete(reason: String = "", signer: NDKSigner, ndk: NDK) async throws -> NDKEvent {
+        // Create deletion event using the shared method
+        let deletionEvent = try await createDeletionRequest(reason: reason, signer: signer, ndk: ndk)
+
+        // Publish the deletion event
+        _ = try await ndk.publish(deletionEvent)
+
+        return deletionEvent
     }
 }

@@ -45,7 +45,5 @@
 		<string>UIInterfaceOrientationLandscapeLeft</string>
 		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
-	<key>NSCameraUsageDescription</key>
-	<string>This app needs access to your camera to scan QR codes for wallet addresses and payment invoices.</string>
 </dict>
 </plist>

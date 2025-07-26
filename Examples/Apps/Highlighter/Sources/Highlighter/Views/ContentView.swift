@@ -120,6 +120,14 @@ struct ContentView: View {
                         }
                 )
                 
+                // Live Activity Indicator (floating)
+                if selectedTab == .home || selectedTab == .feed {
+                    LiveActivityWidget()
+                        .zIndex(100)
+                        .transition(.scale.combined(with: .opacity))
+                        .animation(.spring(response: 0.6, dampingFraction: 0.8), value: contentAppeared)
+                }
+                
                 if tabBarVisible {
                     VStack(spacing: 0) {
                         // Floating Action Button

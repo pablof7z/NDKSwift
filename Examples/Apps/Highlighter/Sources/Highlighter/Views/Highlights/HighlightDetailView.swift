@@ -3,6 +3,14 @@ import NDKSwift
 
 struct HighlightDetailView: View {
     let highlight: HighlightEvent
+    
+    var body: some View {
+        ImmersiveHighlightDetailView(highlight: highlight)
+    }
+}
+
+struct HighlightDetailView_Legacy: View {
+    let highlight: HighlightEvent
     @EnvironmentObject var appState: AppState
     @Environment(\.dismiss) var dismiss
     

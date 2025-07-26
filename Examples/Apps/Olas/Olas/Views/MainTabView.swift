@@ -9,7 +9,6 @@ struct MainTabView: View {
     @State private var showCreatePost = false
     @State private var tabBarOpacity = 1.0
     @State private var tabBarOffset: CGFloat = 0
-    @State private var unreadMessages = 0
     
     var body: some View {
         TabView(selection: $selectedTab) {
@@ -45,16 +44,6 @@ struct MainTabView: View {
                     }
                 }
             
-            // Messages
-            NavigationStack {
-                MessagesListView()
-            }
-            .tabItem {
-                Label("Messages", systemImage: selectedTab == 3 ? "paperplane.fill" : "paperplane")
-            }
-            .tag(3)
-            .badge(unreadMessages > 0 ? "\(unreadMessages)" : nil)
-            
             // Profile Tab with Wallet Access
             Group {
                 if let session = nostrManager.authManager.activeSession {
@@ -74,9 +63,9 @@ struct MainTabView: View {
                 }
             }
             .tabItem {
-                Label("Profile", systemImage: selectedTab == 4 ? "person.circle.fill" : "person.circle")
+                Label("Profile", systemImage: selectedTab == 3 ? "person.circle.fill" : "person.circle")
             }
-            .tag(4)
+            .tag(3)
         }
         .tint(OlasDesign.Colors.primary)
         .onChange(of: selectedTab) { oldValue, newValue in

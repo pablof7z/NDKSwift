@@ -6,6 +6,9 @@ struct FeedView: View {
     @EnvironmentObject var appState: AppState
     @StateObject private var viewModel = FeedViewModel()
     @State private var hasAppeared = false
+    @State private var showLiveIndicator = false
+    @State private var newPostsCount = 0
+    @State private var pulseAnimation = false
     @Namespace private var animation
     
     var body: some View {
@@ -33,8 +36,22 @@ struct FeedView: View {
                             Section {
                                 // Empty section content
                             } header: {
-                                StoriesView()
-                                    .background(OlasDesign.Colors.background)
+                                VStack(spacing: 0) {
+                                    StoriesView()
+                                        .background(OlasDesign.Colors.background)
+                                    
+                                    // Live updates indicator
+                                    if showLiveIndicator {
+                                        LiveUpdatesIndicator(newPostsCount: $newPostsCount)
+                                            .transition(.asymmetric(
+                                                insertion: .push(from: .top).combined(with: .opacity),
+                                                removal: .push(from: .top).combined(with: .opacity)
+                                            ))
+                                            .onTapGesture {
+                                                loadPendingItems()
+                                            }
+                                    }
+                                }
                             }
                             
                             // Feed items
@@ -70,6 +87,29 @@ struct FeedView: View {
             #endif
             .toolbar {
                 #if os(iOS)
+                ToolbarItem(placement: .navigationBarLeading) {
+                    // Live indicator in toolbar
+                    if viewModel.isLive {
+                        HStack(spacing: 6) {
+                            Circle()
+                                .fill(Color.green)
+                                .frame(width: 8, height: 8)
+                                .overlay(
+                                    Circle()
+                                        .stroke(Color.green.opacity(0.3), lineWidth: 8)
+                                        .scaleEffect(pulseAnimation ? 2 : 1)
+                                        .opacity(pulseAnimation ? 0 : 1)
+                                        .animation(.easeOut(duration: 1.5).repeatForever(autoreverses: false), value: pulseAnimation)
+                                )
+                            
+                            Text("LIVE")
+                                .font(.system(size: 12, weight: .bold, design: .rounded))
+                                .foregroundColor(.green)
+                        }
+                        .onAppear { pulseAnimation = true }
+                    }
+                }
+                
                 ToolbarItem(placement: .navigationBarTrailing) {
                 #else
                 ToolbarItem(placement: .automatic) {
@@ -101,6 +141,18 @@ struct FeedView: View {
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
                     withAnimation {
                         hasAppeared = true
+                    }
+                }
+            }
+            .onChange(of: viewModel.pendingItemsCount) { _, newValue in
+                if newValue > 0 {
+                    withAnimation(.spring()) {
+                        showLiveIndicator = true
+                        newPostsCount = newValue
+                    }
+                } else {
+                    withAnimation(.spring()) {
+                        showLiveIndicator = false
                     }
                 }
             }
@@ -142,6 +194,19 @@ struct FeedView: View {
                 hasAppeared = true
             }
         }
+    }
+    
+    private func loadPendingItems() {
+        withAnimation(.spring(response: 0.5, dampingFraction: 0.8)) {
+            viewModel.loadPendingItems()
+            showLiveIndicator = false
+            newPostsCount = 0
+        }
+        
+        // Haptic feedback
+        #if os(iOS)
+        OlasDesign.Haptic.impact(.medium)
+        #endif
     }
 }
 
@@ -473,10 +538,14 @@ struct FeedItemView: View {
 @MainActor
 class FeedViewModel: ObservableObject {
     @Published var items: [FeedItem] = []
+    @Published var pendingItems: [FeedItem] = []
     @Published var isLoading = true
+    @Published var isLive = false
+    @Published var pendingItemsCount = 0
     private var profileTasks: [String: Task<Void, Never>] = [:]
     private var feedTask: Task<Void, Never>?
     private var engagementTasks: [String: Task<Void, Never>] = [:]
+    private var lastEventTime: Date?
     
     func startFeed(with ndk: NDK) {
         // Cancel any existing feed task
@@ -490,9 +559,11 @@ class FeedViewModel: ObservableObject {
             
             await MainActor.run {
                 self.isLoading = false
+                self.isLive = true
             }
-            // Subscribe to picture posts - NIP-68
-            let filter = NDKFilter(kinds: [EventKind.image], limit: 100)
+            
+            // Subscribe to both picture posts (NIP-68) and text posts with images
+            let filter = NDKFilter(kinds: [EventKind.image, EventKind.textNote], limit: 100)
             
             // Create data source using observe with reactive pattern
             let dataSource = ndk.observe(
@@ -502,16 +573,42 @@ class FeedViewModel: ObservableObject {
             )
             
             for await event in dataSource.events {
-                // For image events, we expect imeta tags
-                if event.kind == EventKind.image {
+                // Check if this is an image post or text post with images
+                let isImagePost = event.kind == EventKind.image
+                let hasImages = event.kind == EventKind.textNote && containsImageURL(event.content)
+                
+                if isImagePost || hasImages {
                     let feedItem = FeedItem(from: event)
                     
                     await MainActor.run {
-                        // Insert sorted by timestamp
-                        if let insertIndex = items.firstIndex(where: { $0.event.createdAt < event.createdAt }) {
-                            items.insert(feedItem, at: insertIndex)
+                        // Check if this is a new post (arrived after initial load)
+                        let isNewPost = lastEventTime != nil && event.createdAt > lastEventTime!
+                        
+                        if isNewPost {
+                            // Add to pending items
+                            if let insertIndex = pendingItems.firstIndex(where: { $0.event.createdAt < event.createdAt }) {
+                                pendingItems.insert(feedItem, at: insertIndex)
+                            } else {
+                                pendingItems.append(feedItem)
+                            }
+                            pendingItemsCount = pendingItems.count
+                            
+                            // Haptic feedback for new posts
+                            #if os(iOS)
+                            OlasDesign.Haptic.impact(.light)
+                            #endif
                         } else {
-                            items.append(feedItem)
+                            // Insert sorted by timestamp
+                            if let insertIndex = items.firstIndex(where: { $0.event.createdAt < event.createdAt }) {
+                                items.insert(feedItem, at: insertIndex)
+                            } else {
+                                items.append(feedItem)
+                            }
+                            
+                            // Update last event time
+                            if lastEventTime == nil || event.createdAt > lastEventTime! {
+                                lastEventTime = event.createdAt
+                            }
                         }
                         
                         // Limit feed size for performance
@@ -583,6 +680,9 @@ class FeedViewModel: ObservableObject {
         // Clear items and restart subscription
         await MainActor.run {
             items.removeAll()
+            pendingItems.removeAll()
+            pendingItemsCount = 0
+            lastEventTime = nil
         }
         // Cancel all tasks
         feedTask?.cancel()
@@ -592,6 +692,27 @@ class FeedViewModel: ObservableObject {
         engagementTasks.removeAll()
         
         // Restart feed will happen when view calls startFeed again
+    }
+    
+    func loadPendingItems() {
+        // Move pending items to main feed
+        let itemsToAdd = pendingItems
+        pendingItems.removeAll()
+        pendingItemsCount = 0
+        
+        // Insert all pending items with animation
+        for item in itemsToAdd {
+            if let insertIndex = items.firstIndex(where: { $0.event.createdAt < item.event.createdAt }) {
+                items.insert(item, at: insertIndex)
+            } else {
+                items.append(item)
+            }
+        }
+        
+        // Update last event time
+        if let latestItem = items.first {
+            lastEventTime = latestItem.event.createdAt
+        }
     }
     
     private func loadEngagementReactively(for eventId: String, ndk: NDK) {

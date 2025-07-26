@@ -367,7 +367,7 @@ struct SearchTabButton: View {
                 Image(systemName: icon)
                     .font(.caption)
                 Text(title)
-                    .font(OlasDesign.Typography.captionBold)
+                    .font(OlasDesign.Typography.caption).fontWeight(.bold)
             }
             .foregroundColor(isSelected ? .white : OlasDesign.Colors.text)
             .padding(.horizontal, OlasDesign.Spacing.md)
@@ -606,7 +606,7 @@ struct PostSearchGridItem: View {
         }
         .aspectRatio(1, contentMode: .fit)
         .navigationDestination(isPresented: $showDetail) {
-            PostDetailView(eventId: post.event.id)
+            PostDetailView(event: post.event)
         }
     }
 }
@@ -661,7 +661,8 @@ class SearchViewModel: ObservableObject {
         )
         
         do {
-            let events = try await ndk.fetchEvents(filter: filter)
+            let dataSource = ndk.observe(filter: filter)
+            let events = await dataSource.collect(timeout: 5.0)
             
             var users: [SearchUser] = []
             
@@ -695,7 +696,8 @@ class SearchViewModel: ObservableObject {
         )
         
         do {
-            let events = try await ndk.fetchEvents(filter: filter)
+            let dataSource = ndk.observe(filter: filter)
+            let events = await dataSource.collect(timeout: 5.0)
             
             var posts: [SearchPost] = []
             
@@ -745,7 +747,8 @@ class SearchViewModel: ObservableObject {
         )
         
         do {
-            let events = try await ndk.fetchEvents(filter: filter)
+            let dataSource = ndk.observe(filter: filter)
+            let events = await dataSource.collect(timeout: 5.0)
             
             let users = events.compactMap { event -> SearchUser? in
                 guard let metadata = try? JSONDecoder().decode(NDKUserProfile.self, from: Data(event.content.utf8)) else { return nil }
