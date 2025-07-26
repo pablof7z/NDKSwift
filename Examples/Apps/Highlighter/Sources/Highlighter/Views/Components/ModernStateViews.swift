@@ -551,14 +551,14 @@ extension View {
     .background(DesignSystem.Colors.background)
 }
 
-#Preview("Error State") {
-    struct SampleError: LocalizedError {
-        var errorDescription: String? {
-            "Failed to load content from the server"
-        }
+struct SampleError: LocalizedError {
+    var errorDescription: String? {
+        "Failed to load content from the server"
     }
-    
-    return ModernErrorStateView(
+}
+
+#Preview("Error State") {
+    ModernErrorStateView(
         error: SampleError(),
         retryAction: {}
     )

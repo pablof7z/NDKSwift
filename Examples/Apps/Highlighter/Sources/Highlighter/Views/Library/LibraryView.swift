@@ -7,32 +7,134 @@ struct LibraryView: View {
     @State private var selectedCuration: ArticleCuration?
     @State private var selectedFollowPack: FollowPack?
     @State private var showCurationManagement = false
+    @State private var selectedFilter = FilterTab.all
+    @State private var searchText = ""
+    @State private var showStats = true
+    @State private var animateGradient = false
+    
+    enum FilterTab: String, CaseIterable {
+        case all = "All"
+        case highlights = "Highlights"
+        case curations = "Collections"
+        case articles = "Articles"
+        
+        var icon: String {
+            switch self {
+            case .all: return "square.grid.2x2"
+            case .highlights: return "highlighter"
+            case .curations: return "folder.fill"
+            case .articles: return "doc.text.fill"
+            }
+        }
+    }
     
     var body: some View {
         NavigationStack {
-            ScrollView {
-                VStack(alignment: .leading, spacing: 24) {
-                    // Saved highlights
-                    SavedHighlightsSection()
-                    
-                    // Your curations
-                    YourCurationsSection(
-                        curations: appState.userCurations,
-                        showCreateCuration: $showCreateCuration,
-                        selectedCuration: $selectedCuration,
-                        showCurationManagement: $showCurationManagement
-                    )
-                    
-                    // Follow packs
-                    FollowPacksSection(
-                        followPacks: appState.followPacks,
-                        selectedFollowPack: $selectedFollowPack
-                    )
+            ZStack {
+                // Animated gradient background
+                LinearGradient(
+                    colors: [
+                        Color.ds.primary.opacity(0.05),
+                        Color.ds.secondary.opacity(0.03),
+                        Color.clear
+                    ],
+                    startPoint: animateGradient ? .topLeading : .bottomTrailing,
+                    endPoint: animateGradient ? .bottomTrailing : .topLeading
+                )
+                .ignoresSafeArea()
+                .animation(.easeInOut(duration: 10).repeatForever(autoreverses: true), value: animateGradient)
+                
+                ScrollView {
+                    VStack(spacing: 0) {
+                        // Stats header
+                        if showStats {
+                            LibraryStatsCard()
+                                .padding(.horizontal)
+                                .padding(.top)
+                                .transition(.asymmetric(
+                                    insertion: .push(from: .top).combined(with: .opacity),
+                                    removal: .push(from: .bottom).combined(with: .opacity)
+                                ))
+                        }
+                        
+                        // Filter tabs
+                        ScrollView(.horizontal, showsIndicators: false) {
+                            HStack(spacing: 12) {
+                                ForEach(FilterTab.allCases, id: \.self) { tab in
+                                    LibraryFilterChip(
+                                        title: tab.rawValue,
+                                        icon: tab.icon,
+                                        isSelected: selectedFilter == tab
+                                    ) {
+                                        withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                                            selectedFilter = tab
+                                            HapticManager.shared.impact(.light)
+                                        }
+                                    }
+                                }
+                            }
+                            .padding(.horizontal)
+                        }
+                        .padding(.vertical)
+                        
+                        // Content based on filter
+                        VStack(spacing: 32) {
+                            switch selectedFilter {
+                            case .all:
+                                allContentView
+                            case .highlights:
+                                EnhancedSavedHighlightsSection()
+                            case .curations:
+                                EnhancedYourCurationsSection(
+                                    curations: appState.userCurations,
+                                    showCreateCuration: $showCreateCuration,
+                                    selectedCuration: $selectedCuration,
+                                    showCurationManagement: $showCurationManagement
+                                )
+                            case .articles:
+                                SavedArticlesSection()
+                            }
+                        }
+                        .padding(.bottom, 32)
+                    }
                 }
-                .padding(.vertical)
+                .refreshable {
+                    HapticManager.shared.impact(.medium)
+                    // Refresh library content
+                }
             }
-            .background(DesignSystem.Colors.background)
             .navigationTitle("Library")
+            .navigationBarTitleDisplayMode(.large)
+            .searchable(text: $searchText, prompt: "Search your library")
+            .toolbar {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Menu {
+                        Button(action: { 
+                            withAnimation {
+                                showStats.toggle()
+                            }
+                        }) {
+                            Label(showStats ? "Hide Stats" : "Show Stats", systemImage: "chart.bar")
+                        }
+                        
+                        Button(action: {}) {
+                            Label("Sort by Date", systemImage: "arrow.up.arrow.down")
+                        }
+                        
+                        Button(action: {}) {
+                            Label("Export Library", systemImage: "square.and.arrow.up")
+                        }
+                    } label: {
+                        Image(systemName: "ellipsis.circle")
+                            .font(.system(size: 18))
+                            .foregroundColor(.ds.text)
+                            .frame(width: 44, height: 44)
+                    }
+                }
+            }
+        }
+        .onAppear {
+            animateGradient = true
         }
         .sheet(isPresented: $showCreateCuration) {
             CreateCurationView()
@@ -51,25 +153,367 @@ struct LibraryView: View {
                 .environmentObject(appState)
         }
     }
+    
+    @ViewBuilder
+    private var allContentView: some View {
+        VStack(spacing: 32) {
+            // Recent Activity
+            RecentActivitySection()
+            
+            // Saved highlights
+            EnhancedSavedHighlightsSection()
+            
+            // Your curations
+            EnhancedYourCurationsSection(
+                curations: appState.userCurations,
+                showCreateCuration: $showCreateCuration,
+                selectedCuration: $selectedCuration,
+                showCurationManagement: $showCurationManagement
+            )
+            
+            // Follow packs
+            EnhancedFollowPacksSection(
+                followPacks: appState.followPacks,
+                selectedFollowPack: $selectedFollowPack
+            )
+        }
+    }
 }
 
-struct SavedHighlightsSection: View {
+// MARK: - New Components
+
+struct LibraryStatsCard: View {
     @EnvironmentObject var appState: AppState
+    @State private var animateStats = false
+    
+    var body: some View {
+        VStack(spacing: 20) {
+            HStack {
+                Text("Your Library")
+                    .font(.system(size: 28, weight: .bold, design: .rounded))
+                    .foregroundColor(.ds.text)
+                
+                Spacer()
+                
+                // Streak indicator
+                HStack(spacing: 6) {
+                    Image(systemName: "flame.fill")
+                        .font(.system(size: 16))
+                        .foregroundColor(.orange)
+                    Text("7 day streak")
+                        .font(.system(size: 14, weight: .medium))
+                        .foregroundColor(.orange)
+                }
+                .padding(.horizontal, 12)
+                .padding(.vertical, 6)
+                .background(
+                    Capsule()
+                        .fill(Color.orange.opacity(0.15))
+                )
+            }
+            
+            // Stats grid
+            LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible()), GridItem(.flexible())], spacing: 16) {
+                LibraryStatCard(
+                    value: "\(appState.highlights.count)",
+                    label: "Highlights",
+                    icon: "highlighter",
+                    color: .ds.primary,
+                    animate: $animateStats
+                )
+                
+                LibraryStatCard(
+                    value: "\(appState.curations.count)",
+                    label: "Collections",
+                    icon: "folder.fill",
+                    color: .purple,
+                    animate: $animateStats
+                )
+                
+                LibraryStatCard(
+                    value: "\(Int.random(in: 10...50))",
+                    label: "Articles",
+                    icon: "doc.text.fill",
+                    color: .blue,
+                    animate: $animateStats
+                )
+            }
+        }
+        .padding(24)
+        .background(
+            RoundedRectangle(cornerRadius: 24, style: .continuous)
+                .fill(
+                    LinearGradient(
+                        colors: [
+                            Color.ds.surfaceSecondary,
+                            Color.ds.surface
+                        ],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                )
+                .shadow(color: Color.black.opacity(0.05), radius: 20, y: 10)
+        )
+        .onAppear {
+            withAnimation(.spring(response: 0.6, dampingFraction: 0.8).delay(0.2)) {
+                animateStats = true
+            }
+        }
+    }
+}
+
+struct LibraryStatCard: View {
+    let value: String
+    let label: String
+    let icon: String
+    let color: Color
+    @Binding var animate: Bool
+    
+    var body: some View {
+        VStack(spacing: 12) {
+            ZStack {
+                Circle()
+                    .fill(color.opacity(0.15))
+                    .frame(width: 56, height: 56)
+                
+                Image(systemName: icon)
+                    .font(.system(size: 24, weight: .semibold))
+                    .foregroundColor(color)
+                    .scaleEffect(animate ? 1 : 0.5)
+                    .opacity(animate ? 1 : 0)
+            }
+            
+            VStack(spacing: 4) {
+                Text(value)
+                    .font(.system(size: 24, weight: .bold, design: .rounded))
+                    .foregroundColor(.ds.text)
+                
+                Text(label)
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundColor(.ds.textSecondary)
+            }
+        }
+        .frame(maxWidth: .infinity)
+    }
+}
+
+struct LibraryFilterChip: View {
+    let title: String
+    let icon: String
+    let isSelected: Bool
+    let action: () -> Void
+    
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 8) {
+                Image(systemName: icon)
+                    .font(.system(size: 16, weight: .medium))
+                Text(title)
+                    .font(.system(size: 15, weight: .medium))
+            }
+            .foregroundColor(isSelected ? .white : .ds.text)
+            .padding(.horizontal, 16)
+            .padding(.vertical, 10)
+            .background(
+                Capsule()
+                    .fill(isSelected ? Color.ds.primary : Color.ds.surfaceSecondary)
+            )
+            .overlay(
+                Capsule()
+                    .strokeBorder(isSelected ? Color.clear : Color.ds.divider, lineWidth: 1)
+            )
+        }
+        .scaleEffect(isSelected ? 1.05 : 1)
+        .animation(.spring(response: 0.3, dampingFraction: 0.7), value: isSelected)
+    }
+}
+
+struct RecentActivitySection: View {
+    @State private var activities: [ActivityItem] = []
+    
+    struct ActivityItem: Identifiable {
+        let id = UUID()
+        let type: ActivityType
+        let title: String
+        let time: Date
+        
+        enum ActivityType {
+            case highlight, curation, article, zap
+            
+            var icon: String {
+                switch self {
+                case .highlight: return "highlighter"
+                case .curation: return "folder.badge.plus"
+                case .article: return "doc.text"
+                case .zap: return "bolt.fill"
+                }
+            }
+            
+            var color: Color {
+                switch self {
+                case .highlight: return .ds.primary
+                case .curation: return .purple
+                case .article: return .blue
+                case .zap: return .orange
+                }
+            }
+        }
+    }
     
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
-            Text("Your Highlights")
-                .font(DesignSystem.Typography.headline)
+            HStack {
+                Label("Recent Activity", systemImage: "clock.arrow.circlepath")
+                    .font(.system(size: 20, weight: .bold, design: .rounded))
+                    .foregroundColor(.ds.text)
+                
+                Spacer()
+                
+                Button(action: {}) {
+                    Text("View All")
+                        .font(.system(size: 14, weight: .medium))
+                        .foregroundColor(.ds.primary)
+                }
+            }
+            .padding(.horizontal)
+            
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 16) {
+                    ForEach(mockActivities) { activity in
+                        ActivityCard(activity: activity)
+                    }
+                }
                 .padding(.horizontal)
+            }
+        }
+        .onAppear {
+            generateMockActivities()
+        }
+    }
+    
+    private var mockActivities: [ActivityItem] {
+        activities.isEmpty ? generateMockActivities() : activities
+    }
+    
+    @discardableResult
+    private func generateMockActivities() -> [ActivityItem] {
+        let newActivities = [
+            ActivityItem(type: .highlight, title: "Highlighted from 'The Future of AI'", time: Date().addingTimeInterval(-300)),
+            ActivityItem(type: .zap, title: "Zapped 1000 sats", time: Date().addingTimeInterval(-1800)),
+            ActivityItem(type: .article, title: "Saved 'Bitcoin Whitepaper'", time: Date().addingTimeInterval(-3600)),
+            ActivityItem(type: .curation, title: "Created 'Tech Insights'", time: Date().addingTimeInterval(-7200)),
+            ActivityItem(type: .highlight, title: "Highlighted from 'SwiftUI Tips'", time: Date().addingTimeInterval(-10800))
+        ]
+        activities = newActivities
+        return newActivities
+    }
+}
+
+struct ActivityCard: View {
+    let activity: RecentActivitySection.ActivityItem
+    
+    var body: some View {
+        HStack(spacing: 12) {
+            ZStack {
+                Circle()
+                    .fill(activity.type.color.opacity(0.15))
+                    .frame(width: 44, height: 44)
+                
+                Image(systemName: activity.type.icon)
+                    .font(.system(size: 20, weight: .medium))
+                    .foregroundColor(activity.type.color)
+            }
+            
+            VStack(alignment: .leading, spacing: 4) {
+                Text(activity.title)
+                    .font(.system(size: 14, weight: .medium))
+                    .foregroundColor(.ds.text)
+                    .lineLimit(1)
+                
+                Text(RelativeTimeFormatter.shortRelativeTime(from: activity.time))
+                    .font(.system(size: 12))
+                    .foregroundColor(.ds.textSecondary)
+            }
+        }
+        .padding(16)
+        .frame(width: 260)
+        .background(
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .fill(Color.ds.surfaceSecondary)
+        )
+    }
+}
+
+struct EnhancedSavedHighlightsSection: View {
+    @EnvironmentObject var appState: AppState
+    @State private var showAllHighlights = false
+    @State private var selectedSortOption = SortOption.recent
+    
+    enum SortOption: String, CaseIterable {
+        case recent = "Recent"
+        case popular = "Popular"
+        case alphabetical = "A-Z"
+    }
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 20) {
+            HStack {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Your Highlights")
+                        .font(.system(size: 24, weight: .bold, design: .rounded))
+                        .foregroundColor(.ds.text)
+                    
+                    Text("\(appState.highlights.count) highlights saved")
+                        .font(.system(size: 14))
+                        .foregroundColor(.ds.textSecondary)
+                }
+                
+                Spacer()
+                
+                Menu {
+                    ForEach(SortOption.allCases, id: \.self) { option in
+                        Button(action: { selectedSortOption = option }) {
+                            Label(option.rawValue, systemImage: selectedSortOption == option ? "checkmark" : "")
+                        }
+                    }
+                } label: {
+                    HStack(spacing: 6) {
+                        Text(selectedSortOption.rawValue)
+                            .font(.system(size: 14, weight: .medium))
+                        Image(systemName: "chevron.down")
+                            .font(.system(size: 12))
+                    }
+                    .foregroundColor(.ds.primary)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 6)
+                    .background(
+                        Capsule()
+                            .fill(Color.ds.primary.opacity(0.1))
+                    )
+                }
+            }
+            .padding(.horizontal)
             
             if appState.highlights.isEmpty {
-                EmptyHighlightsPlaceholder()
-                    .padding(.horizontal)
+                ModernEmptyState(
+                    icon: "highlighter",
+                    title: "No highlights yet",
+                    message: "Start highlighting content to build your collection",
+                    action: {},
+                    actionTitle: "Create Highlight"
+                )
+                .padding(.horizontal)
             } else {
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 16) {
                         ForEach(appState.highlights.prefix(10)) { highlight in
-                            SavedHighlightCard(highlight: highlight)
+                            LibraryHighlightCard(highlight: highlight)
+                        }
+                        
+                        if appState.highlights.count > 10 {
+                            ViewAllCard(count: appState.highlights.count - 10) {
+                                showAllHighlights = true
+                            }
                         }
                     }
                     .padding(.horizontal)
@@ -79,117 +523,508 @@ struct SavedHighlightsSection: View {
     }
 }
 
-struct EmptyHighlightsPlaceholder: View {
-    var body: some View {
-        VStack(spacing: 16) {
-            Image(systemName: "highlighter")
-                .font(.system(size: 48))
-                .foregroundColor(DesignSystem.Colors.primary.opacity(0.5))
-            
-            Text("No highlights yet")
-                .font(DesignSystem.Typography.body)
-                .foregroundColor(DesignSystem.Colors.textSecondary)
-            
-            Text("Start highlighting to build your collection")
-                .font(DesignSystem.Typography.caption)
-                .foregroundColor(DesignSystem.Colors.textSecondary)
-        }
-        .frame(maxWidth: .infinity)
-        .padding(.vertical, 40)
-        .background(DesignSystem.Colors.surface.opacity(0.5))
-        .cornerRadius(12)
-    }
-}
-
-struct SavedHighlightCard: View {
+struct LibraryHighlightCard: View {
     let highlight: HighlightEvent
     @State private var showDetail = false
+    @State private var isBookmarked = false
     
     var body: some View {
         Button(action: { showDetail = true }) {
-            VStack(alignment: .leading, spacing: 8) {
-                Text(ContentFormatter.formatHighlight(highlight.content))
-                    .font(DesignSystem.Typography.body)
-                    .foregroundColor(DesignSystem.Colors.text)
-                    .lineLimit(3)
-                    .multilineTextAlignment(.leading)
-                
+            VStack(alignment: .leading, spacing: 12) {
+                // Header with source
                 if let url = highlight.url {
-                    HStack(spacing: 4) {
-                        Image(systemName: "link")
-                            .font(.system(size: 12))
+                    HStack(spacing: 8) {
+                        Image(systemName: "link.circle.fill")
+                            .font(.system(size: 14))
+                            .foregroundColor(.ds.primary)
+                        
                         Text(ContentFormatter.extractDomain(from: url))
-                            .font(DesignSystem.Typography.caption)
+                            .font(.system(size: 12, weight: .medium))
+                            .foregroundColor(.ds.primary)
+                        
+                        Spacer()
+                        
+                        Button(action: {
+                            isBookmarked.toggle()
+                            HapticManager.shared.impact(.light)
+                        }) {
+                            Image(systemName: isBookmarked ? "bookmark.fill" : "bookmark")
+                                .font(.system(size: 14))
+                                .foregroundColor(isBookmarked ? .ds.primary : .ds.textTertiary)
+                        }
+                        .buttonStyle(PlainButtonStyle())
                     }
-                    .foregroundColor(DesignSystem.Colors.primary)
                 }
                 
-                Text(RelativeTimeFormatter.relativeTime(from: highlight.createdAt))
-                    .font(DesignSystem.Typography.caption)
-                    .foregroundColor(DesignSystem.Colors.textSecondary)
+                // Quote
+                Text("\"\(highlight.content)\"")
+                    .font(.system(size: 16, weight: .medium))
+                    .foregroundColor(.ds.text)
+                    .lineLimit(4)
+                    .multilineTextAlignment(.leading)
+                
+                Spacer()
+                
+                // Footer
+                HStack {
+                    Text(RelativeTimeFormatter.relativeTime(from: highlight.createdAt))
+                        .font(.system(size: 12))
+                        .foregroundColor(.ds.textSecondary)
+                    
+                    Spacer()
+                    
+                    HStack(spacing: 4) {
+                        Image(systemName: "arrow.right.circle")
+                            .font(.system(size: 16))
+                        Text("View")
+                            .font(.system(size: 12, weight: .medium))
+                    }
+                    .foregroundColor(.ds.primary)
+                }
             }
-            .padding()
-            .frame(width: 250, alignment: .leading)
-            .modernCard()
+            .padding(20)
+            .frame(width: 280, height: 180)
+            .background(
+                RoundedRectangle(cornerRadius: 20, style: .continuous)
+                    .fill(
+                        LinearGradient(
+                            colors: [
+                                Color.ds.surface,
+                                Color.ds.surfaceSecondary
+                            ],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 20, style: .continuous)
+                    .strokeBorder(Color.ds.divider, lineWidth: 1)
+            )
+            .shadow(color: Color.black.opacity(0.05), radius: 10, y: 5)
         }
         .buttonStyle(PlainButtonStyle())
         .sheet(isPresented: $showDetail) {
             HighlightDetailView(highlight: highlight)
         }
     }
-    
 }
 
-struct YourCurationsSection: View {
+struct ViewAllCard: View {
+    let count: Int
+    let action: () -> Void
+    
+    var body: some View {
+        Button(action: action) {
+            VStack(spacing: 16) {
+                ZStack {
+                    Circle()
+                        .fill(Color.ds.primary.opacity(0.1))
+                        .frame(width: 64, height: 64)
+                    
+                    Image(systemName: "arrow.right.circle.fill")
+                        .font(.system(size: 32))
+                        .foregroundColor(.ds.primary)
+                }
+                
+                VStack(spacing: 4) {
+                    Text("View All")
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundColor(.ds.text)
+                    
+                    Text("+\(count) more")
+                        .font(.system(size: 14))
+                        .foregroundColor(.ds.textSecondary)
+                }
+            }
+            .frame(width: 140, height: 180)
+            .background(
+                RoundedRectangle(cornerRadius: 20, style: .continuous)
+                    .fill(Color.ds.surfaceSecondary)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 20, style: .continuous)
+                            .strokeBorder(
+                                style: StrokeStyle(lineWidth: 2, dash: [8])
+                            )
+                            .foregroundColor(.ds.primary.opacity(0.3))
+                    )
+            )
+        }
+        .buttonStyle(PlainButtonStyle())
+    }
+}
+
+
+struct SavedArticlesSection: View {
+    var body: some View {
+        VStack(alignment: .leading, spacing: 20) {
+            Text("Saved Articles")
+                .font(.system(size: 24, weight: .bold, design: .rounded))
+                .foregroundColor(.ds.text)
+                .padding(.horizontal)
+            
+            LazyVStack(spacing: 16) {
+                ForEach(0..<5, id: \.self) { _ in
+                    ArticleRow()
+                }
+            }
+            .padding(.horizontal)
+        }
+    }
+}
+
+struct ArticleRow: View {
+    var body: some View {
+        HStack(spacing: 16) {
+            RoundedRectangle(cornerRadius: 12)
+                .fill(
+                    LinearGradient(
+                        colors: [Color.blue.opacity(0.3), Color.purple.opacity(0.3)],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                )
+                .frame(width: 80, height: 80)
+            
+            VStack(alignment: .leading, spacing: 8) {
+                Text("The Future of Decentralized Social Media")
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundColor(.ds.text)
+                    .lineLimit(2)
+                
+                Text("An exploration of how Nostr is changing social media")
+                    .font(.system(size: 14))
+                    .foregroundColor(.ds.textSecondary)
+                    .lineLimit(1)
+                
+                HStack(spacing: 16) {
+                    Label("5 min read", systemImage: "clock")
+                        .font(.system(size: 12))
+                        .foregroundColor(.ds.textTertiary)
+                    
+                    Label("12 highlights", systemImage: "highlighter")
+                        .font(.system(size: 12))
+                        .foregroundColor(.ds.primary)
+                }
+            }
+            
+            Spacer()
+        }
+        .padding(16)
+        .background(
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .fill(Color.ds.surface)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .strokeBorder(Color.ds.divider, lineWidth: 1)
+        )
+    }
+}
+
+struct EnhancedYourCurationsSection: View {
     let curations: [ArticleCuration]
     @Binding var showCreateCuration: Bool
     @Binding var selectedCuration: ArticleCuration?
     @Binding var showCurationManagement: Bool
+    @State private var animateCards = false
     
     var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
+        VStack(alignment: .leading, spacing: 20) {
             HStack {
-                Text("Your Curations")
-                    .font(DesignSystem.Typography.headline)
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Your Collections")
+                        .font(.system(size: 24, weight: .bold, design: .rounded))
+                        .foregroundColor(.ds.text)
+                    
+                    Text("\(curations.count) curated collections")
+                        .font(.system(size: 14))
+                        .foregroundColor(.ds.textSecondary)
+                }
                 
                 Spacer()
                 
-                // Manage button
-                if !curations.isEmpty {
-                    Button(action: { showCurationManagement = true }) {
-                        Label("Manage", systemImage: "folder.badge.gearshape")
-                            .font(.caption.weight(.medium))
-                            .foregroundColor(.highlighterPurple)
-                            .padding(.horizontal, 12)
-                            .padding(.vertical, 6)
-                            .background(Color.highlighterPurple.opacity(0.1))
-                            .cornerRadius(20)
+                HStack(spacing: 12) {
+                    if !curations.isEmpty {
+                        Button(action: { showCurationManagement = true }) {
+                            Image(systemName: "folder.badge.gearshape")
+                                .font(.system(size: 16))
+                                .foregroundColor(.purple)
+                                .frame(width: 36, height: 36)
+                                .background(
+                                    Circle()
+                                        .fill(Color.purple.opacity(0.1))
+                                )
+                        }
+                        .transition(.scale.combined(with: .opacity))
                     }
-                    .transition(.asymmetric(
-                        insertion: .scale.combined(with: .opacity),
-                        removal: .scale.combined(with: .opacity)
-                    ))
-                }
-                
-                Button(action: { showCreateCuration = true }) {
-                    Image(systemName: "plus.circle.fill")
-                        .font(.title2)
-                        .foregroundColor(DesignSystem.Colors.primary)
-                        .symbolEffect(.bounce, value: showCreateCuration)
+                    
+                    Button(action: { showCreateCuration = true }) {
+                        Image(systemName: "plus.circle.fill")
+                            .font(.system(size: 32))
+                            .foregroundStyle(
+                                LinearGradient(
+                                    colors: [.purple, .purple.opacity(0.8)],
+                                    startPoint: .topLeading,
+                                    endPoint: .bottomTrailing
+                                )
+                            )
+                            .background(
+                                Circle()
+                                    .fill(Color.white)
+                                    .frame(width: 28, height: 28)
+                            )
+                            .symbolEffect(.bounce, value: showCreateCuration)
+                    }
                 }
             }
             .padding(.horizontal)
             .animation(.spring(response: 0.3, dampingFraction: 0.7), value: curations.isEmpty)
             
             if curations.isEmpty {
-                EmptyCurationsPlaceholder(showCreateCuration: $showCreateCuration)
-                    .padding(.horizontal)
+                ModernEmptyState(
+                    icon: "folder.badge.plus",
+                    title: "No collections yet",
+                    message: "Create curated collections of your favorite articles",
+                    action: { showCreateCuration = true },
+                    actionTitle: "Create First Collection"
+                )
+                .padding(.horizontal)
             } else {
-                LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 16) {
-                    ForEach(curations) { curation in
-                        LibraryCurationCard(curation: curation)
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 16) {
+                        ForEach(Array(curations.enumerated()), id: \.element.id) { index, curation in
+                            EnhancedCurationCard(curation: curation)
+                                .onTapGesture {
+                                    selectedCuration = curation
+                                    HapticManager.shared.impact(.light)
+                                }
+                                .scaleEffect(animateCards ? 1 : 0.8)
+                                .opacity(animateCards ? 1 : 0)
+                                .animation(
+                                    .spring(response: 0.4, dampingFraction: 0.8)
+                                    .delay(Double(index) * 0.1),
+                                    value: animateCards
+                                )
+                        }
+                        
+                        CreateCurationCard {
+                            showCreateCuration = true
+                        }
+                    }
+                    .padding(.horizontal)
+                }
+                .onAppear {
+                    animateCards = true
+                }
+            }
+        }
+    }
+}
+
+struct EnhancedCurationCard: View {
+    let curation: ArticleCuration
+    @State private var isPressed = false
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            // Image or gradient header
+            ZStack(alignment: .topTrailing) {
+                if let imageUrl = curation.image, let url = URL(string: imageUrl) {
+                    AsyncImage(url: url) { image in
+                        image
+                            .resizable()
+                            .aspectRatio(contentMode: .fill)
+                    } placeholder: {
+                        GradientPlaceholder()
+                    }
+                    .frame(height: 140)
+                    .clipped()
+                } else {
+                    GradientPlaceholder()
+                        .frame(height: 140)
+                }
+                
+                // Article count badge
+                HStack(spacing: 4) {
+                    Image(systemName: "doc.stack.fill")
+                        .font(.system(size: 12))
+                    Text("\(curation.articles.count)")
+                        .font(.system(size: 14, weight: .bold))
+                }
+                .foregroundColor(.white)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 6)
+                .background(
+                    Capsule()
+                        .fill(Color.black.opacity(0.6))
+                        .background(.ultraThinMaterial)
+                )
+                .padding(12)
+            }
+            
+            VStack(alignment: .leading, spacing: 8) {
+                Text(curation.title)
+                    .font(.system(size: 18, weight: .bold))
+                    .foregroundColor(.ds.text)
+                    .lineLimit(1)
+                
+                if let description = curation.description {
+                    Text(description)
+                        .font(.system(size: 14))
+                        .foregroundColor(.ds.textSecondary)
+                        .lineLimit(2)
+                } else {
+                    Text("A curated collection")
+                        .font(.system(size: 14))
+                        .foregroundColor(.ds.textSecondary)
+                        .italic()
+                }
+                
+                // Tags or metadata
+                HStack(spacing: 8) {
+                    ForEach(["Featured", "Tech", "Insights"], id: \.self) { tag in
+                        Text(tag)
+                            .font(.system(size: 11, weight: .medium))
+                            .foregroundColor(.purple)
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 4)
+                            .background(
+                                Capsule()
+                                    .fill(Color.purple.opacity(0.1))
+                            )
+                    }
+                }
+                .padding(.top, 4)
+            }
+            .padding(16)
+        }
+        .frame(width: 260)
+        .background(
+            RoundedRectangle(cornerRadius: 20, style: .continuous)
+                .fill(Color.ds.surface)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 20, style: .continuous)
+                .strokeBorder(Color.ds.divider, lineWidth: 1)
+        )
+        .shadow(color: Color.black.opacity(0.08), radius: 12, y: 6)
+        .scaleEffect(isPressed ? 0.95 : 1)
+        .animation(.spring(response: 0.3, dampingFraction: 0.7), value: isPressed)
+        .onLongPressGesture(minimumDuration: 0.1, maximumDistance: .infinity, pressing: { pressing in
+            isPressed = pressing
+        }, perform: {})
+    }
+}
+
+struct CreateCurationCard: View {
+    let action: () -> Void
+    
+    var body: some View {
+        Button(action: action) {
+            VStack(spacing: 16) {
+                ZStack {
+                    Circle()
+                        .strokeBorder(
+                            style: StrokeStyle(lineWidth: 2, dash: [8])
+                        )
+                        .foregroundColor(.purple.opacity(0.5))
+                        .frame(width: 64, height: 64)
+                    
+                    Image(systemName: "plus")
+                        .font(.system(size: 28, weight: .medium))
+                        .foregroundColor(.purple)
+                }
+                
+                Text("New Collection")
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundColor(.ds.text)
+            }
+            .frame(width: 160, height: 240)
+            .background(
+                RoundedRectangle(cornerRadius: 20, style: .continuous)
+                    .fill(Color.purple.opacity(0.05))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 20, style: .continuous)
+                            .strokeBorder(
+                                style: StrokeStyle(lineWidth: 2, dash: [8])
+                            )
+                            .foregroundColor(.purple.opacity(0.3))
+                    )
+            )
+        }
+        .buttonStyle(PlainButtonStyle())
+    }
+}
+
+struct GradientPlaceholder: View {
+    @State private var animateGradient = false
+    
+    var body: some View {
+        LinearGradient(
+            colors: [
+                Color.purple.opacity(0.6),
+                Color.blue.opacity(0.4),
+                Color.purple.opacity(0.6)
+            ],
+            startPoint: animateGradient ? .topLeading : .bottomTrailing,
+            endPoint: animateGradient ? .bottomTrailing : .topLeading
+        )
+        .animation(.easeInOut(duration: 3).repeatForever(autoreverses: true), value: animateGradient)
+        .onAppear { animateGradient = true }
+    }
+}
+
+struct EnhancedFollowPacksSection: View {
+    let followPacks: [FollowPack]
+    @Binding var selectedFollowPack: FollowPack?
+    @State private var showDiscoverMore = false
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 20) {
+            HStack {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Follow Packs")
+                        .font(.system(size: 24, weight: .bold, design: .rounded))
+                        .foregroundColor(.ds.text)
+                    
+                    Text("Curated lists of people to follow")
+                        .font(.system(size: 14))
+                        .foregroundColor(.ds.textSecondary)
+                }
+                
+                Spacer()
+                
+                Button(action: { showDiscoverMore = true }) {
+                    Text("Discover")
+                        .font(.system(size: 14, weight: .medium))
+                        .foregroundColor(.ds.primary)
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 8)
+                        .background(
+                            Capsule()
+                                .fill(Color.ds.primary.opacity(0.1))
+                        )
+                }
+            }
+            .padding(.horizontal)
+            
+            if followPacks.isEmpty {
+                ModernEmptyState(
+                    icon: "person.3.sequence",
+                    title: "No follow packs yet",
+                    message: "Discover curated lists of interesting people to follow",
+                    action: { showDiscoverMore = true },
+                    actionTitle: "Explore Packs"
+                )
+                .padding(.horizontal)
+            } else {
+                LazyVStack(spacing: 12) {
+                    ForEach(followPacks) { pack in
+                        EnhancedFollowPackRow(followPack: pack)
                             .onTapGesture {
-                                selectedCuration = curation
+                                selectedFollowPack = pack
+                                HapticManager.shared.impact(.light)
                             }
                     }
                 }
@@ -199,165 +1034,88 @@ struct YourCurationsSection: View {
     }
 }
 
-struct EmptyCurationsPlaceholder: View {
-    @Binding var showCreateCuration: Bool
+struct EnhancedFollowPackRow: View {
+    let followPack: FollowPack
+    @State private var profileImages: [String] = []
     
     var body: some View {
-        VStack(spacing: 16) {
-            Image(systemName: "folder.badge.plus")
-                .font(.system(size: 48))
-                .foregroundColor(DesignSystem.Colors.primary.opacity(0.5))
-            
-            Text("No curations yet")
-                .font(DesignSystem.Typography.body)
-                .foregroundColor(DesignSystem.Colors.textSecondary)
-            
-            Button(action: { showCreateCuration = true }) {
-                Text("Create Your First Curation")
-                    .font(DesignSystem.Typography.caption)
-                    .fontWeight(.medium)
-                    .padding(.horizontal, 20)
-                    .padding(.vertical, 10)
-                    .background(DesignSystem.Colors.primary)
-                    .foregroundColor(.white)
-                    .cornerRadius(20)
-            }
-        }
-        .frame(maxWidth: .infinity)
-        .padding(.vertical, 40)
-        .background(DesignSystem.Colors.surface.opacity(0.5))
-        .cornerRadius(12)
-    }
-}
-
-struct LibraryCurationCard: View {
-    let curation: ArticleCuration
-    
-    var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            if let imageUrl = curation.image, let url = URL(string: imageUrl) {
-                AsyncImage(url: url) { image in
-                    image
-                        .resizable()
-                        .aspectRatio(contentMode: .fill)
-                } placeholder: {
-                    Rectangle()
+        HStack(spacing: 16) {
+            // Profile stack
+            ZStack {
+                ForEach(0..<min(3, followPack.profiles.count), id: \.self) { index in
+                    Circle()
                         .fill(
                             LinearGradient(
-                                colors: [DesignSystem.Colors.primary.opacity(0.3), DesignSystem.Colors.secondary.opacity(0.3)],
+                                colors: [
+                                    Color.ds.primary.opacity(0.6),
+                                    Color.ds.secondary.opacity(0.6)
+                                ],
                                 startPoint: .topLeading,
                                 endPoint: .bottomTrailing
                             )
                         )
-                }
-                .frame(height: 80)
-                .clipped()
-                .cornerRadius(8)
-            } else {
-                RoundedRectangle(cornerRadius: 8)
-                    .fill(
-                        LinearGradient(
-                            colors: [DesignSystem.Colors.primary, DesignSystem.Colors.secondary],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
+                        .frame(width: 40, height: 40)
+                        .overlay(
+                            Text(String(followPack.profiles[index].prefix(1)))
+                                .font(.system(size: 16, weight: .bold))
+                                .foregroundColor(.white)
                         )
-                    )
-                    .frame(height: 80)
+                        .offset(x: CGFloat(index * 15))
+                }
+                
+                if followPack.profiles.count > 3 {
+                    Circle()
+                        .fill(Color.ds.surfaceSecondary)
+                        .frame(width: 40, height: 40)
+                        .overlay(
+                            Text("+\(followPack.profiles.count - 3)")
+                                .font(.system(size: 14, weight: .bold))
+                                .foregroundColor(.ds.text)
+                        )
+                        .offset(x: 45)
+                }
             }
+            .frame(width: 100, alignment: .leading)
             
-            Text(curation.title)
-                .font(DesignSystem.Typography.body)
-                .fontWeight(.medium)
-                .lineLimit(1)
-            
-            Text("\(curation.articles.count) articles")
-                .font(DesignSystem.Typography.caption)
-                .foregroundColor(DesignSystem.Colors.textSecondary)
-        }
-        .modernCard()
-    }
-}
-
-struct FollowPacksSection: View {
-    let followPacks: [FollowPack]
-    @Binding var selectedFollowPack: FollowPack?
-    
-    var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            Text("Follow Packs")
-                .font(DesignSystem.Typography.headline)
-                .padding(.horizontal)
-            
-            if followPacks.isEmpty {
-                EmptyFollowPacksPlaceholder()
-                    .padding(.horizontal)
-            } else {
-                VStack(spacing: 12) {
-                    ForEach(followPacks) { pack in
-                        FollowPackRow(followPack: pack)
-                            .onTapGesture {
-                                selectedFollowPack = pack
-                            }
+            VStack(alignment: .leading, spacing: 6) {
+                Text(followPack.title)
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundColor(.ds.text)
+                
+                HStack(spacing: 16) {
+                    Label("\(followPack.profiles.count) people", systemImage: "person.2")
+                        .font(.system(size: 13))
+                        .foregroundColor(.ds.textSecondary)
+                    
+                    if let description = followPack.description {
+                        Text(description)
+                            .font(.system(size: 13))
+                            .foregroundColor(.ds.textSecondary)
+                            .lineLimit(1)
                     }
                 }
-                .padding(.horizontal)
-            }
-        }
-    }
-}
-
-struct EmptyFollowPacksPlaceholder: View {
-    var body: some View {
-        VStack(spacing: 16) {
-            Image(systemName: "person.3")
-                .font(.system(size: 48))
-                .foregroundColor(DesignSystem.Colors.primary.opacity(0.5))
-            
-            Text("No follow packs discovered yet")
-                .font(DesignSystem.Typography.body)
-                .foregroundColor(DesignSystem.Colors.textSecondary)
-            
-            Text("Follow packs will appear here as they're discovered")
-                .font(DesignSystem.Typography.caption)
-                .foregroundColor(DesignSystem.Colors.textSecondary)
-                .multilineTextAlignment(.center)
-        }
-        .frame(maxWidth: .infinity)
-        .padding(.vertical, 40)
-        .background(DesignSystem.Colors.surface.opacity(0.5))
-        .cornerRadius(12)
-    }
-}
-
-struct FollowPackRow: View {
-    let followPack: FollowPack
-    
-    var body: some View {
-        HStack {
-            Image(systemName: "person.3.fill")
-                .font(.title2)
-                .foregroundColor(DesignSystem.Colors.primary)
-            
-            VStack(alignment: .leading, spacing: 4) {
-                Text(followPack.title)
-                    .font(DesignSystem.Typography.body)
-                    .fontWeight(.medium)
-                
-                Text("\(followPack.profiles.count) people")
-                    .font(DesignSystem.Typography.caption)
-                    .foregroundColor(DesignSystem.Colors.textSecondary)
             }
             
             Spacer()
             
             Image(systemName: "chevron.right")
-                .foregroundColor(DesignSystem.Colors.textSecondary)
+                .font(.system(size: 14))
+                .foregroundColor(.ds.textTertiary)
         }
-        .padding()
-        .modernCard()
+        .padding(20)
+        .background(
+            RoundedRectangle(cornerRadius: 20, style: .continuous)
+                .fill(Color.ds.surface)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 20, style: .continuous)
+                .strokeBorder(Color.ds.divider, lineWidth: 1)
+        )
+        .shadow(color: Color.black.opacity(0.05), radius: 8, y: 4)
     }
 }
 
+// Add purple color extension if not already defined
 
 #Preview {
     LibraryView()
