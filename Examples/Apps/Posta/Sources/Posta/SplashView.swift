@@ -5,67 +5,126 @@ struct SplashView: View {
     @State private var showContent = false
     @State private var logoScale: CGFloat = 0
     @State private var logoOpacity: Double = 0
+    @State private var logoRotation: Double = -180
     @State private var titleOpacity: Double = 0
-    @State private var particleOffset: CGFloat = -100
+    @State private var glowOpacity: Double = 0
+    @State private var pulseScale: CGFloat = 1
+    @State private var electricityPhase: CGFloat = 0
     @Binding var isShowingSplash: Bool
     
     var body: some View {
         ZStack {
-            // Animated background
-            AnimatedBackgroundView()
+            // Modern animated background
+            PostaBackgroundView()
             
-            // Floating particles
-            ForEach(0..<15) { index in
-                Circle()
-                    .fill(Color.purple.opacity(0.4))
-                    .frame(width: CGFloat.random(in: 4...12))
-                    .offset(
-                        x: CGFloat.random(in: -150...150),
-                        y: particleOffset + CGFloat(index * 60)
-                    )
-                    .blur(radius: CGFloat.random(in: 1...3))
-                    .opacity(showContent ? 0.6 : 0)
-            }
+            // Electric field effects
+            ElectricFieldView()
+                .opacity(glowOpacity * 0.3)
             
-            VStack(spacing: 30) {
+            VStack(spacing: 40) {
                 Spacer()
                 
-                // Animated logo
-                PostaLogoView(size: 120, color: .purple)
+                // Logo with advanced effects
+                ZStack {
+                    // Outer glow
+                    Circle()
+                        .fill(
+                            RadialGradient(
+                                gradient: Gradient(colors: [
+                                    PostaColors.electricPurple.opacity(0.8),
+                                    PostaColors.glowPink.opacity(0.4),
+                                    Color.clear
+                                ]),
+                                center: .center,
+                                startRadius: 30,
+                                endRadius: 150
+                            )
+                        )
+                        .frame(width: 350, height: 350)
+                        .blur(radius: 40)
+                        .scaleEffect(pulseScale)
+                        .opacity(logoOpacity * 0.6)
+                    
+                    // Logo container
+                    ZStack {
+                        // Background circle
+                        Circle()
+                            .fill(
+                                LinearGradient(
+                                    gradient: PostaColors.primaryGradient,
+                                    startPoint: .topLeading,
+                                    endPoint: .bottomTrailing
+                                )
+                            )
+                            .frame(width: 180, height: 180)
+                            .shadow(color: PostaColors.electricPurple.opacity(0.6), radius: 30, x: 0, y: 10)
+                        
+                        // Logo
+                        PostaLogoView(size: 110, color: .white)
+                    }
                     .scaleEffect(logoScale)
                     .opacity(logoOpacity)
-                    .pulsing(minScale: 0.95, maxScale: 1.05, duration: 2)
+                    .rotationEffect(.degrees(logoRotation))
+                }
                 
-                // App name with shimmer effect
-                Text("Posta")
-                    .font(.system(size: 48, weight: .bold, design: .rounded))
-                    .foregroundStyle(
-                        LinearGradient(
-                            gradient: Gradient(colors: [
-                                Color.white,
-                                Color.white.opacity(0.9)
-                            ]),
-                            startPoint: .top,
-                            endPoint: .bottom
+                // App name with advanced styling
+                VStack(spacing: 16) {
+                    Text("POSTA")
+                        .font(.system(size: 64, weight: .black, design: .default))
+                        .tracking(6)
+                        .foregroundStyle(
+                            LinearGradient(
+                                gradient: Gradient(colors: [
+                                    Color.white,
+                                    Color.white.opacity(0.95)
+                                ]),
+                                startPoint: .top,
+                                endPoint: .bottom
+                            )
                         )
-                    )
-                    .opacity(titleOpacity)
-                    .shimmer()
-                
-                // Tagline
-                Text("Secure Messaging on Nostr")
-                    .font(.system(size: 18, weight: .medium, design: .rounded))
-                    .foregroundColor(.white.opacity(0.8))
-                    .opacity(titleOpacity)
+                        .shadow(color: PostaColors.electricPurple.opacity(0.5), radius: 20, x: 0, y: 4)
+                        .opacity(titleOpacity)
+                        .postaShimmer()
+                    
+                    Text("ENCRYPTED NOSTR MESSAGING")
+                        .font(.system(size: 14, weight: .semibold, design: .monospaced))
+                        .tracking(3)
+                        .foregroundColor(PostaColors.textSecondary)
+                        .opacity(titleOpacity)
+                }
                 
                 Spacer()
                 
-                // Loading indicator
-                LoadingDots(dotSize: 10, color: .white.opacity(0.8))
+                // Modern loading indicator
+                HStack(spacing: 12) {
+                    ForEach(0..<3) { index in
+                        Circle()
+                            .fill(
+                                LinearGradient(
+                                    gradient: PostaColors.primaryGradient,
+                                    startPoint: .leading,
+                                    endPoint: .trailing
+                                )
+                            )
+                            .frame(width: 12, height: 12)
+                            .scaleEffect(showContent ? 1 : 0.3)
+                            .opacity(showContent ? 1 : 0)
+                            .animation(
+                                .spring(response: 0.5, dampingFraction: 0.6)
+                                .delay(Double(index) * 0.1),
+                                value: showContent
+                            )
+                    }
+                }
+                .padding(.bottom, 20)
+                
+                Text("Loading...")
+                    .font(.system(size: 16, weight: .medium))
+                    .foregroundColor(PostaColors.textSecondary)
                     .opacity(showContent ? 1 : 0)
                 
                 Spacer()
-                    .frame(height: 60)
+                    .frame(height: 80)
             }
         }
         .ignoresSafeArea()
@@ -75,26 +134,35 @@ struct SplashView: View {
     }
     
     private func startAnimation() {
-        // Logo entrance animation
-        withAnimation(.spring(response: 0.8, dampingFraction: 0.7)) {
+        // Logo entrance animation with rotation
+        withAnimation(.spring(response: 1.2, dampingFraction: 0.7)) {
             logoScale = 1
             logoOpacity = 1
+            logoRotation = 0
+        }
+        
+        // Glow effects
+        withAnimation(.easeInOut(duration: 1.5).delay(0.2)) {
+            glowOpacity = 1
+        }
+        
+        // Pulse animation
+        withAnimation(.easeInOut(duration: 2).delay(0.8).repeatForever(autoreverses: true)) {
+            pulseScale = 1.2
         }
         
         // Title and content fade in
-        withAnimation(.easeOut(duration: 0.6).delay(0.3)) {
+        withAnimation(.easeOut(duration: 0.8).delay(0.6)) {
             titleOpacity = 1
+        }
+        
+        withAnimation(.easeOut(duration: 0.6).delay(1)) {
             showContent = true
         }
         
-        // Start particle animation
-        withAnimation(.linear(duration: 8).repeatForever(autoreverses: false)) {
-            particleOffset = UIScreen.main.bounds.height + 200
-        }
-        
         // Trigger app transition
-        DispatchQueue.main.asyncAfter(deadline: .now() + 2.5) {
-            withAnimation(.easeInOut(duration: 0.5)) {
+        DispatchQueue.main.asyncAfter(deadline: .now() + 3) {
+            withAnimation(.easeInOut(duration: 0.6)) {
                 isShowingSplash = false
             }
         }

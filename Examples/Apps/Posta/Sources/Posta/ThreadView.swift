@@ -16,19 +16,21 @@ struct ThreadView: View {
     @State private var subscriptionTask: Task<Void, Never>?
     @State private var selectedProfile: String?
     @State private var subThreads: [String: [NDKEvent]] = [:] // eventId -> replies
+    @State private var showContent = false
+    @State private var keyboardHeight: CGFloat = 0
     
     var body: some View {
         NavigationStack {
             ZStack {
-                // Gradient background
+                // Animated gradient background
                 LinearGradient(
-                    gradient: Gradient(stops: [
-                        .init(color: Color(.systemBackground), location: 0),
-                        .init(color: Color(.systemBackground).opacity(0.97), location: 0.1),
-                        .init(color: Color(.secondarySystemBackground).opacity(0.4), location: 1)
+                    gradient: Gradient(colors: [
+                        Color(.systemBackground),
+                        Color.purple.opacity(0.02),
+                        Color(.systemBackground)
                     ]),
-                    startPoint: .top,
-                    endPoint: .bottom
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
                 )
                 .ignoresSafeArea()
                 
@@ -37,7 +39,7 @@ struct ThreadView: View {
                     ScrollViewReader { proxy in
                         ScrollView {
                             VStack(spacing: 0) {
-                                // Root event
+                                // Root event with animation
                                 ThreadEventView(
                                     event: rootEvent,
                                     isRoot: true,
@@ -46,29 +48,37 @@ struct ThreadView: View {
                                     }
                                 )
                                 .id("root")
+                                .opacity(showContent ? 1 : 0)
+                                .scaleEffect(showContent ? 1 : 0.95)
+                                .animation(.spring(response: 0.5, dampingFraction: 0.8), value: showContent)
                                 
                                 Divider()
                                     .padding(.leading, 20)
                                 
-                                // Replies
-                                ForEach(replies.sorted(by: { $0.createdAt < $1.createdAt }), id: \.id) { reply in
+                                // Replies with staggered animation
+                                ForEach(Array(replies.sorted(by: { $0.createdAt < $1.createdAt }).enumerated()), id: \.element.id) { index, reply in
                                     ThreadReplyView(
                                         event: reply,
                                         isReplyingTo: replyingTo?.id == reply.id,
                                         subReplies: subThreads[reply.id] ?? [],
                                         onTap: {
-                                            withAnimation {
+                                            withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
                                                 replyingTo = replyingTo?.id == reply.id ? nil : reply
+                                                HapticFeedback.selection()
                                             }
                                         },
                                         onAvatarTap: {
                                             selectedProfile = reply.pubkey
                                         },
                                         onSubThreadTap: {
+                                            HapticFeedback.impact(.light)
                                             // TODO: Navigate to sub-thread view
                                         }
                                     )
                                     .id(reply.id)
+                                    .opacity(showContent ? 1 : 0)
+                                    .offset(y: showContent ? 0 : 20)
+                                    .animation(.spring(response: 0.5, dampingFraction: 0.8).delay(Double(index) * 0.05), value: showContent)
                                     
                                     if reply.id != replies.last?.id {
                                         Divider()
@@ -78,7 +88,7 @@ struct ThreadView: View {
                                 
                                 // Loading indicator
                                 if isLoadingReplies {
-                                    ProgressView()
+                                    LoadingDots(dotSize: 10, color: .purple)
                                         .padding()
                                 }
                             }
@@ -92,13 +102,23 @@ struct ThreadView: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .principal) {
-                    Text("Thread")
-                        .font(.headline)
+                    HStack(spacing: 6) {
+                        Image(systemName: "bubble.left.and.bubble.right")
+                            .font(.system(size: 16))
+                            .foregroundColor(.purple)
+                        Text("Thread")
+                            .font(.headline)
+                    }
                 }
                 
                 ToolbarItem(placement: .navigationBarTrailing) {
-                    Button("Done") {
+                    Button(action: {
+                        HapticFeedback.impact(.light)
                         dismiss()
+                    }) {
+                        Text("Done")
+                            .font(.system(size: 16, weight: .medium))
+                            .foregroundColor(.purple)
                     }
                 }
             }
@@ -108,6 +128,9 @@ struct ThreadView: View {
         }
         .onAppear {
             loadThread()
+            withAnimation(.spring(response: 0.5, dampingFraction: 0.8).delay(0.1)) {
+                showContent = true
+            }
         }
         .onDisappear {
             subscriptionTask?.cancel()
@@ -116,43 +139,89 @@ struct ThreadView: View {
     
     private var replyComposer: some View {
         VStack(spacing: 0) {
-            // Reply target indicator
+            // Reply target indicator with animation
             if let target = replyingTo {
                 HStack {
                     ProfileLoader(pubkey: target.pubkey) { profile in
-                        Text("Replying to \(profile?.displayName ?? "Unknown")")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
+                        HStack(spacing: 4) {
+                            Image(systemName: "arrow.turn.up.right")
+                                .font(.system(size: 12))
+                                .foregroundColor(.purple)
+                            Text("Replying to \(profile?.displayName ?? "Unknown")")
+                                .font(.system(size: 14, weight: .medium))
+                                .foregroundColor(.primary)
+                        }
                     }
                     
                     Spacer()
                     
                     Button(action: {
-                        withAnimation {
+                        withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
                             replyingTo = nil
+                            HapticFeedback.impact(.light)
                         }
                     }) {
                         Image(systemName: "xmark.circle.fill")
                             .foregroundColor(.secondary)
-                            .font(.caption)
+                            .font(.system(size: 16))
                     }
                 }
                 .padding(.horizontal)
-                .padding(.vertical, 8)
-                .background(Color(.tertiarySystemFill))
+                .padding(.vertical, 10)
+                .background(
+                    LinearGradient(
+                        gradient: Gradient(colors: [
+                            Color.purple.opacity(0.1),
+                            Color.purple.opacity(0.05)
+                        ]),
+                        startPoint: .leading,
+                        endPoint: .trailing
+                    )
+                )
+                .transition(.asymmetric(
+                    insertion: .push(from: .top).combined(with: .opacity),
+                    removal: .push(from: .bottom).combined(with: .opacity)
+                ))
             }
             
-            // Reply input
+            // Reply input with modern styling
             HStack(spacing: 12) {
                 TextField("Reply to thread...", text: $replyText, axis: .vertical)
-                    .textFieldStyle(RoundedBorderTextFieldStyle())
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 10)
+                    .background(
+                        RoundedRectangle(cornerRadius: 20)
+                            .fill(Color(.systemGray6))
+                    )
                     .lineLimit(1...5)
                 
-                Button(action: sendReply) {
-                    Image(systemName: "paperplane.fill")
-                        .foregroundColor(replyText.isEmpty ? .secondary : .accentColor)
+                Button(action: {
+                    sendReply()
+                    HapticFeedback.notification(.success)
+                }) {
+                    ZStack {
+                        Circle()
+                            .fill(
+                                LinearGradient(
+                                    gradient: Gradient(colors: replyText.isEmpty ? 
+                                        [Color(.systemGray5), Color(.systemGray5)] :
+                                        [Color.purple, Color.purple.opacity(0.8)]
+                                    ),
+                                    startPoint: .topLeading,
+                                    endPoint: .bottomTrailing
+                                )
+                            )
+                            .frame(width: 36, height: 36)
+                        
+                        Image(systemName: "paperplane.fill")
+                            .font(.system(size: 16))
+                            .foregroundColor(.white)
+                            .rotationEffect(.degrees(45))
+                    }
                 }
                 .disabled(replyText.isEmpty)
+                .scaleEffect(replyText.isEmpty ? 1 : 1.1)
+                .animation(.spring(response: 0.3, dampingFraction: 0.7), value: replyText.isEmpty)
             }
             .padding()
             .background(
@@ -285,30 +354,19 @@ struct ThreadEventView: View {
             VStack(alignment: .leading, spacing: 12) {
                 // Author info
                 HStack(alignment: .top, spacing: 12) {
-                    // Avatar
-                    Button(action: onAvatarTap) {
-                        if let avatarURL = profile?.picture, let url = URL(string: avatarURL) {
-                            AsyncImage(url: url) { image in
-                                image
-                                    .resizable()
-                                    .aspectRatio(contentMode: .fill)
-                            } placeholder: {
-                                Circle()
-                                    .fill(Color(.tertiarySystemFill))
-                            }
-                            .frame(width: 48, height: 48)
-                            .clipShape(Circle())
-                        } else {
-                            Circle()
-                                .fill(Color(.tertiarySystemFill))
-                                .frame(width: 48, height: 48)
-                                .overlay(
-                                    Text(String(profile?.name?.prefix(1) ?? "?").uppercased())
-                                        .font(.system(size: 20, weight: .medium))
-                                        .foregroundColor(.secondary)
-                                )
-                        }
+                    // Avatar with enhanced styling
+                    Button(action: {
+                        onAvatarTap()
+                        HapticFeedback.impact(.light)
+                    }) {
+                        EnhancedAvatarView(
+                            url: profile?.picture.flatMap { URL(string: $0) },
+                            size: 52,
+                            fallbackText: String(profile?.name?.prefix(1) ?? "?").uppercased(),
+                            showOnlineIndicator: false
+                        )
                     }
+                    .buttonStyle(PlainButtonStyle())
                     
                     // Name and time
                     VStack(alignment: .leading, spacing: 2) {
@@ -323,17 +381,67 @@ struct ThreadEventView: View {
                     Spacer()
                 }
                 
-                // Content
+                // Content with enhanced typography
                 RichTextView(
                     content: event.content,
                     tags: event.tags,
                     currentUser: nil
                 )
-                .font(.system(size: 15))
+                .font(.system(size: isRoot ? 16 : 15))
                 .textSelection(.enabled)
+                
+                // Engagement stats for root event
+                if isRoot {
+                    HStack(spacing: 20) {
+                        HStack(spacing: 4) {
+                            Image(systemName: "bubble.left")
+                                .font(.system(size: 14))
+                            Text("0")
+                                .font(.system(size: 14))
+                        }
+                        .foregroundColor(.secondary)
+                        
+                        HStack(spacing: 4) {
+                            Image(systemName: "arrow.2.squarepath")
+                                .font(.system(size: 14))
+                            Text("0")
+                                .font(.system(size: 14))
+                        }
+                        .foregroundColor(.secondary)
+                        
+                        HStack(spacing: 4) {
+                            Image(systemName: "heart")
+                                .font(.system(size: 14))
+                            Text("0")
+                                .font(.system(size: 14))
+                        }
+                        .foregroundColor(.secondary)
+                        
+                        Spacer()
+                    }
+                    .padding(.top, 8)
+                }
             }
             .padding()
-            .background(isRoot ? Color(.secondarySystemBackground).opacity(0.3) : Color.clear)
+            .background(
+                RoundedRectangle(cornerRadius: isRoot ? 16 : 0)
+                    .fill(isRoot ? 
+                        LinearGradient(
+                            gradient: Gradient(colors: [
+                                Color.purple.opacity(0.05),
+                                Color.purple.opacity(0.02)
+                            ]),
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        ) : 
+                        LinearGradient(
+                            gradient: Gradient(colors: [Color.clear, Color.clear]),
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+            )
+            .padding(.horizontal, isRoot ? 12 : 0)
         }
     }
 }
@@ -347,33 +455,33 @@ struct ThreadReplyView: View {
     let onSubThreadTap: () -> Void
     
     @Environment(NDKManager.self) var ndkManager
+    @State private var isPressed = false
     
     var body: some View {
         ProfileLoader(pubkey: event.pubkey) { profile in
             VStack(alignment: .leading, spacing: 0) {
                 HStack(alignment: .top, spacing: 12) {
-                    // Avatar
-                    Button(action: onAvatarTap) {
-                        if let avatarURL = profile?.picture, let url = URL(string: avatarURL) {
-                            AsyncImage(url: url) { image in
-                                image
-                                    .resizable()
-                                    .aspectRatio(contentMode: .fill)
-                            } placeholder: {
-                                Circle()
-                                    .fill(Color(.tertiarySystemFill))
-                            }
-                            .frame(width: 40, height: 40)
-                            .clipShape(Circle())
-                        } else {
-                            Circle()
-                                .fill(Color(.tertiarySystemFill))
-                                .frame(width: 40, height: 40)
-                                .overlay(
-                                    Text(String(profile?.name?.prefix(1) ?? "?").uppercased())
-                                        .font(.system(size: 16, weight: .medium))
-                                        .foregroundColor(.secondary)
-                                )
+                    // Thread line and avatar
+                    VStack(spacing: 4) {
+                        Button(action: {
+                            onAvatarTap()
+                            HapticFeedback.impact(.light)
+                        }) {
+                            EnhancedAvatarView(
+                                url: profile?.picture.flatMap { URL(string: $0) },
+                                size: 40,
+                                fallbackText: String(profile?.name?.prefix(1) ?? "?").uppercased(),
+                                showOnlineIndicator: false
+                            )
+                        }
+                        .buttonStyle(PlainButtonStyle())
+                        
+                        // Thread line
+                        if !subReplies.isEmpty {
+                            Rectangle()
+                                .fill(Color.purple.opacity(0.2))
+                                .frame(width: 2)
+                                .frame(maxHeight: .infinity)
                         }
                     }
                     .padding(.leading, 20)
@@ -414,9 +522,26 @@ struct ThreadReplyView: View {
                     .padding(.trailing, 20)
                 }
                 .padding(.vertical, 12)
-                .background(isReplyingTo ? Color.accentColor.opacity(0.1) : Color.clear)
+                .background(
+                    RoundedRectangle(cornerRadius: 12)
+                        .fill(isReplyingTo ? 
+                            Color.purple.opacity(0.1) : 
+                            (isPressed ? Color.purple.opacity(0.05) : Color.clear)
+                        )
+                        .padding(.horizontal, 12)
+                )
                 .contentShape(Rectangle())
-                .onTapGesture(perform: onTap)
+                .scaleEffect(isPressed ? 0.98 : 1)
+                .onLongPressGesture(
+                    minimumDuration: 0,
+                    maximumDistance: .infinity,
+                    pressing: { pressing in
+                        withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                            isPressed = pressing
+                        }
+                    },
+                    perform: onTap
+                )
             }
         }
     }

@@ -2,6 +2,7 @@ import SwiftUI
 import NDKSwift
 
 struct RelayManagementView: View {
+    @Environment(NostrManager.self) private var nostrManager
     @EnvironmentObject var appState: AppState
     @State private var relays: [RelayInfo] = []
     @State private var newRelayURL = ""
@@ -338,16 +339,30 @@ struct RelayManagementView: View {
     // MARK: - Methods
     
     private func loadRelays() {
-        guard let ndk = appState.ndk else { return }
+        guard let ndk = nostrManager.ndk else { return }
         
         Task {
             var loadedRelays: [RelayInfo] = []
             
-            for relay in await ndk.relays {
-                let connectionState = await relay.connectionState
+            // Load default relays
+            for relay in nostrManager.defaultRelays {
+                let status = nostrManager.relayStatus[relay] ?? false
                 let relayInfo = RelayInfo(
-                    url: relay.url,
-                    status: connectionState == .connected ? .connected : .disconnected,
+                    url: relay,
+                    status: status ? .connected : .disconnected,
+                    isRead: true,
+                    isWrite: true,
+                    latency: nil
+                )
+                loadedRelays.append(relayInfo)
+            }
+            
+            // Load user-added relays
+            for relay in nostrManager.userAddedRelays {
+                let status = nostrManager.relayStatus[relay] ?? false
+                let relayInfo = RelayInfo(
+                    url: relay,
+                    status: status ? .connected : .disconnected,
                     isRead: true,
                     isWrite: true,
                     latency: nil
@@ -371,7 +386,7 @@ struct RelayManagementView: View {
     }
     
     private func addNewRelay() {
-        guard !newRelayURL.isEmpty, let ndk = appState.ndk else { return }
+        guard !newRelayURL.isEmpty else { return }
         
         isConnecting = true
         
@@ -382,28 +397,23 @@ struct RelayManagementView: View {
                 normalizedURL = "wss://\(normalizedURL)"
             }
             
-            // Add relay to pool
-            _ = await ndk.addRelay(normalizedURL)
+            // Add relay using NostrManager
+            await nostrManager.addUserRelay(normalizedURL)
             
             await MainActor.run {
                 OlasDesign.Haptic.success()
                 showAddRelay = false
                 newRelayURL = ""
-                loadRelays()
-            }
-            
-            await MainActor.run {
                 isConnecting = false
+                loadRelays()
             }
         }
     }
     
     private func removeRelay(_ relay: RelayInfo) {
-        guard let ndk = appState.ndk else { return }
-        
         Task {
-            // Remove from pool
-            await ndk.removeRelay(relay.url)
+            // Remove relay using NostrManager
+            await nostrManager.removeUserRelay(relay.url)
             
             await MainActor.run {
                 relays.removeAll { $0.id == relay.id }
@@ -427,16 +437,14 @@ struct RelayManagementView: View {
     }
     
     private func reconnectRelay(_ relay: RelayInfo) {
-        guard let ndk = appState.ndk else { return }
+        guard let ndk = nostrManager.ndk else { return }
         
         if let index = relays.firstIndex(where: { $0.id == relay.id }) {
             relays[index].status = .connecting
             
             Task {
-                // Reconnect
-                if let ndkRelay = await ndk.relays.first(where: { $0.url == relay.url }) {
-                    try? await ndkRelay.connect()
-                }
+                // Try to reconnect by re-adding the relay
+                await ndk.addRelay(relay.url)
                 
                 await MainActor.run {
                     loadRelays()

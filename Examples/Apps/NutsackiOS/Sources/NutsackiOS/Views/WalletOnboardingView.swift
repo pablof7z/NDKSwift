@@ -856,17 +856,18 @@ struct WalletOnboardingView: View {
                 }
                 
                 // Step 3: Use outbox to track user and find their relays
-                let relayTracker = ndk.outbox
-                await relayTracker.track(pubkey)
+                await ndk.outbox.trackUser(pubkey)
                 
                 // Wait for relay discovery (with timeout)
                 var retries = 0
-                while await relayTracker.getRelays(for: pubkey).isEmpty && retries < 30 {
-                    try await Task.sleep(nanoseconds: 100_000_000) // 100ms
-                    retries += 1
+                var userRelays: [String] = []
+                while userRelays.isEmpty && retries < 30 {
+                    userRelays = await ndk.outbox.getRecommendedRelays(for: pubkey)
+                    if userRelays.isEmpty {
+                        try await Task.sleep(nanoseconds: 100_000_000) // 100ms
+                        retries += 1
+                    }
                 }
-                
-                let userRelays = await relayTracker.getRelays(for: pubkey)
                 print("Found \(userRelays.count) relays for user")
                 
                 await MainActor.run {
@@ -884,7 +885,7 @@ struct WalletOnboardingView: View {
                 let walletDataSource = ndk.observe(
                     filter: walletFilter,
                     maxAge: 0, // Force network fetch
-                    cachePolicy: .network
+                    cachePolicy: .networkOnly
                 )
                 
                 // Wait for EOSE to ensure we've checked all relays

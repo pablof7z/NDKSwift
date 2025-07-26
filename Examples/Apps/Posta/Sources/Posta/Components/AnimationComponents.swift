@@ -87,54 +87,7 @@ struct GlowingButtonStyle: ButtonStyle {
     }
 }
 
-// MARK: - Gradient Button Style
-struct GradientButtonStyle: ButtonStyle {
-    let gradient: LinearGradient
-    let shadowColor: Color
-    
-    init(colors: [Color], shadowColor: Color? = nil) {
-        self.gradient = LinearGradient(
-            gradient: Gradient(colors: colors),
-            startPoint: .leading,
-            endPoint: .trailing
-        )
-        self.shadowColor = shadowColor ?? colors.first ?? .clear
-    }
-    
-    func makeBody(configuration: Configuration) -> some View {
-        configuration.label
-            .foregroundColor(.white)
-            .font(.system(size: 18, weight: .semibold))
-            .frame(maxWidth: .infinity)
-            .frame(height: 56)
-            .background(gradient)
-            .clipShape(RoundedRectangle(cornerRadius: 16))
-            .shadow(color: shadowColor.opacity(0.3), radius: 10, x: 0, y: 4)
-            .scaleEffect(configuration.isPressed ? 0.97 : 1)
-            .animation(.spring(response: 0.3, dampingFraction: 0.7), value: configuration.isPressed)
-    }
-}
-
-// MARK: - Outline Button Style
-struct OutlineButtonStyle: ButtonStyle {
-    let color: Color
-    
-    func makeBody(configuration: Configuration) -> some View {
-        configuration.label
-            .foregroundColor(color)
-            .font(.system(size: 18, weight: .semibold))
-            .frame(maxWidth: .infinity)
-            .frame(height: 56)
-            .background(color.opacity(0.1))
-            .overlay(
-                RoundedRectangle(cornerRadius: 16)
-                    .stroke(color.opacity(0.3), lineWidth: 1)
-            )
-            .clipShape(RoundedRectangle(cornerRadius: 16))
-            .scaleEffect(configuration.isPressed ? 0.97 : 1)
-            .animation(.spring(response: 0.3, dampingFraction: 0.7), value: configuration.isPressed)
-    }
-}
+// Legacy button styles removed - Use PostaPrimaryButtonStyle and PostaSecondaryButtonStyle from DesignSystem.swift instead
 
 
 

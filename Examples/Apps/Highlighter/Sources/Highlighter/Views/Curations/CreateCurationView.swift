@@ -44,6 +44,495 @@ struct CreateCurationView: View {
         !curationTitle.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
     
+    @ViewBuilder
+    private var headerImageSection: some View {
+        ZStack {
+            // Dynamic gradient background
+            RoundedRectangle(cornerRadius: 20)
+                .fill(
+                    LinearGradient(
+                        colors: gradientColors[Int(selectedColor.description.hashValue) % gradientColors.count],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                )
+                .frame(height: 220)
+                .overlay(
+                    // Animated particles
+                    GeometryReader { geometry in
+                        ForEach(0..<15) { index in
+                            Circle()
+                                .fill(Color.white.opacity(0.3))
+                                .frame(width: 8)
+                                .position(
+                                    x: geometry.size.width / 2,
+                                    y: geometry.size.height / 2
+                                )
+                                .animation(
+                                    .easeInOut(duration: 4)
+                                    .repeatForever(autoreverses: true)
+                                    .delay(Double(index) * 0.1),
+                                    value: particleAnimation
+                                )
+                        }
+                    }
+                )
+            
+            // Image preview or placeholder
+            if let imageData = selectedImageData,
+               let uiImage = UIImage(data: imageData) {
+                Image(uiImage: uiImage)
+                    .resizable()
+                    .aspectRatio(contentMode: .fill)
+                    .frame(height: 220)
+                    .clipped()
+                    .cornerRadius(20)
+                    .transition(.asymmetric(
+                        insertion: .scale.combined(with: .opacity),
+                        removal: .opacity
+                    ))
+            }
+            
+            // Interactive overlay
+            VStack {
+                HStack {
+                    Spacer()
+                    
+                    // Color picker button
+                    Button(action: {
+                        withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                            showColorPicker.toggle()
+                        }
+                        HapticManager.shared.impact(.light)
+                    }) {
+                        ZStack {
+                            Circle()
+                                .fill(.ultraThinMaterial)
+                                .frame(width: 36, height: 36)
+                            
+                            Image(systemName: "paintpalette.fill")
+                                .foregroundColor(.white)
+                                .font(.system(size: 16))
+                        }
+                    }
+                    .scaleEffect(pulseAnimation ? 1.1 : 1.0)
+                    .padding(12)
+                }
+                
+                Spacer()
+                
+                // Upload button
+                Button(action: { showImagePicker = true }) {
+                    HStack(spacing: 8) {
+                        Image(systemName: selectedImageData == nil ? "photo.badge.plus" : "photo.badge.checkmark")
+                            .font(.system(size: 20))
+                            .symbolEffect(.bounce, value: selectedImageData != nil)
+                        
+                        Text(selectedImageData == nil ? "Add Cover Image" : "Change Image")
+                            .font(.highlighterBody.weight(.medium))
+                    }
+                    .foregroundColor(.white)
+                    .padding(.horizontal, 20)
+                    .padding(.vertical, 10)
+                    .background(.ultraThinMaterial)
+                    .cornerRadius(20)
+                }
+                .scaleEffect(animateForm ? 1 : 0.8)
+                .opacity(animateForm ? 1 : 0)
+            }
+            .padding()
+        }
+        .frame(height: 220)
+        .shadow(color: selectedColor.opacity(0.3), radius: 20, y: 10)
+        .scaleEffect(animateHeader ? 1 : 0.95)
+        .opacity(animateHeader ? 1 : 0)
+        .padding(.horizontal)
+        .padding(.top, 16)
+    }
+    
+    @ViewBuilder
+    private var colorPickerSection: some View {
+        if showColorPicker {
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 12) {
+                    ForEach(0..<gradientColors.count, id: \.self) { index in
+                        Button(action: {
+                            withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                                selectedColor = gradientColors[index].first ?? .highlighterPurple
+                            }
+                            HapticManager.shared.impact(.light)
+                        }) {
+                            Circle()
+                                .fill(
+                                    LinearGradient(
+                                        colors: gradientColors[index],
+                                        startPoint: .topLeading,
+                                        endPoint: .bottomTrailing
+                                    )
+                                )
+                                .frame(width: 44, height: 44)
+                                .overlay(
+                                    Circle()
+                                        .stroke(Color.white, lineWidth: 3)
+                                        .opacity(selectedColor == gradientColors[index].first ? 1 : 0)
+                                )
+                        }
+                    }
+                }
+                .padding(.horizontal)
+            }
+            .transition(.asymmetric(
+                insertion: .move(edge: .top).combined(with: .opacity),
+                removal: .move(edge: .top).combined(with: .opacity)
+            ))
+        }
+    }
+    
+    @ViewBuilder
+    private var formFieldsSection: some View {
+        VStack(spacing: 24) {
+            // Name field
+            nameField
+            
+            // Title field
+            titleField
+            
+            // Description field
+            descriptionField
+            
+            // Image URL field
+            if selectedImageData == nil {
+                imageUrlField
+            }
+        }
+        .padding(.horizontal)
+    }
+    
+    @ViewBuilder
+    private var nameField: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack {
+                Label("Curation ID", systemImage: "number.square.fill")
+                    .font(.highlighterCaption.weight(.medium))
+                    .foregroundColor(nameFieldFocused ? .highlighterPurple : .highlighterSecondaryText)
+                
+                Spacer()
+                
+                if !curationName.isEmpty {
+                    Text("\(curationName.count)/50")
+                        .font(.ds.footnote)
+                        .foregroundColor(curationName.count > 50 ? .red : .highlighterSecondaryText)
+                }
+            }
+            .animation(.easeInOut(duration: 0.2), value: nameFieldFocused)
+            
+            HStack {
+                TextField("my-reading-list", text: $curationName)
+                    .textFieldStyle(.plain)
+                    .textInputAutocapitalization(.never)
+                    .autocorrectionDisabled()
+                    .onTapGesture { nameFieldFocused = true }
+                    .onChange(of: curationName) { _, newValue in
+                        if newValue.count > 50 {
+                            curationName = String(newValue.prefix(50))
+                        }
+                    }
+                
+                if !curationName.isEmpty {
+                    Button(action: { curationName = "" }) {
+                        Image(systemName: "xmark.circle.fill")
+                            .foregroundColor(.highlighterSecondaryText)
+                            .transition(.scale.combined(with: .opacity))
+                    }
+                }
+            }
+            .padding(14)
+            .background(
+                RoundedRectangle(cornerRadius: 12)
+                    .fill(Color.highlighterCardBackground)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 12)
+                            .stroke(
+                                nameFieldFocused ? Color.highlighterPurple : Color.gray.opacity(0.2),
+                                lineWidth: nameFieldFocused ? 2 : 1
+                            )
+                    )
+            )
+        }
+        .scaleEffect(animateForm && currentStep >= 0 ? 1 : 0.95)
+        .opacity(animateForm && currentStep >= 0 ? 1 : 0)
+        .animation(.spring(response: 0.4, dampingFraction: 0.7).delay(0.1), value: animateForm)
+    }
+    
+    @ViewBuilder
+    private var titleField: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack {
+                Label("Title", systemImage: "textformat.alt")
+                    .font(.highlighterCaption.weight(.medium))
+                    .foregroundColor(titleFieldFocused ? .highlighterPurple : .highlighterSecondaryText)
+                
+                Spacer()
+                
+                if !curationTitle.isEmpty {
+                    Text("\(curationTitle.count)/100")
+                        .font(.ds.footnote)
+                        .foregroundColor(curationTitle.count > 100 ? .red : .highlighterSecondaryText)
+                }
+            }
+            .animation(.easeInOut(duration: 0.2), value: titleFieldFocused)
+            
+            HStack {
+                TextField("My Reading List", text: $curationTitle)
+                    .textFieldStyle(.plain)
+                    .onTapGesture { titleFieldFocused = true }
+                    .onChange(of: curationTitle) { _, newValue in
+                        if newValue.count > 100 {
+                            curationTitle = String(newValue.prefix(100))
+                        }
+                    }
+                
+                if !curationTitle.isEmpty {
+                    Button(action: { curationTitle = "" }) {
+                        Image(systemName: "xmark.circle.fill")
+                            .foregroundColor(.highlighterSecondaryText)
+                            .transition(.scale.combined(with: .opacity))
+                    }
+                }
+            }
+            .padding(14)
+            .background(
+                RoundedRectangle(cornerRadius: 12)
+                    .fill(Color.highlighterCardBackground)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 12)
+                            .stroke(
+                                titleFieldFocused ? Color.highlighterPurple : Color.gray.opacity(0.2),
+                                lineWidth: titleFieldFocused ? 2 : 1
+                            )
+                    )
+            )
+        }
+        .scaleEffect(animateForm && currentStep >= 0 ? 1 : 0.95)
+        .opacity(animateForm && currentStep >= 0 ? 1 : 0)
+        .animation(.spring(response: 0.4, dampingFraction: 0.7).delay(0.2), value: animateForm)
+    }
+    
+    @ViewBuilder
+    private var descriptionField: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack {
+                Label("Description", systemImage: "text.quote")
+                    .font(.highlighterCaption.weight(.medium))
+                    .foregroundColor(descriptionFieldFocused ? .highlighterPurple : .highlighterSecondaryText)
+                
+                Spacer()
+                
+                Text("Optional")
+                    .font(.ds.footnote)
+                    .foregroundColor(.highlighterSecondaryText)
+            }
+            .animation(.easeInOut(duration: 0.2), value: descriptionFieldFocused)
+            
+            ZStack(alignment: .topLeading) {
+                if description.isEmpty {
+                    Text("Describe your curation...")
+                        .foregroundColor(.gray.opacity(0.5))
+                        .padding(.horizontal, 4)
+                        .padding(.vertical, 8)
+                }
+                
+                TextEditor(text: $description)
+                    .font(.highlighterBody)
+                    .scrollContentBackground(.hidden)
+                    .background(Color.clear)
+                    .onTapGesture { descriptionFieldFocused = true }
+            }
+            .padding(12)
+            .frame(minHeight: 120)
+            .background(
+                RoundedRectangle(cornerRadius: 12)
+                    .fill(Color.highlighterCardBackground)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 12)
+                            .stroke(
+                                descriptionFieldFocused ? Color.highlighterPurple : Color.gray.opacity(0.2),
+                                lineWidth: descriptionFieldFocused ? 2 : 1
+                            )
+                    )
+            )
+        }
+        .scaleEffect(animateForm && currentStep >= 0 ? 1 : 0.95)
+        .opacity(animateForm && currentStep >= 0 ? 1 : 0)
+        .animation(.spring(response: 0.4, dampingFraction: 0.7).delay(0.3), value: animateForm)
+    }
+    
+    @ViewBuilder
+    private var imageUrlField: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Label("Or use image URL", systemImage: "link.circle.fill")
+                .font(.highlighterCaption.weight(.medium))
+                .foregroundColor(.highlighterSecondaryText)
+            
+            TextField("https://...", text: $imageUrl)
+                .textFieldStyle(.plain)
+                .textInputAutocapitalization(.never)
+                .autocorrectionDisabled()
+                .padding(14)
+                .background(
+                    RoundedRectangle(cornerRadius: 12)
+                        .fill(Color.highlighterCardBackground)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 12)
+                                .stroke(Color.gray.opacity(0.2), lineWidth: 1)
+                        )
+                )
+        }
+        .scaleEffect(animateForm && currentStep >= 0 ? 1 : 0.95)
+        .opacity(animateForm && currentStep >= 0 ? 1 : 0)
+        .animation(.spring(response: 0.4, dampingFraction: 0.7).delay(0.4), value: animateForm)
+    }
+    
+    @ViewBuilder
+    private var infoBoxSection: some View {
+        VStack(spacing: 16) {
+            HStack(alignment: .top, spacing: 12) {
+                ZStack {
+                    Circle()
+                        .fill(
+                            LinearGradient(
+                                colors: [.highlighterPurple, .highlighterPurple.opacity(0.7)],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
+                        .frame(width: 32, height: 32)
+                    
+                    Image(systemName: "lightbulb.fill")
+                        .foregroundColor(.white)
+                        .font(.system(size: 16))
+                }
+                .scaleEffect(pulseAnimation ? 1.1 : 1.0)
+                
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("What are Article Curations?")
+                        .font(.highlighterBody.weight(.semibold))
+                        .foregroundColor(.highlighterText)
+                    
+                    Text("Create themed collections of articles, highlights, and content. Perfect for organizing your reading lists, research topics, or sharing knowledge with others.")
+                        .font(.highlighterCaption)
+                        .foregroundColor(.highlighterSecondaryText)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                
+                Spacer()
+            }
+            
+            // Feature highlights
+            HStack(spacing: 16) {
+                FeatureBadge(icon: "folder.fill", text: "Organize", color: .highlighterPurple)
+                FeatureBadge(icon: "square.and.arrow.up", text: "Share", color: .highlighterOrange)
+                FeatureBadge(icon: "sparkles", text: "Discover", color: .blue)
+            }
+        }
+        .padding(20)
+        .background(
+            RoundedRectangle(cornerRadius: 16)
+                .fill(.ultraThinMaterial)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 16)
+                        .stroke(
+                            LinearGradient(
+                                colors: [.highlighterPurple.opacity(0.3), .highlighterOrange.opacity(0.3)],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            ),
+                            lineWidth: 1
+                        )
+                )
+        )
+        .padding(.horizontal)
+        .scaleEffect(animateForm ? 1 : 0.95)
+        .opacity(animateForm ? 1 : 0)
+        .animation(.spring(response: 0.4, dampingFraction: 0.7).delay(0.5), value: animateForm)
+    }
+    
+    @ViewBuilder
+    private var createButtonSection: some View {
+        VStack(spacing: 12) {
+            Button(action: createCuration) {
+                ZStack {
+                    // Background gradient
+                    RoundedRectangle(cornerRadius: 16)
+                        .fill(
+                            LinearGradient(
+                                colors: isFormValid ? 
+                                    [.highlighterPurple, .highlighterPurple.opacity(0.8)] :
+                                    [.gray.opacity(0.3), .gray.opacity(0.2)],
+                                startPoint: .leading,
+                                endPoint: .trailing
+                            )
+                        )
+                    
+                    // Shimmer effect when valid
+                    if isFormValid {
+                        RoundedRectangle(cornerRadius: 16)
+                            .fill(
+                                LinearGradient(
+                                    colors: [
+                                        Color.white.opacity(0),
+                                        Color.white.opacity(0.3),
+                                        Color.white.opacity(0)
+                                    ],
+                                    startPoint: .leading,
+                                    endPoint: .trailing
+                                )
+                            )
+                            .mask(
+                                RoundedRectangle(cornerRadius: 16)
+                                    .fill(
+                                        LinearGradient(
+                                            colors: [.clear, .white, .clear],
+                                            startPoint: .leading,
+                                            endPoint: .trailing
+                                        )
+                                    )
+                                    .offset(x: isFormValid ? 200 : -200)
+                                    .animation(
+                                        .linear(duration: 1.5)
+                                        .repeatForever(autoreverses: false),
+                                        value: isFormValid
+                                    )
+                            )
+                    }
+                    
+                    HStack(spacing: 8) {
+                        Image(systemName: "folder.badge.plus")
+                            .font(.system(size: 18, weight: .semibold))
+                            .symbolEffect(.bounce, value: isFormValid)
+                        
+                        Text("Create Curation")
+                            .font(.highlighterBody.weight(.semibold))
+                    }
+                    .foregroundColor(.white)
+                }
+                .frame(height: 56)
+                .disabled(!isFormValid)
+                .scaleEffect(isFormValid ? 1 : 0.98)
+                .animation(.spring(response: 0.3, dampingFraction: 0.7), value: isFormValid)
+            }
+            
+            Text("You can add articles and highlights after creating")
+                .font(.highlighterCaption)
+                .foregroundColor(.highlighterSecondaryText)
+        }
+        .padding(.horizontal)
+        .padding(.bottom, 32)
+        .scaleEffect(animateForm ? 1 : 0.95)
+        .opacity(animateForm ? 1 : 0)
+        .animation(.spring(response: 0.4, dampingFraction: 0.7).delay(0.6), value: animateForm)
+    }
+    
     var body: some View {
         NavigationStack {
             ZStack {
@@ -61,464 +550,20 @@ struct CreateCurationView: View {
                                 .offset(y: animateHeader ? 0 : -20)
                             
                             VStack(spacing: 24) {
-                                // Enhanced header image section
-                                ZStack {
-                                    // Dynamic gradient background
-                                    RoundedRectangle(cornerRadius: 20)
-                                        .fill(
-                                            LinearGradient(
-                                                colors: gradientColors[Int(selectedColor.description.hashValue) % gradientColors.count],
-                                                startPoint: .topLeading,
-                                                endPoint: .bottomTrailing
-                                            )
-                                        )
-                                        .frame(height: 220)
-                                        .overlay(
-                                            // Animated particles
-                                            GeometryReader { geometry in
-                                                ForEach(0..<15) { index in
-                                                    Circle()
-                                                        .fill(Color.white.opacity(0.3))
-                                                        .frame(width: CGFloat.random(in: 4...12))
-                                                        .position(
-                                                            x: particleAnimation ? CGFloat.random(in: 0...geometry.size.width) : geometry.size.width / 2,
-                                                            y: particleAnimation ? CGFloat.random(in: 0...geometry.size.height) : geometry.size.height / 2
-                                                        )
-                                                        .animation(
-                                                            .easeInOut(duration: Double.random(in: 3...6))
-                                                            .repeatForever(autoreverses: true)
-                                                            .delay(Double(index) * 0.1),
-                                                            value: particleAnimation
-                                                        )
-                                                }
-                                            }
-                                        )
-                                    
-                                    // Image preview or placeholder
-                                    if let imageData = selectedImageData,
-                                       let uiImage = UIImage(data: imageData) {
-                                        Image(uiImage: uiImage)
-                                            .resizable()
-                                            .aspectRatio(contentMode: .fill)
-                                            .frame(height: 220)
-                                            .clipped()
-                                            .cornerRadius(20)
-                                            .transition(.asymmetric(
-                                                insertion: .scale.combined(with: .opacity),
-                                                removal: .opacity
-                                            ))
-                                    }
-                                    
-                                    // Interactive overlay
-                                    VStack {
-                                        HStack {
-                                            Spacer()
-                                            
-                                            // Color picker button
-                                            Button(action: {
-                                                withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
-                                                    showColorPicker.toggle()
-                                                }
-                                                HapticManager.shared.impact(.light)
-                                            }) {
-                                                ZStack {
-                                                    Circle()
-                                                        .fill(.ultraThinMaterial)
-                                                        .frame(width: 36, height: 36)
-                                                    
-                                                    Image(systemName: "paintpalette.fill")
-                                                        .foregroundColor(.white)
-                                                        .font(.system(size: 16))
-                                                }
-                                            }
-                                            .scaleEffect(pulseAnimation ? 1.1 : 1.0)
-                                            .padding(12)
-                                        }
-                                        
-                                        Spacer()
-                                        
-                                        // Upload button
-                                        Button(action: { showImagePicker = true }) {
-                                            HStack(spacing: 8) {
-                                                Image(systemName: selectedImageData == nil ? "photo.badge.plus" : "photo.badge.checkmark")
-                                                    .font(.system(size: 20))
-                                                    .symbolEffect(.bounce, value: selectedImageData != nil)
-                                                
-                                                Text(selectedImageData == nil ? "Add Cover Image" : "Change Image")
-                                                    .font(.highlighterBody.weight(.medium))
-                                            }
-                                            .foregroundColor(.white)
-                                            .padding(.horizontal, 20)
-                                            .padding(.vertical, 10)
-                                            .background(.ultraThinMaterial)
-                                            .cornerRadius(20)
-                                        }
-                                        .scaleEffect(animateForm ? 1 : 0.8)
-                                        .opacity(animateForm ? 1 : 0)
-                                    }
-                                    .padding()
-                                }
-                                .frame(height: 220)
-                                .shadow(color: selectedColor.opacity(0.3), radius: 20, y: 10)
-                                .scaleEffect(animateHeader ? 1 : 0.95)
-                                .opacity(animateHeader ? 1 : 0)
-                                .padding(.horizontal)
-                                .padding(.top, 16)
+                                // Header image section
+                                headerImageSection
                                 
                                 // Color picker
-                                if showColorPicker {
-                                    ScrollView(.horizontal, showsIndicators: false) {
-                                        HStack(spacing: 12) {
-                                            ForEach(0..<gradientColors.count, id: \.self) { index in
-                                                Button(action: {
-                                                    withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
-                                                        selectedColor = gradientColors[index].first ?? .highlighterPurple
-                                                    }
-                                                    HapticManager.shared.impact(.light)
-                                                }) {
-                                                    Circle()
-                                                        .fill(
-                                                            LinearGradient(
-                                                                colors: gradientColors[index],
-                                                                startPoint: .topLeading,
-                                                                endPoint: .bottomTrailing
-                                                            )
-                                                        )
-                                                        .frame(width: 44, height: 44)
-                                                        .overlay(
-                                                            Circle()
-                                                                .stroke(Color.white, lineWidth: 3)
-                                                                .opacity(selectedColor == gradientColors[index].first ? 1 : 0)
-                                                        )
-                                                }
-                                            }
-                                        }
-                                        .padding(.horizontal)
-                                    }
-                                    .transition(.asymmetric(
-                                        insertion: .move(edge: .top).combined(with: .opacity),
-                                        removal: .move(edge: .top).combined(with: .opacity)
-                                    ))
-                                }
+                                colorPickerSection
                                 
-                                // Enhanced form fields with animations
-                                VStack(spacing: 24) {
-                                    // Name field with enhanced styling
-                                    VStack(alignment: .leading, spacing: 10) {
-                                        HStack {
-                                            Label("Curation ID", systemImage: "number.square.fill")
-                                                .font(.highlighterCaption.weight(.medium))
-                                                .foregroundColor(nameFieldFocused ? .highlighterPurple : .highlighterSecondaryText)
-                                            
-                                            Spacer()
-                                            
-                                            if !curationName.isEmpty {
-                                                Text("\(curationName.count)/50")
-                                                    .font(.ds.footnote)
-                                                    .foregroundColor(curationName.count > 50 ? .red : .highlighterSecondaryText)
-                                            }
-                                        }
-                                        .animation(.easeInOut(duration: 0.2), value: nameFieldFocused)
-                                        
-                                        HStack {
-                                            TextField("my-reading-list", text: $curationName)
-                                                .textFieldStyle(.plain)
-                                                .textInputAutocapitalization(.never)
-                                                .autocorrectionDisabled()
-                                                .onTapGesture { nameFieldFocused = true }
-                                                .onChange(of: curationName) { _, newValue in
-                                                    if newValue.count > 50 {
-                                                        curationName = String(newValue.prefix(50))
-                                                    }
-                                                }
-                                            
-                                            if !curationName.isEmpty {
-                                                Button(action: { curationName = "" }) {
-                                                    Image(systemName: "xmark.circle.fill")
-                                                        .foregroundColor(.highlighterSecondaryText)
-                                                        .transition(.scale.combined(with: .opacity))
-                                                }
-                                            }
-                                        }
-                                        .padding(14)
-                                        .background(
-                                            RoundedRectangle(cornerRadius: 12)
-                                                .fill(Color.highlighterCardBackground)
-                                                .overlay(
-                                                    RoundedRectangle(cornerRadius: 12)
-                                                        .stroke(
-                                                            nameFieldFocused ? Color.highlighterPurple : Color.gray.opacity(0.2),
-                                                            lineWidth: nameFieldFocused ? 2 : 1
-                                                        )
-                                                )
-                                        )
-                                    }
-                                    .scaleEffect(animateForm && currentStep >= 0 ? 1 : 0.95)
-                                    .opacity(animateForm && currentStep >= 0 ? 1 : 0)
-                                    .animation(.spring(response: 0.4, dampingFraction: 0.7).delay(0.1), value: animateForm)
-                        
-                                    // Title field with enhanced styling
-                                    VStack(alignment: .leading, spacing: 10) {
-                                        HStack {
-                                            Label("Title", systemImage: "textformat.alt")
-                                                .font(.highlighterCaption.weight(.medium))
-                                                .foregroundColor(titleFieldFocused ? .highlighterPurple : .highlighterSecondaryText)
-                                            
-                                            Spacer()
-                                            
-                                            if !curationTitle.isEmpty {
-                                                Text("\(curationTitle.count)/100")
-                                                    .font(.ds.small)
-                                                    .foregroundColor(curationTitle.count > 100 ? .red : .highlighterSecondaryText)
-                                            }
-                                        }
-                                        .animation(.easeInOut(duration: 0.2), value: titleFieldFocused)
-                                        
-                                        HStack {
-                                            TextField("My Reading List", text: $curationTitle)
-                                                .textFieldStyle(.plain)
-                                                .onTapGesture { titleFieldFocused = true }
-                                                .onChange(of: curationTitle) { _, newValue in
-                                                    if newValue.count > 100 {
-                                                        curationTitle = String(newValue.prefix(100))
-                                                    }
-                                                }
-                                            
-                                            if !curationTitle.isEmpty {
-                                                Button(action: { curationTitle = "" }) {
-                                                    Image(systemName: "xmark.circle.fill")
-                                                        .foregroundColor(.highlighterSecondaryText)
-                                                        .transition(.scale.combined(with: .opacity))
-                                                }
-                                            }
-                                        }
-                                        .padding(14)
-                                        .background(
-                                            RoundedRectangle(cornerRadius: 12)
-                                                .fill(Color.highlighterCardBackground)
-                                                .overlay(
-                                                    RoundedRectangle(cornerRadius: 12)
-                                                        .stroke(
-                                                            titleFieldFocused ? Color.highlighterPurple : Color.gray.opacity(0.2),
-                                                            lineWidth: titleFieldFocused ? 2 : 1
-                                                        )
-                                                )
-                                        )
-                                    }
-                                    .scaleEffect(animateForm && currentStep >= 0 ? 1 : 0.95)
-                                    .opacity(animateForm && currentStep >= 0 ? 1 : 0)
-                                    .animation(.spring(response: 0.4, dampingFraction: 0.7).delay(0.2), value: animateForm)
-                        
-                                    // Description field with enhanced styling
-                                    VStack(alignment: .leading, spacing: 10) {
-                                        HStack {
-                                            Label("Description", systemImage: "text.quote")
-                                                .font(.highlighterCaption.weight(.medium))
-                                                .foregroundColor(descriptionFieldFocused ? .highlighterPurple : .highlighterSecondaryText)
-                                            
-                                            Spacer()
-                                            
-                                            Text("Optional")
-                                                .font(.ds.small)
-                                                .foregroundColor(.highlighterSecondaryText)
-                                        }
-                                        .animation(.easeInOut(duration: 0.2), value: descriptionFieldFocused)
-                                        
-                                        ZStack(alignment: .topLeading) {
-                                            if description.isEmpty {
-                                                Text("Describe your curation...")
-                                                    .foregroundColor(.gray.opacity(0.5))
-                                                    .padding(.horizontal, 4)
-                                                    .padding(.vertical, 8)
-                                            }
-                                            
-                                            TextEditor(text: $description)
-                                                .font(.highlighterBody)
-                                                .scrollContentBackground(.hidden)
-                                                .background(Color.clear)
-                                                .onTapGesture { descriptionFieldFocused = true }
-                                        }
-                                        .padding(12)
-                                        .frame(minHeight: 120)
-                                        .background(
-                                            RoundedRectangle(cornerRadius: 12)
-                                                .fill(Color.highlighterCardBackground)
-                                                .overlay(
-                                                    RoundedRectangle(cornerRadius: 12)
-                                                        .stroke(
-                                                            descriptionFieldFocused ? Color.highlighterPurple : Color.gray.opacity(0.2),
-                                                            lineWidth: descriptionFieldFocused ? 2 : 1
-                                                        )
-                                                )
-                                        )
-                                    }
-                                    .scaleEffect(animateForm && currentStep >= 0 ? 1 : 0.95)
-                                    .opacity(animateForm && currentStep >= 0 ? 1 : 0)
-                                    .animation(.spring(response: 0.4, dampingFraction: 0.7).delay(0.3), value: animateForm)
-                        
-                                    // Image URL field (optional)
-                                    if selectedImageData == nil {
-                                        VStack(alignment: .leading, spacing: 10) {
-                                            Label("Or use image URL", systemImage: "link.circle.fill")
-                                                .font(.highlighterCaption.weight(.medium))
-                                                .foregroundColor(.highlighterSecondaryText)
-                                            
-                                            TextField("https://...", text: $imageUrl)
-                                                .textFieldStyle(.plain)
-                                                .textInputAutocapitalization(.never)
-                                                .autocorrectionDisabled()
-                                                .padding(14)
-                                                .background(
-                                                    RoundedRectangle(cornerRadius: 12)
-                                                        .fill(Color.highlighterCardBackground)
-                                                        .overlay(
-                                                            RoundedRectangle(cornerRadius: 12)
-                                                                .stroke(Color.gray.opacity(0.2), lineWidth: 1)
-                                                        )
-                                                )
-                                        }
-                                        .scaleEffect(animateForm && currentStep >= 0 ? 1 : 0.95)
-                                        .opacity(animateForm && currentStep >= 0 ? 1 : 0)
-                                        .animation(.spring(response: 0.4, dampingFraction: 0.7).delay(0.4), value: animateForm)
-                                    }
-                                }
-                                .padding(.horizontal)
+                                // Form fields
+                                formFieldsSection
                     
-                                // Enhanced info box with animation
-                                VStack(spacing: 16) {
-                                    HStack(alignment: .top, spacing: 12) {
-                                        ZStack {
-                                            Circle()
-                                                .fill(
-                                                    LinearGradient(
-                                                        colors: [.highlighterPurple, .highlighterPurple.opacity(0.7)],
-                                                        startPoint: .topLeading,
-                                                        endPoint: .bottomTrailing
-                                                    )
-                                                )
-                                                .frame(width: 32, height: 32)
-                                            
-                                            Image(systemName: "lightbulb.fill")
-                                                .foregroundColor(.white)
-                                                .font(.system(size: 16))
-                                        }
-                                        .scaleEffect(pulseAnimation ? 1.1 : 1.0)
-                                        
-                                        VStack(alignment: .leading, spacing: 6) {
-                                            Text("What are Article Curations?")
-                                                .font(.highlighterBody.weight(.semibold))
-                                                .foregroundColor(.highlighterText)
-                                            
-                                            Text("Create themed collections of articles, highlights, and content. Perfect for organizing your reading lists, research topics, or sharing knowledge with others.")
-                                                .font(.highlighterCaption)
-                                                .foregroundColor(.highlighterSecondaryText)
-                                                .fixedSize(horizontal: false, vertical: true)
-                                        }
-                                        
-                                        Spacer()
-                                    }
-                                    
-                                    // Feature highlights
-                                    HStack(spacing: 16) {
-                                        FeatureBadge(icon: "folder.fill", text: "Organize", color: .highlighterPurple)
-                                        FeatureBadge(icon: "square.and.arrow.up", text: "Share", color: .highlighterOrange)
-                                        FeatureBadge(icon: "sparkles", text: "Discover", color: .blue)
-                                    }
-                                }
-                                .padding(20)
-                                .background(
-                                    RoundedRectangle(cornerRadius: 16)
-                                        .fill(.ultraThinMaterial)
-                                        .overlay(
-                                            RoundedRectangle(cornerRadius: 16)
-                                                .stroke(
-                                                    LinearGradient(
-                                                        colors: [.highlighterPurple.opacity(0.3), .highlighterOrange.opacity(0.3)],
-                                                        startPoint: .topLeading,
-                                                        endPoint: .bottomTrailing
-                                                    ),
-                                                    lineWidth: 1
-                                                )
-                                        )
-                                )
-                                .padding(.horizontal)
-                                .scaleEffect(animateForm ? 1 : 0.95)
-                                .opacity(animateForm ? 1 : 0)
-                                .animation(.spring(response: 0.4, dampingFraction: 0.7).delay(0.5), value: animateForm)
+                                // Info box
+                                infoBoxSection
                     
-                                // Enhanced create button with animations
-                                VStack(spacing: 12) {
-                                    Button(action: createCuration) {
-                                        ZStack {
-                                            // Background gradient
-                                            RoundedRectangle(cornerRadius: 16)
-                                                .fill(
-                                                    LinearGradient(
-                                                        colors: isFormValid ? 
-                                                            [.highlighterPurple, .highlighterPurple.opacity(0.8)] :
-                                                            [.gray.opacity(0.3), .gray.opacity(0.2)],
-                                                        startPoint: .leading,
-                                                        endPoint: .trailing
-                                                    )
-                                                )
-                                            
-                                            // Shimmer effect when valid
-                                            if isFormValid {
-                                                RoundedRectangle(cornerRadius: 16)
-                                                    .fill(
-                                                        LinearGradient(
-                                                            colors: [
-                                                                Color.white.opacity(0),
-                                                                Color.white.opacity(0.3),
-                                                                Color.white.opacity(0)
-                                                            ],
-                                                            startPoint: .leading,
-                                                            endPoint: .trailing
-                                                        )
-                                                    )
-                                                    .mask(
-                                                        RoundedRectangle(cornerRadius: 16)
-                                                            .fill(
-                                                                LinearGradient(
-                                                                    colors: [.clear, .white, .clear],
-                                                                    startPoint: .leading,
-                                                                    endPoint: .trailing
-                                                                )
-                                                            )
-                                                            .offset(x: isFormValid ? 200 : -200)
-                                                            .animation(
-                                                                .linear(duration: 1.5)
-                                                                .repeatForever(autoreverses: false),
-                                                                value: isFormValid
-                                                            )
-                                                    )
-                                            }
-                                            
-                                            HStack(spacing: 8) {
-                                                Image(systemName: "folder.badge.plus")
-                                                    .font(.system(size: 18, weight: .semibold))
-                                                    .symbolEffect(.bounce, value: isFormValid)
-                                                
-                                                Text("Create Curation")
-                                                    .font(.highlighterBody.weight(.semibold))
-                                            }
-                                            .foregroundColor(.white)
-                                        }
-                                        .frame(height: 56)
-                                        .disabled(!isFormValid)
-                                        .scaleEffect(isFormValid ? 1 : 0.98)
-                                        .animation(.spring(response: 0.3, dampingFraction: 0.7), value: isFormValid)
-                                    }
-                                    
-                                    Text("You can add articles and highlights after creating")
-                                        .font(.highlighterCaption)
-                                        .foregroundColor(.highlighterSecondaryText)
-                                }
-                                .padding(.horizontal)
-                                .padding(.bottom, 32)
-                                .scaleEffect(animateForm ? 1 : 0.95)
-                                .opacity(animateForm ? 1 : 0)
-                                .animation(.spring(response: 0.4, dampingFraction: 0.7).delay(0.6), value: animateForm)
+                                // Create button
+                                createButtonSection
                             }
                         }
                         .padding(.bottom, keyboardHeight)

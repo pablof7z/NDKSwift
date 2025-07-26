@@ -14,7 +14,7 @@ let package = Package(
         .executableTarget(
             name: "Olas",
             dependencies: [
-                .product(name: "NDKSwift", package: "NDKSwift")
+                .product(name: "NDKSwift", package: "NDKSwift-z94ws0")
             ],
             path: "Olas"
         )

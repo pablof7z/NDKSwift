@@ -2,6 +2,7 @@ import SwiftUI
 import NDKSwift
 
 struct CreateAccountView: View {
+    @Environment(NostrManager.self) private var nostrManager
     @EnvironmentObject var appState: AppState
     @Environment(\.dismiss) var dismiss
     @State private var displayName = ""
@@ -121,7 +122,7 @@ struct CreateAccountView: View {
         Task {
             do {
                 isCreatingAccount = true
-                try await appState.createAccount(displayName: displayName)
+                _ = try await nostrManager.createNewAccount(displayName: displayName)
                 dismiss()
             } catch {
                 print("Account creation failed: \(error)")
