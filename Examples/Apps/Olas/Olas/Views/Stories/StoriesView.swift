@@ -12,6 +12,7 @@ struct StoriesView: View {
     @State private var showCreateStory = false
     @State private var isLoading = true
     @State private var hasLoadedStories = false
+    @State private var storiesManager: StoriesManager?
     
     var body: some View {
         ScrollView(.horizontal, showsIndicators: false) {
@@ -40,8 +41,14 @@ struct StoriesView: View {
                 endPoint: .bottom
             )
         )
+        .onAppear {
+            if storiesManager == nil {
+                storiesManager = StoriesManager(nostrManager: nostrManager)
+            }
+        }
         .task {
             if !hasLoadedStories {
+                hasLoadedStories = true
                 await loadStories()
             }
         }
@@ -51,9 +58,11 @@ struct StoriesView: View {
                 .environmentObject(appState)
         }
         .sheet(isPresented: $showCreateStory) {
-            CreateStoryView()
-                .environment(nostrManager)
-                .environmentObject(appState)
+            if let storiesManager = storiesManager {
+                CreateStoryView(storiesManager: storiesManager)
+                    .environment(nostrManager)
+                    .environmentObject(appState)
+            }
         }
     }
     
@@ -65,7 +74,7 @@ struct StoriesView: View {
             VStack(spacing: OlasDesign.Spacing.xs) {
                 ZStack {
                     // User avatar
-                    if let profilePicture = appState.currentUserProfile?.picture {
+                    if let profilePicture = nostrManager.currentUserProfile?.picture {
                         AsyncImage(url: URL(string: profilePicture)) { image in
                             image
                                 .resizable()
@@ -126,11 +135,20 @@ struct StoriesView: View {
         // Stories are kind 30024 events (NIP-51 highlights)
         let filter = NDKFilter(
             kinds: [30024],
-            since: Timestamp(Date().addingTimeInterval(-86400)) // Last 24 hours
+            since: Timestamp(Int64(Date().addingTimeInterval(-86400).timeIntervalSince1970)) // Last 24 hours
         )
         
         do {
-            let storyEvents = try await ndk.fetchEvents(filter: filter)
+            // Create a data source to fetch events
+            let dataSource = ndk.dataSource(filter: filter)
+            
+            // Collect events until EOSE
+            var storyEvents: [NDKEvent] = []
+            for await event in dataSource.events {
+                storyEvents.append(event)
+                // Check if we have enough or should stop
+                if storyEvents.count > 100 { break }
+            }
             
             // Convert to Story models
             var loadedStories: [Story] = []

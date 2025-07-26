@@ -13,6 +13,9 @@ struct ContentView: View {
     @State private var contentOffset: CGFloat = 0
     @State private var dragOffset: CGFloat = 0
     @State private var showTabSwitchAnimation = false
+    @State private var tabSwitchProgress: CGFloat = 0
+    @State private var activeTabGlow: CGFloat = 0
+    @State private var navigationHapticTriggered = false
     @AppStorage("hasCompletedOnboarding") private var hasCompletedOnboarding = false
     
     enum Tab: CaseIterable {
@@ -36,7 +39,7 @@ struct ContentView: View {
                             case .home:
                                 SimplifiedHybridFeedView()
                             case .feed:
-                                SimplifiedHybridFeedView()
+                                TimelineFeedView()
                             case .discover:
                                 SearchView()
                             case .library:
@@ -46,14 +49,55 @@ struct ContentView: View {
                             }
                         }
                         .opacity(selectedTab == tab ? 1 : 0)
-                        .scaleEffect(selectedTab == tab ? 1 : 0.95)
-                        .offset(x: offsetForTab(tab))
-                        .blur(radius: selectedTab == tab ? 0 : 2)
+                        .scaleEffect(selectedTab == tab ? 1 : 0.92)
+                        .offset(x: offsetForTab(tab), y: selectedTab == tab ? 0 : 10)
+                        .blur(radius: selectedTab == tab ? 0 : 3)
+                        .rotation3DEffect(
+                            .degrees(selectedTab == tab ? 0 : 5),
+                            axis: (x: 1, y: 0, z: 0),
+                            perspective: 0.5
+                        )
                         .allowsHitTesting(selectedTab == tab)
                         .transition(transitionForTab(tab))
+                        .zIndex(selectedTab == tab ? 1 : 0)
                     }
                 }
-                .animation(.spring(response: 0.5, dampingFraction: 0.8, blendDuration: 0.2), value: selectedTab)
+                .animation(
+                    .interactiveSpring(
+                        response: 0.45,
+                        dampingFraction: 0.75,
+                        blendDuration: 0.25
+                    ),
+                    value: selectedTab
+                )
+                .background(
+                    // Ambient glow effect
+                    Circle()
+                        .fill(
+                            RadialGradient(
+                                colors: [
+                                    DesignSystem.Colors.primary.opacity(0.3 * activeTabGlow),
+                                    DesignSystem.Colors.secondary.opacity(0.2 * activeTabGlow),
+                                    Color.clear
+                                ],
+                                center: .center,
+                                startRadius: 50,
+                                endRadius: 200
+                            )
+                        )
+                        .frame(width: 400, height: 400)
+                        .blur(radius: 50)
+                        .offset(y: -100)
+                        .allowsHitTesting(false)
+                )
+                .onAppear {
+                    withAnimation(
+                        .easeInOut(duration: 2)
+                        .repeatForever(autoreverses: true)
+                    ) {
+                        activeTabGlow = 1
+                    }
+                }
                 .gesture(
                     DragGesture()
                         .onChanged { value in
@@ -87,6 +131,7 @@ struct ContentView: View {
                                 withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) {
                                     fabScale = 1.2
                                     fabRotation += 180
+                                    showTabSwitchAnimation = true
                                 }
                                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
                                     withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) {
@@ -144,11 +189,32 @@ struct ContentView: View {
                                         .offset(y: 4)
                                     
                                     // Icon with enhanced animation
-                                    Image(systemName: "highlighter")
-                                        .font(.system(size: 24, weight: .semibold))
-                                        .foregroundColor(.white)
-                                        .rotationEffect(.degrees(fabRotation))
-                                        .shadow(color: .black.opacity(0.2), radius: 2, x: 0, y: 1)
+                                    ZStack {
+                                        Image(systemName: "highlighter")
+                                            .font(.system(size: 24, weight: .semibold))
+                                            .foregroundColor(.white)
+                                            .rotationEffect(.degrees(fabRotation))
+                                            .shadow(color: .black.opacity(0.2), radius: 2, x: 0, y: 1)
+                                        
+                                        // Particle burst on tap
+                                        if showTabSwitchAnimation {
+                                            ForEach(0..<8, id: \.self) { index in
+                                                Circle()
+                                                    .fill(DesignSystem.Colors.secondary)
+                                                    .frame(width: 4, height: 4)
+                                                    .offset(
+                                                        x: showTabSwitchAnimation ? cos(CGFloat(index) * .pi / 4) * 30 : 0,
+                                                        y: showTabSwitchAnimation ? sin(CGFloat(index) * .pi / 4) * 30 : 0
+                                                    )
+                                                    .opacity(showTabSwitchAnimation ? 0 : 1)
+                                                    .animation(
+                                                        .easeOut(duration: 0.6)
+                                                        .delay(Double(index) * 0.02),
+                                                        value: showTabSwitchAnimation
+                                                    )
+                                            }
+                                        }
+                                    }
                                 }
                                 .scaleEffect(fabScale)
                                 .rotation3DEffect(
@@ -206,15 +272,53 @@ struct ContentView: View {
     private func switchToNextTab() {
         let currentIndex = Tab.allCases.firstIndex(of: selectedTab) ?? 0
         let nextIndex = (currentIndex + 1) % Tab.allCases.count
-        selectedTab = Tab.allCases[nextIndex]
-        HapticManager.shared.impact(.light)
+        
+        // Trigger advanced transition
+        withAnimation(.spring(response: 0.4, dampingFraction: 0.75)) {
+            tabSwitchProgress = 1
+        }
+        
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+            selectedTab = Tab.allCases[nextIndex]
+            
+            withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                tabSwitchProgress = 0
+            }
+        }
+        
+        if !navigationHapticTriggered {
+            HapticManager.shared.impact(.light)
+            navigationHapticTriggered = true
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+                navigationHapticTriggered = false
+            }
+        }
     }
     
     private func switchToPreviousTab() {
         let currentIndex = Tab.allCases.firstIndex(of: selectedTab) ?? 0
         let previousIndex = currentIndex > 0 ? currentIndex - 1 : Tab.allCases.count - 1
-        selectedTab = Tab.allCases[previousIndex]
-        HapticManager.shared.impact(.light)
+        
+        // Trigger advanced transition
+        withAnimation(.spring(response: 0.4, dampingFraction: 0.75)) {
+            tabSwitchProgress = -1
+        }
+        
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+            selectedTab = Tab.allCases[previousIndex]
+            
+            withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                tabSwitchProgress = 0
+            }
+        }
+        
+        if !navigationHapticTriggered {
+            HapticManager.shared.impact(.light)
+            navigationHapticTriggered = true
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+                navigationHapticTriggered = false
+            }
+        }
     }
 }
 

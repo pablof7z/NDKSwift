@@ -170,21 +170,9 @@ struct ProfileHeaderView: View {
                 HStack(spacing: OlasDesign.Spacing.xl) {
                     ProfileStatView(value: postsCount, label: "Posts")
                     
-                    Button {
-                        selectedFollowMode = .followers
-                        showFollowers = true
-                    } label: {
-                        ProfileStatView(value: followersCount, label: "Followers")
-                    }
-                    .buttonStyle(PlainButtonStyle())
+                    ProfileStatView(value: followersCount, label: "Followers")
                     
-                    Button {
-                        selectedFollowMode = .following
-                        showFollowing = true
-                    } label: {
-                        ProfileStatView(value: followingCount, label: "Following")
-                    }
-                    .buttonStyle(PlainButtonStyle())
+                    ProfileStatView(value: followingCount, label: "Following")
                 }
                 
                 // Follow/Edit Button

@@ -60,11 +60,13 @@ struct MintManagementView: View {
             .navigationBarTitleDisplayMode(.large)
             #endif
             .toolbar {
-                #if os(iOS)
-                ToolbarItem(placement: .navigationBarTrailing) {
-                #else
-                ToolbarItem(placement: .automatic) {
-                #endif
+                ToolbarItem(placement: {
+                    #if os(iOS)
+                    .navigationBarTrailing
+                    #else
+                    .automatic
+                    #endif
+                }()) {
                     Button("Done") {
                         dismiss()
                     }
@@ -119,19 +121,19 @@ struct MintManagementView: View {
             
             // Stats Row
             HStack(spacing: OlasDesign.Spacing.xl) {
-                StatCard(
+                MintStatCard(
                     icon: "building.2.fill",
                     value: "\(walletManager.mintURLs.count)",
                     label: "Active Mints"
                 )
                 
-                StatCard(
+                MintStatCard(
                     icon: "bitcoinsign.circle.fill",
                     value: "\(walletManager.activeTokens.count)",
                     label: "Total Tokens"
                 )
                 
-                StatCard(
+                MintStatCard(
                     icon: "bolt.fill",
                     value: "\(calculateTransactionCount())",
                     label: "Transactions"
@@ -325,7 +327,7 @@ struct MintManagementView: View {
 
 // MARK: - Supporting Views
 
-struct StatCard: View {
+struct MintStatCard: View {
     let icon: String
     let value: String
     let label: String
@@ -626,11 +628,13 @@ struct MintDetailView: View {
             .navigationBarTitleDisplayMode(.inline)
             #endif
             .toolbar {
-                #if os(iOS)
-                ToolbarItem(placement: .navigationBarTrailing) {
-                #else
-                ToolbarItem(placement: .automatic) {
-                #endif
+                ToolbarItem(placement: {
+                    #if os(iOS)
+                    .navigationBarTrailing
+                    #else
+                    .automatic
+                    #endif
+                }()) {
                     Button("Done") {
                         dismiss()
                     }
@@ -659,5 +663,6 @@ struct AnimatedMeshGradient: View {
                 animationTrigger = true
             }
     }
-}}}
+}
 
+// End of MintManagementView.swift
