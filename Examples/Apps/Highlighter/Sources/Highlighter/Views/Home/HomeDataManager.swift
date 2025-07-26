@@ -39,6 +39,7 @@ class HomeDataManager: ObservableObject {
         
         // Start all streams concurrently
         await withTaskGroup(of: Void.self) { group in
+            group.addTask { await self.fetchRecentlyHighlightedArticles(ndk: ndk) }
             group.addTask { await self.streamHighlights(ndk: ndk) }
             group.addTask { await self.streamUserHighlights(ndk: ndk) }
             group.addTask { await self.streamDiscussions(ndk: ndk) }
@@ -75,8 +76,57 @@ class HomeDataManager: ObservableObject {
     
     // MARK: - Private Streaming Methods
     
+    /// Fetch recently highlighted articles - waits for EOSE then fetches articles
+    private func fetchRecentlyHighlightedArticles(ndk: NDK) async {
+        print("DEBUG: Fetching recently highlighted articles")
+        
+        // Create subscription for recent highlights
+        let sevenDaysAgo = Timestamp(Date().addingTimeInterval(-7 * 24 * 60 * 60).timeIntervalSince1970)
+        let highlightFilter = NDKFilter(
+            kinds: [9802],
+            since: sevenDaysAgo,
+            limit: 100
+        )
+        
+        let subscription = ndk.subscribe(filter: highlightFilter, closeOnEose: true)
+        
+        var articleReferences: Set<String> = []
+        var highlightsByArticle: [String: [HighlightEvent]] = [:]
+        var allHighlights: [HighlightEvent] = []
+        
+        // Collect all highlights until EOSE
+        for await event in subscription {
+            if let highlight = try? HighlightEvent(from: event) {
+                allHighlights.append(highlight)
+                
+                // Track article references
+                if let ref = highlight.referencedEvent {
+                    articleReferences.insert(ref)
+                    if highlightsByArticle[ref] != nil {
+                        highlightsByArticle[ref]?.append(highlight)
+                    } else {
+                        highlightsByArticle[ref] = [highlight]
+                    }
+                    print("DEBUG: Found highlight for article: \(ref)")
+                }
+            }
+        }
+        
+        print("DEBUG: Collected \(allHighlights.count) highlights referencing \(articleReferences.count) unique articles")
+        
+        // Now fetch the referenced articles
+        if !articleReferences.isEmpty {
+            await fetchHighlightedArticles(
+                ndk: ndk,
+                references: Array(articleReferences),
+                highlightsByArticle: highlightsByArticle
+            )
+        }
+    }
+    
     private func streamHighlights(ndk: NDK) async {
         let task = Task {
+            print("DEBUG: Starting to stream highlights")
             let highlightSource = await ndk.outbox.observe(
                 filter: NDKFilter(kinds: [9802], limit: 50),
                 maxAge: CachePolicies.shortTerm,
@@ -93,6 +143,14 @@ class HomeDataManager: ObservableObject {
                             if !highlights.contains(where: { $0.id == highlight.id }) {
                                 highlights.append(highlight)
                                 highlights.sort { $0.createdAt > $1.createdAt }
+                                
+                                // Also add to userHighlights for display
+                                if !userHighlights.contains(where: { $0.id == highlight.id }) {
+                                    userHighlights.append(highlight)
+                                    userHighlights.sort { $0.createdAt > $1.createdAt }
+                                }
+                                
+                                print("DEBUG: Added highlight: \(highlight.content.prefix(50))")
                                 
                                 // Track article references for highlighted articles
                                 if let ref = highlight.referencedEvent {
@@ -191,6 +249,7 @@ class HomeDataManager: ObservableObject {
                     withAnimation(DesignSystem.Animation.quick) {
                         if !zappedArticles.contains(where: { $0.id == event.id }) {
                             zappedArticles.append(event)
+                            zappedArticles.sort { $0.createdAt > $1.createdAt }
                         }
                     }
                 }
@@ -198,6 +257,7 @@ class HomeDataManager: ObservableObject {
         }
         streamingTasks.append(task)
     }
+    
     
     private func fetchHighlightedArticles(
         ndk: NDK,
@@ -228,40 +288,39 @@ class HomeDataManager: ObservableObject {
             }
         }
         
-        // Stream articles
+        // Fetch articles for each filter
         for filter in articleFilters {
-            let task = Task {
-                let dataSource = await ndk.outbox.observe(
-                    filter: filter,
-                    maxAge: CachePolicies.shortTerm,
-                    cachePolicy: .cacheWithNetwork
-                )
-                
-                for await event in dataSource.events {
-                    if event.kind == 30023,
-                       let article = try? Article(from: event) {
-                        // Check both formats: event ID and "a" tag format
-                        let aTagReference = "\(event.kind):\(event.pubkey):\(article.identifier ?? "")"
-                        let highlights = highlightsByArticle[event.id] ?? highlightsByArticle[aTagReference]
+            let subscription = ndk.subscribe(filter: filter, closeOnEose: true)
+            
+            for await event in subscription {
+                if event.kind == 30023,
+                   let article = try? Article(from: event) {
+                    // Check both formats: event ID and "a" tag format
+                    let aTagReference = "\(event.kind):\(event.pubkey):\(article.identifier ?? "")"
+                    let highlights = highlightsByArticle[event.id] ?? highlightsByArticle[aTagReference]
+                    
+                    print("DEBUG: Found article - ID: \(event.id), identifier: \(article.identifier ?? "nil"), aTagReference: \(aTagReference)")
+                    print("DEBUG: Looking for highlights with keys: \(event.id) or \(aTagReference)")
+                    print("DEBUG: Available highlight keys: \(highlightsByArticle.keys)")
+                    
+                    if let highlights = highlights {
+                        let lastHighlight = highlights.max(by: { $0.createdAt < $1.createdAt })
                         
-                        print("DEBUG: Found article - ID: \(event.id), identifier: \(article.identifier ?? "nil"), aTagReference: \(aTagReference)")
-                        print("DEBUG: Looking for highlights with keys: \(event.id) or \(aTagReference)")
-                        print("DEBUG: Available highlight keys: \(highlightsByArticle.keys)")
-                        
-                        if let highlights = highlights {
-                            let lastHighlight = highlights.max(by: { $0.createdAt < $1.createdAt })
-                            
-                            await MainActor.run {
-                                withAnimation(DesignSystem.Animation.quick) {
-                                    let highlightedArticle = HighlightedArticle(
-                                        article: article,
-                                        highlights: highlights,
-                                        lastHighlightTime: lastHighlight?.createdAt ?? Date()
-                                    )
+                        await MainActor.run {
+                            withAnimation(DesignSystem.Animation.quick) {
+                                let highlightedArticle = HighlightedArticle(
+                                    article: article,
+                                    highlights: highlights,
+                                    lastHighlightTime: lastHighlight?.createdAt ?? Date()
+                                )
+                                
+                                if !highlightedArticles.contains(where: { $0.article.id == article.id }) {
+                                    highlightedArticles.append(highlightedArticle)
+                                    highlightedArticles.sort { $0.lastHighlightTime > $1.lastHighlightTime }
                                     
-                                    if !highlightedArticles.contains(where: { $0.article.id == article.id }) {
-                                        highlightedArticles.append(highlightedArticle)
-                                        highlightedArticles.sort { $0.lastHighlightTime > $1.lastHighlightTime }
+                                    // Limit to top 10 most recently highlighted articles
+                                    if highlightedArticles.count > 10 {
+                                        highlightedArticles = Array(highlightedArticles.prefix(10))
                                     }
                                 }
                             }
@@ -269,7 +328,6 @@ class HomeDataManager: ObservableObject {
                     }
                 }
             }
-            streamingTasks.append(task)
         }
     }
     

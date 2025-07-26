@@ -156,20 +156,15 @@ struct CommentsSection: View {
         
         Task {
             do {
-                // Create comment event (kind 1)
-                let commentEvent = NDKEvent(
-                    pubkey: try await signer.publicKey(),
-                    createdAt: Int64(Date().timeIntervalSince1970),
-                    kind: 1,
-                    tags: [
-                        NDKTag(tag: "e", value: highlightId)
-                    ],
-                    content: newCommentText
-                )
+                // Create comment event using NDKEventBuilder
+                let commentEvent = try await NDKEventBuilder(ndk: ndk)
+                    .kind(1)
+                    .content(newCommentText)
+                    .tags([["e", highlightId]])
+                    .build(signer: signer)
                 
-                // Sign and publish
-                try await commentEvent.sign(with: signer)
-                _ = try await ndk.publish(event: commentEvent)
+                // Publish
+                _ = try await ndk.publish(commentEvent)
                 
                 await MainActor.run {
                     newCommentText = ""

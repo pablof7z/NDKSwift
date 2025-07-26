@@ -59,6 +59,35 @@ swift package resolve
 swift package generate-xcodeproj
 ```
 
+### Building iOS Apps (Examples/Apps)
+
+For iOS apps that use XcodeGen (project.yml):
+
+```bash
+# Always regenerate project after adding/removing files
+cd Examples/Apps/Highlighter
+./refresh-project.sh
+
+# Build with clean output using xcbeautify
+./build.sh
+
+# Custom build configurations
+DESTINATION="platform=iOS Simulator,name=iPhone 16 Pro" ./build.sh
+CONFIGURATION=Release ./build.sh
+
+# Manual commands if needed
+xcodegen generate
+xcodebuild -project Highlighter.xcodeproj -scheme Highlighter -destination 'platform=iOS Simulator,name=iPhone 15 Pro' build | xcbeautify
+```
+
+#### Code Signing Configuration
+
+The project.yml files now include code signing settings. You can either:
+1. Set the DEVELOPMENT_TEAM environment variable: `export DEVELOPMENT_TEAM=YOUR_TEAM_ID`
+2. Or hardcode your team ID in the project.yml file
+
+This ensures code signing persists across project regenerations.
+
 ## Architecture Overview
 
 ### Core Architecture Patterns
@@ -178,6 +207,73 @@ The subscription system uses modern Swift patterns for cleaner, more intuitive c
 - When refactoring APIs, ensure examples and tests are updated to use the new patterns
 - Prefer modern Swift patterns (async/await, AsyncSequence) over callback-based APIs
 - Guide users toward best practices through API design and clear deprecation messages
+
+## iOS App Development Reminders
+
+When working on iOS apps in Examples/Apps:
+
+1. **Always regenerate the Xcode project after file changes**:
+   - Run `./refresh-project.sh` after adding/removing files
+   - This ensures the .xcodeproj is up to date
+   - IMPORTANT: This is required when you add or remove Swift files
+
+2. **Use the build scripts for cleaner output**:
+   - Run `./build.sh` instead of raw xcodebuild
+   - Output will be formatted with xcbeautify
+   - The build script automatically regenerates the project first
+
+3. **Code signing is now persistent**:
+   - Settings are in project.yml
+   - Set DEVELOPMENT_TEAM env var or hardcode in project.yml
+   - No more manual Xcode configuration after regeneration
+
+4. **When creating new iOS apps**:
+   - Copy an existing project.yml as template
+   - Include code signing settings
+   - Create refresh-project.sh and build.sh scripts
+
+### iOS Apps Location
+
+All iOS apps are located in `Examples/Apps/`:
+- Highlighter - Nostr highlights reader
+- NutsackiOS - Cashu wallet
+- Ambulando - Audio walking app
+- Posta - Nostr client
+- Olas - Instagram-like app
+
+### Common iOS App Commands
+
+```bash
+# Build any iOS app
+cd Examples/Apps/Highlighter  # or any other app
+./build.sh
+
+# Just refresh project after file changes
+./refresh-project.sh
+
+# Build with custom settings
+DESTINATION="platform=iOS Simulator,name=iPhone 16 Pro" ./build.sh
+CONFIGURATION=Release ./build.sh
+
+# Clean build
+CLEAN=true ./refresh-project.sh
+./build.sh
+```
+
+### When Adding/Removing Files
+
+**CRITICAL**: After adding or removing ANY Swift files in an iOS app:
+1. Run `./refresh-project.sh` immediately
+2. This regenerates the .xcodeproj with all current files
+3. Without this, the build will fail with "file not found" errors
+
+Example workflow:
+```bash
+# After creating a new Swift file
+cd Examples/Apps/Highlighter
+./refresh-project.sh  # Updates .xcodeproj
+./build.sh           # Now it will build successfully
+```
 
 UUIDs are stupid and should never be used in the context of nostr.
 
