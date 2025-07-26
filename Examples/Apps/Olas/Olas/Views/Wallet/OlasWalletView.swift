@@ -1,10 +1,8 @@
 import SwiftUI
 import NDKSwift
-import CashuSwift
 
 struct OlasWalletView: View {
-    let nostrManager: NostrManager
-    @StateObject private var walletManager = OlasWalletViewModel()
+    @ObservedObject var walletManager: OlasWalletManager
     @State private var selectedTab = 0
     @State private var showReceive = false
     @State private var showSend = false
@@ -17,36 +15,53 @@ struct OlasWalletView: View {
     var body: some View {
         NavigationStack {
             ZStack {
-                // Gradient background
-                LinearGradient(
-                    colors: [
-                        OlasDesign.Colors.background,
-                        OlasDesign.Colors.surface.opacity(0.3)
-                    ],
-                    startPoint: .top,
-                    endPoint: .bottom
-                )
-                .ignoresSafeArea()
+                // Enhanced gradient background with animated mesh
+                TimeBasedGradient()
+                    .ignoresSafeArea()
+                    .opacity(0.3)
                 
                 ScrollView {
                     VStack(spacing: OlasDesign.Spacing.lg) {
-                        // Enhanced Balance Card
-                        OlasBalanceCard(walletManager: walletManager)
-                            .padding(.horizontal, OlasDesign.Spacing.md)
-                            .padding(.top, OlasDesign.Spacing.sm)
+                        // Enhanced Balance Card with glassmorphism
+                        GlassmorphicCard {
+                            VStack(spacing: OlasDesign.Spacing.lg) {
+                                // Lightning icon with pulse
+                                PulsingIcon(
+                                    systemName: "bolt.circle.fill",
+                                    size: 80,
+                                    colors: [Color.orange, Color.yellow]
+                                )
+                                
+                                // Animated balance display
+                                AnimatedBalanceDisplay(
+                                    balance: walletManager.currentBalance,
+                                    btcPrice: nil
+                                )
+                                
+                                // Mint distribution preview
+                                if walletManager.mintURLs.count > 1 {
+                                    MintDistributionPreview(walletManager: walletManager)
+                                        .padding(.top, OlasDesign.Spacing.sm)
+                                }
+                            }
+                            .padding(.vertical, OlasDesign.Spacing.xl)
+                            .padding(.horizontal, OlasDesign.Spacing.lg)
+                        }
+                        .padding(.horizontal, OlasDesign.Spacing.md)
+                        .padding(.top, OlasDesign.Spacing.sm)
                         
-                        // Quick Stats
+                        // Quick Stats with glassmorphism
                         quickStats
                             .padding(.horizontal, OlasDesign.Spacing.md)
                         
-                        // Action Buttons
-                        actionButtons
+                        // Modern Action Buttons
+                        modernActionButtons
                             .padding(.horizontal, OlasDesign.Spacing.md)
                         
-                        // Recent Activity
+                        // Recent Activity with enhanced UI
                         recentActivity
                     }
-                    .padding(.bottom, 100) // Space for floating buttons
+                    .padding(.bottom, 100)
                 }
                 .refreshable {
                     await refreshWallet()
@@ -101,7 +116,7 @@ struct OlasWalletView: View {
                 ReceiveView(walletManager: walletManager)
             }
             .sheet(isPresented: $showSend) {
-                SendView(walletManager: walletManager, nostrManager: nostrManager)
+                SendView(walletManager: walletManager)
             }
             .sheet(isPresented: $showAddMint) {
                 AddMintView(walletManager: walletManager)
@@ -115,8 +130,11 @@ struct OlasWalletView: View {
                 MintManagementView(walletManager: walletManager)
             }
             .task {
-                await walletManager.initialize()
-                await walletManager.refreshBalance()
+                do {
+                    try await walletManager.loadWallet()
+                } catch {
+                    print("Failed to load wallet: \(error)")
+                }
             }
         }
     }
@@ -124,37 +142,39 @@ struct OlasWalletView: View {
     private var quickStats: some View {
         HStack(spacing: OlasDesign.Spacing.sm) {
             // Total Mints
-            StatCard(
-                icon: "server.rack",
-                value: "\(walletManager.mints.count)",
-                label: "Mints",
-                color: .blue
-            )
+            GlassmorphicCard {
+                StatCard(
+                    icon: "server.rack",
+                    value: "\(walletManager.mintURLs.count)",
+                    label: "Mints",
+                    color: .blue
+                )
+            }
             
             // Active Tokens
-            StatCard(
-                icon: "ticket.fill",
-                value: "\(walletManager.activeTokens.count)",
-                label: "Tokens",
-                color: .green
-            )
+            GlassmorphicCard {
+                StatCard(
+                    icon: "ticket.fill",
+                    value: "\(walletManager.activeTokens.count)",
+                    label: "Tokens",
+                    color: .green
+                )
+            }
             
             // Today's Activity
-            StatCard(
-                icon: "arrow.up.arrow.down",
-                value: "\(todaysTransactionCount)",
-                label: "Today",
-                color: .orange
-            )
+            GlassmorphicCard {
+                StatCard(
+                    icon: "arrow.up.arrow.down",
+                    value: "\(walletManager.recentTransactions.filter { Calendar.current.isDateInToday($0.timestamp) }.count)",
+                    label: "Today",
+                    color: .orange
+                )
+            }
         }
     }
     
     private var todaysTransactionCount: Int {
-        let calendar = Calendar.current
-        let today = calendar.startOfDay(for: Date())
-        return walletManager.transactions.filter { transaction in
-            calendar.startOfDay(for: transaction.timestamp) == today
-        }.count
+        return 0 // Handled inline now
     }
     
     private var actionButtons: some View {
@@ -198,7 +218,7 @@ struct OlasWalletView: View {
                 
                 Spacer()
                 
-                NavigationLink(destination: TransactionHistoryView(walletManager: walletManager)) {
+                NavigationLink(destination: Text("Transaction History")) {
                     Text("See All")
                         .font(OlasDesign.Typography.caption)
                         .foregroundColor(OlasDesign.Colors.primary)
@@ -206,17 +226,17 @@ struct OlasWalletView: View {
             }
             .padding(.horizontal, OlasDesign.Spacing.md)
             
-            if walletManager.transactions.isEmpty {
+            if walletManager.recentTransactions.isEmpty {
                 EmptyActivityView()
                     .padding(.horizontal, OlasDesign.Spacing.md)
             } else {
                 // Show last 5 transactions
                 VStack(spacing: 0) {
-                    ForEach(walletManager.transactions.prefix(5)) { transaction in
-                        TransactionRow(transaction: transaction)
+                    ForEach(walletManager.recentTransactions.prefix(5)) { transaction in
+                        TransactionRow(transaction: transaction, walletManager: walletManager)
                             .padding(.horizontal, OlasDesign.Spacing.md)
                         
-                        if transaction.id != walletManager.transactions.prefix(5).last?.id {
+                        if transaction.id != walletManager.recentTransactions.prefix(5).last?.id {
                             Divider()
                                 .padding(.leading, 60)
                         }
@@ -232,9 +252,12 @@ struct OlasWalletView: View {
     }
     
     private func refreshWallet() async {
-        await walletManager.refreshBalance()
-        // Animate refresh
-        OlasDesign.Haptic.selection()
+        do {
+            try await walletManager.loadWallet()
+            OlasDesign.Haptic.selection()
+        } catch {
+            print("Failed to refresh wallet: \(error)")
+        }
     }
     
     private func handleScannedCode(_ code: String) {
@@ -248,7 +271,11 @@ struct OlasWalletView: View {
         } else if code.lowercased().starts(with: "cashu:") {
             // Cashu token
             Task {
-                await walletManager.redeemToken(code)
+                do {
+                    try await walletManager.receiveEcash(code)
+                } catch {
+                    print("Failed to redeem token: \(error)")
+                }
             }
         } else if code.lowercased().starts(with: "https://") {
             // Might be a mint URL
@@ -259,20 +286,22 @@ struct OlasWalletView: View {
 
 // MARK: - Mint Row
 struct MintRow: View {
-    let mint: WalletMint
+    let mintURL: String
+    let balance: Int64
     
     var body: some View {
         HStack {
             Circle()
-                .fill(mint.isActive ? Color.green : Color.gray)
+                .fill(Color.green)
                 .frame(width: 8, height: 8)
             
             VStack(alignment: .leading, spacing: 2) {
-                Text(mint.name)
+                Text(mintURL.replacingOccurrences(of: "https://", with: ""))
                     .font(OlasDesign.Typography.bodyMedium)
                     .foregroundColor(OlasDesign.Colors.text)
+                    .lineLimit(1)
                 
-                Text(mint.url)
+                Text("Active mint")
                     .font(OlasDesign.Typography.caption)
                     .foregroundColor(OlasDesign.Colors.textTertiary)
                     .lineLimit(1)
@@ -280,7 +309,7 @@ struct MintRow: View {
             
             Spacer()
             
-            Text("\(mint.balance) sats")
+            Text("\(balance) sats")
                 .font(OlasDesign.Typography.caption)
                 .foregroundColor(OlasDesign.Colors.textSecondary)
         }
@@ -294,7 +323,8 @@ struct MintRow: View {
 
 // MARK: - Transaction Row
 struct TransactionRow: View {
-    let transaction: WalletTransaction
+    let transaction: OlasWalletManager.WalletTransaction
+    let walletManager: OlasWalletManager
     @State private var showDetail = false
     
     private var transactionIcon: String {
@@ -378,7 +408,32 @@ struct TransactionRow: View {
         }
         .buttonStyle(PlainButtonStyle())
         .sheet(isPresented: $showDetail) {
-            TransactionDetailView(transaction: transaction)
+            TransactionDetailView(transaction: transaction, walletManager: walletManager)
+        }
+    }
+    
+    private var modernActionButtons: some View {
+        HStack(spacing: OlasDesign.Spacing.md) {
+            FloatingActionButton(
+                icon: "arrow.down.circle.fill",
+                title: "Receive",
+                gradient: [Color(hex: "4ECDC4"), Color(hex: "44A08D")],
+                action: { showReceive = true }
+            )
+            
+            FloatingActionButton(
+                icon: "arrow.up.circle.fill",
+                title: "Send",
+                gradient: [Color(hex: "F56565"), Color(hex: "D53F8C")],
+                action: { showSend = true }
+            )
+            
+            FloatingActionButton(
+                icon: "qrcode.viewfinder",
+                title: "Scan",
+                gradient: [Color(hex: "805AD5"), Color(hex: "6B46C1")],
+                action: { showScanner = true }
+            )
         }
     }
     
@@ -404,113 +459,14 @@ struct TransactionRow: View {
     }
 }
 
-// MARK: - Wallet View Model
-@MainActor
-class OlasWalletViewModel: ObservableObject {
-    @Published var totalBalance: Int = 0
-    @Published var mints: [WalletMint] = []
-    @Published var transactions: [WalletTransaction] = []
-    @Published var activeTokens: [CashuToken] = []
-    @Published var btcPrice: Double?
-    @Published var isLoading = false
-    
-    private var wallet: CashuWallet?
-    
-    func initialize() async {
-        isLoading = true
-        defer { isLoading = false }
-        
-        // Initialize with sample data for now
-        mints = [
-            WalletMint(name: "Cashu Mint", url: "https://mint.cashu.space", balance: 50000, isActive: true),
-            WalletMint(name: "Bitcoin Mint", url: "https://mint.bitcoin.space", balance: 25000, isActive: true),
-            WalletMint(name: "Lightning Mint", url: "https://mint.ln.space", balance: 10000, isActive: false)
-        ]
-        
-        // Sample transactions
-        transactions = [
-            WalletTransaction(
-                type: .received,
-                amount: 10000,
-                description: "Zap from nostr:alice",
-                timestamp: Date().addingTimeInterval(-3600),
-                mint: "https://mint.cashu.space",
-                invoice: nil
-            ),
-            WalletTransaction(
-                type: .sent,
-                amount: 5000,
-                description: "Coffee payment",
-                timestamp: Date().addingTimeInterval(-7200),
-                mint: "https://mint.bitcoin.space",
-                invoice: nil
-            ),
-            WalletTransaction(
-                type: .received,
-                amount: 25000,
-                description: "Invoice payment",
-                timestamp: Date().addingTimeInterval(-86400),
-                mint: "https://mint.cashu.space",
-                invoice: "lnbc..."
-            )
-        ]
-        
-        // Sample tokens
-        activeTokens = [
-            CashuToken(id: "token1", amount: 1000, mint: "https://mint.cashu.space"),
-            CashuToken(id: "token2", amount: 5000, mint: "https://mint.bitcoin.space"),
-            CashuToken(id: "token3", amount: 10000, mint: "https://mint.cashu.space")
-        ]
-        
-        await refreshBalance()
-    }
-    
-    func refreshBalance() async {
-        // Calculate total balance across all mints
-        totalBalance = mints.reduce(0) { $0 + $1.balance }
-        
-        // Fetch BTC price
-        await fetchBTCPrice()
-    }
-    
-    func redeemToken(_ token: String) async {
-        // Redeem Cashu token
-        // This would integrate with the actual Cashu protocol
-    }
-    
-    private func fetchBTCPrice() async {
-        // In production, fetch from a price API
-        // For now, use a realistic placeholder
-        btcPrice = 98543.21
-    }
-}
-
-// MARK: - Models
-struct WalletMint: Identifiable {
-    let id = UUID()
-    let name: String
-    let url: String
-    let balance: Int
-    let isActive: Bool
-}
-
-struct WalletTransaction: Identifiable {
-    let id = UUID()
-    let type: TransactionType
-    let amount: Int
-    let description: String
-    let timestamp: Date
-    let mint: String?
-    let invoice: String?
-    
-    enum TransactionType {
-        case sent
-        case received
-    }
-}
-
+// MARK: - Supporting Types
 struct CashuToken: Identifiable {
     let id: String
     let amount: Int
     let mint: String
+}
+
+enum TransactionType {
+    case sent
+    case received
 }

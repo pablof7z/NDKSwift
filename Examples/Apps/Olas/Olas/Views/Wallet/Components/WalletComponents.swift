@@ -168,7 +168,7 @@ struct EmptyActivityView: View {
 
 // MARK: - Transaction History View
 struct TransactionHistoryView: View {
-    @ObservedObject var walletManager: OlasWalletViewModel
+    @ObservedObject var walletManager: OlasWalletManager
     @State private var searchText = ""
     @State private var selectedFilter: TransactionFilter = .all
     
@@ -186,8 +186,8 @@ struct TransactionHistoryView: View {
         }
     }
     
-    var filteredTransactions: [WalletTransaction] {
-        walletManager.transactions.filter { transaction in
+    var filteredTransactions: [OlasWalletManager.WalletTransaction] {
+        walletManager.recentTransactions.filter { transaction in
             let matchesFilter = selectedFilter == .all || 
                 (selectedFilter == .sent && transaction.type == .sent) ||
                 (selectedFilter == .received && transaction.type == .received)
@@ -256,9 +256,8 @@ struct TransactionHistoryView: View {
                         LazyVStack(spacing: 0) {
                             ForEach(filteredTransactions) { transaction in
                                 VStack(spacing: 0) {
-                                    TransactionRow(transaction: transaction)
+                                    TransactionRow(transaction: transaction, walletManager: walletManager)
                                         .padding(.horizontal, OlasDesign.Spacing.md)
-                                        .padding(.vertical, OlasDesign.Spacing.sm)
                                     
                                     if transaction.id != filteredTransactions.last?.id {
                                         Divider()

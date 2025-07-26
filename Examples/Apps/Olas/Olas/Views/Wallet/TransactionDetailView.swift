@@ -68,7 +68,11 @@ struct TransactionDetailView: View {
                     
                     // Trigger particle effect based on transaction type
                     if transaction.status == .completed {
+                        #if os(iOS)
                         particleSystem.emit(count: 20, from: CGPoint(x: UIScreen.main.bounds.width / 2, y: 200))
+                        #else
+                        particleSystem.emit(count: 20, from: CGPoint(x: 400, y: 200))
+                        #endif
                     }
                 }
             }
@@ -687,7 +691,11 @@ struct RippleButton: View {
 struct TransactionQRCodeView: View {
     let content: String
     @Environment(\.dismiss) private var dismiss
+    #if os(iOS)
     @State private var qrImage: UIImage?
+    #else
+    @State private var qrImage: NSImage?
+    #endif
     @State private var showCopied = false
     
     var body: some View {
@@ -698,6 +706,7 @@ struct TransactionQRCodeView: View {
                 
                 VStack(spacing: OlasDesign.Spacing.xl) {
                     if let qrImage = qrImage {
+                        #if os(iOS)
                         Image(uiImage: qrImage)
                             .interpolation(.none)
                             .resizable()
@@ -709,6 +718,18 @@ struct TransactionQRCodeView: View {
                             .shadow(color: Color.black.opacity(0.1), radius: 20, x: 0, y: 10)
                             .scaleEffect(showCopied ? 0.95 : 1)
                             .animation(.spring(response: 0.3, dampingFraction: 0.6), value: showCopied)
+                        #else
+                        Image(nsImage: qrImage)
+                            .resizable()
+                            .scaledToFit()
+                            .frame(width: 280, height: 280)
+                            .padding(OlasDesign.Spacing.lg)
+                            .background(Color.white)
+                            .cornerRadius(OlasDesign.CornerRadius.lg)
+                            .shadow(color: Color.black.opacity(0.1), radius: 20, x: 0, y: 10)
+                            .scaleEffect(showCopied ? 0.95 : 1)
+                            .animation(.spring(response: 0.3, dampingFraction: 0.6), value: showCopied)
+                        #endif
                     } else {
                         ProgressView()
                             .frame(width: 280, height: 280)
@@ -761,7 +782,6 @@ struct TransactionQRCodeView: View {
     }
     
     private func generateQRCode() {
-        #if os(iOS)
         let context = CIContext()
         let filter = CIFilter.qrCodeGenerator()
         filter.message = Data(content.utf8)
@@ -771,10 +791,13 @@ struct TransactionQRCodeView: View {
             let scaledImage = outputImage.transformed(by: transform)
             
             if let cgImage = context.createCGImage(scaledImage, from: scaledImage.extent) {
+                #if os(iOS)
                 qrImage = UIImage(cgImage: cgImage)
+                #else
+                qrImage = NSImage(cgImage: cgImage, size: NSSize(width: cgImage.width, height: cgImage.height))
+                #endif
             }
         }
-        #endif
     }
     
     private func copyContent() {
@@ -799,14 +822,3 @@ struct TransactionQRCodeView: View {
     }
 }
 
-// MARK: - Share Sheet
-
-struct ShareSheet: UIViewControllerRepresentable {
-    let items: [Any]
-    
-    func makeUIViewController(context: Context) -> UIActivityViewController {
-        UIActivityViewController(activityItems: items, applicationActivities: nil)
-    }
-    
-    func updateUIViewController(_ uiViewController: UIActivityViewController, context: Context) {}
-}

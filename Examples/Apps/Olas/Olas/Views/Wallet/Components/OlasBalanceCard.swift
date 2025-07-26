@@ -2,7 +2,7 @@ import SwiftUI
 import CashuSwift
 
 struct OlasBalanceCard: View {
-    @ObservedObject var walletManager: OlasWalletViewModel
+    @ObservedObject var walletManager: OlasWalletManager
     @State private var isExpanded = false
     @State private var pulseAnimation = false
     @State private var balanceAnimation = false
