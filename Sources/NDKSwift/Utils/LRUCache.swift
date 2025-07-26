@@ -1,28 +1,62 @@
 import Foundation
 
 /// Thread-safe LRU (Least Recently Used) cache with TTL support
+///
+/// This cache implementation provides:
+/// - Automatic eviction of least recently used items when capacity is reached
+/// - Time-to-live (TTL) support for automatic expiration
+/// - Thread-safe access using Swift actors
+/// - Performance statistics tracking (hits/misses)
+///
+/// Example usage:
+/// ```swift
+/// let cache = LRUCache<String, Data>(capacity: 100, defaultTTL: 3600)
+/// await cache.set("key", value: data)
+/// if let cached = await cache.get("key") {
+///     // Use cached data
+/// }
+/// ```
 actor LRUCache<Key: Hashable, Value> {
+    /// Internal structure to store cached values with metadata
     private struct CacheEntry {
         let value: Value
         let expiresAt: Date
         var lastAccessTime: Date
     }
 
+    /// Main storage dictionary mapping keys to cache entries
     private var cache: [Key: CacheEntry] = [:]
+    
+    /// Ordered list of keys by access time (most recent at end)
     private var accessOrder: [Key] = []
+    
+    /// Maximum number of items the cache can hold
     private let capacity: Int
+    
+    /// Default time-to-live for cache entries in seconds
     private let defaultTTL: TimeInterval
 
-    // Statistics
+    // MARK: - Statistics
+    
+    /// Number of successful cache hits
     private var hits: Int = 0
+    
+    /// Number of cache misses
     private var misses: Int = 0
 
+    /// Initialize a new LRU cache
+    /// - Parameters:
+    ///   - capacity: Maximum number of items to store (default: 100)
+    ///   - defaultTTL: Default time-to-live for entries in seconds (default: 1 hour)
     init(capacity: Int = 100, defaultTTL: TimeInterval = TimeConstants.hour) {
         self.capacity = capacity
         self.defaultTTL = defaultTTL
     }
 
-    /// Get a value from the cache
+    /// Retrieve a value from the cache
+    /// - Parameter key: The key to look up
+    /// - Returns: The cached value if it exists and hasn't expired, nil otherwise
+    /// - Note: This method updates the access order, making the item the most recently used
     func get(_ key: Key) -> Value? {
         guard var entry = cache[key] else {
             misses += 1

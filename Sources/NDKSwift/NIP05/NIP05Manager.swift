@@ -6,6 +6,7 @@ public actor NIP05Manager {
     private let cache: NDKCache
     private let memoryCache: LRUCache<String, NIP05CacheEntry>
     private let domainRateLimiter: LRUCache<String, Date>
+    private let networkClient = NDKNetworkClient()
 
     /// In-flight requests to prevent duplicate network calls
     private var inFlightRequests: [String: Task<NDKUser?, Error>] = [:]

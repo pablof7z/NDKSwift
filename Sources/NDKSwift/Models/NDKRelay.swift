@@ -564,12 +564,13 @@ public final class NDKRelay: RelayProtocol, Hashable, Equatable, @unchecked Send
             return
         }
 
-        var request = URLRequest(url: httpURL)
-        request.setValue(HTTPConstants.contentTypeNostrJSON, forHTTPHeaderField: HTTPConstants.headerAccept)
-        request.timeoutInterval = NetworkConstants.timeoutRelayInfo
-
         do {
-            let (data, _) = try await URLSession.shared.data(for: request)
+            var request = URLRequest(url: httpURL)
+            request.setValue(HTTPConstants.contentTypeNostrJSON, forHTTPHeaderField: HTTPConstants.headerAccept)
+            request.timeoutInterval = NetworkConstants.timeoutRelayInfo
+            
+            let networkClient = NDKNetworkClient()
+            let data = try await networkClient.fetchData(with: request)
             let relayInfo = try JSONCoding.decode(NDKRelayInformation.self, from: data)
             await stateActor.setInfo(relayInfo)
         } catch {

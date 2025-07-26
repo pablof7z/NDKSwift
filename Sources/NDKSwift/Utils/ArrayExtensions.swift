@@ -105,3 +105,47 @@ public extension Array where Element: Equatable {
     }
 }
 
+// MARK: - Array Utilities
+
+public extension Array {
+    /// Split array into chunks of specified size
+    /// - Parameter size: The size of each chunk
+    /// - Returns: Array of arrays, each containing at most `size` elements
+    ///
+    /// Example:
+    /// ```swift
+    /// let numbers = [1, 2, 3, 4, 5, 6, 7]
+    /// let chunks = numbers.chunked(size: 3)
+    /// // Result: [[1, 2, 3], [4, 5, 6], [7]]
+    /// ```
+    func chunked(size: Int) -> [[Element]] {
+        guard size > 0 else { return [] }
+        return stride(from: 0, to: count, by: size).map {
+            Array(self[$0..<Swift.min($0 + size, count)])
+        }
+    }
+}
+
+public extension Array where Element: Hashable {
+    /// Returns an array with duplicate elements removed while preserving order
+    /// - Returns: Array containing only unique elements in their original order
+    ///
+    /// Example:
+    /// ```swift
+    /// let numbers = [1, 2, 3, 2, 4, 3, 5]
+    /// let unique = numbers.unique()
+    /// // Result: [1, 2, 3, 4, 5]
+    /// ```
+    func unique() -> [Element] {
+        var seen = Set<Element>()
+        return filter { element in
+            if seen.contains(element) {
+                return false
+            } else {
+                seen.insert(element)
+                return true
+            }
+        }
+    }
+}
+
