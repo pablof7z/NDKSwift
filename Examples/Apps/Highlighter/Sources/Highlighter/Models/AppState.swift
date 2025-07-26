@@ -14,7 +14,8 @@ class AppState: ObservableObject {
     @Published private(set) var dataStreamManager = DataStreamManager()
     @Published private(set) var profileManager = ProfileManager()
     @Published private(set) var publishingService = PublishingService()
-    // @Published private(set) var bookmarkService = BookmarkService() // TODO: Add to Xcode project
+    @Published private(set) var bookmarkService = BookmarkService()
+    @Published private(set) var commentService = CommentService()
     
     // Computed Content State (from services)
     var highlights: [HighlightEvent] { dataStreamManager.highlights }
@@ -60,7 +61,8 @@ class AppState: ObservableObject {
             dataStreamManager.configure(with: ndk!)
             profileManager.configure(with: ndk!)
             publishingService.configure(with: ndk!, signer: authManager.activeSigner)
-            // bookmarkService.configure(with: ndk!, signer: authManager.activeSigner) // TODO: Add to Xcode project
+            bookmarkService.configure(with: ndk!, signer: authManager.activeSigner)
+            commentService.configure(with: ndk!, signer: authManager.activeSigner)
             
             // Connect to relays asynchronously
             Task {
@@ -107,7 +109,8 @@ class AppState: ObservableObject {
         
         // Update services with new signer
         publishingService.configure(with: ndk!, signer: signer)
-        // bookmarkService.configure(with: ndk!, signer: signer) // TODO: Add to Xcode project
+        bookmarkService.configure(with: ndk!, signer: signer)
+        commentService.configure(with: ndk!, signer: signer)
         
         // Start streaming data
         await dataStreamManager.startAllStreams()
@@ -125,7 +128,8 @@ class AppState: ObservableObject {
         
         // Update services with new signer
         publishingService.configure(with: ndk!, signer: signer)
-        // bookmarkService.configure(with: ndk!, signer: signer) // TODO: Add to Xcode project
+        bookmarkService.configure(with: ndk!, signer: signer)
+        commentService.configure(with: ndk!, signer: signer)
         
         // Start streaming data
         await dataStreamManager.startAllStreams()

@@ -7,6 +7,12 @@ struct HighlightsFeedView: View {
     @State private var currentIndex = 0
     @State private var dragOffset: CGSize = .zero
     @State private var isDragging = false
+    @State private var isLoading = true
+    @State private var showLoadingAnimation = true
+    @State private var selectedHighlight: HighlightEvent?
+    @State private var showHighlightDetail = false
+    @State private var showCommentSheet = false
+    @State private var hapticPrepared = false
     @Binding var tabBarVisible: Bool
     
     // Author cache
@@ -16,54 +22,119 @@ struct HighlightsFeedView: View {
     @State private var articleCache: [String: Article] = [:]
     @State private var articleImages: [String: UIImage] = [:]
     
+    // Animation states
+    @State private var backgroundAnimation = false
+    @State private var pulseAnimation = false
+    
+    private let impactGenerator = UIImpactFeedbackGenerator(style: .light)
+    private let selectionGenerator = UISelectionFeedbackGenerator()
+    
     var body: some View {
         GeometryReader { geometry in
             ZStack {
-                // Background
-                Color.black
-                    .ignoresSafeArea()
+                // Enhanced animated background
+                ImmersiveGradientBackground(animate: $backgroundAnimation)
                 
-                if highlights.isEmpty {
-                    VStack(spacing: 20) {
-                        Image(systemName: "highlighter")
-                            .font(.system(size: 60))
-                            .foregroundColor(.gray)
-                        Text("No highlights yet")
-                            .font(DesignSystem.Typography.title3)
-                            .foregroundColor(.gray)
-                    }
+                if isLoading && showLoadingAnimation {
+                    // Premium loading state
+                    LoadingHighlightView()
+                        .transition(.asymmetric(
+                            insertion: .opacity,
+                            removal: .scale(scale: 0.9).combined(with: .opacity)
+                        ))
+                } else if highlights.isEmpty {
+                    EmptyHighlightsView()
+                        .transition(.scale.combined(with: .opacity))
                 } else {
-                    // Highlights Stack
-                    TabView(selection: $currentIndex) {
+                    // Enhanced Highlights Stack with gestures
+                    ZStack {
                         ForEach(Array(highlights.enumerated()), id: \.element.id) { index, highlight in
-                            HighlightFeedItemView(
-                                highlight: highlight,
-                                author: authorProfiles[highlight.author],
-                                article: articleForHighlight(highlight),
-                                articleImage: articleImageForHighlight(highlight),
-                                onAuthorTap: { showProfile(for: highlight.author) },
-                                onZap: { zapHighlight(highlight) },
-                                onShare: { shareHighlight(highlight) },
-                                onComment: { commentOnHighlight(highlight) }
-                            )
-                            .tag(index)
+                            if index >= currentIndex - 1 && index <= currentIndex + 1 {
+                                HighlightFeedItemView(
+                                    highlight: highlight,
+                                    author: authorProfiles[highlight.author],
+                                    article: articleForHighlight(highlight),
+                                    articleImage: articleImageForHighlight(highlight),
+                                    onAuthorTap: { 
+                                        impactGenerator.impactOccurred()
+                                        showProfile(for: highlight.author) 
+                                    },
+                                    onZap: { 
+                                        impactGenerator.impactOccurred(intensity: 0.7)
+                                        zapHighlight(highlight) 
+                                    },
+                                    onShare: { 
+                                        selectionGenerator.selectionChanged()
+                                        shareHighlight(highlight) 
+                                    },
+                                    onComment: { 
+                                        selectedHighlight = highlight
+                                        showCommentSheet = true
+                                    },
+                                    onDoubleTap: {
+                                        likeHighlight(highlight)
+                                    }
+                                )
+                                .scaleEffect(index == currentIndex ? 1 : 0.95)
+                                .opacity(index == currentIndex ? 1 : 0)
+                                .offset(y: CGFloat(index - currentIndex) * geometry.size.height + dragOffset.height)
+                                .animation(.interactiveSpring(response: 0.4, dampingFraction: 0.8), value: currentIndex)
+                                .animation(.interactiveSpring(response: 0.3, dampingFraction: 0.7), value: dragOffset)
+                                .zIndex(index == currentIndex ? 1 : 0)
+                            }
                         }
                     }
-                    .tabViewStyle(PageTabViewStyle(indexDisplayMode: .never))
-                    .ignoresSafeArea()
+                    .gesture(createDragGesture())
+                    
+                    // Progress indicator
+                    if highlights.count > 1 {
+                        VStack {
+                            HighlightProgressIndicator(
+                                currentIndex: currentIndex,
+                                total: highlights.count
+                            )
+                            .padding(.top, geometry.safeAreaInsets.top + 20)
+                            .padding(.horizontal, 20)
+                            
+                            Spacer()
+                        }
+                        .transition(.move(edge: .top).combined(with: .opacity))
+                    }
                 }
             }
         }
         .onAppear {
             tabBarVisible = false
+            prepareHaptics()
+            withAnimation(.easeInOut(duration: 3).repeatForever(autoreverses: true)) {
+                backgroundAnimation = true
+            }
             Task {
                 await loadHighlights()
+            }
+        }
+        .sheet(isPresented: $showCommentSheet) {
+            if let highlight = selectedHighlight {
+                CommentSheetView(highlight: highlight)
+                    .presentationDetents([.medium, .large])
+                    .presentationDragIndicator(.visible)
+                    .presentationBackground(.ultraThinMaterial)
+            }
+        }
+        .onChange(of: currentIndex) { oldValue, newValue in
+            if oldValue != newValue {
+                selectionGenerator.selectionChanged()
             }
         }
     }
     
     private func loadHighlights() async {
         guard let ndk = appState.ndk else { return }
+        
+        // Show loading for at least 1 second for smooth transition
+        let minimumLoadingTime = Task {
+            try? await Task.sleep(nanoseconds: 1_000_000_000)
+        }
         
         let filter = NDKFilter(
             kinds: [9802],
@@ -77,6 +148,8 @@ struct HighlightsFeedView: View {
             cachePolicy: .cacheWithNetwork
         )
         
+        var hasReceivedFirstEvent = false
+        
         // Process each highlight as it arrives
         for await event in dataSource.events {
             if let highlightEvent = try? HighlightEvent(from: event) {
@@ -85,6 +158,19 @@ struct HighlightsFeedView: View {
                     if !highlights.contains(where: { $0.id == highlightEvent.id }) {
                         highlights.append(highlightEvent)
                         highlights.sort { $0.createdAt > $1.createdAt }
+                        
+                        if !hasReceivedFirstEvent {
+                            hasReceivedFirstEvent = true
+                            Task {
+                                await minimumLoadingTime.value
+                                withAnimation(.spring(response: 0.6, dampingFraction: 0.8)) {
+                                    isLoading = false
+                                }
+                                // Keep loading animation visible briefly for smooth transition
+                                try? await Task.sleep(nanoseconds: 200_000_000)
+                                showLoadingAnimation = false
+                            }
+                        }
                     }
                 }
                 
@@ -272,9 +358,12 @@ struct HighlightFeedItemView: View {
     let onZap: () -> Void
     let onShare: () -> Void
     let onComment: () -> Void
+    let onDoubleTap: () -> Void
     
     @State private var isLiked = false
     @State private var showingActions = false
+    @State private var showHeartAnimation = false
+    @State private var likeScale: CGFloat = 1.0
     
     var body: some View {
         GeometryReader { geometry in
@@ -474,9 +563,47 @@ struct HighlightFeedItemView: View {
                         .padding(.bottom, 80) // Extra padding to position above user info
                     }
                 }
+                
+                // Double tap heart animation
+                if showHeartAnimation {
+                    Image(systemName: "heart.fill")
+                        .font(.system(size: 120))
+                        .foregroundStyle(
+                            LinearGradient(
+                                colors: [.red, .pink],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
+                        .scaleEffect(likeScale)
+                        .opacity(showHeartAnimation ? 0 : 1)
+                        .shadow(color: .black.opacity(0.3), radius: 10)
+                        .allowsHitTesting(false)
+                }
             }
         }
         .ignoresSafeArea()
+        .onTapGesture(count: 2) {
+            onDoubleTap()
+            triggerLikeAnimation()
+        }
+    }
+    
+    private func triggerLikeAnimation() {
+        withAnimation(.easeOut(duration: 0.1)) {
+            likeScale = 1.3
+            showHeartAnimation = true
+            isLiked = true
+        }
+        
+        withAnimation(.easeInOut(duration: 0.3).delay(0.1)) {
+            likeScale = 0.8
+        }
+        
+        withAnimation(.easeOut(duration: 0.2).delay(0.4)) {
+            showHeartAnimation = false
+            likeScale = 1.0
+        }
     }
     
     // Computed properties for cleaner code
@@ -510,6 +637,303 @@ struct HighlightFeedItemView: View {
 }
 
 // Color extension removed - using the one from SharedStyles.swift
+
+// MARK: - Missing Components
+
+struct ImmersiveGradientBackground: View {
+    @Binding var animate: Bool
+    
+    var body: some View {
+        ZStack {
+            LinearGradient(
+                colors: [
+                    Color(hex: "1A1B3A"),
+                    Color(hex: "0F0F1E")
+                ],
+                startPoint: animate ? .topLeading : .bottomTrailing,
+                endPoint: animate ? .bottomTrailing : .topLeading
+            )
+            
+            // Animated circles
+            ForEach(0..<3) { index in
+                Circle()
+                    .fill(
+                        RadialGradient(
+                            colors: [
+                                DesignSystem.Colors.primary.opacity(0.3),
+                                DesignSystem.Colors.primary.opacity(0.0)
+                            ],
+                            center: .center,
+                            startRadius: 50,
+                            endRadius: animate ? 300 : 200
+                        )
+                    )
+                    .frame(width: 400, height: 400)
+                    .offset(
+                        x: animate ? CGFloat.random(in: -200...200) : CGFloat.random(in: -100...100),
+                        y: animate ? CGFloat.random(in: -200...200) : CGFloat.random(in: -100...100)
+                    )
+                    .blur(radius: 40)
+                    .scaleEffect(animate ? 1.2 : 0.8)
+            }
+        }
+        .ignoresSafeArea()
+    }
+}
+
+struct LoadingHighlightView: View {
+    @State private var shimmer = false
+    @State private var pulse = false
+    
+    var body: some View {
+        VStack(spacing: 24) {
+            // Loading indicator
+            ZStack {
+                Circle()
+                    .stroke(
+                        LinearGradient(
+                            colors: [
+                                DesignSystem.Colors.primary.opacity(0.4),
+                                DesignSystem.Colors.secondary.opacity(0.4)
+                            ],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        ),
+                        lineWidth: 3
+                    )
+                    .frame(width: 60, height: 60)
+                    .rotationEffect(.degrees(shimmer ? 360 : 0))
+                
+                Image(systemName: "highlighter")
+                    .font(.system(size: 28, weight: .medium))
+                    .foregroundStyle(
+                        LinearGradient(
+                            colors: [DesignSystem.Colors.primary, DesignSystem.Colors.secondary],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+                    .scaleEffect(pulse ? 1.1 : 0.9)
+            }
+            
+            Text("Loading highlights...")
+                .font(DesignSystem.Typography.body)
+                .foregroundColor(.white.opacity(0.8))
+                .opacity(pulse ? 1 : 0.6)
+        }
+        .onAppear {
+            withAnimation(.linear(duration: 2).repeatForever(autoreverses: false)) {
+                shimmer = true
+            }
+            withAnimation(.easeInOut(duration: 1.5).repeatForever(autoreverses: true)) {
+                pulse = true
+            }
+        }
+    }
+}
+
+struct EmptyHighlightsView: View {
+    var body: some View {
+        VStack(spacing: 20) {
+            Image(systemName: "highlighter")
+                .font(.system(size: 60))
+                .foregroundStyle(
+                    LinearGradient(
+                        colors: [DesignSystem.Colors.primary.opacity(0.6), DesignSystem.Colors.secondary.opacity(0.6)],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                )
+            
+            Text("No highlights yet")
+                .font(DesignSystem.Typography.headline)
+                .foregroundColor(.white)
+            
+            Text("Discover and share the best moments")
+                .font(DesignSystem.Typography.body)
+                .foregroundColor(.white.opacity(0.6))
+                .multilineTextAlignment(.center)
+        }
+        .padding()
+    }
+}
+
+struct HighlightProgressIndicator: View {
+    let currentIndex: Int
+    let total: Int
+    @State private var animatedProgress: Double = 0
+    
+    var body: some View {
+        HStack(spacing: 4) {
+            ForEach(0..<total, id: \.self) { index in
+                RoundedRectangle(cornerRadius: 2)
+                    .fill(index == currentIndex ? Color.white : Color.white.opacity(0.3))
+                    .frame(height: 3)
+                    .scaleEffect(x: index == currentIndex ? animatedProgress : 1, y: 1, anchor: .leading)
+            }
+        }
+        .padding(.horizontal, 20)
+        .padding(.top, 10)
+        .onAppear {
+            withAnimation(.linear(duration: 5)) {
+                animatedProgress = 1
+            }
+        }
+        .onChange(of: currentIndex) { _, _ in
+            animatedProgress = 0
+            withAnimation(.linear(duration: 5)) {
+                animatedProgress = 1
+            }
+        }
+    }
+}
+
+struct CommentSheetView: View {
+    let highlight: HighlightEvent
+    @EnvironmentObject var appState: AppState
+    @Environment(\.dismiss) var dismiss
+    @State private var commentText = ""
+    @FocusState private var isCommentFieldFocused: Bool
+    
+    var body: some View {
+        NavigationStack {
+            VStack(spacing: 16) {
+                // Highlight preview
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Replying to highlight")
+                        .font(DesignSystem.Typography.caption)
+                        .foregroundColor(DesignSystem.Colors.textSecondary)
+                    
+                    Text(highlight.content)
+                        .font(DesignSystem.Typography.body)
+                        .foregroundColor(DesignSystem.Colors.text)
+                        .lineLimit(3)
+                        .padding()
+                        .background(DesignSystem.Colors.surface)
+                        .cornerRadius(12)
+                }
+                .padding(.horizontal)
+                
+                // Comment input
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Your comment")
+                        .font(DesignSystem.Typography.caption)
+                        .foregroundColor(DesignSystem.Colors.textSecondary)
+                        .padding(.horizontal)
+                    
+                    TextEditor(text: $commentText)
+                        .padding(8)
+                        .background(DesignSystem.Colors.surface)
+                        .cornerRadius(12)
+                        .frame(minHeight: 100)
+                        .focused($isCommentFieldFocused)
+                        .padding(.horizontal)
+                }
+                
+                Spacer()
+            }
+            .padding(.top)
+            .navigationTitle("Add Comment")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarLeading) {
+                    Button("Cancel") {
+                        dismiss()
+                    }
+                }
+                
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button("Post") {
+                        Task {
+                            await postComment()
+                        }
+                    }
+                    .disabled(commentText.isEmpty)
+                }
+            }
+        }
+        .onAppear {
+            isCommentFieldFocused = true
+        }
+    }
+    
+    private func postComment() async {
+        guard !commentText.isEmpty else { return }
+        
+        do {
+            try await appState.commentService.postComment(
+                on: highlight.id,
+                content: commentText
+            )
+            dismiss()
+        } catch {
+            print("Failed to post comment: \(error)")
+        }
+    }
+}
+
+// MARK: - Extensions
+
+extension HighlightsFeedView {
+    private func prepareHaptics() {
+        impactGenerator.prepare()
+        selectionGenerator.prepare()
+        hapticPrepared = true
+    }
+    
+    private func createDragGesture() -> some Gesture {
+        DragGesture()
+            .onChanged { value in
+                if !isDragging {
+                    isDragging = true
+                }
+                dragOffset = value.translation
+            }
+            .onEnded { value in
+                let threshold: CGFloat = 100
+                let verticalThreshold: CGFloat = 150
+                
+                withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
+                    if abs(value.translation.height) > verticalThreshold {
+                        // Vertical swipe - dismiss or refresh
+                        if value.translation.height > 0 {
+                            // Swipe down - could trigger refresh
+                        }
+                    } else if value.translation.width > threshold {
+                        // Swipe right - previous
+                        if currentIndex > 0 {
+                            currentIndex -= 1
+                        }
+                    } else if value.translation.width < -threshold {
+                        // Swipe left - next
+                        if currentIndex < highlights.count - 1 {
+                            currentIndex += 1
+                        }
+                    }
+                    
+                    dragOffset = .zero
+                    isDragging = false
+                }
+            }
+    }
+    
+    private func likeHighlight(_ highlight: HighlightEvent) {
+        impactGenerator.impactOccurred()
+        // TODO: Implement actual like functionality
+    }
+    
+    private func showProfile(for pubkey: String) {
+        // TODO: Navigate to profile view
+    }
+    
+    private func zapHighlight(_ highlight: HighlightEvent) {
+        // TODO: Implement zap functionality
+    }
+    
+    private func shareHighlight(_ highlight: HighlightEvent) {
+        // TODO: Implement share functionality
+    }
+}
 
 #Preview {
     HighlightsFeedView(tabBarVisible: .constant(false))

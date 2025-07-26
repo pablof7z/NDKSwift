@@ -235,7 +235,7 @@ class BookmarkService: ObservableObject {
                 summary: nil,
                 content: "", // Will be loaded when opened
                 author: author,
-                publishedAt: Date(),
+                publishedAt: event.createdAt,
                 image: nil,
                 hashtags: [],
                 createdAt: event.createdAt
@@ -260,10 +260,16 @@ class BookmarkService: ObservableObject {
                     if let highlightEvent = try await ndk.fetchEvent(filter) {
                         // Convert to HighlightEvent
                         let highlight = HighlightEvent(
+                            id: highlightId,
+                            event: highlightEvent,
                             content: highlightEvent.content,
-                            articleId: "", // Extract from tags if available
                             author: highlightEvent.pubkey,
-                            createdAt: highlightEvent.createdAt
+                            createdAt: highlightEvent.createdAt,
+                            context: nil,
+                            url: highlightEvent.tags.first(where: { $0.first == "r" })?.dropFirst().first,
+                            referencedEvent: highlightEvent.tags.first(where: { $0.first == "e" })?.dropFirst().first,
+                            attributedAuthors: highlightEvent.tags.filter { $0.first == "p" }.compactMap { $0.dropFirst().first },
+                            comment: nil
                         )
                         
                         await addHighlightBookmark(highlight)

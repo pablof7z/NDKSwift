@@ -19,9 +19,15 @@ struct ProfileView: View {
     @State private var showingQRCode = false
     @State private var selectedTab = 0
     @State private var showContent = false
+    @State private var showingLogoutConfirmation = false
+    @State private var isLoggingOut = false
     
     private var displayPubkey: String {
         pubkey ?? authManager.activeSession?.pubkey ?? ""
+    }
+    
+    private var isOwnProfile: Bool {
+        displayPubkey == authManager.activeSession?.pubkey
     }
     
     init(pubkey: String?) {
@@ -43,11 +49,7 @@ struct ProfileView: View {
                 )
                 .ignoresSafeArea()
                 
-                if isLoadingProfile && profile == nil {
-                    ProgressView("Loading profile...")
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
-                } else {
-                    ScrollView {
+                ScrollView {
                         VStack(spacing: 0) {
                             // Header with banner and avatar
                             profileHeaderView
@@ -83,7 +85,6 @@ struct ProfileView: View {
                         }
                     }
                     .ignoresSafeArea(edges: .top)
-                }
                 
                 // Error overlay
                 if let error = profileError ?? notesError {
@@ -108,6 +109,16 @@ struct ProfileView: View {
             if let pubkey = displayPubkey.isEmpty ? nil : displayPubkey {
                 QRCodeView(pubkey: pubkey, profile: profile)
             }
+        }
+        .alert("Log Out", isPresented: $showingLogoutConfirmation) {
+            Button("Cancel", role: .cancel) { }
+            Button("Log Out", role: .destructive) {
+                Task {
+                    await performLogout()
+                }
+            }
+        } message: {
+            Text("Are you sure you want to log out? This will remove your session from this device.")
         }
     }
     
@@ -267,6 +278,34 @@ struct ProfileView: View {
                         }
                     }
                     .buttonStyle(PostaPrimaryButtonStyle(isEnabled: !isFollowing))
+                } else {
+                    // Show settings and logout for own profile
+                    NavigationLink(destination: SettingsView()) {
+                        HStack {
+                            Image(systemName: "gearshape")
+                            Text("Settings")
+                        }
+                    }
+                    .buttonStyle(PostaPrimaryButtonStyle(isEnabled: true))
+                    
+                    Button(action: {
+                        showingLogoutConfirmation = true
+                        HapticFeedback.impact(.light)
+                    }) {
+                        HStack {
+                            if isLoggingOut {
+                                ProgressView()
+                                    .progressViewStyle(CircularProgressViewStyle())
+                                    .scaleEffect(0.8)
+                                    .tint(.white)
+                            } else {
+                                Image(systemName: "rectangle.portrait.and.arrow.right")
+                            }
+                            Text(isLoggingOut ? "Logging out..." : "Log Out")
+                        }
+                    }
+                    .buttonStyle(PostaPrimaryButtonStyle(isEnabled: true, backgroundColor: .red))
+                    .disabled(isLoggingOut)
                 }
                 
                 Button(action: {
@@ -461,6 +500,28 @@ struct ProfileView: View {
         
         notes = collectedNotes.sorted(by: { $0.createdAt > $1.createdAt })
         isLoadingNotes = false
+    }
+    
+    private func performLogout() async {
+        isLoggingOut = true
+        
+        // Clear cache if available
+        if let cache = ndkManager.ndk?.cache {
+            try? await cache.clear()
+        }
+        
+        // CRITICAL: Delete all sessions from keychain to prevent resurrection on app restart
+        // This follows section 2.1 of NDKSWIFT-EXPERT-PROMPT.md
+        for session in authManager.availableSessions {
+            try? await authManager.deleteSession(session)
+        }
+        
+        // Clear memory state
+        await MainActor.run {
+            authManager.logout()
+            isLoggingOut = false
+            dismiss()
+        }
     }
 }
 
