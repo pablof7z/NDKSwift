@@ -7,6 +7,7 @@ import UIKit
 
 struct OlasCaptionComposer: View {
     @Binding var caption: String
+    @Environment(NostrManager.self) private var nostrManager
     @EnvironmentObject var appState: AppState
     
     @State private var showMentions = false
@@ -179,7 +180,7 @@ struct OlasCaptionComposer: View {
     }
     
     private func searchUsers(_ query: String) {
-        guard let ndk = appState.ndk else { return }
+        guard let ndk = nostrManager.ndk else { return }
         
         Task {
             // Search for users by name/username
@@ -203,12 +204,12 @@ struct OlasCaptionComposer: View {
     }
     
     private func loadProfilesForSuggestions() async {
-        guard let profileManager = appState.profileManager else { return }
+        guard let profileManager = nostrManager.ndk?.profileManager else { return }
         
         for user in suggestedUsers {
             if suggestedProfiles[user.pubkey] == nil {
                 Task {
-                    for await profile in await profileManager.observe(for: user.pubkey, maxAge: TimeConstants.hour) {
+                    for await profile in await profileManager.observe(for: user.pubkey, maxAge: 3600) {
                         await MainActor.run {
                             suggestedProfiles[user.pubkey] = profile
                         }

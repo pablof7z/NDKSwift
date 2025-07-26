@@ -10,7 +10,9 @@ import AppKit
 #endif
 
 struct CreatePostView: View {
+    @Environment(NostrManager.self) private var nostrManager
     @EnvironmentObject var appState: AppState
+    @EnvironmentObject var blossomServerManager: BlossomServerManager
     @Environment(\.dismiss) var dismiss
     
     // Photo selection
@@ -417,7 +419,7 @@ struct CreatePostView: View {
     
     @MainActor
     private func performCreatePost() async {
-        guard let ndk = appState.ndk else { return }
+        guard let ndk = nostrManager.ndk else { return }
         
         isPosting = true
         uploadProgress = 0.0
@@ -462,7 +464,7 @@ struct CreatePostView: View {
                             size: size,
                             mimeType: mimeType,
                             signer: signer,
-                            ndk: appState.ndk!,
+                            ndk: nostrManager.ndk!,
                             expiration: Date().addingTimeInterval(60) // 1 minute expiration
                         )
                         

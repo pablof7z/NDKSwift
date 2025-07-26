@@ -3,6 +3,7 @@ import NDKSwift
 
 struct ReplyView: View {
     let parentEvent: NDKEvent
+    @Environment(NostrManager.self) private var nostrManager
     @EnvironmentObject var appState: AppState
     @StateObject private var viewModel = ReplyViewModel()
     @State private var replyText = ""
@@ -56,11 +57,11 @@ struct ReplyView: View {
                     
                     HStack(alignment: .bottom, spacing: OlasDesign.Spacing.sm) {
                         // User avatar
-                        if let currentUser = appState.currentUserProfile {
+                        if let currentUser = nostrManager.currentUserProfile {
                             OlasAvatar(
                                 url: currentUser.picture,
                                 size: 32,
-                                pubkey: appState.currentUser?.pubkey ?? ""
+                                pubkey: nostrManager.authManager.activeSession?.pubkey ?? ""
                             )
                         }
                         
@@ -132,7 +133,7 @@ struct ReplyView: View {
             }
             #endif
             .onAppear {
-                if let ndk = appState.ndk {
+                if let ndk = nostrManager.ndk {
                     viewModel.loadReplies(for: parentEvent, ndk: ndk)
                 }
             }
@@ -140,7 +141,7 @@ struct ReplyView: View {
     }
     
     private func sendReply() {
-        guard let ndk = appState.ndk,
+        guard let ndk = nostrManager.ndk,
               let signer = NDKAuthManager.shared.activeSigner,
               !replyText.isEmpty else { return }
         
@@ -333,7 +334,7 @@ class ReplyViewModel: ObservableObject {
         Task {
             // Load parent profile
             if let profileManager = ndk.profileManager {
-                for await profile in await profileManager.observe(for: event.pubkey, maxAge: TimeConstants.hour) {
+                for await profile in await profileManager.observe(for: event.pubkey, maxAge: 3600) {
                     if let profile = profile {
                         await MainActor.run {
                             self.parentProfile = profile
@@ -393,7 +394,7 @@ class ReplyViewModel: ObservableObject {
         profileTasks[pubkey] = Task {
             guard let profileManager = ndk.profileManager else { return }
             
-            for await profile in await profileManager.observe(for: pubkey, maxAge: TimeConstants.hour) {
+            for await profile in await profileManager.observe(for: pubkey, maxAge: 3600) {
                 if let profile = profile {
                     await MainActor.run {
                         updateRepliesWithProfile(pubkey: pubkey, profile: profile)

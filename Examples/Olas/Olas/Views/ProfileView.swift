@@ -3,6 +3,7 @@ import NDKSwift
 
 struct ProfileView: View {
     let pubkey: String
+    @Environment(NostrManager.self) private var nostrManager
     @EnvironmentObject var appState: AppState
     @StateObject private var viewModel = ProfileViewModel()
     @State private var selectedTab = 0
@@ -64,7 +65,7 @@ struct ProfileView: View {
         .navigationBarTitleDisplayMode(.inline)
         #endif
         .onAppear {
-            if let ndk = appState.ndk {
+            if let ndk = nostrManager.ndk {
                 viewModel.startObserving(pubkey: pubkey, ndk: ndk)
             }
         }
@@ -401,7 +402,7 @@ class ProfileViewModel: ObservableObject {
         Task {
             guard let profileManager = ndk.profileManager else { return }
             
-            for await profile in await profileManager.observe(for: pubkey, maxAge: TimeConstants.hour) {
+            for await profile in await profileManager.observe(for: pubkey, maxAge: 3600) {
                 if let profile = profile {
                     await MainActor.run {
                         self.profile = profile

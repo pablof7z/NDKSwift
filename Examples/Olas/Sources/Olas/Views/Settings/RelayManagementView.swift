@@ -2,6 +2,7 @@ import SwiftUI
 import NDKSwift
 
 struct RelayManagementView: View {
+    @Environment(NostrManager.self) private var nostrManager
     @EnvironmentObject var appState: AppState
     @State private var relays: [RelayInfo] = []
     @State private var newRelayURL = ""
@@ -263,7 +264,9 @@ struct RelayManagementView: View {
                                 RoundedRectangle(cornerRadius: 8)
                                     .stroke(OlasDesign.Colors.border, lineWidth: 1)
                             )
+                            #if os(iOS)
                             .autocapitalization(.none)
+                            #endif
                             .disableAutocorrection(true)
                     }
                     
@@ -338,7 +341,7 @@ struct RelayManagementView: View {
     // MARK: - Methods
     
     private func loadRelays() {
-        guard let ndk = appState.ndk else { return }
+        guard let ndk = nostrManager.ndk else { return }
         
         relays = ndk.relayPool.relays.map { relay in
             RelayInfo(
@@ -361,7 +364,7 @@ struct RelayManagementView: View {
     }
     
     private func addNewRelay() {
-        guard !newRelayURL.isEmpty, let ndk = appState.ndk else { return }
+        guard !newRelayURL.isEmpty, let ndk = nostrManager.ndk else { return }
         
         isConnecting = true
         
@@ -397,7 +400,7 @@ struct RelayManagementView: View {
     }
     
     private func removeRelay(_ relay: RelayInfo) {
-        guard let ndk = appState.ndk else { return }
+        guard let ndk = nostrManager.ndk else { return }
         
         Task {
             // Remove from pool
@@ -425,7 +428,7 @@ struct RelayManagementView: View {
     }
     
     private func reconnectRelay(_ relay: RelayInfo) {
-        guard let ndk = appState.ndk else { return }
+        guard let ndk = nostrManager.ndk else { return }
         
         if let index = relays.firstIndex(where: { $0.id == relay.id }) {
             relays[index].status = .connecting

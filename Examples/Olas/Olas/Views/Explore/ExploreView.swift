@@ -2,6 +2,7 @@ import SwiftUI
 import NDKSwift
 
 struct ExploreView: View {
+    @Environment(NostrManager.self) private var nostrManager
     @EnvironmentObject var appState: AppState
     @StateObject private var viewModel = ExploreViewModel()
     @State private var searchText = ""
@@ -101,18 +102,19 @@ struct ExploreView: View {
             .navigationBarTitleDisplayMode(.large)
             #endif
             .task {
-                if let ndk = appState.ndk {
+                if let ndk = nostrManager.ndk {
                     viewModel.startObserving(ndk: ndk, category: selectedCategory)
                 }
             }
             .onChange(of: selectedCategory) { _, newCategory in
-                if let ndk = appState.ndk {
+                if let ndk = nostrManager.ndk {
                     viewModel.changeCategory(to: newCategory, ndk: ndk)
                 }
             }
             .sheet(isPresented: $showingHashtagView) {
                 HashtagView(hashtag: selectedHashtag)
                     .environmentObject(appState)
+                    .environment(nostrManager)
             }
         }
     }
@@ -365,7 +367,7 @@ class ExploreViewModel: ObservableObject {
         profileTasks[pubkey] = Task {
             guard let profileManager = ndk.profileManager else { return }
             
-            for await profile in await profileManager.observe(for: pubkey, maxAge: TimeConstants.hour) {
+            for await profile in await profileManager.observe(for: pubkey, maxAge: 3600) {
                 if let profile = profile {
                     await MainActor.run {
                         updateItemsWithProfile(pubkey: pubkey, profile: profile)

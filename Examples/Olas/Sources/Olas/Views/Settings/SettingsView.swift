@@ -2,6 +2,7 @@ import SwiftUI
 import NDKSwift
 
 struct SettingsView: View {
+    @Environment(NostrManager.self) private var nostrManager
     @EnvironmentObject var appState: AppState
     @State private var showingLogoutAlert = false
     
@@ -37,7 +38,7 @@ struct SettingsView: View {
                                 
                                 Spacer()
                                 
-                                Text("\(appState.ndk?.relayPool.relays.count ?? 0)")
+                                Text("\(nostrManager.ndk?.relayPool.relays.count ?? 0)")
                                     .font(OlasDesign.Typography.caption)
                                     .foregroundColor(OlasDesign.Colors.textSecondary)
                             }
@@ -163,7 +164,9 @@ struct SettingsView: View {
     private func logout() {
         appState.isAuthenticated = false
         appState.currentUser = nil
-        appState.ndk = nil
+        Task {
+            await nostrManager.disconnect()
+        }
         NDKAuthManager.shared.signOut()
     }
 }

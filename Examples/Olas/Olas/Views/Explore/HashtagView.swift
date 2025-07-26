@@ -3,6 +3,7 @@ import NDKSwift
 
 struct HashtagView: View {
     let hashtag: String
+    @Environment(NostrManager.self) private var nostrManager
     @EnvironmentObject var appState: AppState
     @Environment(\.dismiss) var dismiss
     
@@ -186,7 +187,7 @@ struct HashtagView: View {
     }
     
     private func loadHashtagPosts() async {
-        guard let ndk = appState.ndk else { return }
+        guard let ndk = nostrManager.ndk else { return }
         
         // Create filter for posts containing this hashtag
         let filter = NDKFilter(
@@ -234,7 +235,7 @@ struct HashtagView: View {
               let profileManager = appState.profileManager else { return }
         
         Task {
-            for await profile in await profileManager.observe(for: pubkey, maxAge: TimeConstants.hour) {
+            for await profile in await profileManager.observe(for: pubkey, maxAge: 3600) {
                 await MainActor.run {
                     profiles[pubkey] = profile
                 }

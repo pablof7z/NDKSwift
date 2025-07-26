@@ -2,6 +2,7 @@ import SwiftUI
 import NDKSwift
 
 struct AuthenticationView: View {
+    @Environment(NostrManager.self) private var nostrManager
     @EnvironmentObject var appState: AppState
     @State private var showCreateAccount = false
     @State private var privateKey = ""
@@ -33,7 +34,9 @@ struct AuthenticationView: View {
                 VStack(spacing: 16) {
                     TextField("Enter your private key (nsec or hex)", text: $privateKey)
                         .textFieldStyle(.roundedBorder)
+                        #if os(iOS)
                         .autocapitalization(.none)
+                        #endif
                         .autocorrectionDisabled()
                     
                     Button(action: login) {
@@ -81,7 +84,7 @@ struct AuthenticationView: View {
         Task {
             do {
                 let signer = try NDKPrivateKeySigner(privateKey: privateKey)
-                appState.ndk?.signer = signer
+                nostrManager.ndk?.signer = signer
                 
                 let user = try NDKUser(pubkey: signer.publicKey(format: .hex))
                 appState.currentUser = user

@@ -24,9 +24,9 @@ class NostrManager {
     let defaultRelays = [
         RelayConstants.primal,
         RelayConstants.damus,
-        RelayConstants.nosGardens,
         RelayConstants.nosLol,
-        RelayConstants.nostrWine
+        RelayConstants.nostrWine,
+        "wss://relay.nostr.band"
     ]
     
     // Key for storing user-added relays
@@ -96,11 +96,11 @@ class NostrManager {
         for await change in relayChanges {
             switch change {
             case .relayConnected(let relay):
-                relayStatus[relay] = true
+                relayStatus[relay.url] = true
             case .relayDisconnected(let relay):
-                relayStatus[relay] = false
+                relayStatus[relay.url] = false
             case .relayAdded(let relay):
-                relayStatus[relay] = false
+                relayStatus[relay.url] = false
             case .relayRemoved(let relay):
                 relayStatus.removeValue(forKey: relay)
             }
@@ -279,7 +279,7 @@ class NostrManager {
         // Start observing user profile using NDKProfileManager
         profileObservationTask = Task { @MainActor in
             // Use maxAge of 3600 (1 hour) for the profile
-            for await profile in await ndk.profileManager.observe(for: pubkey, maxAge: TimeConstants.hour) {
+            for await profile in await ndk.profileManager.observe(for: pubkey, maxAge: 3600) {
                 self.currentUserProfile = profile
             }
         }

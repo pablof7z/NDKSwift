@@ -2,6 +2,7 @@ import SwiftUI
 import NDKSwift
 
 struct CreateAccountView: View {
+    @Environment(NostrManager.self) private var nostrManager
     @EnvironmentObject var appState: AppState
     @Environment(\.dismiss) var dismiss
     @State private var mnemonic: [String] = []
@@ -101,7 +102,7 @@ struct CreateAccountView: View {
         Task {
             do {
                 let signer = try NDKPrivateKeySigner(privateKey: privateKey)
-                appState.ndk?.signer = signer
+                nostrManager.ndk?.signer = signer
                 
                 let user = try NDKUser(pubkey: signer.publicKey(format: .hex))
                 appState.currentUser = user

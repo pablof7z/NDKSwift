@@ -6,6 +6,7 @@ import NDKSwift
 struct OlasRichText: View {
     let content: String
     let tags: [[String]]
+    @Environment(NostrManager.self) private var nostrManager
     @EnvironmentObject var appState: AppState
     
     @State private var parsedComponents: [RichTextComponent] = []
@@ -210,7 +211,7 @@ struct OlasRichText: View {
     }
     
     private func loadProfiles() async {
-        guard let profileManager = appState.ndk?.profileManager else { return }
+        guard let profileManager = nostrManager.ndk?.profileManager else { return }
         
         // Find all unique pubkeys that need loading
         let pubkeysToLoad = parsedComponents.compactMap { component -> String? in
@@ -233,7 +234,7 @@ struct OlasRichText: View {
                 group.addTask {
                     // Use observe to get reactive updates
                     var profile: NDKUserProfile?
-                    for await p in await profileManager.observe(for: pubkey, maxAge: TimeConstants.hour) {
+                    for await p in await profileManager.observe(for: pubkey, maxAge: 3600) {
                         profile = p
                         break // Just get the first one for now
                     }

@@ -69,7 +69,11 @@ struct AuthenticationView: View {
             VStack(spacing: OlasDesign.Spacing.md) {
                 Button {
                     showOnboarding = true
-                    HapticManager.impact(.medium)
+                    #if os(iOS)
+                    OlasDesign.Haptic.impact(.medium)
+                    #else
+                    OlasDesign.Haptic.impact(0)
+                    #endif
                 } label: {
                     HStack {
                         Image(systemName: "sparkles")
@@ -91,7 +95,7 @@ struct AuthenticationView: View {
                 
                 Button {
                     showLoginSheet = true
-                    HapticManager.impact(.light)
+                    OlasDesign.Haptic.selection()
                 } label: {
                     Text("I Have an Account")
                     .font(OlasDesign.Typography.bodyBold)
@@ -228,7 +232,7 @@ struct LoginSheet: View {
                         VStack(spacing: OlasDesign.Spacing.md) {
                             Button {
                                 // TODO: Implement NIP-07 login
-                                HapticManager.impact(.light)
+                                OlasDesign.Haptic.selection()
                             } label: {
                                 HStack {
                                     Image(systemName: "globe")
@@ -240,7 +244,7 @@ struct LoginSheet: View {
                             
                             Button {
                                 // TODO: Implement key import
-                                HapticManager.impact(.light)
+                                OlasDesign.Haptic.selection()
                             } label: {
                                 HStack {
                                     Image(systemName: "qrcode")
@@ -272,18 +276,18 @@ struct LoginSheet: View {
     
     private func login() {
         isLoading = true
-        HapticManager.impact(.light)
+        OlasDesign.Haptic.selection()
         
         Task {
             do {
                 try await nostrManager.login(with: privateKey)
-                HapticManager.notification(.success)
+                OlasDesign.Haptic.success()
                 dismiss()
             } catch {
                 isLoading = false
                 errorMessage = error.localizedDescription
                 showError = true
-                HapticManager.notification(.error)
+                OlasDesign.Haptic.error()
             }
         }
     }

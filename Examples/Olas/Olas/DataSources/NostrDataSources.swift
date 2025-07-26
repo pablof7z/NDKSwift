@@ -108,9 +108,11 @@ public class HashtagFeedDataSource: ObservableObject {
     public init(ndk: NDK, hashtag: String, limit: Int = 50) {
         self.hashtag = hashtag.lowercased().replacingOccurrences(of: "#", with: "")
         
-        var filter = NDKFilter(kinds: [EventKind.textNote])
-        filter.tags = [["t", self.hashtag]]
-        filter.limit = limit
+        let filter = NDKFilter(
+            kinds: [EventKind.textNote],
+            limit: limit,
+            tags: ["t": Set([self.hashtag])]
+        )
         
         self.dataSource = ndk.observe(
             filter: filter,

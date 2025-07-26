@@ -6,6 +6,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- Removed TODO comment in NDKDataRequirementManager that was already implemented
+
 ### Added
 - Incoming events from relays are now tracked in NDKEventTracker with `markSeen` when received
 - First relay to deliver an event is automatically set as the source relay in NDKEventTracker
@@ -48,6 +51,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Marker strings like "reply", "root", "redeemed" now use `NostrConstants.Marker` constants
   - Improves maintainability and reduces potential for typos
 - Added utility extensions to reduce code duplication
+- Major test infrastructure improvements
+  - Reorganized test directory structure with consistent Unit/Integration/E2E separation
+  - Fixed test file naming inconsistencies (all tests now follow `*Tests.swift` pattern)
+  - Created comprehensive test helpers: `TestFactories`, `TestAssertions`, `TestFixtures`
+  - Added base test classes: `NDKTestCase`, `NDKIntegrationTestCase`, `NDKPerformanceTestCase`
+  - Improved test isolation and resource cleanup
+  - Added tests for core components: `NDK`, `NDKEventManager`, `NDKSubscription`
+  - Test coverage foundation established for future 80% coverage target
   - Added `nilIfEmpty` property to `String` and `Collection` types
   - Added `setOrNil` property to `String` collections for cleaner optional Set conversion
   - Replaced multiple `.isEmpty ? nil : value` patterns with new extensions
