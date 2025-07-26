@@ -921,18 +921,6 @@ extension HighlightsFeedView {
         impactGenerator.impactOccurred()
         // TODO: Implement actual like functionality
     }
-    
-    private func showProfile(for pubkey: String) {
-        // TODO: Navigate to profile view
-    }
-    
-    private func zapHighlight(_ highlight: HighlightEvent) {
-        // TODO: Implement zap functionality
-    }
-    
-    private func shareHighlight(_ highlight: HighlightEvent) {
-        // TODO: Implement share functionality
-    }
 }
 
 #Preview {

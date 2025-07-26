@@ -16,13 +16,13 @@ struct ContentView: View {
     }
     
     var body: some View {
-        if !hasCompletedOnboarding {
+        if !hasCompletedOnboarding || !authManager.isAuthenticated {
             OnboardingView(hasCompletedOnboarding: $hasCompletedOnboarding)
                 .transition(.asymmetric(
                     insertion: .opacity,
                     removal: .move(edge: .leading).combined(with: .opacity)
                 ))
-        } else if authManager.isAuthenticated {
+        } else {
             ZStack(alignment: .bottom) {
                 Group {
                     switch selectedTab {
@@ -101,9 +101,6 @@ struct ContentView: View {
             .fullScreenCover(isPresented: $showCreateHighlight) {
                 CreateHighlightView()
             }
-        } else {
-            ModernAuthenticationView()
-                .transition(.opacity)
         }
     }
 }
@@ -145,4 +142,5 @@ extension ContentView.Tab {
 #Preview {
     ContentView()
         .environmentObject(AppState())
+        .preferredColorScheme(.dark)
 }

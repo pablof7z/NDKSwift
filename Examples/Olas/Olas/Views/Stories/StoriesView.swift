@@ -1,5 +1,8 @@
 import SwiftUI
 import NDKSwift
+#if os(iOS)
+import UIKit
+#endif
 
 struct StoriesView: View {
     @Environment(NostrManager.self) private var nostrManager

@@ -126,17 +126,10 @@ struct ComposeView: View {
                         .font(.caption)
                         .foregroundColor(.secondary)
                     
-                case .partial(let confirmed, let pending):
-                    Image(systemName: "arrow.up.circle.fill")
-                        .foregroundColor(.orange)
-                    Text("Sent to \(confirmed.count) of \(confirmed.count + pending.count) relays")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                    
-                case .confirmed:
+                case .confirmed(let relay):
                     Image(systemName: "checkmark.circle.fill")
                         .foregroundColor(.green)
-                    Text("Published successfully!")
+                    Text("Confirmed by \(relay)")
                         .font(.caption)
                         .foregroundColor(.green)
                     
@@ -171,7 +164,7 @@ struct ComposeView: View {
         
         do {
             // Build and sign the event
-            let event = try await NDKEventBuilder()
+            let event = try await NDKEventBuilder(ndk: ndk)
                 .content(content)
                 .kind(EventKind.textNote)
                 .build(signer: signer)
@@ -193,7 +186,7 @@ struct ComposeView: View {
             try? await Task.sleep(nanoseconds: 2_000_000_000) // 2 seconds
             
             // Check final state
-            if confirmationState == .confirmed {
+            if case .confirmed = confirmationState {
                 // Success - dismiss after brief delay
                 try? await Task.sleep(nanoseconds: 500_000_000) // 0.5 seconds
                 await MainActor.run {
@@ -217,9 +210,7 @@ struct ComposeView: View {
                     self.confirmationState = state
                     
                     // Stop publishing indicator once we have any confirmation
-                    if case .partial = state {
-                        self.isPublishing = false
-                    } else if case .confirmed = state {
+                    if case .confirmed = state {
                         self.isPublishing = false
                     }
                 }

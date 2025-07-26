@@ -31,6 +31,7 @@ struct AuthenticationFlow: View {
     // Wallet onboarding sheet
     @State private var showWalletOnboarding = false
     @State private var walletOnboardingAuthMode: WalletOnboardingView.AuthMode = .none
+    @State private var checkingExistingUser = true
     
     var body: some View {
         ZStack {
@@ -70,6 +71,7 @@ struct AuthenticationFlow: View {
         }
         .onAppear {
             startSplashAnimation()
+            checkForExistingUser()
         }
         .fullScreenCover(isPresented: $showWalletOnboarding) {
             WalletOnboardingView(authMode: walletOnboardingAuthMode)
@@ -247,6 +249,19 @@ struct AuthenticationFlow: View {
             buttonsOpacity = 1
             contentOpacity = 1
         }
+    }
+    
+    private func checkForExistingUser() {
+        // If user is already authenticated but wallet not configured, 
+        // skip auth selection and go directly to wallet setup
+        if nostrManager.authManager.isAuthenticated && !walletManager.isWalletConfigured {
+            // User has auth but no wallet, go to wallet setup with no auth mode
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                walletOnboardingAuthMode = .none
+                showWalletOnboarding = true
+            }
+        }
+        checkingExistingUser = false
     }
 }
 

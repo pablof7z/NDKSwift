@@ -216,9 +216,22 @@ struct HighlightDetailView: View {
                     .padding(.horizontal)
                     
                     // Comments section
-                    CommentsSection(highlightId: highlight.id)
-                        .environmentObject(appState)
-                        .padding(.top)
+                    // TODO: Replace with CommentsSection when added to project
+                    VStack(alignment: .leading, spacing: 16) {
+                        Text("Comments")
+                            .font(DesignSystem.Typography.headline)
+                            .padding(.horizontal)
+                        
+                        Text("Comments feature coming soon")
+                            .font(DesignSystem.Typography.body)
+                            .foregroundColor(DesignSystem.Colors.textSecondary)
+                            .padding()
+                            .frame(maxWidth: .infinity)
+                            .background(DesignSystem.Colors.surface)
+                            .cornerRadius(12)
+                            .padding(.horizontal)
+                    }
+                    .padding(.top)
                     
                     // Related highlights section
                     VStack(alignment: .leading, spacing: 16) {

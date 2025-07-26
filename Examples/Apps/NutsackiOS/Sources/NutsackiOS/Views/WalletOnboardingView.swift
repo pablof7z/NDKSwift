@@ -36,11 +36,11 @@ struct WalletOnboardingView: View {
     
     // Mint discovery
     @State private var discoveredMints: [DiscoveredMint] = []
-    @State private var isDiscoveringMints = false
+    @State private var isDiscoveringMints = true // Start as true since we begin discovery immediately
+    @State private var mintDiscoveryTask: Task<Void, Never>?
     
     // Auth form states
     @State private var displayName = ""
-    @State private var about = ""
     @State private var nsecInput = ""
     @State private var showPassword = false
     @State private var isProcessing = false
@@ -55,16 +55,16 @@ struct WalletOnboardingView: View {
     
     init(authMode: AuthMode = .none) {
         self.authMode = authMode
-        // Start at -1 for auth forms if authMode is not .none
-        self._currentStep = State(initialValue: authMode == .none ? 0 : -1)
+        // If authMode is .none, skip auth and go to step 1
+        self._currentStep = State(initialValue: authMode == .none ? 1 : 0)
     }
     
     private var currentTitle: String {
         switch currentStep {
-        case -1: return authMode == .create ? "CREATE ACCOUNT" : "LOGIN"
-        case 0: return "SETUP"
-        case 1: return "RELAYS"
-        case 2: return "MINTS"
+        case 0: return authMode == .create ? "REGISTER" : authMode == .import ? "LOGIN" : "AUTHENTICATE"
+        case 1: return "SETUP"
+        case 2: return "RELAYS"
+        case 3: return "MINTS"
         default: return ""
         }
     }
@@ -201,7 +201,7 @@ struct WalletOnboardingView: View {
                     
                     // Step indicator under the header
                     HStack(spacing: 12) {
-                        ForEach(0..<3) { step in
+                        ForEach(0..<4) { step in
                             Capsule()
                                 .fill(currentStep >= step ? Color.orange : Color.white.opacity(0.2))
                                 .frame(width: currentStep == step ? 32 : 16, height: 4)
@@ -215,7 +215,7 @@ struct WalletOnboardingView: View {
                 // Content
                 VStack {
                     switch currentStep {
-                    case -1:
+                    case 0:
                         if authMode == .create {
                             createAccountForm
                                 .transition(.asymmetric(
@@ -228,14 +228,17 @@ struct WalletOnboardingView: View {
                                     insertion: .move(edge: .trailing).combined(with: .opacity),
                                     removal: .move(edge: .leading).combined(with: .opacity)
                                 ))
+                        } else {
+                            // This shouldn't happen as authMode should be set
+                            EmptyView()
                         }
-                    case 0:
+                    case 1:
                         WelcomeStepView()
                             .transition(.asymmetric(
                                 insertion: .move(edge: .trailing).combined(with: .opacity),
                                 removal: .move(edge: .leading).combined(with: .opacity)
                             ))
-                    case 1:
+                    case 2:
                         RelaySelectionView(
                             selectedRelays: $selectedRelays,
                             suggestedRelays: suggestedRelays
@@ -244,7 +247,7 @@ struct WalletOnboardingView: View {
                             insertion: .move(edge: .trailing).combined(with: .opacity),
                             removal: .move(edge: .leading).combined(with: .opacity)
                         ))
-                    case 2:
+                    case 3:
                         MintSelectionView(
                             selectedMints: $selectedMints,
                             discoveredMints: discoveredMints,
@@ -267,14 +270,14 @@ struct WalletOnboardingView: View {
                 
                 // Action buttons
                 VStack(spacing: 16) {
-                    if currentStep == -1 {
+                    if currentStep == 0 {
                         // Auth form buttons - handled within forms
                         EmptyView()
-                    } else if currentStep == 0 {
+                    } else if currentStep == 1 {
                         // Continue button
                         Button(action: {
                             withAnimation(.spring(response: 0.5, dampingFraction: 0.8)) {
-                                currentStep = 1
+                                currentStep = 2
                             }
                         }) {
                             HStack {
@@ -311,11 +314,11 @@ struct WalletOnboardingView: View {
                                 .font(.system(size: 16, weight: .medium))
                                 .foregroundColor(Color.white.opacity(0.6))
                         }
-                    } else if currentStep == 1 {
+                    } else if currentStep == 2 {
                         // Next button for relay selection
                         Button(action: {
                             withAnimation(.spring(response: 0.5, dampingFraction: 0.8)) {
-                                currentStep = 2
+                                currentStep = 3
                             }
                         }) {
                             HStack {
@@ -345,14 +348,14 @@ struct WalletOnboardingView: View {
                         // Back button
                         Button(action: {
                             withAnimation(.spring(response: 0.5, dampingFraction: 0.8)) {
-                                currentStep = 0
+                                currentStep = 1
                             }
                         }) {
                             Text("Back")
                                 .font(.system(size: 16, weight: .medium))
                                 .foregroundColor(Color.white.opacity(0.6))
                         }
-                    } else if currentStep == 2 {
+                    } else if currentStep == 3 {
                         // Setup wallet button
                         Button(action: setupWallet) {
                             if isSettingUpWallet {
@@ -400,7 +403,7 @@ struct WalletOnboardingView: View {
                         // Back button
                         Button(action: {
                             withAnimation(.spring(response: 0.5, dampingFraction: 0.8)) {
-                                currentStep = 1
+                                currentStep = 2
                             }
                         }) {
                             Text("Back")
@@ -417,7 +420,12 @@ struct WalletOnboardingView: View {
         }
         .onAppear {
             animateOnboarding()
-            setupMintDiscovery()
+            // Start mint discovery immediately when view appears
+            startMintDiscovery()
+        }
+        .onDisappear {
+            // Cancel mint discovery when view disappears
+            mintDiscoveryTask?.cancel()
         }
         .alert("Setup Error", isPresented: $showError) {
             Button("OK") { }
@@ -473,24 +481,30 @@ struct WalletOnboardingView: View {
         }
     }
     
-    private func setupMintDiscovery() {
-        guard let ndk = nostrManager.ndk else { return }
-        
-        Task {
-            isDiscoveringMints = true
+    private func startMintDiscovery() {
+        // Start mint discovery immediately, even before authentication
+        mintDiscoveryTask = Task {
+            // Wait for NDK to be available (should be almost immediate)
+            while nostrManager.ndk == nil && !Task.isCancelled {
+                try? await Task.sleep(nanoseconds: 100_000_000) // 100ms
+            }
+            
+            guard let ndk = nostrManager.ndk, !Task.isCancelled else { return }
             
             // Use MintDiscoveryManager to get mints
             let discoveryManager = MintDiscoveryManager(ndk: ndk)
             
             // Create an async stream to collect discovered mints
             for await mints in discoveryManager.discoverMintsStream() {
+                guard !Task.isCancelled else { break }
+                
                 await MainActor.run {
                     self.discoveredMints = mints
+                    // After first batch of mints, we're no longer "discovering"
+                    if !mints.isEmpty && self.isDiscoveringMints {
+                        self.isDiscoveringMints = false
+                    }
                 }
-            }
-            
-            await MainActor.run {
-                isDiscoveringMints = false
             }
         }
     }
@@ -593,15 +607,6 @@ struct WalletOnboardingView: View {
                         .textContentType(.name)
                 }
                 
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("About (optional)")
-                        .font(.system(size: 14, weight: .medium))
-                        .foregroundColor(Color.white.opacity(0.8))
-                    
-                    TextField("", text: $about, axis: .vertical)
-                        .textFieldStyle(DarkTextFieldStyle())
-                        .lineLimit(3...6)
-                }
                 
                 Text("This information will be public on Nostr")
                     .font(.system(size: 12))
@@ -619,7 +624,7 @@ struct WalletOnboardingView: View {
                 } else {
                     HStack {
                         Image(systemName: "bolt.fill")
-                        Text("Create Wallet")
+                        Text("Create Account")
                             .fontWeight(.semibold)
                     }
                 }
@@ -787,7 +792,7 @@ struct WalletOnboardingView: View {
             do {
                 _ = try await nostrManager.createNewAccount(
                     displayName: displayName,
-                    about: about.isEmpty ? nil : about,
+                    about: nil,
                     picture: selectedAvatar.isEmpty ? nil : selectedAvatar
                 )
                 
@@ -795,9 +800,9 @@ struct WalletOnboardingView: View {
                     isProcessing = false
                     // Transition to welcome step
                     withAnimation(.spring(response: 0.8, dampingFraction: 0.8)) {
-                        currentStep = 0
+                        currentStep = 1
                     }
-                    setupMintDiscovery()
+                    // Mint discovery is already running, no need to start it again
                 }
             } catch {
                 await MainActor.run {
@@ -940,9 +945,9 @@ struct WalletOnboardingView: View {
                     } else {
                         // Go to wallet setup if no wallet found
                         withAnimation(.spring(response: 0.8, dampingFraction: 0.8)) {
-                            currentStep = 0
+                            currentStep = 1
                         }
-                        setupMintDiscovery()
+                        // Mint discovery is already running, no need to start it again
                     }
                 }
             } catch {
@@ -1198,13 +1203,9 @@ struct MintSelectionView: View {
     
     @ViewBuilder
     private var mintListContent: some View {
-        if isDiscoveringMints && discoveredMints.isEmpty {
-            discoveringView
-        } else if discoveredMints.isEmpty {
-            emptyStateView
-        } else {
-            mintScrollView
-        }
+        // Always show the scroll view, even if empty
+        // This follows the "never wait, always stream" philosophy
+        mintScrollView
     }
     
     @ViewBuilder
@@ -1247,8 +1248,42 @@ struct MintSelectionView: View {
         ScrollView {
             VStack(spacing: 12) {
                 customMintSection
+                
+                // Show discovery status if still loading and no mints yet
+                if isDiscoveringMints && discoveredMints.isEmpty {
+                    HStack(spacing: 12) {
+                        ProgressView()
+                            .scaleEffect(0.8)
+                            .progressViewStyle(CircularProgressViewStyle(tint: .green))
+                        
+                        Text("Finding recommended mints...")
+                            .font(.system(size: 14))
+                            .foregroundColor(Color.white.opacity(0.6))
+                        
+                        Spacer()
+                    }
+                    .padding(16)
+                    .background(sectionBackground)
+                }
+                
                 discoveredMintsSection
                 manuallyAddedMintsSection
+                
+                // Show a hint if no mints discovered yet
+                if discoveredMints.isEmpty && !isDiscoveringMints {
+                    VStack(spacing: 12) {
+                        Text("No recommended mints found yet")
+                            .font(.system(size: 14, weight: .medium))
+                            .foregroundColor(Color.white.opacity(0.5))
+                        
+                        Text("You can add custom mints above or wait for recommendations")
+                            .font(.system(size: 12))
+                            .foregroundColor(Color.white.opacity(0.4))
+                            .multilineTextAlignment(.center)
+                    }
+                    .padding(20)
+                    .frame(maxWidth: .infinity)
+                }
             }
         }
         .scrollIndicators(.hidden)

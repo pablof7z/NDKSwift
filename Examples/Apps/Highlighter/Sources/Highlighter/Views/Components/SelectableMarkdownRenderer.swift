@@ -22,33 +22,22 @@ struct SelectableMarkdownRenderer: View {
     var onNostrEntityTap: ((ContentEntity) -> Void)?
     
     var body: some View {
-        ZStack {
-            // Base markdown renderer
-            NDKMarkdownRenderer(content, ndk: ndk)
-                .markdownStyle(configuration)
-                .onMentionTap { mention in
-                    onMentionTap?(mention)
-                }
-                .onHashtagTap { tag in
-                    onHashtagTap?(tag)
-                }
-                .onLinkTap { url in
-                    onLinkTap?(url)
-                }
-                .onNostrEntityTap { entity in
-                    onNostrEntityTap?(entity)
-                }
-                .overlay(
-                    // Invisible text overlay for selection
-                    SelectableTextOverlay(
-                        content: content,
-                        onTextSelected: { text, range in
-                            onTextSelected(text, range)
-                        }
-                    )
-                    .opacity(0.01) // Nearly invisible but still interactive
-                )
-        }
+        // Base markdown renderer without overlay for now
+        NDKMarkdownRenderer(content, ndk: ndk)
+            .markdownStyle(configuration)
+            .onMentionTap { mention in
+                onMentionTap?(mention)
+            }
+            .onHashtagTap { tag in
+                onHashtagTap?(tag)
+            }
+            .onLinkTap { url in
+                onLinkTap?(url)
+            }
+            .onNostrEntityTap { entity in
+                onNostrEntityTap?(entity)
+            }
+            .fixedSize(horizontal: false, vertical: true)
     }
 }
 

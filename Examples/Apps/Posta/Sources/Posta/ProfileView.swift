@@ -304,7 +304,25 @@ struct ProfileView: View {
                             Text(isLoggingOut ? "Logging out..." : "Log Out")
                         }
                     }
-                    .buttonStyle(PostaPrimaryButtonStyle(isEnabled: true, backgroundColor: .red))
+                    .buttonStyle(PlainButtonStyle())
+                    .font(.system(size: 18, weight: .semibold))
+                    .foregroundColor(.white)
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 56)
+                    .background(
+                        LinearGradient(
+                            gradient: Gradient(colors: [Color.red, Color.red.opacity(0.8)]),
+                            startPoint: .leading,
+                            endPoint: .trailing
+                        )
+                    )
+                    .clipShape(RoundedRectangle(cornerRadius: 16))
+                    .shadow(
+                        color: Color.red.opacity(0.3),
+                        radius: 10,
+                        x: 0,
+                        y: 4
+                    )
                     .disabled(isLoggingOut)
                 }
                 

@@ -1,6 +1,5 @@
 import Foundation
 import NDKSwift
-import Combine
 
 @MainActor
 class CommentService: ObservableObject {
@@ -12,8 +11,7 @@ class CommentService: ObservableObject {
     // MARK: - Properties
     private var ndk: NDK?
     private var signer: NDKSigner?
-    private var cancellables = Set<AnyCancellable>()
-    private var activeSubscriptions: [String: AnyCancellable] = [:]
+    private var activeTasks: [String: Task<Void, Never>] = [:]
     
     // MARK: - Configuration
     
@@ -47,41 +45,38 @@ class CommentService: ObservableObject {
         )
         
         // Cancel any existing subscription
-        activeSubscriptions[highlightId]?.cancel()
+        activeTasks[highlightId]?.cancel()
         
         // Process comments as they arrive
-        let subscription = dataSource.events
-            .sink(
-                receiveCompletion: { _ in
-                    Task { @MainActor in
+        let task = Task {
+            for await event in dataSource.events {
+                if let comment = await self.processCommentEvent(event, highlightId: highlightId) {
+                    await MainActor.run {
+                        if self.comments[highlightId] == nil {
+                            self.comments[highlightId] = []
+                        }
+                        
+                        // Add if not already present
+                        if !self.comments[highlightId]!.contains(where: { $0.id == comment.id }) {
+                            self.comments[highlightId]!.append(comment)
+                            
+                            // Sort by timestamp
+                            self.comments[highlightId]!.sort { $0.createdAt > $1.createdAt }
+                        }
+                        
+                        // Mark as loaded after first comment
                         self.isLoadingComments[highlightId] = false
                     }
-                },
-                receiveValue: { event in
-                    Task {
-                        if let comment = await self.processCommentEvent(event, highlightId: highlightId) {
-                            await MainActor.run {
-                                if self.comments[highlightId] == nil {
-                                    self.comments[highlightId] = []
-                                }
-                                
-                                // Add if not already present
-                                if !self.comments[highlightId]!.contains(where: { $0.id == comment.id }) {
-                                    self.comments[highlightId]!.append(comment)
-                                    
-                                    // Sort by timestamp
-                                    self.comments[highlightId]!.sort { $0.createdAt > $1.createdAt }
-                                }
-                                
-                                // Mark as loaded after first comment
-                                self.isLoadingComments[highlightId] = false
-                            }
-                        }
-                    }
                 }
-            )
+            }
+            
+            // Mark as loaded when stream ends
+            await MainActor.run {
+                self.isLoadingComments[highlightId] = false
+            }
+        }
         
-        activeSubscriptions[highlightId] = subscription
+        activeTasks[highlightId] = task
     }
     
     /// Post a comment on a highlight
@@ -113,7 +108,7 @@ class CommentService: ObservableObject {
             .build(signer: signer)
         
         // Publish the comment
-        try await ndk.publish(event)
+        _ = try await ndk.publish(event)
         
         // Create local comment object
         let comment = Comment(
@@ -154,7 +149,7 @@ class CommentService: ObservableObject {
             ])
             .build(signer: signer)
         
-        try await ndk.publish(event)
+        _ = try await ndk.publish(event)
         
         // Update local state
         await MainActor.run {
@@ -175,7 +170,7 @@ class CommentService: ObservableObject {
         }
         
         // Verify the user is the author
-        let userPubkey = try await signer.publicKey(format: .hex)
+        let userPubkey = try await signer.pubkey
         guard comment.author == userPubkey else {
             throw CommentError.notAuthor
         }
@@ -187,7 +182,7 @@ class CommentService: ObservableObject {
             .tags([["e", comment.id]])
             .build(signer: signer)
         
-        try await ndk.publish(event)
+        _ = try await ndk.publish(event)
         
         // Remove from local state
         await MainActor.run {
@@ -215,8 +210,8 @@ class CommentService: ObservableObject {
     
     /// Clear all subscriptions
     func clearSubscriptions() {
-        activeSubscriptions.values.forEach { $0.cancel() }
-        activeSubscriptions.removeAll()
+        activeTasks.values.forEach { $0.cancel() }
+        activeTasks.removeAll()
     }
     
     // MARK: - Private Methods
@@ -253,31 +248,44 @@ class CommentService: ObservableObject {
             tags: ["e": [eventId]]
         )
         
-        do {
-            let events = try await ndk.fetchEvents(filter, timeout: 2.0)
-            return events.filter { $0.content == "+" || $0.content == "❤️" }.count
-        } catch {
-            return 0
+        // Use outbox to get reactions
+        let dataSource = await ndk.outbox.observe(
+            filter: filter,
+            maxAge: 60 // 1 minute cache for reactions
+        )
+        
+        var count = 0
+        for await event in dataSource.events {
+            if event.content == "+" || event.content == "❤️" {
+                count += 1
+            }
         }
+        return count
     }
     
     private func checkIfLiked(_ eventId: String) async -> Bool {
         guard let ndk = ndk, let signer = signer else { return false }
         
-        do {
-            let userPubkey = try await signer.publicKey(format: .hex)
-            
-            let filter = NDKFilter(
-                authors: [userPubkey],
-                kinds: [7], // Reactions
-                tags: ["e": [eventId]]
-            )
-            
-            let events = try await ndk.fetchEvents(filter, timeout: 1.0)
-            return events.contains { $0.content == "+" || $0.content == "❤️" }
-        } catch {
-            return false
+        guard let userPubkey = try? await signer.pubkey else { return false }
+        
+        let filter = NDKFilter(
+            authors: [userPubkey],
+            kinds: [7], // Reactions
+            tags: ["e": [eventId]]
+        )
+        
+        // Use observe with maxAge for one-shot fetch
+        let dataSource = await ndk.outbox.observe(
+            filter: filter,
+            maxAge: 60 // 1 minute cache
+        )
+        
+        for await event in dataSource.events {
+            if event.content == "+" || event.content == "❤️" {
+                return true
+            }
         }
+        return false
     }
 }
 

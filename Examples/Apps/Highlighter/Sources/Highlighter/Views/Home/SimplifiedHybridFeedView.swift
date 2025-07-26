@@ -2,7 +2,7 @@ import SwiftUI
 import NDKSwift
 
 // Make NDKEvent conform to Identifiable for SwiftUI usage
-extension NDKEvent: Identifiable {}
+extension NDKEvent: @retroactive Identifiable {}
 
 struct SimplifiedHybridFeedView: View {
     @EnvironmentObject var appState: AppState
