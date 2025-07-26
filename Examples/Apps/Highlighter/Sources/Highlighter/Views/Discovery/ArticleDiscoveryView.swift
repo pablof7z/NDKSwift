@@ -18,15 +18,22 @@ struct ArticleDiscoveryView: View {
     
     var body: some View {
         ScrollView {
-            LazyVStack(spacing: 16) {
-                ForEach(filteredArticles) { article in
-                    NavigationLink(destination: ArticleView(article: article)) {
-                        ArticleCardView(article: article)
+            VStack(spacing: 24) {
+                // Featured Section
+                VStack(alignment: .leading, spacing: 16) {
+                    ModernSectionHeader(title: "Featured Articles")
+                    
+                    LazyVStack(spacing: 16) {
+                        ForEach(filteredArticles.prefix(10)) { article in
+                            NavigationLink(destination: ArticleView(article: article)) {
+                                ArticleCardView(article: article)
+                            }
+                            .buttonStyle(PlainButtonStyle())
+                        }
                     }
-                    .buttonStyle(PlainButtonStyle())
                 }
             }
-            .padding()
+            .padding(.vertical, 24)
         }
         .task {
             await loadArticles()
