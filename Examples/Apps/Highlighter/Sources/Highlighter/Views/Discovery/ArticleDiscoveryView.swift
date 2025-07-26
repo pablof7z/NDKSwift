@@ -5,6 +5,7 @@ struct ArticleDiscoveryView: View {
     let searchText: String
     @EnvironmentObject var appState: AppState
     @State private var articles: [Article] = []
+    @State private var articleEngagements: [String: EngagementService.EngagementMetrics] = [:]
     
     var filteredArticles: [Article] {
         if searchText.isEmpty {
@@ -25,10 +26,10 @@ struct ArticleDiscoveryView: View {
                     
                     LazyVStack(spacing: 16) {
                         ForEach(filteredArticles.prefix(10)) { article in
-                            NavigationLink(destination: ArticleView(article: article)) {
-                                ArticleCardView(article: article)
-                            }
-                            .buttonStyle(PlainButtonStyle())
+                            ArticleCardView(
+                                article: article,
+                                engagement: articleEngagements[article.id] ?? EngagementService.EngagementMetrics()
+                            )
                         }
                     }
                 }
@@ -37,6 +38,11 @@ struct ArticleDiscoveryView: View {
         }
         .task {
             await loadArticles()
+        }
+        .onChange(of: articles) { _ in
+            Task {
+                await fetchArticleEngagements()
+            }
         }
     }
     
@@ -64,17 +70,29 @@ struct ArticleDiscoveryView: View {
             }
         }
     }
+    
+    private func fetchArticleEngagements() async {
+        let eventIds = articles.map { $0.id }
+        guard !eventIds.isEmpty else { return }
+        
+        let engagements = await appState.engagementService.fetchEngagementBatch(for: eventIds)
+        await MainActor.run {
+            articleEngagements = engagements
+        }
+    }
 }
 
 // MARK: - Article Card View
 
 struct ArticleCardView: View {
     let article: Article
+    let engagement: EngagementService.EngagementMetrics
     @State private var author: NDKUserProfile?
     @EnvironmentObject var appState: AppState
     
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        NavigationLink(destination: ArticleView(article: article)) {
+            VStack(alignment: .leading, spacing: 12) {
             // Header image
             if let imageURL = article.image, let url = URL(string: imageURL) {
                 AsyncImage(url: url) { image in
@@ -141,14 +159,31 @@ struct ArticleCardView: View {
                     
                     Spacer()
                     
-                    Label("\(article.estimatedReadingTime) min", systemImage: "clock")
-                        .font(.ds.caption)
-                        .foregroundColor(.ds.textSecondary)
+                    // Engagement metrics
+                    HStack(spacing: 12) {
+                        if engagement.likes > 0 {
+                            Label("\(engagement.likes)", systemImage: "heart")
+                                .font(.ds.caption)
+                                .foregroundColor(.ds.textSecondary)
+                        }
+                        if engagement.comments > 0 {
+                            Label("\(engagement.comments)", systemImage: "bubble.right")
+                                .font(.ds.caption)
+                                .foregroundColor(.ds.textSecondary)
+                        }
+                        
+                        Label("\(article.estimatedReadingTime) min", systemImage: "clock")
+                            .font(.ds.caption)
+                            .foregroundColor(.ds.textSecondary)
+                    }
                 }
             }
             .padding()
         }
+        }
+        .buttonStyle(PlainButtonStyle()) // Prevent default button styling
         .modernCard()
+        .contentShape(Rectangle()) // Make entire card tappable
         .task {
             await loadAuthor()
         }

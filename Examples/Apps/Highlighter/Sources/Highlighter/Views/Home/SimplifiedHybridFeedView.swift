@@ -10,8 +10,8 @@ struct SimplifiedHybridFeedView: View {
     @State private var selectedSection = 0
     @State private var scrollOffset: CGFloat = 0
     @State private var headerOpacity: Double = 1
-    @State private var showLiveIndicator = false
-    @State private var pulseAnimation = false
+    @State private var highlightEngagements: [String: EngagementService.EngagementMetrics] = [:]
+    @State private var discussionEngagements: [String: EngagementService.EngagementMetrics] = [:]
     
     // Dynamic gradient colors that shift based on time of day
     private var gradientColors: [Color] {
@@ -25,6 +25,27 @@ struct SimplifiedHybridFeedView: View {
             return [Color(hex: "FF6B6B").opacity(0.3), Color(hex: "FF8E53").opacity(0.2)]
         default: // Night
             return [Color(hex: "2C3E50").opacity(0.3), Color(hex: "34495E").opacity(0.2)]
+        }
+    }
+    
+    // MARK: - Engagement Fetching
+    private func fetchHighlightEngagements() async {
+        let eventIds = dataManager.userHighlights.map { $0.id }
+        guard !eventIds.isEmpty else { return }
+        
+        let engagements = await appState.engagementService.fetchEngagementBatch(for: eventIds)
+        await MainActor.run {
+            highlightEngagements = engagements
+        }
+    }
+    
+    private func fetchDiscussionEngagements() async {
+        let eventIds = dataManager.discussions.prefix(10).map { $0.id }
+        guard !eventIds.isEmpty else { return }
+        
+        let engagements = await appState.engagementService.fetchEngagementBatch(for: eventIds)
+        await MainActor.run {
+            discussionEngagements = engagements
         }
     }
     
@@ -52,18 +73,13 @@ struct SimplifiedHybridFeedView: View {
                                 .opacity(headerOpacity)
                                 .id("header")
                             
-                            // Live activity indicator
-                            if showLiveIndicator {
-                                LiveActivityBar()
-                                    .padding(.horizontal, 20)
-                                    .padding(.top, 16)
-                                    .transition(.asymmetric(
-                                        insertion: .push(from: .top).combined(with: .opacity),
-                                        removal: .push(from: .bottom).combined(with: .opacity)
-                                    ))
-                            }
                             
                             VStack(spacing: 32) {
+                                // Recently Highlighted Articles
+                                if !dataManager.highlightedArticles.isEmpty {
+                                    recentlyHighlightedSection
+                                }
+                                
                                 // Featured Highlights with enhanced carousel
                                 if !dataManager.userHighlights.isEmpty {
                                     enhancedCarouselSection(
@@ -72,28 +88,19 @@ struct SimplifiedHybridFeedView: View {
                                         items: dataManager.userHighlights,
                                         icon: "sparkle"
                                     ) { highlight in
-                                        EnhancedHighlightCard(highlight: highlight)
+                                        EnhancedHighlightCard(
+                                            highlight: highlight,
+                                            engagement: highlightEngagements[highlight.id] ?? EngagementService.EngagementMetrics()
+                                        )
                                     }
                                 } else {
                                     // Loading state with skeleton UI
                                     carouselLoadingState(title: "Featured Highlights")
                                 }
                                 
-                                // Active Discussions with real-time indicator
+                                // Active Discussions
                                 if !dataManager.discussions.isEmpty {
                                     enhancedDiscussionsSection
-                                }
-                                
-                                // Trending Content with zap animations
-                                if !dataManager.zappedArticles.isEmpty {
-                                    enhancedCarouselSection(
-                                        title: "Trending Now",
-                                        subtitle: "Most zapped content",
-                                        items: dataManager.zappedArticles,
-                                        icon: "bolt.fill"
-                                    ) { event in
-                                        EnhancedTrendingCard(event: event)
-                                    }
                                 }
                             }
                             .padding(.top, 24)
@@ -123,15 +130,19 @@ struct SimplifiedHybridFeedView: View {
         }
         .onAppear {
             dataManager.appState = appState
-            // Animate live indicator after a short delay
-            DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
-                withAnimation(.spring(response: 0.5, dampingFraction: 0.8)) {
-                    showLiveIndicator = true
-                }
-            }
         }
         .task {
             await dataManager.startStreaming()
+        }
+        .onChange(of: dataManager.userHighlights) { _ in
+            Task {
+                await fetchHighlightEngagements()
+            }
+        }
+        .onChange(of: dataManager.discussions) { _ in
+            Task {
+                await fetchDiscussionEngagements()
+            }
         }
     }
     
@@ -143,12 +154,9 @@ struct SimplifiedHybridFeedView: View {
                         .font(.system(size: 34, weight: .bold, design: .rounded))
                         .foregroundColor(.ds.text)
                     
-                    // Animated emoji based on time
+                    // Time-based emoji without pulsing animation
                     Text(timeBasedEmoji)
                         .font(.system(size: 28))
-                        .rotationEffect(.degrees(pulseAnimation ? 10 : -10))
-                        .animation(.easeInOut(duration: 2).repeatForever(autoreverses: true), value: pulseAnimation)
-                        .onAppear { pulseAnimation = true }
                 }
                 
                 HStack(spacing: 6) {
@@ -200,7 +208,6 @@ struct SimplifiedHybridFeedView: View {
                         Image(systemName: icon)
                             .font(.system(size: 20, weight: .semibold))
                             .foregroundColor(.ds.primary)
-                            .symbolEffect(.pulse)
                     }
                     
                     Text(title)
@@ -254,6 +261,35 @@ struct SimplifiedHybridFeedView: View {
         }
     }
     
+    private var recentlyHighlightedSection: some View {
+        VStack(alignment: .leading, spacing: 20) {
+            VStack(alignment: .leading, spacing: 6) {
+                Text("Recently Highlighted")
+                    .font(.system(size: 28, weight: .bold, design: .rounded))
+                    .foregroundColor(.ds.text)
+                
+                Text("Articles you might enjoy")
+                    .font(.ds.body)
+                    .foregroundColor(.ds.textSecondary)
+            }
+            .padding(.horizontal, 20)
+            
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 16) {
+                    ForEach(dataManager.highlightedArticles.prefix(5), id: \.article.id) { highlightedArticle in
+                        NavigationLink(destination: ArticleView(article: highlightedArticle.article)) {
+                            RecentlyHighlightedArticleCard(highlightedArticle: highlightedArticle)
+                                .frame(width: 280)
+                        }
+                        .buttonStyle(PlainButtonStyle())
+                    }
+                }
+                .padding(.horizontal, 20)
+                .padding(.vertical, 4)
+            }
+        }
+    }
+    
     private var enhancedDiscussionsSection: some View {
         VStack(alignment: .leading, spacing: 20) {
             HStack {
@@ -262,7 +298,6 @@ struct SimplifiedHybridFeedView: View {
                         Image(systemName: "bubble.left.and.bubble.right.fill")
                             .font(.system(size: 20, weight: .semibold))
                             .foregroundColor(.ds.primary)
-                            .symbolEffect(.pulse)
                         
                         Text("Active Discussions")
                             .font(.system(size: 24, weight: .bold, design: .rounded))
@@ -275,15 +310,15 @@ struct SimplifiedHybridFeedView: View {
                 }
                 
                 Spacer()
-                
-                // Real-time indicator
-                PulsingDot()
             }
             .padding(.horizontal, 20)
             
             VStack(spacing: 0) {
                 ForEach(dataManager.discussions.prefix(5), id: \.id) { event in
-                    EnhancedDiscussionRow(event: event)
+                    EnhancedDiscussionRow(
+                        event: event,
+                        engagement: discussionEngagements[event.id] ?? EngagementService.EngagementMetrics()
+                    )
                     
                     if event.id != dataManager.discussions.prefix(5).last?.id {
                         Divider()
@@ -306,6 +341,7 @@ struct SimplifiedHybridFeedView: View {
 
 struct EnhancedHighlightCard: View {
     let highlight: HighlightEvent
+    let engagement: EngagementService.EngagementMetrics
     @State private var isPressed = false
     @State private var showingDetail = false
     
@@ -380,9 +416,9 @@ struct EnhancedHighlightCard: View {
                         
                         // Interaction buttons
                         HStack(spacing: 16) {
-                            InteractionButton(icon: "heart", count: Int.random(in: 5...50))
-                            InteractionButton(icon: "bubble.right", count: Int.random(in: 0...20))
-                            InteractionButton(icon: "bolt.fill", count: Int.random(in: 100...1000), color: .orange)
+                            InteractionButton(icon: "heart", count: engagement.likes)
+                            InteractionButton(icon: "bubble.right", count: engagement.comments)
+                            InteractionButton(icon: "bolt.fill", count: engagement.zaps, color: .orange)
                         }
                     }
                 }
@@ -407,120 +443,10 @@ struct EnhancedHighlightCard: View {
     }
 }
 
-struct EnhancedTrendingCard: View {
-    let event: NDKEvent
-    @State private var zapAnimation = false
-    @State private var particleAnimation = false
-    
-    var body: some View {
-        ZStack {
-            // Animated gradient background
-            LinearGradient(
-                colors: [
-                    Color.orange.opacity(0.2),
-                    Color.yellow.opacity(0.1)
-                ],
-                startPoint: zapAnimation ? .topLeading : .bottomTrailing,
-                endPoint: zapAnimation ? .bottomTrailing : .topLeading
-            )
-            .animation(.easeInOut(duration: 3).repeatForever(autoreverses: true), value: zapAnimation)
-            
-            VStack(alignment: .leading, spacing: 16) {
-                HStack(spacing: 16) {
-                    // Animated zap icon
-                    ZStack {
-                        Circle()
-                            .fill(
-                                RadialGradient(
-                                    colors: [Color.orange, Color.orange.opacity(0.3)],
-                                    center: .center,
-                                    startRadius: 5,
-                                    endRadius: 25
-                                )
-                            )
-                            .frame(width: 56, height: 56)
-                            .scaleEffect(zapAnimation ? 1.1 : 1.0)
-                        
-                        Image(systemName: "bolt.fill")
-                            .font(.system(size: 28, weight: .bold))
-                            .foregroundStyle(
-                                LinearGradient(
-                                    colors: [.yellow, .orange],
-                                    startPoint: .topLeading,
-                                    endPoint: .bottomTrailing
-                                )
-                            )
-                            .rotationEffect(.degrees(zapAnimation ? 10 : -10))
-                    }
-                    
-                    VStack(alignment: .leading, spacing: 6) {
-                        Text("Lightning Zapped")
-                            .font(.system(size: 18, weight: .bold, design: .rounded))
-                            .foregroundColor(.ds.text)
-                        
-                        HStack(spacing: 6) {
-                            Image(systemName: "bitcoinsign.circle.fill")
-                                .font(.system(size: 14))
-                                .foregroundColor(.orange)
-                            
-                            Text("\(Int.random(in: 1000...50000)) sats")
-                                .font(.system(size: 16, weight: .semibold))
-                                .foregroundColor(.orange)
-                        }
-                    }
-                    
-                    Spacer()
-                }
-                
-                Text(event.content.prefix(100) + "...")
-                    .font(.system(size: 15, weight: .medium))
-                    .foregroundColor(.ds.text)
-                    .lineLimit(3)
-                    .multilineTextAlignment(.leading)
-                
-                // Engagement metrics
-                HStack(spacing: 20) {
-                    MetricPill(icon: "eye", value: "\(Int.random(in: 100...1000))")
-                    MetricPill(icon: "arrow.2.squarepath", value: "\(Int.random(in: 10...100))")
-                    MetricPill(icon: "heart.fill", value: "\(Int.random(in: 50...500))")
-                }
-            }
-            .padding(20)
-            
-            // Particle effects
-            if particleAnimation {
-                ForEach(0..<8, id: \.self) { index in
-                    Circle()
-                        .fill(Color.orange)
-                        .frame(width: 4, height: 4)
-                        .offset(
-                            x: particleAnimation ? CGFloat.random(in: -150...150) : 0,
-                            y: particleAnimation ? CGFloat.random(in: -100...100) : 0
-                        )
-                        .opacity(particleAnimation ? 0 : 1)
-                        .animation(
-                            .easeOut(duration: 1.5)
-                            .delay(Double(index) * 0.1)
-                            .repeatForever(autoreverses: false),
-                            value: particleAnimation
-                        )
-                }
-            }
-        }
-        .frame(height: 180)
-        .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
-        .shadow(color: Color.orange.opacity(0.2), radius: 16, y: 8)
-        .onAppear {
-            zapAnimation = true
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                particleAnimation = true
-            }
-        }
-    }
-}
 
 struct EnhancedDiscussionRow: View {
     let event: NDKEvent
+    let engagement: EngagementService.EngagementMetrics
     @State private var author: NDKUserProfile?
     
     var body: some View {
@@ -566,12 +492,12 @@ struct EnhancedDiscussionRow: View {
                     .lineLimit(2)
                     .fixedSize(horizontal: false, vertical: true)
                 
-                // Engagement row
+                // Engagement row with real metrics
                 HStack(spacing: 20) {
-                    EngagementButton(icon: "bubble.right", count: Int.random(in: 0...20))
-                    EngagementButton(icon: "arrow.2.squarepath", count: Int.random(in: 0...10))
-                    EngagementButton(icon: "heart", count: Int.random(in: 0...50))
-                    EngagementButton(icon: "bolt.fill", count: Int.random(in: 0...1000), color: .orange)
+                    EngagementButton(icon: "bubble.right", count: engagement.comments)
+                    EngagementButton(icon: "arrow.2.squarepath", count: engagement.reposts)
+                    EngagementButton(icon: "heart", count: engagement.likes)
+                    EngagementButton(icon: "bolt.fill", count: engagement.zaps, color: .orange)
                 }
                 .padding(.top, 4)
             }
@@ -585,48 +511,154 @@ struct EnhancedDiscussionRow: View {
 
 // MARK: - Supporting Components
 
-struct LiveActivityBar: View {
-    @State private var dots = [false, false, false]
+struct RecentlyHighlightedArticleCard: View {
+    let highlightedArticle: HomeDataManager.HighlightedArticle
+    @State private var isPressed = false
     
     var body: some View {
-        HStack {
-            HStack(spacing: 6) {
-                ForEach(0..<3, id: \.self) { index in
-                    Circle()
-                        .fill(Color.green)
-                        .frame(width: 6, height: 6)
-                        .scaleEffect(dots[index] ? 1.2 : 0.8)
-                        .animation(
-                            .easeInOut(duration: 0.6)
-                            .delay(Double(index) * 0.2)
-                            .repeatForever(autoreverses: true),
-                            value: dots[index]
-                        )
+        VStack(spacing: 0) {
+            // Article thumbnail/gradient
+            ZStack(alignment: .bottom) {
+                // Background image or gradient
+                if let imageUrl = highlightedArticle.article.image {
+                    AsyncImage(url: URL(string: imageUrl)) { phase in
+                        switch phase {
+                        case .success(let image):
+                            image
+                                .resizable()
+                                .aspectRatio(contentMode: .fill)
+                                .frame(height: 180)
+                                .clipped()
+                        case .empty, .failure:
+                            LinearGradient(
+                                colors: [
+                                    Color.ds.primary.opacity(0.8),
+                                    Color.ds.primary.opacity(0.4)
+                                ],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                            .frame(height: 180)
+                        @unknown default:
+                            EmptyView()
+                        }
+                    }
+                } else {
+                    LinearGradient(
+                        colors: [
+                            Color.ds.primary.opacity(0.8),
+                            Color.ds.primary.opacity(0.4)
+                        ],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                    .frame(height: 180)
                 }
                 
-                Text("Live feed updating")
-                    .font(.ds.caption)
-                    .fontWeight(.medium)
-                    .foregroundColor(.green)
+                // Overlay gradient for readability
+                LinearGradient(
+                    colors: [
+                        Color.clear,
+                        Color.black.opacity(0.7)
+                    ],
+                    startPoint: .center,
+                    endPoint: .bottom
+                )
+                
+                // Article title
+                VStack(alignment: .leading, spacing: 8) {
+                    Text(highlightedArticle.article.title)
+                        .font(.system(size: 18, weight: .bold, design: .rounded))
+                        .foregroundColor(.white)
+                        .lineLimit(2)
+                        .multilineTextAlignment(.leading)
+                    
+                    if let summary = highlightedArticle.article.summary {
+                        Text(summary)
+                            .font(.system(size: 14))
+                            .foregroundColor(.white.opacity(0.8))
+                            .lineLimit(2)
+                            .multilineTextAlignment(.leading)
+                    }
+                }
+                .padding(16)
+                .frame(maxWidth: .infinity, alignment: .leading)
             }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 8)
-            .background(
-                Capsule()
-                    .fill(Color.green.opacity(0.1))
-                    .overlay(
-                        Capsule()
-                            .strokeBorder(Color.green.opacity(0.3), lineWidth: 1)
-                    )
-            )
+            .frame(height: 180)
             
-            Spacer()
+            // Bottom metadata
+            VStack(alignment: .leading, spacing: 12) {
+                // Author and time
+                HStack(spacing: 8) {
+                    AsyncProfileImage(pubkey: highlightedArticle.article.author, size: 24)
+                    
+                    Text(PubkeyFormatter.formatCompact(highlightedArticle.article.author))
+                        .font(.ds.caption)
+                        .fontWeight(.medium)
+                        .foregroundColor(.ds.text)
+                    
+                    Spacer()
+                    
+                    Text(highlightedArticle.article.estimatedReadingTime > 0 ? "\(highlightedArticle.article.estimatedReadingTime) min read" : "Quick read")
+                        .font(.ds.caption)
+                        .foregroundColor(.ds.textSecondary)
+                }
+                
+                // Highlight count and sample
+                VStack(alignment: .leading, spacing: 6) {
+                    HStack(spacing: 6) {
+                        Image(systemName: "highlighter")
+                            .font(.system(size: 12))
+                            .foregroundColor(.orange)
+                        
+                        Text("\(highlightedArticle.highlights.count) highlight\(highlightedArticle.highlights.count == 1 ? "" : "s")")
+                            .font(.system(size: 12, weight: .medium))
+                            .foregroundColor(.orange)
+                        
+                        Text("·")
+                            .foregroundColor(.ds.textTertiary)
+                        
+                        Text(RelativeTimeFormatter.shortRelativeTime(from: highlightedArticle.lastHighlightTime))
+                            .font(.system(size: 12))
+                            .foregroundColor(.ds.textTertiary)
+                    }
+                    
+                    // Show a preview of the most recent highlight
+                    if let latestHighlight = highlightedArticle.highlights.first {
+                        Text("\"\(latestHighlight.content.prefix(80))...\"")
+                            .font(.system(size: 13, design: .serif))
+                            .italic()
+                            .foregroundColor(.ds.textSecondary)
+                            .lineLimit(2)
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 6)
+                            .background(
+                                RoundedRectangle(cornerRadius: 8)
+                                    .fill(Color.ds.highlightSubtle.opacity(0.5))
+                            )
+                    }
+                }
+            }
+            .padding(16)
+            .background(Color.ds.surface)
         }
-        .onAppear {
-            dots = [true, true, true]
-        }
+        .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+        .shadow(color: Color.black.opacity(0.1), radius: 12, y: 6)
+        .overlay(
+            RoundedRectangle(cornerRadius: 20, style: .continuous)
+                .strokeBorder(Color.ds.divider.opacity(0.5), lineWidth: 0.5)
+        )
+        .scaleEffect(isPressed ? 0.97 : 1)
+        .animation(.spring(response: 0.3, dampingFraction: 0.7), value: isPressed)
+        .onLongPressGesture(minimumDuration: 0.1, maximumDistance: .infinity, pressing: { pressing in
+            isPressed = pressing
+            if pressing {
+                HapticManager.shared.impact(.light)
+            }
+        }, perform: {})
     }
 }
+
 
 struct ActivityRing: View {
     @State private var progress: CGFloat = 0.75
@@ -666,33 +698,6 @@ struct ActivityRing: View {
     }
 }
 
-struct PulsingDot: View {
-    @State private var scale: CGFloat = 1
-    @State private var opacity: Double = 1
-    
-    var body: some View {
-        ZStack {
-            Circle()
-                .fill(Color.green)
-                .frame(width: 8, height: 8)
-            
-            Circle()
-                .stroke(Color.green, lineWidth: 1)
-                .frame(width: 16, height: 16)
-                .scaleEffect(scale)
-                .opacity(opacity)
-                .animation(
-                    .easeOut(duration: 1)
-                    .repeatForever(autoreverses: false),
-                    value: scale
-                )
-        }
-        .onAppear {
-            scale = 2
-            opacity = 0
-        }
-    }
-}
 
 struct InteractionButton: View {
     let icon: String

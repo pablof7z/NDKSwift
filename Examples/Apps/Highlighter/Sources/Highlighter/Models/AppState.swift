@@ -16,6 +16,7 @@ class AppState: ObservableObject {
     @Published private(set) var publishingService = PublishingService()
     @Published private(set) var bookmarkService = BookmarkService()
     @Published private(set) var commentService = CommentService()
+    @Published private(set) var engagementService = EngagementService()
     
     // Computed Content State (from services)
     var highlights: [HighlightEvent] { dataStreamManager.highlights }
@@ -63,10 +64,13 @@ class AppState: ObservableObject {
             publishingService.configure(with: ndk!, signer: authManager.activeSigner)
             bookmarkService.configure(with: ndk!, signer: authManager.activeSigner)
             commentService.configure(with: ndk!, signer: authManager.activeSigner)
+            engagementService.configure(with: ndk!, signer: authManager.activeSigner)
             
             // Connect to relays asynchronously
             Task {
+                print("DEBUG: Connecting to relays...")
                 await ndk?.connect()
+                print("DEBUG: Connected to relays")
             }
             
             // Set NDK instance in auth manager
@@ -111,6 +115,7 @@ class AppState: ObservableObject {
         publishingService.configure(with: ndk!, signer: signer)
         bookmarkService.configure(with: ndk!, signer: signer)
         commentService.configure(with: ndk!, signer: signer)
+        engagementService.configure(with: ndk!, signer: signer)
         
         // Start streaming data
         await dataStreamManager.startAllStreams()
@@ -130,6 +135,7 @@ class AppState: ObservableObject {
         publishingService.configure(with: ndk!, signer: signer)
         bookmarkService.configure(with: ndk!, signer: signer)
         commentService.configure(with: ndk!, signer: signer)
+        engagementService.configure(with: ndk!, signer: signer)
         
         // Start streaming data
         await dataStreamManager.startAllStreams()
