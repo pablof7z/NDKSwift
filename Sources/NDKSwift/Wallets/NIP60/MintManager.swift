@@ -8,6 +8,7 @@ public actor MintManager {
     private var mints: [String: CashuSwift.Mint] = [:] // URL string to Mint
     private var keysets: [String: CashuSwift.Keyset] = [:] // Keyset ID to Keyset
     private let mintLoader: CachedMintLoader?
+    private let networkClient = NDKNetworkClient()
 
     // MARK: - Initialization
 
@@ -93,8 +94,7 @@ public actor MintManager {
         } else {
             // Fallback to direct network fetch
             let infoUrl = url.appending(path: "/v1/info")
-            let data = try await URLSession.shared.data(from: infoUrl).0
-            return try JSONCoding.decode(NDKMintInfo.self, from: data)
+            return try await networkClient.fetchJSON(NDKMintInfo.self, from: infoUrl)
         }
     }
 

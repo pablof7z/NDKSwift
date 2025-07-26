@@ -16,6 +16,7 @@ public actor CachedMintLoader {
     private let cache: NDKCache
     private let mintInfoMaxAge: TimeInterval
     private let keysetMaxAge: TimeInterval
+    private let networkClient = NDKNetworkClient()
 
     /// Initialize with a cache and staleness intervals
     /// - Parameters:
@@ -78,10 +79,7 @@ public actor CachedMintLoader {
 
         // Fetch from network
         let infoUrl = url.appending(path: "/v1/info")
-        let data = try await URLSession.shared.data(from: infoUrl).0
-
-        // Decode to our local type
-        let info = try JSONCoding.decode(NDKMintInfo.self, from: data)
+        let info = try await networkClient.fetchJSON(NDKMintInfo.self, from: infoUrl)
 
         // Cache the result
         try await cache.saveMintInfo(info, url: urlString)
