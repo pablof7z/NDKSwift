@@ -92,7 +92,7 @@ public actor NDKNWCWallet: NDKPaymentProvider {
         NDKLogger.log(.info, category: .wallet, "\(logPrefix) Starting connection...")
 
         // Store the connection task
-        connectionTask = Task {
+        let task = Task {
             do {
                 // Fetch wallet info to verify connection
                 NDKLogger.log(.debug, category: .wallet, "\(logPrefix) Fetching wallet info...")
@@ -108,8 +108,9 @@ public actor NDKNWCWallet: NDKPaymentProvider {
                 throw error
             }
         }
+        connectionTask = task
 
-        try await connectionTask!.value
+        try await task.value
     }
 
     public func disconnect() async {
