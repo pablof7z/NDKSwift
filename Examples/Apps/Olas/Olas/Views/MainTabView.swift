@@ -62,7 +62,7 @@ struct MainTabView: View {
                         ProfileView(pubkey: session.pubkey)
                             .toolbar {
                                 ToolbarItem(placement: .navigationBarTrailing) {
-                                    NavigationLink(destination: OlasWalletView(nostrManager: nostrManager)) {
+                                    NavigationLink(destination: OlasWalletView(walletManager: OlasWalletManager(nostrManager: nostrManager), nostrManager: nostrManager)) {
                                         Image(systemName: "bolt.circle")
                                             .foregroundStyle(OlasDesign.Colors.primary)
                                     }

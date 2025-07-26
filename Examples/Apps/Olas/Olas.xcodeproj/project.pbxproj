@@ -9,6 +9,7 @@
 /* Begin PBXBuildFile section */
 		01C1277A4958204E2214C93F /* WalletComponents.swift in Sources */ = {isa = PBXBuildFile; fileRef = F0D414502891E1EC2CE6E922 /* WalletComponents.swift */; };
 		06AC116E460E4F31DD3BBD57 /* ExploreGridItem.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE5D2F12FC56EE978555C47B /* ExploreGridItem.swift */; };
+		0905711379449AC46A4273AC /* NutZapView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 287257D32F572630FCA42034 /* NutZapView.swift */; };
 		0B2306D1588353B28A44655F /* BlossomServerManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0DF6B5D6DAD2165D2F3B150C /* BlossomServerManager.swift */; };
 		0E232AE7924923B09E2FC403 /* QRScannerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2ADCEFDDDBDFB19EBBEEB77C /* QRScannerView.swift */; };
 		0F5CE064001E306B1B790C55 /* CreateAccountView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 705A87128F6D1AEBA79A339E /* CreateAccountView.swift */; };
@@ -46,6 +47,7 @@
 		94538F4CB2769C17DC35092E /* ImetaUtils.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4AABC79BC6DFBC543250469D /* ImetaUtils.swift */; };
 		94F13714534E78B509F261DF /* NewMessageView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2E3E17DE272A7FD12BABD30B /* NewMessageView.swift */; };
 		A136013AB9390198484B893D /* CreatePostView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1204549B5A0A2545A6BE397 /* CreatePostView.swift */; };
+		A5FB76D9192AA9F499E1AF21 /* ModernStatCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD16CB15C45D9DAE6E3DE7CF /* ModernStatCard.swift */; };
 		AEC0A8C28C4D986F0D692041 /* TrendingHashtagPill.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7E0B2A99137ED5B72E8CB5D5 /* TrendingHashtagPill.swift */; };
 		B2FBFEC058C9E9CA607C231E /* NostrDataSources.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6A753FD2A91AF03BEF0CB9C8 /* NostrDataSources.swift */; };
 		B8BC21E8CCEA9D3D36982769 /* AppState.swift in Sources */ = {isa = PBXBuildFile; fileRef = C30D4C6D7E0FBCFA086E1A14 /* AppState.swift */; };
@@ -81,6 +83,7 @@
 		0DF6B5D6DAD2165D2F3B150C /* BlossomServerManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BlossomServerManager.swift; sourceTree = "<group>"; };
 		0F05007F8118B0E79C2A3ADB /* OlasCaptionComposer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OlasCaptionComposer.swift; sourceTree = "<group>"; };
 		14D8D07AC09D2E5371438874 /* OlasMultiImageView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OlasMultiImageView.swift; sourceTree = "<group>"; };
+		287257D32F572630FCA42034 /* NutZapView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NutZapView.swift; sourceTree = "<group>"; };
 		2889EBFAC7191DB90EF5A718 /* BlurhashView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BlurhashView.swift; sourceTree = "<group>"; };
 		296EBA9575D28E53EB7F04B2 /* ConversationView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConversationView.swift; sourceTree = "<group>"; };
 		29C0295E5754245F8E85B8F0 /* MainTabView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MainTabView.swift; sourceTree = "<group>"; };
@@ -119,6 +122,7 @@
 		A38516C3E4BB7DAAF6E8E239 /* RelayManagementView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RelayManagementView.swift; sourceTree = "<group>"; };
 		A71169960D37CBCEE47EAA21 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		AA76818313AF29C142656C94 /* WalletView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WalletView.swift; sourceTree = "<group>"; };
+		AD16CB15C45D9DAE6E3DE7CF /* ModernStatCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModernStatCard.swift; sourceTree = "<group>"; };
 		AD6C17EF35CA0BA6764177D5 /* OlasRichText.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OlasRichText.swift; sourceTree = "<group>"; };
 		AE5D2F12FC56EE978555C47B /* ExploreGridItem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExploreGridItem.swift; sourceTree = "<group>"; };
 		B2CACDD908BC9D11BF314BE1 /* Color+Extensions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Color+Extensions.swift"; sourceTree = "<group>"; };
@@ -166,6 +170,7 @@
 			isa = PBXGroup;
 			children = (
 				4A9926280304B7F0FE1C5562 /* GlassmorphicComponents.swift */,
+				AD16CB15C45D9DAE6E3DE7CF /* ModernStatCard.swift */,
 				EDD6264F0208655CB610E045 /* OlasBalanceCard.swift */,
 				F0D414502891E1EC2CE6E922 /* WalletComponents.swift */,
 				851122CBDCB02605E4D5F097 /* WalletUIHelpers.swift */,
@@ -217,6 +222,7 @@
 			children = (
 				D0E35B4E3669C4951F0F18C7 /* AddMintView.swift */,
 				8F055984A54417D09BE8C6CD /* MintManagementView.swift */,
+				287257D32F572630FCA42034 /* NutZapView.swift */,
 				C060397AFF9AE231D0F4C5D1 /* OlasWalletView.swift */,
 				2ADCEFDDDBDFB19EBBEEB77C /* QRScannerView.swift */,
 				51E6250ADC1D4C0CC7018CC6 /* ReceiveView.swift */,
@@ -481,10 +487,12 @@
 				12935921425F9629FDF657C2 /* MessagesListView.swift in Sources */,
 				84F59D51C1815FA4548AFF8C /* MessagingModels.swift in Sources */,
 				79213F75D245172935B59B1B /* MintManagementView.swift in Sources */,
+				A5FB76D9192AA9F499E1AF21 /* ModernStatCard.swift in Sources */,
 				94F13714534E78B509F261DF /* NewMessageView.swift in Sources */,
 				B2FBFEC058C9E9CA607C231E /* NostrDataSources.swift in Sources */,
 				C512EF61FCCE3F0FCB0C6C3B /* NostrManager.swift in Sources */,
 				30900EADB1C47C320161DE31 /* NotificationSettingsView.swift in Sources */,
+				0905711379449AC46A4273AC /* NutZapView.swift in Sources */,
 				2A29D6554673DAA6F190F3DE /* OlasApp.swift in Sources */,
 				F2E1196AD75ABF08BD62EAAE /* OlasBalanceCard.swift in Sources */,
 				39402DE58E8562B4B5607BAE /* OlasButton.swift in Sources */,

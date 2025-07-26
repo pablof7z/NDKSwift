@@ -10,6 +10,7 @@ class OlasWalletManager: ObservableObject {
     @Published var currentBalance: Int64 = 0
     @Published var mintURLs: [String] = []
     @Published var mintBalances: [String: Int64] = [:]
+    @Published var pendingAmount: Int64 = 0
     @Published var activeTokens: [WalletToken] = []
     @Published var pendingInvoices: [String: (amount: Int64, description: String, expiry: Date)] = [:]
     
@@ -24,6 +25,7 @@ class OlasWalletManager: ObservableObject {
         case sent
         case received
         case zapped
+        case nutzapped
         case minted
         case melted
         case swapped
@@ -39,11 +41,17 @@ class OlasWalletManager: ObservableObject {
         let invoice: String?
         let fee: Int64?
         let status: TransactionStatus
+        let direction: Direction?
         
         enum TransactionStatus {
             case pending
             case completed
             case failed
+        }
+        
+        enum Direction {
+            case incoming
+            case outgoing
         }
     }
     
@@ -198,7 +206,8 @@ class OlasWalletManager: ObservableObject {
                 mint: primaryMint,
                 invoice: invoice,
                 fee: feeReserve,
-                status: .completed
+                status: .completed,
+                direction: .outgoing
             )
             recentTransactions.insert(transaction, at: 0)
             
@@ -245,7 +254,8 @@ class OlasWalletManager: ObservableObject {
                 mint: tokensToSend.first?.mint,
                 invoice: nil,
                 fee: 0,
-                status: .completed
+                status: .completed,
+                direction: .outgoing
             )
             recentTransactions.insert(transaction, at: 0)
             
@@ -271,12 +281,16 @@ class OlasWalletManager: ObservableObject {
         print("💰 Zapping event \(event.id) with \(amount) sats")
         
         // Add to transactions
-        let transaction = (
-            id: UUID().uuidString,
-            type: TransactionType.zapped,
+        let transaction = WalletTransaction(
+            type: .zapped,
             amount: amount,
             description: comment ?? "Zapped a post",
-            timestamp: Date()
+            timestamp: Date(),
+            mint: nil,
+            invoice: nil,
+            fee: 0,
+            status: .completed,
+            direction: .outgoing
         )
         recentTransactions.insert(transaction, at: 0)
         
@@ -351,7 +365,8 @@ class OlasWalletManager: ObservableObject {
                 mint: validTokens.first?.mint,
                 invoice: nil,
                 fee: 0,
-                status: .completed
+                status: .completed,
+                direction: .incoming
             )
             recentTransactions.insert(transaction, at: 0)
             
@@ -396,7 +411,8 @@ class OlasWalletManager: ObservableObject {
                     mint: primaryMint,
                     invoice: nil,
                     fee: 0,
-                    status: .completed
+                    status: .completed,
+                    direction: .incoming
                 )
                 
                 await MainActor.run {
