@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - Incoming events from relays are now tracked in NDKEventTracker with `markSeen` when received
 - First relay to deliver an event is automatically set as the source relay in NDKEventTracker
+- Per-author relay count configuration for outbox model (matches ndk-core behavior)
+  - Publishing uses 2 relays per author by default (`OutboxConstants.relaysPerAuthor`)
+  - Fetching uses 2 relays per author by default (`OutboxConstants.relaysPerAuthorForFetching`)
+  - Relay selection now scales dynamically with the number of authors instead of using hard limits
 
 ### Fixed
 - Fixed outbox subscriptions not connecting to all NIP-65 relays
@@ -29,6 +33,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Closed subscriptions are properly removed and won't be replayed to newly connected relays
 
 ### Changed
+- Improved outbox relay selection algorithm (aligned with ndk-core)
+  - Connected relays are now prioritized over disconnected ones
+  - Maximum relay limits increased: 30 for publishing (was 10), 50 for fetching (was 15)
+  - These are soft limits that can be exceeded based on author count
+  - Relay selection now considers connected state to minimize new connections
 - Optimized relay connection handling from O(n) to O(1) for subscription replay
   - Added relay-to-subscription mapping in `InternalSubscriptionManager` for direct lookups
   - Separated universal subscriptions (no relay targets) from relay-specific subscriptions
