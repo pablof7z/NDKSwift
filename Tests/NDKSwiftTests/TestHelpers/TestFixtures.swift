@@ -44,8 +44,8 @@ enum TestFixtures {
             createdAt: 1700000100,
             kind: 1,
             tags: [
-                Tag(name: NostrConstants.TagName.event, value: textNote.id),
-                Tag(name: NostrConstants.TagName.pubkey, value: textNote.pubkey)
+                [NostrConstants.TagName.event, textNote.id],
+                [NostrConstants.TagName.pubkey, textNote.pubkey]
             ],
             content: "Nice to meet you!",
             sig: "test_signature_002"
@@ -74,8 +74,8 @@ enum TestFixtures {
             createdAt: 1700000300,
             kind: 3,
             tags: [
-                Tag(name: NostrConstants.TagName.pubkey, value: Keys.bob.publicKey),
-                Tag(name: NostrConstants.TagName.pubkey, value: Keys.charlie.publicKey)
+                [NostrConstants.TagName.pubkey, Keys.bob.publicKey],
+                [NostrConstants.TagName.pubkey, Keys.charlie.publicKey]
             ],
             content: "",
             sig: "test_signature_004"
@@ -87,7 +87,7 @@ enum TestFixtures {
             createdAt: 1700000400,
             kind: 5,
             tags: [
-                Tag(name: NostrConstants.TagName.event, value: textNote.id)
+                [NostrConstants.TagName.event, textNote.id]
             ],
             content: "Deleting test note",
             sig: "test_signature_005"
@@ -171,27 +171,27 @@ enum TestFixtures {
     /// Common tag patterns
     enum Tags {
         static let mention = { (pubkey: PublicKey) in
-            Tag(name: NostrConstants.TagName.pubkey, value: pubkey)
+            [NostrConstants.TagName.pubkey, pubkey]
         }
         
         static let eventReference = { (eventId: EventID) in
-            Tag(name: NostrConstants.TagName.event, value: eventId)
+            [NostrConstants.TagName.event, eventId]
         }
         
         static let replyMarker = { (eventId: EventID) in
-            Tag(name: NostrConstants.TagName.event, value: eventId, otherParameters: [NostrConstants.Marker.reply])
+            [NostrConstants.TagName.event, eventId, "", NostrConstants.Marker.reply]
         }
         
         static let rootMarker = { (eventId: EventID) in
-            Tag(name: NostrConstants.TagName.event, value: eventId, otherParameters: [NostrConstants.Marker.root])
+            [NostrConstants.TagName.event, eventId, "", NostrConstants.Marker.root]
         }
         
         static let hashtag = { (tag: String) in
-            Tag(name: NostrConstants.TagName.hashtag, value: tag)
+            [NostrConstants.TagName.hashtag, tag]
         }
         
         static let relayHint = { (eventId: EventID, relay: String) in
-            Tag(name: NostrConstants.TagName.event, value: eventId, otherParameters: [relay])
+            [NostrConstants.TagName.event, eventId, relay]
         }
     }
     
@@ -271,9 +271,9 @@ extension TestFixtures {
                 createdAt: parent.createdAt + 60,
                 kind: 1,
                 tags: [
-                    Tag(name: NostrConstants.TagName.event, value: root.id, otherParameters: [NostrConstants.Marker.root]),
-                    Tag(name: NostrConstants.TagName.event, value: parent.id, otherParameters: [NostrConstants.Marker.reply]),
-                    Tag(name: NostrConstants.TagName.pubkey, value: parent.pubkey)
+                    [NostrConstants.TagName.event, root.id, "", NostrConstants.Marker.root],
+                    [NostrConstants.TagName.event, parent.id, "", NostrConstants.Marker.reply],
+                    [NostrConstants.TagName.pubkey, parent.pubkey]
                 ],
                 content: "Reply #\(i) to thread",
                 sig: "thread_reply_\(i)_sig"

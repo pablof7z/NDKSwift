@@ -12,6 +12,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Comprehensive documentation for AsyncSequence API usage
 - Migration guide from callback-based to AsyncSequence patterns
 - Convenience methods to HexValidator for backward compatibility (isValidHexString, isValidHexPubkey, isValidEventId, isValidSignature)
+- ContentParserTests for testing content parsing functionality
+- Shared BlossomServerManager class for use across example apps
+- Shared ExampleRelayConstants for consistent relay usage in examples
 
 ### Changed
 - BlossomClient now accepts URLSessionProtocol instead of concrete URLSession
@@ -21,11 +24,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Re-enabled BlossomClient metadata tests that were previously disabled
 - Improved error logging in NDKSignatureVerificationSampler for better debugging
 - Removed force unwrapping in NDKNWCWallet connection handling for safer code
+- Test compilation errors by updating Tag usage to use array syntax
+- TestFactories filter parameter ordering to match NDKFilter constructor
 
 ### Improved
 - API documentation now includes detailed AsyncSequence examples
 - Better migration guidance for developers moving from callbacks to modern patterns
 - Code safety by eliminating force unwrapping in NWC wallet connection
+- ContentTagger public API documentation with comprehensive doc comments
+- Code organization by removing trailing empty lines
+- Reduced code duplication by creating shared components for example apps
 
 ## [0.1.5] - 2025-01-26
 

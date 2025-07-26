@@ -88,11 +88,16 @@ public struct DecodedNostrEntity {
 }
 
 /// Content tagging utilities for NDK Swift
+///
+/// This utility provides functionality for parsing and extracting Nostr entities from text content,
+/// including npubs, notes, hashtags, and URLs. It also generates the appropriate tags for events.
 public enum ContentTagger {
 
     /// Result of parsing content without fetching entities
     public struct ParseResult {
+        /// Array of parsed segments representing different content types
         public let segments: [ParseSegment]
+        /// Array of Nostr tags extracted from the content
         public let tags: [Tag]
     }
 
@@ -106,6 +111,12 @@ public enum ContentTagger {
     }
 
     /// Parse content into segments without fetching entities
+    ///
+    /// This method analyzes the content and extracts various Nostr entities (npubs, notes, hashtags, URLs)
+    /// without making any network requests to fetch additional data.
+    ///
+    /// - Parameter content: The text content to parse
+    /// - Returns: A ParseResult containing the parsed segments and extracted tags
     public static func parseContentSegments(from content: String) -> ParseResult {
         var segments: [ParseSegment] = []
         var tags: [Tag] = []
@@ -232,6 +243,12 @@ public enum ContentTagger {
         return ParseResult(segments: segments, tags: uniqueTags)
     }
     /// Generate hashtags from content
+    ///
+    /// Extracts all unique hashtags from the content, maintaining case sensitivity
+    /// but checking for uniqueness in a case-insensitive manner.
+    ///
+    /// - Parameter content: The text content to search for hashtags
+    /// - Returns: Array of hashtag strings (without the # prefix)
     public static func generateHashtags(from content: String) -> [String] {
         // Regex pattern for hashtags: #word (matches until special characters)
         let hashtagRegex = #"(?<=\s|^)(#[^\s!@#$%^&*()=+./,\[{\]};:'"?><]+)"#
@@ -262,6 +279,13 @@ public enum ContentTagger {
     }
 
     /// Decode Nostr entity from bech32 string
+    ///
+    /// Decodes various Nostr entity types (npub, note, nprofile, nevent, naddr) from their
+    /// bech32-encoded format and extracts all embedded information.
+    ///
+    /// - Parameter entity: The bech32-encoded entity string
+    /// - Returns: A DecodedNostrEntity containing all extracted information
+    /// - Throws: NDKError if the entity format is invalid
     public static func decodeNostrEntity(_ entity: String) throws -> DecodedNostrEntity {
         let (hrp, data) = try Bech32.decode(entity)
 
@@ -321,6 +345,14 @@ public enum ContentTagger {
     }
 
     /// Generate content tags from text content
+    ///
+    /// Parses the content for Nostr entities and hashtags, generates appropriate tags,
+    /// and normalizes entity references to use the nostr: prefix format.
+    ///
+    /// - Parameters:
+    ///   - content: The text content to process
+    ///   - existingTags: Any existing tags to preserve and merge with new tags
+    /// - Returns: A ContentTag containing the generated tags and normalized content
     public static func generateContentTags(from content: String, existingTags: [Tag] = []) -> ContentTag {
         var tags = existingTags
         var modifiedContent = content
@@ -437,6 +469,14 @@ public enum ContentTagger {
     }
 
     /// Merge two tag arrays, removing duplicates and preferring more detailed tags
+    ///
+    /// When merging tags, this method removes duplicates and prefers tags with more
+    /// information (e.g., a tag with relay hints over one without).
+    ///
+    /// - Parameters:
+    ///   - tags1: First array of tags
+    ///   - tags2: Second array of tags
+    /// - Returns: Merged array with duplicates removed
     public static func mergeTags(_ tags1: [Tag], _ tags2: [Tag]) -> [Tag] {
         var tagMap: [String: Tag] = [:]
 

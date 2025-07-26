@@ -15,8 +15,16 @@ struct TextSelectionView: View {
     @State private var selectionRect: CGRect = .zero
     @State private var highlightAnimation = false
     @State private var ripplePositions: [RipplePosition] = []
+    @State private var selectionPulse = false
+    @State private var buttonScale: CGFloat = 1.0
+    @State private var selectionGlow: Double = 0
+    @State private var showSelectionHint = false
+    @State private var hintOpacity: Double = 1.0
     @Environment(\.dismiss) var dismiss
     @StateObject private var publishingService = PublishingService.shared
+    
+    private let selectionFeedback = UISelectionFeedbackGenerator()
+    private let impactFeedback = UIImpactFeedbackGenerator(style: .medium)
     
     var body: some View {
         ZStack {

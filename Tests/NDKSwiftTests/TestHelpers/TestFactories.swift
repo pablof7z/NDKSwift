@@ -188,9 +188,9 @@ enum FilterTestFactory {
             ids: ids,
             authors: authors,
             kinds: kinds,
-            tags: tags,
             since: since,
             until: until,
+            tags: tags,
             limit: limit
         )
     }
