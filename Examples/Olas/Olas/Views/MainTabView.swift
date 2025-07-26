@@ -7,6 +7,8 @@ struct MainTabView: View {
     @State private var selectedTab = 0
     @State private var previousTab = 0
     @State private var showCreatePost = false
+    @State private var tabBarOpacity = 1.0
+    @State private var tabBarOffset: CGFloat = 0
     
     var body: some View {
         TabView(selection: $selectedTab) {
@@ -25,7 +27,7 @@ struct MainTabView: View {
             // Create Post - presented as sheet
             Color.clear
                 .tabItem {
-                    Label("Create", systemImage: "plus.square")
+                    Label("Create", systemImage: "plus.app")
                 }
                 .tag(2)
                 .onAppear {
@@ -35,6 +37,13 @@ struct MainTabView: View {
                         selectedTab = previousTab
                     }
                 }
+            
+            // Wallet Tab
+            OlasWalletView(nostrManager: nostrManager)
+                .tabItem {
+                    Label("Wallet", systemImage: "bolt.circle")
+                }
+                .tag(3)
             
             // Profile Tab
             Group {
@@ -49,13 +58,15 @@ struct MainTabView: View {
             .tabItem {
                 Label("Profile", systemImage: "person.circle")
             }
-            .tag(3)
+            .tag(4)
             
-            Text("Settings")
-                .tabItem {
-                    Label("Settings", systemImage: "gear")
-                }
-                .tag(4)
+            NavigationStack {
+                SettingsView()
+            }
+            .tabItem {
+                Label("Settings", systemImage: "gear")
+            }
+            .tag(5)
         }
         .tint(OlasDesign.Colors.primary)
         .onChange(of: selectedTab) { oldValue, newValue in

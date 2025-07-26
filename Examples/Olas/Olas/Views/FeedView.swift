@@ -2,6 +2,7 @@ import SwiftUI
 import NDKSwift
 
 struct FeedView: View {
+    @Environment(NostrManager.self) private var nostrManager
     @EnvironmentObject var appState: AppState
     @StateObject private var viewModel = FeedViewModel()
     @State private var hasAppeared = false
@@ -59,9 +60,13 @@ struct FeedView: View {
             .navigationBarTitleDisplayMode(.large)
             #endif
             .toolbar {
+                #if os(iOS)
                 ToolbarItem(placement: .navigationBarTrailing) {
+                #else
+                ToolbarItem(placement: .automatic) {
+                #endif
                     Button {
-                        HapticManager.impact(.light)
+                        OlasDesign.Haptic.selection()
                         // TODO: Navigate to create post
                     } label: {
                         Image(systemName: "camera.fill")
@@ -79,7 +84,7 @@ struct FeedView: View {
                 await handleRefresh()
             }
             .onAppear {
-                if let ndk = appState.ndk {
+                if let ndk = nostrManager.ndk {
                     viewModel.startFeed(with: ndk)
                 }
                 
@@ -114,7 +119,11 @@ struct FeedView: View {
     }
     
     private func handleRefresh() async {
-        HapticManager.impact(.medium)
+        #if os(iOS)
+        OlasDesign.Haptic.impact(.medium)
+        #else
+        OlasDesign.Haptic.impact(0)
+        #endif
         hasAppeared = false
         await viewModel.refresh()
         
@@ -129,6 +138,7 @@ struct FeedView: View {
 
 struct FeedItemView: View {
     let item: FeedItem
+    @Environment(NostrManager.self) private var nostrManager
     @EnvironmentObject var appState: AppState
     @State private var isLiked = false
     @State private var scale: CGFloat = 1.0
@@ -331,7 +341,7 @@ struct FeedItemView: View {
                 .environmentObject(appState)
         }
         .sheet(isPresented: $showingZap) {
-            ZapView(event: item.event)
+            ZapView(event: item.event, nostrManager: nostrManager)
                 .environmentObject(appState)
         }
         .navigationDestination(isPresented: $navigateToProfile) {
@@ -348,7 +358,7 @@ struct FeedItemView: View {
     // MARK: - Engagement Actions
     
     private func toggleLike() {
-        guard let ndk = appState.ndk,
+        guard let ndk = nostrManager.ndk,
               let signer = NDKAuthManager.shared.activeSigner else { return }
         
         #if os(iOS)
@@ -416,7 +426,7 @@ struct FeedItemView: View {
     }
     
     private func loadEngagementCounts() async {
-        guard let ndk = appState.ndk else { return }
+        guard let ndk = nostrManager.ndk else { return }
         
         // Check if we already liked this - reactive pattern
         let authManager = NDKAuthManager.shared
@@ -519,7 +529,7 @@ class FeedViewModel: ObservableObject {
         profileTasks[pubkey] = Task {
             guard let profileManager = ndk.profileManager else { return }
             
-            for await profile in await profileManager.observe(for: pubkey, maxAge: TimeConstants.hour) {
+            for await profile in await profileManager.observe(for: pubkey, maxAge: 3600) {
                 if let profile = profile {
                     await MainActor.run {
                         updateItemsWithProfile(pubkey: pubkey, profile: profile)
@@ -940,7 +950,11 @@ struct EmptyFeedView: View {
             
             VStack(spacing: OlasDesign.Spacing.md) {
                 Button {
-                    HapticManager.impact(.medium)
+                    #if os(iOS)
+        OlasDesign.Haptic.impact(.medium)
+        #else
+        OlasDesign.Haptic.impact(0)
+        #endif
                     // TODO: Navigate to create post
                 } label: {
                     HStack {
@@ -963,7 +977,11 @@ struct EmptyFeedView: View {
                 }
                 
                 Button {
-                    HapticManager.impact(.light)
+                    #if os(iOS)
+                    OlasDesign.Haptic.impact(.light)
+                    #else
+                    OlasDesign.Haptic.impact(0)
+                    #endif
                     // TODO: Navigate to discover
                 } label: {
                     Text("Discover People to Follow")
@@ -1051,7 +1069,7 @@ struct LikeAnimationView: View {
             }
             
             // Haptic feedback
-            HapticManager.notification(.success)
+            OlasDesign.Haptic.success()
         }
     }
     
