@@ -14,7 +14,7 @@ struct StoriesContainerView: View {
     
     var body: some View {
         VStack(spacing: 0) {
-            if storiesManager.stories.isEmpty && !storiesManager.isLoading {
+            if storiesManager.userStories.isEmpty && !storiesManager.isLoading {
                 // Empty state
                 emptyStoriesView
             } else {
@@ -24,9 +24,7 @@ struct StoriesContainerView: View {
         .frame(height: 120)
         .background(OlasDesign.Colors.background)
         .onAppear {
-            Task {
-                await storiesManager.loadStories()
-            }
+            storiesManager.startObservingStories()
         }
     }
     

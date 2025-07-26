@@ -223,8 +223,18 @@ struct CreateStoryView: View {
         isUploading = true
         defer { isUploading = false }
         
-        // Create story with the selected image and/or text
-        await storiesManager.createStory(image: selectedImage, text: storyText.isEmpty ? nil : storyText)
+        // Convert image to data and create story
+        if let selectedImage = selectedImage,
+           let imageData = selectedImage.jpegData(compressionQuality: 0.8) {
+            do {
+                try await storiesManager.createStory(
+                    with: imageData,
+                    caption: storyText.isEmpty ? "" : storyText
+                )
+            } catch {
+                print("Failed to create story: \(error)")
+            }
+        }
         
         dismiss()
     }

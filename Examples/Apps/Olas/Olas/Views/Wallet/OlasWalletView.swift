@@ -38,7 +38,7 @@ struct OlasWalletView: View {
                     ScrollView {
                         VStack(spacing: OlasDesign.Spacing.lg) {
                             // Enhanced Balance Card with glassmorphism
-                            OlasBalanceCard(walletManager: walletManager)
+                            OlasEnhancedBalanceCard(walletManager: walletManager)
                                 .padding(.horizontal, OlasDesign.Spacing.md)
                                 .padding(.top, OlasDesign.Spacing.sm)
                         
@@ -46,12 +46,19 @@ struct OlasWalletView: View {
                         quickStats
                             .padding(.horizontal, OlasDesign.Spacing.md)
                         
+                        // Contacts for quick sending
+                        WalletContactsScrollView(
+                            showNutZap: $showNutZap,
+                            nutZapRecipient: $nutZapRecipient
+                        )
+                        .padding(.top, OlasDesign.Spacing.sm)
+                        
                         // Modern Action Buttons
                         modernActionButtons
                             .padding(.horizontal, OlasDesign.Spacing.md)
                         
-                            // Recent Activity with enhanced UI
-                            recentActivity
+                        // Recent Activity with enhanced UI
+                        recentActivity
                         }
                         .padding(.bottom, 100)
                     }
@@ -531,7 +538,7 @@ struct TransactionRow: View {
         }
     }
     
-    private func formatAmount(_ amount: Int) -> String {
+    private func formatAmount(_ amount: Int64) -> String {
         let formatter = NumberFormatter()
         formatter.numberStyle = .decimal
         formatter.groupingSeparator = ","

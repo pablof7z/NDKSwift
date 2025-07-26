@@ -157,6 +157,7 @@ struct DebugLoggingView: View {
         case .performance: return "Performance"
         case .security: return "Security"
         case .database: return "Database"
+        case .signature: return "Signature"
         }
     }
     
@@ -177,6 +178,7 @@ struct DebugLoggingView: View {
         case .performance: return "⚡"
         case .security: return "🛡️"
         case .database: return "🗄️"
+        case .signature: return "✅"
         }
     }
     

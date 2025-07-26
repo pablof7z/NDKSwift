@@ -13,12 +13,12 @@
 		0B2306D1588353B28A44655F /* BlossomServerManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0DF6B5D6DAD2165D2F3B150C /* BlossomServerManager.swift */; };
 		0E232AE7924923B09E2FC403 /* QRScannerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2ADCEFDDDBDFB19EBBEEB77C /* QRScannerView.swift */; };
 		0F5CE064001E306B1B790C55 /* CreateAccountView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 705A87128F6D1AEBA79A339E /* CreateAccountView.swift */; };
-		12935921425F9629FDF657C2 /* MessagesListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0CDC860B6E02BE091F5EA19A /* MessagesListView.swift */; };
 		180647DC6D1F69704EA8A6C9 /* RelayManagementView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A38516C3E4BB7DAAF6E8E239 /* RelayManagementView.swift */; };
 		1AF4FDABA6936B648CF3A16C /* TimeBasedGradient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7F33E0CCE3E7B53127CC6BB1 /* TimeBasedGradient.swift */; };
 		1CF87D6B95CCBDBDBF5E39C1 /* FollowersListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1A4D63C94D74C371408AAA8 /* FollowersListView.swift */; };
 		241F4792DE34ADF449BF84CC /* StoriesContainerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4BB292BF2B88F7420CEA02E0 /* StoriesContainerView.swift */; };
 		2A29D6554673DAA6F190F3DE /* OlasApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A286AD4220C7848F6E96670 /* OlasApp.swift */; };
+		2A806EC9AC3863133FDD786B /* WalletContactsScrollView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5BB963FA177201C71A57748A /* WalletContactsScrollView.swift */; };
 		2F67812910740AED52A322EA /* CreateStoryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1E9EA20339CA54674E85D7F /* CreateStoryView.swift */; };
 		30900EADB1C47C320161DE31 /* NotificationSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2A3C92BB7D7C104011B72E0 /* NotificationSettingsView.swift */; };
 		360DE0B38471B7920BC2063B /* CategoryPill.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4EF431B820BD21FA77DA3788 /* CategoryPill.swift */; };
@@ -34,7 +34,8 @@
 		4F7AB496D2EACFCF9588CE81 /* HeartAnimation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 64A22C0E8157BAB1D6F87DC0 /* HeartAnimation.swift */; };
 		52C8A3E24BA0F5D7F9884660 /* OlasCaptionComposer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0F05007F8118B0E79C2A3ADB /* OlasCaptionComposer.swift */; };
 		5A2FB10AD16E8B4B095AE7B3 /* OlasMultiImageView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 14D8D07AC09D2E5371438874 /* OlasMultiImageView.swift */; };
-		684CE9A2C62CA532FBAB7A85 /* ConversationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 296EBA9575D28E53EB7F04B2 /* ConversationView.swift */; };
+		5B90C5011540A059E7F03BEB /* OlasEnhancedBalanceCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 49939215429C72DDA42C69FD /* OlasEnhancedBalanceCard.swift */; };
+		6389B6CBBE144EEF27F8BAA5 /* OlasAvatar.swift in Sources */ = {isa = PBXBuildFile; fileRef = DE9B0B9BAB8AD75A199772FF /* OlasAvatar.swift */; };
 		68C989A95B9A5996E6EC9E0A /* SendView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 92D8B8EBAAF6B0054A91BADA /* SendView.swift */; };
 		774FD4738B5F1EAAC3603CF0 /* ProfileView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D9AC67F043144FFC6CBB7302 /* ProfileView.swift */; };
 		79213F75D245172935B59B1B /* MintManagementView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8F055984A54417D09BE8C6CD /* MintManagementView.swift */; };
@@ -42,10 +43,10 @@
 		7DE28A4D4D38BD8A85AED62D /* FeedView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 96F5F7B892C30F9D786CDE99 /* FeedView.swift */; };
 		807D5A3A9C77CD85CACB741A /* PostDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 908095A718E167C984E44C97 /* PostDetailView.swift */; };
 		83A8C8A32335B49BC0B753DC /* AddMintView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D0E35B4E3669C4951F0F18C7 /* AddMintView.swift */; };
-		84F59D51C1815FA4548AFF8C /* MessagingModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0C52E0225E7303DD50260335 /* MessagingModels.swift */; };
 		8F40443D2C8F504CC37FDC27 /* ZapView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 354D62DFA4445337C08BF974 /* ZapView.swift */; };
+		9006EABF7102F9B0E1075540 /* StoriesManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 94D85DB518FBEFCAC7500056 /* StoriesManager.swift */; };
 		94538F4CB2769C17DC35092E /* ImetaUtils.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4AABC79BC6DFBC543250469D /* ImetaUtils.swift */; };
-		94F13714534E78B509F261DF /* NewMessageView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2E3E17DE272A7FD12BABD30B /* NewMessageView.swift */; };
+		A0D2BE610665FE13EB045A54 /* LiveUpdatesIndicator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 405F1FA4420DF035BE5CB4C5 /* LiveUpdatesIndicator.swift */; };
 		A136013AB9390198484B893D /* CreatePostView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1204549B5A0A2545A6BE397 /* CreatePostView.swift */; };
 		A5FB76D9192AA9F499E1AF21 /* ModernStatCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD16CB15C45D9DAE6E3DE7CF /* ModernStatCard.swift */; };
 		AEC0A8C28C4D986F0D692041 /* TrendingHashtagPill.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7E0B2A99137ED5B72E8CB5D5 /* TrendingHashtagPill.swift */; };
@@ -78,21 +79,19 @@
 /* Begin PBXFileReference section */
 		068A9E499CCDD35FF9C66745 /* WalletManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WalletManager.swift; sourceTree = "<group>"; };
 		0A286AD4220C7848F6E96670 /* OlasApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OlasApp.swift; sourceTree = "<group>"; };
-		0C52E0225E7303DD50260335 /* MessagingModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MessagingModels.swift; sourceTree = "<group>"; };
-		0CDC860B6E02BE091F5EA19A /* MessagesListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MessagesListView.swift; sourceTree = "<group>"; };
 		0DF6B5D6DAD2165D2F3B150C /* BlossomServerManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BlossomServerManager.swift; sourceTree = "<group>"; };
 		0F05007F8118B0E79C2A3ADB /* OlasCaptionComposer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OlasCaptionComposer.swift; sourceTree = "<group>"; };
 		14D8D07AC09D2E5371438874 /* OlasMultiImageView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OlasMultiImageView.swift; sourceTree = "<group>"; };
 		287257D32F572630FCA42034 /* NutZapView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NutZapView.swift; sourceTree = "<group>"; };
 		2889EBFAC7191DB90EF5A718 /* BlurhashView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BlurhashView.swift; sourceTree = "<group>"; };
-		296EBA9575D28E53EB7F04B2 /* ConversationView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConversationView.swift; sourceTree = "<group>"; };
 		29C0295E5754245F8E85B8F0 /* MainTabView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MainTabView.swift; sourceTree = "<group>"; };
 		29C39E91C10971E68365A9BB /* ThemeSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ThemeSettingsView.swift; sourceTree = "<group>"; };
 		2ADCEFDDDBDFB19EBBEEB77C /* QRScannerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QRScannerView.swift; sourceTree = "<group>"; };
 		2C5B0D5FDA5CD8A4B1D7EC3D /* AccountSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AccountSettingsView.swift; sourceTree = "<group>"; };
-		2E3E17DE272A7FD12BABD30B /* NewMessageView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NewMessageView.swift; sourceTree = "<group>"; };
 		354D62DFA4445337C08BF974 /* ZapView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ZapView.swift; sourceTree = "<group>"; };
+		405F1FA4420DF035BE5CB4C5 /* LiveUpdatesIndicator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiveUpdatesIndicator.swift; sourceTree = "<group>"; };
 		43D4832876CE9DFB908A4B89 /* OlasStoriesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OlasStoriesView.swift; sourceTree = "<group>"; };
+		49939215429C72DDA42C69FD /* OlasEnhancedBalanceCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OlasEnhancedBalanceCard.swift; sourceTree = "<group>"; };
 		4A9926280304B7F0FE1C5562 /* GlassmorphicComponents.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GlassmorphicComponents.swift; sourceTree = "<group>"; };
 		4AABC79BC6DFBC543250469D /* ImetaUtils.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImetaUtils.swift; sourceTree = "<group>"; };
 		4B673BF49DAC65DDF01AE3DE /* ReplyView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReplyView.swift; sourceTree = "<group>"; };
@@ -100,6 +99,7 @@
 		4EF431B820BD21FA77DA3788 /* CategoryPill.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CategoryPill.swift; sourceTree = "<group>"; };
 		51E6250ADC1D4C0CC7018CC6 /* ReceiveView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReceiveView.swift; sourceTree = "<group>"; };
 		5B230A536A508E6F2711DA52 /* OlasUtilities.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OlasUtilities.swift; sourceTree = "<group>"; };
+		5BB963FA177201C71A57748A /* WalletContactsScrollView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WalletContactsScrollView.swift; sourceTree = "<group>"; };
 		612AB9C195293120935CEAAE /* DesignSystem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesignSystem.swift; sourceTree = "<group>"; };
 		64A22C0E8157BAB1D6F87DC0 /* HeartAnimation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HeartAnimation.swift; sourceTree = "<group>"; };
 		6A753FD2A91AF03BEF0CB9C8 /* NostrDataSources.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NostrDataSources.swift; sourceTree = "<group>"; };
@@ -115,6 +115,7 @@
 		908095A718E167C984E44C97 /* PostDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PostDetailView.swift; sourceTree = "<group>"; };
 		92D8B8EBAAF6B0054A91BADA /* SendView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SendView.swift; sourceTree = "<group>"; };
 		9440F2ACC121795D0DD878D2 /* LaunchScreen.storyboard */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; path = LaunchScreen.storyboard; sourceTree = "<group>"; };
+		94D85DB518FBEFCAC7500056 /* StoriesManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StoriesManager.swift; sourceTree = "<group>"; };
 		96F5F7B892C30F9D786CDE99 /* FeedView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FeedView.swift; sourceTree = "<group>"; };
 		A0687A67FF77241C3031DC9D /* Olas.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = Olas.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		A1A4D63C94D74C371408AAA8 /* FollowersListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FollowersListView.swift; sourceTree = "<group>"; };
@@ -138,6 +139,7 @@
 		D7FEE893C1986FEF0987BFAC /* OlasCameraView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OlasCameraView.swift; sourceTree = "<group>"; };
 		D8185DC6DFE110FCB91699D4 /* NostrManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NostrManager.swift; sourceTree = "<group>"; };
 		D9AC67F043144FFC6CBB7302 /* ProfileView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProfileView.swift; sourceTree = "<group>"; };
+		DE9B0B9BAB8AD75A199772FF /* OlasAvatar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OlasAvatar.swift; sourceTree = "<group>"; };
 		EDD6264F0208655CB610E045 /* OlasBalanceCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OlasBalanceCard.swift; sourceTree = "<group>"; };
 		F0D414502891E1EC2CE6E922 /* WalletComponents.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WalletComponents.swift; sourceTree = "<group>"; };
 		F1204549B5A0A2545A6BE397 /* CreatePostView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CreatePostView.swift; sourceTree = "<group>"; };
@@ -172,20 +174,12 @@
 				4A9926280304B7F0FE1C5562 /* GlassmorphicComponents.swift */,
 				AD16CB15C45D9DAE6E3DE7CF /* ModernStatCard.swift */,
 				EDD6264F0208655CB610E045 /* OlasBalanceCard.swift */,
+				49939215429C72DDA42C69FD /* OlasEnhancedBalanceCard.swift */,
 				F0D414502891E1EC2CE6E922 /* WalletComponents.swift */,
+				5BB963FA177201C71A57748A /* WalletContactsScrollView.swift */,
 				851122CBDCB02605E4D5F097 /* WalletUIHelpers.swift */,
 			);
 			path = Components;
-			sourceTree = "<group>";
-		};
-		198E22366BFEC80AE4DB1FA0 /* Messages */ = {
-			isa = PBXGroup;
-			children = (
-				296EBA9575D28E53EB7F04B2 /* ConversationView.swift */,
-				0CDC860B6E02BE091F5EA19A /* MessagesListView.swift */,
-				2E3E17DE272A7FD12BABD30B /* NewMessageView.swift */,
-			);
-			path = Messages;
 			sourceTree = "<group>";
 		};
 		1E0E52E5000C2391339E0CD6 /* Settings */ = {
@@ -255,7 +249,6 @@
 				D9AC67F043144FFC6CBB7302 /* ProfileView.swift */,
 				C11C1420A07269F24B4D3411 /* Components */,
 				92362D4DC6ABBEC36EA5AA36 /* Explore */,
-				198E22366BFEC80AE4DB1FA0 /* Messages */,
 				74739EECF086534C983194B1 /* Onboarding */,
 				F1EC532B26DB16DEA7C18F93 /* Profile */,
 				FD9ADC04290DF2F7BC6AA997 /* Search */,
@@ -309,8 +302,8 @@
 				B2CACDD908BC9D11BF314BE1 /* Color+Extensions.swift */,
 				612AB9C195293120935CEAAE /* DesignSystem.swift */,
 				4AABC79BC6DFBC543250469D /* ImetaUtils.swift */,
-				0C52E0225E7303DD50260335 /* MessagingModels.swift */,
 				D8185DC6DFE110FCB91699D4 /* NostrManager.swift */,
+				94D85DB518FBEFCAC7500056 /* StoriesManager.swift */,
 				068A9E499CCDD35FF9C66745 /* WalletManager.swift */,
 			);
 			path = Models;
@@ -339,6 +332,8 @@
 			isa = PBXGroup;
 			children = (
 				64A22C0E8157BAB1D6F87DC0 /* HeartAnimation.swift */,
+				405F1FA4420DF035BE5CB4C5 /* LiveUpdatesIndicator.swift */,
+				DE9B0B9BAB8AD75A199772FF /* OlasAvatar.swift */,
 				74FC226D4CCA6A20D5CD00E9 /* OlasButton.swift */,
 				D7FEE893C1986FEF0987BFAC /* OlasCameraView.swift */,
 				0F05007F8118B0E79C2A3ADB /* OlasCaptionComposer.swift */,
@@ -417,7 +412,7 @@
 				LastUpgradeCheck = 1430;
 				TargetAttributes = {
 					B84BF25033E01E4965E0FC9E = {
-						DevelopmentTeam = "${DEVELOPMENT_TEAM}";
+						DevelopmentTeam = 456SHKPP26;
 						ProvisioningStyle = Automatic;
 					};
 				};
@@ -470,7 +465,6 @@
 				360DE0B38471B7920BC2063B /* CategoryPill.swift in Sources */,
 				E9B5E3D9D503DFBDC206DF2F /* Color+Extensions.swift in Sources */,
 				D109CAAD7B0CB24AA2BEA4CF /* ContentView.swift in Sources */,
-				684CE9A2C62CA532FBAB7A85 /* ConversationView.swift in Sources */,
 				0F5CE064001E306B1B790C55 /* CreateAccountView.swift in Sources */,
 				A136013AB9390198484B893D /* CreatePostView.swift in Sources */,
 				2F67812910740AED52A322EA /* CreateStoryView.swift in Sources */,
@@ -483,21 +477,21 @@
 				C2A3272349AA15DF12B1DFFC /* HashtagView.swift in Sources */,
 				4F7AB496D2EACFCF9588CE81 /* HeartAnimation.swift in Sources */,
 				94538F4CB2769C17DC35092E /* ImetaUtils.swift in Sources */,
+				A0D2BE610665FE13EB045A54 /* LiveUpdatesIndicator.swift in Sources */,
 				E41B33117D720DF62A208927 /* MainTabView.swift in Sources */,
-				12935921425F9629FDF657C2 /* MessagesListView.swift in Sources */,
-				84F59D51C1815FA4548AFF8C /* MessagingModels.swift in Sources */,
 				79213F75D245172935B59B1B /* MintManagementView.swift in Sources */,
 				A5FB76D9192AA9F499E1AF21 /* ModernStatCard.swift in Sources */,
-				94F13714534E78B509F261DF /* NewMessageView.swift in Sources */,
 				B2FBFEC058C9E9CA607C231E /* NostrDataSources.swift in Sources */,
 				C512EF61FCCE3F0FCB0C6C3B /* NostrManager.swift in Sources */,
 				30900EADB1C47C320161DE31 /* NotificationSettingsView.swift in Sources */,
 				0905711379449AC46A4273AC /* NutZapView.swift in Sources */,
 				2A29D6554673DAA6F190F3DE /* OlasApp.swift in Sources */,
+				6389B6CBBE144EEF27F8BAA5 /* OlasAvatar.swift in Sources */,
 				F2E1196AD75ABF08BD62EAAE /* OlasBalanceCard.swift in Sources */,
 				39402DE58E8562B4B5607BAE /* OlasButton.swift in Sources */,
 				E719C86C48E19C300B0DC21D /* OlasCameraView.swift in Sources */,
 				52C8A3E24BA0F5D7F9884660 /* OlasCaptionComposer.swift in Sources */,
+				5B90C5011540A059E7F03BEB /* OlasEnhancedBalanceCard.swift in Sources */,
 				486054C690B69D02E841B06E /* OlasImageEditor.swift in Sources */,
 				5A2FB10AD16E8B4B095AE7B3 /* OlasMultiImageView.swift in Sources */,
 				FBCE5F4649AA36855003BF51 /* OlasRichText.swift in Sources */,
@@ -514,12 +508,14 @@
 				797A68B1F704D15AD4B56F51 /* SearchView.swift in Sources */,
 				68C989A95B9A5996E6EC9E0A /* SendView.swift in Sources */,
 				241F4792DE34ADF449BF84CC /* StoriesContainerView.swift in Sources */,
+				9006EABF7102F9B0E1075540 /* StoriesManager.swift in Sources */,
 				369E1C8E18B8FED6F4E6FB26 /* StoriesView.swift in Sources */,
 				D902ABD89CEEC5ECC73FA005 /* ThemeSettingsView.swift in Sources */,
 				1AF4FDABA6936B648CF3A16C /* TimeBasedGradient.swift in Sources */,
 				C20809FC7BE0679E8B22AB4D /* TransactionDetailView.swift in Sources */,
 				AEC0A8C28C4D986F0D692041 /* TrendingHashtagPill.swift in Sources */,
 				01C1277A4958204E2214C93F /* WalletComponents.swift in Sources */,
+				2A806EC9AC3863133FDD786B /* WalletContactsScrollView.swift in Sources */,
 				4C82038EB944CCB3A908422A /* WalletManager.swift in Sources */,
 				C73CCED2E1070B7C29DFBE6F /* WalletUIHelpers.swift in Sources */,
 				F96646DDAEF5560130E65C0D /* WalletView.swift in Sources */,
@@ -568,7 +564,7 @@
 				COPY_PHASE_STRIP = NO;
 				CURRENT_PROJECT_VERSION = 1;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
-				DEVELOPMENT_TEAM = "${DEVELOPMENT_TEAM}";
+				DEVELOPMENT_TEAM = 456SHKPP26;
 				ENABLE_NS_ASSERTIONS = NO;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
 				GCC_C_LANGUAGE_STANDARD = gnu11;
@@ -667,7 +663,7 @@
 				COPY_PHASE_STRIP = NO;
 				CURRENT_PROJECT_VERSION = 1;
 				DEBUG_INFORMATION_FORMAT = dwarf;
-				DEVELOPMENT_TEAM = "${DEVELOPMENT_TEAM}";
+				DEVELOPMENT_TEAM = 456SHKPP26;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
 				ENABLE_TESTABILITY = YES;
 				GCC_C_LANGUAGE_STANDARD = gnu11;

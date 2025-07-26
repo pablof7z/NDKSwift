@@ -5,6 +5,7 @@ import UIKit
 // Run this in a SwiftUI app context to generate the icons
 
 struct IconGenerator {
+    @MainActor
     static func generateAllIcons() {
         let sizes: [(name: String, size: CGFloat)] = [
             ("Icon-1024", 1024),

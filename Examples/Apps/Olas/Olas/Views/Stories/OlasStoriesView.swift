@@ -22,23 +22,54 @@ struct OlasStoriesView: View {
                 AddStoryButton(showCreateStory: $showCreateStory)
                 
                 // User stories
-                ForEach(storiesManager.stories.indices, id: \.self) { index in
-                    StoryCircle(
-                        story: storiesManager.stories[index],
-                        index: index,
-                        selectedStoryIndex: Binding(
-                            get: { selectedStoryWrapper?.id == index ? index : nil },
+                ForEach(storiesManager.userStories.flatMap { $0.stories }.indices, id: \.self) { index in
+                    let allStories = storiesManager.userStories.flatMap { $0.stories }
+                    if index < allStories.count {
+                        let story = allStories[index]
+                        // Convert Story to UserStory for compatibility
+                        let userStory = UserStory(
+                            user: StoryUser(
+                                pubkey: story.authorPubkey,
+                                displayName: storiesManager.userStories.first { $0.authorPubkey == story.authorPubkey }?.authorProfile?.name ?? "User",
+                                avatarURL: storiesManager.userStories.first { $0.authorPubkey == story.authorPubkey }?.authorProfile?.picture
+                            ),
+                            imageURL: story.mediaURLs.first,
+                            text: story.content,
+                            timestamp: story.timestamp,
+                            isViewed: storiesManager.isStoryViewed(story.id)
+                        )
+                        StoryCircle(
+                            story: userStory,
+                            index: index,
+                            selectedStoryIndex: Binding(
+                                get: { selectedStoryWrapper?.id == index ? index : nil },
                             set: { _ in selectedStoryWrapper = StoryIndexWrapper(index) }
                         )
                     )
+                    }
                 }
             }
             .padding(.horizontal, OlasDesign.Spacing.md)
         }
         .frame(height: 100)
         .fullScreenCover(item: $selectedStoryWrapper) { wrapper in
+            let allStories = storiesManager.userStories.flatMap { collection in
+                collection.stories.map { story in
+                    UserStory(
+                        user: StoryUser(
+                            pubkey: story.authorPubkey,
+                            displayName: collection.authorProfile?.name ?? "User",
+                            avatarURL: collection.authorProfile?.picture
+                        ),
+                        imageURL: story.mediaURLs.first,
+                        text: story.content,
+                        timestamp: story.timestamp,
+                        isViewed: storiesManager.isStoryViewed(story.id)
+                    )
+                }
+            }
             OlasStoryViewerView(
-                stories: storiesManager.stories,
+                stories: allStories,
                 initialIndex: wrapper.id,
                 onDismiss: {
                     selectedStoryWrapper = nil
@@ -445,67 +476,7 @@ struct ProgressBar: View {
     }
 }
 
-// MARK: - Stories Manager
-@MainActor
-class StoriesManager: ObservableObject {
-    @Published var stories: [UserStory] = []
-    @Published var isLoading = false
-    
-    private let nostrManager: NostrManager
-    
-    init(nostrManager: NostrManager) {
-        self.nostrManager = nostrManager
-    }
-    
-    func loadStories() async {
-        isLoading = true
-        defer { isLoading = false }
-        
-        // In production, load from Nostr events with special story kind
-        // For now, create sample data
-        stories = [
-            UserStory(
-                user: StoryUser(
-                    pubkey: "alice123",
-                    displayName: "Alice",
-                    avatarURL: nil
-                ),
-                imageURL: "https://picsum.photos/400/800?random=1",
-                text: "Beautiful sunset today! 🌅",
-                timestamp: Date().addingTimeInterval(-3600),
-                isViewed: false
-            ),
-            UserStory(
-                user: StoryUser(
-                    pubkey: "bob456",
-                    displayName: "Bob",
-                    avatarURL: nil
-                ),
-                imageURL: "https://picsum.photos/400/800?random=2",
-                text: nil,
-                timestamp: Date().addingTimeInterval(-7200),
-                isViewed: true
-            ),
-            UserStory(
-                user: StoryUser(
-                    pubkey: "carol789",
-                    displayName: "Carol",
-                    avatarURL: nil
-                ),
-                imageURL: "https://picsum.photos/400/800?random=3",
-                text: "Living my best life! ✨",
-                timestamp: Date().addingTimeInterval(-10800),
-                isViewed: false
-            )
-        ]
-    }
-    
-    func createStory(image: UIImage?, text: String?) async {
-        // Upload image to Blossom if provided
-        // Create story event on Nostr
-        // Add to local stories
-    }
-}
+// Removed duplicate StoriesManager and models - using the one from Models/StoriesManager.swift
 
 // MARK: - Models
 struct UserStory: Identifiable {
