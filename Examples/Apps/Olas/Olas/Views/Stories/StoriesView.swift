@@ -95,7 +95,7 @@ struct StoriesView: View {
                             )
                             .frame(width: 70, height: 70)
                             .overlay(
-                                Text(String(appState.currentUserProfile?.name?.first ?? "?").uppercased())
+                                Text(getUserInitial())
                                     .font(.title2)
                                     .fontWeight(.bold)
                                     .foregroundColor(.white)
@@ -126,6 +126,24 @@ struct StoriesView: View {
         }
     }
     
+    private func getUserInitial() -> String {
+        // Get current user's profile from storiesManager
+        if let currentUser = storiesManager?.currentUserProfile {
+            if let name = currentUser.name, !name.isEmpty {
+                return String(name.prefix(1)).uppercased()
+            } else if let displayName = currentUser.displayName, !displayName.isEmpty {
+                return String(displayName.prefix(1)).uppercased()
+            }
+        }
+        
+        // Fallback to first character of pubkey if no profile
+        if let session = nostrManager.authManager.activeSession {
+            return String(session.pubkey.prefix(1)).uppercased()
+        }
+        
+        return "?"
+    }
+    
     private func loadStories() async {
         guard let ndk = nostrManager.ndk else { return }
         
@@ -138,43 +156,36 @@ struct StoriesView: View {
             since: Timestamp(Int64(Date().addingTimeInterval(-86400).timeIntervalSince1970)) // Last 24 hours
         )
         
-        do {
-            // Create a data source to fetch events
-            let dataSource = ndk.dataSource(filter: filter)
-            
-            // Collect events until EOSE
-            var storyEvents: [NDKEvent] = []
-            for await event in dataSource.events {
-                storyEvents.append(event)
-                // Check if we have enough or should stop
-                if storyEvents.count > 100 { break }
-            }
-            
-            // Convert to Story models
-            var loadedStories: [Story] = []
-            
-            for event in storyEvents {
-                // Extract story data from event
-                let story = Story(from: event)
-                loadedStories.append(story)
-            }
-            
-            // Sort by timestamp
-            loadedStories.sort { $0.timestamp > $1.timestamp }
-            
-            await MainActor.run {
-                self.stories = loadedStories
-                self.isLoading = false
-            }
-            
-            // Load profiles for story authors
-            await loadProfiles(for: loadedStories)
-        } catch {
-            print("Failed to load stories: \(error)")
-            await MainActor.run {
-                self.isLoading = false
-            }
+        // Create a data source to fetch events
+        let dataSource = ndk.dataSource(filter: filter)
+        
+        // Collect events until EOSE
+        var storyEvents: [NDKEvent] = []
+        for await event in dataSource.events {
+            storyEvents.append(event)
+            // Check if we have enough or should stop
+            if storyEvents.count > 100 { break }
         }
+        
+        // Convert to Story models
+        var loadedStories: [Story] = []
+        
+        for event in storyEvents {
+            // Extract story data from event
+            let story = Story(from: event)
+            loadedStories.append(story)
+        }
+        
+        // Sort by timestamp
+        loadedStories.sort { $0.timestamp > $1.timestamp }
+        
+        await MainActor.run {
+            self.stories = loadedStories
+            self.isLoading = false
+        }
+        
+        // Load profiles for story authors
+        await loadProfiles(for: loadedStories)
     }
     
     private func loadProfiles(for stories: [Story]) async {

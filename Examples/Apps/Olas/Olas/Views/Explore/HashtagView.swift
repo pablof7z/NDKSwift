@@ -232,7 +232,8 @@ struct HashtagView: View {
     
     private func loadProfileIfNeeded(for pubkey: String) {
         guard profiles[pubkey] == nil,
-              let profileManager = appState.profileManager else { return }
+              let ndk = nostrManager.ndk,
+              let profileManager = ndk.profileManager else { return }
         
         Task {
             for await profile in await profileManager.observe(for: pubkey, maxAge: 3600) {

@@ -9,6 +9,13 @@ struct MainTabView: View {
     @State private var showCreatePost = false
     @State private var tabBarOpacity = 1.0
     @State private var tabBarOffset: CGFloat = 0
+    @StateObject private var dmManager: DirectMessagesManager
+    
+    init() {
+        // Initialize managers
+        let nostrManager = NostrManager()
+        self._dmManager = StateObject(wrappedValue: DirectMessagesManager(nostrManager: nostrManager))
+    }
     
     var body: some View {
         TabView(selection: $selectedTab) {
@@ -44,16 +51,35 @@ struct MainTabView: View {
                     }
                 }
             
-            // Profile Tab with Wallet Access
+            // Messages Tab
+            NavigationStack {
+                MessagesListView(nostrManager: nostrManager)
+            }
+            .tabItem {
+                Label("Messages", systemImage: selectedTab == 3 ? "bubble.left.and.bubble.right.fill" : "bubble.left.and.bubble.right")
+            }
+            .tag(3)
+            .badge(dmManager.unreadCount > 0 ? "\(dmManager.unreadCount)" : nil)
+            
+            // Profile Tab with Wallet & Analytics Access
             Group {
                 if let session = nostrManager.authManager.activeSession {
                     NavigationStack {
                         ProfileView(pubkey: session.pubkey)
                             .toolbar {
                                 ToolbarItem(placement: .navigationBarTrailing) {
-                                    NavigationLink(destination: OlasWalletView(walletManager: OlasWalletManager(nostrManager: nostrManager), nostrManager: nostrManager)) {
-                                        Image(systemName: "bolt.circle")
-                                            .foregroundStyle(OlasDesign.Colors.primary)
+                                    HStack(spacing: 16) {
+                                        // Analytics
+                                        NavigationLink(destination: AnalyticsDashboardView().environment(nostrManager)) {
+                                            Image(systemName: "chart.line.uptrend.xyaxis")
+                                                .foregroundStyle(OlasDesign.Colors.primary)
+                                        }
+                                        
+                                        // Wallet
+                                        NavigationLink(destination: OlasWalletView(walletManager: OlasWalletManager(nostrManager: nostrManager), nostrManager: nostrManager)) {
+                                            Image(systemName: "bolt.circle")
+                                                .foregroundStyle(OlasDesign.Colors.primary)
+                                        }
                                     }
                                 }
                             }
@@ -63,15 +89,18 @@ struct MainTabView: View {
                 }
             }
             .tabItem {
-                Label("Profile", systemImage: selectedTab == 3 ? "person.circle.fill" : "person.circle")
+                Label("Profile", systemImage: selectedTab == 4 ? "person.circle.fill" : "person.circle")
             }
-            .tag(3)
+            .tag(4)
         }
         .tint(OlasDesign.Colors.primary)
         .onChange(of: selectedTab) { oldValue, newValue in
             if newValue != 2 {
                 previousTab = oldValue
             }
+        }
+        .task {
+            dmManager.startObservingMessages()
         }
         .sheet(isPresented: $showCreatePost) {
             CreatePostView()

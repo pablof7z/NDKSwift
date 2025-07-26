@@ -376,6 +376,31 @@ struct OlasWalletView: View {
             showAddMint = true
         }
     }
+    
+    private var modernActionButtons: some View {
+        HStack(spacing: OlasDesign.Spacing.md) {
+            FloatingActionButton(
+                icon: "arrow.down.circle.fill",
+                title: "Receive",
+                gradient: [Color(hex: "4ECDC4"), Color(hex: "44A08D")],
+                action: { showReceive = true }
+            )
+            
+            FloatingActionButton(
+                icon: "arrow.up.circle.fill",
+                title: "Send",
+                gradient: [Color(hex: "F56565"), Color(hex: "D53F8C")],
+                action: { showSend = true }
+            )
+            
+            FloatingActionButton(
+                icon: "qrcode.viewfinder",
+                title: "Scan",
+                gradient: [Color(hex: "805AD5"), Color(hex: "6B46C1")],
+                action: { showScanner = true }
+            )
+        }
+    }
 }
 
 // MARK: - Mint Row
@@ -510,31 +535,6 @@ struct TransactionRow: View {
         .buttonStyle(PlainButtonStyle())
         .sheet(isPresented: $showDetail) {
             TransactionDetailView(transaction: transaction, walletManager: walletManager)
-        }
-    }
-    
-    private var modernActionButtons: some View {
-        HStack(spacing: OlasDesign.Spacing.md) {
-            FloatingActionButton(
-                icon: "arrow.down.circle.fill",
-                title: "Receive",
-                gradient: [Color(hex: "4ECDC4"), Color(hex: "44A08D")],
-                action: { showReceive = true }
-            )
-            
-            FloatingActionButton(
-                icon: "arrow.up.circle.fill",
-                title: "Send",
-                gradient: [Color(hex: "F56565"), Color(hex: "D53F8C")],
-                action: { showSend = true }
-            )
-            
-            FloatingActionButton(
-                icon: "qrcode.viewfinder",
-                title: "Scan",
-                gradient: [Color(hex: "805AD5"), Color(hex: "6B46C1")],
-                action: { showScanner = true }
-            )
         }
     }
     
