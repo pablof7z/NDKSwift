@@ -187,7 +187,7 @@ public final class NDKEventBuilder {
 
             // Carry over all p tags from parent
             for tag in event.tags where tag.first == NostrConstants.TagName.pubkey {
-                if tag.count > 1 && tag[1] != event.pubkey {
+                if let tagValue = tag.value, tagValue != event.pubkey {
                     builder.tag(tag)
                 }
             }
@@ -1156,8 +1156,8 @@ public final class NDKEventBuilder {
     public func language(_ languageCode: String) -> NDKEventBuilder {
         // Remove existing language tags
         self.tags.removeAll { tag in
-            (tag.first == "L" && tag.count >= 2 && tag[1] == "ISO-639-1") ||
-            (tag.first == "l" && tag.count >= 3 && tag[2] == "ISO-639-1")
+            (tag.first == "L" && tag.value == "ISO-639-1") ||
+            (tag.first == "l" && tag.count > 2 && tag[2] == "ISO-639-1")
         }
 
         // Add new language tags

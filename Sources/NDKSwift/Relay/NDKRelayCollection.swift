@@ -130,18 +130,27 @@ public final class NDKRelayCollection: ObservableObject {
         // Create observer task
         let task = Task { @MainActor in
             for await state in relay.stateStream {
-                updateRelayInfo(url: url, state: state.connectionState)
+                // Extract error message if state is failed
+                let errorMessage: String? = if case .failed(let message) = state.connectionState {
+                    message
+                } else {
+                    nil
+                }
+                updateRelayInfo(url: url, state: state.connectionState, error: errorMessage)
             }
         }
 
         stateObservers[url] = task
     }
 
-    private func updateRelayInfo(url: String, state: NDKRelayConnectionState) {
+    private func updateRelayInfo(url: String, state: NDKRelayConnectionState, error: String? = nil) {
         if let index = relays.firstIndex(where: { $0.url == url }) {
             relays[index].state = state
             if state == .connected {
                 relays[index].lastConnectedAt = Date()
+                relays[index].lastError = nil // Clear error on successful connection
+            } else if case .failed = state, let error = error {
+                relays[index].lastError = error
             }
         }
         updateCounts()
