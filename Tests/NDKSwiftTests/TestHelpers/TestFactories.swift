@@ -107,7 +107,7 @@ enum EventTestFactory {
             "about": about,
             "picture": picture
         ]
-        let content = String(data: try! JSONEncoder().encode(metadata), encoding: .utf8)!
+        let content = try! JSONCoding.encodeToString(metadata)
         return createEvent(kind: 0, content: content, pubkey: pubkey)
     }
     
@@ -139,7 +139,7 @@ enum EventTestFactory {
             [NostrConstants.TagName.event, event.id],
             [NostrConstants.TagName.pubkey, event.pubkey]
         ]
-        let content = String(data: try! JSONEncoder().encode(event), encoding: .utf8)!
+        let content = try! JSONCoding.encodeToString(event)
         return createEvent(kind: 6, content: content, tags: tags, pubkey: pubkey)
     }
     

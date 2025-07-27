@@ -171,7 +171,7 @@ final class NDKProfileManagerTests: NDKTestCase {
             "about": "From event",
             "picture": "https://example.com/event.jpg"
         ]
-        let content = String(data: try JSONEncoder().encode(metadata), encoding: .utf8)!
+        let content = try JSONCoding.encodeToString(metadata)
         let event = EventTestFactory.createEvent(kind: 0, content: content, pubkey: pubkey)
         
         // When

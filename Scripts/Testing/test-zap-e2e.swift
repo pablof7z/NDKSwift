@@ -232,8 +232,7 @@ struct ZapE2ERunner {
             p2pkPubkey: recipientPubkey
         )
         
-        let preferencesData = try JSONEncoder().encode(preferences)
-        let preferencesContent = String(data: preferencesData, encoding: .utf8)!
+        let preferencesContent = try JSONCoding.encodeToString(preferences)
         
         let preferencesEvent = try await recipientNDK.event()
             .content(preferencesContent)
