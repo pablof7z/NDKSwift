@@ -1,5 +1,31 @@
 import Foundation
 
+// MARK: - Media Blob Protocol
+
+/// Protocol for objects that can provide media metadata
+/// Used internally to unify handling of different media sources
+private protocol MediaBlobProtocol {
+    var url: String { get }
+    var sha256: String { get }
+    var type: String? { get }
+    var size: Int64 { get }
+    var blurhash: String? { get }
+    var dimensionsString: String? { get }
+}
+
+/// Partial implementation for manual media additions
+private struct PartialBlossomBlob: MediaBlobProtocol {
+    let url: String
+    let sha256: String
+    let type: String?
+    let size: Int64
+    let blurhash: String?
+    let dimensionsString: String?
+}
+
+/// Extension to make BlossomBlob conform to our protocol
+extension BlossomBlob: MediaBlobProtocol {}
+
 // MARK: - Client Tag Configuration
 
 /// Configuration for automatic client tagging (NIP-89)
@@ -1055,34 +1081,24 @@ public final class NDKEventBuilder {
         fallbacks: [String]? = nil,
         userAnnotations: [UserAnnotation]? = nil
     ) -> NDKEventBuilder {
-        let imeta = NDKImetaTag(
+        // Create a partial BlossomBlob-like structure to reuse the other addMedia method
+        let partialBlob = PartialBlossomBlob(
             url: url,
+            sha256: sha256 ?? "",
+            type: mimeType,
+            size: size.flatMap { Int64($0) } ?? 0,
             blurhash: blurhash,
-            dim: dim,
+            dimensionsString: dim
+        )
+        
+        // Use the common implementation
+        addMediaInternal(
+            blob: partialBlob,
             alt: alt,
-            m: mimeType,
-            x: sha256,
-            size: size,
-            fallback: fallbacks,
+            fallbacks: fallbacks,
             userAnnotations: userAnnotations
         )
-
-        self.imetaTag(imeta)
-
-        // Add m tag for media type filtering (NIP-68)
-        if let mimeType = mimeType {
-            if !tags.contains(where: { $0.count >= 2 && $0[0] == "m" && $0[1] == mimeType }) {
-                self.tags.append(["m", mimeType])
-            }
-        }
-
-        // Add x tag for hash querying (NIP-68)
-        if let sha256 = sha256 {
-            if !tags.contains(where: { $0.count >= 2 && $0[0] == "x" && $0[1] == sha256 }) {
-                self.tags.append(["x", sha256])
-            }
-        }
-
+        
         return self
     }
 
@@ -1094,32 +1110,12 @@ public final class NDKEventBuilder {
         fallbacks: [String]? = nil,
         userAnnotations: [UserAnnotation]? = nil
     ) async throws -> NDKEventBuilder {
-        let imeta = NDKImetaTag(
-            url: upload.url,
-            blurhash: upload.blurhash,
-            dim: upload.dimensionsString,
+        addMediaInternal(
+            blob: upload,
             alt: alt,
-            m: upload.type,
-            x: upload.sha256,
-            size: String(upload.size),
-            fallback: fallbacks,
+            fallbacks: fallbacks,
             userAnnotations: userAnnotations
         )
-
-        self.imetaTag(imeta)
-
-        // Add m tag for media type filtering
-        if let mimeType = upload.type {
-            if !tags.contains(where: { $0.count >= 2 && $0[0] == "m" && $0[1] == mimeType }) {
-                self.tags.append(["m", mimeType])
-            }
-        }
-
-        // Add x tag for hash querying
-        if !tags.contains(where: { $0.count >= 2 && $0[0] == "x" && $0[1] == upload.sha256 }) {
-            self.tags.append(["x", upload.sha256])
-        }
-
         return self
     }
 
@@ -1163,6 +1159,42 @@ public final class NDKEventBuilder {
     }
 
     // MARK: - Private Helpers
+    
+    /// Common implementation for adding media attachments
+    private func addMediaInternal(
+        blob: MediaBlobProtocol,
+        alt: String?,
+        fallbacks: [String]?,
+        userAnnotations: [UserAnnotation]?
+    ) {
+        let imeta = NDKImetaTag(
+            url: blob.url,
+            blurhash: blob.blurhash,
+            dim: blob.dimensionsString,
+            alt: alt,
+            m: blob.type,
+            x: blob.sha256.isEmpty ? nil : blob.sha256,
+            size: blob.size > 0 ? String(blob.size) : nil,
+            fallback: fallbacks,
+            userAnnotations: userAnnotations
+        )
+        
+        self.imetaTag(imeta)
+        
+        // Add m tag for media type filtering (NIP-68)
+        if let mimeType = blob.type {
+            if !tags.contains(where: { $0.count >= 2 && $0[0] == "m" && $0[1] == mimeType }) {
+                self.tags.append(["m", mimeType])
+            }
+        }
+        
+        // Add x tag for hash querying (NIP-68) - only if we have a valid hash
+        if !blob.sha256.isEmpty {
+            if !tags.contains(where: { $0.count >= 2 && $0[0] == "x" && $0[1] == blob.sha256 }) {
+                self.tags.append(["x", blob.sha256])
+            }
+        }
+    }
 
     /// Extract media URLs from content based on file extensions
     private func extractMediaURLs(from content: String) -> [String] {

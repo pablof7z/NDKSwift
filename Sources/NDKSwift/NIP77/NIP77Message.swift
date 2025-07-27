@@ -128,20 +128,15 @@ public struct NIP77Message {
             break // No additional data
         }
 
-        let jsonData = try JSONSerialization.data(withJSONObject: array)
-        return String(data: jsonData, encoding: .utf8) ?? ""
+        return try JSONCoding.serializeToString(array)
     }
 
     // MARK: - Decoding
 
     /// Decode from JSON array
     public static func fromJSON(_ json: String) throws -> NIP77Message {
-        guard let data = json.data(using: .utf8) else {
-            throw NIP77Error.invalidMessage
-        }
-
-        guard let array = try JSONSerialization.jsonObject(with: data) as? [Any],
-              array.count >= 2 else {
+        let array = try JSONCoding.parseArray(from: json)
+        guard array.count >= 2 else {
             throw NIP77Error.invalidMessage
         }
 
