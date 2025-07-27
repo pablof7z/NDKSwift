@@ -32,7 +32,7 @@ final class NIP77MessageTests: XCTestCase {
     func testNIP77MessageJSONEncoding() throws {
         let message = NIP77Message.negOpen(
             subscriptionId: "sub123",
-            filter: NDKFilter(kinds: [1, 3], authors: ["pubkey1"]),
+            filter: NDKFilter(authors: ["pubkey1"], kinds: [1, 3]),
             initialMessage: "abc123"
         )
         

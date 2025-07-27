@@ -33,9 +33,8 @@ final class NDKDataSourceTests: NDKTestCase {
     }
     
     func testDataSourceReceivesEvents() async throws {
-        let ndk = createTestNDK()
         let cache = createMemoryCache()
-        ndk.cache = cache
+        let ndk = createTestNDK(cache: cache)
         
         let filter = NDKFilter(kinds: [1])
         let dataSource = ndk.observe(filter: filter)
@@ -48,7 +47,7 @@ final class NDKDataSourceTests: NDKTestCase {
             for await event in dataSource.events {
                 return event // Return first event
             }
-            return nil
+            fatalError("Should not reach here")
         }
         
         // Give the data source time to set up
@@ -66,9 +65,8 @@ final class NDKDataSourceTests: NDKTestCase {
     // MARK: - AsyncSequence Tests
     
     func testAsyncSequenceIteration() async throws {
-        let ndk = createTestNDK()
         let cache = createMemoryCache()
-        ndk.cache = cache
+        let ndk = createTestNDK(cache: cache)
         
         let filter = NDKFilter(kinds: [1])
         let dataSource = ndk.observe(filter: filter)
@@ -103,9 +101,8 @@ final class NDKDataSourceTests: NDKTestCase {
     }
     
     func testDataSourceFiltering() async throws {
-        let ndk = createTestNDK()
         let cache = createMemoryCache()
-        ndk.cache = cache
+        let ndk = createTestNDK(cache: cache)
         
         let targetAuthor = TestFixtures.Keys.alice.publicKey
         let filter = NDKFilter(authors: [targetAuthor], kinds: [1])
@@ -144,9 +141,8 @@ final class NDKDataSourceTests: NDKTestCase {
     // MARK: - EOSE Tests
     
     func testEOSEHandling() async throws {
-        let ndk = createTestNDK()
         let cache = createMemoryCache()
-        ndk.cache = cache
+        let ndk = createTestNDK(cache: cache)
         
         let dataSource = ndk.observe(filter: NDKFilter(kinds: [1]))
         
@@ -175,9 +171,8 @@ final class NDKDataSourceTests: NDKTestCase {
     }
     
     func testCloseOnEose() async throws {
-        let ndk = createTestNDK()
         let cache = createMemoryCache()
-        ndk.cache = cache
+        let ndk = createTestNDK(cache: cache)
         
         // Create with closeOnEose = true
         let dataSource = ndk.observe(
@@ -199,9 +194,8 @@ final class NDKDataSourceTests: NDKTestCase {
     // MARK: - Data Collection Tests
     
     func testCollectWithTimeout() async throws {
-        let ndk = createTestNDK()
         let cache = createMemoryCache()
-        ndk.cache = cache
+        let ndk = createTestNDK(cache: cache)
         
         let dataSource = ndk.observe(filter: NDKFilter(kinds: [1]))
         
@@ -228,9 +222,8 @@ final class NDKDataSourceTests: NDKTestCase {
     }
     
     func testFirstWithTimeout() async throws {
-        let ndk = createTestNDK()
         let cache = createMemoryCache()
-        ndk.cache = cache
+        let ndk = createTestNDK(cache: cache)
         
         let dataSource = ndk.observe(filter: NDKFilter(kinds: [1]))
         
@@ -255,9 +248,8 @@ final class NDKDataSourceTests: NDKTestCase {
     // MARK: - Multiple Observer Tests
     
     func testMultipleDataSources() async throws {
-        let ndk = createTestNDK()
         let cache = createMemoryCache()
-        ndk.cache = cache
+        let ndk = createTestNDK(cache: cache)
         
         // Create two data sources with different filters
         let dataSource1 = ndk.observe(filter: NDKFilter(kinds: [1]))
@@ -308,9 +300,8 @@ final class NDKDataSourceTests: NDKTestCase {
     // MARK: - Cache Policy Tests
     
     func testCacheOnlyPolicy() async throws {
-        let ndk = createTestNDK()
         let cache = createMemoryCache()
-        ndk.cache = cache
+        let ndk = createTestNDK(cache: cache)
         
         // Pre-populate cache
         let event = EventTestFactory.createTextNote()
@@ -331,9 +322,8 @@ final class NDKDataSourceTests: NDKTestCase {
     // MARK: - Transform Tests
     
     func testDataSourceWithTransform() async throws {
-        let ndk = createTestNDK()
         let cache = createMemoryCache()
-        ndk.cache = cache
+        let ndk = createTestNDK(cache: cache)
         
         // Create data source that transforms events to just their content
         let dataSource = ndk.observe(
@@ -347,7 +337,7 @@ final class NDKDataSourceTests: NDKTestCase {
             for await content in dataSource.events {
                 return content
             }
-            return nil
+            fatalError("Should not reach here")
         }
         
         // Give time to set up
@@ -363,9 +353,8 @@ final class NDKDataSourceTests: NDKTestCase {
     // MARK: - Error Handling Tests
     
     func testDataSourceErrorHandling() async throws {
-        let ndk = createTestNDK()
         let cache = createMemoryCache()
-        ndk.cache = cache
+        let ndk = createTestNDK(cache: cache)
         
         let dataSource = ndk.observe(filter: NDKFilter(kinds: [1]))
         
