@@ -322,6 +322,18 @@ public final class NDKDataSource<T>: ObservableObject, CacheObserver {
     ///   - timeout: Maximum time to wait (default: 10 seconds)
     ///   - limit: Maximum number of events to collect (nil = unlimited)
     /// - Returns: Array of collected events
+    ///
+    /// ## Usage
+    /// ```swift
+    /// // Collect all text notes from the last hour
+    /// let dataSource = ndk.observe(filter: NDKFilter(kinds: [1]), maxAge: 3600)
+    /// let events = await dataSource.collect(timeout: 5.0)
+    /// 
+    /// // Collect up to 100 events
+    /// let limitedEvents = await dataSource.collect(limit: 100)
+    /// ```
+    /// 
+    /// - Note: This method waits for EOSE from all relays or until timeout/limit is reached
     public func collect(timeout: TimeInterval = 10.0, limit: Int? = nil) async -> [T] {
         var collected: [T] = []
 
@@ -457,6 +469,14 @@ public final class NDKDataSource<T>: ObservableObject, CacheObserver {
     /// Update the filter for this data source
     /// - Parameter newFilter: The new filter to apply
     /// - Note: This method cancels the current subscription and starts a new one
+    ///
+    /// ## Usage
+    /// ```swift
+    /// let dataSource = ndk.observe(filter: NDKFilter(kinds: [1]))
+    /// 
+    /// // Later, update to show only events from specific authors
+    /// await dataSource.updateFilter(NDKFilter(kinds: [1], authors: ["pubkey1", "pubkey2"]))
+    /// ```
     public func updateFilter(_ newFilter: NDKFilter) async {
         // Update the filter property
         self.filter = newFilter

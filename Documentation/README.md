@@ -6,6 +6,7 @@ Welcome to the NDKSwift documentation. This directory contains comprehensive gui
 
 ### Getting Started
 - [Getting Started Guide](GETTING_STARTED.md) - Installation, setup, and your first Nostr app
+- [Common Patterns](COMMON_PATTERNS.md) - Practical examples and best practices for common tasks
 - [API Reference](API_REFERENCE.md) - Complete API documentation for all classes and methods
 - [NDKSwiftUI Reference](NDKSWIFTUI_REFERENCE.md) - SwiftUI components and UI toolkit documentation
 

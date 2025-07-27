@@ -13,6 +13,12 @@ This directory contains technical documentation for developers working on NDKSwi
 - **[Test Coverage Analysis](TEST_COVERAGE_ANALYSIS.md)** - Current test coverage report and gap analysis
 - **[Test Implementation Plan](TEST_IMPLEMENTATION_PLAN.md)** - Comprehensive testing strategy and implementation roadmap
 
+### Performance Testing
+- **Large Subscription Performance Tests** - Tests for handling 10,000+ events and 100+ concurrent subscriptions
+  - Located in `Tests/NDKSwiftTests/Unit/Subscription/LargeSubscriptionPerformanceTests.swift`
+  - Validates performance goals: 2000+ events/second processing, <50MB memory increase for 10K events
+  - Tests filter matching performance, cache lookup efficiency, and multi-subscription handling
+
 ## Purpose
 
 These documents are intended for:
