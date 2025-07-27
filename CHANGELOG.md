@@ -6,6 +6,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- Comprehensive unit tests for `Bech32` encoding/decoding utility
+- Comprehensive unit tests for `NostrIdentifier` utility
+
+### Fixed
+- Fixed NIP17PrivateMessagesE2ETests using incorrect NDK connection API
+- Fixed NIP05Manager to use NDKNetworkClient instead of URLSession.shared for better testability
+
+### Improved
+- Code consistency by using centralized network client throughout the codebase
+
 ## [0.7.2] - 2025-01-27
 
 ### Added
