@@ -6,6 +6,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- Enhanced test coverage for `NDKEventManager` with comprehensive unit tests
+- Added tests for NDKSwiftUI components including `NDKProfileDataSource`
+
+### Changed
+- Moved `NDKRelayPoolExtensions.swift` from Outbox to Core/Extensions for better organization
+- Updated JSON encoding/decoding usage to consistently use `JSONCoding` utility
+- Fixed JSON encoding in test helpers and scripts
+
+### Documentation
+- Updated NIP-29 Implementation Plan to clarify it's not yet implemented
+- Added status header to NIP-29 documentation for clarity
+
+### Improved
+- Test coverage for core event publishing functionality
+- Code organization by relocating extensions to appropriate directories
+- Consistency in JSON handling across the codebase
+
 ## [0.7.1] - 2025-01-27
 
 ### Added

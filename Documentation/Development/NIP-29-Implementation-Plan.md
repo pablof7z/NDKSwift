@@ -1,5 +1,10 @@
 # NIP-29 (Relay-based Groups) Implementation Plan for NDKSwift
 
+> **Status**: Planned - Not Yet Implemented  
+> **Last Updated**: December 2024
+
+**Note**: This document outlines a planned implementation for NIP-29 support in NDKSwift. The features described here are not yet available in the current codebase.
+
 ## Overview
 
 NIP-29 defines relay-based groups that are managed by specific relays with closed membership. Groups are identified by a random string ID and can be public/private for reading and open/closed for membership. This implementation will follow NDKSwift's existing patterns while providing a clean, modern Swift API for group functionality.

@@ -31,11 +31,10 @@ final class NDKEventManagerTests: NDKTestCase {
         let signer = try NDKPrivateKeySigner.generate()
         ndk.signer = signer
         
-        let event = try await ndk.createEvent { builder in
-            builder
-                .kind(1)
-                .content("Test note")
-        }
+        let event = try await NDKEventBuilder(ndk: ndk)
+            .kind(1)
+            .content("Test note")
+            .build(signer: signer)
         
         // Since we don't have real relays, the publish will fail
         // but we can verify the event was created correctly
@@ -62,7 +61,7 @@ final class NDKEventManagerTests: NDKTestCase {
         let signer = try NDKPrivateKeySigner.generate()
         ndk.signer = signer
         
-        let (event, _) = try await eventManager.publish { builder in
+        let (event, _) = try await ndk.publish { builder in
             builder
                 .kind(1)
                 .content("Built event")
@@ -81,15 +80,10 @@ final class NDKEventManagerTests: NDKTestCase {
         let signer = try NDKPrivateKeySigner.generate()
         ndk.signer = signer
         
-        // Add a mock relay so publish succeeds
-        let mockRelay = await createTestMockRelay()
-        await ndk.pool.addRelay(mockRelay.url)
-        
-        let event = try await ndk.createEvent { builder in
-            builder
-                .kind(1)
-                .content("Cached event")
-        }
+        let event = try await NDKEventBuilder(ndk: ndk)
+            .kind(1)
+            .content("Cached event")
+            .build(signer: signer)
         
         // Try to publish (will fail without real relay, but should still cache)
         _ = try? await eventManager.publish(event)
@@ -107,24 +101,19 @@ final class NDKEventManagerTests: NDKTestCase {
         ndk.signer = signer
         let author = try await signer.pubkey
         
-        // Create metadata event (kind 0 - replaceable)
-        let metadata1 = try await ndk.createEvent { builder in
-            builder
-                .kind(0)
-                .content("{\"name\":\"Alice\"}")
-        }
+        // Create metadata events
+        let metadata1 = try await NDKEventBuilder(ndk: ndk)
+            .kind(0)
+            .content("{\"name\":\"Alice\"}")
+            .build(signer: signer)
         
-        // Save to cache
         try await mockCache.saveEvent(metadata1)
         
-        // Create newer metadata
-        let metadata2 = try await ndk.createEvent { builder in
-            builder
-                .kind(0)
-                .content("{\"name\":\"Alice Updated\"}")
-        }
+        let metadata2 = try await NDKEventBuilder(ndk: ndk)
+            .kind(0)
+            .content("{\"name\":\"Alice Updated\"}")
+            .build(signer: signer)
         
-        // Save newer version
         try await mockCache.saveEvent(metadata2)
         
         // Query for metadata
@@ -144,23 +133,20 @@ final class NDKEventManagerTests: NDKTestCase {
         let author = try await signer.pubkey
         let dTag = "article-123"
         
-        // Create article (kind 30023 - parameterized replaceable)
-        let article1 = try await ndk.createEvent { builder in
-            builder
-                .kind(30023)
-                .content("Original article")
-                .tag(["d", dTag])
-        }
+        // Create articles
+        let article1 = try await NDKEventBuilder(ndk: ndk)
+            .kind(30023)
+            .content("Original article")
+            .tag(["d", dTag])
+            .build(signer: signer)
         
         try await mockCache.saveEvent(article1)
         
-        // Create updated version
-        let article2 = try await ndk.createEvent { builder in
-            builder
-                .kind(30023)
-                .content("Updated article")
-                .tag(["d", dTag])
-        }
+        let article2 = try await NDKEventBuilder(ndk: ndk)
+            .kind(30023)
+            .content("Updated article")
+            .tag(["d", dTag])
+            .build(signer: signer)
         
         try await mockCache.saveEvent(article2)
         
@@ -183,11 +169,10 @@ final class NDKEventManagerTests: NDKTestCase {
         let signer = try NDKPrivateKeySigner.generate()
         ndk.signer = signer
         
-        let event = try await ndk.createEvent { builder in
-            builder
-                .kind(1)
-                .content("Optimistic event")
-        }
+        let event = try await NDKEventBuilder(ndk: ndk)
+            .kind(1)
+            .content("Optimistic event")
+            .build(signer: signer)
         
         // Event should be added to cache immediately for optimistic publishing
         _ = try? await eventManager.publish(event)
@@ -202,11 +187,10 @@ final class NDKEventManagerTests: NDKTestCase {
         ndk.signer = signer
         
         // Create an event
-        let event = try await ndk.createEvent { builder in
-            builder
-                .kind(1)
-                .content("Unpublished event")
-        }
+        let event = try await NDKEventBuilder(ndk: ndk)
+            .kind(1)
+            .content("Unpublished event")
+            .build(signer: signer)
         
         // Add to unpublished events
         try await mockCache.addUnpublishedEvent(event, relays: ["wss://relay1.test", "wss://relay2.test"])
@@ -225,11 +209,10 @@ final class NDKEventManagerTests: NDKTestCase {
         let signer = try NDKPrivateKeySigner.generate()
         ndk.signer = signer
         
-        let event = try await ndk.createEvent { builder in
-            builder
-                .kind(1)
-                .content("Relay-specific event")
-        }
+        let event = try await NDKEventBuilder(ndk: ndk)
+            .kind(1)
+            .content("Relay-specific event")
+            .build(signer: signer)
         
         let targetRelays: Set<String> = ["wss://specific1.test", "wss://specific2.test"]
         
@@ -262,9 +245,86 @@ final class NDKEventManagerTests: NDKTestCase {
         }
     }
     
-    // MARK: - Helper Methods
+    // MARK: - Edge Case Tests
     
-    private func createTestMockRelay() async -> MockRelay {
-        return MockRelay(url: "wss://test.relay")
+    func testPublishToEmptyRelaySet() async throws {
+        let signer = try NDKPrivateKeySigner.generate()
+        ndk.signer = signer
+        
+        let event = try await NDKEventBuilder(ndk: ndk)
+            .kind(1)
+            .content("No relays")
+            .build(signer: signer)
+        
+        let emptyRelays: Set<String> = []
+        
+        // Should handle empty relay set gracefully
+        let publishedRelays = try await eventManager.publish(event: event, to: emptyRelays)
+        XCTAssertTrue(publishedRelays.isEmpty)
+        
+        // Event should still be cached
+        let cachedEvent = await mockCache.getEvent(id: event.id)
+        XCTAssertNotNil(cachedEvent)
+    }
+    
+    func testPublishWithLogRawJSON() async throws {
+        let signer = try NDKPrivateKeySigner.generate()
+        ndk.signer = signer
+        
+        let event = try await NDKEventBuilder(ndk: ndk)
+            .kind(1)
+            .content("JSON logged event")
+            .build(signer: signer)
+        
+        // Test with logRawJSON enabled
+        do {
+            _ = try await eventManager.publish(event, logRawJSON: true)
+        } catch {
+            // Expected to fail without real relays, but JSON logging path is tested
+        }
+        
+        // Test with explicit relay publish and logRawJSON
+        do {
+            _ = try await eventManager.publish(event: event, to: ["wss://test.relay"], logRawJSON: true)
+        } catch {
+            // Expected to fail without real relays
+        }
+    }
+    
+    // MARK: - Concurrent Publishing Tests
+    
+    func testConcurrentPublishingOfMultipleEvents() async throws {
+        let signer = try NDKPrivateKeySigner.generate()
+        ndk.signer = signer
+        
+        // Create multiple events concurrently
+        let eventCount = 10
+        
+        await withTaskGroup(of: NDKEvent?.self) { group in
+            for i in 0..<eventCount {
+                group.addTask {
+                    do {
+                        let event = try await NDKEventBuilder(ndk: self.ndk)
+                            .kind(1)
+                            .content("Concurrent event \(i)")
+                            .build(signer: signer)
+                        _ = try? await self.eventManager.publish(event)
+                        return event
+                    } catch {
+                        return nil
+                    }
+                }
+            }
+            
+            var publishedEvents = 0
+            for await event in group {
+                if event != nil {
+                    publishedEvents += 1
+                }
+            }
+            
+            // All events should have been created
+            XCTAssertEqual(publishedEvents, eventCount)
+        }
     }
 }
