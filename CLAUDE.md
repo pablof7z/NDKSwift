@@ -208,71 +208,26 @@ The subscription system uses modern Swift patterns for cleaner, more intuitive c
 - Prefer modern Swift patterns (async/await, AsyncSequence) over callback-based APIs
 - Guide users toward best practices through API design and clear deprecation messages
 
-## iOS App Development Reminders
+## Examples and Demos
 
-When working on iOS apps in Examples/Apps:
+The repository includes various standalone examples and feature demos in the `Examples/` directory:
 
-1. **Always regenerate the Xcode project after file changes**:
-   - Run `./refresh-project.sh` after adding/removing files
-   - This ensures the .xcodeproj is up to date
-   - IMPORTANT: This is required when you add or remove Swift files
+- **GettingStarted/**: Basic examples for learning NDKSwift
+- **Features/**: Specific feature demonstrations (OutboxDebugger, DebugKind0Fetcher, etc.)
+- **Scripts/**: Testing scripts and utilities
+- **StandaloneDemo.swift**: Simple runnable demo
+- **NIP60Wallet.swift**: Cashu wallet integration example
 
-2. **Use the build scripts for cleaner output**:
-   - Run `./build.sh` instead of raw xcodebuild
-   - Output will be formatted with xcbeautify
-   - The build script automatically regenerates the project first
-
-3. **Code signing is now persistent**:
-   - Settings are in project.yml
-   - Set DEVELOPMENT_TEAM env var or hardcode in project.yml
-   - No more manual Xcode configuration after regeneration
-
-4. **When creating new iOS apps**:
-   - Copy an existing project.yml as template
-   - Include code signing settings
-   - Create refresh-project.sh and build.sh scripts
-
-### iOS Apps Location
-
-All iOS apps are located in `Examples/Apps/`:
-- Highlighter - Nostr highlights reader
-- NutsackiOS - Cashu wallet
-- Ambulando - Audio walking app
-- Posta - Nostr client
-- Olas - Instagram-like app
-
-### Common iOS App Commands
-
+To run examples:
 ```bash
-# Build any iOS app
-cd Examples/Apps/Highlighter  # or any other app
-./build.sh
+# Run standalone demo (no compilation needed)
+swift Examples/StandaloneDemo.swift
 
-# Just refresh project after file changes
-./refresh-project.sh
-
-# Build with custom settings
-DESTINATION="platform=iOS Simulator,name=iPhone 16 Pro" ./build.sh
-CONFIGURATION=Release ./build.sh
-
-# Clean build
-CLEAN=true ./refresh-project.sh
-./build.sh
-```
-
-### When Adding/Removing Files
-
-**CRITICAL**: After adding or removing ANY Swift files in an iOS app:
-1. Run `./refresh-project.sh` immediately
-2. This regenerates the .xcodeproj with all current files
-3. Without this, the build will fail with "file not found" errors
-
-Example workflow:
-```bash
-# After creating a new Swift file
-cd Examples/Apps/Highlighter
-./refresh-project.sh  # Updates .xcodeproj
-./build.sh           # Now it will build successfully
+# Run feature demos
+swift run --package-path Examples SimpleDemo
+swift run --package-path Examples NostrDemo
+swift run --package-path Examples FileCacheDemo
+swift run --package-path Examples BlossomDemo
 ```
 
 UUIDs are stupid and should never be used in the context of nostr.

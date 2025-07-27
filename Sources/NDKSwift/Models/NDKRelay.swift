@@ -804,8 +804,8 @@ public final class NDKRelay: RelayProtocol, Hashable, Equatable, @unchecked Send
 
     /// Get normalized relay URL
     public var normalizedURL: String {
-        // Use the URLNormalizer for consistent normalization
-        return URLNormalizer.tryNormalizeRelayUrl(url) ?? url
+        // Directly use the String extension for consistency
+        return url.normalizedRelayURL
     }
 }
 
