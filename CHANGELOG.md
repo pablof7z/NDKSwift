@@ -4,7 +4,7 @@ All notable changes to NDKSwift will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.7.4] - 2025-01-27
 
 ### Added
 - Comprehensive test coverage for `ArrayExtensions` including performance and edge cases
@@ -34,9 +34,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Enhanced `HexValidator` performance by checking string length before hex validation
 - Fixed `NIP77SyncHandler` to use proper error types from `NIP77Error` enum
 - Updated `Crypto.CryptoError` to use `ErrorMessageConstants` for consistent error messages
+- Refactored error messages in `Nutzap` to use `ErrorMessageConstants` for consistency
 
 ### Fixed
 - Fixed optional unwrapping in `ContentTaggerTests` for error detail checking
+- Added validation for public key in `NDKEventBuilder.pubkey()` to ensure valid 64-character hex
+- Added validation for empty tags in `NDKEventBuilder.tag()` to prevent adding empty tags
 
 ### Documentation
 - Updated documentation version references from 0.6.2 to 0.7.3 in README
@@ -48,6 +51,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - DRY principle by creating `NDKDataSourceProtocol` to standardize error handling in SwiftUI data sources
 - Developer experience with convenience filter factory methods for common use cases
 - Test code readability with new ContentEntity helper extensions in TestAssertions.swift
+- Code quality by using centralized error message constants in more places
+- Input validation in `NDKEventBuilder` for public keys and tags
 - Test coverage for content parsing edge cases including invalid entities and whitespace preservation
 - Test coverage for utility classes that were previously untested (URLUtils, DateFormatters, ImetaUtils, FileManagerExtensions)
 - Code organization by consolidating crypto-related constants into a single location
