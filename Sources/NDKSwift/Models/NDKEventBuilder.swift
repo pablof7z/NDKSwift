@@ -1020,16 +1020,35 @@ public final class NDKEventBuilder {
     }
 
     /// Add media with comprehensive metadata support
+    ///
+    /// Creates a properly formatted imeta tag for media attachments following NIP-92.
+    /// The media URL is automatically appended to the event content for backward compatibility.
+    /// This method also adds 'm' and 'x' tags for media type and hash-based querying (NIP-68).
+    ///
     /// - Parameters:
-    ///   - url: The media URL
-    ///   - mimeType: MIME type (e.g., "image/jpeg")
-    ///   - blurhash: Blurhash string for placeholder
-    ///   - dim: Dimensions in "widthxheight" format
-    ///   - alt: Alternative text description
-    ///   - sha256: SHA256 hash of the file
-    ///   - size: File size in bytes as string
-    ///   - fallbacks: Alternative URLs for the same content
-    ///   - userAnnotations: User tags with coordinates
+    ///   - url: The URL of the media file (required)
+    ///   - mimeType: MIME type of the media (e.g., "image/jpeg", "video/mp4", "audio/mp3")
+    ///   - blurhash: Optional blurhash string for preview while the media is loading
+    ///   - dim: Optional dimensions as "widthxheight" (e.g., "1920x1080" for images/videos)
+    ///   - alt: Optional alt text for accessibility and when media fails to load
+    ///   - sha256: Optional SHA-256 hash of the file (hex format) for integrity verification
+    ///   - size: Optional file size in bytes as a string
+    ///   - fallbacks: Optional array of alternative URLs for the same content if primary fails
+    ///   - userAnnotations: Optional user annotations for tagging people in media (coordinates + pubkey)
+    ///
+    /// ## Example
+    /// ```swift
+    /// let event = NDKEventBuilder(ndk: ndk)
+    ///     .content("Check out this photo!")
+    ///     .addMedia(
+    ///         url: "https://example.com/photo.jpg",
+    ///         mimeType: "image/jpeg",
+    ///         blurhash: "LEHV6nWB2yk8pyo0adR*.7kCMdnj",
+    ///         dim: "1920x1080",
+    ///         alt: "Sunset over the mountains"
+    ///     )
+    ///     .build()
+    /// ```
     @discardableResult
     public func addMedia(
         url: String,

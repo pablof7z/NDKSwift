@@ -74,7 +74,7 @@ final class NIP60SimpleWalletE2ETest: XCTestCase {
         }
         
         // Wait a bit for event propagation
-        try await Task.sleep(nanoseconds: 3_000_000_000)
+        try await Task.sleep(nanoseconds: 3 * TimeConstants.nanosecondsPerSecond)
         
         // Verify
         XCTAssertTrue(received7375, "Should have received a 7375 event")

@@ -70,7 +70,7 @@ public enum CashuDeposit {
             mintURL: mintURL,
             amount: amount,
             invoice: quoteResponse.request,
-            expiry: Date().addingTimeInterval(TimeInterval(quoteResponse.expiry ?? 600)),
+            expiry: Date().addingTimeInterval(TimeInterval(quoteResponse.expiry ?? Int(10 * TimeConstants.minute))),
             requestedAt: Date()
         )
 
@@ -94,7 +94,7 @@ public enum CashuDeposit {
     ///   - mints: MintManager instance for mint operations
     ///   - eventManager: WalletEventManager for event management
     ///   - signer: NDKSigner for signing events
-    ///   - timeout: Maximum time to monitor before giving up (default: 600 seconds)
+    ///   - timeout: Maximum time to monitor before giving up (default: 10 minutes)
     ///   - quoteAge: How old the quote already is (affects check intervals)
     ///   - onProofsReceived: Callback to handle newly minted proofs
     ///   - manualCheckTrigger: Optional AsyncStream that allows manual triggering of status checks.
@@ -117,7 +117,7 @@ public enum CashuDeposit {
         mints: MintManager,
         eventManager: WalletEventManager,
         signer: NDKSigner,
-        timeout: TimeInterval = 600.0,
+        timeout: TimeInterval = 10 * TimeConstants.minute,
         quoteAge: TimeInterval = 0,
         onProofsReceived: @escaping ([CashuSwift.Proof]) async throws -> [String],
         manualCheckTrigger: AsyncStream<Void>? = nil

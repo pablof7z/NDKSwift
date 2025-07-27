@@ -17,6 +17,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added comprehensive test coverage for `DataHexExtensions` including hex conversion and padding
 - Added comprehensive test coverage for `RetryPolicy` including exponential backoff and async execution
 - Added comprehensive test coverage for `IDGenerator` including concurrent ID generation
+- Added comprehensive test coverage for `NDKEventTracker` including relay tracking, publish status, OK messages, custom properties, and cleanup methods
+- Added comprehensive test coverage for `ContentParser` including entity extraction, tag references, mixed content, and edge cases
+- Added comprehensive test coverage for `SubscriptionSwapManager` including registration, follow list updates, and filter swapping
 
 ### Changed
 - Moved `NDKRelayPoolExtensions.swift` from Outbox to Core/Extensions for better organization
@@ -30,6 +33,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Enhanced inline documentation for `ContentTagger` Tag extension with examples
 - Improved documentation for Tag validation methods with detailed type descriptions
 - Fixed broken links in README.md (removed references to non-existent LICENSE and CONTRIBUTING.md files)
+- Enhanced documentation for `NDKEventBuilder.addMedia()` methods with detailed parameter descriptions and examples
 
 ### Improved
 - Test coverage for core event publishing functionality
@@ -39,6 +43,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Replaced redundant HexValidator.validate32ByteHex try-catch patterns with simpler guard statements
 - Updated version references in README from 0.7.0 to 0.7.1
 - Test coverage increased with new test suites for utility classes
+- Replaced hardcoded time values with `TimeConstants` in test files for better maintainability
+- Cleaned up import statements by removing unnecessary blank lines in multiple files
+- Fixed compilation errors in test files (JSONCodingTests, NDKAuthManagerTests, NIP17Tests)
+- Replaced hardcoded time constants with TimeConstants throughout the codebase
 
 ### Fixed
 - Removed redundant hex validation patterns in NDKPrivateKeySigner, P2PKManager, NIP04, and NIP44 encryption modules

@@ -1,6 +1,5 @@
 import Foundation
 import CryptoKit
-
 import CashuSwift
 
 /// Manages zapping functionality with decoupled protocol and payment handling

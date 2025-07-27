@@ -1,5 +1,4 @@
 import Foundation
-
 import CashuSwift
 import GRDB
 

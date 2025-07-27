@@ -141,7 +141,7 @@ final class BasicEventFlowE2ETests: XCTestCase {
         let fetchStart = Date()
         
         // Use observe with maxAge > 0 for one-shot behavior
-        let oneShot = subscriberNDK.observe(filter: filter, maxAge: 3600) // 1 hour
+        let oneShot = subscriberNDK.observe(filter: filter, maxAge: TimeConstants.hour)
         var fetchedEvents: [NDKEvent] = []
         
         // Collect events for a short time
@@ -164,7 +164,7 @@ final class BasicEventFlowE2ETests: XCTestCase {
         let individualFetchStart = Date()
         
         let idFilter = NDKFilter(ids: [event.id])
-        let idDataSource = subscriberNDK.observe(filter: idFilter, maxAge: 3600)
+        let idDataSource = subscriberNDK.observe(filter: idFilter, maxAge: TimeConstants.hour)
         
         var individualEvent: NDKEvent?
         for await fetchedEvent in idDataSource.events {
@@ -249,7 +249,7 @@ final class BasicEventFlowE2ETests: XCTestCase {
         
         let fetchStart = Date()
         // Use observe with maxAge for one-shot fetch
-        let dataSource = ndk.observe(filter: filter, maxAge: 3600)
+        let dataSource = ndk.observe(filter: filter, maxAge: TimeConstants.hour)
         var fetchedEvents: [NDKEvent] = []
         
         for await event in dataSource.events {
@@ -316,7 +316,7 @@ final class BasicEventFlowE2ETests: XCTestCase {
         print("[\(timestamp())] Fetching event...")
         // Fetch the specific event
         let idFilter = NDKFilter(ids: [event.id])
-        let dataSource = ndk.observe(filter: idFilter, maxAge: 3600)
+        let dataSource = ndk.observe(filter: idFilter, maxAge: TimeConstants.hour)
         
         var fetchedEvent: NDKEvent?
         for await foundEvent in dataSource.events {

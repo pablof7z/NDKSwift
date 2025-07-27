@@ -411,7 +411,8 @@ final class NDKAuthManagerTests: XCTestCase {
         
         // Create a session first
         let privateKey = "8f40e50a84a7462e2b8d24c28898ef0ce0d0113a0a2ce9648e6006b79c7e5185"
-        let session = try await authManager.createSession(withPrivateKey: privateKey, saveToKeychain: true)
+        let signer = try NDKPrivateKeySigner(privateKey: privateKey)
+        let session = try await authManager.createSession(with: signer)
         
         // Verify session is active
         XCTAssertTrue(authManager.isAuthenticated)
