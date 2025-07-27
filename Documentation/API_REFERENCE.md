@@ -479,6 +479,53 @@ public func addTagFilter(_ tagName: String, values: [String])
 public func tagFilter(_ tagName: String) -> [String]?
 ```
 
+#### Convenience Factory Methods
+
+```swift
+// User profile metadata (kind:0)
+static func profile(for pubkey: String, limit: Int? = 1) -> NDKFilter
+
+// User's text notes (kind:1)
+static func textNotes(
+    by pubkey: String,
+    limit: Int? = nil,
+    since: Timestamp? = nil,
+    until: Timestamp? = nil
+) -> NDKFilter
+
+// User's contact list (kind:3)
+static func contactList(for pubkey: String, limit: Int? = 1) -> NDKFilter
+
+// Reactions to a specific event (kind:7)
+static func reactions(to eventId: String, limit: Int? = nil) -> NDKFilter
+
+// Deletion events (kind:5)
+static func deletions(by pubkey: String, limit: Int? = nil) -> NDKFilter
+
+// Relay list metadata (kind:10002)
+static func relayList(for pubkey: String, limit: Int? = 1) -> NDKFilter
+
+// Multiple event kinds by a user
+static func multipleKinds(_ kinds: [EventKind], by pubkey: String, limit: Int? = nil) -> NDKFilter
+```
+
+**Examples:**
+```swift
+// Fetch user profile
+let profileFilter = NDKFilter.profile(for: pubkey)
+let profile = await ndk.fetchEvent(with: profileFilter)
+
+// Stream user's recent notes
+let notesFilter = NDKFilter.textNotes(by: pubkey, limit: 20)
+for await note in ndk.observe(filter: notesFilter).events {
+    print(note.content)
+}
+
+// Get reactions to an event
+let reactionsFilter = NDKFilter.reactions(to: eventId)
+let reactions = await ndk.fetchEvents(with: reactionsFilter)
+```
+
 ### NDKSubscription
 
 **⚠️ Internal Implementation Detail**: `NDKSubscription` is an internal component that should not be used directly. Use the public `NDKDataSource` API instead. See [Internal Components](#internal-components) for details.

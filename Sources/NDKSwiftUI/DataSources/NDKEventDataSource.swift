@@ -30,7 +30,7 @@ import Combine
 /// )
 /// ```
 @MainActor
-public final class NDKEventDataSource: ObservableObject {
+public final class NDKEventDataSource: ObservableObject, NDKDataSourceProtocol {
 
     // MARK: - Published Properties
 

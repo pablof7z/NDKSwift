@@ -10,10 +10,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Comprehensive test coverage for `ArrayExtensions` including performance and edge cases
 - Additional test coverage for `LRUCache` including concurrent access and zero capacity tests
 - Updated README to include NIP-17, NIP-42, and NIP-59 in supported NIPs table
+- `NDKFilter` convenience factory methods for common filter patterns (profile, textNotes, contactList, reactions, etc.)
+- `NDKDataSourceProtocol` for standardizing SwiftUI data source interfaces
+- Unit tests for `NDKFilter` convenience methods
 
 ### Changed
 - Fixed JSON decoder usage in `BlossomBlobTests` to use centralized `JSONCoding` utility
 - Replaced `isEmpty ? nil : value` pattern with `nilIfEmpty` extension in `NDKEventBuilder`
+- SwiftUI data sources now conform to `NDKDataSourceProtocol` for consistency
 
 ### Fixed
 - Fixed optional unwrapping in `ContentTaggerTests` for error detail checking
@@ -22,6 +26,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Updated documentation version references from 0.6.2 to 0.7.3 in README
 - Cleaned up and improved consistency across documentation files
 - Added missing NIPs (17, 42, 59) to the supported NIPs table in README
+- Added comprehensive documentation for `NDKFilter` convenience methods in API_REFERENCE.md
+
+### Improved
+- DRY principle by creating `NDKDataSourceProtocol` to standardize error handling in SwiftUI data sources
+- Developer experience with convenience filter factory methods for common use cases
 
 ## [0.7.3] - 2025-01-27
 
