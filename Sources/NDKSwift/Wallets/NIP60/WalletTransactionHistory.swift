@@ -298,9 +298,13 @@ public actor WalletTransactionHistory {
         var amount: Int64 = 0
         for tag in event.tags {
             if tag.count >= 2 && tag[0] == NostrConstants.TagName.proof {
-                if let proofData = tag[1].data(using: .utf8),
-                   let proof = try? JSONCoding.decode(CashuSwift.Proof.self, from: proofData) {
-                    amount += Int64(proof.amount)
+                if let proofData = tag[1].data(using: .utf8) {
+                    do {
+                        let proof = try JSONCoding.decode(CashuSwift.Proof.self, from: proofData)
+                        amount += Int64(proof.amount)
+                    } catch {
+                        NDKLogger.log(.warning, category: .wallet, "Failed to decode proof in transaction history: \(error.localizedDescription)")
+                    }
                 }
             }
         }
@@ -366,9 +370,13 @@ public actor WalletTransactionHistory {
                 case NostrConstants.TagName.pubkey:
                     recipient = tag[1]
                 case NostrConstants.TagName.proof:
-                    if let proofData = tag[1].data(using: .utf8),
-                       let proof = try? JSONCoding.decode(CashuSwift.Proof.self, from: proofData) {
-                        amount += Int64(proof.amount)
+                    if let proofData = tag[1].data(using: .utf8) {
+                        do {
+                            let proof = try JSONCoding.decode(CashuSwift.Proof.self, from: proofData)
+                            amount += Int64(proof.amount)
+                        } catch {
+                            NDKLogger.log(.warning, category: .wallet, "Failed to decode proof in nutzap transaction: \(error.localizedDescription)")
+                        }
                     }
                 default:
                     break

@@ -45,6 +45,22 @@ public actor NDKPool {
     }
 
     /// Public accessor for relay pool changes stream
+    /// 
+    /// Provides real-time notifications of relay pool state changes including additions, removals,
+    /// connections, and disconnections. Use this stream to react to pool changes in your application.
+    /// 
+    /// Example:
+    /// ```swift
+    /// for await change in await pool.relayChanges {
+    ///     switch change {
+    ///     case .relayAdded(let relay):
+    ///         print("New relay added: \(relay.url)")
+    ///     case .relayConnected(let relay):
+    ///         print("Relay connected: \(relay.url)")
+    ///     // ... handle other cases
+    ///     }
+    /// }
+    /// ```
     public var relayChanges: AsyncStream<NDKPoolChangeEvent> {
         poolChangeStream
     }
@@ -59,6 +75,13 @@ public actor NDKPool {
     }
 
     /// Refresh the blocked relay list and remove any currently connected relays that are now blocked
+    /// 
+    /// Forces an immediate refresh of the user's blocked relay list (kind 10013 events) and removes
+    /// any currently connected relays that appear on the updated block list. This is useful when
+    /// you know the block list has been updated and want to apply changes immediately.
+    /// 
+    /// - Note: The blocked relay list is automatically monitored in the background, so manual
+    ///   refresh is typically not necessary unless you need immediate updates.
     public func refreshBlockedRelays() async {
         // Force refresh by clearing cache
         blockedRelaysLastFetched = nil
@@ -232,6 +255,17 @@ public actor NDKPool {
     }
 
     /// Get connected relays
+    /// 
+    /// Returns an array of all relays that are currently in the connected state.
+    /// This method filters the relay pool to include only relays with an active WebSocket connection.
+    /// 
+    /// - Returns: Array of connected `NDKRelay` instances
+    /// 
+    /// Example:
+    /// ```swift
+    /// let connected = await pool.connectedRelays()
+    /// print("Connected to \(connected.count) relays")
+    /// ```
     public func connectedRelays() async -> [NDKRelay] {
         await relays.asyncFilter { relay in
             await relay.connectionState == .connected
@@ -267,7 +301,16 @@ public actor NDKPool {
     }
 
     /// Get current user's relays from their relay list
-    /// Returns URLs from the user's relay list (kind 10002) if available
+    /// 
+    /// Fetches the relay URLs from the current user's relay list (NIP-65, kind 10002 events).
+    /// This includes both read and write relays configured by the user.
+    /// 
+    /// - Returns: Set of relay URLs from the user's relay list, or empty set if:
+    ///   - No signer is configured
+    ///   - User has no relay list published
+    ///   - An error occurs during fetching
+    /// 
+    /// - Note: This method uses the outbox tracker cache for efficient retrieval
     public func getCurrentUserRelayUrls() async -> Set<String> {
         guard let ndk = ndk,
               let signer = ndk.signer else {
@@ -295,7 +338,19 @@ public actor NDKPool {
     }
 
     /// Get a snapshot of all relay states for quick status checks
-    /// Returns a dictionary mapping relay URLs to their current connection states
+    /// 
+    /// Provides a complete overview of the connection state for all relays in the pool.
+    /// Useful for displaying relay status in UI or monitoring connection health.
+    /// 
+    /// - Returns: Dictionary mapping relay URLs to their current connection states
+    /// 
+    /// Example:
+    /// ```swift
+    /// let snapshot = await pool.getRelayStateSnapshot()
+    /// for (url, state) in snapshot {
+    ///     print("\(url): \(state)")
+    /// }
+    /// ```
     public func getRelayStateSnapshot() async -> [RelayURL: NDKRelayConnectionState] {
         var snapshot: [RelayURL: NDKRelayConnectionState] = [:]
         for relay in relays {
@@ -305,6 +360,18 @@ public actor NDKPool {
     }
 
     /// Get connection summary (connected count, total count)
+    /// 
+    /// Provides a quick summary of relay pool connectivity status.
+    /// 
+    /// - Returns: Tuple containing:
+    ///   - connected: Number of relays currently connected
+    ///   - total: Total number of relays in the pool
+    /// 
+    /// Example:
+    /// ```swift
+    /// let summary = await pool.getConnectionSummary()
+    /// print("Connected to \(summary.connected)/\(summary.total) relays")
+    /// ```
     public func getConnectionSummary() async -> (connected: Int, total: Int) {
         let states = await getRelayStateSnapshot()
         let connected = states.values.filter { $0 == .connected }.count
@@ -312,6 +379,20 @@ public actor NDKPool {
     }
 
     /// Connect to all relays
+    /// 
+    /// Attempts to establish connections to all relays in the pool concurrently.
+    /// Connection attempts are made in parallel for efficiency. Failed connections
+    /// are logged but don't prevent other relays from connecting.
+    /// 
+    /// - Note: This method returns after all connection attempts complete, regardless
+    ///   of success or failure. Check connection states afterwards if needed.
+    /// 
+    /// Example:
+    /// ```swift
+    /// await pool.connectAll()
+    /// let summary = await pool.getConnectionSummary()
+    /// print("Connected to \(summary.connected) relays")
+    /// ```
     public func connectAll() async {
         let relayCount = relays.count
 
@@ -332,6 +413,16 @@ public actor NDKPool {
     }
 
     /// Disconnect from all relays
+    /// 
+    /// Gracefully disconnects from all relays in the pool concurrently.
+    /// All active WebSocket connections are closed and resources are cleaned up.
+    /// 
+    /// - Note: This method waits for all disconnections to complete before returning
+    /// 
+    /// Example:
+    /// ```swift
+    /// await pool.disconnectAll()
+    /// ```
     public func disconnectAll() async {
         await withTaskGroup(of: Void.self) { group in
             for relay in relays {
@@ -343,10 +434,29 @@ public actor NDKPool {
     }
 
     /// Prepare relays for use by ensuring they exist in the pool and optionally connecting them
+    /// 
+    /// This method is useful for pre-loading relays before performing operations. It ensures
+    /// the specified relays are added to the pool and can optionally establish connections.
+    /// 
     /// - Parameters:
     ///   - urls: The relay URLs to prepare
-    ///   - autoConnect: Whether to automatically connect to disconnected relays
+    ///   - autoConnect: Whether to automatically connect to disconnected relays (default: false)
+    /// 
     /// - Returns: Array of prepared relay instances
+    /// 
+    /// - Note: Blocked relays will be created but not added to the pool or connected
+    /// 
+    /// Example:
+    /// ```swift
+    /// // Just ensure relays exist in pool
+    /// let relays = await pool.prepareRelays(["wss://relay1.com", "wss://relay2.com"])
+    /// 
+    /// // Ensure relays exist and connect them
+    /// let connectedRelays = await pool.prepareRelays(
+    ///     ["wss://relay1.com", "wss://relay2.com"],
+    ///     autoConnect: true
+    /// )
+    /// ```
     public func prepareRelays(_ urls: [String], autoConnect: Bool = false) async -> [NDKRelay] {
         NDKLogger.log(.debug, category: .relay, "🔧 Preparing \(urls.count) relays, autoConnect: \(autoConnect)")
         var preparedRelays: [NDKRelay] = []
