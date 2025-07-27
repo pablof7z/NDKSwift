@@ -4,6 +4,23 @@ All notable changes to NDKSwift will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.7.9] - 2025-01-27
+
+### Added
+- Comprehensive test coverage for `CachedMintLoader` with mock cache implementation
+- Comprehensive test coverage for `CrossMintTransfer` payment routing logic
+- `XCTestCase+Async.swift` test helper extensions for async testing, timeouts, and test data generation
+
+### Improved
+- Fixed logging category inconsistencies in `CrossMintTransfer` (changed from `.general` to `.wallet`)
+- Enhanced test organization with shared test helpers for better DRY principles
+- Code quality through targeted improvements and test coverage expansion
+
+### Technical
+- Added 120+ test cases across the codebase for better reliability
+- Created reusable test infrastructure for async operations and mock data
+- Ensured consistent logging categories throughout wallet-related code
+
 ## [0.7.8] - 2025-01-27
 
 ### Added

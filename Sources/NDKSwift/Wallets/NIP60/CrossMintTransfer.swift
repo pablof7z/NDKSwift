@@ -20,16 +20,16 @@ public enum CrossMintTransfer {
 
         // Find intersection and exclude blacklisted mints
         let commonMints = ourMints.intersection(acceptedMints).subtracting(blacklistedMints)
-        NDKLogger.log(.debug, category: .general, "CrossMintTransfer.findMintWithSufficientBalance - ourMints: \(ourMints)")
-        NDKLogger.log(.debug, category: .general, "CrossMintTransfer.findMintWithSufficientBalance - acceptedMints: \(acceptedMints)")
-        NDKLogger.log(.debug, category: .general, "CrossMintTransfer.findMintWithSufficientBalance - blacklistedMints: \(blacklistedMints)")
-        NDKLogger.log(.debug, category: .general, "CrossMintTransfer.findMintWithSufficientBalance - commonMints: \(commonMints)")
+        NDKLogger.log(.debug, category: .wallet, "CrossMintTransfer.findMintWithSufficientBalance - ourMints: \(ourMints)")
+        NDKLogger.log(.debug, category: .wallet, "CrossMintTransfer.findMintWithSufficientBalance - acceptedMints: \(acceptedMints)")
+        NDKLogger.log(.debug, category: .wallet, "CrossMintTransfer.findMintWithSufficientBalance - blacklistedMints: \(blacklistedMints)")
+        NDKLogger.log(.debug, category: .wallet, "CrossMintTransfer.findMintWithSufficientBalance - commonMints: \(commonMints)")
 
         // Get mints with sufficient balance, then find first one in accepted mints
         let mintsWithBalance = await proofStateManager.getMintsWithSufficientBalance(amount: requiredAmount)
-        NDKLogger.log(.debug, category: .general, "CrossMintTransfer.findMintWithSufficientBalance - mintsWithBalance: \(mintsWithBalance)")
+        NDKLogger.log(.debug, category: .wallet, "CrossMintTransfer.findMintWithSufficientBalance - mintsWithBalance: \(mintsWithBalance)")
         let result = mintsWithBalance.first { commonMints.contains($0) }
-        NDKLogger.log(.debug, category: .general, "CrossMintTransfer.findMintWithSufficientBalance - result: \(String(describing: result))")
+        NDKLogger.log(.debug, category: .wallet, "CrossMintTransfer.findMintWithSufficientBalance - result: \(String(describing: result))")
         return result
     }
 
@@ -101,7 +101,7 @@ public enum CrossMintTransfer {
         proofStateManager: ProofStateManager,
         blacklistedMints: Set<String> = []
     ) async -> PaymentRoute {
-        NDKLogger.log(.debug, category: .general, "CrossMintTransfer.findBestPaymentRoute - amount: \(amount), acceptedMints: \(acceptedMints)")
+        NDKLogger.log(.debug, category: .wallet, "CrossMintTransfer.findBestPaymentRoute - amount: \(amount), acceptedMints: \(acceptedMints)")
         // First, try to find a direct payment option
         // Add buffer for fees (typically 1-2 sats for small payments)
         let amountWithFeeBuffer = amount + 2
@@ -159,7 +159,7 @@ public enum CrossMintTransfer {
             mints: mints,
             proofStateManager: proofStateManager
         )
-        NDKLogger.log(.debug, category: .general, "CrossMintTransfer.evaluateTransferRoute - totalBalance: \(totalBalance), required amount: \(amount)")
+        NDKLogger.log(.debug, category: .wallet, "CrossMintTransfer.evaluateTransferRoute - totalBalance: \(totalBalance), required amount: \(amount)")
         if totalBalance < amount {
             return .impossible(reason: "Insufficient total balance: \(totalBalance) < \(amount)")
         } else {
@@ -277,7 +277,7 @@ public enum CrossMintTransfer {
         // Get mints with actual proofs, not configured mints
         let proofsByMint = await proofStateManager.getAvailableProofsByMint()
         let mintsWithProofs = Array(proofsByMint.keys)
-        NDKLogger.log(.debug, category: .general, "CrossMintTransfer.getTotalBalance - checking balance for \(mintsWithProofs.count) mints with proofs: \(mintsWithProofs)")
+        NDKLogger.log(.debug, category: .wallet, "CrossMintTransfer.getTotalBalance - checking balance for \(mintsWithProofs.count) mints with proofs: \(mintsWithProofs)")
 
         var total: Int64 = 0
         for (mint, proofs) in proofsByMint {
