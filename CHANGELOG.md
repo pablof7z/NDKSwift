@@ -6,6 +6,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Documentation
+- Updated documentation version references from 0.6.2 to 0.7.3 in README
+- Cleaned up and improved consistency across documentation files
+
 ## [0.7.3] - 2025-01-27
 
 ### Added
