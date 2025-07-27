@@ -303,8 +303,7 @@ public struct NWCResponseHandler {
                         }
 
                         // Convert notification data back to JSON for parsing
-                        let notificationJSON = try JSONSerialization.data(withJSONObject: notificationData)
-                        let paymentNotification = try JSONCoding.decode(PaymentNotification.self, from: notificationJSON)
+                        let paymentNotification = try JSONCoding.decodeFromDictionary(PaymentNotification.self, from: notificationData as! [String: Any])
 
                         let notification = NWCNotification(
                             notificationType: notificationType,

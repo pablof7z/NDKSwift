@@ -6,22 +6,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.3] - 2025-01-27
+
 ### Added
-- Comprehensive unit tests for `Bech32` encoding/decoding utility
-- Comprehensive unit tests for `NostrIdentifier` utility
-- Safe data conversion methods to `HexValidator` for validated hex string conversion
+- Unit tests for `NDKLogFormatter` message truncation and emoji formatting
+- Unit tests for `URLUtils` validation methods
+- `RetryConfiguration` struct for consistent retry behavior across operations with presets (fast, standard, aggressive, mint)
+- Comprehensive documentation for `NDKParsedContent` with usage examples
 
 ### Changed
-- Refactored `NDKLogFormatter` to use `JSONCoding` utility instead of direct JSON serialization
-- Refactored `NDKCashuWalletEvent`, `NDKCashuWalletBackupEvent`, `NDKBlockedMintsEvent`, and `NDKNutzapEvent` to use `EventPublishingHelper` for consistent event publishing
-- Updated README version to 0.7.2
-
-### Fixed
-- Fixed NIP17PrivateMessagesE2ETests using incorrect NDK connection API
-- Fixed NIP05Manager to use NDKNetworkClient instead of URLSession.shared for better testability
+- Refactored `NDKZapManager` and `NWCResponseHandler` to use `JSONCoding.decodeFromDictionary` instead of manual JSON serialization
+- Enhanced `NDKParsedContent` documentation with detailed component descriptions
+- Updated version to 0.7.3
 
 ### Improved
-- Code consistency by using centralized network client throughout the codebase
+- Code quality through increased test coverage
+- DRY principle by eliminating duplicate JSON encoding/decoding patterns
+- Documentation consistency across utilities
 - Code consistency by using centralized JSON handling with `JSONCoding` utility
 - Reduced code duplication in event publishing using `EventPublishingHelper`
 
