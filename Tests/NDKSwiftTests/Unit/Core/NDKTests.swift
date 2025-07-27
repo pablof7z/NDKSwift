@@ -372,21 +372,22 @@ final class NDKTests: NDKTestCase {
         let ndk = createTestNDK()
         
         let defaultConfig = ndk.signatureVerificationConfig
-        XCTAssertEqual(defaultConfig.enabled, NDKSignatureVerificationConfig.default.enabled)
-        XCTAssertEqual(defaultConfig.samplingRate, NDKSignatureVerificationConfig.default.samplingRate)
+        XCTAssertEqual(defaultConfig.initialValidationRatio, NDKSignatureVerificationConfig.default.initialValidationRatio)
+        XCTAssertEqual(defaultConfig.lowestValidationRatio, NDKSignatureVerificationConfig.default.lowestValidationRatio)
         
         // Create custom config
         let customConfig = NDKSignatureVerificationConfig(
-            enabled: false,
-            samplingRate: 0.5,
-            cacheSize: 1000
+            initialValidationRatio: 0.5,
+            lowestValidationRatio: 0.1,
+            autoBlacklistInvalidRelays: false,
+            validationRatioFunction: nil
         )
         
         let ndkWithCustomConfig = NDK(
             signatureVerificationConfig: customConfig
         )
         
-        XCTAssertFalse(ndkWithCustomConfig.signatureVerificationConfig.enabled)
-        XCTAssertEqual(ndkWithCustomConfig.signatureVerificationConfig.samplingRate, 0.5)
+        XCTAssertEqual(ndkWithCustomConfig.signatureVerificationConfig.initialValidationRatio, 0.5)
+        XCTAssertEqual(ndkWithCustomConfig.signatureVerificationConfig.lowestValidationRatio, 0.1)
     }
 }
