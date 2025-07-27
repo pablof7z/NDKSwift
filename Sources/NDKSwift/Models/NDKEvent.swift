@@ -213,16 +213,12 @@ public struct NDKEvent: Codable, Equatable, Hashable, Sendable {
     /// Verify the signature of this event
     /// - Returns: true if the signature is valid, false otherwise
     public func verifySignature() -> Bool {
-        do {
-            let calculatedID = try calculateID()
-            guard calculatedID == id else { return false }
-
-            // Use crypto utilities to verify signature
-            let messageData = Data(hexString: id) ?? Data()
-            return try Crypto.verify(signature: sig, message: messageData, pubkey: pubkey)
-        } catch {
-            return false
-        }
+        // Calculate ID (needed for the comparison)
+        guard (try? calculateID()) == id else { return false }
+        // Convert hex string to Data
+        guard let messageData = id.hexDecoded() else { return false }
+        // Directly call Crypto.verify and handle its throwing nature
+        return (try? Crypto.verify(signature: sig, message: messageData, pubkey: pubkey)) ?? false
     }
 
 

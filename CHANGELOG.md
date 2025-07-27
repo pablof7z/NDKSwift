@@ -4,6 +4,19 @@ All notable changes to NDKSwift will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.7.7] - 2025-01-27
+
+### Improved
+- Eliminated code duplication by refactoring `NDKRelay.normalizedURL` to use String extension
+- Simplified `NDKEvent.verifySignature()` implementation using modern Swift patterns
+- Updated documentation by removing references to moved iOS apps in `CLAUDE.md`
+- General code quality improvements through DRY refactoring
+
+### Technical
+- Refactored `NDKRelay.normalizedURL` to use `url.normalizedRelayURL` extension for consistency
+- Simplified signature verification logic using guard statements and nil-coalescing operator
+- Better alignment between documentation and current repository structure
+
 ## [0.7.6] - 2025-01-27
 
 ### Improved
