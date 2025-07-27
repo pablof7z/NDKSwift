@@ -28,7 +28,7 @@ import Combine
 /// }
 /// ```
 @MainActor
-public final class NDKContactsDataSource: ObservableObject {
+public final class NDKContactsDataSource: ObservableObject, NDKDataSourceProtocol {
 
     // MARK: - Published Properties
 
