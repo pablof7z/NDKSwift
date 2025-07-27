@@ -466,7 +466,10 @@ public struct NDKFilter: Codable, Equatable, Sendable {
         }
 
         // Otherwise, hash it and take first 15 chars
-        let data = filterString.data(using: .utf8)!
+        guard let data = filterString.data(using: .utf8) else {
+            // Fallback to a simple ID if encoding fails
+            return "filter_\(UUID().uuidString.prefix(8))"
+        }
         let hash = SHA256.hash(data: data)
         let hashHex = Data(hash).hexString
         return String(hashHex.prefix(15))

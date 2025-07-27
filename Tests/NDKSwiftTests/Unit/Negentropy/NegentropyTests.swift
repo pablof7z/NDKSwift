@@ -262,20 +262,20 @@ final class NegentropyTests: XCTestCase {
         let filter = NDKFilter(kinds: [1], limit: 100)
         let data = Data(repeating: 0x42, count: 32)
         
-        let openMsg = NIP77Message.open(
+        let openMsg = NIP77Message.negOpen(
             subscriptionId: "test123",
             filter: filter,
-            initialMessage: data
+            initialMessage: data.hexString
         )
         
         let json = try openMsg.toJSON()
-        let decoded = try NIP77Message.fromJSON(json)
+        let decoded = try NIP77Message.parse(from: json)
         
-        XCTAssertEqual(decoded.type, .negOpen)
+        XCTAssertEqual(decoded.messageType, .negOpen)
         XCTAssertEqual(decoded.subscriptionId, "test123")
         XCTAssertEqual(decoded.filter?.kinds, [1])
         XCTAssertEqual(decoded.filter?.limit, 100)
-        XCTAssertEqual(decoded.data, data)
+        XCTAssertEqual(decoded.initialMessage, data.hexString)
     }
     
     // MARK: - End-to-End Reconciliation Tests
@@ -431,49 +431,49 @@ final class NegentropyTests: XCTestCase {
         let initialData = Data(repeating: 0x42, count: 64)
         
         // Test NEG-OPEN
-        let openMsg = NIP77Message.open(
+        let openMsg = NIP77Message.negOpen(
             subscriptionId: "test-sub-123",
             filter: filter,
-            initialMessage: initialData
+            initialMessage: initialData.hexString
         )
         
         let openJson = try openMsg.toJSON()
-        let decodedOpen = try NIP77Message.fromJSON(openJson)
+        let decodedOpen = try NIP77Message.parse(from: openJson)
         
-        XCTAssertEqual(decodedOpen.type, .negOpen)
+        XCTAssertEqual(decodedOpen.messageType, .negOpen)
         XCTAssertEqual(decodedOpen.subscriptionId, "test-sub-123")
-        XCTAssertEqual(decodedOpen.data, initialData)
+        XCTAssertEqual(decodedOpen.initialMessage, initialData.hexString)
         XCTAssertEqual(decodedOpen.filter?.kinds, [1])
         XCTAssertEqual(decodedOpen.filter?.limit, 100)
         
         // Test NEG-MSG
         let msgData = Data(repeating: 0xAB, count: 32)
-        let msgMsg = NIP77Message.message(subscriptionId: "test-sub-123", data: msgData)
+        let msgMsg = NIP77Message.negMsg(subscriptionId: "test-sub-123", message: msgData.hexString)
         
         let msgJson = try msgMsg.toJSON()
-        let decodedMsg = try NIP77Message.fromJSON(msgJson)
+        let decodedMsg = try NIP77Message.parse(from: msgJson)
         
-        XCTAssertEqual(decodedMsg.type, .negMsg)
+        XCTAssertEqual(decodedMsg.messageType, .negMsg)
         XCTAssertEqual(decodedMsg.subscriptionId, "test-sub-123")
-        XCTAssertEqual(decodedMsg.data, msgData)
+        XCTAssertEqual(decodedMsg.message, msgData.hexString)
         
         // Test NEG-CLOSE
-        let closeMsg = NIP77Message.close(subscriptionId: "test-sub-123")
+        let closeMsg = NIP77Message.negClose(subscriptionId: "test-sub-123")
         let closeJson = try closeMsg.toJSON()
-        let decodedClose = try NIP77Message.fromJSON(closeJson)
+        let decodedClose = try NIP77Message.parse(from: closeJson)
         
-        XCTAssertEqual(decodedClose.type, .negClose)
+        XCTAssertEqual(decodedClose.messageType, .negClose)
         XCTAssertEqual(decodedClose.subscriptionId, "test-sub-123")
-        XCTAssertNil(decodedClose.data)
+        XCTAssertNil(decodedClose.message)
         
         // Test NEG-ERR
-        let errMsg = NIP77Message.error(subscriptionId: "test-sub-123", error: "Test error")
+        let errMsg = NIP77Message.negErr(subscriptionId: "test-sub-123", reason: "Test error")
         let errJson = try errMsg.toJSON()
-        let decodedErr = try NIP77Message.fromJSON(errJson)
+        let decodedErr = try NIP77Message.parse(from: errJson)
         
-        XCTAssertEqual(decodedErr.type, .negErr)
+        XCTAssertEqual(decodedErr.messageType, .negErr)
         XCTAssertEqual(decodedErr.subscriptionId, "test-sub-123")
-        XCTAssertEqual(decodedErr.error, "Test error")
+        XCTAssertEqual(decodedErr.reason, "Test error")
     }
     
     func testNegentropyReconcilerFlow() async throws {
@@ -698,17 +698,17 @@ final class NegentropyTests: XCTestCase {
     
     func testInvalidNIP77Message() {
         // Test invalid JSON
-        XCTAssertThrowsError(try NIP77Message.fromJSON("invalid json")) { error in
+        XCTAssertThrowsError(try NIP77Message.parse(from: "invalid json")) { error in
             XCTAssertTrue(error is NIP77Error)
         }
         
         // Test wrong array structure
-        XCTAssertThrowsError(try NIP77Message.fromJSON("[\"NEG-OPEN\"]")) { error in
+        XCTAssertThrowsError(try NIP77Message.parse(from: "[\"NEG-OPEN\"]")) { error in
             XCTAssertTrue(error is NIP77Error)
         }
         
         // Test invalid message type
-        XCTAssertThrowsError(try NIP77Message.fromJSON("[\"INVALID-TYPE\", \"sub123\"]")) { error in
+        XCTAssertThrowsError(try NIP77Message.parse(from: "[\"INVALID-TYPE\", \"sub123\"]")) { error in
             XCTAssertTrue(error is NIP77Error)
         }
     }

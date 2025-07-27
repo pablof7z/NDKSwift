@@ -143,11 +143,11 @@ final class NostrIdentifierTests: XCTestCase {
             }
             
             switch ndkError {
-            case .invalidDataFormat(let type, let details):
-                XCTAssertEqual(type, "bech32")
-                XCTAssertTrue(details?.contains("Unsupported type") ?? false)
+            case .invalidInput(let message):
+                XCTAssertTrue(message.contains("bech32"))
+                XCTAssertTrue(message.contains("Unsupported type"))
             default:
-                XCTFail("Expected invalidDataFormat error")
+                XCTFail("Expected invalidInput error")
             }
         }
     }

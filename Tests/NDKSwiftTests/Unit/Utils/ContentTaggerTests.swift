@@ -80,8 +80,8 @@ final class ContentTaggerTests: XCTestCase {
         XCTAssertThrowsError(try ContentTagger.decodeNostrEntity(invalidNpub)) { error in
             if let ndkError = error as? NDKError {
                 switch ndkError {
-                case .invalidDataFormat(_, let details):
-                    XCTAssertTrue(details?.contains("Expected 32 bytes") ?? false)
+                case .invalidInput(let message):
+                    XCTAssertTrue(message.contains("Expected 32 bytes"))
                 default:
                     XCTFail("Wrong error type")
                 }

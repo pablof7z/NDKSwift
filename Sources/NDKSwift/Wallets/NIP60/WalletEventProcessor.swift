@@ -52,17 +52,11 @@ actor WalletEventProcessor {
         NDKLogger.log(.debug, category: .wallet, "Processing token event: \(event.id)")
         NDKLogger.log(.debug, category: .wallet, "Event Kind: \(event.kind)")
 
-        // Decrypt and process token
-        let sender = NDKUser(pubkey: event.pubkey)
-        let decryptedContent = try await context.signer.decrypt(
-            sender: sender,
-            value: event.content,
-            scheme: .nip44
-        )
-
-        // Parse token data
-        guard let tokenData = decryptedContent.data(using: .utf8),
-              let nip60Token = JSONCoding.safeDecode(NIP60TokenEvent.self, from: tokenData) else {
+        // Decrypt and parse token data
+        guard let nip60Token: NIP60TokenEvent = await WalletEventParsingUtils.safeDecryptAndParse(
+            event: event,
+            signer: context.signer
+        ) else {
             NDKLogger.log(.error, category: .wallet, ErrorMessageConstants.failedTo("parse NIP-60 token event data from decrypted content"))
             throw NDKError.invalidContent(ErrorMessageConstants.failedTo("parse NIP-60 token event data"))
         }
@@ -109,23 +103,11 @@ actor WalletEventProcessor {
         NDKLogger.log(.debug, category: .wallet, "Encrypted content length: \(event.content.count) characters")
         NDKLogger.log(.debug, category: .wallet, "Encrypted content (first \(StringConstants.DisplayFormatting.debugLogPreviewLength) chars): \(event.content.prefix(StringConstants.DisplayFormatting.debugLogPreviewLength))")
 
-        // Decrypt content
-        let sender = NDKUser(pubkey: event.pubkey)
-        let decryptedContent = try await context.signer.decrypt(
-            sender: sender,
-            value: event.content,
-            scheme: .nip44
+        // Decrypt and parse quote data
+        let quote: CashuMintQuote = try await WalletEventParsingUtils.decryptAndParse(
+            event: event,
+            signer: context.signer
         )
-
-        NDKLogger.log(.debug, category: .wallet, "DECRYPTED QUOTE CONTENT:")
-        NDKLogger.log(.debug, category: .wallet, "Decrypted length: \(decryptedContent.count) characters")
-        NDKLogger.log(.debug, category: .wallet, "Decrypted content: \(decryptedContent)")
-
-        // Parse quote data
-        guard let quoteData = decryptedContent.data(using: .utf8),
-              let quote = JSONCoding.safeDecode(CashuMintQuote.self, from: quoteData) else {
-            throw NDKError.invalidContent(ErrorMessageConstants.failedTo("parse quote event data"))
-        }
 
         NDKLogger.log(.debug, category: .wallet, "Loaded quote: \(quote.quoteId) for \(quote.amount) sats")
 

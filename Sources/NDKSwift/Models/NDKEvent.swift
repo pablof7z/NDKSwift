@@ -139,7 +139,9 @@ public struct NDKEvent: Codable, Equatable, Hashable, Sendable {
     /// Calculate event ID based on NIP-01 without modifying the event
     public func calculateID() throws -> EventID {
         let serialized = try serializeForID()
-        let data = serialized.data(using: .utf8)!
+        guard let data = serialized.data(using: .utf8) else {
+            throw NDKError.invalidInput(message: "Failed to convert serialized event to UTF-8 data")
+        }
         let hash = data.sha256()
         return hash.hexString
     }
