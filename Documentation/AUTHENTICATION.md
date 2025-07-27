@@ -32,8 +32,9 @@ struct MyApp: App {
             ContentView()
                 .environment(authManager)
                 .environment(\.ndk, ndk)
-                .onAppear {
+                .task {
                     authManager.setNDK(ndk)
+                    await authManager.initialize()  // Restores previous session
                 }
         }
     }
@@ -55,6 +56,19 @@ struct ContentView: View {
 ## NDKAuthManager
 
 The authentication manager is a singleton that manages all authentication state:
+
+### Initialization
+
+```swift
+// Early in your app lifecycle (e.g., in your App's .task modifier)
+await authManager.initialize()
+```
+
+The `initialize()` method automatically:
+- Loads all saved sessions from the keychain
+- Restores the most recent active session
+- Handles biometric authentication if required
+- Sets up the NDK signer
 
 ### Accessing the Manager
 
@@ -110,6 +124,16 @@ let session = try await authManager.createSession(
 
 ### Managing Sessions
 
+#### Automatic Session Restoration
+
+The `initialize()` method handles session restoration automatically:
+
+```swift
+// On app launch
+await authManager.initialize()
+// Previous session is automatically restored if available
+```
+
 #### Switch Between Accounts
 
 ```swift
@@ -142,6 +166,36 @@ try await authManager.deleteSession(session)
 
 // Or logout and clear active session
 authManager.logout()
+```
+
+#### Complete Logout Implementation
+
+**Important**: The default `logout()` method only clears the in-memory state. For a complete logout that prevents sessions from reappearing after app restart, you must delete the sessions from the keychain:
+
+```swift
+// CORRECT: Complete logout that removes all session data
+func performCompleteLogout() async {
+    // Optional: Clear cache
+    if let cache = ndk.cache {
+        try? await cache.clear()
+    }
+    
+    // Delete all sessions from keychain
+    for session in authManager.availableSessions {
+        try? await authManager.deleteSession(session)
+    }
+    
+    // Clear memory state
+    authManager.logout()
+}
+
+// Alternative: Delete only the active session
+func logoutCurrentUser() async {
+    if let activeSession = authManager.activeSession {
+        try? await authManager.deleteSession(activeSession)
+    }
+    authManager.logout()
+}
 ```
 
 ### Authentication States
@@ -417,11 +471,10 @@ struct NostrApp: App {
             ContentView()
                 .environment(authManager)
                 .environment(\.ndk, ndk)
-                .onAppear {
+                .task {
                     authManager.setNDK(ndk)
-                    Task {
-                        await ndk.connect()
-                    }
+                    await authManager.initialize()  // Restore sessions
+                    await ndk.connect()
                 }
         }
     }
@@ -509,6 +562,25 @@ If you're migrating from a custom authentication system:
 2. **Update UI**: Build your own authentication UI using NDKAuthManager
 3. **Handle Legacy Sessions**: Provide migration path for old session formats
 4. **Test Thoroughly**: Ensure biometric authentication works as expected
+
+### API Changes
+
+The authentication API has been simplified:
+
+```swift
+// Old pattern (still works but deprecated)
+.task {
+    await authManager.restoreSessions()
+    if let session = authManager.availableSessions.last {
+        try await authManager.switchToSession(session)
+    }
+}
+
+// New pattern - cleaner and automatic
+.task {
+    await authManager.initialize()
+}
+```
 
 ## Next Steps
 

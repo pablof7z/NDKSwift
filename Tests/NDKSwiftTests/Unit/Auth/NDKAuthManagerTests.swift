@@ -425,11 +425,8 @@ final class NDKAuthManagerTests: XCTestCase {
         XCTAssertFalse(authManager.isAuthenticated)
         XCTAssertNil(authManager.activeSession)
         
-        // Restore session
-        authManager.restoreSession()
-        
-        // Give it a moment to restore asynchronously
-        try await Task.sleep(nanoseconds: 100_000_000) // 0.1 seconds
+        // Initialize auth manager (restores sessions automatically)
+        await authManager.initialize()
         
         // Should now be authenticated with the same session
         XCTAssertTrue(authManager.isAuthenticated)
@@ -444,11 +441,8 @@ final class NDKAuthManagerTests: XCTestCase {
         // Ensure no sessions exist
         authManager.logout()
         
-        // Restore session should not crash and should remain unauthenticated
-        authManager.restoreSession()
-        
-        // Give it a moment to complete
-        try await Task.sleep(nanoseconds: 50_000_000) // 0.05 seconds
+        // Initialize should not crash and should remain unauthenticated
+        await authManager.initialize()
         
         // Should still be unauthenticated
         XCTAssertFalse(authManager.isAuthenticated)

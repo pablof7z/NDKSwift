@@ -153,59 +153,82 @@ public class NDKAuthManager {
         if let activeSigner = activeSigner {
             ndk.signer = activeSigner
         }
-
-        // Start session restoration now that NDK is available
-        if authenticationState == .unauthenticated {
-            restoreSession()
-        }
     }
 
     // MARK: - Session Management
 
-    /// Restore sessions from secure storage
+    /// Initialize the authentication manager
+    /// 
+    /// This method should be called early in your app lifecycle (e.g., in your App's .task modifier).
+    /// It automatically:
+    /// - Loads all saved sessions from the keychain
+    /// - Restores the most recent active session
+    /// - Handles biometric authentication if required
+    /// - Sets up the NDK signer
+    ///
+    /// ## Usage
+    /// ```swift
+    /// .task {
+    ///     await authManager.initialize()
+    /// }
+    /// ```
+    public func initialize() async {
+        await restoreSessions()
+    }
+    
+    /// Restore all sessions from secure storage
+    /// 
+    /// This method loads all saved sessions and attempts to restore the most recent active session.
+    /// Called automatically by `initialize()`.
+    public func restoreSessions() async {
+        do {
+            authenticationState = .authenticating
+
+            // Load all session identifiers
+            let sessionIds = try await keychainManager.getAllSessionIdentifiers()
+
+            // Load session metadata for each
+            var sessions: [NDKSession] = []
+            for sessionId in sessionIds {
+                do {
+                    let data = try await keychainManager.retrieveSessionMetadata(identifier: sessionId)
+                    let session = try JSONCoding.decode(NDKSession.self, from: data)
+                    sessions.append(session)
+                } catch {
+                    NDKLogger.log(.error, category: .auth, "Failed to load session \(sessionId): \(error)")
+                    // Clean up corrupted session
+                    try? await keychainManager.deleteSessionMetadata(identifier: sessionId)
+                }
+            }
+
+            availableSessions = sessions.sortedByLastUsed
+
+            // Try to restore the active session
+            if let activeSession = sessions.activeSession {
+                try await restoreActiveSession(activeSession)
+            } else if let mostRecent = sessions.sortedByLastUsed.first {
+                // Use most recent session if no active session
+                try await restoreActiveSession(mostRecent)
+            } else {
+                // No sessions available
+                authenticationState = .unauthenticated
+            }
+
+        } catch {
+            // Don't show error to user for session restoration failures
+            // Just treat it as unauthenticated
+            authenticationState = .unauthenticated
+        }
+    }
+    
+    /// Restore sessions from secure storage (deprecated)
+    @available(*, deprecated, renamed: "initialize", message: "Use initialize() instead for cleaner API")
     public func restoreSession() {
         // Cancel any existing restoration task
         restorationTask?.cancel()
 
         restorationTask = Task { @MainActor in
-            do {
-                authenticationState = .authenticating
-
-                // Load all session identifiers
-                let sessionIds = try await keychainManager.getAllSessionIdentifiers()
-
-                // Load session metadata for each
-                var sessions: [NDKSession] = []
-                for sessionId in sessionIds {
-                    do {
-                        let data = try await keychainManager.retrieveSessionMetadata(identifier: sessionId)
-                        let session = try JSONCoding.decode(NDKSession.self, from: data)
-                        sessions.append(session)
-                    } catch {
-                        NDKLogger.log(.error, category: .auth, "Failed to load session \(sessionId): \(error)")
-                        // Clean up corrupted session
-                        try? await keychainManager.deleteSessionMetadata(identifier: sessionId)
-                    }
-                }
-
-                availableSessions = sessions.sortedByLastUsed
-
-                // Try to restore the active session
-                if let activeSession = sessions.activeSession {
-                    try await restoreActiveSession(activeSession)
-                } else if let mostRecent = sessions.sortedByLastUsed.first {
-                    // Use most recent session if no active session
-                    try await restoreActiveSession(mostRecent)
-                } else {
-                    // No sessions available
-                    authenticationState = .unauthenticated
-                }
-
-            } catch {
-                // Don't show error to user for session restoration failures
-                // Just treat it as unauthenticated
-                authenticationState = .unauthenticated
-            }
+            await restoreSessions()
         }
     }
 

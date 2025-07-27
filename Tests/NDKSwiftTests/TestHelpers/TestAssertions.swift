@@ -135,7 +135,7 @@ func XCTAssertCacheEventCount(
     file: StaticString = #filePath,
     line: UInt = #line
 ) async {
-    let events = await cache.getEvents(filter: filter ?? NDKFilter())
+    let events = (try? await cache.queryEvents(filter ?? NDKFilter())) ?? []
     XCTAssertEqual(
         events.count,
         expectedCount,
@@ -179,7 +179,7 @@ func XCTAssertAsyncCompletes<T>(
     file: StaticString = #filePath,
     line: UInt = #line,
     operation: () async throws -> T
-) async rethrows -> T {
+) async throws -> T {
     let task = Task {
         try await operation()
     }

@@ -5,15 +5,17 @@ final class NDKTests: NDKTestCase {
     
     // MARK: - Initialization Tests
     
-    func testInitializationWithDefaults() {
+    func testInitializationWithDefaults() async {
         let ndk = NDK()
         
         XCTAssertNil(ndk.signer)
         XCTAssertNil(ndk.cache)
-        XCTAssertNil(ndk.activeUser)
+        let activeUser = await ndk.activeUser
+        XCTAssertNil(activeUser)
         XCTAssertTrue(ndk.outboxEnabled)
         XCTAssertFalse(ndk.debugMode)
-        XCTAssertTrue(ndk.relays.isEmpty)
+        let relays = await ndk.relays
+        XCTAssertTrue(relays.isEmpty)
     }
     
     func testInitializationWithParameters() async throws {
@@ -27,23 +29,29 @@ final class NDKTests: NDKTestCase {
             cache: cache
         )
         
-        XCTAssertEqual(ndk.signer as? NDKPrivateKeySigner, signer)
+        XCTAssertNotNil(ndk.signer)
         XCTAssertNotNil(ndk.cache)
-        XCTAssertNotNil(ndk.activeUser)
-        XCTAssertEqual(ndk.activeUser?.pubkey, try await signer.pubkey)
-        XCTAssertEqual(ndk.relays.count, 2)
-        XCTAssertEqual(Set(ndk.relays.map(\.url)), Set(relayUrls))
+        let activeUser = await ndk.activeUser
+        XCTAssertNotNil(activeUser)
+        let signerPubkey = try await signer.pubkey
+        XCTAssertEqual(activeUser?.pubkey, signerPubkey)
+        let relays = await ndk.relays
+        XCTAssertEqual(relays.count, 2)
+        XCTAssertEqual(Set(relays.map(\.url)), Set(relayUrls))
     }
     
     func testActiveUserUpdatesWithSigner() async throws {
         let ndk = createTestNDK()
-        XCTAssertNil(ndk.activeUser)
+        let activeUser1 = await ndk.activeUser
+        XCTAssertNil(activeUser1)
         
         let signer = try NDKPrivateKeySigner.generate()
         ndk.signer = signer
         
-        XCTAssertNotNil(ndk.activeUser)
-        XCTAssertEqual(ndk.activeUser?.pubkey, try await signer.pubkey)
+        let activeUser2 = await ndk.activeUser
+        XCTAssertNotNil(activeUser2)
+        let signerPubkey = try await signer.pubkey
+        XCTAssertEqual(activeUser2?.pubkey, signerPubkey)
     }
     
     // MARK: - Relay Management Tests

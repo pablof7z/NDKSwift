@@ -91,29 +91,25 @@ NDKSwift provides a powerful, self-contained authentication system via `NDKAuthM
     ```
 
 4.  **Session Management on App Launch:**
-    NDKSwift automatically handles session restoration and biometric authentication on app launch.
+    NDKSwift provides a simple `initialize()` method that handles all session restoration automatically.
 
     ```swift
     // In your App or initial view
     .task {
-        // Restore sessions from keychain
-        await authManager.restoreSessions()
-        
-        // Use the most recent session if available
-        if let mostRecentSession = authManager.availableSessions.last {
-            try await authManager.switchToSession(mostRecentSession)
-        }
+        // Initialize auth manager - handles everything automatically
+        await authManager.initialize()
     }
     ```
 
-    The session restoration process:
+    The `initialize()` method:
     - Loads all saved sessions from the keychain
-    - You can manually select which session to activate
-    - Use `switchToSession()` to activate a specific session
-    - Biometric authentication is handled when switching sessions
+    - Automatically restores the most recent active session
+    - Handles biometric authentication if required
+    - Sets up the NDK signer
+    - No manual session switching needed for common cases
 
 5.  **Handling Multiple Sessions:**
-    When multiple sessions exist, you can access and switch between them.
+    When multiple sessions exist, `initialize()` automatically restores the most recent active session. To switch between sessions manually:
 
     ```swift
     // Get all available sessions
@@ -122,11 +118,6 @@ NDKSwift provides a powerful, self-contained authentication system via `NDKAuthM
     // Manually switch to a specific session
     if let targetSession = sessions.first(where: { $0.displayName == "Work Account" }) {
         try await authManager.switchToSession(targetSession)
-    }
-    
-    // Switch to the most recent session
-    if let mostRecentSession = authManager.availableSessions.last {
-        try await authManager.switchToSession(mostRecentSession)
     }
     ```
 
@@ -155,7 +146,7 @@ NDKSwift provides a powerful, self-contained authentication system via `NDKAuthM
 
 **Architectural Tips:**
 
-1. **Session Initialization**: Always call `restoreSessions()` early in your app lifecycle (e.g., in your App's `.task` modifier) to load available sessions, then use `switchToSession()` to activate a specific session.
+1. **Session Initialization**: Always call `initialize()` early in your app lifecycle (e.g., in your App's `.task` modifier). This single method handles everything - loading sessions, restoring the active session, and biometric authentication.
 
 2. **Error Handling**: The authentication system provides specific error types (`NDKAuthError`) for different failure scenarios. Handle these appropriately in your UI.
 

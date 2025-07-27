@@ -242,15 +242,17 @@ public actor NDKRelayConnection {
 
         await withThrowingTaskGroup(of: Void.self) { group in
             // Send event task
-            group.addTask {
+            group.addTask { [weak self] in
+                guard let self = self else { return }
                 let eventMessage = NostrMessage.event(subscriptionId: nil, event: event)
                 try await self.send(eventMessage)
                 NDKLogger.log(.debug, category: .relay, "Event sent, waiting for OK response...")
             }
 
             // Timeout task
-            group.addTask {
+            group.addTask { [weak self] in
                 try await Task.sleep(nanoseconds: UInt64(timeout * Double(TimeConstants.nanosecondsPerSecond)))
+                guard let self = self else { return }
                 await self.handleTimeout(eventId: eventId)
             }
 

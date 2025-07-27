@@ -66,8 +66,12 @@ extension NDK {
         let subscriptionId = "reactive_\(IDGenerator.randomId(length: 8))"
         NDKLogger.log(.debug, category: .subscription, "🔍 [ReactiveFilter] Created subscription ID: \(subscriptionId)")
 
-        Task {
+        Task { [weak self] in
             await withTaskCancellationHandler {
+                guard let self = self else {
+                    continuation.finish()
+                    return
+                }
                 // Use stored session data if available
                 guard let sessionData = self.sessionData else {
                     NDKLogger.log(.error, category: .subscription, "❌ [ReactiveFilter] No session data available - did you call startSession()?")
@@ -157,7 +161,8 @@ extension NDK {
 
                 NDKLogger.log(.debug, category: .subscription, "🔍 [ReactiveFilter] Event stream finished")
                 continuation.finish()
-            } onCancel: {
+            } onCancel: { [weak self] in
+                _ = self // Capture self weakly but don't need to use it
                 NDKLogger.log(.debug, category: .subscription, "🔍 [ReactiveFilter] Subscription cancelled, unregistering...")
                 Task {
                     await SubscriptionSwapManager.shared.unregister(id: subscriptionId)

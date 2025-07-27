@@ -167,7 +167,7 @@ public final class NDKDataSource<T>: ObservableObject, CacheObserver {
 
         // Use the new data requirement manager if available
         if let requirementManager = ndk.dataRequirementManager {
-            NDKLogger.log(.info, category: .subscription, "✅ Found dataRequirementManager, registering requirement", correlationId: correlationId)
+            NDKLogger.log(.debug, category: .subscription, "✅ Found dataRequirementManager, registering requirement", correlationId: correlationId)
             
             requirementHandle = await requirementManager.registerRequirement(
                 filter: filter,
@@ -194,7 +194,7 @@ public final class NDKDataSource<T>: ObservableObject, CacheObserver {
     // MARK: - CacheObserver
 
     public func handleEvent(_ event: NDKEvent) async {
-        NDKLogger.log(.info, category: .subscription, "🎯 [NDKDataSource] handleEvent called - id: \(event.id.prefix(10)), correlationId: \(correlationId)")
+        NDKLogger.log(.trace, category: .subscription, "🎯 [NDKDataSource] handleEvent called - id: \(event.id.prefix(10)), correlationId: \(correlationId)")
         
         // Check if we've already processed this event
         guard await !stateManager.isProcessed(event.id) else {
@@ -204,7 +204,7 @@ public final class NDKDataSource<T>: ObservableObject, CacheObserver {
         await stateManager.markProcessed(event.id)
 
         if let transformed = transform(event) {
-            NDKLogger.log(.info, category: .subscription, "✅ [NDKDataSource] Event transformed and yielding to stream - id: \(event.id.prefix(10)), correlationId: \(correlationId)")
+            NDKLogger.log(.debug, category: .subscription, "✅ [NDKDataSource] Event transformed and yielding to stream - id: \(event.id.prefix(10)), correlationId: \(correlationId)")
 
             // Yield to AsyncStream
             eventsContinuation.yield(transformed)
@@ -215,7 +215,7 @@ public final class NDKDataSource<T>: ObservableObject, CacheObserver {
                 NDKLogger.log(.trace, category: .subscription, "📈 Data array updated - count: \(self.data.count)", correlationId: self.correlationId)
             }
         } else {
-            NDKLogger.log(.info, category: .subscription, "❌ [NDKDataSource] Transform failed - event not added to data - id: \(event.id.prefix(10)), correlationId: \(correlationId)")
+            NDKLogger.log(.debug, category: .subscription, "❌ [NDKDataSource] Transform failed - event not added to data - id: \(event.id.prefix(10)), correlationId: \(correlationId)")
         }
     }
 
@@ -226,7 +226,7 @@ public final class NDKDataSource<T>: ObservableObject, CacheObserver {
         
         // Also process events directly
         if case let .event(event, relay) = update {
-            NDKLogger.log(.info, category: .subscription, "🔄 [NDKDataSource] Processing event from relay update - id: \(event.id.prefix(10)), relay: \(relay)")
+            NDKLogger.log(.debug, category: .subscription, "🔄 [NDKDataSource] Processing event from relay update - id: \(event.id.prefix(10)), relay: \(relay)")
             await handleEvent(event)
         }
     }

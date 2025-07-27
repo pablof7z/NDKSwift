@@ -198,16 +198,25 @@ public actor NIP77SyncHandler {
                 // Move to completed sessions
                 completedSessions[subscriptionId] = session
                 activeSessions.removeValue(forKey: subscriptionId)
+                
+                // Remove self from NDKPool's static map to prevent memory leak
+                await ndk.pool.removeSyncHandler(for: session.relayURL)
             }
 
         case let .negErr(_, error):
             // Handle error from relay
-            activeSessions.removeValue(forKey: subscriptionId)
+            if let session = activeSessions.removeValue(forKey: subscriptionId) {
+                // Remove self from NDKPool's static map to prevent memory leak
+                await ndk.pool.removeSyncHandler(for: session.relayURL)
+            }
             throw NIP77Error.relayError(error)
 
         case .negClose(_):
             // Relay closed the sync
-            activeSessions.removeValue(forKey: subscriptionId)
+            if let session = activeSessions.removeValue(forKey: subscriptionId) {
+                // Remove self from NDKPool's static map to prevent memory leak
+                await ndk.pool.removeSyncHandler(for: session.relayURL)
+            }
 
         default:
             // We don't expect other message types

@@ -128,7 +128,7 @@ open class NDKTestCase: XCTestCase {
     func measureAsync(
         metrics: [XCTMetric] = [XCTClockMetric()],
         options: XCTMeasureOptions = XCTMeasureOptions(),
-        block: () async throws -> Void
+        block: @escaping () async throws -> Void
     ) {
         self.measure(metrics: metrics, options: options) {
             let expectation = self.expectation(description: "async measure")
@@ -215,8 +215,8 @@ open class NDKIntegrationTestCase: NDKTestCase {
         // Wait for event to be retrievable
         try await waitForCondition(timeout: timeout) {
             let filter = NDKFilter(ids: [event.id])
-            let events = await ndk.cache.getEvents(filter: filter)
-            return !events.isEmpty
+            let events = try? await ndk.cache.queryEvents(filter)
+            return !(events ?? []).isEmpty
         }
     }
 }
@@ -254,7 +254,7 @@ open class NDKPerformanceTestCase: NDKTestCase {
     func measureAsyncPerformance(
         metrics: [XCTMetric]? = nil,
         options: XCTMeasureOptions? = nil,
-        block: () async throws -> Void
+        block: @escaping () async throws -> Void
     ) {
         measureAsync(
             metrics: metrics ?? defaultMetrics,

@@ -47,6 +47,18 @@ public actor NDKNostrRPC {
         self.localSigner = localSigner
         self.relayUrls = relayUrls
     }
+    
+    deinit {
+        // Cancel all pending timeout tasks
+        timeoutTasks.values.forEach { $0.cancel() }
+        timeoutTasks.removeAll()
+        
+        // Resolve any pending continuations with a cancellation error
+        pendingRequests.values.forEach { $0.resume(throwing: NDKError.cancelled) }
+        pendingRequests.removeAll()
+        
+        NDKLogger.log(.debug, category: .auth, "NDKNostrRPC deinitialized")
+    }
 
     func parseEvent(_ event: NDKEvent) async throws -> Any {
         let remoteUser = NDKUser(pubkey: event.pubkey)
@@ -150,10 +162,15 @@ public actor NDKNostrRPC {
 
         // If handler provided, call it when response arrives
         if let handler = handler {
-            Task {
+            Task { [weak self] in
+                guard let self = self else { return }
                 NDKLogger.log(.debug, category: .auth, "Waiting for response with id: \(id)")
-                let response = try await waitForResponse(id: id)
-                handler(response)
+                do {
+                    let response = try await self.waitForResponse(id: id)
+                    handler(response)
+                } catch {
+                    NDKLogger.log(.error, category: .auth, "Failed to wait for response: \(error)")
+                }
             }
         }
     }
@@ -164,17 +181,19 @@ public actor NDKNostrRPC {
         return try await withCheckedThrowingContinuation { continuation in
             self.pendingRequests[id] = continuation
 
-            Task {
+            Task { [weak self] in
+                guard let self = self else {
+                    continuation.resume(throwing: NDKError.cancelled)
+                    return
+                }
                 do {
                     // Send the request with the same ID we're waiting for
-                    try await sendRequestInternal(to: pubkey, method: method, params: params, id: id)
+                    try await self.sendRequestInternal(to: pubkey, method: method, params: params, id: id)
 
                     // Set up timeout
-                    setupTimeout(for: id, continuation: continuation)
+                    await self.setupTimeout(for: id, continuation: continuation)
                 } catch {
-                    self.pendingRequests.removeValue(forKey: id)
-                    self.timeoutTasks[id]?.cancel()
-                    self.timeoutTasks.removeValue(forKey: id)
+                    await self.cleanupRequest(id: id)
                     continuation.resume(throwing: error)
                 }
             }
@@ -191,8 +210,9 @@ public actor NDKNostrRPC {
     }
 
     private func setupTimeout(for id: String, continuation: CheckedContinuation<NDKRPCResponse, Error>, timeoutSeconds: UInt64 = UInt64(NetworkConstants.timeoutRPCRequest)) {
-        let timeoutTask = Task {
+        let timeoutTask = Task { [weak self] in
             try? await Task.sleep(nanoseconds: timeoutSeconds * TimeConstants.nanosecondsPerSecond)
+            guard let self = self else { return }
             await self.handleTimeout(id: id, continuation: continuation)
         }
         timeoutTasks[id] = timeoutTask
@@ -203,6 +223,12 @@ public actor NDKNostrRPC {
         if pendingRequests.removeValue(forKey: id) != nil {
             continuation.resume(throwing: NDKError.timeout(operation: "RPC request", seconds: Int(NetworkConstants.timeoutRPCRequest)))
         }
+    }
+    
+    private func cleanupRequest(id: String) async {
+        pendingRequests.removeValue(forKey: id)
+        timeoutTasks[id]?.cancel()
+        timeoutTasks.removeValue(forKey: id)
     }
 
     private func attemptDirectSend(event: NDKEvent, to relayUrls: [String]) async {
