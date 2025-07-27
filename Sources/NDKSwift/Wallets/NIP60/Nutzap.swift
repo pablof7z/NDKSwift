@@ -236,9 +236,16 @@ public enum Nutzap {
         var invalidP2PKError: String?
 
         for proofTag in proofTags {
-            guard let proofData = proofTag[1].data(using: .utf8),
-                  let proof = try? JSONCoding.decode(CashuSwift.Proof.self, from: proofData) else {
-                NDKLogger.log(.error, category: .wallet, "\(ErrorMessageConstants.failedTo("decode proof from tag")): \(proofTag[1])")
+            guard let proofData = proofTag[1].data(using: .utf8) else {
+                NDKLogger.log(.error, category: .wallet, "Invalid proof data encoding in tag: \(proofTag[1])")
+                continue
+            }
+            
+            let proof: CashuSwift.Proof
+            do {
+                proof = try JSONCoding.decode(CashuSwift.Proof.self, from: proofData)
+            } catch {
+                NDKLogger.log(.error, category: .wallet, "\(ErrorMessageConstants.failedTo("decode proof from tag")): \(error.localizedDescription)")
                 continue
             }
 
