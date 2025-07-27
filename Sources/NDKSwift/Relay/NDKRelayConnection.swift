@@ -137,23 +137,13 @@ public actor NDKRelayConnection {
 
     private func _connect() async {
         guard !isConnected else {
-            // Resume all waiting continuations
-            for continuation in connectionContinuations {
-                continuation.resume()
-            }
-            connectionContinuations.removeAll()
-            isConnecting = false
+            resumeAllContinuations(with: .success(()))
             return
         }
 
         #if os(iOS) || os(macOS) || os(watchOS) || os(tvOS)
             guard webSocketTask == nil else {
-                // Resume all waiting continuations
-                for continuation in connectionContinuations {
-                    continuation.resume()
-                }
-                connectionContinuations.removeAll()
-                isConnecting = false
+                resumeAllContinuations(with: .success(()))
                 return
             }
 
@@ -180,12 +170,7 @@ public actor NDKRelayConnection {
             NDKLogger.log(.info, category: .relay, "Mock WebSocket connection to \(url) (Linux doesn't support WebSockets)")
             isConnected = true
             connectedAt = Date()
-            // Resume all waiting continuations
-            for continuation in connectionContinuations {
-                continuation.resume()
-            }
-            connectionContinuations.removeAll()
-            isConnecting = false
+            resumeAllContinuations(with: .success(()))
 
             await notifyDelegate { delegate in
                 delegate.relayConnectionDidConnect(self)
@@ -212,11 +197,7 @@ public actor NDKRelayConnection {
             connectedAt = nil
 
             // Clean up any pending event continuations to prevent leaks
-            for (eventId, continuation) in pendingEvents {
-                NDKLogger.log(.warning, category: .relay, "⚠️ Cancelling pending event \(eventId) due to disconnect")
-                continuation.resume(throwing: NDKError.connectionLost(relay: url.absoluteString, message: "Connection closed"))
-            }
-            pendingEvents.removeAll()
+            await cleanupPendingEvents(error: NDKError.connectionLost(relay: url.absoluteString, message: "Connection closed"))
 
             NDKLogger.log(.info, category: .connection, "✅ Disconnected from \(url)")
             await notifyDelegate { delegate in
@@ -281,9 +262,7 @@ public actor NDKRelayConnection {
             } catch {
                 group.cancelAll()
                 // Remove continuation and resume with error
-                if let storedContinuation = pendingEvents.removeValue(forKey: eventId) {
-                    storedContinuation.resume(throwing: error)
-                }
+                resumePendingEvent(eventId: eventId, with: .failure(error))
             }
         }
     }
@@ -291,9 +270,8 @@ public actor NDKRelayConnection {
 
     /// Handle timeout for a pending event (actor-isolated)
     private func handleTimeout(eventId: EventID) {
-        if let continuation = pendingEvents.removeValue(forKey: eventId) {
-            continuation.resume(throwing: NDKError.timeout(operation: "publishEvent", seconds: Int(NetworkConstants.timeoutRelayConnection)))
-        }
+        let error = NDKError.timeout(operation: "publishEvent", seconds: Int(NetworkConstants.timeoutRelayConnection))
+        resumePendingEvent(eventId: eventId, with: .failure(error))
     }
 
     /// Send raw JSON to relay
@@ -352,8 +330,9 @@ public actor NDKRelayConnection {
             }
         } catch {
             // Connection closed or error occurred
-            NDKLogger.log(.error, category: .connection, "🔴 Receive loop ended with error: \(error)")
-            await handleConnectionError(error)
+            let ndkError = mapToNDKError(error, operation: "receive message")
+            NDKLogger.log(.error, category: .connection, "🔴 Receive loop ended with error: \(ndkError)")
+            await handleConnectionError(ndkError)
         }
     }
     #endif
@@ -378,16 +357,14 @@ public actor NDKRelayConnection {
 
             // Handle OK messages for pending events
             if case let .ok(eventId, accepted, errorMessage) = message {
-                if let continuation = pendingEvents.removeValue(forKey: eventId) {
-                    if accepted {
-                        continuation.resume(returning: true)
-                    } else {
-                        let error = NDKError.publishFailed(
-                            relay: url.absoluteString,
-                            message: errorMessage ?? "Event rejected by relay"
-                        )
-                        continuation.resume(throwing: error)
-                    }
+                if accepted {
+                    resumePendingEvent(eventId: eventId, with: .success(true))
+                } else {
+                    let error = NDKError.publishFailed(
+                        relay: url.absoluteString,
+                        message: errorMessage ?? "Event rejected by relay"
+                    )
+                    resumePendingEvent(eventId: eventId, with: .failure(error))
                 }
             }
 
@@ -406,12 +383,8 @@ public actor NDKRelayConnection {
     private func sendPing() async {
         guard let task = webSocketTask else {
             NDKLogger.log(.error, category: .connection, "❌ No WebSocket task for \(url) - cannot send ping")
-            // Resume all waiting continuations with error
-            for continuation in connectionContinuations {
-                continuation.resume(throwing: NDKError.connectionLost(relay: url.absoluteString, message: "No WebSocket task"))
-            }
-            connectionContinuations.removeAll()
-            isConnecting = false
+            let error = NDKError.connectionLost(relay: url.absoluteString, message: "No WebSocket task")
+            resumeAllContinuations(with: .failure(error))
             return
         }
 
@@ -442,9 +415,10 @@ public actor NDKRelayConnection {
                     }
 
                     if let error = error {
-                        NDKLogger.log(.error, category: .connection, "❌ Ping failed for \(self.url): \(error)")
-                        await self.resumeContinuationWithError(error)
-                        await self.handleConnectionError(error)
+                        let ndkError = await self.mapToNDKError(error, operation: "ping")
+                        NDKLogger.log(.error, category: .connection, "❌ Ping failed for \(self.url): \(ndkError)")
+                        await self.resumeContinuationWithError(ndkError)
+                        await self.handleConnectionError(ndkError)
                         continuation.resume(returning: false)
                     } else {
                         await self.markAsConnected()
@@ -463,11 +437,7 @@ public actor NDKRelayConnection {
 
     private func markAsConnected() async {
         guard !isConnected else {
-            // Resume all waiting continuations
-            for continuation in connectionContinuations {
-                continuation.resume()
-            }
-            connectionContinuations.removeAll()
+            resumeAllContinuations(with: .success(()))
             return
         }
 
@@ -476,13 +446,7 @@ public actor NDKRelayConnection {
         connectedAt = Date()
         retryPolicy.reset()
 
-
-        // Resume all waiting continuations
-        for continuation in connectionContinuations {
-            continuation.resume()
-        }
-        connectionContinuations.removeAll()
-        isConnecting = false
+        resumeAllContinuations(with: .success(()))
 
         // Notify delegate
         await notifyDelegate { delegate in
@@ -491,12 +455,7 @@ public actor NDKRelayConnection {
     }
     
     private func resumeContinuationWithError(_ error: Error) async {
-        // Resume all waiting continuations with error
-        for continuation in connectionContinuations {
-            continuation.resume(throwing: error)
-        }
-        connectionContinuations.removeAll()
-        isConnecting = false
+        resumeAllContinuations(with: .failure(error))
     }
     #endif
 
@@ -510,11 +469,7 @@ public actor NDKRelayConnection {
         #endif
 
         // Clean up any pending event continuations to prevent leaks
-        for (eventId, continuation) in pendingEvents {
-            NDKLogger.log(.warning, category: .relay, "⚠️ Failing pending event \(eventId) due to connection error")
-            continuation.resume(throwing: NDKError.networkError(for: url.absoluteString, operation: "send event", error: error))
-        }
-        pendingEvents.removeAll()
+        await cleanupPendingEvents(error: error)
 
         await notifyDelegate { delegate in
             delegate.relayConnectionDidDisconnect(self, error: error)
@@ -540,6 +495,70 @@ public actor NDKRelayConnection {
                 try? await self.connect()
             }
         }
+    }
+
+    // MARK: - Error Handling Helpers
+    
+    /// Resume all waiting continuations with result
+    private func resumeAllContinuations(with result: Result<Void, Error>) {
+        for continuation in connectionContinuations {
+            switch result {
+            case .success:
+                continuation.resume()
+            case .failure(let error):
+                continuation.resume(throwing: error)
+            }
+        }
+        connectionContinuations.removeAll()
+        isConnecting = false
+    }
+    
+    /// Resume a pending event continuation with result
+    private func resumePendingEvent(eventId: EventID, with result: Result<Bool, Error>) {
+        if let continuation = pendingEvents.removeValue(forKey: eventId) {
+            switch result {
+            case .success(let value):
+                continuation.resume(returning: value)
+            case .failure(let error):
+                continuation.resume(throwing: error)
+            }
+        }
+    }
+    
+    /// Clean up pending events with appropriate error
+    private func cleanupPendingEvents(error: Error) async {
+        let eventIds = Array(pendingEvents.keys)
+        let ndkError = mapToNDKError(error, operation: "send event")
+        
+        for eventId in eventIds {
+            NDKLogger.log(.warning, category: .relay, "⚠️ Failing pending event \(eventId) due to connection error")
+            resumePendingEvent(eventId: eventId, with: .failure(ndkError))
+        }
+    }
+    
+    /// Map generic errors to specific NDKError cases
+    private func mapToNDKError(_ error: Error, operation: String) -> NDKError {
+        // Check if it's already an NDKError
+        if let ndkError = error as? NDKError {
+            return ndkError
+        }
+        
+        // Map URLError cases
+        if let urlError = error as? URLError {
+            switch urlError.code {
+            case .timedOut:
+                return NDKError.timeout(operation: operation, seconds: Int(NetworkConstants.timeoutRelayConnection))
+            case .notConnectedToInternet, .networkConnectionLost:
+                return NDKError.connectionLost(relay: url.absoluteString, message: urlError.localizedDescription)
+            case .cannotConnectToHost, .cannotFindHost:
+                return NDKError.connectionFailed(relay: url.absoluteString, message: urlError.localizedDescription, underlying: error)
+            default:
+                return NDKError.networkError(for: url.absoluteString, operation: operation, error: error)
+            }
+        }
+        
+        // Default to network error
+        return NDKError.networkError(for: url.absoluteString, operation: operation, error: error)
     }
 
     // MARK: - Delegate Notification Helper
