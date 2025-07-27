@@ -31,8 +31,8 @@ enum OutboxConstants {
     /// Always republish when relay info is discovered
     static let republishOnRelayDiscovery = true
     
-    /// Timeout for waiting for relay discovery
-    static let relayDiscoveryTimeout: TimeInterval = 5.0
+    /// Timeout for waiting for relay discovery (uses subscription timeout)
+    static let relayDiscoveryTimeout: TimeInterval = NetworkConstants.timeoutSubscription
     
     // MARK: - Fetching
     

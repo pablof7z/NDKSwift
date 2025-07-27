@@ -4,6 +4,26 @@ All notable changes to NDKSwift will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.7.10] - 2025-01-27
+
+### Added
+- Comprehensive DocC documentation for `NDKOutboxTracker` and `NDKRelayConnection` public APIs
+- Example code snippets in documentation for better developer experience
+
+### Improved
+- Fixed inconsistent logging categories across the codebase:
+  - Changed relay/general logs to appropriate categories (connection, network, wallet)
+  - Standardized logging approach for better debugging
+- Optimized collection operations for performance:
+  - Replaced `filter().map()` with `compactMap()` for better efficiency
+  - Replaced `filter().count` with `count(where:)` for O(n) performance
+- Code quality through targeted low-risk enhancements
+
+### Technical
+- Enhanced public API documentation with parameter descriptions, return values, and usage examples
+- Improved performance of collection operations in hot paths
+- Ensured consistent logging categories throughout the codebase
+
 ## [0.7.9] - 2025-01-27
 
 ### Added

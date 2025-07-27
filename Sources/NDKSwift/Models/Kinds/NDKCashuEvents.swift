@@ -267,10 +267,10 @@ public struct NDKCashuWalletEvent: NDKPublishableEvent {
 
     /// The relays configured in this wallet event (unencrypted)
     public var relays: [String] {
-        let relayURLs = event.tags
-            .filter { $0.first == NostrConstants.TagName.relay && $0.count > 1 }
-            .map { $0[1] }
-        return relayURLs
+        return event.tags.compactMap { tag in
+            guard tag.first == NostrConstants.TagName.relay, tag.count > 1 else { return nil }
+            return tag[1]
+        }
     }
 
     // MARK: - Private Helpers
@@ -556,13 +556,19 @@ public struct NDKCashuSpendingHistory {
     /// Extract created event IDs from the spending history event
     public func createdEventIds(signer: NDKSigner) async throws -> [String] {
         let tags = try await decryptedTags(signer: signer)
-        return tags.filter { $0.count >= 4 && $0[0] == "e" && $0[3] == "created" }.map { $0[1] }
+        return tags.compactMap { tag in
+            guard tag.count >= 4, tag[0] == "e", tag[3] == "created" else { return nil }
+            return tag[1]
+        }
     }
 
     /// Extract destroyed event IDs from the spending history event
     public func destroyedEventIds(signer: NDKSigner) async throws -> [String] {
         let tags = try await decryptedTags(signer: signer)
-        return tags.filter { $0.count >= 4 && $0[0] == "e" && $0[3] == "destroyed" }.map { $0[1] }
+        return tags.compactMap { tag in
+            guard tag.count >= 4, tag[0] == "e", tag[3] == "destroyed" else { return nil }
+            return tag[1]
+        }
     }
 
     /// Extract redeemed event ID from the unencrypted tags

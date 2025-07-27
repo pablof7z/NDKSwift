@@ -180,7 +180,7 @@ public final class NDKRelayCollection: ObservableObject {
     }
 
     private func updateCounts() {
-        connectedCount = relays.filter { $0.isConnected }.count
+        connectedCount = relays.count { $0.isConnected }
         totalCount = relays.count
     }
 

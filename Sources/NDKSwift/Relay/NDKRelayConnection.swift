@@ -90,6 +90,21 @@ public actor NDKRelayConnection {
     /// progress, this method waits for that attempt to complete.
     ///
     /// - Throws: `NDKError.connectionFailed` if the connection cannot be established
+    ///
+    /// - Note: Initial connection failures do not trigger automatic reconnection.
+    ///   Only subsequent connection losses will schedule reconnection attempts
+    ///   according to the retry policy.
+    ///
+    /// Example:
+    /// ```swift
+    /// let connection = NDKRelayConnection(url: relayURL)
+    /// do {
+    ///     try await connection.connect()
+    ///     print("Connected to relay")
+    /// } catch {
+    ///     print("Connection failed: \(error)")
+    /// }
+    /// ```
     public func connect() async throws {
         guard !isConnected else {
             NDKLogger.log(.trace, category: .connection, "✔️ Already connected to \(url)")
@@ -167,7 +182,7 @@ public actor NDKRelayConnection {
             await sendPing()
         #else
             // Mock connection for Linux
-            NDKLogger.log(.info, category: .relay, "Mock WebSocket connection to \(url) (Linux doesn't support WebSockets)")
+            NDKLogger.log(.info, category: .connection, "Mock WebSocket connection to \(url) (Linux doesn't support WebSockets)")
             isConnected = true
             connectedAt = Date()
             resumeAllContinuations(with: .success(()))
@@ -216,7 +231,36 @@ public actor NDKRelayConnection {
         try await send(json)
     }
 
-    /// Publish an event and wait for OK response
+    /// Publish an event and wait for OK response.
+    ///
+    /// Sends an event to the relay and waits for an OK response to confirm
+    /// whether the relay accepted or rejected the event.
+    ///
+    /// - Parameters:
+    ///   - event: The Nostr event to publish
+    ///   - timeout: Maximum time to wait for OK response (default: 30 seconds)
+    ///
+    /// - Returns: `true` if the relay accepted the event, `false` if rejected
+    ///
+    /// - Throws:
+    ///   - `NDKError.timeout` if no OK response is received within the timeout period
+    ///   - `NDKError.publishFailed` if the relay rejects the event with an error message
+    ///   - `NDKError.connectionLost` if the connection is lost during publishing
+    ///
+    /// Example:
+    /// ```swift
+    /// let event = try await eventBuilder.build()
+    /// do {
+    ///     let accepted = try await connection.publishEvent(event)
+    ///     if accepted {
+    ///         print("Event published successfully")
+    ///     } else {
+    ///         print("Event rejected by relay")
+    ///     }
+    /// } catch {
+    ///     print("Failed to publish: \(error)")
+    /// }
+    /// ```
     public func publishEvent(_ event: NDKEvent, timeout: TimeInterval = NetworkConstants.timeoutRelayConnection) async throws -> Bool {
         // Ensure we're connected first
         if !isConnected {
@@ -224,7 +268,7 @@ public actor NDKRelayConnection {
         }
 
         let eventId = event.id
-        NDKLogger.log(.debug, category: .relay, "publishEvent called for event \(eventId)")
+        NDKLogger.log(.debug, category: .network, "publishEvent called for event \(eventId)")
 
         // Store continuation and handle the async work within actor context
         return try await withCheckedThrowingContinuation { continuation in
@@ -245,7 +289,7 @@ public actor NDKRelayConnection {
                 guard let self = self else { return }
                 let eventMessage = NostrMessage.event(subscriptionId: nil, event: event)
                 try await self.send(eventMessage)
-                NDKLogger.log(.debug, category: .relay, "Event sent, waiting for OK response...")
+                NDKLogger.log(.debug, category: .network, "Event sent, waiting for OK response...")
             }
 
             // Timeout task
@@ -293,7 +337,7 @@ public actor NDKRelayConnection {
             try await task.send(message)
         #else
             // Mock sending for Linux
-            NDKLogger.log(.debug, category: .relay, "Mock send to \(url): \(json)")
+            NDKLogger.log(.debug, category: .network, "Mock send to \(url): \(json)")
         #endif
 
         messagesSent += 1
@@ -340,7 +384,7 @@ public actor NDKRelayConnection {
     private func handleReceivedMessage(_ json: String) async {
         // Validate input
         guard !json.isEmpty else {
-            NDKLogger.log(.warning, category: .relay, "Received empty message from relay \(url)")
+            NDKLogger.log(.warning, category: .network, "Received empty message from relay \(url)")
             return
         }
 
