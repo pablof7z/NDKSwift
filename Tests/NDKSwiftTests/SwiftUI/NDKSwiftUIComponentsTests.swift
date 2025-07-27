@@ -4,30 +4,26 @@ import SwiftUI
 @testable import NDKSwiftUI
 
 /// Basic tests for NDKSwiftUI components to ensure they can be instantiated
-/// Note: These tests are disabled pending updates to match the current API
 final class NDKSwiftUIComponentsTests: XCTestCase {
     
-    func testPlaceholder() {
-        // Placeholder test until SwiftUI component tests are properly implemented
-        XCTAssertTrue(true, "SwiftUI component tests need to be updated to match current API")
-    }
-    
-    // TODO: Update these tests once the SwiftUI API stabilizes
-    
-    /*
     func testNDKFollowButtonInitialization() {
         // Test that NDKFollowButton can be created with a pubkey
-        let pubkey = "test_pubkey_123456789"
+        let pubkey = "test_pubkey_123456789012345678901234567890123456789012345678901234"
         let button = NDKFollowButton(pubkey: pubkey)
         
         // If it compiles and creates, the test passes
         XCTAssertNotNil(button)
     }
     
-    func testNDKZapButtonInitialization() {
+    func testNDKZapButtonInitialization() throws {
         // Test that NDKZapButton can be created with an event
-        let event = NDKEvent(kind: .text)
-        event.content = "Test event"
+        let event = NDKEvent(
+            pubkey: "test_pubkey_123456789012345678901234567890123456789012345678901234",
+            createdAt: Date.now,
+            kind: 1,
+            tags: [],
+            content: "Test event"
+        )
         
         let button = NDKZapButton(event: event)
         XCTAssertNotNil(button)
@@ -35,17 +31,21 @@ final class NDKSwiftUIComponentsTests: XCTestCase {
         // Test with custom configuration
         let customButton = NDKZapButton(
             event: event,
-            style: .compact,
             amounts: [10, 50, 100],
             defaultAmount: 10
         )
         XCTAssertNotNil(customButton)
     }
     
-    func testNDKReactionButtonInitialization() {
+    func testNDKReactionButtonInitialization() throws {
         // Test that NDKReactionButton can be created
-        let event = NDKEvent(kind: .text)
-        event.content = "Test event"
+        let event = NDKEvent(
+            pubkey: "test_pubkey_123456789012345678901234567890123456789012345678901234",
+            createdAt: Date.now,
+            kind: 1,
+            tags: [],
+            content: "Test event"
+        )
         
         let button = NDKReactionButton(event: event)
         XCTAssertNotNil(button)
@@ -57,7 +57,7 @@ final class NDKSwiftUIComponentsTests: XCTestCase {
     
     func testNDKProfilePictureInitialization() {
         // Test that NDKProfilePicture can be created
-        let pubkey = "test_pubkey_123456789"
+        let pubkey = "test_pubkey_123456789012345678901234567890123456789012345678901234"
         let profilePicture = NDKProfilePicture(pubkey: pubkey)
         
         XCTAssertNotNil(profilePicture)
@@ -65,7 +65,7 @@ final class NDKSwiftUIComponentsTests: XCTestCase {
     
     func testNDKDisplayNameInitialization() {
         // Test that NDKDisplayName can be created
-        let pubkey = "test_pubkey_123456789"
+        let pubkey = "test_pubkey_123456789012345678901234567890123456789012345678901234"
         let displayName = NDKDisplayName(pubkey: pubkey)
         
         XCTAssertNotNil(displayName)
@@ -80,21 +80,29 @@ final class NDKSwiftUIComponentsTests: XCTestCase {
         XCTAssertNotNil(renderer)
     }
     
-    func testNDKEventViewInitialization() {
+    func testNDKEventViewInitialization() throws {
         // Test that NDKEventView can be created
-        let event = NDKEvent(kind: .text)
-        event.content = "Test event content"
-        event.pubkey = "test_pubkey"
+        let event = NDKEvent(
+            pubkey: "test_pubkey_123456789012345678901234567890123456789012345678901234",
+            createdAt: Date.now,
+            kind: 1,
+            tags: [],
+            content: "Test event content"
+        )
         
         let eventView = NDKEventView(event: event)
         XCTAssertNotNil(eventView)
     }
     
-    func testNDKEventAuthorHeaderInitialization() {
+    func testNDKEventAuthorHeaderInitialization() throws {
         // Test that NDKEventAuthorHeader can be created
-        let event = NDKEvent(kind: .text)
-        event.content = "Test event"
-        event.pubkey = "test_pubkey"
+        let event = NDKEvent(
+            pubkey: "test_pubkey_123456789012345678901234567890123456789012345678901234",
+            createdAt: Date.now,
+            kind: 1,
+            tags: [],
+            content: "Test event"
+        )
         
         let header = NDKEventAuthorHeader(event: event)
         XCTAssertNotNil(header)
@@ -135,5 +143,4 @@ final class NDKSwiftUIComponentsTests: XCTestCase {
         XCTAssertFalse(relativeHour.isEmpty)
         XCTAssertFalse(relativeDay.isEmpty)
     }
-    */
 }
