@@ -6,9 +6,9 @@ import NDKSwift
 // Test profile loading directly
 
 let relays = [
-    "wss://relay.primal.net",
-    "wss://relay.damus.io",
-    "wss://nos.lol"
+    RelayConstants.primal,
+    RelayConstants.damus,
+    RelayConstants.nosLol
 ]
 
 let ndk = NDK(relayUrls: relays)

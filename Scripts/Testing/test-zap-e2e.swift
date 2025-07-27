@@ -34,7 +34,7 @@ struct ZapE2ERunner {
         NDKLogger.log(.info, category: .wallet, "🧪 Starting Lightning Zap E2E test")
         
         // Test configuration
-        let testRelays = ["wss://relay.damus.io", "wss://relay.nostr.band", "wss://nos.lol"]
+        let testRelays = [RelayConstants.damus, RelayConstants.nostrBand, RelayConstants.nosLol]
         
         // Create NDK instances
         let zapperNDK = NDK(cache: MemoryCache())
@@ -192,7 +192,7 @@ struct ZapE2ERunner {
         let startTime = Date()
         NDKLogger.log(.info, category: .wallet, "🧪 Starting Nutzap E2E test")
         
-        let testRelays = ["wss://relay.damus.io", "wss://relay.nostr.band", "wss://nos.lol"]
+        let testRelays = [RelayConstants.damus, RelayConstants.nostrBand, RelayConstants.nosLol]
         
         let zapperNDK = NDK(cache: MemoryCache())
         let recipientNDK = NDK(cache: MemoryCache())
