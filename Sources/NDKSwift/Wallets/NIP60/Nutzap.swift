@@ -49,7 +49,7 @@ public enum Nutzap {
         for mintURL in viableMintURLs {
             // Load mint dynamically
             guard let mintUrl = URL(string: mintURL) else {
-                NDKLogger.log(.error, category: .general, "\(ErrorMessageConstants.invalid("mint URL")): \(mintURL)")
+                NDKLogger.log(.error, category: .wallet, "\(ErrorMessageConstants.invalid("mint URL")): \(mintURL)")
                 continue
             }
 
@@ -57,7 +57,7 @@ public enum Nutzap {
             do {
                 mint = try await wallet.mints.loadMint(url: mintUrl)
             } catch {
-                NDKLogger.log(.error, category: .general, "\(ErrorMessageConstants.failedTo("load mint \(mintURL)")): \(error)")
+                NDKLogger.log(.error, category: .wallet, "\(ErrorMessageConstants.failedTo("load mint \(mintURL)")): \(error)")
                 lastError = error
                 continue
             }
@@ -172,7 +172,7 @@ public enum Nutzap {
                 // Release proofs on failure and try next mint
                 await proofStateManager.releaseProofs(selectedProofs)
                 lastError = error
-                NDKLogger.log(.warning, category: .general, "Nutzap failed with mint \(mintURL): \(error). Trying next mint...")
+                NDKLogger.log(.warning, category: .wallet, "Nutzap failed with mint \(mintURL): \(error). Trying next mint...")
                 continue
             }
         }
@@ -305,7 +305,7 @@ public enum Nutzap {
         for mintURL in mintURLs {
             // Load mint dynamically
             guard let mintUrl = URL(string: mintURL) else {
-                NDKLogger.log(.error, category: .general, "\(ErrorMessageConstants.invalid("mint URL in nutzap")): \(mintURL)")
+                NDKLogger.log(.error, category: .wallet, "\(ErrorMessageConstants.invalid("mint URL in nutzap")): \(mintURL)")
                 continue
             }
 
@@ -313,7 +313,7 @@ public enum Nutzap {
             do {
                 mint = try await wallet.mints.loadMint(url: mintUrl)
             } catch {
-                NDKLogger.log(.error, category: .general, "\(ErrorMessageConstants.failedTo("load mint \(mintURL) for nutzap")): \(error)")
+                NDKLogger.log(.error, category: .wallet, "\(ErrorMessageConstants.failedTo("load mint \(mintURL) for nutzap")): \(error)")
                 continue
             }
 

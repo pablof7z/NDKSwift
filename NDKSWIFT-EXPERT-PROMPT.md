@@ -983,6 +983,8 @@ This optimistic publishing system is fundamental to creating responsive Nostr ap
 
 NDKSwift provides sophisticated profile management through multiple abstraction levels, from high-level reactive APIs to low-level event fetching. All APIs follow the "never wait, always stream" philosophy.
 
+**IMPORTANT: Apps should use NDKProfileManager directly instead of creating their own profile management wrappers. The built-in manager provides all necessary functionality including caching, real-time updates, and thread safety.**
+
 #### NDKProfileManager (Recommended for Most Cases)
 
 The `NDKProfileManager` is an actor-based cache that provides intelligent profile fetching with real-time updates:
@@ -1043,20 +1045,40 @@ struct UserView: View {
 - `nip05: String?` - NIP-05 identifier
 - `about: String?` - Profile bio
 
-#### SwiftUI Profile Components
+#### SwiftUI Profile Components (Use These Instead of Custom Components)
 
-NDKSwift includes ready-to-use SwiftUI components:
+NDKSwift includes ready-to-use SwiftUI components in the NDKSwiftUI module. **Apps should use these components instead of creating their own avatar, profile picture, or display name components.**
 
 ```swift
+import NDKSwiftUI
+
 // Profile picture with automatic loading and fallbacks
 NDKProfilePicture(pubkey: user.pubkey, size: 60)
+    .onTapGesture { /* handle tap */ }
 
 // Display name with intelligent fallback options
 NDKDisplayName(pubkey: user.pubkey, fallbackStyle: .npub)
 
 // Username (prioritizes username over display name)
 NDKUsername(pubkey: user.pubkey)
+
+// Event author header (combines avatar + name)
+NDKEventAuthorHeader(event: event)
+
+// Full event view with author, content, and actions
+NDKEventView(event: event)
 ```
+
+Available components in NDKSwiftUI:
+- `NDKProfilePicture`: Avatar with fallback to initial
+- `NDKDisplayName`: Display name with various fallback styles
+- `NDKUsername`: Username-first display
+- `NDKEventAuthorHeader`: Complete author header for events
+- `NDKEventView`: Full event display with interactions
+- `NDKMarkdownRenderer`: Markdown content with nostr entity parsing
+- `NDKFollowButton`: Follow/unfollow button with state management
+- `NDKZapButton`: Lightning zap button
+- `NDKReactionButton`: Reaction/like button
 
 #### NDKUser Model Methods
 
@@ -1450,7 +1472,97 @@ By integrating Negentropy thoughtfully, you can provide users with dramatically 
 
 ---
 
-### 11. Reactive UI Philosophy: Never Wait, Always Stream
+### 11. Common UI Components and Patterns
+
+#### Relay Management
+
+While apps often need custom relay management UI, they should leverage NDKSwift's built-in relay management capabilities instead of duplicating relay selection logic:
+
+```swift
+// Use NDK's relay management directly
+let relays = await ndk.relays
+let activeRelays = relays.filter { await $0.isConnected }
+
+// Add/remove relays
+await ndk.addRelayAndConnect("wss://new-relay.com")
+await relay.disconnect()
+
+// Monitor relay health
+let isBlacklisted = await ndk.isRelayBlacklisted(relayUrl)
+```
+
+**Apps should NOT:**
+- Create their own relay URL normalization (NDK handles this)
+- Implement their own relay health tracking
+- Duplicate outbox model logic
+
+#### Blossom Server Management
+
+Many apps implement Blossom server management. This functionality should be moved to NDKSwift as `NDKBlossomServerManager` to handle:
+- Server list management (kind 10063 events)
+- Server discovery (kind 36363 events)
+- Multi-server uploads with fallback
+- Server health checks
+
+Current Blossom support in NDKSwift is for the protocol itself, not server management.
+
+#### Media Upload Services
+
+Apps implementing image upload to services like nostr.build and void.cat should use a unified `NDKMediaUploadService` (to be added to NDKSwift) that supports multiple providers alongside Blossom.
+
+#### Hex/Npub/Nsec Conversions (Use NDKSwift's Built-in Methods)
+
+**Apps should NEVER implement their own bech32 conversion functions.** NDKSwift provides complete support for all Nostr identifiers:
+
+```swift
+// Converting hex to npub
+let npub = try String.toNpub(hexPubkey)
+
+// Converting npub to hex  
+let hexPubkey = try String.fromNpub(npub)
+
+// Private key operations
+let signer = try NDKPrivateKeySigner(nsec: nsecString)  // Direct nsec support
+let nsec = try signer.nsec  // Get nsec from signer
+let npub = try signer.npub  // Get npub from signer
+
+// Event ID conversions
+let noteId = try Bech32.note(from: eventId)
+let eventId = try Bech32.eventId(from: noteId)
+
+// Complex identifiers (nevent, naddr)
+let nevent = try Bech32.nevent(
+    eventId: event.id,
+    relays: ["wss://relay.damus.io"],
+    author: event.pubkey,
+    kind: event.kind
+)
+```
+
+**What NOT to do:**
+- Don't implement custom bech32 encoding/decoding
+- Don't write conversion functions between hex and npub/nsec
+- Don't validate formats manually - use NDKSwift's validators
+
+**Built-in Format Validators:**
+```swift
+// Check if string is valid format
+if hexString.isValid32ByteHex { /* valid pubkey or event ID */ }
+if hexString.isValid64ByteHex { /* valid signature */ }
+if Bech32.isBech32(string) { /* valid bech32 format */ }
+
+// Get HRP without full decode
+if let hrp = Bech32.getHRP(string) {
+    switch hrp {
+    case "npub": // Handle npub
+    case "nsec": // Handle nsec
+    case "note": // Handle note
+    default: break
+    }
+}
+```
+
+### 12. Reactive UI Philosophy: Never Wait, Always Stream
 
 This section is crucial for understanding how to build proper Nostr applications. The fundamental principle is: **NEVER wait for data to be "complete" before rendering**. In Nostr, data streams in unreliably and can be slow. Apps must be designed to show what they have immediately and update as more arrives.
 

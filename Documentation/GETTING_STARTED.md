@@ -2,6 +2,15 @@
 
 This guide will help you get up and running with NDKSwift in your iOS, macOS, tvOS, or watchOS app.
 
+## Important: Use Built-in Components
+
+Before implementing custom solutions, check if NDKSwift already provides what you need:
+
+- **Profile Management**: Use `NDKProfileManager` directly instead of creating wrappers
+- **UI Components**: Import `NDKSwiftUI` for ready-made components like `NDKProfilePicture`, `NDKDisplayName`, etc.
+- **Hex/Npub/Nsec Conversions**: Use built-in `Bech32` utilities and `String` extensions
+- **Relay Management**: Use NDK's built-in relay management instead of custom implementations
+
 ## Installation
 
 ### Swift Package Manager
@@ -236,6 +245,36 @@ if let user = user {
         print("Following \(following.count) users")
     }
 }
+```
+
+### Identifier Conversions (Hex/Npub/Nsec)
+
+NDKSwift provides complete support for all Nostr identifier formats. **Never implement your own conversion functions:**
+
+```swift
+// Convert hex pubkey to npub
+let npub = try String.toNpub(hexPubkey)
+let hexPubkey = try String.fromNpub(npub)
+
+// Work with private keys
+let signer = try NDKPrivateKeySigner(nsec: "nsec1...")
+let nsec = try signer.nsec  // Get nsec from signer
+let npub = try signer.npub  // Get npub from signer
+
+// Event ID conversions
+let noteId = try Bech32.note(from: eventId)
+let eventId = try Bech32.eventId(from: noteId)
+
+// Complex identifiers
+let nevent = try Bech32.nevent(
+    eventId: event.id,
+    relays: ["wss://relay.damus.io"],
+    author: event.pubkey
+)
+
+// Validation
+if hexString.isValid32ByteHex { /* valid pubkey */ }
+if Bech32.isBech32(inputString) { /* valid bech32 */ }
 ```
 
 ### Signers

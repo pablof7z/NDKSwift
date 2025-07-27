@@ -59,7 +59,7 @@ enum WalletEventParsingUtils {
         requiredTags: [String] = []
     ) throws {
         guard event.kind == expectedKind else {
-            throw NDKError.invalidInput(message: "Expected kind \(expectedKind) but got \(event.kind)")
+            throw NDKError.invalidDataFormat("event kind", details: "Expected kind \(expectedKind) but got \(event.kind)")
         }
         
         for tagName in requiredTags {

@@ -70,7 +70,32 @@ public actor NDKOutboxTracker {
         self.relayDiscoveryContinuation = continuation
     }
 
-    /// Get relay information for a user
+    /// Get relay information for a user.
+    ///
+    /// Retrieves relay preferences for a given user's public key, implementing the
+    /// NIP-65 outbox model. This method checks multiple cache layers before fetching
+    /// from the network if necessary.
+    ///
+    /// - Parameters:
+    ///   - pubkey: The hex-encoded public key of the user
+    ///   - maxAge: Maximum age of cached data to consider valid (default: 1 hour)
+    ///   - type: Type of relays to retrieve (.read, .write, or .both)
+    ///
+    /// - Returns: An `NDKOutboxItem` containing the user's relay preferences, or nil if not found
+    ///
+    /// - Throws: `NDKError` if the network request fails
+    ///
+    /// - Note: This method implements caching with both positive and negative cache entries.
+    ///   Negative cache entries prevent repeated lookups for users without relay lists.
+    ///
+    /// Example:
+    /// ```swift
+    /// let relays = try await tracker.getRelaysFor(
+    ///     pubkey: userPubkey,
+    ///     maxAge: TimeConstants.hour,
+    ///     type: .read
+    /// )
+    /// ```
     func getRelaysFor(
         pubkey: String,
         maxAge: TimeInterval = TimeConstants.hour,
@@ -151,7 +176,29 @@ public actor NDKOutboxTracker {
         return items
     }
 
-    /// Track a user's relay information
+    /// Track a user's relay information.
+    ///
+    /// Stores relay preferences for a user in the cache and optionally emits a
+    /// discovery event for other components to react to relay information updates.
+    ///
+    /// - Parameters:
+    ///   - pubkey: The hex-encoded public key of the user
+    ///   - readRelays: Set of relay URLs the user reads from
+    ///   - writeRelays: Set of relay URLs the user writes to
+    ///   - source: Source of the relay information (e.g., .nip65, .manual, .blastr)
+    ///   - emitDiscoveryEvent: Whether to emit a `RelayDiscoveryEvent` (default: true)
+    ///
+    /// - Note: Blacklisted relays are automatically filtered out before storage.
+    ///
+    /// Example:
+    /// ```swift
+    /// await tracker.track(
+    ///     pubkey: userPubkey,
+    ///     readRelays: ["wss://relay1.com", "wss://relay2.com"],
+    ///     writeRelays: ["wss://relay3.com"],
+    ///     source: .nip65
+    /// )
+    /// ```
     func track(
         pubkey: String,
         readRelays: Set<String> = [],

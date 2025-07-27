@@ -44,7 +44,7 @@ public actor NIP05Manager {
 
         // Check if there's already an in-flight request
         if let existingTask = inFlightRequests[normalizedIdentifier] {
-            NDKLogger.log(.debug, category: .general, "🔄 NIP-05: Using existing in-flight request for \(normalizedIdentifier)")
+            NDKLogger.log(.debug, category: .network, "🔄 NIP-05: Using existing in-flight request for \(normalizedIdentifier)")
             return try await existingTask.value
         }
 
@@ -150,7 +150,7 @@ public actor NIP05Manager {
         await memoryCache.set(normalizedNip05, value: entry)
         try? await cache.saveNIP05Claim(normalizedNip05, pubkey: event.pubkey, retrievedAt: Date())
 
-        NDKLogger.log(.debug, category: .general, "📝 NIP-05: Cached unverified entry for \(normalizedNip05)")
+        NDKLogger.log(.debug, category: .network, "📝 NIP-05: Cached unverified entry for \(normalizedNip05)")
     }
 
     /// Batch verify stale NIP-05 entries
@@ -170,7 +170,7 @@ public actor NIP05Manager {
                             forceVerify: true
                         )
                     } catch {
-                        NDKLogger.log(.error, category: .general, "❌ NIP-05: Batch verification failed for \(entry.identifier): \(error)")
+                        NDKLogger.log(.error, category: .network, "❌ NIP-05: Batch verification failed for \(entry.identifier): \(error)")
                     }
                 }
             }
@@ -198,10 +198,10 @@ public actor NIP05Manager {
     /// Get cache statistics
     public func getCacheStatistics() async -> NIP05CacheStatistics {
         let memoryItems = await memoryCache.allItems()
-        let verified = memoryItems.values.filter { $0.status == .verified }.count
-        let unverified = memoryItems.values.filter { $0.status == .unverified }.count
-        let invalid = memoryItems.values.filter { $0.status == .invalid }.count
-        let failed = memoryItems.values.filter { $0.status == .failed }.count
+        let verified = memoryItems.values.count { $0.status == .verified }
+        let unverified = memoryItems.values.count { $0.status == .unverified }
+        let invalid = memoryItems.values.count { $0.status == .invalid }
+        let failed = memoryItems.values.count { $0.status == .failed }
 
         return NIP05CacheStatistics(
             totalEntries: memoryItems.count,
@@ -224,10 +224,10 @@ public actor NIP05Manager {
         if !forceVerify {
             if let cached = await checkMemoryCache(identifier: identifier, maxAge: maxAge) {
                 if cached.status == .verified, let user = cached.toUser(ndk: ndk) {
-                    NDKLogger.log(.debug, category: .general, "✅ NIP-05: Memory cache hit for \(identifier)")
+                    NDKLogger.log(.debug, category: .network, "✅ NIP-05: Memory cache hit for \(identifier)")
                     return user
                 } else if cached.status == .invalid || cached.status == .failed {
-                    NDKLogger.log(.debug, category: .general, "❌ NIP-05: Cached failure for \(identifier)")
+                    NDKLogger.log(.debug, category: .network, "❌ NIP-05: Cached failure for \(identifier)")
                     return nil
                 }
             }
@@ -240,10 +240,10 @@ public actor NIP05Manager {
                 await memoryCache.set(identifier, value: cached)
 
                 if cached.status == .verified, let user = cached.toUser(ndk: ndk) {
-                    NDKLogger.log(.debug, category: .general, "✅ NIP-05: Database cache hit for \(identifier)")
+                    NDKLogger.log(.debug, category: .network, "✅ NIP-05: Database cache hit for \(identifier)")
                     return user
                 } else if cached.status == .invalid || cached.status == .failed {
-                    NDKLogger.log(.debug, category: .general, "❌ NIP-05: Cached failure for \(identifier)")
+                    NDKLogger.log(.debug, category: .network, "❌ NIP-05: Cached failure for \(identifier)")
                     return nil
                 }
             }
@@ -309,7 +309,7 @@ public actor NIP05Manager {
             throw NDKError.invalidDataFormat("NIP-05 identifier", details: NostrConstants.NIP05.expectedFormat)
         }
 
-        NDKLogger.log(.info, category: .general, "🌐 NIP-05: Fetching \(urlString)")
+        NDKLogger.log(.info, category: .network, "🌐 NIP-05: Fetching \(urlString)")
 
         // Perform network request
         var request = URLRequest(url: url)
@@ -362,7 +362,7 @@ public actor NIP05Manager {
         await memoryCache.set(identifier, value: verifiedEntry)
         try? await cache.saveNIP05Resolution(verifiedEntry)
 
-        NDKLogger.log(.info, category: .general, "✅ NIP-05: Verified \(identifier) -> \(pubkey)")
+        NDKLogger.log(.info, category: .network, "✅ NIP-05: Verified \(identifier) -> \(pubkey)")
 
         // Create and return user
         let user = NDKUser(pubkey: pubkey)

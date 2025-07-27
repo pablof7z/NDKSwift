@@ -53,7 +53,7 @@ public actor MintFailureHandler {
     private func handleMintFailure(_ operation: PendingMintOperation, paymentProof: String) async throws {
         guard let delegate = delegate else {
             NDKLogger.log(.error, category: .wallet, "No delegate set to handle mint failure")
-            throw NDKError.notConfigured("No mint failure handler delegate")
+            throw NDKError.configurationError("No mint failure handler delegate")
         }
 
         // Get user's decision
@@ -108,7 +108,7 @@ public actor MintFailureHandler {
     private func handleDepositFailure(_ operation: PendingMintOperation) async throws {
         guard let delegate = delegate else {
             NDKLogger.log(.error, category: .wallet, "No delegate set to handle deposit failure")
-            throw NDKError.notConfigured("No mint failure handler delegate")
+            throw NDKError.configurationError("No mint failure handler delegate")
         }
 
         // Get user's decision

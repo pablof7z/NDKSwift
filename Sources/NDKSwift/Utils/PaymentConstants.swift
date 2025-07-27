@@ -28,8 +28,8 @@ public enum PaymentConstants {
 
     // MARK: - Zap Constants
 
-    /// Default timeout for waiting for zap receipts (in seconds)
-    public static let zapReceiptTimeout: TimeInterval = 30
+    /// Default timeout for waiting for zap receipts (uses standard request timeout)
+    public static let zapReceiptTimeout: TimeInterval = NetworkConstants.timeoutStandardRequest
 
     // MARK: - Cashu Constants
 

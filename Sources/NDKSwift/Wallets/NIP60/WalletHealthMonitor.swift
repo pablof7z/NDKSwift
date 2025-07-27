@@ -97,8 +97,8 @@ public actor WalletHealthMonitor {
         let relayHealth = await checkRelayHealth(walletRelays: walletRelays)
         let canonicalEventSet = await calculateCanonicalEventSet()
 
-        let syncedRelays = relayHealth.filter { $0.isHealthy }.count
-        let outOfSyncRelays = relayHealth.filter { !$0.isHealthy }.count
+        let syncedRelays = relayHealth.count { $0.isHealthy }
+        let outOfSyncRelays = relayHealth.count { !$0.isHealthy }
 
         return WalletHealthStatus(
             isHealthy: outOfSyncRelays == 0,

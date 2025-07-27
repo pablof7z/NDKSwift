@@ -23,12 +23,12 @@ public struct NWCConnectionURI {
 
         // Parse the URL
         guard let url = URL(string: uri) else {
-            throw NDKError.invalidInput(message: "Invalid NWC connection URI: \(uri)")
+            throw NDKError.parseError(for: "NWC connection URI", details: "Invalid URI format: \(uri)")
         }
 
         // Validate scheme
         guard url.scheme == "nostr+walletconnect" else {
-            throw NDKError.invalidInput(message: "Invalid URI scheme '\(url.scheme ?? "nil")'. Expected 'nostr+walletconnect'")
+            throw NDKError.parseError(for: "URI scheme", details: "Expected 'nostr+walletconnect' but got '\(url.scheme ?? "nil")'")
         }
 
         // Extract wallet pubkey from host or path
