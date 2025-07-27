@@ -12,22 +12,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Comprehensive test suite for `ContentTagger` utility covering hashtag generation, Nostr entity decoding, and content parsing
 - Complete test coverage for `JSONCoding` utility including encoding, decoding, dictionary conversion, and safe operations
 - Extended `ArrayExtensions` tests to cover safe subscript, async filter, NDKEvent array extensions, and mutation methods
+- Added comprehensive test coverage for `StringFormatHelpers` utility
+- Added comprehensive test coverage for `LRUCache` including TTL, eviction, and concurrent access tests
+- Added comprehensive test coverage for `DataHexExtensions` including hex conversion and padding
+- Added comprehensive test coverage for `RetryPolicy` including exponential backoff and async execution
+- Added comprehensive test coverage for `IDGenerator` including concurrent ID generation
 
 ### Changed
 - Moved `NDKRelayPoolExtensions.swift` from Outbox to Core/Extensions for better organization
 - Updated JSON encoding/decoding usage to consistently use `JSONCoding` utility
 - Fixed JSON encoding in test helpers and scripts
+- Simplified `NDKNetworkLogger` by removing redundant print statements in favor of log handler pattern
 
 ### Documentation
 - Updated NIP-29 Implementation Plan to clarify it's not yet implemented
 - Added status header to NIP-29 documentation for clarity
 - Enhanced inline documentation for `ContentTagger` Tag extension with examples
 - Improved documentation for Tag validation methods with detailed type descriptions
+- Fixed broken links in README.md (removed references to non-existent LICENSE and CONTRIBUTING.md files)
 
 ### Improved
 - Test coverage for core event publishing functionality
 - Code organization by relocating extensions to appropriate directories
 - Consistency in JSON handling across the codebase
+- Code cleanliness by applying DRY principles to logging utilities
 - Replaced redundant HexValidator.validate32ByteHex try-catch patterns with simpler guard statements
 - Updated version references in README from 0.7.0 to 0.7.1
 - Test coverage increased with new test suites for utility classes
