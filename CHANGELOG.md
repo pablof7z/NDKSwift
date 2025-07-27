@@ -34,6 +34,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 - Removed redundant hex validation patterns in NDKPrivateKeySigner, P2PKManager, NIP04, and NIP44 encryption modules
+- Fixed incorrect TLV type indexing for nprofile decoding in ContentTagger (was using type 2 instead of type 0 for pubkey)
 
 ## [0.7.1] - 2025-01-27
 
