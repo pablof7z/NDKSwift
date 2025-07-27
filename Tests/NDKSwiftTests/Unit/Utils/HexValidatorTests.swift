@@ -77,4 +77,122 @@ final class HexValidatorTests: XCTestCase {
         let invalidSig = String(repeating: "g", count: 128)
         XCTAssertFalse(HexValidator.isValidSignature(invalidSig))
     }
+    
+    // MARK: - Tests for throwing validation methods
+    
+    func testValidateHexWithValidInput() throws {
+        let hexString = "abcdef0123456789"
+        let data = try HexValidator.validateHex(hexString)
+        XCTAssertEqual(data.count, 8)
+    }
+    
+    func testValidateHexWithInvalidInput() {
+        let hexString = "xyz123"
+        XCTAssertThrowsError(try HexValidator.validateHex(hexString)) { error in
+            guard case HexValidator.HexValidationError.invalidHexString(let invalidHex) = error else {
+                XCTFail("Expected invalidHexString error")
+                return
+            }
+            XCTAssertEqual(invalidHex, hexString)
+        }
+    }
+    
+    func testValidateHexWithExpectedByteCount() throws {
+        let hexString = "abcd"
+        let data = try HexValidator.validateHex(hexString, expectedByteCount: 2)
+        XCTAssertEqual(data.count, 2)
+    }
+    
+    func testValidateHexWithWrongByteCount() {
+        let hexString = "abcd"
+        XCTAssertThrowsError(try HexValidator.validateHex(hexString, expectedByteCount: 3)) { error in
+            guard case HexValidator.HexValidationError.invalidLength(let expected, let actual) = error else {
+                XCTFail("Expected invalidLength error")
+                return
+            }
+            XCTAssertEqual(expected, 3)
+            XCTAssertEqual(actual, 2)
+        }
+    }
+    
+    func testValidate32ByteHex() throws {
+        let hex32 = String(repeating: "a", count: 64)
+        let data = try HexValidator.validate32ByteHex(hex32)
+        XCTAssertEqual(data.count, 32)
+    }
+    
+    func testValidate32ByteHexWithWrongLength() {
+        let hexWrong = String(repeating: "a", count: 62)
+        XCTAssertThrowsError(try HexValidator.validate32ByteHex(hexWrong))
+    }
+    
+    func testValidate64ByteHex() throws {
+        let hex64 = String(repeating: "b", count: 128)
+        let data = try HexValidator.validate64ByteHex(hex64)
+        XCTAssertEqual(data.count, 64)
+    }
+    
+    func testValidate64ByteHexWithWrongLength() {
+        let hexWrong = String(repeating: "b", count: 126)
+        XCTAssertThrowsError(try HexValidator.validate64ByteHex(hexWrong))
+    }
+    
+    // MARK: - Tests for new convenience methods
+    
+    func testIsValidHexWithExpectedByteCount() {
+        XCTAssertTrue(HexValidator.isValidHex("abcd", expectedByteCount: 2))
+        XCTAssertFalse(HexValidator.isValidHex("abcd", expectedByteCount: 3))
+        XCTAssertTrue(HexValidator.isValidHex("abcdef", expectedByteCount: nil))
+    }
+    
+    func testIsValid32ByteHex() {
+        let valid32 = String(repeating: "c", count: 64)
+        let invalid32 = String(repeating: "c", count: 63)
+        XCTAssertTrue(HexValidator.isValid32ByteHex(valid32))
+        XCTAssertFalse(HexValidator.isValid32ByteHex(invalid32))
+    }
+    
+    func testIsValid64ByteHex() {
+        let valid64 = String(repeating: "d", count: 128)
+        let invalid64 = String(repeating: "d", count: 127)
+        XCTAssertTrue(HexValidator.isValid64ByteHex(valid64))
+        XCTAssertFalse(HexValidator.isValid64ByteHex(invalid64))
+    }
+    
+    // MARK: - Tests for safe data conversion methods
+    
+    func testDataFromHexString() {
+        XCTAssertNotNil(HexValidator.data(from: "abcdef"))
+        XCTAssertNil(HexValidator.data(from: "xyz"))
+        XCTAssertNotNil(HexValidator.data(from: ""))
+    }
+    
+    func testData32FromHexString() {
+        let valid32 = String(repeating: "e", count: 64)
+        let invalid32 = String(repeating: "e", count: 63)
+        XCTAssertNotNil(HexValidator.data32(from: valid32))
+        XCTAssertNil(HexValidator.data32(from: invalid32))
+        XCTAssertNil(HexValidator.data32(from: "xyz"))
+    }
+    
+    func testData64FromHexString() {
+        let valid64 = String(repeating: "f", count: 128)
+        let invalid64 = String(repeating: "f", count: 127)
+        XCTAssertNotNil(HexValidator.data64(from: valid64))
+        XCTAssertNil(HexValidator.data64(from: invalid64))
+        XCTAssertNil(HexValidator.data64(from: "xyz"))
+    }
+    
+    // MARK: - Error description tests
+    
+    func testHexValidationErrorDescriptions() {
+        let invalidHexError = HexValidator.HexValidationError.invalidHexString("xyz")
+        XCTAssertEqual(invalidHexError.errorDescription, "Invalid hex string: xyz")
+        
+        let invalidLengthError = HexValidator.HexValidationError.invalidLength(expected: 32, actual: 31)
+        XCTAssertEqual(invalidLengthError.errorDescription, "Invalid hex string length: expected 32 bytes, got 31 bytes")
+        
+        let invalidFormatError = HexValidator.HexValidationError.invalidFormat
+        XCTAssertEqual(invalidFormatError.errorDescription, "Invalid hex string format")
+    }
 }
