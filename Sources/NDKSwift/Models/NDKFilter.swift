@@ -193,7 +193,7 @@ public struct NDKFilter: Codable, Equatable, Sendable {
         // Check referenced events
         if let events = events {
             let eventTags = event.tags(withName: "e")
-            let eventRefs = eventTags.compactMap { $0.count > 1 ? $0[1] : nil }
+            let eventRefs = eventTags.compactMap { $0.value }
             if !events.contains(where: { eventRefs.contains($0) }) {
                 return false
             }
@@ -202,7 +202,7 @@ public struct NDKFilter: Codable, Equatable, Sendable {
         // Check referenced pubkeys
         if let pubkeys = pubkeys {
             let pTags = event.tags(withName: "p")
-            let pubkeyRefs = pTags.compactMap { $0.count > 1 ? $0[1] : nil }
+            let pubkeyRefs = pTags.compactMap { $0.value }
             if !pubkeys.contains(where: { pubkeyRefs.contains($0) }) {
                 return false
             }
@@ -212,7 +212,7 @@ public struct NDKFilter: Codable, Equatable, Sendable {
         for (tagKey, filterValues) in tagFilters {
             let tagName = String(tagKey.dropFirst()) // Remove '#'
             let eventTags = event.tags(withName: tagName)
-            let eventTagValues = eventTags.compactMap { $0.count > 1 ? $0[1] : nil }
+            let eventTagValues = eventTags.compactMap { $0.value }
 
             if !filterValues.contains(where: { eventTagValues.contains($0) }) {
                 return false
