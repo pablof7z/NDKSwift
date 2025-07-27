@@ -1,6 +1,6 @@
 # NDKSwift API Reference
 
-Complete API documentation for NDKSwift v0.3.0+
+Complete API documentation for NDKSwift v0.7.6+
 
 ## Table of Contents
 

@@ -109,9 +109,9 @@ struct NIP60WalletREPL {
         let ndk = NDK(signer: signer)
         
         // Add relay
-        await ndk.addRelay("wss://relay.primal.net")
+        await ndk.addRelay(RelayConstants.primal)
         await ndk.connect()
-        print("📡 Connected to relay.primal.net")
+        print("📡 Connected to \(RelayConstants.primal)")
         
         // Initialize wallet with test mints
         let mintUrls = [
@@ -120,7 +120,7 @@ struct NIP60WalletREPL {
         ]
         
         let relayUrls = [
-            "wss://relay.primal.net"
+            RelayConstants.primal
         ]
         
         print("🏦 Initializing wallet with mints:")

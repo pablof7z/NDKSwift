@@ -35,6 +35,10 @@ public struct WalletTokenChange {
     /// Proofs to be saved in new token events
     public let saveProofs: [CashuSwift.Proof]
 
+    /// Initialize a new wallet token change
+    /// - Parameters:
+    ///   - deletedTokenIds: Set of token event IDs that should be deleted
+    ///   - saveProofs: Proofs that should be saved in new token events
     public init(deletedTokenIds: Set<String>, saveProofs: [CashuSwift.Proof]) {
         self.deletedTokenIds = deletedTokenIds
         self.saveProofs = saveProofs

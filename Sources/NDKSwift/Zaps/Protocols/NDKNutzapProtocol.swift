@@ -7,6 +7,8 @@ public class NDKNutzapProtocol: NDKZapProtocol {
 
     private let ndk: NDK
 
+    /// Initialize a new Nutzap protocol handler
+    /// - Parameter ndk: The NDK instance to use for event publishing
     public init(ndk: NDK) {
         self.ndk = ndk
     }
