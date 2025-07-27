@@ -316,33 +316,11 @@ public actor NIP05Manager {
         request.timeoutInterval = NetworkConstants.timeoutRelayInfo
         request.setValue(HTTPConstants.userAgentNDKSwift, forHTTPHeaderField: HTTPConstants.headerUserAgent)
 
-        let (data, response) = try await URLSession.shared.data(for: request)
+        let data = try await networkClient.fetchData(with: request)
 
         // Check response size
         guard data.count <= Self.maxResponseSize else {
             throw NDKError.invalidResponse(from: NostrConstants.NIP05.responseTooLarge)
-        }
-
-        // Check HTTP status
-        let httpResponse = response as? HTTPURLResponse
-        let statusCode = httpResponse?.statusCode ?? 0
-        guard statusCode == HTTPStatusCode.ok else {
-            // Cache failed attempt
-            let failedEntry = NIP05CacheEntry(
-                identifier: identifier,
-                pubkey: "",
-                status: .failed,
-                nip46Relays: nil,
-                claimedAt: Date(),
-                verifiedAt: nil,
-                lastCheckAt: Date(),
-                errorMessage: "HTTP \(statusCode)",
-                httpStatusCode: statusCode
-            )
-            await memoryCache.set(identifier, value: failedEntry)
-            try? await cache.saveNIP05Resolution(failedEntry)
-
-            throw NDKError.serverError(relay: domain, code: statusCode, message: "HTTP \(statusCode)")
         }
 
         // Parse JSON response
@@ -377,8 +355,7 @@ public actor NIP05Manager {
             nip46Relays: nip46Relays,
             claimedAt: Date(),
             verifiedAt: Date(),
-            lastCheckAt: Date(),
-            httpStatusCode: HTTPStatusCode.ok
+            lastCheckAt: Date()
         )
 
         // Save to both caches
