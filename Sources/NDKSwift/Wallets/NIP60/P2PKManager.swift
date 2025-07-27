@@ -66,9 +66,12 @@ public actor P2PKManager {
     /// Set keypair (for restoration from backup)
     func setKeypair(privateKey: String, pubkey: String) throws {
         // Validate keys
-        _ = try HexValidator.validate32ByteHex(privateKey)
-
-        _ = try HexValidator.validate32ByteHex(pubkey)
+        guard HexValidator.isValid32ByteHex(privateKey) else {
+            throw NDKError.invalidDataFormat("private key", details: "Must be 32-byte hex string")
+        }
+        guard HexValidator.isValid32ByteHex(pubkey) else {
+            throw NDKError.invalidDataFormat("public key", details: "Must be 32-byte hex string")
+        }
 
         currentKeypair = (privateKey, pubkey)
         keyCreatedAt = Date()
