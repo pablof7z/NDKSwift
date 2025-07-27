@@ -328,8 +328,7 @@ public actor NDKZapManager {
                 "expiry": Int(Timestamp.from(quote.expiry))
             ]
 
-            let jsonData = try JSONSerialization.data(withJSONObject: mintQuoteData)
-            let mintQuote = try JSONCoding.decode(CashuSwift.Bolt11.MintQuote.self, from: jsonData)
+            let mintQuote = try JSONCoding.decodeFromDictionary(CashuSwift.Bolt11.MintQuote.self, from: mintQuoteData)
 
             // Issue tokens for the paid quote
             let (proofs, validDLEQ) = try await CashuSwift.issue(

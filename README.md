@@ -31,7 +31,7 @@ The most feature-complete Swift implementation of the Nostr Development Kit. Bui
 
 ```swift
 dependencies: [
-    .package(url: "https://github.com/nostr-dev-kit/ndk-swift", from: "0.7.2")
+    .package(url: "https://github.com/nostr-dev-kit/ndk-swift", from: "0.7.3")
 ]
 ```
 
