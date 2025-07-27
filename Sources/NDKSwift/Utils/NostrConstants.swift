@@ -23,6 +23,11 @@ public enum NostrConstants {
     public static let neventPrefix = "nevent1"
     public static let naddrPrefix = "naddr1"
 
+    // MARK: - Cryptographic Constants
+    
+    /// Cashu public key prefix for compressed keys
+    public static let cashuCompressedKeyPrefix = "02"
+
     // MARK: - JSON Field Names
 
     /// Core event fields used in event serialization
