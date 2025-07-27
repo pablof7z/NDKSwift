@@ -114,4 +114,27 @@ public enum HexValidator {
     public static func isValidSignature(_ hexString: String) -> Bool {
         return isValid64ByteHex(hexString)
     }
+    
+    // MARK: - Safe Data Conversion
+    
+    /// Safely convert a hex string to Data
+    /// - Parameter hexString: The hex string to convert
+    /// - Returns: The Data if valid, nil otherwise
+    public static func data(from hexString: String) -> Data? {
+        return try? validateHex(hexString)
+    }
+    
+    /// Safely convert a 32-byte hex string to Data
+    /// - Parameter hexString: The hex string to convert
+    /// - Returns: The 32-byte Data if valid, nil otherwise
+    public static func data32(from hexString: String) -> Data? {
+        return try? validate32ByteHex(hexString)
+    }
+    
+    /// Safely convert a 64-byte hex string to Data
+    /// - Parameter hexString: The hex string to convert
+    /// - Returns: The 64-byte Data if valid, nil otherwise
+    public static func data64(from hexString: String) -> Data? {
+        return try? validate64ByteHex(hexString)
+    }
 }

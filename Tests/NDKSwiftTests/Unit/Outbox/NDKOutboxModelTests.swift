@@ -297,7 +297,7 @@ final class NDKOutboxModelTests: XCTestCase {
             try await cache.saveEvent(relayListEvent)
         } catch {
             // Handle cache errors gracefully in tests
-            print("Warning: Failed to cache relay list event: \(error)")
+            NDKLogger.log(.warning, category: .cache, "Failed to cache relay list event: \(error)")
         }
         
         // Manually populate the outbox tracker cache using the track method
