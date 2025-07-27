@@ -1,0 +1,48 @@
+import Foundation
+
+/// Options for configuring NDKDataSource behavior
+public struct NDKDataSourceOptions {
+    /// Maximum age of events to return from cache (0 = no limit)
+    public var maxAge: TimeInterval
+    
+    /// Cache policy for the data source
+    public var cachePolicy: CachePolicy
+    
+    /// Specific relays to use (nil = use default relays)
+    public var relays: Set<RelayURL>?
+    
+    /// Whether to use only specified relays (true) or combine with defaults (false)
+    public var exclusiveRelays: Bool
+    
+    /// Custom subscription ID (nil = auto-generate)
+    public var subscriptionId: String?
+    
+    /// Whether to close subscription on EOSE (nil = auto-determine based on filter)
+    public var closeOnEose: Bool?
+    
+    /// Creates default data source options
+    public init(
+        maxAge: TimeInterval = 0,
+        cachePolicy: CachePolicy = .cacheWithNetwork,
+        relays: Set<RelayURL>? = nil,
+        exclusiveRelays: Bool = false,
+        subscriptionId: String? = nil,
+        closeOnEose: Bool? = nil
+    ) {
+        self.maxAge = maxAge
+        self.cachePolicy = cachePolicy
+        self.relays = relays
+        self.exclusiveRelays = exclusiveRelays
+        self.subscriptionId = subscriptionId
+        self.closeOnEose = closeOnEose
+    }
+    
+    /// Default options
+    public static let `default` = NDKDataSourceOptions()
+    
+    /// Cache-only options
+    public static let cacheOnly = NDKDataSourceOptions(cachePolicy: .cacheOnly)
+    
+    /// Network-only options
+    public static let networkOnly = NDKDataSourceOptions(cachePolicy: .networkOnly)
+}

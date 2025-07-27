@@ -1,8 +1,32 @@
 import Foundation
 import Combine
 
-/// Observable collection of relay states for SwiftUI integration
-/// This is a lightweight wrapper that provides reactive updates without modifying core relay architecture
+/// Observable collection of relay states for SwiftUI integration.
+///
+/// `NDKRelayCollection` provides a reactive view of relay connection states,
+/// designed for SwiftUI integration. It observes the relay pool and publishes
+/// updates when relay states change.
+///
+/// Example usage:
+/// ```swift
+/// struct RelayStatusView: View {
+///     @ObservedObject var relayCollection: NDKRelayCollection
+///     
+///     var body: some View {
+///         List(relayCollection.relays) { relay in
+///             HStack {
+///                 Text(relay.url)
+///                 Spacer()
+///                 Circle()
+///                     .fill(relay.isConnected ? Color.green : Color.red)
+///                     .frame(width: 10, height: 10)
+///             }
+///         }
+///     }
+/// }
+/// ```
+///
+/// - Note: This is a lightweight wrapper that provides reactive updates without modifying core relay architecture
 @MainActor
 public final class NDKRelayCollection: ObservableObject {
     /// Relay information with observable state

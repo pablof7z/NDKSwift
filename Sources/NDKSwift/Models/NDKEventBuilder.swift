@@ -307,16 +307,13 @@ public final class NDKEventBuilder {
         return await self.tagRegularEvent(event, marker: marker, preferredRelay: preferredRelay)
     }
 
-    /// Add an 'e' tag for referencing a regular (non-replaceable) event (NIP-10 compliant)
-    ///
-    /// This is the internal implementation for regular events. Most users should use
-    /// `tagEvent()` which automatically chooses the correct tag type.
+    /// Add an 'e' tag for referencing a regular (non-replaceable) event.
     ///
     /// - Parameters:
     ///   - event: The event to reference
     ///   - marker: Optional marker like "reply", "root", or "mention" (NIP-10)
-    ///   - preferredRelay: Optional relay hint override (takes precedence over tracked relay)
-    ///   - ndk: NDK instance to get relay hints from eventTracker (optional)
+    ///   - preferredRelay: Optional relay hint override
+    /// - Returns: Self for method chaining
     @discardableResult
     public func tagRegularEvent(_ event: NDKEvent, marker: String? = nil, preferredRelay: String? = nil) async -> NDKEventBuilder {
         let relay: String
@@ -359,15 +356,12 @@ public final class NDKEventBuilder {
         return self.tag(tag)
     }
 
-    /// Add a 'q' tag for quoting an event (NIP-10 compliant)
-    ///
-    /// This async version can use the NDK eventTracker to automatically determine
-    /// relay hints from where the event was originally seen.
+    /// Add a 'q' tag for quoting an event (NIP-10 compliant).
     ///
     /// - Parameters:
     ///   - event: The event to quote
-    ///   - preferredRelay: Optional relay hint override (takes precedence over tracked relay)
-    ///   - ndk: NDK instance to get relay hints from eventTracker (optional)
+    ///   - preferredRelay: Optional relay hint override
+    /// - Returns: Self for method chaining
     @discardableResult
     public func quoteEvent(_ event: NDKEvent, preferredRelay: String? = nil) async -> NDKEventBuilder {
         // q tag format: ["q", <event-id>, <relay-url>, <pubkey>]
