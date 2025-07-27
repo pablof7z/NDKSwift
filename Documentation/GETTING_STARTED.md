@@ -10,14 +10,14 @@ In Xcode:
 
 1. Go to **File → Add Package Dependencies**
 2. Enter the repository URL: `https://github.com/nostr-dev-kit/ndk-swift`
-3. Select version 0.6.2 or later
+3. Select version 0.7.0 or later
 4. Click **Add Package**
 
 Or add it to your `Package.swift`:
 
 ```swift
 dependencies: [
-    .package(url: "https://github.com/nostr-dev-kit/ndk-swift", from: "0.6.2")
+    .package(url: "https://github.com/nostr-dev-kit/ndk-swift", from: "0.7.0")
 ]
 ```
 
