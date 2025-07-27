@@ -4,6 +4,21 @@ All notable changes to NDKSwift will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.7.5] - 2025-01-27
+
+### Added
+- Unit tests for `TagValidation` utility with comprehensive edge case coverage
+- Unit tests for `EventPublishingHelper` covering success and error scenarios
+- Unit tests for `Crypto` utility including SHA256, key generation, and signature operations
+
+### Improved
+- Test coverage for previously untested utility classes
+- Code quality with additional test safety nets
+
+### Technical
+- Fixed force unwraps in `NDKFilter` Codable implementation (reverted as they are safe in this context)
+- Note: Some existing tests have compilation errors that need to be addressed separately
+
 ## [0.7.4] - 2025-01-27
 
 ### Added
