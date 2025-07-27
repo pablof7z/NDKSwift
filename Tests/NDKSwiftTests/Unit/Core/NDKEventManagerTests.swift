@@ -41,7 +41,8 @@ final class NDKEventManagerTests: NDKTestCase {
         XCTAssertFalse(event.sig.isEmpty)
         XCTAssertEqual(event.kind, 1)
         XCTAssertEqual(event.content, "Test note")
-        XCTAssertEqual(event.pubkey, try await signer.pubkey)
+        let expectedPubkey = try await signer.pubkey
+        XCTAssertEqual(event.pubkey, expectedPubkey)
     }
     
     func testPublishUnsignedEventFails() async throws {

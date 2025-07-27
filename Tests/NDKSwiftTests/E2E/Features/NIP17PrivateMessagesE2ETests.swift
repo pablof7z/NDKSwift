@@ -18,11 +18,11 @@ final class NIP17PrivateMessagesE2ETests: XCTestCase {
         await ndk.connect()
         
         // Generate test keys
-        alice = NDKPrivateKeySigner.generate()
-        bob = NDKPrivateKeySigner.generate()
+        alice = try NDKPrivateKeySigner.generate()
+        bob = try NDKPrivateKeySigner.generate()
         
-        alicePubkey = await alice.publicKey
-        bobPubkey = await bob.publicKey
+        alicePubkey = try await alice.pubkey
+        bobPubkey = try await bob.pubkey
     }
     
     override func tearDown() async throws {
@@ -53,7 +53,7 @@ final class NIP17PrivateMessagesE2ETests: XCTestCase {
         XCTAssertTrue(wrappedMessage.tags.contains { $0[0] == "p" && $0[1] == bobPubkey })
         
         // Publish the wrapped message
-        _ = try await ndk.publish(event: wrappedMessage)
+        _ = try await ndk.publish(wrappedMessage)
         
         // Small delay to ensure propagation
         try await Task.sleep(nanoseconds: TimeConstants.nanosecondsPerMillisecond * 500) // 0.5 seconds
@@ -64,7 +64,7 @@ final class NIP17PrivateMessagesE2ETests: XCTestCase {
             tags: ["p": [bobPubkey]]
         )
         
-        let receivedEvents = try await ndk.fetchEvents(filter: filter)
+        let receivedEvents = try await ndk.fetchEvents(filter)
         
         // Find our message
         let ourMessage = receivedEvents.first { event in
@@ -89,8 +89,8 @@ final class NIP17PrivateMessagesE2ETests: XCTestCase {
     
     func testGroupMessaging() async throws {
         // Add Charlie to the group
-        let charlie = NDKPrivateKeySigner.generate()
-        let charliePubkey = await charlie.publicKey
+        let charlie = try NDKPrivateKeySigner.generate()
+        let charliePubkey = try await charlie.pubkey
         
         let groupMessage = "Group test message: \(UUID().uuidString)"
         let recipients = [
@@ -122,7 +122,7 @@ final class NIP17PrivateMessagesE2ETests: XCTestCase {
             tags: ["p": [bobPubkey]]
         )
         
-        let bobEvents = try await ndk.fetchEvents(filter: bobFilter)
+        let bobEvents = try await ndk.fetchEvents(bobFilter)
         let bobWrapped = bobEvents.first { event in
             wrappedEvents.events[bobPubkey]?.id == event.id
         }
@@ -146,7 +146,7 @@ final class NIP17PrivateMessagesE2ETests: XCTestCase {
             signer: alice
         )
         
-        _ = try await ndk.publish(event: wrappedOriginal)
+        _ = try await ndk.publish(wrappedOriginal)
         
         // Bob unwraps it
         let unwrappedOriginal = try await NIP17.unwrapEvent(wrappedOriginal, recipientSigner: bob)
