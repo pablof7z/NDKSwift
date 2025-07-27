@@ -148,11 +148,11 @@ let event = try await NDKEventBuilder(ndk: ndk)
 
 ## 🤝 Contributing
 
-We welcome contributions! Check out our [Contributing Guidelines](CONTRIBUTING.md) and [Architecture Overview](Documentation/ARCHITECTURE.md).
+We welcome contributions! Check out our [Architecture Overview](Documentation/ARCHITECTURE.md) to understand the codebase structure.
 
 ## 📄 License
 
-MIT License - see [LICENSE](LICENSE) for details.
+MIT License
 
 ## 🔗 Links
 

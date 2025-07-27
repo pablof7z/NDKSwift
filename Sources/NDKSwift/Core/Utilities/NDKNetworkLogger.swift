@@ -10,13 +10,7 @@ public enum NDKNetworkLogger {
         let output = "\n📤 SENDING TO \(relay.host ?? relay.absoluteString):\n" +
                      "   RAW: \(NDKLogFormatter.truncateMessage(message))"
         
-        if let handler = NDKLogger.logHandler {
-            handler(output)
-        } else {
-            #if DEBUG
-            print(output)
-            #endif
-        }
+        NDKLogger.logHandler?(output)
     }
     
     /// Log received network traffic
@@ -27,13 +21,7 @@ public enum NDKNetworkLogger {
         let output = "\n📥 RECEIVED FROM \(relay.host ?? relay.absoluteString):\n" +
                      "   RAW: \(NDKLogFormatter.truncateMessage(message))"
         
-        if let handler = NDKLogger.logHandler {
-            handler(output)
-        } else {
-            #if DEBUG
-            print(output)
-            #endif
-        }
+        NDKLogger.logHandler?(output)
     }
     
     /// Log parsing errors
@@ -45,13 +33,7 @@ public enum NDKNetworkLogger {
                      "   RAW: \(NDKLogFormatter.truncateMessage(message))\n" +
                      "   ❌ PARSE ERROR: \(error)"
         
-        if let handler = NDKLogger.logHandler {
-            handler(output)
-        } else {
-            #if DEBUG
-            print(output)
-            #endif
-        }
+        NDKLogger.logHandler?(output)
     }
     
     /// Log parsed message details
@@ -145,12 +127,6 @@ public enum NDKNetworkLogger {
             output += "   ERROR: \(error)"
         }
         
-        if let handler = NDKLogger.logHandler {
-            handler(output)
-        } else {
-            #if DEBUG
-            print(output)
-            #endif
-        }
+        NDKLogger.logHandler?(output)
     }
 }
