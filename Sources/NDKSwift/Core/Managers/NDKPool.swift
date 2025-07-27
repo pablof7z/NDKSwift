@@ -179,10 +179,14 @@ public actor NDKPool {
         await relay.observeConnectionState { [weak self, weak relay] state in
             guard let self = self, let relay = relay else { return }
             switch state {
-            case .connected:
+            case .connected, .authenticated:
                 // Emit pool connection event
                 self.poolChangeContinuation.yield(.relayConnected(relay))
-                NDKLogger.log(.info, category: .relay, "🟢 Relay connected: \(relay.url)")
+                if case .authenticated = state {
+                    NDKLogger.log(.info, category: .relay, "🔐 Relay authenticated: \(relay.url)")
+                } else {
+                    NDKLogger.log(.info, category: .relay, "🟢 Relay connected: \(relay.url)")
+                }
                 Task {
                     await self.handleRelayConnected(relay)
                 }
@@ -193,7 +197,7 @@ public actor NDKPool {
                 // Emit pool disconnection event
                 self.poolChangeContinuation.yield(.relayDisconnected(relay))
                 NDKLogger.log(.warning, category: .relay, "🔴 Relay failed: \(relay.url), error: \(error)")
-            case .connecting, .disconnecting:
+            case .connecting, .disconnecting, .authRequired, .authenticating:
                 // Don't emit events for transitional states
                 NDKLogger.log(.trace, category: .relay, "🔄 Relay transitional state: \(state) for \(relay.url)")
                 break

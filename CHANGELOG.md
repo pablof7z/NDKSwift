@@ -4,6 +4,31 @@ All notable changes to NDKSwift will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+- NIP-42 relay authentication support with new authentication states
+- `NDKAuthenticationDelegate` protocol for controlling relay authentication
+- New relay connection states: `authRequired`, `authenticating`, `authenticated`
+- `isAuthenticated` property on `NDKRelay` to check authentication status
+- Automatic detection of auth-required errors in publish failures
+- Example code demonstrating NIP-42 authentication flow
+- Unit tests for authentication state transitions and delegate behavior
+
+### Changed
+- `NDKRelayConnectionState` enum now includes authentication-related states
+- Relay connections can now send messages when in `authenticated` state
+- `isConnected` property now returns true for both `connected` and `authenticated` states
+
+### Improved
+- Refactored JSON encoding/decoding to use centralized `JSONCoding` utility throughout the codebase
+- Moved `NDKSubscription` documentation to Internal Components section to clarify it's an implementation detail
+- Cleaned up deprecated code comments in `NDKAuthManager`
+
+### Documentation
+- Updated API Reference to emphasize `NDKDataSource` as the primary public subscription API
+- Added Internal Components section to documentation for implementation details
+
 ## [0.7.0] - 2025-01-27
 
 ### Added

@@ -32,12 +32,16 @@ public struct NDKRelayInfo: Codable, Equatable, Sendable {
 ///
 /// The relay progresses through these states during its lifecycle:
 /// - `disconnected` → `connecting` → `connected`
+/// - `connected` → `authRequired` → `authenticating` → `authenticated` (NIP-42)
 /// - Any state can transition to `failed` if an error occurs
-/// - `connected` → `disconnecting` → `disconnected` for graceful shutdown
+/// - `connected`/`authenticated` → `disconnecting` → `disconnected` for graceful shutdown
 public enum NDKRelayConnectionState: Equatable, Codable, Sendable {
     case disconnected
     case connecting
     case connected
+    case authRequired(challenge: String) // Relay requires authentication with challenge
+    case authenticating // Authentication in progress
+    case authenticated // Successfully authenticated
     case disconnecting
     case failed(String) // Store error message instead of Error for Equatable
 
@@ -46,8 +50,12 @@ public enum NDKRelayConnectionState: Equatable, Codable, Sendable {
         case (.disconnected, .disconnected),
              (.connecting, .connecting),
              (.connected, .connected),
+             (.authenticating, .authenticating),
+             (.authenticated, .authenticated),
              (.disconnecting, .disconnecting):
             return true
+        case let (.authRequired(lhsChallenge), .authRequired(rhsChallenge)):
+            return lhsChallenge == rhsChallenge
         case let (.failed(lhsMessage), .failed(rhsMessage)):
             return lhsMessage == rhsMessage
         default:
@@ -163,10 +171,12 @@ actor RelayStateActor {
     }
 
     func isConnected() -> Bool {
-        if case .connected = connectionState {
+        switch connectionState {
+        case .connected, .authenticated:
             return true
+        default:
+            return false
         }
-        return false
     }
 
     // MARK: - Connection Management
@@ -425,6 +435,21 @@ public final class NDKRelay: RelayProtocol, Hashable, Equatable, @unchecked Send
             await stateActor.isConnected()
         }
     }
+    
+    /// Check if relay is authenticated (NIP-42)
+    public var isAuthenticated: Bool {
+        get async {
+            if case .authenticated = await connectionState {
+                return true
+            }
+            return false
+        }
+    }
+    
+    /// Update connection state (internal use for authentication)
+    internal func updateConnectionState(_ newState: NDKRelayConnectionState) async {
+        await stateActor.updateConnectionState(newState)
+    }
 
     /// Reactive stream of relay state changes
     ///
@@ -596,7 +621,7 @@ public final class NDKRelay: RelayProtocol, Hashable, Equatable, @unchecked Send
     /// - Throws: `NDKError.connectionLost` if the relay is not connected
     public func send(_ message: String) async throws {
         let currentState = await stateActor.getConnectionState()
-        guard currentState == .connected else {
+        guard currentState == .connected || currentState == .authenticated else {
             throw NDKError.connectionLost(relay: url, message: "Not connected to relay")
         }
 

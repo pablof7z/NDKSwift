@@ -68,8 +68,6 @@ public class NDKAuthManager {
     /// Currently active signer (derived from active session)
     public private(set) var activeSigner: (any NDKSigner)?
 
-    // Removed sessionData - apps should use ndk.startSession() instead
-
     /// Whether biometric authentication is available on this device
     public private(set) var biometricAuthAvailable = false
 
