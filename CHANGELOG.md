@@ -20,6 +20,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Unit tests for `ImetaUtils` tag mapping and round-trip conversion
 - Unit tests for `FileManagerExtensions` Codable operations
 - Centralized crypto size constants in `CryptoConstants.Size` enum
+- Unit tests for `NIP77Message` parsing, encoding, and error handling
+- Documentation improvements to `NIP77Message` with usage examples
 
 ### Changed
 - Fixed JSON decoder usage in `BlossomBlobTests` to use centralized `JSONCoding` utility
@@ -28,6 +30,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Refactored ContentParser tests to use new helper extensions for cleaner assertions
 - Refactored manual hex validation in `NDKPrivateKeySigner` and `NIP44Encryption` to use `HexValidator` utility
 - Updated `Crypto.Constants` to reference centralized `CryptoConstants.Size` values
+- Improved `NIP77Message` API with clearer property names and better error handling
+- Enhanced `HexValidator` performance by checking string length before hex validation
+- Fixed `NIP77SyncHandler` to use proper error types from `NIP77Error` enum
 - Updated `Crypto.CryptoError` to use `ErrorMessageConstants` for consistent error messages
 
 ### Fixed

@@ -28,14 +28,16 @@ public enum HexValidator {
     /// - Returns: The validated Data
     /// - Throws: HexValidationError if validation fails
     public static func validateHex(_ hexString: String, expectedByteCount: Int? = nil) throws -> Data {
+        // Quick validation: check length first if expected count is provided
+        if let expectedCount = expectedByteCount {
+            let expectedHexLength = expectedCount * 2
+            guard hexString.count == expectedHexLength else {
+                throw HexValidationError.invalidLength(expected: expectedCount, actual: hexString.count / 2)
+            }
+        }
+        
         guard let data = Data(hexString: hexString) else {
             throw HexValidationError.invalidHexString(hexString)
-        }
-
-        if let expectedCount = expectedByteCount {
-            guard data.count == expectedCount else {
-                throw HexValidationError.invalidLength(expected: expectedCount, actual: data.count)
-            }
         }
 
         return data
