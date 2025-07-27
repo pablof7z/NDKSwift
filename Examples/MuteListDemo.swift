@@ -20,9 +20,9 @@ struct MuteListDemo {
         // Initialize NDK
         let ndk = NDK(
             relayUrls: [
-                "wss://relay.damus.io",
-                "wss://relay.primal.net",
-                "wss://nos.lol"
+                RelayConstants.damus,
+                RelayConstants.primal,
+                RelayConstants.nosLol
             ]
         )
         

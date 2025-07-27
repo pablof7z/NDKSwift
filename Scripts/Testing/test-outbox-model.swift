@@ -26,7 +26,7 @@ struct TestOutboxModel {
         print("Public key: \(publicKey.hex)")
         
         // Initialize NDK with primal relay
-        let ndk = NDK(explicitRelayUrls: ["wss://relay.primal.net"])
+        let ndk = NDK(explicitRelayUrls: [RelayConstants.primal])
         
         // Set up tracking for relay connections and events
         var connectedRelays: Set<String> = []
@@ -71,8 +71,8 @@ struct TestOutboxModel {
             kind: .text,
             content: "Test outbox model event - should be published to relay.damus.io",
             tags: [
-                ["p", testUser1.hex, "wss://relay.damus.io", "mention"],
-                ["p", testUser2.hex, "wss://relay.damus.io", "mention"]
+                ["p", testUser1.hex, RelayConstants.damus, "mention"],
+                ["p", testUser2.hex, RelayConstants.damus, "mention"]
             ],
             publicKey: publicKey
         )
@@ -103,11 +103,11 @@ struct TestOutboxModel {
         }
         
         // Check if damus relay was connected to
-        let damusConnected = connectedRelays.contains("wss://relay.damus.io/")
+        let damusConnected = connectedRelays.contains(RelayConstants.damus + "/")
         print("\n✅ Damus relay connected: \(damusConnected)")
         
         // Check if event was published to damus
-        let publishedToDamus = publishedEvents.contains { $0.relay == "wss://relay.damus.io/" }
+        let publishedToDamus = publishedEvents.contains { $0.relay == RelayConstants.damus + "/" }
         print("✅ Event published to damus: \(publishedToDamus)")
         
         if damusConnected && publishedToDamus {
