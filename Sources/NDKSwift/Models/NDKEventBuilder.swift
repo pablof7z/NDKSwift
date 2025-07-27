@@ -1173,7 +1173,7 @@ public final class NDKEventBuilder {
             dim: blob.dimensionsString,
             alt: alt,
             m: blob.type,
-            x: blob.sha256.isEmpty ? nil : blob.sha256,
+            x: blob.sha256.nilIfEmpty,
             size: blob.size > 0 ? String(blob.size) : nil,
             fallback: fallbacks,
             userAnnotations: userAnnotations

@@ -9,9 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - Comprehensive test coverage for `ArrayExtensions` including performance and edge cases
 - Additional test coverage for `LRUCache` including concurrent access and zero capacity tests
+- Updated README to include NIP-17, NIP-42, and NIP-59 in supported NIPs table
 
 ### Changed
 - Fixed JSON decoder usage in `BlossomBlobTests` to use centralized `JSONCoding` utility
+- Replaced `isEmpty ? nil : value` pattern with `nilIfEmpty` extension in `NDKEventBuilder`
 
 ### Fixed
 - Fixed optional unwrapping in `ContentTaggerTests` for error detail checking
@@ -19,6 +21,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Documentation
 - Updated documentation version references from 0.6.2 to 0.7.3 in README
 - Cleaned up and improved consistency across documentation files
+- Added missing NIPs (17, 42, 59) to the supported NIPs table in README
 
 ## [0.7.3] - 2025-01-27
 

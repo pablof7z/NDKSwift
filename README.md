@@ -118,14 +118,17 @@ let event = try await NDKEventBuilder(ndk: ndk)
 | [04](https://github.com/nostr-protocol/nips/blob/master/04.md) | Encrypted Direct Messages | ✅ |
 | [09](https://github.com/nostr-protocol/nips/blob/master/09.md) | Event Deletion | ✅ |
 | [10](https://github.com/nostr-protocol/nips/blob/master/10.md) | Reply Threading | ✅ |
+| [17](https://github.com/nostr-protocol/nips/blob/master/17.md) | Private Direct Messages | ✅ |
 | [18](https://github.com/nostr-protocol/nips/blob/master/18.md) | Reposts | ✅ |
 | [19](https://github.com/nostr-protocol/nips/blob/master/19.md) | bech32-encoded entities | ✅ |
 | [22](https://github.com/nostr-protocol/nips/blob/master/22.md) | Comments | ✅ |
 | [25](https://github.com/nostr-protocol/nips/blob/master/25.md) | Reactions | ✅ |
+| [42](https://github.com/nostr-protocol/nips/blob/master/42.md) | Authentication | ✅ |
 | [44](https://github.com/nostr-protocol/nips/blob/master/44.md) | Versioned Encryption | ✅ |
 | [46](https://github.com/nostr-protocol/nips/blob/master/46.md) | Nostr Connect | ✅ |
 | [47](https://github.com/nostr-protocol/nips/blob/master/47.md) | Wallet Connect | ✅ |
 | [57](https://github.com/nostr-protocol/nips/blob/master/57.md) | Lightning Zaps | ✅ |
+| [59](https://github.com/nostr-protocol/nips/blob/master/59.md) | Gift Wrap | ✅ |
 | [60](https://github.com/nostr-protocol/nips/blob/master/60.md) | Cashu Wallet | ✅ |
 | [61](https://github.com/nostr-protocol/nips/blob/master/61.md) | Nutzaps | ✅ |
 | [65](https://github.com/nostr-protocol/nips/blob/master/65.md) | Relay List (Outbox) | ✅ |
