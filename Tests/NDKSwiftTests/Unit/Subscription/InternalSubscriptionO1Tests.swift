@@ -86,7 +86,7 @@ final class InternalSubscriptionO1Test: XCTestCase {
         let manager = InternalSubscriptionManager(ndk: ndk)
         
         // Create subscriptions
-        let sub1 = await manager.createSubscription(
+        _ = await manager.createSubscription(
             id: "sub1",
             filters: [NDKFilter(kinds: [1])],
             relays: ["wss://relay1.com/", "wss://relay2.com/"],

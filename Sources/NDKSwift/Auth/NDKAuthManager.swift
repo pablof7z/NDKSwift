@@ -218,17 +218,6 @@ public class NDKAuthManager {
             authenticationState = .unauthenticated
         }
     }
-    
-    /// Restore sessions from secure storage (deprecated)
-    @available(*, deprecated, renamed: "initialize", message: "Use initialize() instead for cleaner API")
-    public func restoreSession() {
-        // Cancel any existing restoration task
-        restorationTask?.cancel()
-
-        restorationTask = Task { @MainActor in
-            await restoreSessions()
-        }
-    }
 
     /// Restore a specific session as the active session
     /// - Parameter session: The session to restore

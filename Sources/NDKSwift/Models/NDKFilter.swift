@@ -68,11 +68,16 @@ public struct NDKFilter: Codable, Equatable, Sendable {
     // MARK: - Tag Filters
 
     /// Add a generic tag filter
+    /// - Parameters:
+    ///   - tagName: The tag name (without the # prefix)
+    ///   - values: Array of values to filter by for this tag
     public mutating func addTagFilter(_ tagName: String, values: [String]) {
         tagFilters["#\(tagName)"] = values
     }
 
     /// Get tag filter values
+    /// - Parameter tagName: The tag name (without the # prefix)
+    /// - Returns: Array of values for this tag filter, or nil if not set
     public func tagFilter(_ tagName: String) -> [String]? {
         return tagFilters["#\(tagName)"]
     }
