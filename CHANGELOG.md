@@ -13,11 +13,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `NDKFilter` convenience factory methods for common filter patterns (profile, textNotes, contactList, reactions, etc.)
 - `NDKDataSourceProtocol` for standardizing SwiftUI data source interfaces
 - Unit tests for `NDKFilter` convenience methods
+- Comprehensive test coverage for `ContentParser` including all Nostr entity types
+- Test helper extensions for `ContentEntity` arrays to reduce test code duplication
 
 ### Changed
 - Fixed JSON decoder usage in `BlossomBlobTests` to use centralized `JSONCoding` utility
 - Replaced `isEmpty ? nil : value` pattern with `nilIfEmpty` extension in `NDKEventBuilder`
 - SwiftUI data sources now conform to `NDKDataSourceProtocol` for consistency
+- Refactored ContentParser tests to use new helper extensions for cleaner assertions
 
 ### Fixed
 - Fixed optional unwrapping in `ContentTaggerTests` for error detail checking
@@ -31,6 +34,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Improved
 - DRY principle by creating `NDKDataSourceProtocol` to standardize error handling in SwiftUI data sources
 - Developer experience with convenience filter factory methods for common use cases
+- Test code readability with new ContentEntity helper extensions in TestAssertions.swift
+- Test coverage for content parsing edge cases including invalid entities and whitespace preservation
 
 ## [0.7.3] - 2025-01-27
 

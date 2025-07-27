@@ -260,3 +260,158 @@ func XCTAssertEventuallyContains<T>(
         line: line
     )
 }
+
+// MARK: - Content Entity Assertions
+
+extension Array where Element == ContentEntity {
+    /// Check if array contains a text entity
+    func containsText(_ text: String? = nil) -> Bool {
+        contains { entity in
+            if case .text(let entityText) = entity {
+                return text == nil || entityText == text
+            }
+            return false
+        }
+    }
+    
+    /// Check if array contains an npub entity
+    func containsNpub(_ npub: String? = nil) -> Bool {
+        contains { entity in
+            if case .npub(let entityNpub) = entity {
+                return npub == nil || entityNpub == npub
+            }
+            return false
+        }
+    }
+    
+    /// Check if array contains a hashtag entity
+    func containsHashtag(_ tag: String? = nil) -> Bool {
+        contains { entity in
+            if case .hashtag(let entityTag) = entity {
+                return tag == nil || entityTag == tag
+            }
+            return false
+        }
+    }
+    
+    /// Check if array contains a URL entity
+    func containsURL(_ url: String? = nil) -> Bool {
+        contains { entity in
+            if case .url(let entityURL) = entity {
+                return url == nil || entityURL.absoluteString == url
+            }
+            return false
+        }
+    }
+    
+    /// Check if array contains a note entity
+    func containsNote(_ note: String? = nil) -> Bool {
+        contains { entity in
+            if case .note(let entityNote) = entity {
+                return note == nil || entityNote == note
+            }
+            return false
+        }
+    }
+    
+    /// Check if array contains an nprofile entity
+    func containsNprofile(_ nprofile: String? = nil) -> Bool {
+        contains { entity in
+            if case .nprofile(let entityNprofile) = entity {
+                return nprofile == nil || entityNprofile == nprofile
+            }
+            return false
+        }
+    }
+    
+    /// Check if array contains a nevent entity
+    func containsNevent(_ nevent: String? = nil) -> Bool {
+        contains { entity in
+            if case .nevent(let entityNevent) = entity {
+                return nevent == nil || entityNevent == nevent
+            }
+            return false
+        }
+    }
+    
+    /// Check if array contains an naddr entity
+    func containsNaddr(_ naddr: String? = nil) -> Bool {
+        contains { entity in
+            if case .naddr(let entityNaddr) = entity {
+                return naddr == nil || entityNaddr == naddr
+            }
+            return false
+        }
+    }
+    
+    /// Check if array contains a user mention
+    func containsUserMention(pubkey: String? = nil) -> Bool {
+        contains { entity in
+            if case .userMention(let entityPubkey, _) = entity {
+                return pubkey == nil || entityPubkey == pubkey
+            }
+            return false
+        }
+    }
+    
+    /// Check if array contains an event mention
+    func containsEventMention(_ eventId: String? = nil) -> Bool {
+        contains { entity in
+            if case .eventMention(let entityEventId) = entity {
+                return eventId == nil || entityEventId == eventId
+            }
+            return false
+        }
+    }
+    
+    /// Extract all hashtags from entities
+    var hashtags: [String] {
+        compactMap { entity in
+            if case .hashtag(let tag) = entity { return tag }
+            return nil
+        }
+    }
+    
+    /// Extract all URLs from entities
+    var urls: [String] {
+        compactMap { entity in
+            if case .url(let url) = entity { return url.absoluteString }
+            return nil
+        }
+    }
+    
+    /// Count entities of a specific type
+    func countOf(_ entityType: ContentEntityType) -> Int {
+        filter { entity in
+            switch (entity, entityType) {
+            case (.text, .text),
+                 (.npub, .npub),
+                 (.nprofile, .nprofile),
+                 (.note, .note),
+                 (.nevent, .nevent),
+                 (.naddr, .naddr),
+                 (.hashtag, .hashtag),
+                 (.url, .url),
+                 (.userMention, .userMention),
+                 (.eventMention, .eventMention):
+                return true
+            default:
+                return false
+            }
+        }.count
+    }
+}
+
+/// Content entity type for counting
+enum ContentEntityType {
+    case text
+    case npub
+    case nprofile
+    case note
+    case nevent
+    case naddr
+    case hashtag
+    case url
+    case userMention
+    case eventMention
+}
