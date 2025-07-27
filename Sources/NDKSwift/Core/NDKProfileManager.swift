@@ -60,6 +60,10 @@ public actor NDKProfileManager {
 
     private var activeObservations: [PublicKey: [ContinuationWrapper]] = [:]
 
+    /// Initialize a new profile manager
+    /// - Parameters:
+    ///   - ndk: The NDK instance to use for fetching profiles
+    ///   - config: Configuration for cache behavior
     public init(ndk: NDK, config: NDKProfileConfig = .default) {
         self.ndk = ndk
         self.config = config
@@ -128,6 +132,51 @@ public actor NDKProfileManager {
                 }
                 continuation.finish()
             }
+        }
+    }
+
+    /// Load a profile from cache without subscribing to updates
+    /// - Parameter pubkey: The public key to load
+    /// - Returns: The cached profile if available, nil otherwise
+    public func loadProfile(for pubkey: PublicKey) async -> NDKUserProfile? {
+        return getCachedProfile(for: pubkey)
+    }
+    
+    /// Load multiple profiles from cache
+    /// - Parameter pubkeys: Array of public keys to load
+    /// - Returns: Dictionary mapping pubkeys to their profiles (if found)
+    public func loadProfiles(for pubkeys: [PublicKey]) async -> [PublicKey: NDKUserProfile] {
+        var profiles: [PublicKey: NDKUserProfile] = [:]
+        for pubkey in pubkeys {
+            if let profile = getCachedProfile(for: pubkey) {
+                profiles[pubkey] = profile
+            }
+        }
+        return profiles
+    }
+    
+    /// Save a profile to cache
+    /// - Parameters:
+    ///   - profile: The profile to save
+    ///   - pubkey: The public key associated with the profile
+    ///   - expiresIn: Optional expiry time in seconds (not implemented)
+    public func saveProfile(_ profile: NDKUserProfile, for pubkey: PublicKey, expiresIn: TimeInterval? = nil) async {
+        updateCache(pubkey: pubkey, profile: profile)
+        
+        // Also save to persistent cache if available
+        if let ndk = ndk {
+            try? await ndk.cache.saveProfile(profile, pubkey: pubkey)
+        }
+    }
+    
+    /// Process a profile event from a relay
+    /// - Parameter event: The kind 0 event containing profile metadata
+    public func processProfileEvent(_ event: NDKEvent) async {
+        guard event.kind == EventKind.metadata else { return }
+        
+        if let profileData = event.content.data(using: .utf8),
+           let profile = JSONCoding.safeDecode(NDKUserProfile.self, from: profileData) {
+            await saveProfile(profile, for: event.pubkey)
         }
     }
 
