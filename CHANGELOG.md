@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - Enhanced test coverage for `NDKEventManager` with comprehensive unit tests
 - Added tests for NDKSwiftUI components including `NDKProfileDataSource`
+- Comprehensive test suite for `ContentTagger` utility covering hashtag generation, Nostr entity decoding, and content parsing
+- Complete test coverage for `JSONCoding` utility including encoding, decoding, dictionary conversion, and safe operations
+- Extended `ArrayExtensions` tests to cover safe subscript, async filter, NDKEvent array extensions, and mutation methods
 
 ### Changed
 - Moved `NDKRelayPoolExtensions.swift` from Outbox to Core/Extensions for better organization
@@ -18,6 +21,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Documentation
 - Updated NIP-29 Implementation Plan to clarify it's not yet implemented
 - Added status header to NIP-29 documentation for clarity
+- Enhanced inline documentation for `ContentTagger` Tag extension with examples
+- Improved documentation for Tag validation methods with detailed type descriptions
 
 ### Improved
 - Test coverage for core event publishing functionality
@@ -25,6 +30,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Consistency in JSON handling across the codebase
 - Replaced redundant HexValidator.validate32ByteHex try-catch patterns with simpler guard statements
 - Updated version references in README from 0.7.0 to 0.7.1
+- Test coverage increased with new test suites for utility classes
 
 ### Fixed
 - Removed redundant hex validation patterns in NDKPrivateKeySigner, P2PKManager, NIP04, and NIP44 encryption modules
