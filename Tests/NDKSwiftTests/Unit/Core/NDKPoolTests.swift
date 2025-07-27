@@ -192,4 +192,172 @@ final class NDKPoolTests: NDKTestCase {
         let connectedRelays = await pool.connectedRelays()
         XCTAssertEqual(connectedRelays.count, 0)
     }
+    
+    // MARK: - Blocked Relay Tests
+    
+    func testBlockedRelayNotAdded() async throws {
+        let ndk = createMockNDK()
+        let pool = ndk.pool
+        
+        // Setup mock signer with test user
+        let signer = NDKPrivateKeySigner(privateKey: TestFixtures.Keys.alice.privateKey)
+        ndk.signer = signer
+        
+        // Create and cache a blocked relay list event
+        let blockedRelayList = NDKEvent(
+            pubkey: TestFixtures.Keys.alice.publicKey,
+            createdAt: .now,
+            kind: EventKind.blockedRelays,
+            tags: [
+                ["relay", "wss://blocked.relay.com/", "spam"],
+                ["relay", "wss://another.blocked.relay.com/", "malicious"]
+            ],
+            content: ""
+        )
+        try blockedRelayList.sign(with: signer)
+        
+        // Add to cache
+        if let cache = ndk.cache {
+            await cache.saveEvent(blockedRelayList)
+        }
+        
+        // Wait for blocked relay subscription to process
+        try await Task.sleep(nanoseconds: 200_000_000) // 200ms
+        
+        // Try to add a blocked relay
+        let relay = await pool.addRelay("wss://blocked.relay.com", origin: .outbox(authorPubkey: "somepubkey"))
+        
+        // Relay should not be added to the pool
+        let relays = await pool.relays
+        XCTAssertFalse(relays.contains { $0.url == "wss://blocked.relay.com/" }, "Blocked relay should not be added to pool")
+    }
+    
+    func testRefreshBlockedRelaysRemovesExistingRelays() async throws {
+        let ndk = createMockNDK()
+        let pool = ndk.pool
+        
+        // Setup mock signer with test user
+        let signer = NDKPrivateKeySigner(privateKey: TestFixtures.Keys.alice.privateKey)
+        ndk.signer = signer
+        
+        // Add some relays first (before they're blocked)
+        await pool.addRelay("wss://relay1.example.com")
+        await pool.addRelay("wss://relay2.example.com")
+        await pool.addRelay("wss://relay3.example.com")
+        
+        var relays = await pool.relays
+        XCTAssertEqual(relays.count, 3)
+        
+        // Create and cache a blocked relay list event that blocks relay2
+        let blockedRelayList = NDKEvent(
+            pubkey: TestFixtures.Keys.alice.publicKey,
+            createdAt: .now,
+            kind: EventKind.blockedRelays,
+            tags: [
+                ["relay", "wss://relay2.example.com/", "spam"]
+            ],
+            content: ""
+        )
+        try blockedRelayList.sign(with: signer)
+        
+        // Add to cache
+        if let cache = ndk.cache {
+            await cache.saveEvent(blockedRelayList)
+        }
+        
+        // Refresh blocked relays
+        await pool.refreshBlockedRelays()
+        
+        // Wait for processing
+        try await Task.sleep(nanoseconds: 100_000_000) // 100ms
+        
+        // Check that relay2 was removed
+        relays = await pool.relays
+        XCTAssertEqual(relays.count, 2)
+        XCTAssertTrue(relays.contains { $0.url == "wss://relay1.example.com/" })
+        XCTAssertFalse(relays.contains { $0.url == "wss://relay2.example.com/" })
+        XCTAssertTrue(relays.contains { $0.url == "wss://relay3.example.com/" })
+    }
+    
+    // MARK: - Connection State Tests
+    
+    func testGetRelayStateSnapshot() async throws {
+        let ndk = createMockNDK()
+        let pool = ndk.pool
+        
+        // Add multiple relays
+        await pool.addRelay("wss://relay1.example.com")
+        await pool.addRelay("wss://relay2.example.com")
+        await pool.addRelay("wss://relay3.example.com")
+        
+        let snapshot = await pool.getRelayStateSnapshot()
+        
+        // All relays should be in the snapshot
+        XCTAssertEqual(snapshot.count, 3)
+        XCTAssertNotNil(snapshot["wss://relay1.example.com/"])
+        XCTAssertNotNil(snapshot["wss://relay2.example.com/"])
+        XCTAssertNotNil(snapshot["wss://relay3.example.com/"])
+        
+        // All should be disconnected initially
+        for (_, state) in snapshot {
+            XCTAssertEqual(state, .disconnected)
+        }
+    }
+    
+    func testConnectedRelayURLs() async throws {
+        let ndk = createMockNDK()
+        let pool = ndk.pool
+        
+        // Add relays
+        await pool.addRelay("wss://relay1.example.com")
+        await pool.addRelay("wss://relay2.example.com")
+        
+        // Initially no relays should be connected
+        let connectedURLs = await pool.connectedRelayURLs
+        XCTAssertEqual(connectedURLs.count, 0)
+    }
+    
+    func testConnectAll() async throws {
+        let ndk = createMockNDK()
+        let pool = ndk.pool
+        
+        // Add multiple relays
+        await pool.addRelay("wss://relay1.example.com")
+        await pool.addRelay("wss://relay2.example.com")
+        await pool.addRelay("wss://relay3.example.com")
+        
+        // Initial state
+        var summary = await pool.getConnectionSummary()
+        XCTAssertEqual(summary.total, 3)
+        XCTAssertEqual(summary.connected, 0)
+        
+        // Connect all (this will fail in tests but should not crash)
+        await pool.connectAll()
+        
+        // Verify the method completed without errors
+        summary = await pool.getConnectionSummary()
+        XCTAssertEqual(summary.total, 3)
+    }
+    
+    func testPrepareRelaysWithAutoConnect() async throws {
+        let ndk = createMockNDK()
+        let pool = ndk.pool
+        
+        let urls = [
+            "wss://relay1.example.com",
+            "wss://relay2.example.com"
+        ]
+        
+        // Prepare with autoConnect false (default)
+        let preparedRelays = await pool.prepareRelays(urls, autoConnect: false)
+        XCTAssertEqual(preparedRelays.count, 2)
+        
+        // Prepare again with autoConnect true
+        let preparedRelays2 = await pool.prepareRelays(urls, autoConnect: true)
+        XCTAssertEqual(preparedRelays2.count, 2)
+        
+        // Should return same relay instances
+        XCTAssertTrue(preparedRelays[0] === preparedRelays2[0])
+        XCTAssertTrue(preparedRelays[1] === preparedRelays2[1])
+    }
 }
