@@ -2,7 +2,7 @@ import SwiftUI
 import NDKSwift
 
 /// A view that renders markdown content with inline images
-struct NDKMarkdownImageView: View {
+struct NDKUIMarkdownImageView: View {
     let blocks: [MarkdownBlock]
     let configuration: MarkdownConfiguration
     let ndk: NDK

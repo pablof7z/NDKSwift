@@ -5,7 +5,7 @@ import NDKSwift
 import UIKit
 #endif
 
-// MARK: - NDKEventView
+// MARK: - NDKUIEventView
 
 /// A composable SwiftUI component that renders different Nostr event kinds with appropriate styling.
 ///
@@ -20,20 +20,20 @@ import UIKit
 ///
 /// ```swift
 /// // Simple event display
-/// NDKEventView(event: event)
+/// NDKUIEventView(event: event)
 ///
 /// // Customized for preview contexts
-/// NDKEventView(event: event, style: .compact)
+/// NDKUIEventView(event: event, style: .compact)
 ///     .onEventTapped { event in
 ///         // Handle event tap
 ///     }
 ///
 /// // In a feed
 /// ForEach(events, id: \.id) { event in
-///     NDKEventView(event: event, style: .feed)
+///     NDKUIEventView(event: event, style: .feed)
 /// }
 /// ```
-public struct NDKEventView: View {
+public struct NDKUIEventView: View {
 
     // MARK: - Properties
 
@@ -132,14 +132,14 @@ public struct NDKEventView: View {
     // MARK: - Modifiers
 
     /// Handle event tap gestures
-    public func onEventTapped(_ action: @escaping (NDKEvent) -> Void) -> NDKEventView {
+    public func onEventTapped(_ action: @escaping (NDKEvent) -> Void) -> NDKUIEventView {
         var copy = self
         copy.eventTapAction = action
         return copy
     }
 
     /// Handle author tap gestures
-    public func onAuthorTapped(_ action: @escaping (String) -> Void) -> NDKEventView {
+    public func onAuthorTapped(_ action: @escaping (String) -> Void) -> NDKUIEventView {
         var copy = self
         copy.authorTapAction = action
         return copy
@@ -151,7 +151,7 @@ public struct NDKEventView: View {
 /// Specialized view for text note events (kind:1)
 public struct NDKTextNoteView: View {
     let event: NDKEvent
-    let style: NDKEventView.EventStyle
+    let style: NDKUIEventView.EventStyle
     let showAuthor: Bool
     let showTimestamp: Bool
     let showInteractions: Bool
@@ -268,7 +268,7 @@ public struct NDKTextNoteView: View {
 /// Specialized view for long-form article events (kind:30023) - shows rich preview
 public struct NDKLongFormArticleView: View {
     let event: NDKEvent
-    let style: NDKEventView.EventStyle
+    let style: NDKUIEventView.EventStyle
     let showAuthor: Bool
     let showTimestamp: Bool
 
@@ -373,7 +373,7 @@ public struct NDKLongFormArticleView: View {
 /// Specialized view for Cashu token events (kind:9321)
 public struct NDKCashuTokenView: View {
     let event: NDKEvent
-    let style: NDKEventView.EventStyle
+    let style: NDKUIEventView.EventStyle
     let showAuthor: Bool
     let showTimestamp: Bool
 
@@ -460,7 +460,7 @@ public struct NDKCashuTokenView: View {
 /// Specialized view for picture events (kind:20) - NIP-68 picture-first feeds
 public struct NDKPictureEventView: View {
     let event: NDKEvent
-    let style: NDKEventView.EventStyle
+    let style: NDKUIEventView.EventStyle
     let showAuthor: Bool
     let showTimestamp: Bool
 
@@ -551,7 +551,7 @@ public struct NDKPictureEventView: View {
 /// Helper view for displaying picture grids
 private struct PictureGrid: View {
     let imageURLs: [URL]
-    let style: NDKEventView.EventStyle
+    let style: NDKUIEventView.EventStyle
 
     var body: some View {
         switch imageURLs.count {
@@ -617,7 +617,7 @@ private struct PictureGrid: View {
 
 private struct SingleImageView: View {
     let url: URL
-    let style: NDKEventView.EventStyle
+    let style: NDKUIEventView.EventStyle
 
     var body: some View {
         AsyncImage(url: url) { image in
@@ -646,7 +646,7 @@ private struct SingleImageView: View {
 
 private struct GridImageView: View {
     let urls: [URL]
-    let style: NDKEventView.EventStyle
+    let style: NDKUIEventView.EventStyle
 
     var body: some View {
         LazyVGrid(columns: gridColumns, spacing: 4) {
@@ -683,7 +683,7 @@ private struct GridImageView: View {
 /// Fallback view for unknown or unsupported event kinds
 public struct NDKGenericEventView: View {
     let event: NDKEvent
-    let style: NDKEventView.EventStyle
+    let style: NDKUIEventView.EventStyle
     let showAuthor: Bool
     let showTimestamp: Bool
 
@@ -734,7 +734,7 @@ public struct NDKGenericEventView: View {
 // MARK: - Preview
 
 #if DEBUG
-struct NDKEventView_Previews: PreviewProvider {
+struct NDKUIEventView_Previews: PreviewProvider {
     static var previews: some View {
         ScrollView {
             VStack(spacing: 16) {

@@ -1,7 +1,7 @@
 import SwiftUI
 import NDKSwift
 
-// MARK: - NDKDisplayName
+// MARK: - NDKUIDisplayName
 
 /// A SwiftUI component that displays a user's display name with automatic profile loading.
 ///
@@ -16,15 +16,15 @@ import NDKSwift
 ///
 /// ```swift
 /// // Simple usage
-/// NDKDisplayName(pubkey: user.pubkey)
+/// NDKUIDisplayName(pubkey: user.pubkey)
 ///
 /// // Customized styling
-/// NDKDisplayName(pubkey: user.pubkey)
+/// NDKUIDisplayName(pubkey: user.pubkey)
 ///     .font(.headline)
 ///     .foregroundStyle(.primary)
 ///     .onTapGesture { /* handle tap */ }
 /// ```
-public struct NDKDisplayName: View {
+public struct NDKUIDisplayName: View {
 
     // MARK: - Properties
 
@@ -139,20 +139,20 @@ public struct NDKDisplayName: View {
     // MARK: - Modifiers
 
     /// Add a tap gesture to the display name
-    public func onTapGesture(perform action: @escaping () -> Void) -> NDKDisplayName {
+    public func onTapGesture(perform action: @escaping () -> Void) -> NDKUIDisplayName {
         var copy = self
         copy.tapAction = action
         return copy
     }
 }
 
-// MARK: - NDKUsername
+// MARK: - NDKUIUsername
 
 /// A variant that prioritizes username over display name
-public struct NDKUsername: View {
+public struct NDKUIUsername: View {
 
     private let pubkey: String
-    private let fallbackStyle: NDKDisplayName.FallbackStyle
+    private let fallbackStyle: NDKUIDisplayName.FallbackStyle
     private var tapAction: (() -> Void)?
 
     @Environment(\.ndk) private var ndk
@@ -163,7 +163,7 @@ public struct NDKUsername: View {
 
     public init(
         pubkey: String,
-        fallbackStyle: NDKDisplayName.FallbackStyle = .npub
+        fallbackStyle: NDKUIDisplayName.FallbackStyle = .npub
     ) {
         self.pubkey = pubkey
         self.fallbackStyle = fallbackStyle
@@ -171,7 +171,7 @@ public struct NDKUsername: View {
 
     public init(
         user: NDKUser,
-        fallbackStyle: NDKDisplayName.FallbackStyle = .npub
+        fallbackStyle: NDKUIDisplayName.FallbackStyle = .npub
     ) {
         self.init(pubkey: user.pubkey, fallbackStyle: fallbackStyle)
     }
@@ -241,7 +241,7 @@ public struct NDKUsername: View {
 
     // MARK: - Modifiers
 
-    public func onTapGesture(perform action: @escaping () -> Void) -> NDKUsername {
+    public func onTapGesture(perform action: @escaping () -> Void) -> NDKUIUsername {
         var copy = self
         copy.tapAction = action
         return copy
@@ -251,24 +251,24 @@ public struct NDKUsername: View {
 // MARK: - Preview
 
 #if DEBUG
-struct NDKDisplayName_Previews: PreviewProvider {
+struct NDKUIDisplayName_Previews: PreviewProvider {
     static var previews: some View {
         VStack(alignment: .leading, spacing: 16) {
             Group {
                 // Different fallback styles
-                NDKDisplayName(pubkey: "sample_pubkey", fallbackStyle: .npub)
+                NDKUIDisplayName(pubkey: "sample_pubkey", fallbackStyle: .npub)
                     .font(.headline)
 
-                NDKDisplayName(pubkey: "sample_pubkey", fallbackStyle: .placeholder)
+                NDKUIDisplayName(pubkey: "sample_pubkey", fallbackStyle: .placeholder)
                     .font(.body)
 
-                NDKDisplayName(pubkey: "sample_pubkey", fallbackStyle: .pubkey)
+                NDKUIDisplayName(pubkey: "sample_pubkey", fallbackStyle: .pubkey)
                     .font(.caption)
 
                 Divider()
 
                 // Username variant
-                NDKUsername(pubkey: "sample_pubkey")
+                NDKUIUsername(pubkey: "sample_pubkey")
                     .font(.body)
                     .foregroundStyle(.secondary)
             }

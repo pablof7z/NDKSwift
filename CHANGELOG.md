@@ -4,6 +4,44 @@ All notable changes to NDKSwift will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.7.12] - 2025-01-27
+
+### Added
+- New Blossom server management functionality with `NDKBlossomServerManager`
+- Comprehensive NIP-42 authentication integration tests
+- Enhanced SwiftUI components with NDKUI prefix for better naming consistency:
+  - `NDKUIFollowButton`, `NDKUIReactionButton`, `NDKUIZapButton`
+  - `NDKUIDisplayName`, `NDKUIEventAuthorHeader`, `NDKUIEventView`
+  - `NDKUIMarkdownImageView`, `NDKUIMarkdownModifiers`, `NDKUIMarkdownRenderer`, `NDKUIProfilePicture`
+- Additional unit tests for enhanced code coverage:
+  - `NDKEventBuilderTests` for event creation validation
+  - `NDKRelayAuthenticationFlowTests` for auth flow testing
+  - `NDKRelayOKMessageTests` for relay response handling
+
+### Changed
+- Renamed SwiftUI components from `NDK*` to `NDKUI*` prefix for clearer distinction
+- Improved component organization and consistency across the SwiftUI library
+
+### Technical
+- Enhanced test infrastructure for NIP-42 authentication flows
+- Better separation of concerns between core NDK and UI components
+- Improved naming conventions for SwiftUI components to avoid conflicts
+
+## [0.7.11] - 2025-01-27
+
+### Added
+- NIP-42 authentication support for relay connections
+  - New `NDKAuthenticationDelegate` protocol for handling auth requests
+  - Extended `NDKRelayConnectionState` with auth states: `authRequired`, `authenticating`, `authenticated`
+  - Automatic event retry after successful authentication
+  - Observable relay authentication state changes
+- Comprehensive test coverage for NIP-42 authentication flow
+
+### Technical
+- Events that fail due to auth requirements are tracked and automatically retried after authentication
+- Authentication flow integrates seamlessly with existing relay connection logic
+- Apps can control authentication through the delegate pattern
+
 ## [0.7.10] - 2025-01-27
 
 ### Added

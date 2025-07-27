@@ -7,20 +7,12 @@ public protocol LNURLResolving {
     func resolve(_ lnurlOrAddress: String) async throws -> LNURLResolutionResult
 }
 
-/// Protocol for URL data fetching (allows mocking in tests)
-public protocol URLDataFetching {
-    func data(from url: URL) async throws -> (Data, URLResponse)
-}
-
-/// Extension to make URLSession conform to our protocol
-extension URLSession: URLDataFetching {}
-
 /// Default implementation of LNURL resolver
 public class LNURLResolver: LNURLResolving {
-    private let dataFetcher: URLDataFetching
+    private let networkClient: NDKNetworkClient
 
-    public init(dataFetcher: URLDataFetching = URLSession.shared) {
-        self.dataFetcher = dataFetcher
+    public init(session: NDKNetworkFetching = URLSession.shared) {
+        self.networkClient = NDKNetworkClient(session: session)
     }
 
     /// Resolve an LNURL or LUD16 address
@@ -95,17 +87,21 @@ public class LNURLResolver: LNURLResolving {
     /// Fetch LNURL pay metadata from endpoint
     private func fetchLNURLPayMetadata(from url: URL) async throws -> LNURLPayResponse {
         do {
-            let (data, response) = try await dataFetcher.data(from: url)
-
-            guard let httpResponse = response as? HTTPURLResponse,
-                  httpResponse.statusCode == HTTPStatusCode.ok else {
-                throw LNURLError.invalidResponse("HTTP request failed")
+            let payResponse = try await networkClient.fetchJSON(
+                LNURLPayResponse.self,
+                from: url
+            )
+            
+            // Validate it's a payRequest
+            guard payResponse.tag == "payRequest" else {
+                throw LNURLError.invalidResponse("Expected payRequest tag, got: \(payResponse.tag ?? "none")")
             }
-
-            return try JSONCoding.decode(LNURLPayResponse.self, from: data)
-
+            
+            return payResponse
         } catch let error as LNURLError {
             throw error
+        } catch NDKError.invalidResponse {
+            throw LNURLError.invalidResponse("HTTP request failed")
         } catch {
             throw LNURLError.networkError(error)
         }

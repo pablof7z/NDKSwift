@@ -2,13 +2,13 @@ import Foundation
 
 /// Blossom client for interacting with Blossom servers
 public actor BlossomClient {
-    private let urlSession: URLSessionProtocol
+    private let networkClient: NDKNetworkClient
     private var serverCache: [String: BlossomServerDescriptor] = [:]
 
     // MARK: - Constants
 
-    public init(urlSession: URLSessionProtocol = URLSession.shared) {
-        self.urlSession = urlSession
+    public init(urlSession: NDKNetworkFetching = URLSession.shared) {
+        self.networkClient = NDKNetworkClient(session: urlSession)
     }
 
     // MARK: - Private Helpers
@@ -45,23 +45,19 @@ public actor BlossomClient {
         request.setValue(HTTPConstants.contentTypeApplicationJSON, forHTTPHeaderField: HTTPConstants.headerAccept)
 
         do {
-            let (data, response) = try await urlSession.data(for: request)
-            let httpResponse = try handleHTTPResponse(response, data: data, serverURL: serverURL)
-
-            guard httpResponse.statusCode == HTTPStatusCode.ok else {
-                throw createServerError(response: httpResponse, data: data, serverURL: serverURL)
-            }
-
-            let descriptor = try JSONCoding.decode(BlossomServerDescriptor.self, from: data)
-
+            let descriptor = try await networkClient.fetchAndDecode(
+                BlossomServerDescriptor.self,
+                for: request
+            )
+            
             // Cache the descriptor
             serverCache[serverURL] = descriptor
-
+            
             return descriptor
         } catch let error as NDKError {
             throw error
         } catch {
-            throw NDKError.networkError(for: serverURL, operation: "Blossom request", error: error)
+            throw NDKError.networkError(for: serverURL, operation: "Blossom server discovery", error: error)
         }
     }
 
@@ -111,9 +107,9 @@ public actor BlossomClient {
         request.setValue(authHeader, forHTTPHeaderField: HTTPConstants.headerAuthorization)
 
         do {
-            let (responseData, response) = try await urlSession.data(for: request)
-            let httpResponse = try handleHTTPResponse(response, data: responseData, serverURL: serverURL)
-
+            let (responseData, httpResponse) = try await networkClient.fetchAndValidateData(for: request)
+            
+            // The network client already handles common status codes, but we need specific Blossom handling
             switch httpResponse.statusCode {
             case HTTPStatusCode.ok, HTTPStatusCode.created:
                 let uploadDescriptor = try JSONCoding.decode(BlossomUploadDescriptor.self, from: responseData)
@@ -130,23 +126,26 @@ public actor BlossomClient {
                     type: uploadDescriptor.type,
                     uploaded: Date(nostrTimestamp: uploadDescriptor.uploaded)
                 )
-
-            case HTTPStatusCode.unauthorized:
-                throw NDKError.unauthorized(relay: serverURL, message: ErrorMessageConstants.Messages.blossomAuthorizationFailed)
-
-            case HTTPStatusCode.payloadTooLarge:
-                throw NDKError.fileTooLarge(maxSize: descriptor?.maxUploadSize ?? Int64.max)
-
-            case HTTPStatusCode.unsupportedMediaType:
-                throw NDKError.unsupportedMimeType(mimeType ?? "unknown")
-
+                
             default:
+                // This shouldn't happen as fetchAndValidateData handles errors
                 throw createServerError(response: httpResponse, data: responseData, serverURL: serverURL)
             }
+        } catch NDKError.invalidResponse {
+            // Map generic errors to Blossom-specific ones where needed
+            throw NDKError.uploadFailed(reason: "Invalid response from Blossom server")
+        } catch NDKError.rateLimited {
+            throw NDKError.uploadFailed(reason: "Rate limited by Blossom server")
+        } catch NDKError.unauthorized {
+            throw NDKError.unauthorized(relay: serverURL, message: ErrorMessageConstants.Messages.blossomAuthorizationFailed)
+        } catch NDKError.invalidRequest where descriptor?.maxUploadSize != nil {
+            throw NDKError.fileTooLarge(maxSize: descriptor?.maxUploadSize ?? 0)
+        } catch NDKError.invalidRequest {
+            throw NDKError.unsupportedMimeType(mimeType ?? "unknown")
         } catch let error as NDKError {
             throw error
         } catch {
-            throw NDKError.networkError(for: serverURL, operation: "Blossom request", error: error)
+            throw NDKError.networkError(for: serverURL, operation: "Blossom upload", error: error)
         }
     }
 
@@ -191,33 +190,26 @@ public actor BlossomClient {
         request.setValue(authHeader, forHTTPHeaderField: HTTPConstants.headerAuthorization)
 
         do {
-            let (data, response) = try await urlSession.data(for: request)
-            let httpResponse = try handleHTTPResponse(response, data: data, serverURL: serverURL)
-
-            switch httpResponse.statusCode {
-            case HTTPStatusCode.ok:
-                let listResponse = try JSONCoding.decode(BlossomListResponse.self, from: data)
-
-                return listResponse.blobs.map { item in
-                    BlossomBlob(
-                        sha256: item.sha256,
-                        url: "\(serverURL)/\(item.sha256)",
-                        size: item.size,
-                        type: item.type,
-                        uploaded: Date(nostrTimestamp: Timestamp(item.uploaded))
-                    )
-                }
-
-            case HTTPStatusCode.unauthorized:
-                throw NDKError.unauthorized(relay: serverURL, message: ErrorMessageConstants.Messages.blossomAuthorizationFailed)
-
-            default:
-                throw createServerError(response: httpResponse, data: data, serverURL: serverURL)
+            let listResponse = try await networkClient.fetchAndDecode(
+                BlossomListResponse.self,
+                for: request
+            )
+            
+            return listResponse.blobs.map { item in
+                BlossomBlob(
+                    sha256: item.sha256,
+                    url: "\(serverURL)/\(item.sha256)",
+                    size: item.size,
+                    type: item.type,
+                    uploaded: Date(nostrTimestamp: Timestamp(item.uploaded))
+                )
             }
+        } catch NDKError.unauthorized {
+            throw NDKError.unauthorized(relay: serverURL, message: ErrorMessageConstants.Messages.blossomAuthorizationFailed)
         } catch let error as NDKError {
             throw error
         } catch {
-            throw NDKError.networkError(for: serverURL, operation: "Blossom request", error: error)
+            throw NDKError.networkError(for: serverURL, operation: "Blossom list", error: error)
         }
     }
 
@@ -240,27 +232,25 @@ public actor BlossomClient {
         request.setValue(authHeader, forHTTPHeaderField: HTTPConstants.headerAuthorization)
 
         do {
-            let (data, response) = try await urlSession.data(for: request)
-            let httpResponse = try handleHTTPResponse(response, data: data, serverURL: serverURL)
-
+            let (_, httpResponse) = try await networkClient.fetchAndValidateData(for: request)
+            
             switch httpResponse.statusCode {
             case HTTPStatusCode.ok, HTTPStatusCode.noContent:
                 // Success
                 return
-
-            case HTTPStatusCode.unauthorized:
-                throw NDKError.unauthorized(relay: serverURL, message: ErrorMessageConstants.Messages.blossomAuthorizationFailed)
-
-            case HTTPStatusCode.notFound:
-                throw NDKError.blobNotFound(sha256: sha256)
-
+                
             default:
-                throw createServerError(response: httpResponse, data: data, serverURL: serverURL)
+                // This shouldn't happen as fetchAndValidateData handles errors
+                throw NDKError.serverError(relay: serverURL, code: httpResponse.statusCode, message: nil)
             }
+        } catch NDKError.unauthorized {
+            throw NDKError.unauthorized(relay: serverURL, message: ErrorMessageConstants.Messages.blossomAuthorizationFailed)
+        } catch NDKError.invalidRequest {
+            throw NDKError.blobNotFound(sha256: sha256)
         } catch let error as NDKError {
             throw error
         } catch {
-            throw NDKError.networkError(for: serverURL, operation: "Blossom request", error: error)
+            throw NDKError.networkError(for: serverURL, operation: "Blossom delete", error: error)
         }
     }
 
@@ -277,30 +267,23 @@ public actor BlossomClient {
         request.httpMethod = HTTPConstants.methodGet
 
         do {
-            let (data, response) = try await urlSession.data(for: request)
-            let httpResponse = try handleHTTPResponse(response, data: data, serverURL: serverURL)
-
-            switch httpResponse.statusCode {
-            case HTTPStatusCode.ok:
-                // Verify SHA256
-                let downloadedHex = Crypto.sha256(data).hexString
-
-                guard downloadedHex == sha256 else {
-                    throw NDKError.invalidSHA256(sha256)
-                }
-
-                return data
-
-            case HTTPStatusCode.notFound:
-                throw NDKError.blobNotFound(sha256: sha256)
-
-            default:
-                throw createServerError(response: httpResponse, data: data, serverURL: serverURL)
+            let data = try await networkClient.fetchData(with: request)
+            
+            // Verify SHA256
+            let downloadedHex = Crypto.sha256(data).hexString
+            
+            guard downloadedHex == sha256 else {
+                throw NDKError.invalidSHA256(sha256)
             }
+
+            
+            return data
+        } catch NDKError.invalidRequest {
+            throw NDKError.blobNotFound(sha256: sha256)
         } catch let error as NDKError {
             throw error
         } catch {
-            throw NDKError.networkError(for: serverURL, operation: "Blossom request", error: error)
+            throw NDKError.networkError(for: serverURL, operation: "Blossom download", error: error)
         }
     }
 

@@ -5,7 +5,7 @@ import NDKSwift
 import UIKit
 #endif
 
-// MARK: - NDKReactionButton
+// MARK: - NDKUIReactionButton
 
 /// A button component for reacting to Nostr events with customizable emoji reactions.
 ///
@@ -21,17 +21,17 @@ import UIKit
 ///
 /// ```swift
 /// // Basic like button
-/// NDKReactionButton(event: event, reaction: "❤️")
+/// NDKUIReactionButton(event: event, reaction: "❤️")
 ///     .onReactionChanged { isReacted in
 ///         print("User \(isReacted ? "liked" : "unliked") the post")
 ///     }
 ///
 /// // Custom emoji with styling
-/// NDKReactionButton(event: event, reaction: "🤙")
+/// NDKUIReactionButton(event: event, reaction: "🤙")
 ///     .style(.compact)
 ///     .showCount(true)
 /// ```
-public struct NDKReactionButton: View {
+public struct NDKUIReactionButton: View {
 
     // MARK: - Properties
 
@@ -219,7 +219,7 @@ public struct NDKReactionButton: View {
     // MARK: - Modifiers
 
     /// Handle reaction state changes
-    public func onReactionChanged(_ action: @escaping (Bool) -> Void) -> NDKReactionButton {
+    public func onReactionChanged(_ action: @escaping (Bool) -> Void) -> NDKUIReactionButton {
         var copy = self
         copy.onReactionChanged = action
         return copy
@@ -345,48 +345,48 @@ private class ReactionState: ObservableObject {
 
 // MARK: - Convenience Extensions
 
-public extension NDKReactionButton {
+public extension NDKUIReactionButton {
 
     /// Create a like button (❤️)
-    static func like(event: NDKEvent, style: ButtonStyle = .standard) -> NDKReactionButton {
-        NDKReactionButton(event: event, reaction: "❤️", style: style)
+    static func like(event: NDKEvent, style: ButtonStyle = .standard) -> NDKUIReactionButton {
+        NDKUIReactionButton(event: event, reaction: "❤️", style: style)
     }
 
     /// Create a repost button (🔄)
-    static func repost(event: NDKEvent, style: ButtonStyle = .standard) -> NDKReactionButton {
-        NDKReactionButton(event: event, reaction: "🔄", style: style)
+    static func repost(event: NDKEvent, style: ButtonStyle = .standard) -> NDKUIReactionButton {
+        NDKUIReactionButton(event: event, reaction: "🔄", style: style)
     }
 
     /// Create a fire button (🔥)
-    static func fire(event: NDKEvent, style: ButtonStyle = .standard) -> NDKReactionButton {
-        NDKReactionButton(event: event, reaction: "🔥", style: style)
+    static func fire(event: NDKEvent, style: ButtonStyle = .standard) -> NDKUIReactionButton {
+        NDKUIReactionButton(event: event, reaction: "🔥", style: style)
     }
 
     /// Create a thumbs up button (👍)
-    static func thumbsUp(event: NDKEvent, style: ButtonStyle = .standard) -> NDKReactionButton {
-        NDKReactionButton(event: event, reaction: "👍", style: style)
+    static func thumbsUp(event: NDKEvent, style: ButtonStyle = .standard) -> NDKUIReactionButton {
+        NDKUIReactionButton(event: event, reaction: "👍", style: style)
     }
 }
 
 // MARK: - Preview
 
 #if DEBUG
-struct NDKReactionButton_Previews: PreviewProvider {
+struct NDKUIReactionButton_Previews: PreviewProvider {
     static var previews: some View {
         VStack(spacing: 20) {
             // Different styles
             HStack(spacing: 16) {
-                NDKReactionButton.like(event: mockEvent, style: .standard)
-                NDKReactionButton.like(event: mockEvent, style: .compact)
-                NDKReactionButton.like(event: mockEvent, style: .minimal)
+                NDKUIReactionButton.like(event: mockEvent, style: .standard)
+                NDKUIReactionButton.like(event: mockEvent, style: .compact)
+                NDKUIReactionButton.like(event: mockEvent, style: .minimal)
             }
 
             // Different reactions
             HStack(spacing: 16) {
-                NDKReactionButton.like(event: mockEvent)
-                NDKReactionButton.fire(event: mockEvent)
-                NDKReactionButton.thumbsUp(event: mockEvent)
-                NDKReactionButton(event: mockEvent, reaction: "🤙")
+                NDKUIReactionButton.like(event: mockEvent)
+                NDKUIReactionButton.fire(event: mockEvent)
+                NDKUIReactionButton.thumbsUp(event: mockEvent)
+                NDKUIReactionButton(event: mockEvent, reaction: "🤙")
             }
         }
         .padding()

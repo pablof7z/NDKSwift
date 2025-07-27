@@ -4,6 +4,9 @@ import Foundation
 public actor NDKEventManager {
     private weak var ndk: NDK?
     private let cache: NDKCache
+    
+    /// Track events that failed due to auth requirements per relay
+    private var pendingAuthEvents: [RelayURL: [NDKEvent]] = [:]
 
     init(ndk: NDK, cache: NDKCache) {
         self.ndk = ndk
@@ -113,6 +116,21 @@ public actor NDKEventManager {
                     do {
                         let result = try await relay.publish(event)
                         return (relay, result.success)
+                    } catch let error as NDKError {
+                        // Check if error is auth-required
+                        if case let .publishFailed(_, message) = error {
+                            let errorMsg = message.lowercased()
+                            if errorMsg.contains("auth") || errorMsg.contains("restricted") || errorMsg.contains("authentication") {
+                                // Track this event for retry after authentication
+                                await self.trackPendingAuthEvent(event, for: relay.url)
+                                NDKLogger.log(.info, category: .auth, "Event \(event.id) requires authentication on \(relay.url)")
+                            } else {
+                                NDKLogger.log(.error, category: .event, "Failed to publish to \(relay.url): \(error)")
+                            }
+                        } else {
+                            NDKLogger.log(.error, category: .event, "Failed to publish to \(relay.url): \(error)")
+                        }
+                        return (relay, false)
                     } catch {
                         NDKLogger.log(.error, category: .event, "Failed to publish to \(relay.url): \(error)")
                         return (relay, false)
@@ -188,6 +206,46 @@ public actor NDKEventManager {
         }
 
         return results
+    }
+    
+    // MARK: - Authentication-Related Methods
+    
+    /// Track an event that failed due to auth requirements
+    internal func trackPendingAuthEvent(_ event: NDKEvent, for relay: RelayURL) {
+        var pending = pendingAuthEvents[relay] ?? []
+        if !pending.contains(where: { $0.id == event.id }) {
+            pending.append(event)
+            pendingAuthEvents[relay] = pending
+            NDKLogger.log(.debug, category: .auth, "Tracked event \(event.id) pending auth for \(relay)")
+        }
+    }
+    
+    /// Get and clear pending auth events for a relay
+    internal func getPendingAuthEvents(for relay: RelayURL) -> [NDKEvent] {
+        return pendingAuthEvents.removeValue(forKey: relay) ?? []
+    }
+    
+    /// Retry events that were pending authentication for a specific relay
+    internal func retryAuthenticatedEvents(for relay: NDKRelay) async {
+        let pendingEvents = getPendingAuthEvents(for: relay.url)
+        
+        guard !pendingEvents.isEmpty else { return }
+        
+        NDKLogger.log(.info, category: .auth, "Retrying \(pendingEvents.count) events after authentication on \(relay.url)")
+        
+        for event in pendingEvents {
+            do {
+                let result = try await relay.publish(event)
+                if result.success {
+                    NDKLogger.log(.debug, category: .auth, "Successfully published event \(event.id) after authentication")
+                    try await cache.confirmEvent(eventId: event.id, onRelay: relay.url)
+                } else {
+                    NDKLogger.log(.warning, category: .auth, "Failed to publish event \(event.id) after authentication: \(result.message ?? "Unknown error")")
+                }
+            } catch {
+                NDKLogger.log(.error, category: .auth, "Error publishing event \(event.id) after authentication: \(error)")
+            }
+        }
     }
 
     /// Publish queued events for a specific relay (called by NDKPool when relay connects)

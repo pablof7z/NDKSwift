@@ -5,7 +5,7 @@ import NDKSwift
 import UIKit
 #endif
 
-// MARK: - NDKProfilePicture
+// MARK: - NDKUIProfilePicture
 
 /// A SwiftUI component that displays a user's profile picture with automatic loading and fallbacks.
 ///
@@ -21,14 +21,14 @@ import UIKit
 ///
 /// ```swift
 /// // Simple usage
-/// NDKProfilePicture(pubkey: user.pubkey)
+/// NDKUIProfilePicture(pubkey: user.pubkey)
 ///
 /// // Customized
-/// NDKProfilePicture(pubkey: user.pubkey)
+/// NDKUIProfilePicture(pubkey: user.pubkey)
 ///     .frame(width: 80, height: 80)
 ///     .onTapGesture { /* handle tap */ }
 /// ```
-public struct NDKProfilePicture: View {
+public struct NDKUIProfilePicture: View {
 
     // MARK: - Properties
 
@@ -182,7 +182,7 @@ public struct NDKProfilePicture: View {
     // MARK: - Modifiers
 
     /// Add a tap gesture to the profile picture
-    public func onTapGesture(perform action: @escaping () -> Void) -> NDKProfilePicture {
+    public func onTapGesture(perform action: @escaping () -> Void) -> NDKUIProfilePicture {
         var copy = self
         copy.tapAction = action
         return copy
@@ -192,19 +192,19 @@ public struct NDKProfilePicture: View {
 // MARK: - Preview
 
 #if DEBUG
-struct NDKProfilePicture_Previews: PreviewProvider {
+struct NDKUIProfilePicture_Previews: PreviewProvider {
     static var previews: some View {
         VStack(spacing: 20) {
             // Different sizes
             HStack(spacing: 16) {
-                NDKProfilePicture(pubkey: "sample_pubkey", size: 30)
-                NDKProfilePicture(pubkey: "sample_pubkey", size: UIConstants.ProfilePictureSize.small)
-                NDKProfilePicture(pubkey: "sample_pubkey", size: UIConstants.ProfilePictureSize.medium)
-                NDKProfilePicture(pubkey: "sample_pubkey", size: UIConstants.ProfilePictureSize.large)
+                NDKUIProfilePicture(pubkey: "sample_pubkey", size: 30)
+                NDKUIProfilePicture(pubkey: "sample_pubkey", size: UIConstants.ProfilePictureSize.small)
+                NDKUIProfilePicture(pubkey: "sample_pubkey", size: UIConstants.ProfilePictureSize.medium)
+                NDKUIProfilePicture(pubkey: "sample_pubkey", size: UIConstants.ProfilePictureSize.large)
             }
 
             // With border
-            NDKProfilePicture(
+            NDKUIProfilePicture(
                 pubkey: "sample_pubkey",
                 size: UIConstants.ProfilePictureSize.medium,
                 borderColor: .blue,
@@ -212,7 +212,7 @@ struct NDKProfilePicture_Previews: PreviewProvider {
             )
 
             // Square with custom corner radius
-            NDKProfilePicture(
+            NDKUIProfilePicture(
                 pubkey: "sample_pubkey",
                 size: UIConstants.ProfilePictureSize.medium,
                 cornerRadius: 12

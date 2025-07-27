@@ -207,6 +207,12 @@ public actor NDKPool {
                 self.poolChangeContinuation.yield(.relayConnected(relay))
                 if case .authenticated = state {
                     NDKLogger.log(.info, category: .relay, "🔐 Relay authenticated: \(relay.url)")
+                    // Also retry any auth-failed events when transitioning to authenticated
+                    Task {
+                        if let ndk = await self.ndk {
+                            await ndk.eventManager.retryAuthenticatedEvents(for: relay)
+                        }
+                    }
                 } else {
                     NDKLogger.log(.info, category: .relay, "🟢 Relay connected: \(relay.url)")
                 }
@@ -268,7 +274,8 @@ public actor NDKPool {
     /// ```
     public func connectedRelays() async -> [NDKRelay] {
         await relays.asyncFilter { relay in
-            await relay.connectionState == .connected
+            let state = await relay.connectionState
+            return state == .connected || state == .authenticated
         }
     }
 
@@ -374,7 +381,7 @@ public actor NDKPool {
     /// ```
     public func getConnectionSummary() async -> (connected: Int, total: Int) {
         let states = await getRelayStateSnapshot()
-        let connected = states.values.filter { $0 == .connected }.count
+        let connected = states.values.filter { $0 == .connected || $0 == .authenticated }.count
         return (connected: connected, total: states.count)
     }
 
