@@ -46,7 +46,10 @@ public final class NDKPrivateKeySigner: NDKSigner {
     }
 
     public func sign(_ event: NDKEvent) async throws -> Signature {
-        guard let idData = Data(hexString: event.id), idData.count == 32 else {
+        let idData: Data
+        do {
+            idData = try HexValidator.validate32ByteHex(event.id)
+        } catch {
             throw NDKError.parseError(for: "event ID", details: "Invalid 32-byte hex string")
         }
 

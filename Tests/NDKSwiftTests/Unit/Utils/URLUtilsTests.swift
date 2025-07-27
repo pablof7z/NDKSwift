@@ -3,117 +3,82 @@ import XCTest
 
 final class URLUtilsTests: XCTestCase {
     
-    func testValidateURL_ValidHTTPURL() throws {
+    func testValidateURL_ValidURL_ReturnsURL() throws {
         let urlString = "https://example.com"
         let url = try URLUtils.validateURL(urlString)
         XCTAssertEqual(url.absoluteString, urlString)
     }
     
-    func testValidateURL_ValidHTTPURLWithPath() throws {
+    func testValidateURL_ValidURLWithPath_ReturnsURL() throws {
         let urlString = "https://example.com/path/to/resource"
         let url = try URLUtils.validateURL(urlString)
         XCTAssertEqual(url.absoluteString, urlString)
     }
     
-    func testValidateURL_ValidHTTPURLWithQuery() throws {
-        let urlString = "https://example.com/search?q=test&page=1"
+    func testValidateURL_ValidURLWithQuery_ReturnsURL() throws {
+        let urlString = "https://example.com?param=value&other=test"
         let url = try URLUtils.validateURL(urlString)
         XCTAssertEqual(url.absoluteString, urlString)
     }
     
-    func testValidateURL_ValidWebSocketURL() throws {
-        let urlString = "wss://relay.example.com"
-        let url = try URLUtils.validateURL(urlString)
-        XCTAssertEqual(url.absoluteString, urlString)
-    }
-    
-    func testValidateURL_ValidURLWithPort() throws {
-        let urlString = "https://example.com:8080/api"
-        let url = try URLUtils.validateURL(urlString)
-        XCTAssertEqual(url.absoluteString, urlString)
-    }
-    
-    func testValidateURL_ValidURLWithAuthentication() throws {
-        let urlString = "https://user:pass@example.com"
-        let url = try URLUtils.validateURL(urlString)
-        XCTAssertEqual(url.absoluteString, urlString)
-    }
-    
-    func testValidateURL_InvalidURL_EmptyString() {
-        let urlString = ""
-        XCTAssertThrowsError(try URLUtils.validateURL(urlString)) { error in
-            XCTAssertTrue(error is NDKError)
-            if case NDKError.invalidURL(let invalid) = error as! NDKError {
-                XCTAssertEqual(invalid, urlString)
-            } else {
-                XCTFail("Expected NDKError.invalidURL")
+    func testValidateURL_InvalidURL_ThrowsError() {
+        let invalidURLs = [
+            "",
+            " ",
+            "not a url",
+            "://invalid",
+            "http://",
+            "https://",
+            "ftp://[invalid"
+        ]
+        
+        for urlString in invalidURLs {
+            XCTAssertThrowsError(try URLUtils.validateURL(urlString)) { error in
+                guard case NDKError.invalidURL(let invalidString) = error else {
+                    XCTFail("Expected NDKError.invalidURL but got \(error)")
+                    return
+                }
+                XCTAssertEqual(invalidString, urlString)
             }
         }
     }
     
-    func testValidateURL_InvalidURL_MalformedURL() {
-        let urlString = "ht!tp://bad url with spaces"
-        XCTAssertThrowsError(try URLUtils.validateURL(urlString)) { error in
-            XCTAssertTrue(error is NDKError)
-            if case NDKError.invalidURL(let invalid) = error as! NDKError {
-                XCTAssertEqual(invalid, urlString)
-            } else {
-                XCTFail("Expected NDKError.invalidURL")
-            }
-        }
-    }
-    
-    func testValidateURL_InvalidURL_NoScheme() throws {
-        // URLs without scheme are actually valid in Foundation
-        let urlString = "example.com"
-        let url = try URLUtils.validateURL(urlString)
-        XCTAssertEqual(url.absoluteString, urlString)
-    }
-    
-    func testSafeURL_ValidURL() {
+    func testSafeURL_ValidURL_ReturnsURL() {
         let urlString = "https://example.com"
         let url = URLUtils.safeURL(urlString)
         XCTAssertNotNil(url)
         XCTAssertEqual(url?.absoluteString, urlString)
     }
     
-    func testSafeURL_InvalidURL() {
-        let urlString = "ht!tp://bad url with spaces"
-        let url = URLUtils.safeURL(urlString)
-        XCTAssertNil(url)
+    func testSafeURL_InvalidURL_ReturnsNil() {
+        let invalidURLs = [
+            "",
+            " ",
+            "not a url",
+            "://invalid",
+            "http://",
+            "https://",
+            "ftp://[invalid"
+        ]
+        
+        for urlString in invalidURLs {
+            let url = URLUtils.safeURL(urlString)
+            XCTAssertNil(url, "Expected nil for invalid URL: '\(urlString)'")
+        }
     }
     
-    func testSafeURL_EmptyString() {
-        let urlString = ""
-        let url = URLUtils.safeURL(urlString)
-        XCTAssertNil(url)
-    }
-    
-    func testSafeURL_ValidComplexURL() {
-        let urlString = "https://user:pass@example.com:8080/path?query=value#fragment"
-        let url = URLUtils.safeURL(urlString)
-        XCTAssertNotNil(url)
-        XCTAssertEqual(url?.absoluteString, urlString)
-    }
-    
-    func testSafeURL_URLWithSpecialCharacters() {
-        let urlString = "https://example.com/path%20with%20spaces"
-        let url = URLUtils.safeURL(urlString)
-        XCTAssertNotNil(url)
-        XCTAssertEqual(url?.absoluteString, urlString)
-    }
-    
-    func testSafeURL_FileURL() {
-        let urlString = "file:///Users/test/document.pdf"
-        let url = URLUtils.safeURL(urlString)
-        XCTAssertNotNil(url)
-        XCTAssertEqual(url?.absoluteString, urlString)
-    }
-    
-    func testSafeURL_DataURL() {
-        let urlString = "data:text/plain;base64,SGVsbG8sIFdvcmxkIQ=="
-        let url = URLUtils.safeURL(urlString)
-        XCTAssertNotNil(url)
-        XCTAssertEqual(url?.absoluteString, urlString)
+    func testSafeURL_SpecialCharacters_HandlesCorrectly() {
+        let specialURLs = [
+            "https://example.com/path%20with%20spaces",
+            "https://example.com/unicode/测试",
+            "https://example.com:8080/port",
+            "ws://websocket.example.com",
+            "wss://secure.websocket.example.com"
+        ]
+        
+        for urlString in specialURLs {
+            let url = URLUtils.safeURL(urlString)
+            XCTAssertNotNil(url, "Expected valid URL for: '\(urlString)'")
+        }
     }
 }

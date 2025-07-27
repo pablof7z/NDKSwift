@@ -140,13 +140,8 @@ public enum NIP44 {
     /// - Returns: 32-byte conversation key
     public static func getConversationKey(privateKey: PrivateKey, pubkey: PublicKey) throws -> Data {
         // Compute shared secret using ECDH
-        guard let privKeyData = Data(hexString: privateKey), privKeyData.count == 32 else {
-            throw Crypto.CryptoError.invalidKeyLength
-        }
-
-        guard let pubkeyData = Data(hexString: pubkey), pubkeyData.count == 32 else {
-            throw Crypto.CryptoError.invalidKeyLength
-        }
+        let privKeyData = try HexValidator.validate32ByteHex(privateKey)
+        let pubkeyData = try HexValidator.validate32ByteHex(pubkey)
 
         // Try both possible y-coordinate parities (even=0x02, odd=0x03)
         // Nostr uses x-only keys, so we need to try both possibilities

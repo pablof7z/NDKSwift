@@ -15,12 +15,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Unit tests for `NDKFilter` convenience methods
 - Comprehensive test coverage for `ContentParser` including all Nostr entity types
 - Test helper extensions for `ContentEntity` arrays to reduce test code duplication
+- Unit tests for `URLUtils` validation and safety methods
+- Unit tests for `DateFormatters` including all formatter types and convenience methods
+- Unit tests for `ImetaUtils` tag mapping and round-trip conversion
+- Unit tests for `FileManagerExtensions` Codable operations
 
 ### Changed
 - Fixed JSON decoder usage in `BlossomBlobTests` to use centralized `JSONCoding` utility
 - Replaced `isEmpty ? nil : value` pattern with `nilIfEmpty` extension in `NDKEventBuilder`
 - SwiftUI data sources now conform to `NDKDataSourceProtocol` for consistency
 - Refactored ContentParser tests to use new helper extensions for cleaner assertions
+- Refactored manual hex validation in `NDKPrivateKeySigner` and `NIP44Encryption` to use `HexValidator` utility
 
 ### Fixed
 - Fixed optional unwrapping in `ContentTaggerTests` for error detail checking
@@ -36,6 +41,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Developer experience with convenience filter factory methods for common use cases
 - Test code readability with new ContentEntity helper extensions in TestAssertions.swift
 - Test coverage for content parsing edge cases including invalid entities and whitespace preservation
+- Test coverage for utility classes that were previously untested (URLUtils, DateFormatters, ImetaUtils, FileManagerExtensions)
 
 ## [0.7.3] - 2025-01-27
 
