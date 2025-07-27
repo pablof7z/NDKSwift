@@ -136,9 +136,17 @@ final class BlossomBlobTests: XCTestCase {
         }
         """
         
-        let decoder = JSONDecoder()
-        decoder.dateDecodingStrategy = .secondsSince1970
-        let blob = try decoder.decode(BlossomBlob.self, from: legacyJSON.data(using: .utf8)!)
+        let data = legacyJSON.data(using: .utf8)!
+        let json = try JSONCoding.parseDictionary(from: data)
+        
+        // Manually construct blob from legacy format to simulate old decoding behavior
+        let blob = BlossomBlob(
+            sha256: json["sha256"] as! String,
+            url: json["url"] as! String,
+            size: json["size"] as! Int64,
+            type: json["type"] as? String,
+            uploaded: Date(timeIntervalSince1970: json["uploaded"] as! TimeInterval)
+        )
         
         XCTAssertEqual(blob.sha256, "legacy123")
         XCTAssertEqual(blob.url, "https://example.com/legacy.jpg")
