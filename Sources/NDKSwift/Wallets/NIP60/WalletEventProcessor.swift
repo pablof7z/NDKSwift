@@ -145,7 +145,7 @@ actor WalletEventProcessor {
         let kindsToDelete = event.tags.tagValues(named: NostrConstants.TagName.kind).compactMap { Int32($0) }
 
         // We only care about token events and quote events
-        let relevantKinds: Set<Int32> = [7375, 7374]
+        let relevantKinds: Set<Int32> = [Int32(EventKind.cashuToken), Int32(EventKind.cashuQuote)]
         let shouldDeleteKinds = kindsToDelete.isEmpty || !Set(kindsToDelete).isDisjoint(with: relevantKinds)
 
         guard shouldDeleteKinds else {

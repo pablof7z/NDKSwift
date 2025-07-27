@@ -275,7 +275,7 @@ public struct NDKAuthErrorHandler {
             )
         } else {
             return ErrorInfo(
-                title: "Authentication Error",
+                title: ErrorMessageConstants.Messages.authenticationFailed,
                 message: error.localizedDescription,
                 isRecoverable: true,
                 suggestedAction: .retry

@@ -1,7 +1,28 @@
 import Foundation
 
-/// Public-facing outbox manager that provides a simplified API for outbox operations
+/// Public-facing outbox manager that provides a simplified API for outbox operations.
+///
+/// `NDKOutboxManager` implements the NIP-65 outbox model for intelligent relay selection,
+/// ensuring efficient event publishing and retrieval based on users' relay preferences.
 /// This facade hides the complexity of internal components like RelayRanker, RelaySelector, etc.
+///
+/// ## Overview
+/// The outbox model optimizes Nostr network usage by:
+/// - Publishing events only to relays where they're likely to be read
+/// - Fetching events from relays where authors actually publish
+/// - Reducing network overhead and improving performance
+///
+/// ## Example Usage
+/// ```swift
+/// // Publish an event using outbox model
+/// let publishedRelays = try await ndk.outbox.publish(event)
+///
+/// // Observe events with intelligent relay selection
+/// let dataSource = await ndk.outbox.observe(filter: filter)
+/// for await event in dataSource {
+///     print("Received event: \(event)")
+/// }
+/// ```
 public actor NDKOutboxManager {
     private let ndk: NDK
     private var tracker: NDKOutboxTracker {
@@ -25,23 +46,55 @@ public actor NDKOutboxManager {
 
     // MARK: - Public API
 
-    /// Publish an event using the outbox model
+    /// Publishes an event using the outbox model for intelligent relay selection.
+    ///
+    /// This method automatically selects the optimal relays for publishing based on:
+    /// - The event author's relay preferences (NIP-65)
+    /// - Recipients' relay preferences (for targeted events)
+    /// - Relay performance and availability
+    ///
     /// - Parameters:
-    ///   - event: The event to publish
-    ///   - strategy: Optional custom relay selection strategy
-    /// - Returns: Set of relays where the event was successfully published
+    ///   - event: The event to publish. Must be signed before publishing.
+    ///   - strategy: Optional custom relay selection strategy. If nil, uses default outbox strategy.
+    /// - Returns: Set of relay URLs where the event was successfully published.
+    /// - Throws: `NDKError` if the event is unsigned or publishing fails completely.
+    ///
+    /// ## Example
+    /// ```swift
+    /// let event = NDKEvent(content: "Hello Nostr!", kind: 1)
+    /// try event.sign(with: signer)
+    /// let relays = try await outbox.publish(event)
+    /// print("Published to \(relays.count) relays")
+    /// ```
     public func publish(_ event: NDKEvent, strategy: RelaySelectionStrategy? = nil) async throws -> Set<String> {
         let result = try await publishingStrategy.publish(event, customStrategy: strategy)
         return result.successfulRelayUrls
     }
 
-    /// Observe events using the outbox model
+    /// Creates a data source for observing events using the outbox model.
+    ///
+    /// This method intelligently selects relays based on the filter's authors,
+    /// ensuring events are fetched from relays where authors actually publish.
+    ///
     /// - Parameters:
-    ///   - filter: The filter to use for observing events
-    ///   - maxAge: Maximum age of events in seconds (0 = no cache)
-    ///   - cachePolicy: Cache policy to use
-    ///   - strategy: Optional custom relay selection strategy
-    /// - Returns: NDKDataSource for observing events
+    ///   - filter: The filter specifying which events to observe.
+    ///   - maxAge: Maximum age of cached events in seconds. Use 0 to disable cache.
+    ///   - cachePolicy: Policy for cache usage. Defaults to `.networkOnly`.
+    ///   - strategy: Optional custom relay selection strategy. If nil, uses outbox model.
+    /// - Returns: `NDKDataSource` that emits matching events as they arrive.
+    ///
+    /// ## Example
+    /// ```swift
+    /// let filter = NDKFilter(authors: [alicePubkey], kinds: [1])
+    /// let dataSource = await outbox.observe(filter: filter, maxAge: 3600)
+    /// 
+    /// for await event in dataSource {
+    ///     print("New event from Alice: \(event.content)")
+    /// }
+    /// ```
+    ///
+    /// - Note: The returned data source automatically handles relay connections
+    ///   and reconnections based on the selected relay set.
     public func observe(
         filter: NDKFilter,
         maxAge: TimeInterval = 0,
@@ -72,10 +125,28 @@ public actor NDKOutboxManager {
         )
     }
 
-    /// Start tracking a user for outbox operations
+    /// Starts tracking a user's relay preferences for outbox operations.
+    ///
+    /// This method fetches and caches the user's relay list (NIP-65) to optimize
+    /// future publishing and fetching operations involving this user.
+    ///
     /// - Parameters:
-    ///   - pubkey: The public key of the user to track
-    ///   - emitDiscoveryEvent: Whether to emit relay discovery events (default: true)
+    ///   - pubkey: The public key of the user to track (hex format).
+    ///   - emitDiscoveryEvent: Whether to emit relay discovery events for UI updates. Defaults to `true`.
+    ///
+    /// ## Example
+    /// ```swift
+    /// // Start tracking a user's relays
+    /// await outbox.trackUser(bobPubkey)
+    /// 
+    /// // Now publishing to Bob will use his preferred relays
+    /// let event = NDKEvent(content: "Hello Bob!", kind: 1)
+    /// event.tags = [["p", bobPubkey]]
+    /// try await outbox.publish(event)
+    /// ```
+    ///
+    /// - Note: Tracking is asynchronous and may not complete immediately.
+    ///   The system will use any available relay information while fetching updates.
     public func trackUser(_ pubkey: String, emitDiscoveryEvent: Bool = true) async {
         // Fetch user's relay information
         if let item = try? await tracker.getRelaysFor(pubkey: pubkey) {
@@ -90,33 +161,102 @@ public actor NDKOutboxManager {
     }
 
 
-    /// Get the current score for a relay
+    /// Gets the current performance score for a relay.
+    ///
+    /// Relay scores are calculated based on:
+    /// - Connection reliability
+    /// - Response times
+    /// - Message delivery success rate
+    /// - Availability history
+    ///
     /// - Parameters:
-    ///   - relay: The relay URL
-    ///   - pubkey: The public key to get the score for
-    /// - Returns: The relay's score (0.0-1.0)
+    ///   - relay: The relay URL to check.
+    ///   - pubkey: The public key context for the score (scores may vary by user).
+    /// - Returns: Score between 0.0 (worst) and 1.0 (best).
+    ///
+    /// ## Example
+    /// ```swift
+    /// let score = await outbox.getRelayScore(
+    ///     relay: "wss://relay.example.com",
+    ///     for: myPubkey
+    /// )
+    /// if score < 0.5 {
+    ///     print("Poor performing relay")
+    /// }
+    /// ```
     public func getRelayScore(relay: String, for pubkey: String) async -> Double {
         return await ranker.getScore(relay: relay, pubkey: pubkey)
     }
 
-    /// Get recommended relays for a user
+    /// Gets recommended relays for a user based on various factors.
+    ///
+    /// Recommendations consider:
+    /// - User's existing relay preferences
+    /// - Relay performance scores
+    /// - Network topology and peer usage
+    /// - Geographic distribution (when available)
+    ///
     /// - Parameters:
-    ///   - pubkey: The public key to get recommendations for
-    ///   - count: Maximum number of relays to return
-    /// - Returns: Array of recommended relay URLs
+    ///   - pubkey: The public key to get recommendations for.
+    ///   - count: Maximum number of relay URLs to return. Defaults to 5.
+    /// - Returns: Array of recommended relay URLs, ordered by preference.
+    ///
+    /// ## Example
+    /// ```swift
+    /// let recommendations = await outbox.getRecommendedRelays(
+    ///     for: newUserPubkey,
+    ///     count: 3
+    /// )
+    /// // Suggest these relays to the new user
+    /// ```
     public func getRecommendedRelays(for pubkey: String, count: Int = 5) async -> [String] {
         return await selector.selectRelays(for: pubkey, count: count)
     }
 
-    /// Get all tracked outbox items from cache
-    /// - Returns: Array of all cached outbox items
+    /// Retrieves all tracked relay list items from the cache.
+    ///
+    /// This method returns cached relay preferences for all tracked users,
+    /// useful for debugging or displaying relay usage statistics.
+    ///
+    /// - Returns: Array of `NDKOutboxItem` containing relay preferences for each tracked user.
+    ///
+    /// ## Example
+    /// ```swift
+    /// let items = await outbox.getAllTrackedItems()
+    /// for item in items {
+    ///     print("User \(item.pubkey) uses \(item.readRelays.count) read relays")
+    /// }
+    /// ```
+    ///
+    /// - Note: This only returns cached items. Users not yet tracked won't appear.
     public func getAllTrackedItems() async -> [NDKOutboxItem] {
         return await tracker.getAllCachedItems()
     }
 
-    /// Get outbox strategy for a filter, breaking it down by relay with proper author mapping
-    /// - Parameter filter: The filter to analyze
-    /// - Returns: Strategy with filters broken down by relay
+    /// Analyzes a filter and creates an optimized outbox strategy for querying.
+    ///
+    /// This method breaks down a multi-author filter into relay-specific filters,
+    /// ensuring each relay only receives queries for authors who actually use it.
+    /// This significantly reduces network overhead and improves query performance.
+    ///
+    /// - Parameter filter: The filter to analyze and optimize.
+    /// - Returns: `OutboxFilterStrategy` containing:
+    ///   - `filtersByRelay`: Optimized filters mapped to specific relays
+    ///   - `unknownAuthors`: Authors with no known relay information
+    ///   - `authorsToDiscover`: Authors whose relay lists should be fetched
+    ///
+    /// ## Example
+    /// ```swift
+    /// let filter = NDKFilter(authors: [alice, bob, charlie], kinds: [1])
+    /// let strategy = await outbox.getOutboxStrategy(for: filter)
+    /// 
+    /// // Use the optimized filters
+    /// for (relay, optimizedFilter) in strategy.filtersByRelay {
+    ///     print("Query \(relay) for \(optimizedFilter.authors?.count ?? 0) authors")
+    /// }
+    /// ```
+    ///
+    /// - Note: Authors without known relays will be queried on bootstrap/fallback relays.
     public func getOutboxStrategy(for filter: NDKFilter) async -> OutboxFilterStrategy {
         guard let authors = filter.authors, !authors.isEmpty else {
             NDKLogger.log(.debug, category: .outbox, "📡 No authors in filter, no outbox strategy needed")
