@@ -280,11 +280,9 @@ class ChatViewModel: ObservableObject {
 }
 ```
 
-## Migration Notes
+## Notes
 
-If you're updating from a version with configurable optimistic publishing:
-
-1. Remove any `optimisticPublishingConfig` settings - it's now always enabled
-2. Remove `NDKOptimisticPublishingConfig` usage
-3. Publishing behavior remains the same, just simpler
-4. `skipOptimisticEvents` on subscriptions still works as before
+- Optimistic publishing is always enabled in NDKSwift
+- This ensures responsive UI even during network issues
+- Events are automatically retried when connectivity is restored
+- Use `skipOptimisticEvents` on subscriptions if you need only relay-confirmed events
