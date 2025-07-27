@@ -33,7 +33,8 @@ public struct NDKDisplayName: View {
     private var tapAction: (() -> Void)?
 
     @Environment(\.ndk) private var ndk
-    @StateObject private var profileDataSource: NDKProfileDataSource
+    @State private var profile: NDKUserProfile?
+    @State private var profileTask: Task<Void, Never>?
 
     // MARK: - Supporting Types
 
@@ -55,12 +56,6 @@ public struct NDKDisplayName: View {
     ) {
         self.pubkey = pubkey
         self.fallbackStyle = fallbackStyle
-
-        // Initialize data source - will be updated with correct NDK in onAppear
-        self._profileDataSource = StateObject(wrappedValue: NDKProfileDataSource(
-            ndk: NDK(), // Temporary - will be updated
-            pubkey: pubkey
-        ))
     }
 
     /// Initialize with an NDKUser
@@ -83,9 +78,13 @@ public struct NDKDisplayName: View {
             }
             .accessibilityLabel("User name: \(displayText)")
             .onAppear {
-                // Update data source with environment NDK if available
-                // Note: In a production implementation, we'd want a better pattern
-                // for handling environment dependencies in StateObject
+                loadProfile()
+            }
+            .onDisappear {
+                profileTask?.cancel()
+            }
+            .onChange(of: pubkey) { _, newPubkey in
+                loadProfile()
             }
     }
 
@@ -93,13 +92,13 @@ public struct NDKDisplayName: View {
 
     private var displayText: String {
         // Try display name first
-        if let displayName = profileDataSource.profile?.displayName,
+        if let displayName = profile?.displayName,
            displayName.hasContent {
             return displayName
         }
 
         // Try regular name
-        if let name = profileDataSource.profile?.name,
+        if let name = profile?.name,
            name.hasContent {
             return name
         }
@@ -117,6 +116,23 @@ public struct NDKDisplayName: View {
             return "Unknown User"
         case .pubkey:
             return String(pubkey.prefix(16)) + "..."
+        }
+    }
+
+    // MARK: - Private Methods
+
+    private func loadProfile() {
+        profileTask?.cancel()
+
+        guard let ndk = ndk else { return }
+
+        profileTask = Task {
+            for await profile in await ndk.profileManager.observe(for: pubkey) {
+                await MainActor.run {
+                    self.profile = profile
+                }
+                // Continue listening for updates
+            }
         }
     }
 
@@ -140,7 +156,8 @@ public struct NDKUsername: View {
     private var tapAction: (() -> Void)?
 
     @Environment(\.ndk) private var ndk
-    @StateObject private var profileDataSource: NDKProfileDataSource
+    @State private var profile: NDKUserProfile?
+    @State private var profileTask: Task<Void, Never>?
 
     // MARK: - Initialization
 
@@ -150,11 +167,6 @@ public struct NDKUsername: View {
     ) {
         self.pubkey = pubkey
         self.fallbackStyle = fallbackStyle
-
-        self._profileDataSource = StateObject(wrappedValue: NDKProfileDataSource(
-            ndk: NDK(),
-            pubkey: pubkey
-        ))
     }
 
     public init(
@@ -172,19 +184,28 @@ public struct NDKUsername: View {
                 tapAction?()
             }
             .accessibilityLabel("Username: \(usernameText)")
+            .onAppear {
+                loadProfile()
+            }
+            .onDisappear {
+                profileTask?.cancel()
+            }
+            .onChange(of: pubkey) { _, newPubkey in
+                loadProfile()
+            }
     }
 
     // MARK: - Private Properties
 
     private var usernameText: String {
         // Try regular name first (usually the username)
-        if let name = profileDataSource.profile?.name,
+        if let name = profile?.name,
            name.hasContent {
             return "@\(name)"
         }
 
         // Fall back to display name
-        if let displayName = profileDataSource.profile?.displayName,
+        if let displayName = profile?.displayName,
            displayName.hasContent {
             return "@\(displayName)"
         }
@@ -198,6 +219,23 @@ public struct NDKUsername: View {
             return "@unknown"
         case .pubkey:
             return "@\(String(pubkey.prefix(16)))..."
+        }
+    }
+
+    // MARK: - Private Methods
+
+    private func loadProfile() {
+        profileTask?.cancel()
+
+        guard let ndk = ndk else { return }
+
+        profileTask = Task {
+            for await profile in await ndk.profileManager.observe(for: pubkey) {
+                await MainActor.run {
+                    self.profile = profile
+                }
+                // Continue listening for updates
+            }
         }
     }
 

@@ -161,14 +161,8 @@ public actor NDKSignatureVerificationSampler {
         }
 
         do {
-            // Generate the expected event ID
-            let calculatedId = try calculateEventID(
-                pubkey: event.pubkey,
-                createdAt: event.createdAt,
-                kind: event.kind,
-                tags: event.tags,
-                content: event.content
-            )
+            // Generate the expected event ID using the event's own method
+            let calculatedId = try event.calculateID()
 
             // Verify the ID matches
             guard eventId == calculatedId else {
@@ -215,32 +209,5 @@ public actor NDKSignatureVerificationSampler {
     /// Check if a relay is blacklisted
     public func isRelayBlacklisted(_ relayUrl: String) -> Bool {
         return blacklistedRelays.contains(relayUrl)
-    }
-
-    /// Calculate the event ID according to NIP-01
-    private func calculateEventID(
-        pubkey: String,
-        createdAt: Timestamp,
-        kind: Kind,
-        tags: [Tag],
-        content: String
-    ) throws -> EventID {
-        // [0, pubkey, created_at, kind, tags, content]
-        let array: [Any] = [
-            0,
-            pubkey,
-            createdAt,
-            kind,
-            tags,
-            content
-        ]
-
-        let data = try JSONSerialization.data(withJSONObject: array, options: [.withoutEscapingSlashes])
-        guard let jsonString = String(data: data, encoding: .utf8) else {
-            throw NDKError.encodingError("Failed to serialize event for ID generation")
-        }
-
-        let hash = jsonString.data(using: .utf8)!.sha256()
-        return hash.hexString
     }
 }
