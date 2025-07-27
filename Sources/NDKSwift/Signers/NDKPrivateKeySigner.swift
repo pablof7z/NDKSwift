@@ -13,9 +13,7 @@ public final class NDKPrivateKeySigner: NDKSigner {
 
     /// Initialize with a private key
     public init(privateKey: PrivateKey) throws {
-        do {
-            _ = try HexValidator.validate32ByteHex(privateKey)
-        } catch {
+        guard HexValidator.isValid32ByteHex(privateKey) else {
             throw NDKError.invalidDataFormat("private key", details: ValidationConstants.hex64CharacterDetails)
         }
 
@@ -48,11 +46,8 @@ public final class NDKPrivateKeySigner: NDKSigner {
     }
 
     public func sign(_ event: NDKEvent) async throws -> Signature {
-        let idData: Data
-        do {
-            idData = try HexValidator.validate32ByteHex(event.id)
-        } catch {
-            throw NDKError.parseError(for: "event ID", details: error.localizedDescription)
+        guard let idData = Data(hexString: event.id), idData.count == 32 else {
+            throw NDKError.parseError(for: "event ID", details: "Invalid 32-byte hex string")
         }
 
         do {

@@ -23,6 +23,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Test coverage for core event publishing functionality
 - Code organization by relocating extensions to appropriate directories
 - Consistency in JSON handling across the codebase
+- Replaced redundant HexValidator.validate32ByteHex try-catch patterns with simpler guard statements
+- Updated version references in README from 0.7.0 to 0.7.1
+
+### Fixed
+- Removed redundant hex validation patterns in NDKPrivateKeySigner, P2PKManager, NIP04, and NIP44 encryption modules
 
 ## [0.7.1] - 2025-01-27
 

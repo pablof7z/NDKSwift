@@ -23,17 +23,11 @@ public enum NIP04 {
     ///   - pubkey: Recipient's public key (hex)
     /// - Returns: 32-byte shared secret
     static func computeSharedSecret(privateKey: PrivateKey, pubkey: PublicKey) throws -> Data {
-        let privKeyData: Data
-        do {
-            privKeyData = try HexValidator.validate32ByteHex(privateKey)
-        } catch {
+        guard let privKeyData = Data(hexString: privateKey), privKeyData.count == 32 else {
             throw Crypto.CryptoError.invalidKeyLength
         }
 
-        let pubkeyData: Data
-        do {
-            pubkeyData = try HexValidator.validate32ByteHex(pubkey)
-        } catch {
+        guard let pubkeyData = Data(hexString: pubkey), pubkeyData.count == 32 else {
             throw Crypto.CryptoError.invalidKeyLength
         }
 
