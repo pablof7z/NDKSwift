@@ -44,7 +44,7 @@ struct AuthenticationDemo {
             
             // Add a relay that requires authentication
             // Note: Replace with an actual auth-required relay URL
-            let relayUrl = "wss://relay.example.com"
+            let relayUrl = RelayConstants.example
             let relay = try await ndk.addRelay(relayUrl)
             
             print("\n🔌 Connecting to relay: \(relayUrl)")

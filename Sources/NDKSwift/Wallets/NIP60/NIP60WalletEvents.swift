@@ -50,10 +50,14 @@ public final class NIP60WalletEventStream: AsyncSequence {
         stream.makeAsyncIterator()
     }
 
+    /// Send a new wallet event to all active observers
+    /// - Parameter event: The wallet event to broadcast
     func yield(_ event: NIP60WalletEvent) {
         continuation.yield(event)
     }
 
+    /// Signal that no more events will be sent
+    /// This completes the AsyncSequence for all observers
     func finish() {
         continuation.finish()
     }

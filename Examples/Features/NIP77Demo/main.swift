@@ -7,7 +7,7 @@ print("==============================\n")
 
 // Parse command line arguments
 let args = CommandLine.arguments
-var relayURL = "wss://nostr.oxtr.dev"
+var relayURL = RelayConstants.oxtrDev
 var filterKinds: [Int] = [1]
 var filterAuthors: [String] = []
 var filterLimit: Int? = nil

@@ -18,9 +18,9 @@ let signer = try NDKPrivateKeySigner(privateKey: privateKey)
 ndk.signer = signer
 
 // Add relays
-ndk.relayPool.addRelay(url: "wss://relay.damus.io")
-ndk.relayPool.addRelay(url: "wss://nos.lol")
-ndk.relayPool.addRelay(url: "wss://relay.primal.net")
+ndk.relayPool.addRelay(url: RelayConstants.damus)
+ndk.relayPool.addRelay(url: RelayConstants.nosLol)
+ndk.relayPool.addRelay(url: RelayConstants.primal)
 
 // Connect to relays
 print("🔌 Connecting to relays...")
