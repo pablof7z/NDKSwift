@@ -319,7 +319,7 @@ public enum ContentTagger {
 
         case "nprofile":
             let decoded = try decodeTLV(data)
-            guard let pubkeyData = decoded[2]?.first, pubkeyData.count == 32 else {
+            guard let pubkeyData = decoded[0]?.first, pubkeyData.count == 32 else {
                 throw NDKError.invalidDataFormat("bech32 data", details: ValidationConstants.expected32Bytes)
             }
             let pubkey = Data(pubkeyData).hexString
