@@ -66,4 +66,56 @@ public struct NDKNetworkClient {
         
         return data
     }
+    
+    /// Fetch and validate HTTP response with detailed error handling
+    public func fetchAndValidateData(for request: URLRequest) async throws -> (Data, HTTPURLResponse) {
+        var modifiedRequest = request
+        
+        // Ensure user agent is set
+        if modifiedRequest.value(forHTTPHeaderField: HTTPConstants.headerUserAgent) == nil {
+            modifiedRequest.setValue(HTTPConstants.userAgentNDKSwift, forHTTPHeaderField: HTTPConstants.headerUserAgent)
+        }
+        
+        let (data, response) = try await session.data(for: modifiedRequest)
+        
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw NDKError.invalidResponse(from: "Non-HTTP response received")
+        }
+        
+        try handleHTTPResponse(httpResponse, url: modifiedRequest.url)
+        
+        return (data, httpResponse)
+    }
+    
+    /// Fetch and decode JSON with custom request configuration
+    public func fetchAndDecode<T: Decodable>(_ type: T.Type, for request: URLRequest) async throws -> T {
+        let (data, _) = try await fetchAndValidateData(for: request)
+        return try JSONCoding.decode(type, from: data)
+    }
+    
+    /// Handle HTTP response status codes with appropriate errors
+    private func handleHTTPResponse(_ response: HTTPURLResponse, url: URL? = nil) throws {
+        let urlString = url?.absoluteString ?? "unknown"
+        
+        switch response.statusCode {
+        case 200...299:
+            return // Success
+        case 400:
+            throw NDKError.invalidRequest("Bad request")
+        case 401:
+            throw NDKError.unauthorized(relay: urlString, message: "Authentication required")
+        case 403:
+            throw NDKError.invalidRequest("Access forbidden")
+        case 404:
+            throw NDKError.invalidRequest("Resource not found")
+        case 408:
+            throw NDKError.timeout(operation: "HTTP request", seconds: 408)
+        case 429:
+            throw NDKError.rateLimited(message: "Too many requests")
+        case 500...599:
+            throw NDKError.serverError(relay: urlString, code: response.statusCode, message: "Server error")
+        default:
+            throw NDKError.invalidResponse(from: "HTTP status code: \(response.statusCode)")
+        }
+    }
 }

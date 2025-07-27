@@ -2,7 +2,7 @@ import SwiftUI
 import NDKSwift
 
 /// A SwiftUI component that renders markdown content with Nostr entity parsing
-public struct NDKMarkdownRenderer: View {
+public struct NDKUIMarkdownRenderer: View {
     let content: String
     let ndk: NDK
 
@@ -342,7 +342,7 @@ public struct NDKMarkdownRenderer: View {
 
 // MARK: - View Modifiers
 
-public extension NDKMarkdownRenderer {
+public extension NDKUIMarkdownRenderer {
     func onMentionTap(_ action: @escaping (String) -> Void) -> Self {
         var view = self
         view.onMentionTap = action

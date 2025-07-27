@@ -5,7 +5,7 @@ import NDKSwift
 import UIKit
 #endif
 
-// MARK: - NDKFollowButton
+// MARK: - NDKUIFollowButton
 
 /// A button component for following/unfollowing Nostr users with contact list management.
 ///
@@ -22,17 +22,17 @@ import UIKit
 ///
 /// ```swift
 /// // Basic follow button
-/// NDKFollowButton(pubkey: user.pubkey)
+/// NDKUIFollowButton(pubkey: user.pubkey)
 ///     .onFollowChanged { isFollowing in
 ///         print("User is \(isFollowing ? "followed" : "unfollowed")")
 ///     }
 ///
 /// // Custom styling
-/// NDKFollowButton(pubkey: user.pubkey)
+/// NDKUIFollowButton(pubkey: user.pubkey)
 ///     .style(.compact)
 ///     .showFollowText(false)
 /// ```
-public struct NDKFollowButton: View {
+public struct NDKUIFollowButton: View {
 
     // MARK: - Properties
 
@@ -262,7 +262,7 @@ public struct NDKFollowButton: View {
     // MARK: - Modifiers
 
     /// Handle follow state changes
-    public func onFollowChanged(_ action: @escaping (Bool) -> Void) -> NDKFollowButton {
+    public func onFollowChanged(_ action: @escaping (Bool) -> Void) -> NDKUIFollowButton {
         var copy = self
         copy.onFollowChanged = action
         return copy
@@ -439,23 +439,23 @@ private class FollowState: ObservableObject {
 
 // MARK: - Convenience Extensions
 
-public extension NDKFollowButton {
+public extension NDKUIFollowButton {
 
     /// Create a compact follow button (icon only)
-    static func compact(pubkey: String) -> NDKFollowButton {
-        NDKFollowButton(pubkey: pubkey, style: .compact, showFollowText: false)
+    static func compact(pubkey: String) -> NDKUIFollowButton {
+        NDKUIFollowButton(pubkey: pubkey, style: .compact, showFollowText: false)
     }
 
     /// Create a minimal follow button (text only)
-    static func minimal(pubkey: String) -> NDKFollowButton {
-        NDKFollowButton(pubkey: pubkey, style: .minimal)
+    static func minimal(pubkey: String) -> NDKUIFollowButton {
+        NDKUIFollowButton(pubkey: pubkey, style: .minimal)
     }
 }
 
 // MARK: - Preview
 
 #if DEBUG
-struct NDKFollowButton_Previews: PreviewProvider {
+struct NDKUIFollowButton_Previews: PreviewProvider {
     static var previews: some View {
         VStack(spacing: 20) {
             // Different styles
@@ -464,9 +464,9 @@ struct NDKFollowButton_Previews: PreviewProvider {
                     .font(.headline)
 
                 HStack(spacing: 16) {
-                    NDKFollowButton(pubkey: "mock_pubkey", style: .standard)
-                    NDKFollowButton(pubkey: "mock_pubkey", style: .compact)
-                    NDKFollowButton(pubkey: "mock_pubkey", style: .minimal)
+                    NDKUIFollowButton(pubkey: "mock_pubkey", style: .standard)
+                    NDKUIFollowButton(pubkey: "mock_pubkey", style: .compact)
+                    NDKUIFollowButton(pubkey: "mock_pubkey", style: .minimal)
                 }
             }
 
@@ -476,8 +476,8 @@ struct NDKFollowButton_Previews: PreviewProvider {
                     .font(.headline)
 
                 HStack(spacing: 16) {
-                    NDKFollowButton.compact(pubkey: "mock_pubkey")
-                    NDKFollowButton(pubkey: "mock_pubkey", style: .compact, showFollowText: true)
+                    NDKUIFollowButton.compact(pubkey: "mock_pubkey")
+                    NDKUIFollowButton(pubkey: "mock_pubkey", style: .compact, showFollowText: true)
                 }
             }
 
@@ -487,8 +487,8 @@ struct NDKFollowButton_Previews: PreviewProvider {
                     .font(.headline)
 
                 HStack(spacing: 16) {
-                    NDKFollowButton(pubkey: "mock_pubkey") // Not following
-                    // NDKFollowButton(pubkey: "mock_pubkey") // Following (would need state)
+                    NDKUIFollowButton(pubkey: "mock_pubkey") // Not following
+                    // NDKUIFollowButton(pubkey: "mock_pubkey") // Following (would need state)
                 }
             }
         }

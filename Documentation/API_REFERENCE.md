@@ -344,12 +344,9 @@ public var sig: Signature?                       // Event signature
 public weak var ndk: NDK?                        // NDK instance reference
 public var relay: NDKRelay?                      // Source relay
 
-// Relay tracking
-public var seenOnRelays: Set<String> { get }    // Relays where seen
-public var relayPublishStatuses: [String: RelayPublishStatus] { get }
-public var successfullyPublishedRelays: Set<String> { get }
-public var failedPublishRelays: Set<String> { get }
-public var wasPublished: Bool { get }            // Published successfully?
+// Relay tracking (via NDKEventTracker)
+// Note: These properties are tracked externally by NDKEventTracker to maintain event immutability.
+// Access them through: ndk.eventTracker.getSeenOnRelays(eventId:), etc.
 
 // Reply thread helpers
 public var isReply: Bool { get }                 // Has reply tags?
@@ -1437,132 +1434,18 @@ These components are internal implementation details and should not be used dire
 
 ```swift
 // ❌ Don't use NDKSubscription directly
-let subscription = ndk.subscribe(filter: filter)
+// (This API is not exposed publicly)
 
 // ✅ Use NDKDataSource through ndk.observe()
 let dataSource = ndk.observe(filter: filter)
 ```
 
-AsyncSequence-based subscription for real-time event streaming (internal use only).
-
-#### Properties
-
-```swift
-public let id: String                            // Unique subscription ID
-public let filters: [NDKFilter]                  // Applied filters
-public let options: NDKSubscriptionOptions       // Subscription options
+For more information on internal components, see the [Architecture Documentation](ARCHITECTURE.md#internal-components).
 
 // State (async properties)
 public var isActive: Bool { get async }          // Is subscription active?
 public var isClosed: Bool { get async }          // Is subscription closed?
 public var eoseReceived: Bool { get async }      // End of stored events received?
-```
-
-#### AsyncSequence Conformance
-
-NDKSubscription conforms to AsyncSequence, providing a modern Swift pattern for streaming events:
-
-```swift
-// Basic usage - iterate over events as they arrive
-let subscription = ndk.subscribe(filter: myFilter)
-for try await event in subscription {
-    print("Received event: \(event.content)")
-}
-
-// The subscription automatically starts when iteration begins
-// and closes when the loop exits (break, return, throw, or scope end)
-```
-
-##### Advanced AsyncSequence Usage
-
-```swift
-// Limit number of events
-let subscription = ndk.subscribe(filter: myFilter)
-for try await event in subscription.prefix(100) {
-    // Process only first 100 events
-}
-
-// Transform events
-let contentStream = subscription.map { event in
-    event.content
-}
-for try await content in contentStream {
-    print("Content: \(content)")
-}
-
-// Filter events
-let dmEvents = subscription.filter { event in
-    event.kind == 4
-}
-for try await dm in dmEvents {
-    processDM(dm)
-}
-
-// Combine with other async operations
-let subscription = ndk.subscribe(filter: myFilter)
-for try await event in subscription {
-    // Process event
-    if shouldStop(event) {
-        break  // Subscription closes automatically
-    }
-}
-```
-
-##### Error Handling
-
-```swift
-do {
-    let subscription = ndk.subscribe(filter: myFilter)
-    for try await event in subscription {
-        processEvent(event)
-    }
-} catch {
-    print("Subscription error: \(error)")
-}
-```
-
-##### Lifecycle Management
-
-```swift
-// Subscription starts when iteration begins
-let subscription = ndk.subscribe(filter: myFilter)
-
-// Option 1: Let it run until natural completion or scope exit
-Task {
-    for try await event in subscription {
-        processEvent(event)
-    }
-    // Subscription closed automatically when loop exits
-}
-
-// Option 2: Manual cancellation
-let task = Task {
-    for try await event in subscription {
-        processEvent(event)
-    }
-}
-// Later...
-task.cancel()  // Cancels iteration and closes subscription
-
-// Option 3: Explicit close
-Task {
-    for try await event in subscription {
-        processEvent(event)
-        if shouldStop {
-            await subscription.close()  // Ends iteration
-        }
-    }
-}
-```
-
-#### Methods
-
-```swift
-// Close subscription
-public func close() async
-
-// Update relay set
-public func updateRelays(_ relays: Set<NDKRelay>) async
 ```
 
 For documentation on the recommended approach, see the [NDKDataSource](#ndkdatasource) section above.

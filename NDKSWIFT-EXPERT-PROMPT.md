@@ -1496,19 +1496,47 @@ let isBlacklisted = await ndk.isRelayBlacklisted(relayUrl)
 - Implement their own relay health tracking
 - Duplicate outbox model logic
 
-#### Blossom Server Management
+#### Blossom Server Management (Use NDKBlossomServerManager)
 
-Many apps implement Blossom server management. This functionality should be moved to NDKSwift as `NDKBlossomServerManager` to handle:
-- Server list management (kind 10063 events)
-- Server discovery (kind 36363 events)
-- Multi-server uploads with fallback
-- Server health checks
+**Apps should use NDKSwift's built-in `NDKBlossomServerManager` instead of implementing their own server management.** This manager provides comprehensive Blossom server functionality:
 
-Current Blossom support in NDKSwift is for the protocol itself, not server management.
+- **User Server Lists**: Manages personal server lists via kind 10063 events
+- **Server Discovery**: Discovers public servers from kind 36363 events  
+- **Multi-server Uploads**: Upload with automatic fallback across user's servers
+- **Intelligent Caching**: Efficient server list and discovery caching
+
+```swift
+// Access through NDK instance
+let serverManager = ndk.blossomServerManager
+
+// Upload to user's configured servers with fallback
+let result = try await serverManager.uploadToUserServers(
+    data: imageData,
+    mimeType: "image/jpeg"
+)
+
+// Manage user's server list
+serverManager.addUserServer("https://cdn.satellite.earth")
+serverManager.removeUserServer("https://old-server.com")
+
+// Access discovered servers
+let freeServers = serverManager.freeServers
+let paidServers = serverManager.paidServers
+
+// UI integration with SwiftUI
+@StateObject private var serverManager = ndk.blossomServerManager
+// Automatically publishes changes for userServers and discoveredServers
+```
+
+**What NOT to do:**
+- Don't implement custom `BlossomServerManager` classes
+- Don't duplicate server discovery logic
+- Don't implement custom upload fallback logic
+- Don't manage kind 10063 events manually
 
 #### Media Upload Services
 
-Apps implementing image upload to services like nostr.build and void.cat should use a unified `NDKMediaUploadService` (to be added to NDKSwift) that supports multiple providers alongside Blossom.
+For image upload services (nostr.build, void.cat, etc.), apps should leverage `NDKBlossomServerManager` for Blossom uploads and implement a thin wrapper for other services if needed.
 
 #### Hex/Npub/Nsec Conversions (Use NDKSwift's Built-in Methods)
 

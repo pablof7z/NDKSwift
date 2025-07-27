@@ -1,7 +1,7 @@
 import SwiftUI
 import NDKSwift
 
-// MARK: - NDKEventAuthorHeader
+// MARK: - NDKUIEventAuthorHeader
 
 /// A reusable component that displays event author information with profile picture, name, and timestamp.
 ///
@@ -15,7 +15,7 @@ import NDKSwift
 /// ## Usage
 ///
 /// ```swift
-/// NDKEventAuthorHeader(
+/// NDKUIEventAuthorHeader(
 ///     pubkey: event.pubkey,
 ///     timestamp: event.createdAt,
 ///     style: .standard
@@ -24,7 +24,7 @@ import NDKSwift
 ///     // Navigate to profile
 /// }
 /// ```
-public struct NDKEventAuthorHeader: View {
+public struct NDKUIEventAuthorHeader: View {
 
     // MARK: - Properties
 
@@ -65,7 +65,7 @@ public struct NDKEventAuthorHeader: View {
     public var body: some View {
         HStack(spacing: horizontalSpacing) {
             // Profile picture
-            NDKProfilePicture(pubkey: pubkey, size: avatarSize)
+            NDKUIProfilePicture(pubkey: pubkey, size: avatarSize)
                 .onTapGesture {
                     authorTapAction?(pubkey)
                 }
@@ -73,7 +73,7 @@ public struct NDKEventAuthorHeader: View {
             // Author info
             VStack(alignment: .leading, spacing: nameSpacing) {
                 // Display name
-                NDKDisplayName(pubkey: pubkey)
+                NDKUIDisplayName(pubkey: pubkey)
                     .font(nameFont)
                     .fontWeight(.medium)
                     .onTapGesture {
@@ -162,7 +162,7 @@ public struct NDKEventAuthorHeader: View {
     // MARK: - Modifiers
 
     /// Handle author tap gestures
-    public func onAuthorTapped(_ action: @escaping (String) -> Void) -> NDKEventAuthorHeader {
+    public func onAuthorTapped(_ action: @escaping (String) -> Void) -> NDKUIEventAuthorHeader {
         var copy = self
         copy.authorTapAction = action
         return copy
@@ -358,22 +358,22 @@ private struct InteractionButton: View {
 // MARK: - Preview
 
 #if DEBUG
-struct NDKEventAuthorHeader_Previews: PreviewProvider {
+struct NDKUIEventAuthorHeader_Previews: PreviewProvider {
     static var previews: some View {
         VStack(spacing: 20) {
-            NDKEventAuthorHeader(
+            NDKUIEventAuthorHeader(
                 pubkey: "sample_pubkey",
                 timestamp: 1640995200,
                 style: .minimal
             )
 
-            NDKEventAuthorHeader(
+            NDKUIEventAuthorHeader(
                 pubkey: "sample_pubkey",
                 timestamp: 1640995200,
                 style: .standard
             )
 
-            NDKEventAuthorHeader(
+            NDKUIEventAuthorHeader(
                 pubkey: "sample_pubkey",
                 timestamp: 1640995200,
                 style: .detailed
