@@ -140,25 +140,31 @@ final class ArrayExtensionsTests: XCTestCase {
     
     func testMostRecent_withEvents() {
         let event1 = NDKEvent(
+            id: "event1id",
             pubkey: "test",
             createdAt: 1000,
-            kind: .textNote,
+            kind: 1,
             tags: [],
-            content: "oldest"
+            content: "oldest",
+            sig: "sig1"
         )
         let event2 = NDKEvent(
+            id: "event2id",
             pubkey: "test",
             createdAt: 2000,
-            kind: .textNote,
+            kind: 1,
             tags: [],
-            content: "middle"
+            content: "middle",
+            sig: "sig2"
         )
         let event3 = NDKEvent(
+            id: "event3id",
             pubkey: "test",
             createdAt: 3000,
-            kind: .textNote,
+            kind: 1,
             tags: [],
-            content: "newest"
+            content: "newest",
+            sig: "sig3"
         )
         
         let events = [event1, event3, event2]
@@ -175,18 +181,22 @@ final class ArrayExtensionsTests: XCTestCase {
     
     func testOldest_withEvents() {
         let event1 = NDKEvent(
+            id: "event1id",
             pubkey: "test",
             createdAt: 1000,
-            kind: .textNote,
+            kind: 1,
             tags: [],
-            content: "oldest"
+            content: "oldest",
+            sig: "sig1"
         )
         let event2 = NDKEvent(
+            id: "event2id",
             pubkey: "test",
             createdAt: 2000,
-            kind: .textNote,
+            kind: 1,
             tags: [],
-            content: "newest"
+            content: "newest",
+            sig: "sig2"
         )
         
         let events = [event2, event1]
@@ -198,25 +208,31 @@ final class ArrayExtensionsTests: XCTestCase {
     
     func testSortedByRecency() {
         let event1 = NDKEvent(
+            id: "event1id",
             pubkey: "test",
             createdAt: 1000,
-            kind: .textNote,
+            kind: 1,
             tags: [],
-            content: "1"
+            content: "1",
+            sig: "sig1"
         )
         let event2 = NDKEvent(
+            id: "event2id",
             pubkey: "test",
             createdAt: 3000,
-            kind: .textNote,
+            kind: 1,
             tags: [],
-            content: "3"
+            content: "3",
+            sig: "sig2"
         )
         let event3 = NDKEvent(
+            id: "event3id",
             pubkey: "test",
             createdAt: 2000,
-            kind: .textNote,
+            kind: 1,
             tags: [],
-            content: "2"
+            content: "2",
+            sig: "sig3"
         )
         
         let events = [event1, event2, event3]
@@ -229,18 +245,22 @@ final class ArrayExtensionsTests: XCTestCase {
     
     func testSortedByAge() {
         let event1 = NDKEvent(
+            id: "event1id",
             pubkey: "test",
             createdAt: 1000,
-            kind: .textNote,
+            kind: 1,
             tags: [],
-            content: "1"
+            content: "1",
+            sig: "sig1"
         )
         let event2 = NDKEvent(
+            id: "event2id",
             pubkey: "test",
             createdAt: 3000,
-            kind: .textNote,
+            kind: 1,
             tags: [],
-            content: "3"
+            content: "3",
+            sig: "sig2"
         )
         
         let events = [event2, event1]
@@ -280,5 +300,97 @@ final class ArrayExtensionsTests: XCTestCase {
         numbers.removeAll(value: 4)
         
         XCTAssertEqual(numbers, [1, 2, 3])
+    }
+    
+    // MARK: - Performance Tests
+    
+    func testChunkedPerformance() {
+        let largeArray = Array(0..<10000)
+        
+        measure {
+            _ = largeArray.chunked(size: 100)
+        }
+    }
+    
+    func testUniquePerformance() {
+        let largeArray = Array(repeating: Array(0..<100), count: 100).flatMap { $0 }
+        
+        measure {
+            _ = largeArray.unique()
+        }
+    }
+    
+    // MARK: - Edge Cases
+    
+    func testChunkedWithNegativeSize() {
+        let array = [1, 2, 3]
+        let chunks = array.chunked(size: -1)
+        
+        XCTAssertTrue(chunks.isEmpty)
+    }
+    
+    func testRemoveAllWhereAllMatch() {
+        var numbers = [2, 4, 6, 8]
+        let removed = numbers.removeAll { $0 % 2 == 0 }
+        
+        XCTAssertTrue(numbers.isEmpty)
+        XCTAssertEqual(removed, [2, 4, 6, 8])
+    }
+    
+    func testRemoveAllValueMultipleOccurrences() {
+        var letters = ["a", "b", "a", "c", "a", "d"]
+        letters.removeAll(value: "a")
+        
+        XCTAssertEqual(letters, ["b", "c", "d"])
+    }
+    
+    func testGetAllKeysNDKEventArray() {
+        let events = [
+            NDKEvent(id: "event1id", pubkey: "key1", createdAt: 1000, kind: 1, tags: [], content: "1", sig: "sig1"),
+            NDKEvent(id: "event2id", pubkey: "key2", createdAt: 2000, kind: 1, tags: [], content: "2", sig: "sig2")
+        ]
+        
+        // Test that events can be stored and retrieved by id
+        var eventDict: [String: NDKEvent] = [:]
+        for event in events {
+            eventDict[event.id] = event
+        }
+        
+        XCTAssertEqual(eventDict.count, 2)
+        XCTAssertNotNil(eventDict[events[0].id])
+        XCTAssertNotNil(eventDict[events[1].id])
+    }
+    
+    func testSafeSubscriptBoundaryConditions() {
+        let array = [10, 20, 30]
+        
+        // Test exact boundary
+        XCTAssertEqual(array[safe: array.count - 1], 30)
+        XCTAssertNil(array[safe: array.count])
+        
+        // Test with single element
+        let singleElement = [42]
+        XCTAssertEqual(singleElement[safe: 0], 42)
+        XCTAssertNil(singleElement[safe: 1])
+    }
+    
+    func testAsyncFilterMaintainsOrder() async {
+        let numbers = [5, 2, 8, 1, 9, 3]
+        
+        let filtered = await numbers.asyncFilter { $0 > 4 }
+        
+        XCTAssertEqual(filtered, [5, 8, 9])
+    }
+    
+    func testMostRecentWithSameTimestamp() {
+        let event1 = NDKEvent(id: "event1id", pubkey: "test", createdAt: 1000, kind: 1, tags: [], content: "first", sig: "sig1")
+        let event2 = NDKEvent(id: "event2id", pubkey: "test", createdAt: 1000, kind: 1, tags: [], content: "second", sig: "sig2")
+        
+        let events = [event1, event2]
+        let mostRecent = events.mostRecent
+        
+        // Should return one of them (implementation dependent)
+        XCTAssertNotNil(mostRecent)
+        XCTAssertEqual(mostRecent?.createdAt, 1000)
     }
 }

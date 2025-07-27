@@ -6,6 +6,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- Comprehensive test coverage for `ArrayExtensions` including performance and edge cases
+- Additional test coverage for `LRUCache` including concurrent access and zero capacity tests
+
+### Changed
+- Fixed JSON decoder usage in `BlossomBlobTests` to use centralized `JSONCoding` utility
+
+### Fixed
+- Fixed optional unwrapping in `ContentTaggerTests` for error detail checking
+
 ### Documentation
 - Updated documentation version references from 0.6.2 to 0.7.3 in README
 - Cleaned up and improved consistency across documentation files

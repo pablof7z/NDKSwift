@@ -81,7 +81,7 @@ final class ContentTaggerTests: XCTestCase {
             if let ndkError = error as? NDKError {
                 switch ndkError {
                 case .invalidDataFormat(_, let details):
-                    XCTAssertTrue(details.contains("Expected 32 bytes"))
+                    XCTAssertTrue(details?.contains("Expected 32 bytes") ?? false)
                 default:
                     XCTFail("Wrong error type")
                 }
