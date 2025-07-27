@@ -9,6 +9,15 @@ import Foundation
 
 extension Tag {
     /// Validates common tag formats according to Nostr protocol
+    ///
+    /// Validates tags according to their type:
+    /// - `e` (event): Must have 64-character hex event ID
+    /// - `p` (pubkey): Must have 64-character hex public key
+    /// - `a` (addressable): Must follow kind:pubkey:d-tag format
+    /// - `d` (identifier), `t` (hashtag), `r` (URL): Must have a value
+    /// - Other tags: Always considered valid
+    ///
+    /// - Returns: true if the tag is valid according to its type
     var isValid: Bool {
         guard !isEmpty else { return false }
         let tagType = self[0]
@@ -32,21 +41,25 @@ extension Tag {
     }
 
     /// Returns the tag name (first element)
+    /// Example: For tag ["p", "pubkey"], returns "p"
     var name: String? {
         return self.first
     }
 
     /// Returns the primary value (second element)
+    /// Example: For tag ["p", "pubkey"], returns "pubkey"
     var value: String? {
         return count > 1 ? self[1] : nil
     }
 
     /// Returns the relay hint (third element) if present
+    /// Example: For tag ["e", "eventid", "wss://relay.com"], returns "wss://relay.com"
     var relayHint: String? {
         return count > 2 ? self[2] : nil
     }
 
     /// Returns the marker (fourth element) if present
+    /// Example: For tag ["e", "eventid", "wss://relay.com", "reply"], returns "reply"
     var marker: String? {
         return count > 3 ? self[3] : nil
     }
