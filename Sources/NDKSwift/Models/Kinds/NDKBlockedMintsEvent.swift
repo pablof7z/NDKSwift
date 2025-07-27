@@ -2,7 +2,7 @@
 
 /// NIP-60 Blocked Mints Event (kind: 10020)
 /// Public event that contains blacklisted mint URLs that the user wants to avoid
-public struct NDKBlockedMintsEvent {
+public struct NDKBlockedMintsEvent: NDKPublishableEvent {
     public let event: NDKEvent
 
     public init(event: NDKEvent) {
@@ -16,16 +16,17 @@ public struct NDKBlockedMintsEvent {
         blockedMints: [String],
         signer: NDKSigner
     ) async throws -> NDKBlockedMintsEvent {
-        let blockedMintsEvent = try await create(
+        return try await EventPublishingHelper.createAndPublish(
+            type: NDKBlockedMintsEvent.self,
             ndk: ndk,
-            blockedMints: blockedMints,
-            signer: signer
-        )
-
-        _ = try await ndk.publish(blockedMintsEvent.event)
-        NDKLogger.log(.info, category: .event, "Published blocked mints event with \(blockedMints.count) mints")
-
-        return blockedMintsEvent
+            logPrefix: "NDKBlockedMintsEvent"
+        ) {
+            try await create(
+                ndk: ndk,
+                blockedMints: blockedMints,
+                signer: signer
+            )
+        }
     }
 
     /// Create without publishing

@@ -155,7 +155,7 @@ private let decryptedWalletCache = DecryptedWalletCache()
 
 /// NIP-60 Cashu Wallet Configuration Event (kind: 17375)
 /// Stores wallet configuration including mints, relays, and P2PK keys
-public struct NDKCashuWalletEvent {
+public struct NDKCashuWalletEvent: NDKPublishableEvent {
     public let event: NDKEvent
 
     public init(event: NDKEvent) {
@@ -176,28 +176,19 @@ public struct NDKCashuWalletEvent {
         NDKLogger.log(.info, category: .event, "📍   - Relays: \(relays ?? [])")
         NDKLogger.log(.info, category: .event, "📍   - Has P2PK key: \(p2pkPrivateKey != nil)")
 
-        let walletEvent = try await create(
+        return try await EventPublishingHelper.createAndPublishWithId(
+            type: NDKCashuWalletEvent.self,
             ndk: ndk,
-            mints: mints,
-            relays: relays,
-            p2pkPrivateKey: p2pkPrivateKey,
-            signer: signer
-        )
-
-        NDKLogger.log(.info, category: .event, "NDKCashuWalletEvent - Publishing wallet configuration event: \(walletEvent.event.id)")
-        NDKLogger.log(.debug, category: .event, "NDKCashuWalletEvent - Event kind: \(walletEvent.event.kind)")
-        NDKLogger.log(.debug, category: .event, "NDKCashuWalletEvent - Event tags: \(walletEvent.event.tags)")
-        NDKLogger.log(.debug, category: .event, "NDKCashuWalletEvent - Event author: \(walletEvent.event.pubkey)")
-
-        do {
-            let publishedRelays = try await ndk.publish(walletEvent.event)
-            NDKLogger.log(.info, category: .event, "NDKCashuWalletEvent - Successfully published wallet configuration to \(publishedRelays.count) relays: \(publishedRelays)")
-        } catch {
-            NDKLogger.log(.error, category: .event, "NDKCashuWalletEvent - ERROR: Failed to publish wallet event: \(error)")
-            throw error
+            logPrefix: "NDKCashuWalletEvent - Published wallet configuration event"
+        ) {
+            try await create(
+                ndk: ndk,
+                mints: mints,
+                relays: relays,
+                p2pkPrivateKey: p2pkPrivateKey,
+                signer: signer
+            )
         }
-
-        return walletEvent
     }
 
     /// Create without publishing
@@ -313,7 +304,7 @@ public struct NDKCashuWalletEvent {
 
 /// A backup event for NIP-60 wallets (kind 375)
 /// Similar to kind 17375 but includes a public key tag for easy retrieval during restoration
-public struct NDKCashuWalletBackupEvent {
+public struct NDKCashuWalletBackupEvent: NDKPublishableEvent {
     public let event: NDKEvent
 
     public init(event: NDKEvent) {
@@ -331,25 +322,19 @@ public struct NDKCashuWalletBackupEvent {
     ) async throws -> NDKCashuWalletBackupEvent {
         NDKLogger.log(.info, category: .event, "📦 Creating Kind 375 wallet backup event")
 
-        let backupEvent = try await create(
+        return try await EventPublishingHelper.createAndPublishWithId(
+            type: NDKCashuWalletBackupEvent.self,
             ndk: ndk,
-            mints: mints,
-            relays: relays,
-            p2pkPrivateKey: p2pkPrivateKey,
-            signer: signer
-        )
-
-        NDKLogger.log(.info, category: .event, "NDKCashuWalletBackupEvent - Publishing backup event: \(backupEvent.event.id)")
-
-        do {
-            let publishedRelays = try await ndk.publish(backupEvent.event)
-            NDKLogger.log(.info, category: .event, "NDKCashuWalletBackupEvent - Successfully published backup to \(publishedRelays.count) relays: \(publishedRelays)")
-        } catch {
-            NDKLogger.log(.error, category: .event, "NDKCashuWalletBackupEvent - ERROR: Failed to publish backup event: \(error)")
-            throw error
+            logPrefix: "NDKCashuWalletBackupEvent - Published backup event"
+        ) {
+            try await create(
+                ndk: ndk,
+                mints: mints,
+                relays: relays,
+                p2pkPrivateKey: p2pkPrivateKey,
+                signer: signer
+            )
         }
-
-        return backupEvent
     }
 
     /// Create without publishing
@@ -824,7 +809,7 @@ public struct NDKCashuMintAnnouncement {
 
 /// NIP-61 Nutzap Event (kind: 9321)
 /// Public event that sends Cashu tokens to a recipient
-public struct NDKNutzapEvent {
+public struct NDKNutzapEvent: NDKPublishableEvent {
     public let event: NDKEvent
 
     public init(event: NDKEvent) {
@@ -851,19 +836,21 @@ public struct NDKNutzapEvent {
         eventId: String? = nil,
         signer: NDKSigner
     ) async throws -> NDKNutzapEvent {
-        let nutzapEvent = try await create(
+        return try await EventPublishingHelper.createAndPublish(
+            type: NDKNutzapEvent.self,
             ndk: ndk,
-            token: token,
-            mintURL: mintURL,
-            recipient: recipient,
-            comment: comment,
-            eventId: eventId,
-            signer: signer
-        )
-
-        _ = try await ndk.publish(nutzapEvent.event)
-
-        return nutzapEvent
+            logPrefix: "NDKNutzapEvent"
+        ) {
+            try await create(
+                ndk: ndk,
+                token: token,
+                mintURL: mintURL,
+                recipient: recipient,
+                comment: comment,
+                eventId: eventId,
+                signer: signer
+            )
+        }
     }
 
     /// Create without publishing

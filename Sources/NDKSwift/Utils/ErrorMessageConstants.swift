@@ -51,6 +51,9 @@ public enum ErrorMessageConstants {
         public static let noSignerConfigured = "No signer configured"
         public static let noSignerAvailable = "No signer available"
         public static let signerNotAvailable = "Signer not available"
+        
+        /// NDK-related errors
+        public static let noNDKConfigured = "No NDK instance configured"
 
         /// Connection errors
         public static let notConnected = "Not connected"

@@ -9,6 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - Comprehensive unit tests for `Bech32` encoding/decoding utility
 - Comprehensive unit tests for `NostrIdentifier` utility
+- Safe data conversion methods to `HexValidator` for validated hex string conversion
+
+### Changed
+- Refactored `NDKLogFormatter` to use `JSONCoding` utility instead of direct JSON serialization
+- Refactored `NDKCashuWalletEvent`, `NDKCashuWalletBackupEvent`, `NDKBlockedMintsEvent`, and `NDKNutzapEvent` to use `EventPublishingHelper` for consistent event publishing
+- Updated README version to 0.7.2
 
 ### Fixed
 - Fixed NIP17PrivateMessagesE2ETests using incorrect NDK connection API
@@ -16,6 +22,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Improved
 - Code consistency by using centralized network client throughout the codebase
+- Code consistency by using centralized JSON handling with `JSONCoding` utility
+- Reduced code duplication in event publishing using `EventPublishingHelper`
 
 ## [0.7.2] - 2025-01-27
 

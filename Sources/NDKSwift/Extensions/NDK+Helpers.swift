@@ -10,3 +10,20 @@ public extension NDK {
         return signer
     }
 }
+
+/// Helper methods for objects that have a weak reference to NDK
+public protocol NDKDependent {
+    var ndk: NDK? { get }
+}
+
+public extension NDKDependent {
+    /// Ensures NDK is configured and returns it
+    /// - Returns: The configured NDK instance
+    /// - Throws: NDKError.notConfigured if NDK is not available
+    func requireNDK() throws -> NDK {
+        guard let ndk = ndk else {
+            throw NDKError.notConfigured(ErrorMessageConstants.Messages.noNDKConfigured)
+        }
+        return ndk
+    }
+}
