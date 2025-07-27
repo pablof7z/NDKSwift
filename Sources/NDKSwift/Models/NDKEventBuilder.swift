@@ -228,6 +228,10 @@ public final class NDKEventBuilder {
     /// Set the public key
     @discardableResult
     public func pubkey(_ pubkey: PublicKey) -> NDKEventBuilder {
+        guard ValidationHelpers.isValid32ByteHex(pubkey) else {
+            NDKLogger.log(.warning, category: .event, "Invalid public key provided to NDKEventBuilder: \(pubkey)")
+            return self
+        }
         self.pubkey = pubkey
         return self
     }
@@ -249,6 +253,10 @@ public final class NDKEventBuilder {
     /// Add a tag
     @discardableResult
     public func tag(_ tag: Tag) -> NDKEventBuilder {
+        guard !tag.isEmpty else {
+            NDKLogger.log(.warning, category: .event, "Attempted to add empty tag to NDKEventBuilder")
+            return self
+        }
         self.tags.append(tag)
         return self
     }

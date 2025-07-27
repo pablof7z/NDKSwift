@@ -488,15 +488,15 @@ extension Nutzap {
             case .invalidAmount:
                 return .invalidProofs(reason: ErrorMessageConstants.invalid("amount"))
             case .missingRequestDetail(let message):
-                return .invalidProofs(reason: "Missing request detail: \(message)")
+                return .invalidProofs(reason: ErrorMessageConstants.withContext(ErrorMessageConstants.missing("request detail"), context: message))
             case .restoreError(let message):
-                return .invalidProofs(reason: "Restore error: \(message)")
+                return .invalidProofs(reason: ErrorMessageConstants.withContext("Restore error", context: message))
             case .feeCalculationError(let message):
-                return .invalidProofs(reason: "Fee calculation error: \(message)")
+                return .invalidProofs(reason: ErrorMessageConstants.withContext("Fee calculation error", context: message))
             case .partiallySpentToken:
                 return .alreadySpent(proofIds: [])
             case .bolt11InvalidInvoiceError(let message):
-                return .invalidProofs(reason: "Invalid invoice: \(message)")
+                return .invalidProofs(reason: ErrorMessageConstants.withContext(ErrorMessageConstants.invalid("invoice"), context: message))
             case .quoteIsPending:
                 return .temporaryMintError("Quote is pending")
             case .invoiceAlreadyPaid:
@@ -506,13 +506,13 @@ extension Nutzap {
             case .unknownError(let message):
                 return .unknownError(message)
             case .spendingConditionError(let message):
-                return .invalidProofs(reason: "Spending condition error: \(message)")
+                return .invalidProofs(reason: ErrorMessageConstants.withContext("Spending condition error", context: message))
             case .invalidKey(let message):
-                return .invalidProofs(reason: "Invalid key: \(message)")
+                return .invalidProofs(reason: ErrorMessageConstants.withContext(ErrorMessageConstants.invalid("key"), context: message))
             case .p2pkSigningError(let message):
-                return .invalidProofs(reason: "P2PK signing error: \(message)")
+                return .invalidProofs(reason: ErrorMessageConstants.withContext("P2PK signing error", context: message))
             case .invalidSplit(let message):
-                return .invalidProofs(reason: "Invalid split: \(message)")
+                return .invalidProofs(reason: ErrorMessageConstants.withContext(ErrorMessageConstants.invalid("split"), context: message))
             }
         case let ndkError as NDKError:
             switch ndkError {
