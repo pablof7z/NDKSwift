@@ -245,7 +245,7 @@ public enum Nutzap {
             // Extract P2PK data from proof secret for logging
             var p2pkInfo = "none"
             if let secretData = proof.secret.data(using: .utf8),
-               let secret = try? JSONSerialization.jsonObject(with: secretData, options: []) as? [[String: Any]] {
+               let secret = JSONCoding.safeParseJSON(from: secretData) as? [[String: Any]] {
                 for condition in secret {
                     if condition[NostrConstants.JSONField.kind] as? String == "P2PK",
                        let data = condition["data"] as? String {
@@ -286,7 +286,7 @@ public enum Nutzap {
             var expectedPubkey = "unknown"
             if let firstProof = allProofs.first,
                let secretData = firstProof.secret.data(using: .utf8),
-               let secret = try? JSONSerialization.jsonObject(with: secretData, options: []) as? [[String: Any]],
+               let secret = JSONCoding.safeParseJSON(from: secretData) as? [[String: Any]],
                let p2pkCondition = secret.first(where: { $0[NostrConstants.JSONField.kind] as? String == "P2PK" }),
                let data = p2pkCondition["data"] as? String {
                 expectedPubkey = data

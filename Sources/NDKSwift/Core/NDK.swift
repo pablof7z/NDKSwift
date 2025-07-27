@@ -1,5 +1,15 @@
 import Foundation
 
+/// Protocol for handling relay authentication requests (NIP-42)
+public protocol NDKAuthenticationDelegate: AnyObject {
+    /// Called when a relay requires authentication
+    /// - Parameters:
+    ///   - relay: The relay requiring authentication
+    ///   - challenge: The authentication challenge from the relay
+    /// - Returns: true to proceed with authentication, false to decline
+    func relay(_ relay: NDKRelay, requiresAuthenticationWithChallenge challenge: String) async -> Bool
+}
+
 /// Main entry point for NDKSwift
 public final class NDK {
     // MARK: - Core Properties
@@ -30,6 +40,9 @@ public final class NDK {
     /// Signature verification delegate
     public weak var signatureVerificationDelegate: NDKSignatureVerificationDelegate?
 
+    /// Authentication delegate for handling relay authentication (NIP-42)
+    public weak var authenticationDelegate: NDKAuthenticationDelegate?
+
     /// Whether outbox model is enabled (default: true)
     public var outboxEnabled: Bool = true
 
@@ -38,6 +51,9 @@ public final class NDK {
 
     /// Configuration for automatic client tagging (NIP-89)
     public var clientTagConfig: NDKClientTagConfig?
+
+    /// Track pending auth events by event ID to relay
+    private var pendingAuthEvents: [EventID: NDKRelay] = [:]
 
     // MARK: - Outbox API
 
@@ -551,6 +567,24 @@ public final class NDK {
     }
 
     func processOKMessage(eventId: EventID, accepted: Bool, message: String?, from relay: RelayProtocol) async {
+        // Check if this is an auth event response
+        if let authRelay = pendingAuthEvents.removeValue(forKey: eventId) {
+            if accepted {
+                // Authentication successful
+                await authRelay.updateConnectionState(.authenticated)
+                NDKLogger.log(.info, category: .auth, "Successfully authenticated with relay \(relay.url)")
+                
+                // Trigger retry of failed publishes
+                await retryFailedPublishesForRelay(authRelay)
+            } else {
+                // Authentication failed, revert to connected state
+                await authRelay.updateConnectionState(.connected)
+                NDKLogger.log(.error, category: .auth, "Authentication failed for relay \(relay.url): \(message ?? "No reason given")")
+            }
+            return
+        }
+        
+        // Regular event processing
         if accepted {
             // Always confirm event in cache
             do {
@@ -560,6 +594,22 @@ public final class NDK {
             }
         } else {
             NDKLogger.log(.warning, category: .event, "Event \(eventId) rejected by relay \(relay.url): \(message ?? "No reason given")")
+            
+            // Check if rejection was due to auth required
+            if let errorMessage = message?.lowercased(),
+               (errorMessage.contains("auth") || errorMessage.contains("restricted") || errorMessage.contains("authentication")),
+               let ndkRelay = relay as? NDKRelay {
+                
+                NDKLogger.log(.info, category: .auth, "Event \(eventId) requires authentication on \(relay.url)")
+                
+                // Update relay state to indicate auth is required
+                // The relay should send an AUTH challenge message soon
+                let currentState = await ndkRelay.connectionState
+                if case .connected = currentState {
+                    // Don't update if we're already in an auth flow
+                    NDKLogger.log(.debug, category: .auth, "Relay \(relay.url) requires authentication for publishing")
+                }
+            }
         }
     }
 
@@ -573,10 +623,36 @@ public final class NDK {
     }
 
     func handleAuthChallenge(challenge: String, from relay: RelayProtocol) async {
+        guard let ndkRelay = relay as? NDKRelay else {
+            NDKLogger.log(.warning, category: .auth, "Cannot handle auth challenge - relay is not NDKRelay")
+            return
+        }
+
+        // Update relay state to authRequired
+        await ndkRelay.updateConnectionState(.authRequired(challenge: challenge))
+
+        // Check if we should authenticate
+        let shouldAuthenticate: Bool
+        if let delegate = authenticationDelegate {
+            shouldAuthenticate = await delegate.relay(ndkRelay, requiresAuthenticationWithChallenge: challenge)
+        } else {
+            // Default behavior: authenticate if we have a signer
+            shouldAuthenticate = signer != nil
+            NDKLogger.log(.debug, category: .auth, "No authentication delegate set, defaulting to \(shouldAuthenticate ? "authenticating" : "not authenticating")")
+        }
+
+        guard shouldAuthenticate else {
+            NDKLogger.log(.info, category: .auth, "Authentication declined for relay \(relay.url)")
+            return
+        }
+
         guard let signer = signer else {
             NDKLogger.log(.warning, category: .auth, "Cannot respond to auth challenge - no signer available")
             return
         }
+
+        // Update state to authenticating
+        await ndkRelay.updateConnectionState(.authenticating)
 
         do {
             let authEvent = try await NDKEventBuilder(ndk: self)
@@ -598,10 +674,27 @@ public final class NDK {
             let authMessage: [Any] = ["AUTH", eventDict]
             let jsonData = try JSONSerialization.data(withJSONObject: authMessage, options: [.withoutEscapingSlashes])
             let jsonString = String(data: jsonData, encoding: .utf8) ?? ""
+            
+            // Track pending auth event
+            pendingAuthEvents[authEvent.id] = ndkRelay
+            
             try await relay.send(jsonString)
+            
+            // The OK response will trigger state change to authenticated
         } catch {
             NDKLogger.log(.error, category: .auth, "Failed to respond to auth challenge: \(error)")
+            // Revert to connected state on failure
+            await ndkRelay.updateConnectionState(.connected)
         }
+    }
+
+    // MARK: - Authentication Helpers
+    
+    /// Notifies that a relay has been authenticated
+    /// Apps can listen to relay state changes to retry failed publishes
+    private func retryFailedPublishesForRelay(_ relay: NDKRelay) async {
+        NDKLogger.log(.info, category: .auth, "Relay \(relay.url) is now authenticated - apps can retry failed publishes")
+        // Apps should listen to relay state changes and retry publishes when state becomes .authenticated
     }
 
     // MARK: - Signature Verification

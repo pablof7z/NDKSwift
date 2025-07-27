@@ -9,7 +9,6 @@ Complete API documentation for NDKSwift v0.3.0+
   - [NDKDataSource](#ndkdatasource)
   - [NDKEvent](#ndkevent)
   - [NDKFilter](#ndkfilter)
-  - [NDKSubscription](#ndksubscription)
   - [NDKUser](#ndkuser)
   - [NDKRelay](#ndkrelay)
 - [Protocols](#protocols)
@@ -20,6 +19,8 @@ Complete API documentation for NDKSwift v0.3.0+
   - [CachePolicy](#cachepolicy)
   - [EventConfirmationState](#eventconfirmationstate)
 - [Utilities](#utilities)
+- [Internal Components](#internal-components)
+  - [NDKSubscription](#ndksubscription)
 
 ## Core Classes
 
@@ -480,7 +481,17 @@ public func tagFilter(_ tagName: String) -> [String]?
 
 ### NDKSubscription
 
-AsyncSequence-based subscription for real-time event streaming.
+**⚠️ Internal Implementation Detail**: `NDKSubscription` is an internal component that should not be used directly. Use the public `NDKDataSource` API instead:
+
+```swift
+// ❌ Don't use NDKSubscription directly
+let subscription = ndk.subscribe(filter: filter)
+
+// ✅ Use NDKDataSource through ndk.observe()
+let dataSource = ndk.observe(filter: filter)
+```
+
+AsyncSequence-based subscription for real-time event streaming (internal use only).
 
 #### Properties
 
@@ -1498,3 +1509,13 @@ class EventHandler {
 ```
 
 The new AsyncSequence pattern is cleaner, automatically manages lifecycle, and integrates better with Swift's async/await ecosystem.
+
+## Internal Components
+
+These components are internal implementation details and should not be used directly in application code.
+
+### NDKSubscription (Internal)
+
+NDKSubscription has been moved here as it is an internal implementation detail. Applications should use `NDKDataSource` via `ndk.observe()` instead.
+
+For documentation on the recommended approach, see the [NDKDataSource](#ndkdatasource) section above.
