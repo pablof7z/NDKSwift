@@ -107,11 +107,11 @@ public actor NIP77SyncHandler {
         case let .negClose(subId):
             subscriptionId = subId
         default:
-            throw NIP77Error.invalidMessage
+            throw NIP77Error.invalidMessageFormat("Unknown message type")
         }
 
         guard var session = activeSessions[subscriptionId] else {
-            throw NIP77Error.invalidMessage
+            throw NIP77Error.invalidMessageFormat("Unknown message type")
         }
 
         switch message {
@@ -119,7 +119,7 @@ public actor NIP77SyncHandler {
             NDKLogger.log(.debug, category: .network, "\(logPrefix) Received NEG-MSG with data: \(dataHex)")
 
             guard let data = Data(hexString: dataHex) else {
-                throw NIP77Error.invalidMessage
+                throw NIP77Error.invalidMessageFormat("Unknown message type")
             }
 
             // Update stats
@@ -220,7 +220,7 @@ public actor NIP77SyncHandler {
 
         default:
             // We don't expect other message types
-            throw NIP77Error.invalidMessage
+            throw NIP77Error.invalidMessageFormat("Unknown message type")
         }
     }
 

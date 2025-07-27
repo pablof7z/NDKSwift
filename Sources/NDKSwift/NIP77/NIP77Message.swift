@@ -27,27 +27,30 @@ public enum NIP77MessageType: String {
 ///
 /// ```swift
 /// // Start a sync session
-/// let openMsg = NIP77Message.open(
+/// let openMsg = NIP77Message.negOpen(
 ///     subscriptionId: "sync-123",
 ///     filter: NDKFilter(kinds: [1]),
-///     initialMessage: negentropyData
+///     initialMessage: negentropyData.hexString
 /// )
 /// let json = try openMsg.toJSON()
 /// await relay.send(json)
 ///
 /// // Continue reconciliation
-/// let msgResponse = NIP77Message.message(
+/// let msgResponse = NIP77Message.negMsg(
 ///     subscriptionId: "sync-123",
-///     data: responseData
+///     message: responseData.hexString
 /// )
 /// await relay.send(try msgResponse.toJSON())
 /// ```
 public struct NIP77Message {
-    public let type: NIP77MessageType
+    // MARK: - Properties
+    
+    public let messageType: NIP77MessageType
     public let subscriptionId: String
-    public let data: Data?
     public let filter: NDKFilter?
-    public let error: String?
+    public let initialMessage: String?
+    public let message: String?
+    public let reason: String?
 
     // MARK: - Constructors
 
@@ -56,150 +59,178 @@ public struct NIP77Message {
     /// - Parameters:
     ///   - subscriptionId: Unique identifier for this sync session
     ///   - filter: Nostr filter defining which events to synchronize
-    ///   - initialMessage: Initial Negentropy reconciliation data
+    ///   - initialMessage: Initial Negentropy reconciliation data as hex string
     /// - Returns: NEG-OPEN message ready for transmission
-    public static func open(subscriptionId: String, filter: NDKFilter, initialMessage: Data) -> NIP77Message {
+    public static func negOpen(subscriptionId: String, filter: NDKFilter, initialMessage: String) -> NIP77Message {
         return NIP77Message(
-            type: .negOpen,
+            messageType: .negOpen,
             subscriptionId: subscriptionId,
-            data: initialMessage,
             filter: filter,
-            error: nil
+            initialMessage: initialMessage,
+            message: nil,
+            reason: nil
         )
     }
 
-    /// Create a NEG-MSG message
-    public static func message(subscriptionId: String, data: Data) -> NIP77Message {
+    /// Creates a NEG-MSG message for continuing synchronization.
+    ///
+    /// - Parameters:
+    ///   - subscriptionId: Unique identifier for this sync session
+    ///   - message: Negentropy reconciliation data as hex string
+    /// - Returns: NEG-MSG message ready for transmission
+    public static func negMsg(subscriptionId: String, message: String) -> NIP77Message {
         return NIP77Message(
-            type: .negMsg,
+            messageType: .negMsg,
             subscriptionId: subscriptionId,
-            data: data,
             filter: nil,
-            error: nil
+            initialMessage: nil,
+            message: message,
+            reason: nil
         )
     }
 
-    /// Create a NEG-CLOSE message
-    public static func close(subscriptionId: String) -> NIP77Message {
+    /// Creates a NEG-CLOSE message to terminate synchronization.
+    ///
+    /// - Parameters:
+    ///   - subscriptionId: Unique identifier for the sync session to close
+    /// - Returns: NEG-CLOSE message ready for transmission
+    public static func negClose(subscriptionId: String) -> NIP77Message {
         return NIP77Message(
-            type: .negClose,
+            messageType: .negClose,
             subscriptionId: subscriptionId,
-            data: nil,
             filter: nil,
-            error: nil
+            initialMessage: nil,
+            message: nil,
+            reason: nil
         )
     }
 
-    /// Create a NEG-ERR message
-    public static func error(subscriptionId: String, error: String) -> NIP77Message {
+    /// Creates a NEG-ERR message to report an error.
+    ///
+    /// - Parameters:
+    ///   - subscriptionId: Unique identifier for this sync session
+    ///   - reason: Human-readable error description
+    /// - Returns: NEG-ERR message ready for transmission
+    public static func negErr(subscriptionId: String, reason: String) -> NIP77Message {
         return NIP77Message(
-            type: .negErr,
+            messageType: .negErr,
             subscriptionId: subscriptionId,
-            data: nil,
             filter: nil,
-            error: error
+            initialMessage: nil,
+            message: nil,
+            reason: reason
         )
     }
 
     // MARK: - Encoding
 
     /// Encode to JSON array format for Nostr
-    public func toJSON() throws -> String {
-        var array: [Any] = [type.rawValue, subscriptionId]
+    public func toJSON() throws -> Any {
+        var array: [Any] = [messageType.rawValue, subscriptionId]
 
-        switch type {
+        switch messageType {
         case .negOpen:
-            if let filter = filter, let data = data {
+            if let filter = filter, let initialMessage = initialMessage {
                 array.append(filter.toDictionary())
-                array.append(data.hexString)
+                array.append(initialMessage)
+            } else {
+                throw NIP77Error.missingRequiredField("filter or initialMessage")
             }
 
         case .negMsg:
-            if let data = data {
-                array.append(data.hexString)
+            if let message = message {
+                array.append(message)
+            } else {
+                throw NIP77Error.missingRequiredField("message")
             }
 
         case .negErr:
-            if let error = error {
-                array.append(error)
+            if let reason = reason {
+                array.append(reason)
+            } else {
+                throw NIP77Error.missingRequiredField("reason")
             }
 
         case .negClose:
             break // No additional data
         }
 
-        return try JSONCoding.serializeToString(array)
+        return array
     }
 
     // MARK: - Decoding
 
-    /// Decode from JSON array
-    public static func fromJSON(_ json: String) throws -> NIP77Message {
-        let array = try JSONCoding.parseArray(from: json)
-        guard array.count >= 2 else {
-            throw NIP77Error.invalidMessage
+    /// Parse from JSON array
+    public static func parse(from json: Any) throws -> NIP77Message {
+        guard let array = json as? [Any], array.count >= 2 else {
+            throw NIP77Error.invalidMessageFormat("Expected array with at least 2 elements")
         }
 
         guard let typeString = array[0] as? String,
-              let messageType = NIP77MessageType(rawValue: typeString),
-              let subscriptionId = array[1] as? String else {
-            throw NIP77Error.invalidMessage
+              let messageType = NIP77MessageType(rawValue: typeString) else {
+            throw NIP77Error.invalidMessageType(String(describing: array[0]))
+        }
+        
+        guard let subscriptionId = array[1] as? String else {
+            throw NIP77Error.invalidMessageFormat("Missing subscription ID")
         }
 
         switch messageType {
         case .negOpen:
             guard array.count >= 4,
                   let filterDict = array[2] as? [String: Any],
-                  let hexData = array[3] as? String,
-                  let messageData = hexData.hexDecoded() else {
-                throw NIP77Error.invalidMessage
+                  let initialMessage = array[3] as? String else {
+                throw NIP77Error.missingRequiredField("filter or initialMessage")
             }
 
             let filter = try NDKFilter.fromDictionary(filterDict)
             return NIP77Message(
-                type: .negOpen,
+                messageType: .negOpen,
                 subscriptionId: subscriptionId,
-                data: messageData,
                 filter: filter,
-                error: nil
+                initialMessage: initialMessage,
+                message: nil,
+                reason: nil
             )
 
         case .negMsg:
             guard array.count >= 3,
-                  let hexData = array[2] as? String,
-                  let messageData = hexData.hexDecoded() else {
-                throw NIP77Error.invalidMessage
+                  let message = array[2] as? String else {
+                throw NIP77Error.missingRequiredField("message")
             }
 
             return NIP77Message(
-                type: .negMsg,
+                messageType: .negMsg,
                 subscriptionId: subscriptionId,
-                data: messageData,
                 filter: nil,
-                error: nil
+                initialMessage: nil,
+                message: message,
+                reason: nil
             )
 
         case .negErr:
             guard array.count >= 3,
-                  let error = array[2] as? String else {
-                throw NIP77Error.invalidMessage
+                  let reason = array[2] as? String else {
+                throw NIP77Error.missingRequiredField("reason")
             }
 
             return NIP77Message(
-                type: .negErr,
+                messageType: .negErr,
                 subscriptionId: subscriptionId,
-                data: nil,
                 filter: nil,
-                error: error
+                initialMessage: nil,
+                message: nil,
+                reason: reason
             )
 
         case .negClose:
             return NIP77Message(
-                type: .negClose,
+                messageType: .negClose,
                 subscriptionId: subscriptionId,
-                data: nil,
                 filter: nil,
-                error: nil
+                initialMessage: nil,
+                message: nil,
+                reason: nil
             )
         }
     }
@@ -207,7 +238,9 @@ public struct NIP77Message {
 
 /// NIP-77 specific errors
 public enum NIP77Error: LocalizedError {
-    case invalidMessage
+    case invalidMessageType(String)
+    case invalidMessageFormat(String)
+    case missingRequiredField(String)
     case syncFailed(String)
     case relayError(String)
     case unsupportedByRelay
@@ -215,10 +248,14 @@ public enum NIP77Error: LocalizedError {
 
     public var errorDescription: String? {
         switch self {
-        case .invalidMessage:
-            return ErrorMessageConstants.invalid("NIP-77 message format")
+        case .invalidMessageType(let type):
+            return "Invalid NIP-77 message type: \(type)"
+        case .invalidMessageFormat(let reason):
+            return "Invalid NIP-77 message format: \(reason)"
+        case .missingRequiredField(let field):
+            return "Missing required field: \(field)"
         case .syncFailed(let reason):
-            return ErrorMessageConstants.withContext("Sync failed", context: reason)
+            return "Negentropy sync failed: \(reason)"
         case .relayError(let error):
             return ErrorMessageConstants.relayError(relay: "NIP-77", message: error)
         case .unsupportedByRelay:
