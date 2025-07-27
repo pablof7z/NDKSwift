@@ -10,7 +10,19 @@ public protocol NDKRelayConnectionDelegate: AnyObject {
     func relayConnectionDidDisconnect(_ connection: NDKRelayConnection, error: Error?)
 }
 
-/// WebSocket connection to a Nostr relay using actor for thread safety
+/// WebSocket connection to a Nostr relay using actor for thread safety.
+///
+/// `NDKRelayConnection` manages a WebSocket connection to a single Nostr relay,
+/// handling connection lifecycle, message sending/receiving, and automatic
+/// reconnection with exponential backoff.
+///
+/// Example usage:
+/// ```swift
+/// let connection = NDKRelayConnection(url: URL(string: "wss://relay.example.com")!)
+/// connection.delegate = self
+/// try await connection.connect()
+/// try await connection.send(message: .event(event))
+/// ```
 public actor NDKRelayConnection {
     private let url: URL
 
@@ -71,7 +83,13 @@ public actor NDKRelayConnection {
 
     // MARK: - Connection Management
 
-    /// Connect to the relay (async version that properly waits)
+    /// Connect to the relay.
+    ///
+    /// Establishes a WebSocket connection to the relay. If already connected,
+    /// this method returns immediately. If a connection attempt is already in
+    /// progress, this method waits for that attempt to complete.
+    ///
+    /// - Throws: `NDKError.connectionFailed` if the connection cannot be established
     public func connect() async throws {
         guard !isConnected else {
             NDKLogger.log(.trace, category: .connection, "✔️ Already connected to \(url)")
