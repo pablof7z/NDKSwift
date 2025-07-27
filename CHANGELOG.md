@@ -19,6 +19,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Unit tests for `DateFormatters` including all formatter types and convenience methods
 - Unit tests for `ImetaUtils` tag mapping and round-trip conversion
 - Unit tests for `FileManagerExtensions` Codable operations
+- Centralized crypto size constants in `CryptoConstants.Size` enum
 
 ### Changed
 - Fixed JSON decoder usage in `BlossomBlobTests` to use centralized `JSONCoding` utility
@@ -26,6 +27,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - SwiftUI data sources now conform to `NDKDataSourceProtocol` for consistency
 - Refactored ContentParser tests to use new helper extensions for cleaner assertions
 - Refactored manual hex validation in `NDKPrivateKeySigner` and `NIP44Encryption` to use `HexValidator` utility
+- Updated `Crypto.Constants` to reference centralized `CryptoConstants.Size` values
+- Updated `Crypto.CryptoError` to use `ErrorMessageConstants` for consistent error messages
 
 ### Fixed
 - Fixed optional unwrapping in `ContentTaggerTests` for error detail checking
@@ -42,6 +45,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Test code readability with new ContentEntity helper extensions in TestAssertions.swift
 - Test coverage for content parsing edge cases including invalid entities and whitespace preservation
 - Test coverage for utility classes that were previously untested (URLUtils, DateFormatters, ImetaUtils, FileManagerExtensions)
+- Code organization by consolidating crypto-related constants into a single location
+- Error message consistency across the codebase using centralized error message constants
 
 ## [0.7.3] - 2025-01-27
 

@@ -10,9 +10,9 @@ public enum Crypto {
     /// Cryptographic constants
     public enum Constants {
         /// secp256k1 private key size in bytes
-        public static let privateKeySize = 32
+        public static let privateKeySize = CryptoConstants.Size.privateKey
         /// secp256k1 signature size in bytes
-        public static let signatureSize = 64
+        public static let signatureSize = CryptoConstants.Size.signature
     }
 
     /// Errors that can occur during cryptographic operations
@@ -27,17 +27,17 @@ public enum Crypto {
         public var errorDescription: String? {
             switch self {
             case .invalidKeyLength:
-                return "Invalid key length (expected \(Constants.privateKeySize) bytes)"
+                return ErrorMessageConstants.invalid("key length (expected \(Constants.privateKeySize) bytes)")
             case .invalidSignatureLength:
-                return "Invalid signature length (expected \(Constants.signatureSize) bytes)"
+                return ErrorMessageConstants.invalid("signature length (expected \(Constants.signatureSize) bytes)")
             case .signingFailed:
-                return "Failed to sign message"
+                return ErrorMessageConstants.Messages.signingFailed
             case .verificationFailed:
-                return "Failed to verify signature"
+                return ErrorMessageConstants.Messages.verificationFailed
             case .invalidPoint:
-                return "Invalid elliptic curve point"
+                return ErrorMessageConstants.invalid("elliptic curve point")
             case .invalidScalar:
-                return "Invalid scalar value"
+                return ErrorMessageConstants.invalid("scalar value")
             }
         }
 
