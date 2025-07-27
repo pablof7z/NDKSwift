@@ -8,25 +8,49 @@ Welcome to the NDKSwift documentation. This directory contains comprehensive gui
 - [Getting Started Guide](GETTING_STARTED.md) - Installation, setup, and your first Nostr app
 - [API Reference](API_REFERENCE.md) - Complete API documentation for all classes and methods
 - [NDKSwiftUI Reference](NDKSWIFTUI_REFERENCE.md) - SwiftUI components and UI toolkit documentation
-- [Examples](EXAMPLES.md) - Practical code examples for common use cases
 
 ### Architecture & Design
 - [Architecture Overview](ARCHITECTURE.md) - System design, patterns, and internals
 - [Nostr Protocol Guide](NOSTR_PROTOCOL_GUIDE.md) - Comprehensive guide to the Nostr protocol
+- [Local First Architecture](LOCAL_FIRST.md) - Building offline-first Nostr apps
+- [Optimistic Publishing](OPTIMISTIC_PUBLISHING.md) - Fast event publishing with eventual consistency
 
 ### Feature Guides
 - [Authentication Guide](AUTHENTICATION.md) - Complete guide to authentication, sessions, and multi-account support
 - [Session Data Management](SESSION_DATA_MANAGEMENT.md) - Reactive filters, follow lists, and web-of-trust
 - [NIP-44 Encryption Guide](NIP44_ENCRYPTION_GUIDE.md) - End-to-end encryption implementation
+- [NIP-77 Implementation](NIP77Implementation.md) - Negentropy protocol for set reconciliation
+- [NIP-92 Media Attachments](NIP92_MEDIA_ATTACHMENTS.md) - Media file handling and metadata
 - [Signature Verification Sampling](SIGNATURE_VERIFICATION_SAMPLING.md) - Performance optimization for signature verification
+- [Relay Health Monitoring](RELAY_HEALTH_MONITORING.md) - Monitoring and managing relay connections
+- [Reactive Profiles](ReactiveProfiles.md) - Real-time profile updates and caching
+
+### Wallet Features
+- [Cashu Retry Mechanism](CASHU_RETRY_MECHANISM.md) - Robust payment retry handling
+- [API Reference - Cashu Retry](API_REFERENCE_CASHU_RETRY.md) - Cashu retry API documentation
+
+### Advanced Topics
+- [Negentropy Protocol](Negentropy.md) - Set reconciliation algorithm
+- [Negentropy Examples](NegentropyExamples.md) - Practical negentropy use cases
+- [NIP-60 Deletion Tag Fix](NIP60_DEL_TAG_FIX.md) - Handling event deletions in wallets
+
+### Architecture Internals
+Located in the [Architecture](Architecture/) subdirectory:
+- [Outbox Caching](Architecture/OutboxCaching.md) - Efficient relay selection and caching
+- [Profile Caching](Architecture/ProfileCaching.md) - User profile caching strategy
+
+### Internals
+Located in the [Internals](Internals/) subdirectory:
+- [Outbox Model](Internals/Outbox.md) - Deep dive into the outbox implementation
+
+### Examples
+Located in the [Examples](Examples/) subdirectory:
+- [Markdown Rendering](Examples/MARKDOWN_RENDERING.md) - Rendering Nostr content with markdown
 
 ### Development Resources
 Located in the [Development](Development/) subdirectory:
+- [Development README](Development/README.md) - Developer guide and contribution guidelines
 - [NIP-29 Implementation Plan](Development/NIP-29-Implementation-Plan.md) - Community moderation implementation
-- [NIP-60/61 Implementation Plan](Development/NIP-60-61-Implementation-Plan.md) - Wallet protocol implementation
-- [Technical Debt](Development/TECHNICAL_DEBT.md) - Known technical debt and improvement areas
-- [Test Coverage Analysis](Development/TEST_COVERAGE_ANALYSIS.md) - Current test coverage report
-- [Test Implementation Plan](Development/TEST_IMPLEMENTATION_PLAN.md) - Testing strategy and roadmap
 
 ## 🚀 Quick Links
 
