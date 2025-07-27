@@ -42,10 +42,7 @@ final class ContentParserFullTests: XCTestCase {
         let result = ContentParser.parseContent(content)
         
         // Then
-        let hashtags = result.entities.compactMap { entity in
-            if case .hashtag(let tag) = entity { return tag }
-            return nil
-        }
+        let hashtags = result.entities.hashtags
         XCTAssertEqual(hashtags, ["hello_world", "test-123", "nostr2024"])
     }
     
@@ -57,10 +54,7 @@ final class ContentParserFullTests: XCTestCase {
         let result = ContentParser.parseContent(content)
         
         // Then
-        let hashtags = result.entities.compactMap { entity in
-            if case .hashtag(let tag) = entity { return tag }
-            return nil
-        }
+        let hashtags = result.entities.hashtags
         XCTAssertEqual(hashtags, ["valid"])
     }
     
@@ -72,10 +66,7 @@ final class ContentParserFullTests: XCTestCase {
         let result = ContentParser.parseContent(content)
         
         // Then
-        let urls = result.entities.compactMap { entity in
-            if case .url(let url) = entity { return url.absoluteString }
-            return nil
-        }
+        let urls = result.entities.urls
         XCTAssertEqual(urls, ["https://nostr.com", "http://example.org"])
     }
     
@@ -163,12 +154,7 @@ final class ContentParserFullTests: XCTestCase {
         XCTAssertTrue(result.entities.contains(.text(", check out ")))
         XCTAssertTrue(result.entities.contains(.hashtag("bitcoin")))
         XCTAssertTrue(result.entities.contains(.text(" at ")))
-        XCTAssertTrue(result.entities.contains { entity in
-            if case .url(let url) = entity {
-                return url.absoluteString == "https://bitcoin.org"
-            }
-            return false
-        })
+        XCTAssertTrue(result.entities.containsURL("https://bitcoin.org"))
     }
     
     func testParseMultipleHashtags() {
@@ -179,10 +165,7 @@ final class ContentParserFullTests: XCTestCase {
         let result = ContentParser.parseContent(content)
         
         // Then
-        let hashtags = result.entities.compactMap { entity in
-            if case .hashtag(let tag) = entity { return tag }
-            return nil
-        }
+        let hashtags = result.entities.hashtags
         XCTAssertEqual(hashtags, ["bitcoin", "lightning", "nostr", "decentralized"])
     }
     
@@ -256,11 +239,7 @@ final class ContentParserFullTests: XCTestCase {
         // Then
         // Invalid reference should remain as text
         XCTAssertEqual(result.normalizedContent, content)
-        XCTAssertFalse(result.entities.contains { entity in
-            if case .userMention = entity { return true }
-            if case .eventMention = entity { return true }
-            return false
-        })
+        XCTAssertFalse(result.entities.containsUserMention() || result.entities.containsEventMention())
     }
     
     // MARK: - Current User Mention Detection Tests
@@ -343,14 +322,8 @@ final class ContentParserFullTests: XCTestCase {
         let result = ContentParser.parseContent(content)
         
         // Then
-        let urls = result.entities.compactMap { entity in
-            if case .url(let url) = entity { return url.absoluteString }
-            return nil
-        }
-        let hashtags = result.entities.compactMap { entity in
-            if case .hashtag(let tag) = entity { return tag }
-            return nil
-        }
+        let urls = result.entities.urls
+        let hashtags = result.entities.hashtags
         
         XCTAssertEqual(urls, ["https://example.com/#section"])
         XCTAssertEqual(hashtags, ["real"]) // Only the standalone hashtag
@@ -380,11 +353,8 @@ final class ContentParserFullTests: XCTestCase {
         let result = ContentParser.parseContent(content)
         
         // Then
-        let urls = result.entities.compactMap { entity in
-            if case .url = entity { return true }
-            return nil
-        }
-        XCTAssertTrue(urls.isEmpty)
+        let hasURL = result.entities.containsURL()
+        XCTAssertFalse(hasURL)
     }
     
     // MARK: - Performance Test
