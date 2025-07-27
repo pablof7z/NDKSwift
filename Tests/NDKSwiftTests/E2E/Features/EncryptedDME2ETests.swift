@@ -86,7 +86,7 @@ final class EncryptedDME2ETests: XCTestCase {
         }
         
         // Give subscription time to establish
-        try await Task.sleep(nanoseconds: 1_000_000_000) // 1 second
+        try await Task.sleep(nanoseconds: TimeConstants.nanosecondsPerSecond) // 1 second
         
         // Step 4: Alice sends encrypted DM to Bob (using NIP-44)
         print("[\(timestamp())] Alice sending encrypted DM to Bob (NIP-44)...")
@@ -188,7 +188,7 @@ final class EncryptedDME2ETests: XCTestCase {
         }
         
         // Give subscription time to establish
-        try await Task.sleep(nanoseconds: 500_000_000) // 0.5 seconds
+        try await Task.sleep(nanoseconds: TimeConstants.nanosecondsPerMillisecond * 500) // 0.5 seconds
         
         // Publish Bob's reply
         _ = try await bobNDK.publish(bobDM)
@@ -413,7 +413,7 @@ final class EncryptedDME2ETests: XCTestCase {
             }
             
             // Give subscription time to establish
-            try await Task.sleep(nanoseconds: 500_000_000)
+            try await Task.sleep(nanoseconds: TimeConstants.nanosecondsPerMillisecond * 500)
             
             // Publish the DM
             _ = try await senderNDK.publish(dmEvent)

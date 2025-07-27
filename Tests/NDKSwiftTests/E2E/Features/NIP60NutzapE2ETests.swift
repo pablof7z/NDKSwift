@@ -74,7 +74,7 @@ final class NIP60NutzapE2ETests: XCTestCase {
         }
         
         // Wait for relay connections
-        try await Task.sleep(nanoseconds: 3_000_000_000) // 3 seconds
+        try await Task.sleep(nanoseconds: 3 * TimeConstants.nanosecondsPerSecond) // 3 seconds
         
         // Check connection status
         print("📡 NDK1 relay status:")
@@ -143,7 +143,7 @@ final class NIP60NutzapE2ETests: XCTestCase {
         
         // Wait for wallet setup to propagate
         print("\n⏳ Waiting for wallet setup to propagate (3 seconds)...")
-        try await Task.sleep(nanoseconds: 3_000_000_000) // 3 seconds
+        try await Task.sleep(nanoseconds: 3 * TimeConstants.nanosecondsPerSecond) // 3 seconds
         print("✅ Setup propagation complete")
         
         // 3. Create deposit on testnut.cashu.space for a random amount
@@ -391,11 +391,11 @@ final class NIP60NutzapE2ETests: XCTestCase {
         print("⏳ Processing incoming nutzaps for pubkey2...")
         
         // Give some time for the nutzap to propagate
-        try await Task.sleep(nanoseconds: 3_000_000_000) // 3 seconds
+        try await Task.sleep(nanoseconds: 3 * TimeConstants.nanosecondsPerSecond) // 3 seconds
         
         // The wallet should automatically process incoming nutzaps through its subscription
         // but let's wait a bit to ensure processing completes
-        try await Task.sleep(nanoseconds: 2_000_000_000) // 2 seconds
+        try await Task.sleep(nanoseconds: 2 * TimeConstants.nanosecondsPerSecond) // 2 seconds
         
         // 9. Wait for and validate pubkey2's 7375 event
         await fulfillment(of: [redeem7375Expectation], timeout: 30.0)

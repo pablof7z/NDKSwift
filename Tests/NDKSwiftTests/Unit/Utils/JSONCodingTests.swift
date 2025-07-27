@@ -196,11 +196,11 @@ final class JSONCodingTests: XCTestCase {
         XCTAssertThrowsError(try JSONCoding.parseDictionary(from: json)) { error in
             if let ndkError = error as? NDKError {
                 switch ndkError {
-                case .parseError(let type, let details):
-                    XCTAssertEqual(type, "JSON dictionary")
-                    XCTAssertTrue(details.contains("Expected dictionary"))
+                case .invalidInput(let message):
+                    XCTAssertTrue(message.contains("JSON dictionary"))
+                    XCTAssertTrue(message.contains("Expected dictionary"))
                 default:
-                    XCTFail("Wrong error type")
+                    XCTFail("Wrong error type: \(ndkError)")
                 }
             }
         }
@@ -220,10 +220,10 @@ final class JSONCodingTests: XCTestCase {
         XCTAssertThrowsError(try JSONCoding.parseArray(from: "")) { error in
             if let ndkError = error as? NDKError {
                 switch ndkError {
-                case .validationError(let message):
+                case .invalidInput(let message):
                     XCTAssertTrue(message.contains("Empty string"))
                 default:
-                    XCTFail("Wrong error type")
+                    XCTFail("Wrong error type: \(ndkError)")
                 }
             }
         }

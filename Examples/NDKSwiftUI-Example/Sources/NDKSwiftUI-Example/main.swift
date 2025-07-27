@@ -116,11 +116,11 @@ struct ExampleComponentsView: View {
                         .fontWeight(.semibold)
                     
                     VStack(alignment: .leading, spacing: 8) {
-                        NDKRelativeTime(timestamp: Timestamp(Date().timeIntervalSince1970 - 300))
-                        NDKRelativeTime(timestamp: Timestamp(Date().timeIntervalSince1970 - 3600))
-                        NDKRelativeTime(timestamp: Timestamp(Date().timeIntervalSince1970 - 86400))
+                        NDKRelativeTime(timestamp: Timestamp(Date().timeIntervalSince1970 - 5 * TimeConstants.minute))
+                        NDKRelativeTime(timestamp: Timestamp(Date().timeIntervalSince1970 - TimeConstants.hour))
+                        NDKRelativeTime(timestamp: Timestamp(Date().timeIntervalSince1970 - TimeConstants.day))
                         
-                        NDKRelativeTimeLong(timestamp: Timestamp(Date().timeIntervalSince1970 - 300))
+                        NDKRelativeTimeLong(timestamp: Timestamp(Date().timeIntervalSince1970 - 5 * TimeConstants.minute))
                     }
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)

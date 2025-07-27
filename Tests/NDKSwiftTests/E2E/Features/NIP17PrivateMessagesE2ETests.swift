@@ -56,7 +56,7 @@ final class NIP17PrivateMessagesE2ETests: XCTestCase {
         _ = try await ndk.publish(event: wrappedMessage)
         
         // Small delay to ensure propagation
-        try await Task.sleep(nanoseconds: 500_000_000) // 0.5 seconds
+        try await Task.sleep(nanoseconds: TimeConstants.nanosecondsPerMillisecond * 500) // 0.5 seconds
         
         // Bob fetches gift wrapped messages
         let filter = NDKFilter(
@@ -114,7 +114,7 @@ final class NIP17PrivateMessagesE2ETests: XCTestCase {
             _ = try await ndk.publish(event: event)
         }
         
-        try await Task.sleep(nanoseconds: 500_000_000) // 0.5 seconds
+        try await Task.sleep(nanoseconds: TimeConstants.nanosecondsPerMillisecond * 500) // 0.5 seconds
         
         // Bob fetches and unwraps his copy
         let bobFilter = NDKFilter(
