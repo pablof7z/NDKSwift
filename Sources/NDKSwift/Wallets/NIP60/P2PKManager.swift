@@ -40,7 +40,7 @@ public actor P2PKManager {
     /// Get Cashu-formatted public key (with "02" prefix)
     func getCashuPublicKey() async throws -> String {
         let (_, pubkey) = try await getOrCreateKeypair()
-        return "02\(pubkey)"
+        return "\(NostrConstants.cashuCompressedKeyPrefix)\(pubkey)"
     }
 
     /// Create P2PK witness signature

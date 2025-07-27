@@ -135,10 +135,12 @@ public final class NDK {
         self.signatureVerificationConfig = signatureVerificationConfig
         self.signatureVerificationSampler = NDKSignatureVerificationSampler(config: signatureVerificationConfig)
 
-        // Initialize internal subscription manager
+        // Initialize internal subscription manager (must be early for event routing)
         self.internalSubscriptionManager = InternalSubscriptionManager(ndk: self)
 
-        // Initialize managers
+        // Initialize core managers
+        // Note: These are initialized directly (not lazy) because they're essential
+        // for basic NDK operation and have interdependencies during startup
         self.eventManager = NDKEventManager(
             ndk: self,
             cache: self.cache
@@ -147,8 +149,6 @@ public final class NDK {
         self.pool = NDKPool(
             ndk: self
         )
-
-        // Subscription coordinator removed - using declarative API instead
 
         self.profileManager = NDKProfileManager(
             ndk: self

@@ -12,7 +12,18 @@ public actor NDKEventManager {
 
     // MARK: - Event Publishing
 
-    /// Publish an event to relays
+    /// Publish an event to relays using the outbox model
+    ///
+    /// This method automatically selects the best relays for publishing based on the event type
+    /// and outbox configuration. It uses optimistic publishing for better user experience.
+    ///
+    /// - Parameters:
+    ///   - event: The event to publish (must be signed)
+    ///   - logRawJSON: If true, logs the raw JSON of the event for debugging
+    /// - Returns: Set of relays that successfully accepted the event
+    /// - Throws: `NDKError.invalidContent` if the event is not signed,
+    ///           `NDKError.notConfigured` if NDK reference is lost,
+    ///           `NDKError.publishError` if publishing fails
     public func publish(_ event: NDKEvent, logRawJSON: Bool = false) async throws -> Set<NDKRelay> {
         guard let ndk = ndk else {
             throw NDKError.notConfigured(ErrorMessageConstants.Messages.ndkReferenceLost)
@@ -30,12 +41,31 @@ public actor NDKEventManager {
     }
 
     /// Publish an event to specific relays
+    ///
+    /// This method bypasses the outbox model and publishes directly to the specified relays.
+    /// Optimistic publishing is disabled when using explicit relay selection.
+    ///
+    /// - Parameters:
+    ///   - event: The event to publish (must be signed)
+    ///   - relayUrls: Set of relay URLs to publish to
+    ///   - logRawJSON: If true, logs the raw JSON of the event for debugging
+    /// - Returns: Set of relays that successfully accepted the event
+    /// - Throws: `NDKError.invalidContent` if the event is not signed,
+    ///           `NDKError.notConfigured` if NDK reference is lost,
+    ///           `NDKError.publishError` if publishing fails
     public func publish(event: NDKEvent, to relayUrls: Set<String>, logRawJSON: Bool = false) async throws -> Set<NDKRelay> {
         // Use common publish implementation without optimistic publishing for explicit relay selection
         return try await publishToRelays(event: event, relayUrls: relayUrls, logRawJSON: logRawJSON, useOptimistic: false)
     }
 
     /// Common implementation for publishing events
+    ///
+    /// - Parameters:
+    ///   - event: The event to publish
+    ///   - relayUrls: Target relay URLs
+    ///   - logRawJSON: Whether to log raw JSON
+    ///   - useOptimistic: Whether to use optimistic publishing
+    /// - Returns: Set of relays that accepted the event
     private func publishToRelays(event: NDKEvent, relayUrls: Set<String>, logRawJSON: Bool, useOptimistic: Bool) async throws -> Set<NDKRelay> {
         guard let ndk = ndk else {
             throw NDKError.notConfigured(ErrorMessageConstants.Messages.ndkReferenceLost)
