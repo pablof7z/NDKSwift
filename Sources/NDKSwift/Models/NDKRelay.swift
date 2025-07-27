@@ -441,7 +441,11 @@ public final class NDKRelay: RelayProtocol, Hashable, Equatable, @unchecked Send
     /// ```
     public var stateStream: AsyncStream<State> {
         AsyncStream { continuation in
-            let task = Task {
+            let task = Task { [weak self] in
+                guard let self = self else { 
+                    continuation.finish()
+                    return 
+                }
                 // Register for state updates
                 await self.stateActor.addFullStateObserver { state in
                     continuation.yield(state)
@@ -542,11 +546,10 @@ public final class NDKRelay: RelayProtocol, Hashable, Equatable, @unchecked Send
         let actualDelay = min(delay, stateActor.maxReconnectDelay)
         await stateActor.updateReconnectDelay(delay * 2)
 
-        let reconnectTask = Task {
+        let reconnectTask = Task { [weak self] in
             try? await Task.sleep(nanoseconds: UInt64(actualDelay * Double(TimeConstants.nanosecondsPerSecond)))
-            if !Task.isCancelled {
-                try? await self.connect()
-            }
+            guard let self = self, !Task.isCancelled else { return }
+            try? await self.connect()
         }
 
         await stateActor.scheduleReconnectTask(reconnectTask)
@@ -658,7 +661,8 @@ public final class NDKRelay: RelayProtocol, Hashable, Equatable, @unchecked Send
             // NIP-77 messages - route to sync handler via NDK
             NDKLogger.log(.debug, category: .relay, "Routing NIP-77 message to handler: \(message)")
             if let ndk = ndk {
-                Task {
+                Task { [weak self] in
+                    guard let self = self else { return }
                     await ndk.processNIP77Message(message, from: self)
                 }
             } else {
@@ -676,7 +680,8 @@ public final class NDKRelay: RelayProtocol, Hashable, Equatable, @unchecked Send
 
         // Route to subscription manager via NDK only
         if let ndk = ndk, let subId = subscriptionId {
-            Task {
+            Task { [weak self] in
+                guard let self = self else { return }
                 await ndk.processEvent(event, subscriptionId: subId, from: self)
             }
         } else {
@@ -704,7 +709,8 @@ public final class NDKRelay: RelayProtocol, Hashable, Equatable, @unchecked Send
 
         // Notify NDK about OK message
         if let ndk = ndk {
-            Task {
+            Task { [weak self] in
+                guard let self = self else { return }
                 await ndk.processOKMessage(eventId: eventId, accepted: accepted, message: message, from: self)
             }
         }
@@ -782,8 +788,9 @@ public final class NDKRelay: RelayProtocol, Hashable, Equatable, @unchecked Send
 
 extension NDKRelay: NDKRelayConnectionDelegate {
     public func relayConnectionDidConnect(_: NDKRelayConnection) {
-        Task {
-            await stateActor.updateStats {
+        Task { [weak self] in
+            guard let self = self else { return }
+            await self.stateActor.updateStats {
                 $0.connectedAt = Date()
                 $0.successfulConnections += 1
             }
@@ -798,9 +805,10 @@ extension NDKRelay: NDKRelayConnectionDelegate {
     }
 
     public func relayConnectionDidDisconnect(_: NDKRelayConnection, error: Error?) {
-        Task {
+        Task { [weak self] in
+            guard let self = self else { return }
             // Clear all subscriptions when disconnected
-            await stateActor.clearAllSubscriptions()
+            await self.stateActor.clearAllSubscriptions()
 
             if let error = error {
                 await handleConnectionFailure(error)
@@ -811,8 +819,9 @@ extension NDKRelay: NDKRelayConnectionDelegate {
     }
 
     public func relayConnection(_: NDKRelayConnection, didReceiveMessage message: NostrMessage) {
-        Task {
-            await handleNostrMessage(message)
+        Task { [weak self] in
+            guard let self = self else { return }
+            await self.handleNostrMessage(message)
         }
     }
 

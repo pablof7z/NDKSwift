@@ -160,7 +160,8 @@ public actor NDKBunkerSigner: NDKSigner, Sendable {
         self.localSigner = localSigner
         self.relayUrls = []
 
-        Task { @MainActor in
+        Task { @MainActor [weak self] in
+            guard let self = self else { return }
             switch connectionType {
             case let .bunker(token):
                 await self.parseBunkerUrl(token)
@@ -186,8 +187,9 @@ public actor NDKBunkerSigner: NDKSigner, Sendable {
         self.nostrConnectSecret = generateNostrConnectSecret()
 
         // Generate nostrconnect:// URI - Note: pubkey will be set later
-        Task { @MainActor in
-            let pubkey = try? await localSigner.pubkey
+        Task { @MainActor [weak self] in
+            guard let self = self else { return }
+            let pubkey = try? await self.localSigner.pubkey
             await self.generateNostrConnectUri(pubkey: pubkey ?? "", relay: relay, options: options)
         }
     }

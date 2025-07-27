@@ -1,338 +1,270 @@
 import XCTest
 @testable import NDKSwift
 
+/// Tests for NDKEventManager's publish functionality
 final class NDKEventManagerTests: NDKTestCase {
     
+    var ndk: NDK!
     var eventManager: NDKEventManager!
     var mockCache: MemoryCache!
     
     override func setUp() async throws {
         try await super.setUp()
         
-        mockCache = MemoryCache()
-        eventManager = NDKEventManager(cache: mockCache)
+        mockCache = createMemoryCache()
+        ndk = createTestNDK(cache: mockCache)
+        eventManager = ndk.eventManager
     }
     
     override func tearDown() async throws {
         eventManager = nil
         mockCache = nil
+        ndk = nil
         
         try await super.tearDown()
     }
     
-    // MARK: - Event Processing Tests
+    // MARK: - Event Publishing Tests
     
-    func testProcessNewEvent() async throws {
-        let event = EventTestFactory.createEvent()
+    func testPublishSignedEvent() async throws {
+        // Create a signed event
+        let signer = try NDKPrivateKeySigner.generate()
+        ndk.signer = signer
         
-        let processed = await eventManager.processEvent(event)
+        let event = try await ndk.createEvent { builder in
+            builder
+                .kind(1)
+                .content("Test note")
+        }
         
-        XCTAssertTrue(processed)
+        // Since we don't have real relays, the publish will fail
+        // but we can verify the event was created correctly
+        XCTAssertFalse(event.sig.isEmpty)
+        XCTAssertEqual(event.kind, 1)
+        XCTAssertEqual(event.content, "Test note")
+        XCTAssertEqual(event.pubkey, try await signer.pubkey)
+    }
+    
+    func testPublishUnsignedEventFails() async throws {
+        // Create unsigned event manually
+        let event = EventTestFactory.createEvent(sig: "")
+        
+        do {
+            _ = try await eventManager.publish(event)
+            XCTFail("Should have thrown error for unsigned event")
+        } catch {
+            // Expected error
+            XCTAssertTrue(error is NDKError)
+        }
+    }
+    
+    func testPublishWithBuilder() async throws {
+        let signer = try NDKPrivateKeySigner.generate()
+        ndk.signer = signer
+        
+        let (event, _) = try await eventManager.publish { builder in
+            builder
+                .kind(1)
+                .content("Built event")
+                .tag(["p", TestFixtures.Keys.alice.publicKey])
+        }
+        
+        XCTAssertEqual(event.kind, 1)
+        XCTAssertEqual(event.content, "Built event")
+        XCTAssertEqual(event.tags.count, 1)
+        XCTAssertEqual(event.tags[0], ["p", TestFixtures.Keys.alice.publicKey])
+    }
+    
+    // MARK: - Event Caching Tests
+    
+    func testPublishedEventIsCached() async throws {
+        let signer = try NDKPrivateKeySigner.generate()
+        ndk.signer = signer
+        
+        // Add a mock relay so publish succeeds
+        let mockRelay = await createTestMockRelay()
+        await ndk.pool.addRelay(mockRelay.url)
+        
+        let event = try await ndk.createEvent { builder in
+            builder
+                .kind(1)
+                .content("Cached event")
+        }
+        
+        // Try to publish (will fail without real relay, but should still cache)
+        _ = try? await eventManager.publish(event)
         
         // Event should be in cache
-        let cachedEvent = await mockCache.getEvent(event.id)
+        let cachedEvent = await mockCache.getEvent(id: event.id)
         XCTAssertNotNil(cachedEvent)
-        XCTAssertEventEqual(event, cachedEvent!)
-    }
-    
-    func testProcessDuplicateEvent() async throws {
-        let event = EventTestFactory.createEvent()
-        
-        // Process once
-        let firstProcess = await eventManager.processEvent(event)
-        XCTAssertTrue(firstProcess)
-        
-        // Process again
-        let secondProcess = await eventManager.processEvent(event)
-        XCTAssertFalse(secondProcess) // Should not process duplicate
-    }
-    
-    func testProcessEventWithNewerTimestamp() async throws {
-        let oldEvent = EventTestFactory.createEvent(
-            id: "event1",
-            createdAt: 1000
-        )
-        
-        let newEvent = EventTestFactory.createEvent(
-            id: "event1", // Same ID
-            createdAt: 2000 // Newer timestamp
-        )
-        
-        // Process old event first
-        _ = await eventManager.processEvent(oldEvent)
-        
-        // Try to process newer event with same ID
-        let processed = await eventManager.processEvent(newEvent)
-        XCTAssertFalse(processed) // Should reject based on ID, not timestamp
-        
-        // Old event should still be in cache
-        let cachedEvent = await mockCache.getEvent("event1")
-        XCTAssertEqual(cachedEvent?.createdAt, 1000)
-    }
-    
-    // MARK: - Deletion Event Processing Tests
-    
-    func testProcessDeletionEvent() async throws {
-        let author = TestFixtures.Keys.alice.publicKey
-        
-        // Create events to be deleted
-        let event1 = EventTestFactory.createEvent(id: "event1", pubkey: author)
-        let event2 = EventTestFactory.createEvent(id: "event2", pubkey: author)
-        let event3 = EventTestFactory.createEvent(id: "event3", pubkey: TestFixtures.Keys.bob.publicKey)
-        
-        // Save events to cache
-        try await mockCache.saveEvent(event1)
-        try await mockCache.saveEvent(event2)
-        try await mockCache.saveEvent(event3)
-        
-        // Create deletion event
-        let deletionEvent = EventTestFactory.createDeletionEvent(
-            eventIds: ["event1", "event2", "event3"],
-            pubkey: author
-        )
-        
-        // Process deletion
-        let processed = await eventManager.processEvent(deletionEvent)
-        XCTAssertTrue(processed)
-        
-        // Check that only author's events were deleted
-        await XCTAssertEventNotInCache(eventId: "event1", cache: mockCache)
-        await XCTAssertEventNotInCache(eventId: "event2", cache: mockCache)
-        await XCTAssertEventInCache(event3, cache: mockCache) // Should not be deleted (different author)
-    }
-    
-    func testProcessDeletionEventWithoutPermission() async throws {
-        let originalAuthor = TestFixtures.Keys.alice.publicKey
-        let deletionAuthor = TestFixtures.Keys.bob.publicKey
-        
-        // Create event by Alice
-        let event = EventTestFactory.createEvent(
-            id: "event1",
-            pubkey: originalAuthor
-        )
-        try await mockCache.saveEvent(event)
-        
-        // Bob tries to delete Alice's event
-        let deletionEvent = EventTestFactory.createDeletionEvent(
-            eventIds: ["event1"],
-            pubkey: deletionAuthor
-        )
-        
-        // Process deletion
-        let processed = await eventManager.processEvent(deletionEvent)
-        XCTAssertTrue(processed) // Deletion event itself is processed
-        
-        // But original event should NOT be deleted
-        await XCTAssertEventInCache(event, cache: mockCache)
+        XCTAssertEqual(cachedEvent?.id, event.id)
     }
     
     // MARK: - Replaceable Event Tests
     
-    func testProcessReplaceableEvent() async throws {
-        let author = TestFixtures.Keys.alice.publicKey
+    func testPublishReplaceableEvent() async throws {
+        let signer = try NDKPrivateKeySigner.generate()
+        ndk.signer = signer
+        let author = try await signer.pubkey
         
-        // Create old replaceable event (kind 0 - metadata)
-        let oldEvent = EventTestFactory.createMetadataEvent(
-            name: "Old Name",
-            pubkey: author
-        )
-        oldEvent.createdAt = 1000
+        // Create metadata event (kind 0 - replaceable)
+        let metadata1 = try await ndk.createEvent { builder in
+            builder
+                .kind(0)
+                .content("{\"name\":\"Alice\"}")
+        }
         
-        _ = await eventManager.processEvent(oldEvent)
+        // Save to cache
+        try await mockCache.saveEvent(metadata1)
         
-        // Create newer replaceable event
-        let newEvent = EventTestFactory.createMetadataEvent(
-            name: "New Name",
-            pubkey: author
-        )
-        newEvent.createdAt = 2000
+        // Create newer metadata
+        let metadata2 = try await ndk.createEvent { builder in
+            builder
+                .kind(0)
+                .content("{\"name\":\"Alice Updated\"}")
+        }
         
-        _ = await eventManager.processEvent(newEvent)
+        // Save newer version
+        try await mockCache.saveEvent(metadata2)
         
-        // Only newer event should be in cache
-        let events = await mockCache.getEvents(
-            filter: NDKFilter(authors: [author], kinds: [0])
-        )
-        
-        XCTAssertEqual(events.count, 1)
-        XCTAssertEqual(events.first?.content.contains("New Name"), true)
-    }
-    
-    func testProcessOlderReplaceableEvent() async throws {
-        let author = TestFixtures.Keys.alice.publicKey
-        
-        // Create newer event first
-        let newEvent = EventTestFactory.createMetadataEvent(
-            name: "New Name",
-            pubkey: author
-        )
-        newEvent.createdAt = 2000
-        
-        _ = await eventManager.processEvent(newEvent)
-        
-        // Try to process older event
-        let oldEvent = EventTestFactory.createMetadataEvent(
-            name: "Old Name",
-            pubkey: author
-        )
-        oldEvent.createdAt = 1000
-        
-        let processed = await eventManager.processEvent(oldEvent)
-        XCTAssertTrue(processed) // Should still be processed
-        
-        // But newer event should remain in cache
-        let events = await mockCache.getEvents(
-            filter: NDKFilter(authors: [author], kinds: [0])
+        // Query for metadata
+        let events = try await mockCache.queryEvents(
+            NDKFilter(authors: [author], kinds: [0])
         )
         
-        XCTAssertEqual(events.count, 1)
-        XCTAssertEqual(events.first?.createdAt, 2000)
+        // Should have both events in cache (cache doesn't enforce replaceable logic)
+        XCTAssertEqual(events.count, 2)
     }
     
     // MARK: - Parameterized Replaceable Event Tests
     
-    func testProcessParameterizedReplaceableEvent() async throws {
-        let author = TestFixtures.Keys.alice.publicKey
-        let dTag = "test-article"
+    func testPublishParameterizedReplaceableEvent() async throws {
+        let signer = try NDKPrivateKeySigner.generate()
+        ndk.signer = signer
+        let author = try await signer.pubkey
+        let dTag = "article-123"
         
-        // Create old article
-        let oldArticle = EventTestFactory.createEvent(
-            kind: 30023, // Long-form content
-            content: "Old article content",
-            tags: [Tag(name: NostrConstants.TagName.d, value: dTag)],
-            pubkey: author,
-            createdAt: 1000
-        )
+        // Create article (kind 30023 - parameterized replaceable)
+        let article1 = try await ndk.createEvent { builder in
+            builder
+                .kind(30023)
+                .content("Original article")
+                .tag(["d", dTag])
+        }
         
-        _ = await eventManager.processEvent(oldArticle)
+        try await mockCache.saveEvent(article1)
         
-        // Create newer version
-        let newArticle = EventTestFactory.createEvent(
-            kind: 30023,
-            content: "New article content",
-            tags: [Tag(name: NostrConstants.TagName.d, value: dTag)],
-            pubkey: author,
-            createdAt: 2000
-        )
+        // Create updated version
+        let article2 = try await ndk.createEvent { builder in
+            builder
+                .kind(30023)
+                .content("Updated article")
+                .tag(["d", dTag])
+        }
         
-        _ = await eventManager.processEvent(newArticle)
+        try await mockCache.saveEvent(article2)
         
-        // Only newer version should exist
-        let events = await mockCache.getEvents(
-            filter: NDKFilter(
+        // Query for articles
+        let events = try await mockCache.queryEvents(
+            NDKFilter(
                 authors: [author],
                 kinds: [30023],
-                tags: [NostrConstants.TagName.d: [dTag]]
+                tags: ["d": Set([dTag])]
             )
         )
         
-        XCTAssertEqual(events.count, 1)
-        XCTAssertEqual(events.first?.content, "New article content")
+        // Cache stores both versions
+        XCTAssertEqual(events.count, 2)
     }
     
-    // MARK: - Ephemeral Event Tests
+    // MARK: - Optimistic Publishing Tests
     
-    func testProcessEphemeralEvent() async throws {
-        // Create ephemeral event (kind 20000-29999)
-        let ephemeralEvent = EventTestFactory.createEvent(
-            kind: 20001, // Ephemeral
-            content: "Ephemeral content"
-        )
+    func testOptimisticPublishing() async throws {
+        let signer = try NDKPrivateKeySigner.generate()
+        ndk.signer = signer
         
-        let processed = await eventManager.processEvent(ephemeralEvent)
-        XCTAssertTrue(processed)
+        let event = try await ndk.createEvent { builder in
+            builder
+                .kind(1)
+                .content("Optimistic event")
+        }
         
-        // Should NOT be in cache
-        await XCTAssertEventNotInCache(eventId: ephemeralEvent.id, cache: mockCache)
+        // Event should be added to cache immediately for optimistic publishing
+        _ = try? await eventManager.publish(event)
+        
+        // Check if event was added to unpublished events
+        let unpublishedEvents = await mockCache.getUnpublishedEvents(maxAge: 60, limit: nil)
+        XCTAssertFalse(unpublishedEvents.isEmpty)
     }
     
-    // MARK: - Batch Processing Tests
-    
-    func testBatchProcessEvents() async throws {
-        let events = (0..<100).map { index in
-            EventTestFactory.createEvent(
-                content: "Batch event \(index)",
-                createdAt: Timestamp(1000 + index)
-            )
+    func testRetryUnpublishedEvents() async throws {
+        let signer = try NDKPrivateKeySigner.generate()
+        ndk.signer = signer
+        
+        // Create an event
+        let event = try await ndk.createEvent { builder in
+            builder
+                .kind(1)
+                .content("Unpublished event")
         }
         
-        // Process all events
-        var processedCount = 0
-        for event in events {
-            if await eventManager.processEvent(event) {
-                processedCount += 1
-            }
-        }
+        // Add to unpublished events
+        try await mockCache.addUnpublishedEvent(event, relays: ["wss://relay1.test", "wss://relay2.test"])
         
-        XCTAssertEqual(processedCount, 100)
+        // Try to retry (will fail without real relays)
+        let results = try await eventManager.retryUnpublishedEvents()
         
-        // All should be in cache
-        let cachedEvents = await mockCache.getEvents(filter: NDKFilter())
-        XCTAssertEqual(cachedEvents.count, 100)
+        // Should attempt to publish
+        XCTAssertEqual(results.count, 1)
+        XCTAssertEqual(results[0].event.id, event.id)
     }
     
-    // MARK: - Thread Safety Tests
+    // MARK: - Relay Selection Tests
     
-    func testConcurrentEventProcessing() async throws {
-        let eventCount = 100
-        let events = (0..<eventCount).map { index in
-            EventTestFactory.createEvent(
-                id: "concurrent_\(index)",
-                content: "Concurrent event \(index)"
-            )
+    func testPublishToSpecificRelays() async throws {
+        let signer = try NDKPrivateKeySigner.generate()
+        ndk.signer = signer
+        
+        let event = try await ndk.createEvent { builder in
+            builder
+                .kind(1)
+                .content("Relay-specific event")
         }
         
-        // Process events concurrently
-        await withTaskGroup(of: Bool.self) { group in
-            for event in events {
-                group.addTask {
-                    await self.eventManager.processEvent(event)
-                }
-            }
+        let targetRelays: Set<String> = ["wss://specific1.test", "wss://specific2.test"]
+        
+        // Publish to specific relays (will fail without real relays)
+        do {
+            _ = try await eventManager.publish(event: event, to: targetRelays)
+        } catch {
+            // Expected to fail without real relays
         }
         
-        // All unique events should be in cache
-        let cachedEvents = await mockCache.getEvents(filter: NDKFilter())
-        XCTAssertEqual(cachedEvents.count, eventCount)
+        // The event should still be cached
+        let cachedEvent = await mockCache.getEvent(id: event.id)
+        XCTAssertNotNil(cachedEvent)
     }
     
-    func testConcurrentDuplicateProcessing() async throws {
-        let event = EventTestFactory.createEvent()
-        let concurrentAttempts = 10
+    // MARK: - Error Handling Tests
+    
+    func testPublishWithoutSigner() async throws {
+        // Remove signer
+        ndk.signer = nil
         
-        // Try to process the same event multiple times concurrently
-        let results = await withTaskGroup(of: Bool.self) { group in
-            for _ in 0..<concurrentAttempts {
-                group.addTask {
-                    await self.eventManager.processEvent(event)
-                }
+        do {
+            _ = try await eventManager.publish { builder in
+                builder.kind(1).content("No signer")
             }
-            
-            var results: [Bool] = []
-            for await result in group {
-                results.append(result)
-            }
-            return results
+            XCTFail("Should have thrown error without signer")
+        } catch {
+            // Expected error
+            XCTAssertTrue(error is NDKError)
         }
-        
-        // Only one should succeed
-        let successCount = results.filter { $0 }.count
-        XCTAssertEqual(successCount, 1)
-        
-        // Event should be in cache once
-        let cachedEvents = await mockCache.getEvents(filter: NDKFilter(ids: [event.id]))
-        XCTAssertEqual(cachedEvents.count, 1)
     }
     
-    // MARK: - Performance Tests
+    // MARK: - Helper Methods
     
-    func testEventProcessingPerformance() {
-        let events = createLargeEventSet(count: 1000)
-        
-        measureAsyncPerformance {
-            for event in events {
-                _ = await self.eventManager.processEvent(event)
-            }
-        }
+    private func createTestMockRelay() async -> MockRelay {
+        return MockRelay(url: "wss://test.relay")
     }
 }

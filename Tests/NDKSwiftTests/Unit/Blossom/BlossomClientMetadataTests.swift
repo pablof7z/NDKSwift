@@ -1,16 +1,18 @@
 import XCTest
 @testable import NDKSwift
 
-final class BlossomClientMetadataTests: XCTestCase {
+final class BlossomClientMetadataTests: NDKTestCase {
     var mockURLSession: SimpleMockURLSession!
     var client: BlossomClient!
     var signer: NDKPrivateKeySigner!
+    var ndk: NDK!
     
     override func setUp() async throws {
         try await super.setUp()
         mockURLSession = SimpleMockURLSession()
         client = BlossomClient(urlSession: mockURLSession)
         signer = try NDKPrivateKeySigner.generate()
+        ndk = createTestNDK(signer: signer)
     }
     
     #if canImport(UIKit)
@@ -53,7 +55,8 @@ final class BlossomClientMetadataTests: XCTestCase {
             data: imageData,
             mimeType: nil, // Let it auto-detect
             to: "https://example.com",
-            signer: signer
+            signer: signer,
+            ndk: ndk
         )
         
         // Verify metadata was extracted
@@ -96,7 +99,8 @@ final class BlossomClientMetadataTests: XCTestCase {
             data: imageData,
             mimeType: nil, // Should be inferred
             to: "https://example.com",
-            signer: signer
+            signer: signer,
+            ndk: ndk
         )
         
         // Verify MIME type was inferred
@@ -132,7 +136,8 @@ final class BlossomClientMetadataTests: XCTestCase {
             data: pdfData,
             mimeType: "application/pdf",
             to: "https://example.com",
-            signer: signer
+            signer: signer,
+            ndk: ndk
         )
         
         // Verify no image metadata was extracted
@@ -171,7 +176,8 @@ final class BlossomClientMetadataTests: XCTestCase {
             data: data,
             mimeType: "application/octet-stream", // Override auto-detection
             to: "https://example.com",
-            signer: signer
+            signer: signer,
+            ndk: ndk
         )
         
         // Verify no metadata extraction occurred due to MIME type
@@ -220,7 +226,8 @@ final class BlossomClientMetadataTests: XCTestCase {
             data: pngData,
             mimeType: nil, // Auto-detect
             to: "https://example.com",
-            signer: signer
+            signer: signer,
+            ndk: ndk
         )
         
         // Verify metadata was extracted for PNG

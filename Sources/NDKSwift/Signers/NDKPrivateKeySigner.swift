@@ -5,6 +5,11 @@ public final class NDKPrivateKeySigner: NDKSigner {
     private let privateKey: PrivateKey
     private let _pubkey: PublicKey
     private var isReady = true
+    
+    /// Access to the private key for NIP-59 operations
+    public var privateKeyForNIP59: PrivateKey {
+        return privateKey
+    }
 
     /// Initialize with a private key
     public init(privateKey: PrivateKey) throws {

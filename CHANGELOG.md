@@ -4,7 +4,24 @@ All notable changes to NDKSwift will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.7.0] - 2025-01-27
+
+### Added
+- NIP-17 Private Direct Messages implementation with metadata privacy
+- NIP-59 Gift Wrap protocol for event sealing and wrapping
+- Support for chat messages (kind 14) and file messages (kind 15)
+- Comprehensive unit tests with test vectors from nostr-tools
+- Integration tests and example code for NIP-17 usage
+- New `initialize()` method on NDKAuthManager for simplified session restoration
+
+### Changed
+- Reduced log verbosity by moving detailed event processing logs from INFO to DEBUG/TRACE level in NDKDataSource
+- Simplified NDKAuthManager API - developers now just call `await authManager.initialize()` instead of manually restoring and switching sessions
+- Deprecated `restoreSession()` method in favor of the new `initialize()` method
+
+### Improved
+- Authentication session restoration is now automatic and requires less boilerplate code
+- Documentation updated to reflect the new simplified authentication pattern
 
 ## [0.6.0] - 2025-01-26
 

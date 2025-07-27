@@ -184,14 +184,22 @@ enum FilterTestFactory {
         until: Timestamp? = nil,
         limit: Int? = nil
     ) -> NDKFilter {
+        var tagsDict: [String: Set<String>]? = nil
+        if let tags = tags {
+            tagsDict = [:]
+            for (key, values) in tags {
+                tagsDict![key] = Set(values)
+            }
+        }
+        
         return NDKFilter(
             ids: ids,
             authors: authors,
             kinds: kinds,
             since: since,
             until: until,
-            tags: tags,
-            limit: limit
+            limit: limit,
+            tags: tagsDict
         )
     }
     

@@ -3,9 +3,15 @@ import XCTest
 
 final class NDKPoolTests: NDKTestCase {
     
+    // MARK: - Helper Methods
+    
+    private func createMockNDK() -> NDK {
+        return createTestNDK()
+    }
+    
     func testAddRelay() async throws {
-        let ndk = await createMockNDK()
-        let pool = await ndk.relayPool
+        let ndk = createMockNDK()
+        let pool = ndk.pool
         
         let relayURL = "wss://relay.example.com"
         let relay = await pool.addRelay(relayURL)
@@ -18,8 +24,8 @@ final class NDKPoolTests: NDKTestCase {
     }
     
     func testAddDuplicateRelay() async throws {
-        let ndk = await createMockNDK()
-        let pool = await ndk.relayPool
+        let ndk = createMockNDK()
+        let pool = ndk.pool
         
         let relayURL = "wss://relay.example.com"
         let relay1 = await pool.addRelay(relayURL)
@@ -33,8 +39,8 @@ final class NDKPoolTests: NDKTestCase {
     }
     
     func testRemoveRelay() async throws {
-        let ndk = await createMockNDK()
-        let pool = await ndk.relayPool
+        let ndk = createMockNDK()
+        let pool = ndk.pool
         
         let relayURL = "wss://relay.example.com"
         await pool.addRelay(relayURL)
@@ -49,8 +55,8 @@ final class NDKPoolTests: NDKTestCase {
     }
     
     func testGetRelayByURL() async throws {
-        let ndk = await createMockNDK()
-        let pool = await ndk.relayPool
+        let ndk = createMockNDK()
+        let pool = ndk.pool
         
         let relayURL = "wss://relay.example.com"
         let addedRelay = await pool.addRelay(relayURL)
@@ -66,14 +72,14 @@ final class NDKPoolTests: NDKTestCase {
     }
     
     func testExplicitRelays() async throws {
-        let ndk = await createMockNDK()
-        let pool = await ndk.relayPool
+        let ndk = createMockNDK()
+        let pool = ndk.pool
         
         // Add explicit relay
         await pool.addRelay("wss://explicit.relay.com", origin: .explicit)
         
-        // Add discovered relay
-        await pool.addRelay("wss://discovered.relay.com", origin: .discovered)
+        // Add discovered relay (using outbox origin with a pubkey)
+        await pool.addRelay("wss://discovered.relay.com", origin: .outbox(authorPubkey: TestFixtures.Keys.alice.publicKey))
         
         let allRelays = await pool.relays
         XCTAssertEqual(allRelays.count, 2)
@@ -84,8 +90,8 @@ final class NDKPoolTests: NDKTestCase {
     }
     
     func testPrepareRelays() async throws {
-        let ndk = await createMockNDK()
-        let pool = await ndk.relayPool
+        let ndk = createMockNDK()
+        let pool = ndk.pool
         
         let urls = [
             "wss://relay1.example.com",
@@ -110,8 +116,8 @@ final class NDKPoolTests: NDKTestCase {
     }
     
     func testRelayPoolChangeEvents() async throws {
-        let ndk = await createMockNDK()
-        let pool = await ndk.relayPool
+        let ndk = createMockNDK()
+        let pool = ndk.pool
         
         var receivedEvents: [NDKPoolChangeEvent] = []
         
@@ -157,8 +163,8 @@ final class NDKPoolTests: NDKTestCase {
     }
     
     func testConnectionSummary() async throws {
-        let ndk = await createMockNDK()
-        let pool = await ndk.relayPool
+        let ndk = createMockNDK()
+        let pool = ndk.pool
         
         // Add some relays
         await pool.addRelay("wss://relay1.example.com")
@@ -173,8 +179,8 @@ final class NDKPoolTests: NDKTestCase {
     }
     
     func testDisconnectAll() async throws {
-        let ndk = await createMockNDK()
-        let pool = await ndk.relayPool
+        let ndk = createMockNDK()
+        let pool = ndk.pool
         
         // Add relays
         await pool.addRelay("wss://relay1.example.com")
