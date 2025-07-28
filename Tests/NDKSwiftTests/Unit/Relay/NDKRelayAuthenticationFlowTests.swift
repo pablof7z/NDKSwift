@@ -17,7 +17,7 @@ final class NDKRelayAuthenticationFlowTests: XCTestCase {
         
         // Create mock relay with auth support
         mockRelay = MockAuthRelay(url: "wss://auth.test.relay")
-        mockRelay.setNDK(ndk)
+        mockRelay.ndk = ndk
     }
     
     override func tearDown() async throws {
@@ -33,7 +33,7 @@ final class NDKRelayAuthenticationFlowTests: XCTestCase {
     func testAuthChallengeTriggersStateTransition() async throws {
         // Connect relay
         await mockRelay.simulateConnect()
-        let connectedState = await mockRelay.connectionState
+        let connectedState = mockRelay.connectionState
         XCTAssertEqual(connectedState, .connected)
         
         // Simulate AUTH challenge
@@ -41,7 +41,7 @@ final class NDKRelayAuthenticationFlowTests: XCTestCase {
         await mockRelay.simulateAuthChallenge(challenge: challenge)
         
         // Verify state transition
-        let authRequiredState = await mockRelay.connectionState
+        let authRequiredState = mockRelay.connectionState
         XCTAssertEqual(authRequiredState, .authRequired(challenge: challenge))
         
         // Verify delegate was called
@@ -58,7 +58,7 @@ final class NDKRelayAuthenticationFlowTests: XCTestCase {
         
         // Create test event
         let event = try await NDKEventBuilder(ndk: ndk)
-            .kind(.textNote)
+            .kind(1)
             .content("Test note requiring auth")
             .build(signer: signer)
         
@@ -120,7 +120,7 @@ final class NDKRelayAuthenticationFlowTests: XCTestCase {
             for i in 0..<3 {
                 group.addTask {
                     try await NDKEventBuilder(ndk: self.ndk)
-                        .kind(.textNote)
+                        .kind(1)
                         .content("Test note \(i)")
                         .build(signer: self.signer)
                 }
@@ -177,7 +177,7 @@ final class NDKRelayAuthenticationFlowTests: XCTestCase {
         
         // Create test event
         let event = try await NDKEventBuilder(ndk: ndk)
-            .kind(.textNote)
+            .kind(1)
             .content("Test note")
             .build(signer: signer)
         
@@ -237,9 +237,8 @@ final class NDKRelayAuthenticationFlowTests: XCTestCase {
 
 // MARK: - Mock Auth Relay
 
-class MockAuthRelay: NDKRelay {
+class MockAuthRelay: MockRelay, @unchecked Sendable {
     var shouldRejectWithAuthRequired = false
-    var publishedEvents: [NDKEvent] = []
     var onPublishAttempt: ((NDKEvent) -> Void)?
     
     override func publish(_ event: NDKEvent) async throws -> (success: Bool, message: String?) {
@@ -257,12 +256,12 @@ class MockAuthRelay: NDKRelay {
     }
     
     func simulateConnect() async {
-        await updateConnectionState(.connected)
+        connectionState = .connected
     }
     
     func simulateAuthChallenge(challenge: String) async {
         // First update state
-        await updateConnectionState(.authRequired(challenge: challenge))
+        connectionState = .authRequired(challenge: challenge)
         
         // Then trigger the AUTH handler
         if let ndk = ndk {
@@ -271,7 +270,7 @@ class MockAuthRelay: NDKRelay {
     }
     
     func simulateAuthSuccess() async {
-        await updateConnectionState(.authenticated)
+        connectionState = .authenticated
         
         // Trigger retry of pending events
         if let ndk = ndk {

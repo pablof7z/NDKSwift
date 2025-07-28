@@ -1,4 +1,5 @@
 import XCTest
+@testable import NDKSwift
 
 // MARK: - Async Test Helpers
 
@@ -106,8 +107,8 @@ extension XCTestCase {
         return NDKEvent(
             kind: kind,
             content: content,
-            pubkey: pubkey ?? randomKey(),
-            tags: tags
+            tags: tags,
+            pubkey: pubkey ?? randomKey()
         )
     }
 }
