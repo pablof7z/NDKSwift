@@ -49,4 +49,36 @@ extension NDKError {
     static func configurationError(_ message: String) -> NDKError {
         return .notConfigured(message)
     }
+    
+    // MARK: - Wallet-specific error factories
+    
+    static func walletInsufficientBalance(amount: Int64, available: Int64? = nil) -> NDKError {
+        if let available = available {
+            return .walletError(message: "Insufficient balance: requested \(amount) sats, available: \(available) sats")
+        } else {
+            return .insufficientBalance(amount: amount)
+        }
+    }
+    
+    static func walletMintError(_ mintURL: String, operation: String, details: String? = nil) -> NDKError {
+        let message = details.map { "Mint \(mintURL) \(operation) failed: \($0)" }
+            ?? "Mint \(mintURL) \(operation) failed"
+        return .walletError(message: message)
+    }
+    
+    static func walletPaymentFailed(reason: String, invoice: String? = nil) -> NDKError {
+        let message = invoice.map { "Payment failed for invoice \($0): \(reason)" }
+            ?? "Payment failed: \(reason)"
+        return .paymentFailed(reason: message)
+    }
+    
+    static func walletInvalidProof(details: String? = nil) -> NDKError {
+        let message = details.map { "Invalid proof: \($0)" } ?? "Invalid proof"
+        return .invalidProof(message)
+    }
+    
+    static func walletNoMintAvailable(reason: String? = nil) -> NDKError {
+        let message = reason ?? "No mint available"
+        return .noMintAvailable(message)
+    }
 }

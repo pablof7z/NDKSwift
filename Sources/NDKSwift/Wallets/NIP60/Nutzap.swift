@@ -38,7 +38,8 @@ public enum Nutzap {
         let viableMintURLs = await proofStateManager.getMintsWithSufficientBalance(amount: amountWithFeeBuffer)
 
         guard !viableMintURLs.isEmpty else {
-            throw NDKError.insufficientBalance(amount: amount)
+            let balance = await proofStateManager.getTotalBalance()
+            throw NDKError.walletInsufficientBalance(amount: amount, available: balance)
         }
 
         // Use the provided P2PK key (should come from payment request)
@@ -64,14 +65,15 @@ public enum Nutzap {
             // Get available proofs and use CashuSwift's pick function to handle fee calculation
             let availableProofs = await proofStateManager.getAvailableProofs(mint: mintURL)
             guard let pickResult = CashuSwift.pick(availableProofs, amount: Int(amount), mint: mint) else {
-                lastError = NDKError.insufficientBalance(amount: amount)
+                let mintBalance = Int64(availableProofs.reduce(0) { $0 + $1.amount })
+                lastError = NDKError.walletInsufficientBalance(amount: amount, available: mintBalance)
                 continue
             }
 
             // Convert ProofRepresenting to concrete Proof types
             let selectedProofs = pickResult.selected.compactMap { $0 as? CashuSwift.Proof }
             guard selectedProofs.count == pickResult.selected.count else {
-                lastError = NDKError.invalidProof(ErrorMessageConstants.failedTo("convert selected proofs"))
+                lastError = NDKError.walletInvalidProof(details: "Failed to convert selected proofs")
                 continue
             }
 
@@ -420,7 +422,7 @@ public enum Nutzap {
 
         // Get the locked proofs from the token
         guard let lockedProofs = token.proofsByMint[mintURL] else {
-            throw NDKError.invalidProof("No proofs in created token")
+            throw NDKError.walletInvalidProof(details: "No proofs found in created token for mint \(mintURL)")
         }
 
         return (proofs: lockedProofs, change: changeProofs)
