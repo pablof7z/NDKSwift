@@ -66,10 +66,11 @@ final class SimpleMockURLSession: URLSessionProtocol, NDKNetworkFetching, @unche
         return (data, response)
     }
     
-    func data(from url: URL) async throws -> (Data, URLResponse) {
+    func data(from url: URL) async throws -> Data {
         var request = URLRequest(url: url)
         request.httpMethod = "GET"
-        return try await data(for: request)
+        let (data, _) = try await data(for: request)
+        return data
     }
     
     func upload(for request: URLRequest, from bodyData: Data) async throws -> (Data, URLResponse) {
