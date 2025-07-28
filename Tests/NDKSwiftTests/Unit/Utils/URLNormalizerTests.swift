@@ -191,4 +191,33 @@ final class URLNormalizerTests: XCTestCase {
         // Test URL with encoded characters
         XCTAssertEqual(try URLNormalizer.normalizeRelayUrl("wss://relay.nostr.band/path%20with%20spaces"), "wss://relay.nostr.band/path%20with%20spaces/")
     }
+    
+    // MARK: - WebSocket to HTTP Conversion Tests
+    
+    func testConvertWebSocketToHTTP() {
+        // Test ws:// to http:// conversion
+        let wsURL = URL(string: "ws://relay.example.com/path")!
+        let httpURL = URLNormalizer.convertWebSocketToHTTP(wsURL)
+        XCTAssertEqual(httpURL?.absoluteString, "http://relay.example.com/path")
+        
+        // Test wss:// to https:// conversion
+        let wssURL = URL(string: "wss://relay.example.com/path")!
+        let httpsURL = URLNormalizer.convertWebSocketToHTTP(wssURL)
+        XCTAssertEqual(httpsURL?.absoluteString, "https://relay.example.com/path")
+        
+        // Test non-WebSocket URLs remain unchanged
+        let regularURL = URL(string: "https://example.com/path")!
+        let unchangedURL = URLNormalizer.convertWebSocketToHTTP(regularURL)
+        XCTAssertEqual(unchangedURL?.absoluteString, "https://example.com/path")
+        
+        // Test URL with query parameters
+        let urlWithQuery = URL(string: "wss://relay.example.com/path?param=value")!
+        let convertedWithQuery = URLNormalizer.convertWebSocketToHTTP(urlWithQuery)
+        XCTAssertEqual(convertedWithQuery?.absoluteString, "https://relay.example.com/path?param=value")
+        
+        // Test URL with fragment
+        let urlWithFragment = URL(string: "ws://relay.example.com/path#section")!
+        let convertedWithFragment = URLNormalizer.convertWebSocketToHTTP(urlWithFragment)
+        XCTAssertEqual(convertedWithFragment?.absoluteString, "http://relay.example.com/path#section")
+    }
 }

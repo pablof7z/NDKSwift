@@ -4,6 +4,18 @@ All notable changes to NDKSwift will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.7.15] - 2025-01-28
+
+### Changed
+- Improved error handling in `Types.swift` by replacing force unwraps with safer optional mapping
+- Added test coverage for `URLNormalizer.convertWebSocketToHTTP` method
+- Enhanced documentation in `LRUCache` with performance considerations
+
+### Technical
+- Code quality improvements focused on safety and eliminating force unwraps
+- Better test coverage for utility methods
+- Added performance notes for future optimization opportunities
+
 ## [0.7.14] - 2025-01-28
 
 ### Added
