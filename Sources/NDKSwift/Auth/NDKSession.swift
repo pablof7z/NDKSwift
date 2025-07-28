@@ -103,9 +103,9 @@ public struct NDKSession: Codable, Identifiable, Sendable {
 /// Short identifier for UI display
     public var shortIdentifier: String {
         if let npub = npub {
-            return String(npub.prefix(16)) + "..."
+            return StringFormatHelpers.truncate(npub, maxLength: 16)
         } else {
-            return String(pubkey.prefix(16)) + "..."
+            return StringFormatHelpers.truncate(pubkey, maxLength: 16)
         }
     }
 
