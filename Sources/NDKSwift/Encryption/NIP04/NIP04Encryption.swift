@@ -15,6 +15,7 @@ import secp256k1
 /// - Weak key derivation
 ///
 /// Specification: https://github.com/nostr-protocol/nips/blob/master/04.md
+@available(*, deprecated, message: "NIP-04 is deprecated due to security issues. Use NIP-44 instead for better security")
 public enum NIP04 {
 
     /// Compute shared secret using ECDH

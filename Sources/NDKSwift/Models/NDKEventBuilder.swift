@@ -456,7 +456,7 @@ public final class NDKEventBuilder {
     /// ```
     @discardableResult
     public func clientTag(name: String, address: String? = nil, relay: String? = nil) -> NDKEventBuilder {
-        var tag = ["client", name]
+        var tag = [NostrConstants.TagName.client, name]
 
         // Add address if provided
         if let address = address, !address.isEmpty {
@@ -852,7 +852,7 @@ public final class NDKEventBuilder {
         if let clientConfig = ndk?.clientTagConfig,
            clientConfig.autoTag,
            !clientConfig.excludedKinds.contains(kind),
-           !tags.contains(where: { $0.first == "client" }) {
+           !tags.contains(where: { $0.first == NostrConstants.TagName.client }) {
 
             // Add client tag - address is optional
             _ = self.clientTag(name: clientConfig.name, address: clientConfig.address, relay: clientConfig.relay)
@@ -1042,8 +1042,8 @@ public final class NDKEventBuilder {
     /// Add a title tag (commonly used in NIP-68 and other events)
     @discardableResult
     public func title(_ title: String) -> NDKEventBuilder {
-        self.tags.removeAll { $0.first == "title" }
-        self.tags.append(["title", title])
+        self.tags.removeAll { $0.first == NostrConstants.TagName.title }
+        self.tags.append([NostrConstants.TagName.title, title])
         return self
     }
 

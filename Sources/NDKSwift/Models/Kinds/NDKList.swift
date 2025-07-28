@@ -93,7 +93,7 @@ public class NDKList {
     public var title: String? {
         get {
             // First check for explicit title tag
-            if let titleTag = tags.first(where: { !$0.isEmpty && ($0[0] == "title" || $0[0] == "name") }) {
+            if let titleTag = tags.first(where: { !$0.isEmpty && ($0[0] == NostrConstants.TagName.title || $0[0] == NostrConstants.TagName.name) }) {
                 return titleTag.count > 1 ? titleTag[1] : nil
             }
 
@@ -102,11 +102,11 @@ public class NDKList {
         }
         set {
             // Remove existing title/name tags
-            tags.removeAll { !$0.isEmpty && ($0[0] == "title" || $0[0] == "name") }
+            tags.removeAll { !$0.isEmpty && ($0[0] == NostrConstants.TagName.title || $0[0] == NostrConstants.TagName.name) }
 
             // Add new title if provided
             if let title = newValue, !title.isEmpty {
-                tags.append(["title", title])
+                tags.append([NostrConstants.TagName.title, title])
             }
         }
     }
@@ -136,13 +136,13 @@ public class NDKList {
     /// Description of this list
     public var listDescription: String? {
         get {
-            let descTag = tags.first { !$0.isEmpty && $0[0] == "description" }
+            let descTag = tags.first { !$0.isEmpty && $0[0] == NostrConstants.TagName.description }
             return (descTag?.count ?? 0) > 1 ? descTag?[1] : nil
         }
         set {
-            tags.removeAll { !$0.isEmpty && $0[0] == "description" }
+            tags.removeAll { !$0.isEmpty && $0[0] == NostrConstants.TagName.description }
             if let description = newValue, !description.isEmpty {
-                tags.append(["description", description])
+                tags.append([NostrConstants.TagName.description, description])
             }
         }
     }
@@ -150,13 +150,13 @@ public class NDKList {
     /// Image URL for this list
     public var image: String? {
         get {
-            let imageTag = tags.first { !$0.isEmpty && $0[0] == "image" }
+            let imageTag = tags.first { !$0.isEmpty && $0[0] == NostrConstants.TagName.image }
             return (imageTag?.count ?? 0) > 1 ? imageTag?[1] : nil
         }
         set {
-            tags.removeAll { !$0.isEmpty && $0[0] == "image" }
+            tags.removeAll { !$0.isEmpty && $0[0] == NostrConstants.TagName.image }
             if let image = newValue, !image.isEmpty {
-                tags.append(["image", image])
+                tags.append([NostrConstants.TagName.image, image])
             }
         }
     }
@@ -299,7 +299,7 @@ public class NDKList {
                 // Insert after metadata tags
                 let metadataCount = tags.prefix { tag in
                     guard !tag.isEmpty else { return false }
-                    return ["title", "name", "description", "image"].contains(tag[0])
+                    return [NostrConstants.TagName.title, NostrConstants.TagName.name, NostrConstants.TagName.description, NostrConstants.TagName.image].contains(tag[0])
                 }.count
                 tags.insert(listTag, at: metadataCount)
             } else {
