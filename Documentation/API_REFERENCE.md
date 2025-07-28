@@ -523,16 +523,12 @@ let reactionsFilter = NDKFilter.reactions(to: eventId)
 let reactions = await ndk.fetchEvents(with: reactionsFilter)
 ```
 
-### NDKSubscription
+### NDKDataSourceOptions
 
-**⚠️ Internal Implementation Detail**: `NDKSubscription` is an internal component that should not be used directly. Use the public `NDKDataSource` API instead. See [Internal Components](#internal-components) for details.
-
-### NDKSubscriptionOptions
-
-Configuration for subscriptions.
+Configuration for data sources and subscriptions.
 
 ```swift
-public struct NDKSubscriptionOptions {
+public struct NDKDataSourceOptions {
     public var closeOnEose: Bool = false         // Auto-close on EOSE
     public var useCache: Bool = true             // Check cache first
     public var limit: Int?                       // Max events to receive

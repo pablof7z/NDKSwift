@@ -36,14 +36,14 @@ public enum NIP04 {
 
         // For x-only pubkey, we need to try both possible y coordinates
         // First try with 02 prefix (even y)
-        let fullPubkey = Data([0x02]) + pubkeyData
+        let fullPubkey = Data([CryptoConstants.KeyFormat.compressedPubkeyPrefixEven]) + pubkeyData
 
         let pubkey: secp256k1.KeyAgreement.PublicKey
         do {
             pubkey = try secp256k1.KeyAgreement.PublicKey(dataRepresentation: fullPubkey)
         } catch {
             // If that fails, try with 03 prefix (odd y)
-            let fullPubkeyOdd = Data([0x03]) + pubkeyData
+            let fullPubkeyOdd = Data([CryptoConstants.KeyFormat.compressedPubkeyPrefixOdd]) + pubkeyData
             pubkey = try secp256k1.KeyAgreement.PublicKey(dataRepresentation: fullPubkeyOdd)
         }
 
@@ -54,7 +54,7 @@ public enum NIP04 {
         let sharedData = Data(sharedSecret.bytes)
 
         // If the shared secret has a prefix byte, remove it
-        if sharedData.count == 33 && (sharedData[0] == 0x02 || sharedData[0] == 0x03) {
+        if sharedData.count == 33 && (sharedData[0] == CryptoConstants.KeyFormat.compressedPubkeyPrefixEven || sharedData[0] == CryptoConstants.KeyFormat.compressedPubkeyPrefixOdd) {
             return sharedData.dropFirst()
         }
 
