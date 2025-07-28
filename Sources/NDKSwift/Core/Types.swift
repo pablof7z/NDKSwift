@@ -436,19 +436,19 @@ public enum NDKError: LocalizedError {
 
         // Crypto
         case .signingFailed(let message, let underlying):
-            return underlying != nil ? "\(message): \(underlying!.localizedDescription)" : message
+            return underlying.map { "\(message): \($0.localizedDescription)" } ?? message
         case .verificationFailed(let message, let underlying):
-            return underlying != nil ? "\(message): \(underlying!.localizedDescription)" : message
+            return underlying.map { "\(message): \($0.localizedDescription)" } ?? message
         case .encryptionFailed(let message, let underlying):
-            return underlying != nil ? "\(message): \(underlying!.localizedDescription)" : message
+            return underlying.map { "\(message): \($0.localizedDescription)" } ?? message
         case .decryptionFailed(let message, let underlying):
-            return underlying != nil ? "\(message): \(underlying!.localizedDescription)" : message
+            return underlying.map { "\(message): \($0.localizedDescription)" } ?? message
         case .keyDerivationFailed(let message, let underlying):
-            return underlying != nil ? "\(message): \(underlying!.localizedDescription)" : message
+            return underlying.map { "\(message): \($0.localizedDescription)" } ?? message
 
         // Network
         case .connectionFailed(let relay, let message, let underlying):
-            return underlying != nil ? "Connection to \(relay) failed: \(message) - \(underlying!.localizedDescription)" : "Connection to \(relay) failed: \(message)"
+            return underlying.map { "Connection to \(relay) failed: \(message) - \($0.localizedDescription)" } ?? "Connection to \(relay) failed: \(message)"
         case .connectionLost(let relay, let message):
             return "Connection to \(relay) lost: \(message)"
         case .timeout(let operation, let seconds):
@@ -462,7 +462,7 @@ public enum NDKError: LocalizedError {
 
         // Storage
         case .cacheFailed(let operation, let underlying):
-            return underlying != nil ? "Cache \(operation) failed: \(underlying!.localizedDescription)" : "Cache \(operation) failed"
+            return underlying.map { "Cache \(operation) failed: \($0.localizedDescription)" } ?? "Cache \(operation) failed"
         case .diskFull:
             return "Insufficient storage space"
         case .fileNotFound(let path):
@@ -492,7 +492,7 @@ public enum NDKError: LocalizedError {
         case .cancelled:
             return "Operation was cancelled"
         case .unknown(let message, let underlying):
-            return underlying != nil ? "\(message): \(underlying!.localizedDescription)" : message
+            return underlying.map { "\(message): \($0.localizedDescription)" } ?? message
         case .internalError(let message):
             return "Internal error: \(message)"
         case .publishFailed(let relay, let message):
@@ -502,11 +502,11 @@ public enum NDKError: LocalizedError {
 
         // Wallet
         case .walletRateLimited(let retryAfter):
-            return retryAfter != nil ? "Too many requests. Retry after \(retryAfter!) seconds." : "Too many requests. Please try again later."
+            return retryAfter.map { "Too many requests. Retry after \($0) seconds." } ?? "Too many requests. Please try again later."
         case .walletNotImplemented(let method):
             return "\(method) is not supported by the wallet"
         case .insufficientBalance(let amount):
-            return amount != nil ? "Insufficient balance (need \(amount!) sats)" : "Insufficient balance"
+            return amount.map { "Insufficient balance (need \($0) sats)" } ?? "Insufficient balance"
         case .walletQuotaExceeded:
             return "Spending quota exceeded"
         case .walletRestricted(let reason):

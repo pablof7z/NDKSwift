@@ -158,6 +158,8 @@ actor LRUCache<Key: Hashable, Value> {
     // MARK: - Private
 
     /// Remove a key from the access order list
+    /// - Note: This operation is O(n) in the worst case. For better performance with very large caches,
+    ///         consider using a doubly linked list with a hash map of nodes.
     private func removeFromAccessOrder(_ key: Key) {
         accessOrder.removeAll(value: key)
     }
