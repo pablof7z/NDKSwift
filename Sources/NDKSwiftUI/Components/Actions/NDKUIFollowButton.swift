@@ -308,7 +308,7 @@ private class FollowState: ObservableObject {
         // Create filter for user's contact list (kind:3)
         let filter = NDKFilter(
             authors: [userPubkey],
-            kinds: [3]
+            kinds: [EventKind.contacts]
         )
 
         let dataSource = ndk.observe(
@@ -416,7 +416,7 @@ private class FollowState: ObservableObject {
     ) async throws -> NDKEvent {
 
         let eventBuilder = NDKEventBuilder(ndk: ndk)
-            .kind(3) // Contact list
+            .kind(EventKind.contacts) // Contact list
             .content(currentContactListEvent?.content ?? "") // Preserve existing content
 
         // Add contact tags

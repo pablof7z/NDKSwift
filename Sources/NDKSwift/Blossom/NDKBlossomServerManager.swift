@@ -161,7 +161,7 @@ public class NDKBlossomServerManager: ObservableObject {
             // Fetch user's blossom server list event (kind 10063)
             let filter = NDKFilter(
                 authors: [pubkey],
-                kinds: [10063],
+                kinds: [EventKind.blossomServerList],
                 limit: 1
             )
             
@@ -242,7 +242,7 @@ public class NDKBlossomServerManager: ObservableObject {
         do {
             // Create server list event (kind 10063)
             let event = try await NDKEventBuilder(ndk: ndk)
-                .kind(10063)
+                .kind(EventKind.blossomServerList)
                 .content("")
                 .tags(userServers.map { ["server", $0] })
                 .build(signer: signer)
@@ -265,7 +265,7 @@ public class NDKBlossomServerManager: ObservableObject {
             
             // Create filter for Blossom server discovery events (kind 36363)
             let filter = NDKFilter(
-                kinds: [36363],
+                kinds: [EventKind.blossomServerAnnouncement],
                 limit: 50
             )
             
