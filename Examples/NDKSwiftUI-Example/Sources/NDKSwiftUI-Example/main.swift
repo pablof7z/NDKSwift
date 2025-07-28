@@ -88,18 +88,18 @@ struct ExampleComponentsView: View {
                     VStack(spacing: 16) {
                         // Profile pictures in different sizes
                         HStack(spacing: 16) {
-                            NDKProfilePicture(pubkey: examplePubkey, size: 30)
-                            NDKProfilePicture(pubkey: examplePubkey, size: 40)
-                            NDKProfilePicture(pubkey: examplePubkey, size: 60)
-                            NDKProfilePicture(pubkey: examplePubkey, size: 80)
+                            NDKUIProfilePicture(pubkey: examplePubkey, size: 30)
+                            NDKUIProfilePicture(pubkey: examplePubkey, size: 40)
+                            NDKUIProfilePicture(pubkey: examplePubkey, size: 60)
+                            NDKUIProfilePicture(pubkey: examplePubkey, size: 80)
                         }
                         
                         // Display names
                         VStack(alignment: .leading, spacing: 8) {
-                            NDKDisplayName(pubkey: examplePubkey)
+                            NDKUIDisplayName(pubkey: examplePubkey)
                                 .font(.headline)
                             
-                            NDKUsername(pubkey: examplePubkey)
+                            NDKUIUsername(pubkey: examplePubkey)
                                 .font(.subheadline)
                                 .foregroundStyle(.secondary)
                         }
@@ -116,11 +116,12 @@ struct ExampleComponentsView: View {
                         .fontWeight(.semibold)
                     
                     VStack(alignment: .leading, spacing: 8) {
-                        NDKRelativeTime(timestamp: Timestamp(Date().timeIntervalSince1970 - 5 * TimeConstants.minute))
-                        NDKRelativeTime(timestamp: Timestamp(Date().timeIntervalSince1970 - TimeConstants.hour))
-                        NDKRelativeTime(timestamp: Timestamp(Date().timeIntervalSince1970 - TimeConstants.day))
+                        NDKUIRelativeTime(timestamp: Timestamp(Date().timeIntervalSince1970 - 5 * TimeConstants.minute))
+                        NDKUIRelativeTime(timestamp: Timestamp(Date().timeIntervalSince1970 - TimeConstants.hour))
+                        NDKUIRelativeTime(timestamp: Timestamp(Date().timeIntervalSince1970 - TimeConstants.day))
                         
-                        NDKRelativeTimeLong(timestamp: Timestamp(Date().timeIntervalSince1970 - 5 * TimeConstants.minute))
+                        // Long format relative time (component not available)
+                        NDKUIRelativeTime(timestamp: Timestamp(Date().timeIntervalSince1970 - 5 * TimeConstants.minute))
                     }
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)

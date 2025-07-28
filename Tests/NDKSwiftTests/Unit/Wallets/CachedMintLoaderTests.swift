@@ -162,13 +162,29 @@ final class CachedMintLoaderTests: XCTestCase {
 
 // MARK: - Mock NDKCache for Testing
 
-class MockNDKCache: NDKCache {
+actor MockNDKCache: NDKCache {
     var mockKeysets: [String: [CashuSwift.Keyset]] = [:]
     var mockKeysetsLastUpdated: [String: Date] = [:]
     var mockKeysetsById: [String: CashuSwift.Keyset] = [:]
     var mockMintInfo: [String: NDKMintInfo] = [:]
     var mockMintInfoLastUpdated: [String: Date] = [:]
     
+    // MARK: - NDKCache Protocol Implementation
+    
+    // Event operations
+    func saveEvent(_ event: NDKEvent) async throws {}
+    func getEvent(id: String) async -> NDKEvent? { nil }
+    func queryEvents(_ filter: NDKFilter) async throws -> [NDKEvent] { [] }
+    func deleteEvent(id: String) async throws {}
+    
+    // Profile operations
+    func saveProfile(_ profile: NDKUserProfile, pubkey: String) async throws {}
+    func getProfile(pubkey: String) async -> NDKUserProfile? { nil }
+    
+    // Cache management
+    func clear() async throws {}
+    
+    // Mint cache operations - custom implementation for testing
     func getKeysets(mintUrl: String) async -> [CashuSwift.Keyset] {
         return mockKeysets[mintUrl] ?? []
     }
@@ -215,32 +231,7 @@ class MockNDKCache: NDKCache {
         mockMintInfoLastUpdated.removeValue(forKey: url)
     }
     
-    // Required NDKCache protocol methods
-    func save(event: NDKEvent) async throws {}
-    func save(events: [NDKEvent]) async throws {}
-    func saveProfile(_ profile: NDKUserProfile, for pubkey: PublicKey) async throws {}
-    func loadEvents(filter: NDKFilter) async throws -> [NDKEvent] { [] }
-    func loadProfile(pubkey: PublicKey) async -> NDKUserProfile? { nil }
-    func deleteEvent(_ event: NDKEvent) async throws {}
-    func deleteEvents(filter: NDKFilter) async throws {}
-    func hasEvent(id: String) async -> Bool { false }
-    func addObserver(_ observer: any NDKCacheObserver) {}
-    func removeObserver(_ observer: any NDKCacheObserver) {}
-    func loadAllKind0Events() async throws -> [NDKEvent] { [] }
-    func replaceProofs(_ proofs: [CashuSwift.Proof], for mint: String) async throws {}
-    func appendProof(_ proof: CashuSwift.Proof, for mint: String) async throws {}
-    func loadProofs(for mint: String) async throws -> [CashuSwift.Proof] { [] }
-    func invalidateProof(_ proof: CashuSwift.Proof, for mint: String) async throws {}
-    func restoreValidProof(_ proof: CashuSwift.Proof, for mint: String) async throws {}
-    func saveSpentProof(_ proofInfo: SpentProofInfo) async throws {}
-    func loadSpentProofs(for mint: String) async throws -> [SpentProofInfo] { [] }
-    func saveMintQuote(_ quote: CashuMintQuote) async throws {}
-    func loadMintQuotes(for mint: String, state: MintQuoteState?) async throws -> [CashuMintQuote] { [] }
-    func updateMintQuoteState(quoteId: String, state: MintQuoteState) async throws {}
-    func saveMeltQuote(_ quote: CashuMeltQuote) async throws {}
-    func loadMeltQuotes(for mint: String, state: MeltQuoteState?) async throws -> [CashuMeltQuote] { [] }
-    func updateMeltQuoteState(quoteId: String, state: MeltQuoteState) async throws {}
-    func loadAllMintURLs() async -> Set<String> { [] }
-    func loadAllActiveKeysets() async -> [CashuSwift.Keyset] { [] }
-    func saveKeysetActivation(keysetId: String, mintUrl: String, activatedAt: Date) async throws {}
+    // Other required methods with default implementation
+    func saveKeyset(_ keyset: CashuSwift.Keyset, mintUrl: String) async throws {}
+    func getActiveKeysets(mintUrl: String, unit: String) async -> [CashuSwift.Keyset] { [] }
 }

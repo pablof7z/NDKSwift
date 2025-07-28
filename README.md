@@ -41,9 +41,10 @@ dependencies: [
 import NDKSwift
 
 // Initialize with SQLite cache for offline support
+let cache = try await NDKSQLiteCache()
 let ndk = NDK(
     relayUrls: ["wss://relay.damus.io", "wss://relay.primal.net"],
-    cache: NDKSQLiteCache()
+    cache: cache
 )
 
 // Generate keys and connect
@@ -52,15 +53,15 @@ ndk.signer = signer
 await ndk.connect()
 
 // Stream real-time notes
-let notes = ndk.observe(filter: NDKFilter(kinds: [1], limit: 50))
-for await note in notes.events {
+let subscription = ndk.subscribe(filter: NDKFilter(kinds: [1], limit: 50))
+for await note in subscription {
     print("\(note.content)")
 }
 
 // Publish (works offline!)
-let event = try await NDKEventBuilder(ndk: ndk)
-    .content("Hello, Nostr! 🎉")
-    .build()
+let event = NDKEvent(kind: .text)
+event.content = "Hello, Nostr! 🎉"
+try event.sign(with: signer)
 try await ndk.publish(event)
 ```
 
@@ -70,17 +71,17 @@ try await ndk.publish(event)
 ### 🔄 Offline-First Notes
 ```swift
 // Your app works without internet!
-let event = try await NDKEventBuilder(ndk: ndk)
-    .content("Posted from airplane mode ✈️")
-    .build()
+let event = NDKEvent(kind: .text)
+event.content = "Posted from airplane mode ✈️"
+try event.sign(with: signer)
 try await ndk.publish(event)  // Queued locally, syncs when connected
 ```
 
 ### 🎭 Real-time Social Feed
 ```swift
 // Stream notes with instant updates
-let feed = ndk.observe(filter: NDKFilter(kinds: [1]))
-for await note in feed.events {
+let subscription = ndk.subscribe(filter: NDKFilter(kinds: [1]))
+for await note in subscription {
     // New notes appear instantly - no pull-to-refresh needed!
 }
 ```
@@ -94,19 +95,20 @@ try await event.zap(amountSats: 1000, comment: "Great post! ⚡")
 ### 🔐 End-to-End Encrypted DMs
 ```swift
 // Send encrypted messages (NIP-44)
-let dm = try await NDKEventBuilder(ndk: ndk)
-    .encryptedDirectMessage(to: recipientPubkey, content: "Secret message 🤫")
-    .build()
+let dm = try await NDKEvent.encryptedDirectMessage(
+    from: signer,
+    to: recipientPubkey,
+    content: "Secret message 🤫"
+)
 ```
 
 ### 📸 Decentralized File Storage
 ```swift
 // Upload to Blossom servers
 let imageURL = try await ndk.blossom.upload(imageData)
-let event = try await NDKEventBuilder(ndk: ndk)
-    .content("Check out this photo!")
-    .imageAttachment(url: imageURL, blurhash: blurhash)
-    .build()
+let event = NDKEvent(kind: .text)
+event.content = "Check out this photo!\n\(imageURL)"
+try event.sign(with: signer)
 ```
 
 ## 📋 Supported NIPs

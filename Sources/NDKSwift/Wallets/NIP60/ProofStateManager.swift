@@ -35,7 +35,7 @@ public actor ProofStateManager {
     // MARK: - Public Methods
 
     /// Add a proof to the state manager
-    func addProof(_ proof: CashuSwift.Proof, mint: String, state: ProofState = .available, eventId: String? = nil, timestamp: Timestamp? = nil) {
+    public func addProof(_ proof: CashuSwift.Proof, mint: String, state: ProofState = .available, eventId: String? = nil, timestamp: Timestamp? = nil) {
         // Check if proof already exists
         if let existing = proofState[proof.C] {
             // Only update if the new event is newer (higher timestamp)
@@ -69,7 +69,7 @@ public actor ProofStateManager {
     }
 
     /// Update the state of a proof
-    func updateProofState(_ proofC: String, state: ProofState) {
+    public func updateProofState(_ proofC: String, state: ProofState) {
         if var entry = proofState[proofC] {
             entry.state = state
             proofState[proofC] = entry
@@ -77,7 +77,7 @@ public actor ProofStateManager {
     }
 
     /// Update ownership of existing proofs to a new event
-    func updateProofOwnership(_ proofs: [CashuSwift.Proof], eventId: String, timestamp: Timestamp) {
+    public func updateProofOwnership(_ proofs: [CashuSwift.Proof], eventId: String, timestamp: Timestamp) {
         for proof in proofs {
             if var entry = proofState[proof.C] {
                 let previousOwner = entry.ownerEventId ?? "none"
@@ -98,21 +98,21 @@ public actor ProofStateManager {
     }
 
     /// Get all available proofs
-    func getAvailableProofs() -> [CashuSwift.Proof] {
+    public func getAvailableProofs() -> [CashuSwift.Proof] {
         return proofState.values
             .filter { $0.state == .available }
             .map { $0.proof }
     }
 
     /// Get available proofs for a specific mint
-    func getAvailableProofs(mint: String) -> [CashuSwift.Proof] {
+    public func getAvailableProofs(mint: String) -> [CashuSwift.Proof] {
         return proofState.values
             .filter { $0.state == .available && $0.mint == mint }
             .map { $0.proof }
     }
 
     /// Get all proofs grouped by mint
-    func getAvailableProofsByMint() -> [String: [CashuSwift.Proof]] {
+    public func getAvailableProofsByMint() -> [String: [CashuSwift.Proof]] {
         var result: [String: [CashuSwift.Proof]] = [:]
 
         for entry in proofState.values where entry.state == .available {
@@ -123,7 +123,7 @@ public actor ProofStateManager {
     }
 
     /// Get total balance
-    func getTotalBalance() -> Int64 {
+    public func getTotalBalance() -> Int64 {
         let availableProofs = proofState.values.filter { $0.state == .available }
         let totalBalance = availableProofs.reduce(0) { $0 + Int64($1.proof.amount) }
 
@@ -137,7 +137,7 @@ public actor ProofStateManager {
     }
 
     /// Get balance for a specific mint
-    func getBalance(mint: String) -> Int64 {
+    public func getBalance(mint: String) -> Int64 {
         let availableProofs = proofState.values
             .filter { $0.state == .available && $0.mint == mint }
         let balance = availableProofs.reduce(0) { $0 + Int64($1.proof.amount) }
@@ -147,7 +147,7 @@ public actor ProofStateManager {
 
     /// Get all mints that have sufficient balance for the given amount
     /// Returns mints sorted by balance (highest first)
-    func getMintsWithSufficientBalance(amount: Int64) -> [String] {
+    public func getMintsWithSufficientBalance(amount: Int64) -> [String] {
         let availableProofsByMint = getAvailableProofsByMint()
 
         return availableProofsByMint
@@ -161,7 +161,7 @@ public actor ProofStateManager {
 
     /// Select proofs for a given amount from a specific mint
     /// Uses a greedy algorithm to minimize the number of proofs and change
-    func selectProofs(amount: Int64, mint: String) -> [CashuSwift.Proof] {
+    public func selectProofs(amount: Int64, mint: String) -> [CashuSwift.Proof] {
         var selected: [CashuSwift.Proof] = []
         var total: Int64 = 0
 
@@ -185,7 +185,7 @@ public actor ProofStateManager {
     }
 
     /// Reserve proofs for concurrent operations
-    func reserveProofs(_ proofs: [CashuSwift.Proof]) throws {
+    public func reserveProofs(_ proofs: [CashuSwift.Proof]) throws {
         for proof in proofs {
             guard var entry = proofState[proof.C], entry.state == .available else {
                 // Rollback any reservations we've made so far
@@ -203,7 +203,7 @@ public actor ProofStateManager {
     }
 
     /// Release reserved proofs back to available
-    func releaseProofs(_ proofs: [CashuSwift.Proof]) {
+    public func releaseProofs(_ proofs: [CashuSwift.Proof]) {
         for proof in proofs {
             if var entry = proofState[proof.C], entry.state == .reserved {
                 entry.state = .available
@@ -213,7 +213,7 @@ public actor ProofStateManager {
     }
 
     /// Mark proofs as deleted/spent
-    func markProofsAsDeleted(_ proofs: [CashuSwift.Proof]) {
+    public func markProofsAsDeleted(_ proofs: [CashuSwift.Proof]) {
         for proof in proofs {
             if var entry = proofState[proof.C] {
                 entry.state = .deleted
@@ -223,7 +223,7 @@ public actor ProofStateManager {
     }
 
     /// Mark proofs owned by a deleted event as deleted
-    func markProofsOwnedByEventAsDeleted(_ eventId: String) -> [CashuSwift.Proof] {
+    public func markProofsOwnedByEventAsDeleted(_ eventId: String) -> [CashuSwift.Proof] {
         var deletedProofs: [CashuSwift.Proof] = []
 
         for (proofC, entry) in proofState {
@@ -240,17 +240,17 @@ public actor ProofStateManager {
     }
 
     /// Remove deleted proofs from state
-    func pruneDeletedProofs() {
+    public func pruneDeletedProofs() {
         proofState = proofState.filter { $0.value.state != .deleted }
     }
 
     /// Clear all proof state
-    func clear() {
+    public func clear() {
         proofState.removeAll()
     }
 
     /// Get proof state for debugging
-    func getProofState(for proofC: String) -> ProofState? {
+    public func getProofState(for proofC: String) -> ProofState? {
         return proofState[proofC]?.state
     }
 
@@ -265,7 +265,7 @@ public actor ProofStateManager {
     }
 
     /// Reconcile proof states after checking with mint
-    func reconcileProofStates(spentProofCs: Set<String>) {
+    public func reconcileProofStates(spentProofCs: Set<String>) {
         for proofC in spentProofCs {
             if var entry = proofState[proofC] {
                 entry.state = .deleted
@@ -276,18 +276,18 @@ public actor ProofStateManager {
 
     /// Get the owner event ID for a single proof
     /// Returns the event ID that owns this proof, or nil if no owner
-    func getOwnerEventId(for proof: CashuSwift.Proof) -> String? {
+    public func getOwnerEventId(for proof: CashuSwift.Proof) -> String? {
         return proofState[proof.C]?.ownerEventId
     }
 
     /// Get the mint for a proof
-    func getMintForProof(_ proof: CashuSwift.Proof) -> String? {
+    public func getMintForProof(_ proof: CashuSwift.Proof) -> String? {
         return proofState[proof.C]?.mint
     }
 
     /// Get the owner event IDs for a set of proofs
     /// Returns a set of event IDs that previously owned these proofs
-    func getOwnerEventIds(for proofs: [CashuSwift.Proof]) -> Set<String> {
+    public func getOwnerEventIds(for proofs: [CashuSwift.Proof]) -> Set<String> {
         var ownerIds = Set<String>()
 
         for proof in proofs {
@@ -302,7 +302,7 @@ public actor ProofStateManager {
 
     /// Get all proofs (available and reserved) that belong to a specific event
     /// This is crucial for proper proof rollover when creating new token events
-    func getProofsForEvent(_ eventId: String) -> [CashuSwift.Proof] {
+    public func getProofsForEvent(_ eventId: String) -> [CashuSwift.Proof] {
         let proofs = proofState.values
             .filter { entry in
                 entry.ownerEventId == eventId && entry.state != .deleted
@@ -313,7 +313,7 @@ public actor ProofStateManager {
     }
 
     /// Get all available proofs that belong to a specific event
-    func getAvailableProofsForEvent(_ eventId: String) -> [CashuSwift.Proof] {
+    public func getAvailableProofsForEvent(_ eventId: String) -> [CashuSwift.Proof] {
         let proofs = proofState.values
             .filter { entry in
                 entry.ownerEventId == eventId && entry.state == .available

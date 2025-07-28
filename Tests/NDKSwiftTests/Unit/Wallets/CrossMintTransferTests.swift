@@ -286,7 +286,7 @@ class MockMintManager: MintManager {
     }
 }
 
-class MockProofStateManager: ProofStateManager {
+class MockProofStateManager: ProofStateManagerProtocol {
     var mockProofsByMint: [String: [CashuSwift.Proof]] = [:]
     
     func getAvailableProofsByMint() async -> [String: [CashuSwift.Proof]] {
@@ -319,7 +319,7 @@ protocol MintManager {
     func requestMintQuote(amount: Int64, mintURL: String) async throws -> CashuSwift.Bolt11.MintQuote
 }
 
-protocol ProofStateManager {
+protocol ProofStateManagerProtocol {
     func getAvailableProofsByMint() async -> [String: [CashuSwift.Proof]]
     func getAvailableProofs(mint: String) async -> [CashuSwift.Proof]
     func getMintsWithSufficientBalance(amount: Int64) async -> [String]
