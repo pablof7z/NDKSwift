@@ -51,36 +51,21 @@ struct NDKUIMarkdownImageView: View {
                         })
 
                 case .image(let alt, let url):
-                    AsyncImage(url: url) { phase in
-                        switch phase {
-                        case .success(let image):
-                            image
-                                .resizable()
-                                .aspectRatio(contentMode: .fit)
-                                .frame(maxHeight: UIConstants.markdownImageMaxHeight)
-                                .cornerRadius(configuration.codeBlockCornerRadius)
-                                .onTapGesture {
-                                    onImageTap?(url)
-                                }
-
-                        case .failure(_):
-                            Label("Failed to load image", systemImage: "photo")
-                                .foregroundColor(.secondary)
-                                .frame(height: 100)
-                                .frame(maxWidth: .infinity)
-                                .background(Color.gray.opacity(OpacityConstants.subtle))
-                                .cornerRadius(configuration.codeBlockCornerRadius)
-
-                        case .empty:
-                            ProgressView()
-                                .frame(height: 100)
-                                .frame(maxWidth: .infinity)
-                                .background(Color.gray.opacity(OpacityConstants.subtle))
-                                .cornerRadius(configuration.codeBlockCornerRadius)
-
-                        @unknown default:
-                            EmptyView()
-                        }
+                    CachedAsyncImage(url: url) { image in
+                        image
+                            .resizable()
+                            .aspectRatio(contentMode: .fit)
+                            .frame(maxHeight: UIConstants.markdownImageMaxHeight)
+                            .cornerRadius(configuration.codeBlockCornerRadius)
+                            .onTapGesture {
+                                onImageTap?(url)
+                            }
+                    } placeholder: {
+                        ProgressView()
+                            .frame(height: 100)
+                            .frame(maxWidth: .infinity)
+                            .background(Color.gray.opacity(OpacityConstants.subtle))
+                            .cornerRadius(configuration.codeBlockCornerRadius)
                     }
                     .accessibilityLabel(alt.isEmpty ? "Image" : alt)
                 }

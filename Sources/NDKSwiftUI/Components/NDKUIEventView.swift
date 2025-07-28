@@ -289,7 +289,7 @@ public struct NDKLongFormArticleView: View {
             VStack(alignment: .leading, spacing: 8) {
                 // Article image if available
                 if let imageURL = extractImageURL() {
-                    AsyncImage(url: imageURL) { image in
+                    CachedAsyncImage(url: imageURL) { image in
                         image
                             .resizable()
                             .aspectRatio(contentMode: .fill)
@@ -560,7 +560,7 @@ private struct PictureGrid: View {
         case 2:
             HStack(spacing: 4) {
                 ForEach(Array(imageURLs.enumerated()), id: \.offset) { _, url in
-                    AsyncImage(url: url) { image in
+                    CachedAsyncImage(url: url) { image in
                         image
                             .resizable()
                             .aspectRatio(contentMode: .fill)
@@ -620,7 +620,7 @@ private struct SingleImageView: View {
     let style: NDKUIEventView.EventStyle
 
     var body: some View {
-        AsyncImage(url: url) { image in
+        CachedAsyncImage(url: url) { image in
             image
                 .resizable()
                 .aspectRatio(contentMode: .fit)
@@ -651,7 +651,7 @@ private struct GridImageView: View {
     var body: some View {
         LazyVGrid(columns: gridColumns, spacing: 4) {
             ForEach(Array(urls.enumerated()), id: \.offset) { _, url in
-                AsyncImage(url: url) { image in
+                CachedAsyncImage(url: url) { image in
                     image
                         .resizable()
                         .aspectRatio(contentMode: .fill)
