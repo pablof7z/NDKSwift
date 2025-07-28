@@ -229,17 +229,50 @@ public extension EventKind {
 /// Tag structure
 public typealias Tag = [String]
 
-/// Imeta tag representation
+/// Imeta tag representation for NIP-92 media attachments
+///
+/// This structure represents media metadata tags used to describe images, videos,
+/// and other media attachments in Nostr events. It follows the NIP-92 specification
+/// for inline media metadata.
+///
+/// Example usage:
+/// ```swift
+/// let imeta = NDKImetaTag(
+///     url: "https://example.com/image.jpg",
+///     blurhash: "eHF$@-4mR*t7t7WB",
+///     dim: "1024x768",
+///     alt: "A beautiful sunset"
+/// )
+/// ```
 public struct NDKImetaTag: Sendable {
+    /// The URL of the media file
     public var url: String?
+    
+    /// Blurhash representation for progressive loading
     public var blurhash: String?
+    
+    /// Dimensions in format "widthxheight" (e.g., "1024x768")
     public var dim: String?
+    
+    /// Alternative text description for accessibility
     public var alt: String?
+    
+    /// MIME type of the media (e.g., "image/jpeg", "video/mp4")
     public var m: String?
+    
+    /// SHA256 hash of the file content
     public var x: String?
+    
+    /// File size in bytes
     public var size: String?
+    
+    /// Fallback URLs if the primary URL is unavailable
     public var fallback: [String]?
+    
+    /// User annotations for tagging people in images
     public var userAnnotations: [UserAnnotation]?
+    
+    /// Additional non-standard fields
     public var additionalFields: [String: String] = [:]
 
     public init(
@@ -268,9 +301,26 @@ public struct NDKImetaTag: Sendable {
 }
 
 /// User annotation for tagging people in images (NIP-68)
+///
+/// Represents a coordinate-based tag of a user in an image, allowing
+/// social media-style face tagging functionality.
+///
+/// Example usage:
+/// ```swift
+/// let annotation = UserAnnotation(
+///     pubkey: "abc123...",
+///     x: 150,  // X coordinate in pixels
+///     y: 200   // Y coordinate in pixels
+/// )
+/// ```
 public struct UserAnnotation: Sendable {
+    /// The public key of the tagged user
     public let pubkey: PublicKey
+    
+    /// X coordinate of the tag position in pixels
     public let x: Int
+    
+    /// Y coordinate of the tag position in pixels
     public let y: Int
 
     public init(pubkey: PublicKey, x: Int, y: Int) {

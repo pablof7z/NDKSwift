@@ -98,4 +98,63 @@ final class StringFormatHelpersTests: XCTestCase {
         XCTAssertEqual(StringFormatHelpers.formatTimeInterval(45), "45 seconds")
         XCTAssertEqual(StringFormatHelpers.formatTimeInterval(90), "1 minute") // Rounds to nearest unit
     }
+    
+    // MARK: - Edge Cases
+    
+    func testFormatHexWithEmptyString() {
+        XCTAssertEqual(StringFormatHelpers.formatHex(""), "")
+    }
+    
+    func testTruncateHexWithEmptyString() {
+        XCTAssertEqual(StringFormatHelpers.truncateHex(""), "")
+    }
+    
+    func testDisplayURLWithEmptyString() {
+        XCTAssertEqual(StringFormatHelpers.displayURL(""), "")
+    }
+    
+    func testDisplayURLsWithEmptyArray() {
+        XCTAssertEqual(StringFormatHelpers.displayURLs([]), "")
+    }
+    
+    func testFormatTimeIntervalWithZero() {
+        XCTAssertEqual(StringFormatHelpers.formatTimeInterval(0), "0 seconds")
+    }
+    
+    func testFormatTimeIntervalWithNegative() {
+        XCTAssertEqual(StringFormatHelpers.formatTimeInterval(-60), "0 seconds")
+    }
+    
+    func testValidationErrorWithEmptyStrings() {
+        let error = StringFormatHelpers.validationError(field: "", requirement: "")
+        XCTAssertEqual(error, " ")
+    }
+    
+    func testTruncateHexWithCustomLengthsExceedingString() {
+        let hex = "abc123"
+        XCTAssertEqual(StringFormatHelpers.truncateHex(hex, prefixLength: 10, suffixLength: 10), "abc123")
+    }
+    
+    func testFormatHexWithMixedCase0xPrefix() {
+        XCTAssertEqual(StringFormatHelpers.formatHex("0XaBc123"), "abc123")
+        XCTAssertEqual(StringFormatHelpers.formatHex("0xAbC123"), "abc123")
+    }
+    
+    func testDisplayURLWithMultipleTrailingSlashes() {
+        XCTAssertEqual(StringFormatHelpers.displayURL("wss://relay.example.com///"), "wss://relay.example.com")
+    }
+    
+    func testPrettyJSONWithEmptyDictionary() {
+        let dict: [String: Any] = [:]
+        let pretty = StringFormatHelpers.prettyJSON(from: dict)
+        XCTAssertNotNil(pretty)
+        XCTAssertEqual(pretty, "{\n\n}")
+    }
+    
+    func testPrettyJSONWithEmptyArray() {
+        let array: [String] = []
+        let pretty = StringFormatHelpers.prettyJSON(from: array)
+        XCTAssertNotNil(pretty)
+        XCTAssertEqual(pretty, "[\n\n]")
+    }
 }
