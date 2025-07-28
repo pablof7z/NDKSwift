@@ -4,6 +4,24 @@ All notable changes to NDKSwift will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.7.14] - 2025-01-28
+
+### Added
+- Unit tests for `NDKNetworkClient` with comprehensive mock implementation
+- Improved documentation for `OptionalExtensions` with usage examples
+
+### Changed
+- Fixed warning in `LNURLResolver` where nil coalescing was used on non-optional string
+- Updated `MockURLDataFetcher` to properly conform to `NDKNetworkFetching` protocol
+
+### Removed
+- Removed duplicate `URLSessionProtocol` in favor of `NDKNetworkFetching` protocol
+
+### Technical
+- DRY improvements by consolidating network protocol definitions
+- Enhanced documentation consistency with code examples
+- Better test coverage for network client functionality
+
 ## [0.7.13] - 2025-01-28
 
 ### Changed

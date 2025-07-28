@@ -94,7 +94,7 @@ public class LNURLResolver: LNURLResolving {
             
             // Validate it's a payRequest
             guard payResponse.tag == "payRequest" else {
-                throw LNURLError.invalidResponse("Expected payRequest tag, got: \(payResponse.tag ?? "none")")
+                throw LNURLError.invalidResponse("Expected payRequest tag, got: \(payResponse.tag)")
             }
             
             return payResponse
