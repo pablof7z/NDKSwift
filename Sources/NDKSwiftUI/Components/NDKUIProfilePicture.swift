@@ -96,7 +96,7 @@ public struct NDKUIProfilePicture: View {
     public var body: some View {
         Group {
             if let pictureURL = pictureURL {
-                AsyncImage(url: pictureURL) { image in
+                CachedAsyncImage(url: pictureURL) { image in
                     image
                         .resizable()
                         .aspectRatio(contentMode: .fill)

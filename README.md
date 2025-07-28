@@ -25,7 +25,9 @@ The most feature-complete Swift implementation of the Nostr Development Kit. Bui
 - **Integrated Payments** - Lightning & Cashu wallets with nutzaps
 - **File Storage** - Blossom protocol for decentralized media
 - **Profile Semantic Caching** - 10x faster profile loading with direct column storage
+- **Image Caching** - Automatic memory & disk caching for all images (profiles, embedded content)
 - **Cross-Platform** - iOS, macOS, tvOS, watchOS support
+- **SwiftUI Components** - Ready-to-use UI components with built-in optimizations
 
 ## 📦 Installation
 
@@ -65,6 +67,35 @@ try event.sign(with: signer)
 try await ndk.publish(event)
 ```
 
+## 🎨 SwiftUI Components
+
+NDKSwiftUI provides ready-to-use components with built-in optimizations:
+
+### Image Caching
+All image components automatically cache to memory and disk for blazing-fast scrolling:
+
+```swift
+import NDKSwiftUI
+
+// Profile pictures with automatic caching
+NDKUIProfilePicture(pubkey: userPubkey, size: 50)
+
+// Event view with cached embedded images
+NDKUIEventView(event: event)
+    .onEventTapped { event in
+        // Handle tap
+    }
+
+// Markdown with cached inline images
+NDKUIMarkdownRenderer(content: event.content, ndk: ndk)
+    .renderImages()  // All images cached automatically
+```
+
+**Cache Features:**
+- 🎯 Memory cache (100 images, 100MB limit)
+- 💾 Disk cache (7-day expiration)
+- 🌐 Smart loading (memory → disk → network)
+- 📊 Console logging to monitor cache performance
 
 ## 💡 Cool Things You Can Build
 
