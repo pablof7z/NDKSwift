@@ -4,6 +4,33 @@ All notable changes to NDKSwift will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.7.17] - 2025-01-28
+
+### Added
+- Comprehensive unit tests for `GuardHelpers` utility covering all helper methods
+- New `GuardHelpers` utility providing common guard pattern helpers:
+  - `unwrap`: Safely unwraps optionals or throws a custom error
+  - `requireNotEmpty`: Ensures strings/arrays are not empty
+  - `require`: Validates values against custom conditions
+  - `requireContent`: Ensures string content is not nil and not empty
+- `NDKErrorFactories` for consistent error creation patterns
+- `TaskExtensions` with timeout support and concurrent execution helpers
+- Enhanced `NDKSignatureVerificationTypes` with better documentation and error handling
+- Additional test coverage for `URLNormalizer`, `StringFormatHelpers`, and `NDKNetworkLogger`
+
+### Changed
+- Improved error handling patterns throughout the codebase using new `GuardHelpers`
+- Enhanced documentation in multiple files with better examples and usage notes
+- Refactored optional handling to use `OptionalExtensions` for cleaner code
+- Updated `LNURLResolver` to properly handle optional values
+- Improved `NDKContactList` with safer optional handling patterns
+
+### Technical
+- Better code organization with utility helpers reducing boilerplate
+- Enhanced test coverage for utility classes
+- Improved type safety with comprehensive generic support in helper methods
+- More consistent error handling patterns across the codebase
+
 ## [0.7.16] - 2025-01-28
 
 ### Added
