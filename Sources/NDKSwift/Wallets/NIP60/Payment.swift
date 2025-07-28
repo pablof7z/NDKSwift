@@ -364,7 +364,7 @@ public enum Payment {
                 store: changeProofs,
                 destroy: selectedProofs,
                 mint: mintURL.absoluteString,
-                memo: "Send tokens"
+                memo: StringConstants.Transactions.sendTokens
             )
             _ = try await wallet.update(stateChange: stateChange)
 

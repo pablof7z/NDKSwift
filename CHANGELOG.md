@@ -4,6 +4,20 @@ All notable changes to NDKSwift will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.7.13] - 2025-01-28
+
+### Changed
+- Replaced hardcoded string literals with `StringConstants` for better maintainability:
+  - Lightning payment descriptions now use `StringConstants.Transactions`
+  - Display formatting lengths now use `StringConstants.DisplayFormatting.hexPrefixLength`
+- Improved force unwrapping patterns in `NDKContactList` for safer optional handling
+- Updated VERSION file to match the latest CHANGELOG entry
+
+### Technical
+- Code quality improvements focused on DRY principles and consistency
+- Better use of existing constants throughout the codebase
+- Safer optional handling patterns to prevent potential crashes
+
 ## [0.7.12] - 2025-01-27
 
 ### Added

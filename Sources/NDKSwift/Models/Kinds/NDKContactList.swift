@@ -238,12 +238,18 @@ public class NDKContactList: NDKList {
 
     /// Get contacts with petnames
     public var contactsWithPetnames: [NDKContactEntry] {
-        return contacts.filter { $0.petname != nil && !$0.petname!.isEmpty }
+        return contacts.filter { contact in
+            guard let petname = contact.petname else { return false }
+            return !petname.isEmpty
+        }
     }
 
     /// Get contacts with relay URLs
     public var contactsWithRelayURLs: [NDKContactEntry] {
-        return contacts.filter { $0.relayURL != nil && !$0.relayURL!.isEmpty }
+        return contacts.filter { contact in
+            guard let relayURL = contact.relayURL else { return false }
+            return !relayURL.isEmpty
+        }
     }
 
     /// Create a filter to fetch events from all contacts
