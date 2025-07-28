@@ -215,7 +215,7 @@ public struct NDKCashuWalletEvent: NDKPublishableEvent {
 
         // Add P2PK private key if provided
         if let privkey = p2pkPrivateKey {
-            walletTags.append(["privkey", privkey])
+            walletTags.append([NostrConstants.TagName.privkey, privkey])
             NDKLogger.log(.debug, category: .event, "🔐 NDKCashuWalletEvent - Added P2PK private key tag")
         }
 
@@ -261,7 +261,7 @@ public struct NDKCashuWalletEvent: NDKPublishableEvent {
     /// The P2PK private key configured in this wallet event
     public func privateKey(signer: NDKSigner) async throws -> String? {
         let tags = try await decryptedTags(signer: signer)
-        let privateKey = tags.first(where: { $0.first == "privkey" && $0.count > 1 })?[1]
+        let privateKey = tags.first(where: { $0.first == NostrConstants.TagName.privkey && $0.count > 1 })?[1]
         return privateKey
     }
 
@@ -356,7 +356,7 @@ public struct NDKCashuWalletBackupEvent: NDKPublishableEvent {
 
         // Add P2PK private key if provided
         if let privkey = p2pkPrivateKey {
-            walletTags.append(["privkey", privkey])
+            walletTags.append([NostrConstants.TagName.privkey, privkey])
         }
 
         // Encrypt wallet configuration
@@ -396,7 +396,7 @@ public struct NDKCashuWalletBackupEvent: NDKPublishableEvent {
     /// The P2PK private key in this backup event
     public func p2pkPrivateKey(signer: NDKSigner) async throws -> String? {
         let tags = try await decryptedWalletTags(signer: signer)
-        return tags.firstTagValue(named: "privkey")
+        return tags.firstTagValue(named: NostrConstants.TagName.privkey)
     }
 
     /// The relays configured in this backup event
