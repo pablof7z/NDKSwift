@@ -4,6 +4,22 @@ All notable changes to NDKSwift will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.7.16] - 2025-01-28
+
+### Added
+- Unit tests for `NDKNetworkLogger` with comprehensive coverage of all logging methods
+- General string truncation methods in `StringFormatHelpers` for consistent text formatting
+
+### Changed
+- Updated README.md to reflect current version (0.7.15 -> 0.7.16)
+- Refactored string truncation code to use centralized helper methods (DRY improvement)
+- Improved code consistency by using `StringFormatHelpers.truncateHex` in `NDKUser` and `StringFormatHelpers.truncate` in `NDKSession`
+
+### Technical
+- Eliminated code duplication in string truncation logic across multiple files
+- Enhanced test coverage for network logging functionality
+- Improved maintainability with centralized string formatting utilities
+
 ## [0.7.15] - 2025-01-28
 
 ### Changed

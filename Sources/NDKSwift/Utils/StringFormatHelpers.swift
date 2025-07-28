@@ -81,4 +81,22 @@ public enum StringFormatHelpers {
         formatter.allowedUnits = [.year, .month, .day, .hour, .minute, .second]
         return formatter.string(from: interval) ?? "\(Int(interval)) seconds"
     }
+    
+    // MARK: - General String Formatting
+    
+    /// Truncate any string for display with ellipsis
+    public static func truncate(_ string: String, maxLength: Int, ellipsis: String = "...") -> String {
+        guard string.count > maxLength else { return string }
+        let adjustedLength = maxLength - ellipsis.count
+        guard adjustedLength > 0 else { return ellipsis }
+        return String(string.prefix(adjustedLength)) + ellipsis
+    }
+    
+    /// Truncate with prefix and suffix (e.g., "abc...xyz")
+    public static func truncateMiddle(_ string: String, prefixLength: Int = 8, suffixLength: Int = 4) -> String {
+        guard string.count > prefixLength + suffixLength + 3 else { return string }
+        let prefix = string.prefix(prefixLength)
+        let suffix = string.suffix(suffixLength)
+        return "\(prefix)...\(suffix)"
+    }
 }
