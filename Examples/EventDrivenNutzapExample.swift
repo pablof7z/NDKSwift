@@ -67,10 +67,10 @@ actor EventDrivenNutzapManager {
 
 @main
 struct EventDrivenExample {
-    static func main() async {
+    static func main() async throws {
         // Initialize NDK
         let ndk = NDK()
-        try! await ndk.connect()
+        try await ndk.connect()
         
         // Create event-driven manager
         let nutzapManager = EventDrivenNutzapManager(ndk: ndk)
