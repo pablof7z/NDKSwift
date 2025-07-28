@@ -29,8 +29,13 @@ struct MuteListDemo {
         // Create or restore a signer
         let signer: NDKSigner
         if let privateKey = ProcessInfo.processInfo.environment["NOSTR_PRIVATE_KEY"] {
-            signer = try! NDKPrivateKeySigner(privateKey: privateKey)
-            print("✅ Using provided private key")
+            do {
+                signer = try NDKPrivateKeySigner(privateKey: privateKey)
+                print("✅ Using provided private key")
+            } catch {
+                print("❌ Invalid private key: \(error)")
+                return
+            }
         } else {
             signer = NDKPrivateKeySigner.generate()
             print("🔑 Generated new keypair: \(signer.publicKey)")

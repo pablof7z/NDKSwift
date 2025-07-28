@@ -120,7 +120,6 @@ public struct NDKBlossomServerInfo: Identifiable, Equatable, Hashable {
 }
 
 /// Manages Blossom server lists for the current user and discovers public servers
-@MainActor
 public class NDKBlossomServerManager: ObservableObject {
     @Published public private(set) var userServers: [String] = []
     @Published public private(set) var discoveredServers: [NDKBlossomServerInfo] = []
@@ -242,7 +241,7 @@ public class NDKBlossomServerManager: ObservableObject {
         
         do {
             // Create server list event (kind 10063)
-            let event = try await NDKEventBuilder()
+            let event = try await NDKEventBuilder(ndk: ndk)
                 .kind(10063)
                 .content("")
                 .tags(userServers.map { ["server", $0] })
@@ -311,7 +310,7 @@ public class NDKBlossomServerManager: ObservableObject {
     // MARK: - Upload Functionality
     
     /// Upload data to user's selected servers with fallback
-    public func uploadToUserServers(data: Data, mimeType: String) async throws -> BlossomUploadResult {
+    public func uploadToUserServers(data: Data, mimeType: String) async throws -> BlossomBlob {
         guard !userServers.isEmpty else {
             throw BlossomManagerError.noServersConfigured
         }
@@ -325,8 +324,9 @@ public class NDKBlossomServerManager: ObservableObject {
             do {
                 let result = try await client.uploadWithAuth(
                     data: data,
+                    mimeType: mimeType,
                     to: serverUrl,
-                    signer: ndk.signer!,
+                    signer: try ndk.requireSigner(),
                     ndk: ndk
                 )
                 return result
@@ -340,20 +340,21 @@ public class NDKBlossomServerManager: ObservableObject {
     }
     
     /// Upload to specific servers
-    public func uploadToServers(_ serverUrls: [String], data: Data, mimeType: String) async throws -> [BlossomUploadResult] {
+    public func uploadToServers(_ serverUrls: [String], data: Data, mimeType: String) async throws -> [BlossomBlob] {
         guard !serverUrls.isEmpty else {
             throw BlossomManagerError.noServersConfigured
         }
         
         let client = BlossomClient()
-        var results: [BlossomUploadResult] = []
+        var results: [BlossomBlob] = []
         
         for serverUrl in serverUrls {
             do {
                 let result = try await client.uploadWithAuth(
                     data: data,
+                    mimeType: mimeType,
                     to: serverUrl,
-                    signer: ndk.signer!,
+                    signer: try ndk.requireSigner(),
                     ndk: ndk
                 )
                 results.append(result)

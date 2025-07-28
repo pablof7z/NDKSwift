@@ -6,7 +6,7 @@ import NDKSwift
 /// Demo of reactive filters that automatically update when follows change
 @main
 struct ReactiveFilterDemo {
-    static func main() async {
+    static func main() async throws {
         print("🚀 NDKSwift Reactive Filter Demo")
         print("================================\n")
         
@@ -15,12 +15,13 @@ struct ReactiveFilterDemo {
         
         // Create test signer
         let privateKey = "d7f2e96bb7187bca152a5b60b12a0b0e4fbb3b18b0ba9b256552bcea02adae18"
-        let signer = try! NDKPrivateKeySigner(privateKey: privateKey)
+        do {
+            let signer = try NDKPrivateKeySigner(privateKey: privateKey)
         
         print("📝 Starting session with follow list requirement...")
         
         // Start session with follow list requirement
-        let sessionData = try! await ndk.startSession(
+            let sessionData = try await ndk.startSession(
             signer: signer,
             config: NDKSessionConfiguration(
                 dataRequirements: [.followList],
@@ -31,7 +32,7 @@ struct ReactiveFilterDemo {
         print("✅ Session started for pubkey: \(sessionData.pubkey)")
         
         // Wait a moment for initial follow list to load
-        try! await Task.sleep(nanoseconds: 2_000_000_000)
+            try await Task.sleep(nanoseconds: 2_000_000_000)
         
         // Create reactive filter for text notes from follows
         let notesFilter = ReactiveFilter(
@@ -78,7 +79,7 @@ struct ReactiveFilterDemo {
         
         // Simulate follow list change after 5 seconds
         Task {
-            try! await Task.sleep(nanoseconds: 5_000_000_000)
+            try await Task.sleep(nanoseconds: 5_000_000_000)
             
             print("\n🔄 Simulating follow list update...")
             print("   In a real app, this would happen when user follows someone new")
@@ -89,8 +90,11 @@ struct ReactiveFilterDemo {
         }
         
         // Keep running for 10 seconds
-        try! await Task.sleep(nanoseconds: 10_000_000_000)
-        
-        print("\n👋 Demo finished!")
+            try await Task.sleep(nanoseconds: 10_000_000_000)
+            
+            print("\n👋 Demo finished!")
+        } catch {
+            print("❌ Error: \(error)")
+        }
     }
 }

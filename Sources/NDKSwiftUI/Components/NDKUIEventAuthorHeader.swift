@@ -81,6 +81,8 @@ public struct NDKUIEventAuthorHeader: View {
                     }
 
                 // Username (detailed style only)
+                // TODO: Add NDKUsername component
+                /*
                 if style == .detailed {
                     NDKUsername(pubkey: pubkey)
                         .font(usernameFont)
@@ -89,23 +91,30 @@ public struct NDKUIEventAuthorHeader: View {
                             authorTapAction?(pubkey)
                         }
                 }
+                */
 
                 // Timestamp (if provided and not minimal)
+                // TODO: Add NDKRelativeTime component
+                /*
                 if let timestamp = timestamp, style != .minimal {
                     NDKRelativeTime(timestamp: timestamp)
                         .font(timestampFont)
                         .foregroundStyle(.secondary)
                 }
+                */
             }
 
             Spacer()
 
             // Timestamp (minimal style, on the right)
+            // TODO: Add NDKRelativeTime component
+            /*
             if let timestamp = timestamp, style == .minimal {
                 NDKRelativeTime(timestamp: timestamp)
                     .font(timestampFont)
                     .foregroundStyle(.secondary)
             }
+            */
         }
     }
 
