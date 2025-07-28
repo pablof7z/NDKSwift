@@ -109,14 +109,8 @@ final class NIP42AuthenticationIntegrationTests: XCTestCase {
             .content("Test")
             .build(signer: signer)
         
-        // Simulate auth-required error
-        let authError = NDKError.publishFailed(
-            relay: "wss://test.relay",
-            message: "error: restricted: authentication required"
-        )
-        
-        // The event manager should detect this as auth-required
-        // In real usage, this happens during publish
+        // In real usage, auth-required errors happen during publish
+        // Here we simulate the tracking that would occur
         await eventManager.trackPendingAuthEvent(event, for: "wss://test.relay")
         
         // Verify event is tracked

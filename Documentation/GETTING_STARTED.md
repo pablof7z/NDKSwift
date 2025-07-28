@@ -93,35 +93,35 @@ struct NotesView: View {
 
 ### 3. Access Specific Data
 
-Use the observe API with different cache strategies:
+Use the fetch and subscribe APIs with different strategies:
 
 ```swift
-// Get user profile with transformation
-let user = ndk.getUser(npub: "npub1...")
-let profileSource = ndk.observe(
-    filter: NDKFilter(kinds: [0], authors: [user.pubkey]),
-    maxAge: 3600,  // Cache valid for 1 hour
-    transform: { event -> NDKUserProfile? in
-        try? event.decodeMetadata()
-    }
-)
-
-// Get the profile (waits for EOSE or timeout)
-let profiles = await profileSource.collect(timeout: 5.0)
-if let profile = profiles.first {
+// Get user profile
+let user = NDKUser.fromNostrURI("npub1...", ndk: ndk)!
+let profile = try await ndk.fetchProfile(user.pubkey)
+if let profile = profile {
     print("Name: \(profile.name ?? "Unknown")")
 }
 
-// Access recent notes with 5-minute cache
-let recentNotesSource = ndk.observe(
-    filter: NDKFilter(kinds: [1], limit: 10),
-    maxAge: 300  // Accept cached data up to 5 minutes old
+// Access recent notes
+let events = try await ndk.fetchEvents(
+    NDKFilter(kinds: [1], limit: 10)
 )
+for event in events {
+    print(event.content)
+}
 
-// Get specific event by ID (always fresh)
-let eventSource = ndk.observe(
-    filter: NDKFilter(ids: ["eventId..."]),
-    maxAge: 0,  // Always fetch from relays
+// Subscribe to real-time updates
+let subscription = ndk.subscribe(
+    filter: NDKFilter(kinds: [1], limit: 10)
+)
+for await event in subscription {
+    print("New event: \(event.content)")
+}
+
+// Get specific event by ID
+let event = try await ndk.fetchEvent(
+    NDKFilter(ids: ["eventId..."])
     cachePolicy: .networkOnly  // Skip cache entirely
 )
 

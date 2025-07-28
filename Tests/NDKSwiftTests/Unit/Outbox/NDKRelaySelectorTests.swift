@@ -236,12 +236,26 @@ final class NDKRelaySelectorTests: XCTestCase {
     // MARK: - Blocked Relays Tests
     
     func testBlockedRelaysAreExcluded() async throws {
-        // Setup session data with blocked relays
+        // Setup blocked relays by creating a blocked relay list event
         let blockedRelay = "wss://blocked.com"
-        let sessionData = NDKSessionData(pubkey: try await signer.pubkey, ndk: ndk)
-        // Manually set blocked relays for testing
-        sessionData.blockedRelaysState = .loaded(Set([blockedRelay]))
+        let pubkey = try await signer.pubkey
+        
+        // Create blocked relay list event
+        let blockedRelayEvent = try await NDKEventBuilder(ndk: ndk)
+            .kind(10017) // EventKind.blockedRelays
+            .content("")
+            .tag(["relay", blockedRelay])
+            .build()
+        
+        // Save to cache so session data can load it
+        try await cache.saveEvent(blockedRelayEvent)
+        
+        // Initialize session data (loads automatically)
+        let sessionData = NDKSessionData(pubkey: pubkey, ndk: ndk)
         ndk.sessionData = sessionData
+        
+        // Wait for blocked relays to load
+        try await Task.sleep(nanoseconds: 100_000_000) // 100ms
         
         let user1 = "user1_pubkey_64_chars_hex_abcdef1234567890abcdef1234567890abcdef12"
         await setupMockRelayList(for: user1, 
@@ -266,17 +280,39 @@ final class NDKRelaySelectorTests: XCTestCase {
         // In a real scenario, we'd need to mock Date() or wait 5 minutes
         // For now, we just verify the cache behavior exists
         
-        let sessionData1 = NDKSessionData(pubkey: try await signer.pubkey, ndk: ndk)
-        sessionData1.blockedRelaysState = .loaded(Set(["wss://blocked1.com"]))
+        let pubkey = try await signer.pubkey
+        
+        // Create initial blocked relay list
+        let blockedRelayEvent1 = try await NDKEventBuilder(ndk: ndk)
+            .kind(10017) // EventKind.blockedRelays
+            .content("")
+            .tag(["relay", "wss://blocked1.com"])
+            .build()
+        try await cache.saveEvent(blockedRelayEvent1)
+        
+        let sessionData1 = NDKSessionData(pubkey: pubkey, ndk: ndk)
         ndk.sessionData = sessionData1
+        
+        // Wait for blocked relays to load
+        try await Task.sleep(nanoseconds: 100_000_000) // 100ms
         
         let filter = NDKFilter(kinds: [1])
         _ = await relaySelector.selectRelaysForFetching(filter: filter)
         
-        // Update blocked relays
-        let sessionData2 = NDKSessionData(pubkey: try await signer.pubkey, ndk: ndk)
-        sessionData2.blockedRelaysState = .loaded(Set(["wss://blocked2.com"]))
+        // Update blocked relays with new event
+        let blockedRelayEvent2 = try await NDKEventBuilder(ndk: ndk)
+            .kind(10017) // EventKind.blockedRelays
+            .content("")
+            .tag(["relay", "wss://blocked2.com"])
+            .createdAt(blockedRelayEvent1.createdAt + 1) // Ensure newer timestamp
+            .build()
+        try await cache.saveEvent(blockedRelayEvent2)
+        
+        let sessionData2 = NDKSessionData(pubkey: pubkey, ndk: ndk)
         ndk.sessionData = sessionData2
+        
+        // Wait for blocked relays to load
+        try await Task.sleep(nanoseconds: 100_000_000) // 100ms
         
         // Within cache period, should still use old blocked list
         // This is a limitation of the test - in production the cache would expire

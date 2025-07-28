@@ -89,21 +89,34 @@ public typealias RelayURL = String
 /// Nostr event kind
 public typealias Kind = Int
 
-/// Common Nostr event kinds
+/// Common Nostr event kinds as defined in various NIPs
 public enum EventKind {
     // MARK: - Core Events (0-999)
+    /// User metadata (NIP-01) - Contains profile information like name, picture, about
     public static let metadata = 0
+    /// Short text note (NIP-01) - Main content type, like tweets
     public static let textNote = 1
+    /// Relay recommendation (NIP-01, deprecated) - Suggests relays to connect to
     public static let recommendRelay = 2
+    /// Contact list (NIP-02) - List of pubkeys the user follows
     public static let contacts = 3
+    /// Encrypted direct message (NIP-04, deprecated) - Use NIP-44 instead
     public static let encryptedDirectMessage = 4
+    /// Event deletion (NIP-09) - Requests deletion of previous events
     public static let deletion = 5
+    /// Repost (NIP-18) - Shares another event
     public static let repost = 6
+    /// Reaction (NIP-25) - Like, emoji reaction, or upvote
     public static let reaction = 7
+    /// Generic repost (NIP-18) - Repost any event kind
     public static let genericRepost = 16
-    public static let image = 20  // NIP-68 Picture-first feeds
+    /// Image event (NIP-68) - Picture-first content for Instagram-like feeds
+    public static let image = 20
+    /// Channel creation (NIP-28) - Creates a chat channel
     public static let channel = 40
+    /// Channel metadata (NIP-28) - Updates channel information
     public static let channelMetadata = 41
+    /// Channel message (NIP-28) - Message sent to a channel
     public static let channelMessage = 42
 
     // MARK: - Extended Events (1000-9999)
