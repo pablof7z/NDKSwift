@@ -43,6 +43,12 @@ public enum CryptoConstants {
         
         /// Valid prefixes for compressed secp256k1 public keys
         public static let compressedPublicKeyPrefixes = ["02", "03"]
+        
+        /// Compressed pubkey prefix for even y-coordinate
+        public static let compressedPubkeyPrefixEven: UInt8 = 0x02
+        
+        /// Compressed pubkey prefix for odd y-coordinate
+        public static let compressedPubkeyPrefixOdd: UInt8 = 0x03
     }
     
     /// Common crypto sizes in bytes

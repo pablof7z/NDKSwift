@@ -148,12 +148,12 @@ public enum NIP44 {
         var pubkey = secp256k1_pubkey()
 
         // First try with even y-coordinate (0x02 prefix)
-        var publicKeyBytes = [UInt8]([0x02]) + [UInt8](pubkeyData)
+        var publicKeyBytes = [UInt8]([CryptoConstants.KeyFormat.compressedPubkeyPrefixEven]) + [UInt8](pubkeyData)
         var parseResult = secp256k1_ec_pubkey_parse(secp256k1.Context.rawRepresentation, &pubkey, publicKeyBytes, publicKeyBytes.count)
 
         // If that fails, try with odd y-coordinate (0x03 prefix)
         if parseResult != 1 {
-            publicKeyBytes[0] = 0x03
+            publicKeyBytes[0] = CryptoConstants.KeyFormat.compressedPubkeyPrefixOdd
             parseResult = secp256k1_ec_pubkey_parse(secp256k1.Context.rawRepresentation, &pubkey, publicKeyBytes, publicKeyBytes.count)
         }
 

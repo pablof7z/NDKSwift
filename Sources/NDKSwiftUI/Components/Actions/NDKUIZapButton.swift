@@ -632,7 +632,7 @@ struct NDKZapButton_Previews: PreviewProvider {
         id: "mock_id",
         pubkey: "mock_pubkey",
         createdAt: Date.currentNostrTimestamp,
-        kind: 1,
+        kind: EventKind.textNote,
         tags: [],
         content: "Mock event content",
         sig: "mock_sig"
