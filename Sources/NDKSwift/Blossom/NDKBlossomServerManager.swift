@@ -180,7 +180,7 @@ public class NDKBlossomServerManager: ObservableObject {
                 userServers = [defaultServer]
             }
         } catch {
-            print("NDKBlossomServerManager - Failed to fetch user server list: \(error)")
+            NDKLogger.log(.error, category: .general, "NDKBlossomServerManager - Failed to fetch user server list: \(error)")
             userServers = [defaultServer]
         }
     }
@@ -249,9 +249,9 @@ public class NDKBlossomServerManager: ObservableObject {
             
             _ = try await ndk.publish(event)
             
-            print("NDKBlossomServerManager - Published user server list")
+            NDKLogger.log(.info, category: .general, "NDKBlossomServerManager - Published user server list")
         } catch {
-            print("NDKBlossomServerManager - Failed to publish server list: \(error)")
+            NDKLogger.log(.error, category: .general, "NDKBlossomServerManager - Failed to publish server list: \(error)")
         }
     }
     
@@ -261,7 +261,7 @@ public class NDKBlossomServerManager: ObservableObject {
     public func loadDiscoveredServers() async {
         discoveryTask?.cancel()
         discoveryTask = Task {
-            print("NDKBlossomServerManager - Starting to fetch kind 36363 events...")
+            NDKLogger.log(.debug, category: .general, "NDKBlossomServerManager - Starting to fetch kind 36363 events...")
             
             // Create filter for Blossom server discovery events (kind 36363)
             let filter = NDKFilter(
@@ -285,25 +285,26 @@ public class NDKBlossomServerManager: ObservableObject {
                     seenUrls.insert(serverInfo.url)
                     serverInfos.append(serverInfo)
                     
-                    print("NDKBlossomServerManager - Found server: \(serverInfo.name) at \(serverInfo.url)")
+                    NDKLogger.log(.debug, category: .general, "NDKBlossomServerManager - Found server: \(serverInfo.name) at \(serverInfo.url)")
                     
                     // Update UI incrementally
-                    await MainActor.run {
-                        discoveredServers = serverInfos.sorted { server1, server2 in
-                            // Sort free servers first, then by name
-                            if server1.isPaid == server2.isPaid && server1.isWhitelisted == server2.isWhitelisted {
-                                return server1.name < server2.name
-                            }
-                            if server1.isPaid != server2.isPaid {
-                                return !server1.isPaid
-                            }
-                            return !server1.isWhitelisted
+                    let sortedServers = serverInfos.sorted { server1, server2 in
+                        // Sort free servers first, then by name
+                        if server1.isPaid == server2.isPaid && server1.isWhitelisted == server2.isWhitelisted {
+                            return server1.name < server2.name
                         }
+                        if server1.isPaid != server2.isPaid {
+                            return !server1.isPaid
+                        }
+                        return !server1.isWhitelisted
+                    }
+                    await MainActor.run {
+                        discoveredServers = sortedServers
                     }
                 }
             }
             
-            print("NDKBlossomServerManager - Finished loading discovered servers. Found \(serverInfos.count) servers.")
+            NDKLogger.log(.info, category: .general, "NDKBlossomServerManager - Finished loading discovered servers. Found \(serverInfos.count) servers.")
         }
     }
     
@@ -359,7 +360,7 @@ public class NDKBlossomServerManager: ObservableObject {
                 )
                 results.append(result)
             } catch {
-                print("NDKBlossomServerManager - Upload to \(serverUrl) failed: \(error)")
+                NDKLogger.log(.warning, category: .general, "NDKBlossomServerManager - Upload to \(serverUrl) failed: \(error)")
                 // Continue with other servers
             }
         }

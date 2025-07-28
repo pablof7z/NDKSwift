@@ -162,7 +162,7 @@ public struct NDKTextNoteView: View {
         VStack(alignment: .leading, spacing: verticalSpacing) {
             // Author header
             if showAuthor {
-                NDKEventAuthorHeader(
+                NDKUIEventAuthorHeader(
                     pubkey: event.pubkey,
                     timestamp: showTimestamp ? event.createdAt : nil,
                     style: authorHeaderStyle
@@ -218,7 +218,7 @@ public struct NDKTextNoteView: View {
         }
     }
 
-    private var authorHeaderStyle: NDKEventAuthorHeader.Style {
+    private var authorHeaderStyle: NDKUIEventAuthorHeader.Style {
         switch style {
         case .full: return .detailed
         case .feed: return .standard
@@ -278,7 +278,7 @@ public struct NDKLongFormArticleView: View {
         VStack(alignment: .leading, spacing: 12) {
             // Author header
             if showAuthor {
-                NDKEventAuthorHeader(
+                NDKUIEventAuthorHeader(
                     pubkey: event.pubkey,
                     timestamp: showTimestamp ? event.createdAt : nil,
                     style: .standard
@@ -330,7 +330,7 @@ public struct NDKLongFormArticleView: View {
                     Spacer()
 
                     if let publishedAt = extractPublishedAt() {
-                        NDKRelativeTime(timestamp: publishedAt)
+                        NDKUIRelativeTime(timestamp: publishedAt)
                             .font(.caption)
                     }
                 }
@@ -383,7 +383,7 @@ public struct NDKCashuTokenView: View {
         VStack(alignment: .leading, spacing: 8) {
             // Author header
             if showAuthor {
-                NDKEventAuthorHeader(
+                NDKUIEventAuthorHeader(
                     pubkey: event.pubkey,
                     timestamp: showTimestamp ? event.createdAt : nil,
                     style: .minimal
@@ -470,7 +470,7 @@ public struct NDKPictureEventView: View {
         VStack(alignment: .leading, spacing: 12) {
             // Author header
             if showAuthor {
-                NDKEventAuthorHeader(
+                NDKUIEventAuthorHeader(
                     pubkey: event.pubkey,
                     timestamp: showTimestamp ? event.createdAt : nil,
                     style: .standard
@@ -691,7 +691,7 @@ public struct NDKGenericEventView: View {
         VStack(alignment: .leading, spacing: 8) {
             // Author header
             if showAuthor {
-                NDKEventAuthorHeader(
+                NDKUIEventAuthorHeader(
                     pubkey: event.pubkey,
                     timestamp: showTimestamp ? event.createdAt : nil,
                     style: .minimal
