@@ -59,8 +59,7 @@ struct DebugKind0Fetcher {
             ndk: ndk,
             filter: NDKFilter(
                 authors: [pubkeyHex],
-                kinds: [0],
-                limit: 1
+                kinds: [0]
             )
         ) { event in
             guard let data = event.content.data(using: .utf8),

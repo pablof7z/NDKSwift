@@ -114,7 +114,7 @@ extension NDKUser {
     func fetchProfileOld() async -> NDKUserProfile? {
         let dataSource = NDKDataSource(
             ndk: ndk,
-            filter: NDKFilter(kinds: [0], authors: [pubkey], limit: 1)
+            filter: NDKFilter(kinds: [0], authors: [pubkey])
         )
         let events = await dataSource.currentValue()
         return events.first?.userProfile()

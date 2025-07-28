@@ -560,7 +560,6 @@ public final class NDK {
 
         // Also process through internal subscription manager
         if let ndkRelay = relay as? NDKRelay {
-            NDKLogger.log(.trace, category: .event, "🔄 Routing to internal subscription manager")
             // Process through internal subscription manager with correct subscription ID
             await internalSubscriptionManager.processEvent(event, subscriptionId: subscriptionId, from: ndkRelay)
         } else {

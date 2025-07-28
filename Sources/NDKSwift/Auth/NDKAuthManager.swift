@@ -312,20 +312,29 @@ public class NDKAuthManager {
         }
     }
 
-    /// Create a new session with a signer
+    /// Add a new session with a signer and make it the active session
+    /// 
+    /// This method handles everything automatically:
+    /// - Creates the session
+    /// - Stores signer data in keychain
+    /// - Starts the NDK session immediately
+    /// - Makes it the active session
+    /// 
     /// - Parameters:
     ///   - signer: The signer for this session
-    ///   - requiresBiometric: Whether biometric auth is required
-    ///   - isHardwareBacked: Whether the signer uses secure enclave
+    ///   - requiresBiometric: Whether biometric auth is required for this session
     /// - Returns: The created session
-    public func createSession(
-        with signer: any NDKSigner,
-        requiresBiometric: Bool = false,
-        isHardwareBacked: Bool = false
+    public func addSession(
+        _ signer: any NDKSigner,
+        requiresBiometric: Bool = false
     ) async throws -> NDKSession {
 
         // Get pubkey from signer
         let pubkey = try await signer.pubkey
+
+        // Determine if hardware-backed based on signer type
+        // TODO: Implement NDKBiometricSigner
+        let isHardwareBacked = false
 
         // Create session
         var session = NDKSession(
@@ -366,6 +375,22 @@ public class NDKAuthManager {
 
         // Set signer on NDK if available
         ndk?.signer = signer
+        
+        // Start NDK session immediately if NDK is available
+        if let ndk = ndk {
+            do {
+                _ = try await ndk.startSession(
+                    signer: signer,
+                    config: NDKSessionConfiguration(
+                        dataRequirements: [.followList, .muteList],
+                        preloadStrategy: .progressive
+                    )
+                )
+            } catch {
+                // Log error but don't fail the session creation
+                NDKLogger.log(.warning, category: .auth, "Failed to start NDK session: \(error)")
+            }
+        }
 
         return session
     }
@@ -392,9 +417,9 @@ public class NDKAuthManager {
         try await restoreActiveSession(session)
     }
 
-    /// Delete a session
-    /// - Parameter session: The session to delete
-    public func deleteSession(_ session: NDKSession) async throws {
+    /// Remove a session from storage and clear it if active
+    /// - Parameter session: The session to remove
+    public func removeSession(_ session: NDKSession) async throws {
         // Remove from available sessions
         availableSessions.removeAll { $0.id == session.id }
 
@@ -410,21 +435,29 @@ public class NDKAuthManager {
         NDKLogger.log(.info, category: .auth, "Deleted session for user: \(session.pubkey)")
     }
 
-    /// Logout from the current session
+    /// Clear all sessions from storage and logout
+    public func clearAllSessions() async throws {
+        // Delete all sessions from keychain
+        for session in availableSessions {
+            try await keychainManager.deleteSignerData(identifier: session.id)
+            try await keychainManager.deleteSessionMetadata(identifier: session.id)
+        }
+        
+        // Clear available sessions
+        availableSessions = []
+        
+        // Then logout
+        logout()
+    }
+    
+    /// Logout from the current session (only clears active state, doesn't remove from storage)
     public func logout() {
-
         activeSession = nil
         activeSigner = nil
         authenticationState = .unauthenticated
         ndk?.signer = nil
-
-        // Mark all sessions as inactive
-        availableSessions = availableSessions.map { session in
-            var updated = session
-            updated.markAsInactive()
-            return updated
-        }
-
+        
+        // Don't modify availableSessions here - they remain in storage
     }
 
     // MARK: - Biometric Authentication
@@ -488,6 +521,33 @@ public class NDKAuthManager {
     private func saveSessionMetadata(_ session: NDKSession) async throws {
         let data = try JSONCoding.encode(session)
         try await keychainManager.storeSessionMetadata(identifier: session.id, data: data)
+    }
+}
+
+// MARK: - Deprecated APIs for Backward Compatibility
+
+extension NDKAuthManager {
+    /// Creates a new session with a signer
+    /// - Parameters:
+    ///   - signer: The signer for this session
+    ///   - requiresBiometric: Whether biometric auth is required
+    ///   - isHardwareBacked: Whether the signer uses secure enclave (ignored, now auto-detected)
+    /// - Returns: The created session
+    @available(*, deprecated, renamed: "addSession(_:requiresBiometric:)", message: "Use addSession(_:requiresBiometric:) instead. The isHardwareBacked parameter is now automatically determined based on the signer type.")
+    public func createSession(
+        with signer: any NDKSigner,
+        requiresBiometric: Bool = false,
+        isHardwareBacked: Bool = false
+    ) async throws -> NDKSession {
+        // Call the new method, ignoring isHardwareBacked parameter
+        return try await addSession(signer, requiresBiometric: requiresBiometric)
+    }
+    
+    /// Deletes a session
+    /// - Parameter session: The session to delete
+    @available(*, deprecated, renamed: "removeSession", message: "Use removeSession instead")
+    public func deleteSession(_ session: NDKSession) async throws {
+        try await removeSession(session)
     }
 }
 

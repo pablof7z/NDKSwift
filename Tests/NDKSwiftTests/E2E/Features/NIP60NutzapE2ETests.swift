@@ -325,8 +325,7 @@ final class NIP60NutzapE2ETests: XCTestCase {
         // Fetch pubkey2's nutzap preferences to get accepted mints
         let preferencesFilter = NDKFilter(
             authors: [pubkey2],
-            kinds: [EventKind.nutzapPreferences],
-            limit: 1
+            kinds: [EventKind.nutzapPreferences]
         )
         
         let dataSource = ndk1.observe(

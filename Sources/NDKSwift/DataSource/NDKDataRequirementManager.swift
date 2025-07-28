@@ -1072,12 +1072,7 @@ actor DataRequirement {
 
         // Process events from subscription
         Task {
-            var eventCount = 0
-
             for await (event, relay) in await internalSubscription.events {
-                eventCount += 1
-                NDKLogger.log(.trace, category: .subscription, "📨 Event #\(eventCount) received - id: \(event.id), kind: \(event.kind), from: \(relay)")
-
                 // Apply exclusive relay filtering if enabled
                 if exclusiveRelays, let relayFilter = relays {
                     guard relayFilter.contains(relay) else {
@@ -1107,7 +1102,6 @@ actor DataRequirement {
                         from: relay,
                         subscriptionId: subscriptionId
                     )
-                    NDKLogger.log(.trace, category: .subscription, "✅ Event processed by cache")
                 } catch {
                     NDKLogger.log(.error, category: .subscription, "❌ Failed to process event: \(error)")
                 }
@@ -1117,8 +1111,6 @@ actor DataRequirement {
                     await observer.handleRelayUpdate(.event(event, relay: relay))
                 }
             }
-
-            NDKLogger.log(.info, category: .subscription, "🔚 Event stream ended - processed \(eventCount) events for subscription: \(subscriptionId)")
         }
     }
 }

@@ -20,8 +20,7 @@ struct Example04_UserProfile {
         // Create a filter for profile metadata (kind 0)
         let profileFilter = NDKFilter(
             authors: [jackPubkey],
-            kinds: [EventKind.metadata],
-            limit: 1
+            kinds: [EventKind.metadata]
         )
         
         // Fetch profile using observe

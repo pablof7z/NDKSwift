@@ -338,7 +338,7 @@ let limitedEvents = await dataSource.collect(timeout: 10.0, limit: 50)
     ```swift
     // Fetch user profile with 1-hour cache
     let profileSource = ndk.observe(
-        filter: NDKFilter(authors: [pubkey], kinds: [0], limit: 1),
+        filter: NDKFilter(authors: [pubkey], kinds: [0]),
         maxAge: 3600  // 1 hour cache tolerance
     )
     
@@ -1991,3 +1991,46 @@ func publishWithNetworkAwareness(event: NDKEvent) async throws {
 ```
 
 By understanding and applying these principles, you can build truly native, performant, and reliable Nostr applications on Apple platforms using NDKSwift.
+
+---
+
+### 13. iOS Networking Configuration for Cashu Mints
+
+When building iOS apps that interact with Cashu mints, you'll likely encounter networking issues where some mints can't be reached. This is because many Cashu mints run on HTTP (instead of HTTPS) or have SSL certificates that don't meet Apple's strict App Transport Security (ATS) requirements.
+
+**The Problem:**
+By default, iOS apps block connections to:
+- HTTP servers (non-HTTPS)
+- Servers with invalid/self-signed SSL certificates
+- Servers that don't meet modern TLS requirements
+
+**The Solution:**
+Add NSAppTransportSecurity configuration to your app's `Info.plist`:
+
+```xml
+<key>NSAppTransportSecurity</key>
+<dict>
+    <key>NSAllowsArbitraryLoads</key>
+    <true/>
+    <key>NSAllowsArbitraryLoadsInWebContent</key>
+    <true/>
+</dict>
+```
+
+**What This Does:**
+- **`NSAllowsArbitraryLoads`**: Allows the app to connect to HTTP servers and servers with invalid SSL certificates
+- **`NSAllowsArbitraryLoadsInWebContent`**: Extends this permission to web content as well
+
+**When You Need This:**
+- Any app using NIP-60 wallets (Cashu integration)
+- Apps that need to connect to a variety of Cashu mints
+- Development/testing with local or staging mint servers
+- Production apps in the Cashu ecosystem
+
+**Security Considerations:**
+While this configuration reduces security for network connections, it's necessary for interoperability with the current Cashu mint ecosystem. The alternative would be requiring all mints to have proper SSL certificates, which isn't realistic.
+
+**Implementation Example:**
+Most NDK-based wallet apps (Nutsack, Olas, Highlighter) include this configuration to ensure compatibility with the full range of available Cashu mints.
+
+This configuration is essential for any iOS app that uses NDKSwift's NIP-60 wallet functionality or needs to interact with the broader Cashu mint network.

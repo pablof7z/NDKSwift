@@ -45,8 +45,7 @@ Task {
     print("\nTrying direct filter...")
     let filter = NDKFilter(
         authors: [testPubkey],
-        kinds: [0],
-        limit: 1
+        kinds: [0]
     )
     
     let dataSource = ndk.observe(filter: filter, maxAge: 0)

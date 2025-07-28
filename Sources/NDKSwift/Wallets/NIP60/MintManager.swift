@@ -146,9 +146,10 @@ public actor MintManager {
     /// Request a mint quote for Lightning deposits
     public func requestMintQuote(amount: Int64, mintURL: String) async throws -> CashuSwift.Bolt11.MintQuote {
         // Always ensure mint is properly loaded with keysets
-        guard let url = URL(string: mintURL) else {
-            throw NDKError.invalidURL("\(ErrorMessageConstants.invalid("mint URL")): \(mintURL)")
-        }
+        let url = try GuardHelpers.unwrap(
+            URL(string: mintURL),
+            error: NDKError.invalidURL("\(ErrorMessageConstants.invalid("mint URL")): \(mintURL)")
+        )
 
         // Get mint - loadMint will use cache and store in memory
         let mint = try await loadMint(url: url)
@@ -169,9 +170,10 @@ public actor MintManager {
             quoteRequest: quoteRequest
         )
 
-        guard let quoteResponse = response as? CashuSwift.Bolt11.MintQuote else {
-            throw NDKError.walletError(message: "Unexpected quote response type")
-        }
+        let quoteResponse = try GuardHelpers.unwrap(
+            response as? CashuSwift.Bolt11.MintQuote,
+            error: NDKError.walletError(message: "Unexpected quote response type")
+        )
 
         return quoteResponse
     }

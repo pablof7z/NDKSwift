@@ -87,7 +87,7 @@ final class NDKFilterConvenienceTests: XCTestCase {
         
         XCTAssertEqual(filter.kinds, [10002])
         XCTAssertEqual(filter.authors, [pubkey])
-        XCTAssertEqual(filter.limit, 1)
+        XCTAssertNil(filter.limit)
     }
     
     func testMultipleKindsFilterConvenience() {

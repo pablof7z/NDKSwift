@@ -73,9 +73,10 @@ public actor NDKNostrRPC {
             encryptionScheme = otherScheme
         }
 
-        guard let json = try? JSONCoding.parseDictionary(from: decryptedContent) else {
-            throw NDKError.invalidMessage(ErrorMessageConstants.failedTo("parse RPC content"))
-        }
+        let json = try GuardHelpers.unwrap(
+            try? JSONCoding.parseDictionary(from: decryptedContent),
+            error: NDKError.invalidMessage(ErrorMessageConstants.failedTo("parse RPC content"))
+        )
 
         let id = json["id"] as? String ?? ""
 

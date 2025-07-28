@@ -37,7 +37,7 @@ public enum Nutzap {
         let amountWithFeeBuffer = amount + 2
         let viableMintURLs = await proofStateManager.getMintsWithSufficientBalance(amount: amountWithFeeBuffer)
 
-        guard !viableMintURLs.isEmpty else {
+        if viableMintURLs.isEmpty {
             let balance = await proofStateManager.getTotalBalance()
             throw NDKError.walletInsufficientBalance(amount: amount, available: balance)
         }
@@ -220,17 +220,17 @@ public enum Nutzap {
 
         NDKLogger.log(.debug, category: .wallet, "Mint URLs in nutzap: \(mintURLs)")
 
-        guard !mintURLs.isEmpty else {
-            NDKLogger.log(.error, category: .wallet, "No mint URLs in nutzap")
-            throw NutzapRedemptionError.invalidProofs(reason: "No mint URLs in nutzap event")
-        }
+        try GuardHelpers.requireNotEmpty(
+            mintURLs,
+            error: NutzapRedemptionError.invalidProofs(reason: "No mint URLs in nutzap event")
+        )
 
         // Extract proofs from proof tags
         let proofTags = event.tags.filter { $0.count >= 2 && $0[0] == NostrConstants.TagName.proof }
-        guard !proofTags.isEmpty else {
-            NDKLogger.log(.error, category: .wallet, "No proofs in nutzap")
-            throw NutzapRedemptionError.invalidProofs(reason: "No proofs in nutzap event")
-        }
+        try GuardHelpers.requireNotEmpty(
+            proofTags,
+            error: NutzapRedemptionError.invalidProofs(reason: "No proofs in nutzap event")
+        )
 
         NDKLogger.log(.debug, category: .wallet, "Found \(proofTags.count) proof tags in nutzap")
 
@@ -289,7 +289,7 @@ public enum Nutzap {
 
         NDKLogger.log(.debug, category: .wallet, "Total proofs: \(allProofs.count), Proofs locked to us: \(ourProofs.count)")
 
-        guard !ourProofs.isEmpty else {
+        if ourProofs.isEmpty {
             NDKLogger.log(.debug, category: .wallet, "No proofs locked to our P2PK pubkey (\(ourPubkeyHex)) in nutzap")
             // Extract expected pubkey from the first proof's secret
             var expectedPubkey = "unknown"
@@ -421,9 +421,10 @@ public enum Nutzap {
         )
 
         // Get the locked proofs from the token
-        guard let lockedProofs = token.proofsByMint[mintURL] else {
-            throw NDKError.walletInvalidProof(details: "No proofs found in created token for mint \(mintURL)")
-        }
+        let lockedProofs = try GuardHelpers.unwrap(
+            token.proofsByMint[mintURL],
+            error: NDKError.walletInvalidProof(details: "No proofs found in created token for mint \(mintURL)")
+        )
 
         return (proofs: lockedProofs, change: changeProofs)
     }
