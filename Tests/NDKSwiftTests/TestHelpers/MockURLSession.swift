@@ -45,7 +45,7 @@ class MockURLSession: URLProtocol {
 }
 
 /// Simple mock for testing
-final class SimpleMockURLSession: URLSessionProtocol, NDKNetworkFetching, @unchecked Sendable {
+final class SimpleMockURLSession: NDKNetworkFetching, @unchecked Sendable {
     var data: Data?
     var response: URLResponse?
     var error: Error?

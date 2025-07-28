@@ -162,7 +162,19 @@ class MockURLDataFetcher: NDKNetworkFetching {
     var response: URLResponse?
     var error: Error?
     
-    func data(from url: URL) async throws -> (Data, URLResponse) {
+    func data(from url: URL) async throws -> Data {
+        if let error = error {
+            throw error
+        }
+        
+        guard let data = data else {
+            throw URLError(.badServerResponse)
+        }
+        
+        return data
+    }
+    
+    func data(for request: URLRequest) async throws -> (Data, URLResponse) {
         if let error = error {
             throw error
         }
