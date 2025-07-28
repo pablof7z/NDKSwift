@@ -274,6 +274,7 @@ actor InternalSubscriptionManager {
                 NDKLogger.log(.info, category: .subscription, "🔄 Subscription \(subscription.id) was started but has no active relays - sending REQ to \(relay.url)")
                 do {
                     let message = await subscription.createREQMessage()
+                    NDKLogger.log(.debug, category: .subscription, "📤 [RelayActivation] REQ message: \(message)")
                     try await relay.send(message)
                     await relay.trackSubscription(id: subscription.id, filters: subscription.filters)
                     await subscription.markRelayAsActive(relay.url)
@@ -285,7 +286,8 @@ actor InternalSubscriptionManager {
                 // If already active on other relays, just send REQ to this relay
                 do {
                     let message = await subscription.createREQMessage()
-                    NDKLogger.log(.debug, category: .subscription, "📨 Replaying subscription \(subscription.id) to \(relay.url)")
+                    NDKLogger.log(.debug, category: .subscription, "📨 [RelayReplay] Replaying subscription \(subscription.id) to \(relay.url)")
+                    NDKLogger.log(.debug, category: .subscription, "📤 [RelayReplay] REQ message: \(message)")
                     try await relay.send(message)
 
                     // Track subscription on the relay
@@ -387,7 +389,22 @@ actor InternalSubscription: Hashable {
             targetRelays = await ndk.pool.connectedRelays()
         }
         
+        // Log the filters being sent to relays
         NDKLogger.log(.info, category: .subscription, "🚀 Opening subscription: \(id) on relays: \(targetRelays.map { $0.url })")
+        NDKLogger.log(.info, category: .subscription, "📨 [RelaySubscription] Sending \(filters.count) filters to \(targetRelays.count) relays")
+        
+        for (index, filter) in filters.enumerated() {
+            var filterParts: [String] = []
+            if let kinds = filter.kinds { filterParts.append("kinds:\(kinds)") }
+            if let authors = filter.authors { filterParts.append("authors:\(authors.count)") }
+            if let ids = filter.ids { filterParts.append("ids:\(ids.count)") }
+            if let tags = filter.tags, !tags.isEmpty { filterParts.append("tags:\(tags.keys.joined(separator: ","))") }
+            if let since = filter.since { filterParts.append("since:\(since)") }
+            if let until = filter.until { filterParts.append("until:\(until)") }
+            if let limit = filter.limit { filterParts.append("limit:\(limit)") }
+            
+            NDKLogger.log(.info, category: .subscription, "  Filter[\(index + 1)]: \(filterParts.joined(separator: ", "))")
+        }
         
         // Send REQ message to each relay
         var successCount = 0
@@ -402,6 +419,7 @@ actor InternalSubscription: Hashable {
             
             do {
                 let message = createREQMessage()
+                NDKLogger.log(.debug, category: .subscription, "📤 [RelaySubscription] Sending REQ to \(relay.url): \(message)")
                 try await relay.send(message)
 
                 // Track subscription on the relay
@@ -410,6 +428,7 @@ actor InternalSubscription: Hashable {
                 // Track that we successfully sent REQ to this relay
                 activeRelays.insert(relay.url)
 
+                NDKLogger.log(.info, category: .subscription, "✅ [RelaySubscription] Successfully sent subscription \(id) to \(relay.url)")
                 successCount += 1
             } catch {
                 NDKLogger.log(.error, category: .subscription, "❌ Failed to send REQ to \(relay.url): \(error)")
