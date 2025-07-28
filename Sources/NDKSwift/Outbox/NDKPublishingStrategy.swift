@@ -455,23 +455,40 @@ actor OutboxItem {
     }
 }
 
-/// Overall publish status
+/// Overall status of an event publishing operation
+///
+/// Represents the aggregated status across all target relays
 public enum PublishStatus: String, Codable, Sendable {
+    /// Event is queued for publishing
     case pending
+    /// Publishing is currently in progress
     case inProgress
+    /// Event was successfully published to all target relays
     case succeeded
+    /// Event failed to publish to any relay
     case failed
+    /// Publishing operation was cancelled
     case cancelled
+    /// Status is unknown (event not found in tracking)
     case unknown
 }
 
 /// Status of publishing to a specific relay
+///
+/// Tracks the detailed state of publishing an event to an individual relay,
+/// including retry attempts and specific failure reasons
 public enum RelayPublishStatus: Equatable, Codable, Sendable {
+    /// Waiting to be published to this relay
     case pending
+    /// Currently being sent to this relay
     case inProgress
+    /// Successfully published to this relay
     case succeeded
+    /// Failed to publish with specific reason
     case failed(PublishFailureReason)
+    /// Rate limited by the relay
     case rateLimited
+    /// Retrying after failure (with attempt number)
     case retrying(attempt: Int)
 
     enum CodingKeys: String, CodingKey {
@@ -526,12 +543,20 @@ public enum RelayPublishStatus: Equatable, Codable, Sendable {
     }
 }
 
-/// Reason for publish failure
+/// Specific reasons why publishing to a relay failed
+///
+/// Provides detailed information about publishing failures to help
+/// with debugging and implementing appropriate retry strategies
 public enum PublishFailureReason: Equatable, Codable, Sendable {
+    /// Failed to connect to the relay
     case connectionFailed
+    /// Authentication with the relay failed (NIP-42)
     case authFailed
+    /// Event was rejected as invalid by the relay (with reason)
     case invalid(String)
+    /// Maximum number of retry attempts exceeded
     case maxRetriesExceeded
+    /// Custom failure reason (with description)
     case custom(String)
 
     enum CodingKeys: String, CodingKey {
