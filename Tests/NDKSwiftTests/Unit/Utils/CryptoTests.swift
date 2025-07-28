@@ -35,16 +35,19 @@ final class CryptoTests: XCTestCase {
         
         for (input, expected) in testVectors {
             let data = input.data(using: .utf8)!
-            let hash = Crypto.sha256(data)
-            XCTAssertEqual(hash, expected, "SHA256 hash mismatch for input: '\(input)'")
+            let hashData = Crypto.sha256(data)
+            let hashHex = hashData.hexEncodedString()
+            XCTAssertEqual(hashHex, expected, "SHA256 hash mismatch for input: '\(input)'")
         }
     }
     
     func testSHA256_hexString() {
         let input = "hello world"
-        let hash = Crypto.sha256Hex(input)
+        let data = input.data(using: .utf8)!
+        let hashData = Crypto.sha256(data)
+        let hashHex = hashData.hexEncodedString()
         let expected = "b94d27b9934d3e08a52e52d7da7dabfac484efe37a5380ee9088f7ace2efcde9"
-        XCTAssertEqual(hash, expected)
+        XCTAssertEqual(hashHex, expected)
     }
     
     // MARK: - Key generation tests
@@ -82,19 +85,19 @@ final class CryptoTests: XCTestCase {
         ]
         
         for (privateKey, expectedPublicKey) in testVectors {
-            let publicKey = try Crypto.derivePublicKey(from: privateKey)
+            let publicKey = try Crypto.getPublicKey(from: privateKey)
             XCTAssertEqual(publicKey, expectedPublicKey)
         }
     }
     
     func testDerivePublicKey_invalidPrivateKey() {
         // Test invalid hex
-        XCTAssertThrowsError(try Crypto.derivePublicKey(from: "not-hex")) { error in
+        XCTAssertThrowsError(try Crypto.getPublicKey(from: "not-hex")) { error in
             XCTAssertTrue(error is Crypto.CryptoError)
         }
         
         // Test wrong length
-        XCTAssertThrowsError(try Crypto.derivePublicKey(from: "deadbeef")) { error in
+        XCTAssertThrowsError(try Crypto.getPublicKey(from: "deadbeef")) { error in
             XCTAssertTrue(error is Crypto.CryptoError)
         }
     }
@@ -103,46 +106,51 @@ final class CryptoTests: XCTestCase {
     
     func testSignAndVerify_roundTrip() throws {
         let privateKey = Crypto.generatePrivateKey()
-        let publicKey = try Crypto.derivePublicKey(from: privateKey)
+        let publicKey = try Crypto.getPublicKey(from: privateKey)
         let message = "Hello, Nostr!"
-        let messageData = Crypto.sha256Hex(message)
+        let messageData = message.data(using: .utf8)!
+        let messageHash = Crypto.sha256(messageData)
         
         // Sign the message
-        let signature = try Crypto.sign(message: messageData, with: privateKey)
+        let signature = try Crypto.sign(message: messageHash, privateKey: privateKey)
         
         // Verify the signature
-        let isValid = try Crypto.verifySignature(signature, for: messageData, publicKey: publicKey)
+        let isValid = try Crypto.verify(signature: signature, message: messageHash, pubkey: publicKey)
         XCTAssertTrue(isValid)
     }
     
     func testVerifySignature_invalidSignatureFails() throws {
         let privateKey = Crypto.generatePrivateKey()
-        let publicKey = try Crypto.derivePublicKey(from: privateKey)
-        let message = Crypto.sha256Hex("Hello, Nostr!")
+        let publicKey = try Crypto.getPublicKey(from: privateKey)
+        let messageData = "Hello, Nostr!".data(using: .utf8)!
+        let message = Crypto.sha256(messageData)
         
         // Create a valid signature
-        let signature = try Crypto.sign(message: message, with: privateKey)
+        let signature = try Crypto.sign(message: message, privateKey: privateKey)
         
         // Corrupt the signature
         var corruptedSig = signature
-        corruptedSig.replaceSubrange(0..<2, with: "ff")
+        let startIndex = corruptedSig.startIndex
+        let endIndex = corruptedSig.index(startIndex, offsetBy: 2)
+        corruptedSig.replaceSubrange(startIndex..<endIndex, with: "ff")
         
         // Verification should fail
-        let isValid = try Crypto.verifySignature(corruptedSig, for: message, publicKey: publicKey)
+        let isValid = try Crypto.verify(signature: corruptedSig, message: message, pubkey: publicKey)
         XCTAssertFalse(isValid)
     }
     
     func testVerifySignature_wrongPublicKeyFails() throws {
         let privateKey1 = Crypto.generatePrivateKey()
         let privateKey2 = Crypto.generatePrivateKey()
-        let publicKey2 = try Crypto.derivePublicKey(from: privateKey2)
-        let message = Crypto.sha256Hex("Hello, Nostr!")
+        let publicKey2 = try Crypto.getPublicKey(from: privateKey2)
+        let messageData = "Hello, Nostr!".data(using: .utf8)!
+        let message = Crypto.sha256(messageData)
         
         // Sign with key1
-        let signature = try Crypto.sign(message: message, with: privateKey1)
+        let signature = try Crypto.sign(message: message, privateKey: privateKey1)
         
         // Verify with key2 should fail
-        let isValid = try Crypto.verifySignature(signature, for: message, publicKey: publicKey2)
+        let isValid = try Crypto.verify(signature: signature, message: message, pubkey: publicKey2)
         XCTAssertFalse(isValid)
     }
     

@@ -1,4 +1,17 @@
 /// Configuration for signature verification sampling
+///
+/// This configuration controls how NDK verifies event signatures from relays.
+/// By default, all signatures are verified, but you can configure sampling
+/// to improve performance at the cost of some security.
+///
+/// Example:
+/// ```swift
+/// let config = NDKSignatureVerificationConfig(
+///     initialValidationRatio: 0.5,  // Verify 50% of events from new relays
+///     lowestValidationRatio: 0.1,   // Never go below 10% verification
+///     autoBlacklistInvalidRelays: true  // Auto-blacklist bad relays
+/// )
+/// ```
 public struct NDKSignatureVerificationConfig: Sendable {
     /// The signature verification validation ratio for new relays (1.0 = verify all)
     public var initialValidationRatio: Double
@@ -65,22 +78,56 @@ public struct NDKRelaySignatureStats: Sendable, Equatable {
 }
 
 /// Result of a signature verification attempt
+///
+/// Indicates the outcome of verifying an event's signature.
+/// Signatures may be skipped for performance reasons based on sampling configuration.
 public enum NDKSignatureVerificationResult: Sendable {
+    /// Signature was verified and is valid
     case valid
+    /// Signature was verified and is invalid
     case invalid
-    case skipped // Skipped due to sampling
-    case cached // Already verified (cached result)
+    /// Signature verification was skipped due to sampling configuration
+    case skipped
+    /// Signature was already verified (result from cache)
+    case cached
 }
 
 /// Protocol for signature verification delegate
+///
+/// Implement this protocol to receive notifications about signature verification
+/// failures and relay blacklisting. This is useful for monitoring relay behavior
+/// and taking custom actions when invalid signatures are detected.
+///
+/// Example implementation:
+/// ```swift
+/// class MyVerificationDelegate: NDKSignatureVerificationDelegate {
+///     func signatureVerificationFailed(for event: NDKEvent, from relay: RelayProtocol) {
+///         print("Invalid signature detected from \(relay.url)")
+///         // Log to analytics, notify user, etc.
+///     }
+///     
+///     func relayBlacklisted(_ relay: RelayProtocol) {
+///         print("Relay blacklisted: \(relay.url)")
+///         // Update UI, save to persistent blacklist, etc.
+///     }
+/// }
+/// ```
 public protocol NDKSignatureVerificationDelegate: AnyObject {
     /// Called when an invalid signature is detected
+    /// 
+    /// This method is called on the main thread when signature verification fails.
+    /// The event will not be processed further by NDK.
+    ///
     /// - Parameters:
     ///   - event: The event with invalid signature
     ///   - relay: The relay that provided the invalid signature
     func signatureVerificationFailed(for event: NDKEvent, from relay: RelayProtocol)
 
     /// Called when a relay is blacklisted for providing invalid signatures
+    /// 
+    /// This occurs when `autoBlacklistInvalidRelays` is enabled in the configuration
+    /// and a relay provides an event with an invalid signature.
+    ///
     /// - Parameter relay: The blacklisted relay
     func relayBlacklisted(_ relay: RelayProtocol)
 }

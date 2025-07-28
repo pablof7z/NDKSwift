@@ -66,8 +66,7 @@ final class NIP42AuthenticationIntegrationTests: XCTestCase {
             // If auth is required, wait for authentication
             if let ndkError = error as? NDKError,
                case let .publishFailed(_, message) = ndkError,
-               let msg = message.lowercased(),
-               (msg.contains("auth") || msg.contains("restricted")) {
+               message.lowercased().contains("auth") || message.lowercased().contains("restricted") {
                 
                 print("Authentication required, waiting for auth flow...")
                 
