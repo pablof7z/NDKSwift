@@ -8,28 +8,28 @@ import CryptoKit
 /// GOOD: observe(NDKFilter(kinds: [kind1, kind2])) - creates 1 subscription
 /// The arrays in this struct exist specifically to enable efficient batching!
 public struct NDKFilter: Codable, Equatable, Sendable {
-    /// Event IDs to filter
+    /// Event IDs to filter by. Only events with these exact IDs will match.
     public var ids: [EventID]?
 
-    /// Pubkeys of event authors
+    /// Pubkeys of event authors. Only events from these authors will match.
     public var authors: [PublicKey]?
 
-    /// Event kinds
+    /// Event kinds to filter by. Only events of these kinds will match.
     public var kinds: [Kind]?
 
-    /// Referenced event IDs (in 'e' tags)
+    /// Referenced event IDs (in 'e' tags). Only events that reference these event IDs will match.
     public var events: [EventID]?
 
-    /// Referenced pubkeys (in 'p' tags)
+    /// Referenced pubkeys (in 'p' tags). Only events that reference these pubkeys will match.
     public var pubkeys: [PublicKey]?
 
-    /// Events created after this timestamp
+    /// Unix timestamp. Only events created at or after this time will match.
     public var since: Timestamp?
 
-    /// Events created before this timestamp
+    /// Unix timestamp. Only events created at or before this time will match.
     public var until: Timestamp?
 
-    /// Maximum number of events to return
+    /// Maximum number of events to return. If unspecified, relays may apply their own limits.
     public var limit: Int?
 
     /// Generic tag filters

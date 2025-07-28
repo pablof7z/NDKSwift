@@ -36,14 +36,29 @@ public struct NDKRelayInfo: Codable, Equatable, Sendable {
 /// - Any state can transition to `failed` if an error occurs
 /// - `connected`/`authenticated` → `disconnecting` → `disconnected` for graceful shutdown
 public enum NDKRelayConnectionState: Equatable, Codable, Sendable {
+    /// The relay is not connected. This is the initial state.
     case disconnected
+    
+    /// Connection attempt is in progress
     case connecting
+    
+    /// Successfully connected to the relay (WebSocket open)
     case connected
-    case authRequired(challenge: String) // Relay requires authentication with challenge
-    case authenticating // Authentication in progress
-    case authenticated // Successfully authenticated
+    
+    /// Relay requires authentication with the provided challenge (NIP-42)
+    case authRequired(challenge: String)
+    
+    /// Authentication is in progress after receiving an AUTH challenge
+    case authenticating
+    
+    /// Successfully authenticated with the relay
+    case authenticated
+    
+    /// Disconnection is in progress (graceful shutdown)
     case disconnecting
-    case failed(String) // Store error message instead of Error for Equatable
+    
+    /// Connection failed with the given error message
+    case failed(String)
 
     public static func == (lhs: NDKRelayConnectionState, rhs: NDKRelayConnectionState) -> Bool {
         switch (lhs, rhs) {
