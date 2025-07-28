@@ -10,6 +10,21 @@ import Foundation
 ///
 /// **Value Semantics**: This struct uses value semantics for equality comparisons.
 /// Two events with the same Nostr ID will be considered equal.
+///
+/// Example:
+/// ```swift
+/// // Creating and publishing a text note
+/// let event = try await ndk.publish {
+///     $0.kind(1)
+///       .content("Hello, Nostr!")
+///       .tags([["t", "greeting"]])
+/// }
+/// 
+/// // Accessing event properties
+/// print("Event ID: \(event.id)")
+/// print("Author: \(event.pubkey)")
+/// print("Content: \(event.content)")
+/// ```
 public struct NDKEvent: Codable, Equatable, Hashable, Sendable {
     /// Unique event ID (32-byte hash)
     public let id: EventID

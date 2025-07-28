@@ -32,13 +32,13 @@ private struct ProfileCacheEntry {
 /// Example usage:
 /// ```swift
 /// // Feed view - many profiles, use cache
-/// for await profile in profileManager.observe(for: pubkey, maxAge: TimeConstants.hour, maxAge: TimeConstants.hour) {
+/// for await profile in profileManager.observe(for: pubkey, maxAge: TimeConstants.hour) {
 ///     // Use profile (may be nil if not found)
 ///     break // If you only need one value
 /// }
 ///
 /// // Profile page - want real-time updates
-/// for await profile in profileManager.observe(for: pubkey, maxAge: 0, maxAge: TimeConstants.hour) {
+/// for await profile in profileManager.observe(for: pubkey, maxAge: 0) {
 ///     // Handle profile updates
 /// }
 /// ```
