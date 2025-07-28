@@ -17,7 +17,7 @@ struct DebugSubscription {
         print("\n✅ Connected to relay\n")
         
         // Create filter
-        let filter = NDKFilter(kinds: [1], limit: 1)
+        let filter = NDKFilter(kinds: [1])
         print("📋 Filter created: kinds=[\(filter.kinds?.map { String($0) }.joined(separator: ",") ?? "")], limit=\(filter.limit ?? 0)\n")
         
         // Create data source

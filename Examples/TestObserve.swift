@@ -15,7 +15,7 @@ if ndk.dataRequirementManager == nil {
 }
 
 // Create data source
-let filter = NDKFilter(kinds: [1], limit: 1)
+let filter = NDKFilter(kinds: [1])
 let dataSource = ndk.observe(filter: filter, cachePolicy: .networkOnly)
 
 print("DataSource created, checking if it registers with manager...")

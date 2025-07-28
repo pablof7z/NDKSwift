@@ -13,8 +13,6 @@ actor InternalSubscriptionManager {
     
     // NEW: Relay-to-subscription mapping for O(1) lookups
     private var relayToSubscriptions: [RelayURL: Set<InternalSubscription>] = [:]
-    // Track subscriptions that go to all relays (no specific relay targets)
-    private var universalSubscriptions: Set<InternalSubscription> = []
 
     init(ndk: NDK) {
         self.ndk = ndk
@@ -75,8 +73,9 @@ actor InternalSubscriptionManager {
                 relayToSubscriptions[relayUrl] = relaySubs
             }
         } else {
-            // Subscription goes to all relays
-            universalSubscriptions.insert(subscription)
+            // When relays are not specified, the subscription will use outbox model
+            // or fallback relays when started
+            NDKLogger.log(.debug, category: .subscription, "📌 Subscription created without explicit relays - will use outbox model or fallback relays")
         }
         
         NDKLogger.log(.debug, category: .subscription, "📌 Created subscription '\(id)' with fingerprint '\(fp)'")
@@ -124,8 +123,6 @@ actor InternalSubscriptionManager {
                         }
                     }
                 }
-            } else {
-                universalSubscriptions.remove(subscription)
             }
             
             await subscription.close()
@@ -208,9 +205,7 @@ actor InternalSubscriptionManager {
     private func replaySubscriptionsForRelay(_ relay: NDKRelay) async {
         // O(1) lookup: Get subscriptions that specifically target this relay
         let relaySpecificSubs = relayToSubscriptions[relay.url] ?? []
-        
-        // Combine relay-specific and universal subscriptions
-        let subscriptionsToReplay = Array(relaySpecificSubs) + Array(universalSubscriptions)
+        let subscriptionsToReplay = Array(relaySpecificSubs)
         
         guard !subscriptionsToReplay.isEmpty else {
             NDKLogger.log(.debug, category: .subscription, "📭 No active subscriptions to replay for \(relay.url)")
@@ -218,8 +213,6 @@ actor InternalSubscriptionManager {
         }
         
         NDKLogger.log(.debug, category: .subscription, "🔍 Found \(subscriptionsToReplay.count) subscriptions for relay \(relay.url) (O(1) lookup)")
-        NDKLogger.log(.debug, category: .subscription, "  - Relay-specific: \(relaySpecificSubs.count)")
-        NDKLogger.log(.debug, category: .subscription, "  - Universal: \(universalSubscriptions.count)")
         
         // All subscriptions in this list are already relevant - no filtering needed
         let relevantSubscriptions = subscriptionsToReplay
@@ -386,7 +379,18 @@ actor InternalSubscription: Hashable {
             // Use prepareRelays with autoConnect to ensure relays are connected
             targetRelays = await ndk.pool.prepareRelays(Array(specificRelays), autoConnect: true)
         } else {
-            targetRelays = await ndk.pool.connectedRelays()
+            // When no specific relays are provided, this means outbox model should be used
+            // but relay selection should have happened at a higher level (NDKDataRequirementManager)
+            NDKLogger.log(.warning, category: .subscription, "⚠️ Subscription started without relay specification - this should only happen when outbox relay selection failed")
+            
+            // Use fallback relays as a safety net
+            let fallbackRelays = await ndk.pool.explicitRelays()
+            if fallbackRelays.isEmpty {
+                NDKLogger.log(.error, category: .subscription, "❌ No fallback relays available - cannot start subscription")
+                return
+            }
+            targetRelays = fallbackRelays
+            NDKLogger.log(.info, category: .subscription, "📍 Using \(fallbackRelays.count) fallback relays for subscription")
         }
         
         // Log the filters being sent to relays

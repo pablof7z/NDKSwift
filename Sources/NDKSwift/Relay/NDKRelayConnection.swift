@@ -135,15 +135,25 @@ public actor NDKRelayConnection {
             NDKLogger.log(.info, category: .connection, "✅ Successfully connected to \(url)")
         } catch {
             isConnecting = false
-            NDKLogger.log(.error, category: .connection, "❌ Connection failed to \(url): \(error)")
+            let shouldLog = await connectionErrorRateLimiter.shouldLogError(for: url.absoluteString, errorType: "connectionFailed")
+            if shouldLog {
+                NDKLogger.log(.error, category: .connection, "❌ Connection failed to \(url): \(error)")
+                if let summary = await connectionErrorRateLimiter.getSuppressedErrorSummary(for: url.absoluteString) {
+                    NDKLogger.log(.debug, category: .connection, "📊 \(summary)")
+                }
+            }
             // For initial connection failures, don't auto-retry (as per Gemini's suggestion)
             if isInitialConnection {
                 isInitialConnection = false
-                NDKLogger.log(.debug, category: .connection, "🛑 Initial connection failure - not auto-retrying")
+                if shouldLog {
+                    NDKLogger.log(.debug, category: .connection, "🛑 Initial connection failure - not auto-retrying")
+                }
                 throw error
             } else {
                 // For subsequent failures, schedule reconnection
-                NDKLogger.log(.debug, category: .connection, "🔄 Scheduling reconnection for \(url)")
+                if shouldLog {
+                    NDKLogger.log(.debug, category: .connection, "🔄 Scheduling reconnection for \(url)")
+                }
                 await scheduleReconnection()
                 throw error
             }
@@ -374,8 +384,11 @@ public actor NDKRelayConnection {
         } catch {
             // Connection closed or error occurred
             let ndkError = mapToNDKError(error, operation: "receive message")
-            NDKLogger.log(.error, category: .connection, "🔴 Receive loop ended with error: \(ndkError)")
-            await handleConnectionError(ndkError)
+            let shouldLog = await connectionErrorRateLimiter.shouldLogError(for: url.absoluteString, errorType: "receiveError")
+            if shouldLog {
+                NDKLogger.log(.error, category: .connection, "🔴 Receive loop ended with error: \(ndkError)")
+            }
+            await handleConnectionError(ndkError, shouldLog: false) // Don't double-log
         }
     }
     #endif
@@ -454,9 +467,12 @@ public actor NDKRelayConnection {
 
                     if let error = error {
                         let ndkError = await self.mapToNDKError(error, operation: "ping")
-                        NDKLogger.log(.error, category: .connection, "❌ Ping failed for \(self.url): \(ndkError)")
+                        let shouldLog = await connectionErrorRateLimiter.shouldLogError(for: self.url.absoluteString, errorType: "pingFailed")
+                        if shouldLog {
+                            NDKLogger.log(.error, category: .connection, "❌ Ping failed for \(self.url): \(ndkError)")
+                        }
                         await self.resumeContinuationWithError(ndkError)
-                        await self.handleConnectionError(ndkError)
+                        await self.handleConnectionError(ndkError, shouldLog: false) // Don't double-log
                         continuation.resume(returning: false)
                     } else {
                         await self.markAsConnected()
@@ -497,8 +513,17 @@ public actor NDKRelayConnection {
     }
     #endif
 
-    private func handleConnectionError(_ error: Error) async {
-        NDKLogger.log(.error, category: .connection, "🔴 Connection error for \(url): \(error)")
+    private func handleConnectionError(_ error: Error, shouldLog: Bool = true) async {
+        if shouldLog {
+            let shouldLogError = await connectionErrorRateLimiter.shouldLogError(for: url.absoluteString, errorType: "connectionError")
+            if shouldLogError {
+                let logLevel: NDKLogLevel = isInitialConnection ? .error : .warning
+                NDKLogger.log(logLevel, category: .connection, "🔴 Connection error for \(url): \(error)")
+                if let summary = await connectionErrorRateLimiter.getSuppressedErrorSummary(for: url.absoluteString) {
+                    NDKLogger.log(.debug, category: .connection, "📊 \(summary)")
+                }
+            }
+        }
         isConnected = false
         connectedAt = nil
 

@@ -30,7 +30,8 @@ public struct NDKSession: Codable, Identifiable, Sendable {
 
 
     /// Signer type identifier (used for deserialization)
-    public let signerType: String
+    /// nil indicates a read-only session without signing capabilities
+    public let signerType: String?
 
     /// When this session was created
     public let createdAt: Date
@@ -77,12 +78,12 @@ public struct NDKSession: Codable, Identifiable, Sendable {
     ///   - autoLockTimeout: Auto-lock timeout in seconds
     public init(
         pubkey: String,
-        signerType: String,
+        signerType: String?,
         requiresBiometric: Bool = false,
         isHardwareBacked: Bool = false,
         autoLockTimeout: TimeInterval? = nil
     ) {
-        self.id = "\(pubkey):\(signerType)"
+        self.id = "\(pubkey):\(signerType ?? "readonly")"
         self.pubkey = pubkey
         self.signerType = signerType
         self.createdAt = Date()
@@ -127,6 +128,16 @@ public struct NDKSession: Codable, Identifiable, Sendable {
 
         return components.isEmpty ? "Standard" : components.joined(separator: ", ")
     }
+    
+    /// Whether this is a read-only session (no signer)
+    public var isReadOnly: Bool {
+        signerType == nil
+    }
+    
+    /// Whether this session can sign events
+    public var canSign: Bool {
+        !isReadOnly
+    }
 
     // MARK: - Session Management
 
@@ -168,8 +179,8 @@ public struct NDKSession: Codable, Identifiable, Sendable {
             throw NDKSessionError.invalidPubkey(pubkey)
         }
 
-        // Validate signer type
-        guard signerType.hasContent else {
+        // Validate signer type if present
+        if let signerType = signerType, !signerType.hasContent {
             throw NDKSessionError.invalidSignerType(signerType)
         }
 

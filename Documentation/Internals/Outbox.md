@@ -69,7 +69,27 @@ When creating a subscription without explicit relays:
    - Both the fallback and specific relay subscriptions remain active
    - Events flow from all sources - no events are missed during discovery
 
-### 3. Publishing Handling
+### 3. Subscription Lifecycle
+
+Understanding subscription lifecycle is critical for proper outbox implementation:
+
+1. **Creation Phase**:
+   - Subscriptions created without explicit relays trigger outbox logic
+   - Relay selection happens once at creation time
+   - Each subscription is permanently associated with its selected relays
+   - This association persists through relay disconnections/reconnections
+
+2. **Active Phase**:
+   - Subscriptions maintain their relay associations throughout their lifetime
+   - New relay discoveries create additional subscriptions, not modifications
+   - Original subscriptions continue uninterrupted during enhancement
+
+3. **Termination Phase**:
+   - Close messages sent only to relays that received the subscription
+   - Cleanup of relay-to-subscription mappings
+   - Proper cancellation of background discovery tasks
+
+### 4. Publishing Handling
 
 When publishing an event without explicit relays:
 
@@ -126,6 +146,38 @@ Unlike subscriptions which can be long-lived, publishing is a one-time operation
 - **NDKPublishingStrategy**: Manages publishing with background relay discovery
 - **NDKRelaySelector**: Implements relay selection logic based on NIP-65 rules
 
+### Relay Selection Granularity
+
+The outbox model must handle different levels of relay selection:
+
+1. **Unified Selection**: When all authors in a filter share common relays
+   - Single subscription sent to the common relay set
+   - Reduces connection overhead and message duplication
+   - Efficient for filters with authors from the same community
+
+2. **Per-Relay Filters**: When authors use different relays
+   - Create separate subscriptions with author-specific filters per relay
+   - Each relay receives only queries for authors it serves
+   - Prevents unnecessary network traffic and relay load
+
+3. **Mixed Scenarios**: Some authors share relays, others don't
+   - Group authors by their relay sets
+   - Create optimized subscriptions for each group
+   - Balance between connection efficiency and query precision
+
+### Efficient Subscription Replay on Reconnection
+
+When implementing outbox, it's crucial to efficiently handle relay reconnections:
+- Maintain an O(1) lookup structure mapping relay URLs to their associated subscriptions
+- When a relay reconnects, immediately identify which subscriptions belong to it
+- Avoid iterating through all active subscriptions to determine relevance
+- This prevents performance degradation as subscription count grows
+
+Benefits:
+- Instant subscription replay on reconnection (microseconds vs milliseconds)
+- Scalable to thousands of concurrent subscriptions
+- Reduced CPU usage during relay churn
+
 ## Failure Modes and Edge Cases
 
 ### Unknown Authors
@@ -134,6 +186,28 @@ When relay information cannot be found:
 - Subscriptions continue using fallback relays indefinitely
 - Publishing uses fallback relays and may miss optimal delivery
 - The system tracks lookup attempts to avoid repeated failed discoveries
+
+### Handling Edge Cases
+
+Robust outbox implementations must handle:
+
+1. **Relay List Conflicts**:
+   - User publishes different relay lists to different relays
+   - Implementation should use most recently seen version
+   - Consider relay list event timestamps
+   - Log conflicts for debugging
+
+2. **Circular Dependencies**:
+   - User A's relay list is only on User B's relays
+   - User B's relay list is only on User A's relays
+   - Must have fallback strategy to break cycles
+   - Timeout mechanisms prevent infinite loops
+
+3. **Missing Relay Lists**:
+   - Many users never publish relay lists
+   - Implementation must handle this gracefully
+   - Fallback relays become critically important
+   - Consider inference from user activity patterns
 
 ### Relay List Changes
 
@@ -148,6 +222,61 @@ When a user updates their relay list:
 - Subscription updates create additional network connections
 - The system limits discovery attempts to prevent infinite loops
 - Cache entries have TTL to ensure eventual consistency
+
+## State Management Considerations
+
+### Subscription State Tracking
+
+Implementations must carefully track subscription state:
+- **Relay Associations**: Which relays received which subscriptions
+- **Author Coverage**: Which authors are covered by which subscriptions
+- **Discovery Status**: Which authors have pending relay discovery
+- **Enhancement History**: Which subscriptions were created for enhancement
+
+### Avoiding State Duplication
+
+Key principle: Relay selection decisions should be made once and stored:
+- Don't recompute relay selection on every reconnection
+- Store relay-to-subscription mappings at creation time
+- Use these mappings for all future operations
+- This ensures consistency and performance
+
+### Concurrent Operation Safety
+
+The outbox model involves concurrent operations:
+- Multiple subscriptions may target the same authors
+- Relay discoveries happen asynchronously
+- Connection state changes occur independently
+- Implementations must handle race conditions gracefully
+
+## Performance Optimization Strategies
+
+### Connection Pooling
+
+- Reuse existing relay connections across multiple operations
+- Prioritize already-connected relays in selection algorithms
+- Batch connection attempts to reduce overhead
+- Implement connection health monitoring
+
+### Caching Strategies
+
+1. **Relay List Cache**:
+   - Cache discovered relay lists with appropriate TTL
+   - Invalidate on user's own relay list updates
+   - Share cache across all operations
+   - Consider memory vs disk caching based on scale
+
+2. **Selection Decision Cache**:
+   - Cache relay selection results for common filter patterns
+   - Invalidate when relay connectivity changes significantly
+   - Useful for repeated queries with same author sets
+
+### Scalability Considerations
+
+- Design for thousands of concurrent subscriptions
+- Plan for hundreds of unique authors per filter
+- Handle relay sets with 50+ relays per user
+- Optimize for both memory usage and CPU efficiency
 
 ## Benefits of This Architecture
 

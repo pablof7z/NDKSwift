@@ -273,7 +273,8 @@ actor NDKDataRequirementManager {
                 var relays: Set<RelayURL>? = lifecycleGroup.first?.relays
 
                 // Handle outbox model filter decomposition
-                if relays == nil && ndk.outboxEnabled && optimizedFilter.authors != nil {
+                if relays == nil {
+                    if ndk.outboxEnabled && optimizedFilter.authors != nil {
                     let outboxStrategy = await ndk.outbox.getOutboxStrategy(for: optimizedFilter)
 
                     // Start background discovery if needed
@@ -382,9 +383,23 @@ actor NDKDataRequirementManager {
                         continue
                     }
 
-                    // If no relay-specific filters, fall back to using all connected relays
-                    NDKLogger.log(.trace, category: .subscription, "📡 [DataReqManager] No relay-specific filters, using all connected relays")
-                    relays = nil
+                    // If no relay-specific filters but we have filter authors, 
+                    // still use outbox to select the best common relays
+                    if !outboxStrategy.filtersByRelay.isEmpty {
+                        // This shouldn't happen - if we have an outbox strategy, it should have filters
+                        NDKLogger.log(.warning, category: .subscription, "⚠️ Outbox strategy has no relay-specific filters")
+                    }
+                    
+                    // Use outbox selector to get the best relays for this filter
+                    let selection = await ndk.relaySelector.selectRelaysForFetching(filter: optimizedFilter)
+                    relays = selection.relays
+                    NDKLogger.log(.trace, category: .subscription, "📡 [DataReqManager] Using outbox selector: \(relays?.count ?? 0) relays selected")
+                    } else {
+                        // Outbox is disabled - use explicit relays only
+                        let explicitRelays = await ndk.pool.explicitRelays()
+                        relays = Set(explicitRelays.map { $0.url })
+                        NDKLogger.log(.debug, category: .subscription, "📡 [DataReqManager] Outbox disabled, using \(relays?.count ?? 0) explicit relays")
+                    }
                 }
 
                 // Create single subscription for non-outbox or non-decomposed cases
@@ -480,6 +495,15 @@ actor NDKDataRequirementManager {
         // Group filters by compatibility
         let filterGroups = groupCompatibleFilters(filters)
         NDKLogger.log(.info, category: .subscription, "📊 [FilterAggregation] Grouped into \(filterGroups.count) compatible groups")
+        
+        // Log group details
+        for (groupIndex, group) in filterGroups.enumerated() {
+            NDKLogger.log(.debug, category: .subscription, "  Group \(groupIndex + 1): \(group.count) filters")
+            if group.count > 1 {
+                // This group has multiple filters that will be merged
+                NDKLogger.log(.debug, category: .subscription, "    → Will merge \(group.count) filters with same structure")
+            }
+        }
 
         // Aggregate each group separately
         let aggregated = filterGroups.map { group in
@@ -560,54 +584,60 @@ actor NDKDataRequirementManager {
 
     /// Check if two filters can be efficiently combined
     private func canCombineFilters(_ filter1: NDKFilter, _ filter2: NDKFilter) -> Bool {
-        // Filters are compatible if they have:
-        // 1. Same or compatible kinds
-        // 2. Same or compatible authors
-        // 3. Same tag keys (values can differ and will be merged)
-
-        // Check kinds compatibility
-        if let kinds1 = filter1.kinds, let kinds2 = filter2.kinds {
-            // Both have kinds - check if they're the same or one is subset
-            let set1 = Set(kinds1)
-            let set2 = Set(kinds2)
-
-            // Allow merging if:
-            // - They have overlap OR
-            // - They have the same count (likely similar queries) OR
-            // - One is a subset of the other
-            if set1.isDisjoint(with: set2) &&
-               kinds1.count != kinds2.count &&
-               !set1.isSubset(of: set2) &&
-               !set2.isSubset(of: set1) {
-                return false
-            }
-        }
-
-        // Check authors compatibility
-        if let authors1 = filter1.authors, let authors2 = filter2.authors {
-            // Both have authors - must have overlap or be for same purpose
-            let set1 = Set(authors1)
-            let set2 = Set(authors2)
-
-            if set1.isDisjoint(with: set2) &&
-               authors1.count != authors2.count &&
-               !set1.isSubset(of: set2) &&
-               !set2.isSubset(of: set1) {
-                return false
-            }
-        }
-
-        // For tags: allow merging if they have the same tag keys
-        // Different values will be aggregated (unioned) during merge
-        let keys1 = filter1.tags.map { Set($0.keys) } ?? Set<String>()
-        let keys2 = filter2.tags.map { Set($0.keys) } ?? Set<String>()
-
-        // If they have different tag keys, they're likely different queries
-        if !keys1.isEmpty && !keys2.isEmpty && keys1 != keys2 {
+        // Following ndk-core's approach: filters with the same structure can be merged
+        // Structure = same keys present (not necessarily same values)
+        
+        // Don't combine if limits are different
+        if filter1.limit != filter2.limit {
             return false
         }
-
-        // Filters are compatible
+        
+        // Don't combine if time constraints are different
+        if filter1.since != filter2.since || filter1.until != filter2.until {
+            return false
+        }
+        
+        // Check if both have the same keys for arrays (kinds, authors, ids, events, pubkeys)
+        // Presence matters, not values - we'll merge the values
+        let hasKinds1 = filter1.kinds != nil
+        let hasKinds2 = filter2.kinds != nil
+        if hasKinds1 != hasKinds2 {
+            return false
+        }
+        
+        let hasAuthors1 = filter1.authors != nil
+        let hasAuthors2 = filter2.authors != nil
+        if hasAuthors1 != hasAuthors2 {
+            return false
+        }
+        
+        let hasIds1 = filter1.ids != nil
+        let hasIds2 = filter2.ids != nil
+        if hasIds1 != hasIds2 {
+            return false
+        }
+        
+        let hasEvents1 = filter1.events != nil
+        let hasEvents2 = filter2.events != nil
+        if hasEvents1 != hasEvents2 {
+            return false
+        }
+        
+        let hasPubkeys1 = filter1.pubkeys != nil
+        let hasPubkeys2 = filter2.pubkeys != nil
+        if hasPubkeys1 != hasPubkeys2 {
+            return false
+        }
+        
+        // For tags: must have the same tag keys
+        let keys1 = filter1.tags.map { Set($0.keys) } ?? Set<String>()
+        let keys2 = filter2.tags.map { Set($0.keys) } ?? Set<String>()
+        
+        if keys1 != keys2 {
+            return false
+        }
+        
+        // Filters have the same structure and can be merged
         return true
     }
 

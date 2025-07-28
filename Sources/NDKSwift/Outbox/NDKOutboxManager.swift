@@ -344,10 +344,10 @@ public actor NDKOutboxManager {
         
         Task {
             // Create filter for relay lists
+            // Do NOT set a limit - this prevents filter aggregation
             let relayListFilter = NDKFilter(
                 authors: Array(authors),
-                kinds: [EventKind.relayList],
-                limit: authors.count
+                kinds: [EventKind.relayList]
             )
 
             // Determine which relays to use for discovery

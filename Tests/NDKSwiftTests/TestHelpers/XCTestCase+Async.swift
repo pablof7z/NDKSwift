@@ -34,7 +34,7 @@ extension XCTestCase {
     /// Asserts that an async function completes within a timeout
     func assertCompletesWithin<T>(
         timeout: TimeInterval,
-        _ expression: @autoclosure () async throws -> T,
+        _ expression: @autoclosure @escaping () async throws -> T,
         file: StaticString = #filePath,
         line: UInt = #line
     ) async throws -> T {

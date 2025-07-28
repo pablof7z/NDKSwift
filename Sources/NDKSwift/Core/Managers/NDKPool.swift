@@ -225,7 +225,12 @@ public actor NDKPool {
             case .failed(let error):
                 // Emit pool disconnection event
                 self.poolChangeContinuation.yield(.relayDisconnected(relay))
-                NDKLogger.log(.warning, category: .relay, "🔴 Relay failed: \(relay.url), error: \(error)")
+                Task {
+                    let shouldLog = await connectionErrorRateLimiter.shouldLogError(for: relay.url, errorType: "relayFailed")
+                    if shouldLog {
+                        NDKLogger.log(.warning, category: .relay, "🔴 Relay failed: \(relay.url), error: \(error)")
+                    }
+                }
             case .connecting, .disconnecting, .authRequired, .authenticating:
                 // Don't emit events for transitional states
                 NDKLogger.log(.trace, category: .relay, "🔄 Relay transitional state: \(state) for \(relay.url)")
@@ -409,7 +414,12 @@ public actor NDKPool {
                     do {
                         try await relay.connect()
                     } catch {
-                        NDKLogger.log(.error, category: .relay, "❌ Failed to connect to \(relay.url): \(error)")
+                        Task {
+                            let shouldLog = await connectionErrorRateLimiter.shouldLogError(for: relay.url, errorType: "connectFailed")
+                            if shouldLog {
+                                NDKLogger.log(.error, category: .relay, "❌ Failed to connect to \(relay.url): \(error)")
+                            }
+                        }
                     }
                 }
             }
@@ -484,7 +494,12 @@ public actor NDKPool {
                             do {
                                 try await relay.connect()
                             } catch {
-                                NDKLogger.log(.error, category: .relay, "[NDKPool] Failed to connect to relay \(relay.url): \(error)")
+                                Task {
+                                    let shouldLog = await connectionErrorRateLimiter.shouldLogError(for: relay.url, errorType: "poolConnectFailed")
+                                    if shouldLog {
+                                        NDKLogger.log(.error, category: .relay, "[NDKPool] Failed to connect to relay \(relay.url): \(error)")
+                                    }
+                                }
                             }
                         }
                     }
