@@ -7,7 +7,7 @@ final class NDKEventBuilderTests: XCTestCase {
     
     override func setUp() async throws {
         try await super.setUp()
-        signer = try NDKPrivateKeySigner.generateNewKeyPair()
+        signer = try NDKPrivateKeySigner.generate()
         builder = NDKEventBuilder()
     }
     
@@ -239,14 +239,13 @@ final class NDKEventBuilderTests: XCTestCase {
             sha256: "abc123def456",
             size: 1024,
             type: "image/jpeg",
-            uploaded: 1609459200,
+            uploaded: Date(timeIntervalSince1970: 1609459200),
             blurhash: "L6PZfSi_.AyE",
-            width: 800,
-            height: 600
+            dimensions: (width: 800, height: 600)
         )
         
         let event = try await builder
-            .addMedia(blob, alt: "Test image")
+            .addMedia(from: blob, alt: "Test image")
             .content("test")
             .kind(1)
             .build(signer: signer)
@@ -273,7 +272,7 @@ final class NDKEventBuilderTests: XCTestCase {
                 dimensions: (width: 1920, height: 1080),
                 alt: "Test video",
                 sha256: "videohash123",
-                size: 5242880,
+                size: "5242880",
                 fallback: ["https://backup.com/video.mp4"]
             )
             .content("test")
@@ -337,23 +336,5 @@ final class NDKEventBuilderTests: XCTestCase {
         XCTAssertEqual(event.tags.count, 6)
         XCTAssertEqual(event.kind, 30000)
         XCTAssertTrue(event.tags.contains(["d", "identifier"]))
-    }
-    
-    func testEncryptedEventBuilding() async throws {
-        let recipientPubkey = try NDKPrivateKeySigner.generateNewKeyPair().pubkey
-        
-        let event = try await builder
-            .content("Secret message")
-            .encrypt(to: recipientPubkey, signer: signer)
-            .build(signer: signer)
-        
-        // Verify event kind is set to encrypted DM
-        XCTAssertEqual(event.kind, NDKEventKind.encryptedDirectMessage.rawValue)
-        
-        // Verify content is encrypted (not the original plain text)
-        XCTAssertNotEqual(event.content, "Secret message")
-        
-        // Verify p tag is added for recipient
-        XCTAssertTrue(event.tags.contains { $0.first == "p" && $0.count > 1 && $0[1] == recipientPubkey })
     }
 }

@@ -55,11 +55,13 @@ final class NDKSwiftUIComponentsTests: XCTestCase {
     func testNDKUIZapButtonInitialization() throws {
         // Test that NDKUIZapButton can be created with an event
         let event = NDKEvent(
+            id: "test_event_id_123456789012345678901234567890123456789012345678",
             pubkey: "test_pubkey_123456789012345678901234567890123456789012345678901234",
-            createdAt: Date.now,
+            createdAt: Timestamp.now,
             kind: 1,
             tags: [],
-            content: "Test event"
+            content: "Test event",
+            sig: "test_signature_123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678"
         )
         
         let button = NDKZapButton(event: event)
@@ -80,21 +82,23 @@ final class NDKSwiftUIComponentsTests: XCTestCase {
         )
         XCTAssertNotNil(compactButton)
         
-        // Test with custom comment
-        let buttonWithComment = NDKZapButton(
+        // Test with different default amount
+        let buttonWithAmount = NDKZapButton(
             event: event,
-            defaultComment: "Great post!"
+            defaultAmount: 100
         )
-        XCTAssertNotNil(buttonWithComment)
+        XCTAssertNotNil(buttonWithAmount)
     }
     
     func testNDKUIZapButtonCallbacks() throws {
         let event = NDKEvent(
+            id: "test_event_id_123456789012345678901234567890123456789012345678",
             pubkey: "test_pubkey_123456789012345678901234567890123456789012345678901234",
-            createdAt: Date.now,
+            createdAt: Timestamp.now,
             kind: 1,
             tags: [],
-            content: "Test event"
+            content: "Test event",
+            sig: "test_signature_123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678"
         )
         
         let button = NDKZapButton(event: event)
@@ -109,11 +113,13 @@ final class NDKSwiftUIComponentsTests: XCTestCase {
     func testNDKUIReactionButtonInitialization() throws {
         // Test that NDKUIReactionButton can be created
         let event = NDKEvent(
+            id: "test_event_id_123456789012345678901234567890123456789012345678",
             pubkey: "test_pubkey_123456789012345678901234567890123456789012345678901234",
-            createdAt: Date.now,
+            createdAt: Timestamp.now,
             kind: 1,
             tags: [],
-            content: "Test event"
+            content: "Test event",
+            sig: "test_signature_123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678"
         )
         
         let button = NDKUIReactionButton(event: event)
@@ -141,11 +147,13 @@ final class NDKSwiftUIComponentsTests: XCTestCase {
     
     func testNDKUIReactionButtonCallbacks() throws {
         let event = NDKEvent(
+            id: "test_event_id_123456789012345678901234567890123456789012345678",
             pubkey: "test_pubkey_123456789012345678901234567890123456789012345678901234",
-            createdAt: Date.now,
+            createdAt: Timestamp.now,
             kind: 1,
             tags: [],
-            content: "Test event"
+            content: "Test event",
+            sig: "test_signature_123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678"
         )
         
         let button = NDKUIReactionButton(event: event)
@@ -281,11 +289,13 @@ final class NDKSwiftUIComponentsTests: XCTestCase {
     func testNDKEventAuthorHeaderInitialization() throws {
         // Test that NDKEventAuthorHeader can be created
         let event = NDKEvent(
+            id: "test_event_id_123456789012345678901234567890123456789012345678",
             pubkey: "test_pubkey_123456789012345678901234567890123456789012345678901234",
-            createdAt: Date.now,
+            createdAt: Timestamp.now,
             kind: 1,
             tags: [],
-            content: "Test event"
+            content: "Test event",
+            sig: "test_signature_123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678"
         )
         
         let header = NDKEventAuthorHeader(event: event)

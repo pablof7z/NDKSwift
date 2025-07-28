@@ -31,7 +31,7 @@ final class NDKUIUsernameTests: XCTestCase {
             ("test", "test")
         ]
         
-        for (input, expected) in testCases {
+        for _ in testCases {
             // Since formatNip05 is private, we test the behavior indirectly
             // by checking the component doesn't crash with various inputs
             let username = NDKUIUsername(pubkey: "test_pubkey")
@@ -41,7 +41,6 @@ final class NDKUIUsernameTests: XCTestCase {
     
     func testTruncation() {
         // Test that long usernames are truncated
-        let longName = "ThisIsAVeryLongUsernameForTestingPurposes"
         let pubkey = "test_pubkey"
         let username = NDKUIUsername(pubkey: pubkey, maxLength: 20)
         
