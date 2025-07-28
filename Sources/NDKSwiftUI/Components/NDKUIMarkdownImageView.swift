@@ -282,11 +282,11 @@ struct NDKUIMarkdownImageView: View {
 
 // MARK: - Enhanced Markdown Renderer with Image Support
 
-public extension NDKMarkdownRenderer {
+public extension NDKUIMarkdownRenderer {
     /// Enable inline image rendering
     func renderImages() -> some View {
         ScrollView {
-            NDKMarkdownImageView(
+            NDKUIMarkdownImageView(
                 blocks: renderableBlocks,
                 configuration: configuration,
                 ndk: ndk,

@@ -60,7 +60,7 @@ public extension MarkdownConfiguration {
 public extension View {
     /// Adds markdown rendering capability to any text view
     func markdownText(_ content: String, ndk: NDK, style: MarkdownConfiguration = .minimal) -> some View {
-        NDKMarkdownRenderer(content, ndk: ndk)
+        NDKUIMarkdownRenderer(content, ndk: ndk)
             .markdownStyle(style)
     }
 }
@@ -69,8 +69,8 @@ public extension View {
 
 public extension NDK {
     /// Creates a markdown renderer view for the given content
-    func markdownView(_ content: String) -> NDKMarkdownRenderer {
-        NDKMarkdownRenderer(content, ndk: self)
+    func markdownView(_ content: String) -> NDKUIMarkdownRenderer {
+        NDKUIMarkdownRenderer(content, ndk: self)
     }
 }
 
@@ -95,10 +95,10 @@ public struct NDKMarkdownPreview: View {
     public var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             if isExpanded {
-                NDKMarkdownRenderer(content, ndk: ndk)
+                NDKUIMarkdownRenderer(content, ndk: ndk)
                     .markdownStyle(configuration)
             } else {
-                NDKMarkdownRenderer(truncatedContent, ndk: ndk)
+                NDKUIMarkdownRenderer(truncatedContent, ndk: ndk)
                     .markdownStyle(configuration)
                     .lineLimit(previewLines)
             }
@@ -238,7 +238,7 @@ public struct NDKNostrEntityText: View {
 
 // MARK: - Convenience Initializers
 
-public extension NDKMarkdownRenderer {
+public extension NDKUIMarkdownRenderer {
     /// Initialize with an NDKEvent's content
     init(event: NDKEvent, ndk: NDK) {
         self.init(event.content, ndk: ndk)
