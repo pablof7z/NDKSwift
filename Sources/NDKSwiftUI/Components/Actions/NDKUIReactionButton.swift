@@ -262,7 +262,7 @@ private class ReactionState: ObservableObject {
     private func observeReactions(ndk: NDK) async {
         // Create filter for reaction events (kind:7) referencing our event
         let filter = NDKFilter(
-            kinds: [7], // Reaction events
+            kinds: [EventKind.reaction], // Reaction events
             tags: ["e": Set([eventId])] // Events that reference our event
         )
 
@@ -319,7 +319,7 @@ private class ReactionState: ObservableObject {
                 // Remove reaction (delete the reaction event)
                 if let reactionEventId = reactionEventId {
                     let deleteEvent = try await NDKEventBuilder(ndk: ndk)
-                        .kind(5) // Deletion event
+                        .kind(EventKind.deletion) // Deletion event
                         .content("Removing reaction")
                         .tag(["e", reactionEventId])
                         .build(signer: signer)
@@ -329,7 +329,7 @@ private class ReactionState: ObservableObject {
             } else {
                 // Add reaction
                 let reactionEvent = try await NDKEventBuilder(ndk: ndk)
-                    .kind(7) // Reaction event
+                    .kind(EventKind.reaction) // Reaction event
                     .content(reaction)
                     .tag(["e", event.id])
                     .tag(["p", event.pubkey])
@@ -398,7 +398,7 @@ struct NDKUIReactionButton_Previews: PreviewProvider {
         id: "mock_id",
         pubkey: "mock_pubkey",
         createdAt: Date.currentNostrTimestamp,
-        kind: 1,
+        kind: EventKind.textNote,
         tags: [],
         content: "Mock event content",
         sig: "mock_sig"

@@ -3,20 +3,57 @@ import SwiftUI
 @testable import NDKSwift
 @testable import NDKSwiftUI
 
-/// Basic tests for NDKSwiftUI components to ensure they can be instantiated
+/// Comprehensive tests for NDKSwiftUI components
 final class NDKSwiftUIComponentsTests: XCTestCase {
     
-    func testNDKFollowButtonInitialization() {
-        // Test that NDKFollowButton can be created with a pubkey
+    // MARK: - NDKUIFollowButton Tests
+    
+    func testNDKUIFollowButtonInitialization() {
+        // Test basic initialization
         let pubkey = "test_pubkey_123456789012345678901234567890123456789012345678901234"
-        let button = NDKFollowButton(pubkey: pubkey)
+        let button = NDKUIFollowButton(pubkey: pubkey)
+        XCTAssertNotNil(button)
         
-        // If it compiles and creates, the test passes
+        // Test with different styles
+        let standardButton = NDKUIFollowButton(pubkey: pubkey, style: .standard)
+        XCTAssertNotNil(standardButton)
+        
+        let compactButton = NDKUIFollowButton(pubkey: pubkey, style: .compact)
+        XCTAssertNotNil(compactButton)
+        
+        let minimalButton = NDKUIFollowButton(pubkey: pubkey, style: .minimal)
+        XCTAssertNotNil(minimalButton)
+        
+        // Test convenience initializers
+        let compactConvenience = NDKUIFollowButton.compact(pubkey: pubkey)
+        XCTAssertNotNil(compactConvenience)
+        
+        let minimalConvenience = NDKUIFollowButton.minimal(pubkey: pubkey)
+        XCTAssertNotNil(minimalConvenience)
+        
+        // Test with options
+        let buttonWithOptions = NDKUIFollowButton(
+            pubkey: pubkey,
+            style: .standard,
+            showFollowText: false,
+            confirmUnfollow: false
+        )
+        XCTAssertNotNil(buttonWithOptions)
+    }
+    
+    func testNDKUIFollowButtonCallbacks() {
+        let pubkey = "test_pubkey_123456789012345678901234567890123456789012345678901234"
+        let button = NDKUIFollowButton(pubkey: pubkey)
+            .onFollowChanged { isFollowing in
+                // Test callback configuration
+            }
         XCTAssertNotNil(button)
     }
     
-    func testNDKZapButtonInitialization() throws {
-        // Test that NDKZapButton can be created with an event
+    // MARK: - NDKUIZapButton Tests
+    
+    func testNDKUIZapButtonInitialization() throws {
+        // Test that NDKUIZapButton can be created with an event
         let event = NDKEvent(
             pubkey: "test_pubkey_123456789012345678901234567890123456789012345678901234",
             createdAt: Date.now,
@@ -35,10 +72,23 @@ final class NDKSwiftUIComponentsTests: XCTestCase {
             defaultAmount: 10
         )
         XCTAssertNotNil(customButton)
+        
+        // Test with different button styles
+        let compactButton = NDKZapButton(
+            event: event,
+            style: .compact
+        )
+        XCTAssertNotNil(compactButton)
+        
+        // Test with custom comment
+        let buttonWithComment = NDKZapButton(
+            event: event,
+            defaultComment: "Great post!"
+        )
+        XCTAssertNotNil(buttonWithComment)
     }
     
-    func testNDKReactionButtonInitialization() throws {
-        // Test that NDKReactionButton can be created
+    func testNDKUIZapButtonCallbacks() throws {
         let event = NDKEvent(
             pubkey: "test_pubkey_123456789012345678901234567890123456789012345678901234",
             createdAt: Date.now,
@@ -47,51 +97,185 @@ final class NDKSwiftUIComponentsTests: XCTestCase {
             content: "Test event"
         )
         
-        let button = NDKReactionButton(event: event)
+        let button = NDKZapButton(event: event)
+            .onZapSent { amount, comment in
+                // Test callback configuration
+            }
+        XCTAssertNotNil(button)
+    }
+    
+    // MARK: - NDKUIReactionButton Tests
+    
+    func testNDKUIReactionButtonInitialization() throws {
+        // Test that NDKUIReactionButton can be created
+        let event = NDKEvent(
+            pubkey: "test_pubkey_123456789012345678901234567890123456789012345678901234",
+            createdAt: Date.now,
+            kind: 1,
+            tags: [],
+            content: "Test event"
+        )
+        
+        let button = NDKUIReactionButton(event: event)
         XCTAssertNotNil(button)
         
         // Test with custom reaction
-        let customButton = NDKReactionButton(event: event, reaction: "❤️")
+        let customButton = NDKUIReactionButton(event: event, reaction: "❤️")
         XCTAssertNotNil(customButton)
+        
+        // Test with different styles
+        let compactButton = NDKUIReactionButton(event: event, style: .compact)
+        XCTAssertNotNil(compactButton)
+        
+        let minimalButton = NDKUIReactionButton(event: event, style: .minimal)
+        XCTAssertNotNil(minimalButton)
+        
+        // Test with initial reacted state
+        let reactedButton = NDKUIReactionButton(
+            event: event,
+            reaction: "🔥",
+            hasReacted: true
+        )
+        XCTAssertNotNil(reactedButton)
     }
     
-    func testNDKProfilePictureInitialization() {
-        // Test that NDKProfilePicture can be created
-        let pubkey = "test_pubkey_123456789012345678901234567890123456789012345678901234"
-        let profilePicture = NDKProfilePicture(pubkey: pubkey)
+    func testNDKUIReactionButtonCallbacks() throws {
+        let event = NDKEvent(
+            pubkey: "test_pubkey_123456789012345678901234567890123456789012345678901234",
+            createdAt: Date.now,
+            kind: 1,
+            tags: [],
+            content: "Test event"
+        )
         
+        let button = NDKUIReactionButton(event: event)
+            .onReactionChanged { hasReacted in
+                // Test callback configuration
+            }
+        XCTAssertNotNil(button)
+    }
+    
+    // MARK: - NDKUIProfilePicture Tests
+    
+    func testNDKUIProfilePictureInitialization() {
+        // Test basic initialization
+        let pubkey = "test_pubkey_123456789012345678901234567890123456789012345678901234"
+        let profilePicture = NDKUIProfilePicture(pubkey: pubkey)
         XCTAssertNotNil(profilePicture)
-    }
-    
-    func testNDKDisplayNameInitialization() {
-        // Test that NDKDisplayName can be created
-        let pubkey = "test_pubkey_123456789012345678901234567890123456789012345678901234"
-        let displayName = NDKDisplayName(pubkey: pubkey)
         
-        XCTAssertNotNil(displayName)
+        // Test with different sizes
+        let smallPicture = NDKUIProfilePicture(pubkey: pubkey, size: 24)
+        XCTAssertNotNil(smallPicture)
+        
+        let largePicture = NDKUIProfilePicture(pubkey: pubkey, size: 100)
+        XCTAssertNotNil(largePicture)
+        
+        // Test with placeholder image
+        let withPlaceholder = NDKUIProfilePicture(
+            pubkey: pubkey,
+            size: 50,
+            placeholderImage: "person.circle.fill"
+        )
+        XCTAssertNotNil(withPlaceholder)
     }
     
-    func testNDKMarkdownRendererInitialization() {
-        // Test that NDKMarkdownRenderer can be created
+    // MARK: - NDKUIDisplayName Tests
+    
+    func testNDKUIDisplayNameInitialization() {
+        // Test basic initialization
+        let pubkey = "test_pubkey_123456789012345678901234567890123456789012345678901234"
+        let displayName = NDKUIDisplayName(pubkey: pubkey)
+        XCTAssertNotNil(displayName)
+        
+        // Test with different styles
+        let boldName = NDKUIDisplayName(pubkey: pubkey, font: .headline)
+        XCTAssertNotNil(boldName)
+        
+        let smallName = NDKUIDisplayName(pubkey: pubkey, font: .caption)
+        XCTAssertNotNil(smallName)
+        
+        // Test with show username option
+        let withUsername = NDKUIDisplayName(pubkey: pubkey, showUsername: true)
+        XCTAssertNotNil(withUsername)
+        
+        // Test with max width
+        let truncatedName = NDKUIDisplayName(pubkey: pubkey, maxWidth: 150)
+        XCTAssertNotNil(truncatedName)
+    }
+    
+    // MARK: - NDKUIMarkdownRenderer Tests
+    
+    func testNDKUIMarkdownRendererInitialization() {
+        // Test basic markdown rendering
         let markdown = "# Hello World\n\nThis is **bold** text."
         let ndk = NDK()
-        let renderer = NDKMarkdownRenderer(markdown, ndk: ndk)
-        
+        let renderer = NDKUIMarkdownRenderer(markdown, ndk: ndk)
         XCTAssertNotNil(renderer)
+        
+        // Test with nostr entities
+        let markdownWithNostr = "Check out nostr:npub1234 and #bitcoin"
+        let nostrRenderer = NDKUIMarkdownRenderer(markdownWithNostr, ndk: ndk)
+        XCTAssertNotNil(nostrRenderer)
+        
+        // Test with custom configuration
+        var config = MarkdownConfiguration()
+        config.showImages = false
+        config.fontSize = 14
+        let customRenderer = NDKUIMarkdownRenderer(
+            markdown,
+            ndk: ndk,
+            configuration: config
+        )
+        XCTAssertNotNil(customRenderer)
+        
+        // Test with event context
+        let event = NDKEvent(
+            pubkey: "test_pubkey",
+            createdAt: Date.now,
+            kind: 1,
+            tags: [],
+            content: markdown
+        )
+        let eventRenderer = NDKUIMarkdownRenderer(
+            markdown,
+            ndk: ndk,
+            event: event
+        )
+        XCTAssertNotNil(eventRenderer)
     }
     
-    func testNDKEventViewInitialization() throws {
-        // Test that NDKEventView can be created
-        let event = NDKEvent(
+    // MARK: - NDKUIEventView Tests
+    
+    func testNDKUIEventViewInitialization() throws {
+        // Test text note event
+        let textEvent = NDKEvent(
             pubkey: "test_pubkey_123456789012345678901234567890123456789012345678901234",
             createdAt: Date.now,
             kind: 1,
             tags: [],
             content: "Test event content"
         )
+        let textView = NDKUIEventView(event: textEvent)
+        XCTAssertNotNil(textView)
         
-        let eventView = NDKEventView(event: event)
-        XCTAssertNotNil(eventView)
+        // Test long form article
+        let articleEvent = NDKEvent(
+            pubkey: "test_pubkey_123456789012345678901234567890123456789012345678901234",
+            createdAt: Date.now,
+            kind: 30023,
+            tags: [["title", "Test Article"]],
+            content: "# Article Content\n\nThis is a test article."
+        )
+        let articleView = NDKUIEventView(event: articleEvent)
+        XCTAssertNotNil(articleView)
+        
+        // Test with options
+        let customView = NDKUIEventView(
+            event: textEvent,
+            showAuthor: false,
+            showInteractions: false
+        )
+        XCTAssertNotNil(customView)
     }
     
     func testNDKEventAuthorHeaderInitialization() throws {
@@ -131,16 +315,68 @@ final class NDKSwiftUIComponentsTests: XCTestCase {
         XCTAssertGreaterThan(UIConstants.Radius.large, UIConstants.Radius.medium)
     }
     
+    // MARK: - Helper Components Tests
+    
+    func testNDKUIRelativeTime() {
+        // Test component initialization
+        let date = Date().addingTimeInterval(-3600)
+        let relativeTime = NDKUIRelativeTime(date: date)
+        XCTAssertNotNil(relativeTime)
+        
+        // Test with custom style
+        let compactTime = NDKUIRelativeTime(date: date, style: .compact)
+        XCTAssertNotNil(compactTime)
+    }
+    
+    func testNDKUIUsername() {
+        let pubkey = "test_pubkey_123456789012345678901234567890123456789012345678901234"
+        let username = NDKUIUsername(pubkey: pubkey)
+        XCTAssertNotNil(username)
+        
+        // Test with prefix
+        let withPrefix = NDKUIUsername(pubkey: pubkey, showPrefix: true)
+        XCTAssertNotNil(withPrefix)
+    }
+    
+    func testNDKRichText() {
+        let content = "This is a test with #bitcoin and @npub1234"
+        let ndk = NDK()
+        let richText = NDKRichText(content: content, ndk: ndk)
+        XCTAssertNotNil(richText)
+        
+        // Test with event context
+        let event = NDKEvent(
+            pubkey: "test_pubkey",
+            createdAt: Date.now,
+            kind: 1,
+            tags: [["t", "bitcoin"]],
+            content: content
+        )
+        let eventRichText = NDKRichText(content: content, ndk: ndk, event: event)
+        XCTAssertNotNil(eventRichText)
+    }
+    
     func testNDKRelativeTimeFormatting() {
         // Test relative time formatting
         let now = Date()
+        let oneMinuteAgo = now.addingTimeInterval(-60)
         let oneHourAgo = now.addingTimeInterval(-3600)
         let oneDayAgo = now.addingTimeInterval(-86400)
+        let oneWeekAgo = now.addingTimeInterval(-604800)
         
+        let relativeMinute = NDKRelativeTime.format(oneMinuteAgo)
         let relativeHour = NDKRelativeTime.format(oneHourAgo)
         let relativeDay = NDKRelativeTime.format(oneDayAgo)
+        let relativeWeek = NDKRelativeTime.format(oneWeekAgo)
         
+        XCTAssertFalse(relativeMinute.isEmpty)
         XCTAssertFalse(relativeHour.isEmpty)
         XCTAssertFalse(relativeDay.isEmpty)
+        XCTAssertFalse(relativeWeek.isEmpty)
+        
+        // Test edge cases
+        let future = now.addingTimeInterval(60)
+        let relativeFuture = NDKRelativeTime.format(future)
+        XCTAssertFalse(relativeFuture.isEmpty)
     }
 }

@@ -50,7 +50,7 @@ public actor WalletEventManager {
         // Create deletion events for tokens being deleted
         if !tokenChange.deletedTokenIds.isEmpty {
             let deleteEvent = try await NDKEventBuilder(ndk: ndk)
-                .kind(5) // Event deletion
+                .kind(EventKind.deletion) // Event deletion
                 .content("")
                 .tags([
                     ["k", String(7375)] // Cashu token kind

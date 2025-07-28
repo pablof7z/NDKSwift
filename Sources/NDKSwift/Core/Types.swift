@@ -160,6 +160,7 @@ public enum EventKind {
     public static let liveEvent = 30311
     public static let handlerRecommendation = 31989
     public static let handlerInformation = 31990
+    public static let blossomServerAnnouncement = 36363  // Blossom server discovery
     public static let mintAnnouncement = 38000  // NIP-87 mint discovery
     public static let cashuMintAnnouncement = 38172  // NIP-87
     public static let followPack = 39089  // NIP-51 follow pack

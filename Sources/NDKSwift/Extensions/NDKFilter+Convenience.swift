@@ -8,7 +8,7 @@ public extension NDKFilter {
     ///   - pubkey: The public key of the user
     ///   - limit: Optional limit for results (default: 1)
     static func profile(for pubkey: String, limit: Int? = 1) -> NDKFilter {
-        NDKFilter(authors: [pubkey], kinds: [0], limit: limit)
+        NDKFilter(authors: [pubkey], kinds: [EventKind.metadata], limit: limit)
     }
     
     /// Creates a filter for user's text notes (kind:1)
@@ -23,7 +23,7 @@ public extension NDKFilter {
         since: Timestamp? = nil,
         until: Timestamp? = nil
     ) -> NDKFilter {
-        NDKFilter(authors: [pubkey], kinds: [1], since: since, until: until, limit: limit)
+        NDKFilter(authors: [pubkey], kinds: [EventKind.textNote], since: since, until: until, limit: limit)
     }
     
     /// Creates a filter for user's contact list (kind:3)
@@ -31,7 +31,7 @@ public extension NDKFilter {
     ///   - pubkey: The public key of the user
     ///   - limit: Optional limit for results (default: 1)
     static func contactList(for pubkey: String, limit: Int? = 1) -> NDKFilter {
-        NDKFilter(authors: [pubkey], kinds: [3], limit: limit)
+        NDKFilter(authors: [pubkey], kinds: [EventKind.contacts], limit: limit)
     }
     
     /// Creates a filter for reactions to a specific event
@@ -39,7 +39,7 @@ public extension NDKFilter {
     ///   - eventId: The event ID to find reactions for
     ///   - limit: Optional limit for results
     static func reactions(to eventId: String, limit: Int? = nil) -> NDKFilter {
-        NDKFilter(kinds: [7], events: [eventId], limit: limit)
+        NDKFilter(kinds: [EventKind.reaction], events: [eventId], limit: limit)
     }
     
     /// Creates a filter for deletion events (kind:5)
@@ -47,7 +47,7 @@ public extension NDKFilter {
     ///   - pubkey: The public key of the user who created deletions
     ///   - limit: Optional limit for results
     static func deletions(by pubkey: String, limit: Int? = nil) -> NDKFilter {
-        NDKFilter(authors: [pubkey], kinds: [5], limit: limit)
+        NDKFilter(authors: [pubkey], kinds: [EventKind.deletion], limit: limit)
     }
     
     /// Creates a filter for relay list metadata (kind:10002)
@@ -55,7 +55,7 @@ public extension NDKFilter {
     ///   - pubkey: The public key of the user
     ///   - limit: Optional limit for results (default: 1)
     static func relayList(for pubkey: String, limit: Int? = 1) -> NDKFilter {
-        NDKFilter(authors: [pubkey], kinds: [10002], limit: limit)
+        NDKFilter(authors: [pubkey], kinds: [EventKind.relayList], limit: limit)
     }
     
     /// Creates a filter for multiple event kinds by a user
