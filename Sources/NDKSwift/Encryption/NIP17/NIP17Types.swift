@@ -16,7 +16,7 @@ public extension EventKind {
     /// Chat message (NIP-17)
     static let chatMessage = 14
     
-    /// File message (NIP-17)  
+    /// File message (NIP-17)
     static let fileMessage = 15
     
     /// Gift wrap event (NIP-59)
