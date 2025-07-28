@@ -169,6 +169,12 @@ public enum NostrConstants {
 
         /// Uppercase kind tag ("K") - used in comment threads
         public static let uppercaseKind = "K"
+        
+        /// Client tag ("client") - for NIP-89 client identification
+        public static let client = "client"
+        
+        /// Private key tag ("privkey") - for encrypted private key storage
+        public static let privkey = "privkey"
     }
 
     // MARK: - Tag Markers

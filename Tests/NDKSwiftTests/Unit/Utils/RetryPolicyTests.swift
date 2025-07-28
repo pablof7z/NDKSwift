@@ -269,9 +269,111 @@ final class RetryPolicyTests: XCTestCase {
         }
     }
     
+    // MARK: - Schedule Retry Tests
+    
+    func testScheduleRetry() {
+        let expectation = expectation(description: "Retry operation executed")
+        let config = RetryPolicyConfiguration(
+            initialDelay: 0.05,
+            jitterFactor: 0.0
+        )
+        let policy = RetryPolicy(configuration: config)
+        
+        policy.scheduleRetry {
+            expectation.fulfill()
+        }
+        
+        // Verify retry is scheduled
+        XCTAssertTrue(policy.statistics.isRetrying)
+        
+        wait(for: [expectation], timeout: 0.5)
+        
+        // After execution, should no longer be retrying
+        XCTAssertFalse(policy.statistics.isRetrying)
+    }
+    
+    func testCancelScheduledRetry() {
+        let config = RetryPolicyConfiguration(initialDelay: 0.5)
+        let policy = RetryPolicy(configuration: config)
+        
+        var operationExecuted = false
+        policy.scheduleRetry {
+            operationExecuted = true
+        }
+        
+        // Verify retry is scheduled
+        XCTAssertTrue(policy.statistics.isRetrying)
+        
+        // Cancel before it executes
+        policy.cancel()
+        
+        // Verify it's no longer retrying
+        XCTAssertFalse(policy.statistics.isRetrying)
+        
+        // Wait a bit to ensure operation doesn't execute
+        RunLoop.current.run(until: Date(timeIntervalSinceNow: 0.1))
+        XCTAssertFalse(operationExecuted)
+    }
+    
+    func testLinearBackoff() {
+        // Test with multiplier = 1.0 for linear backoff
+        let config = RetryPolicyConfiguration(
+            initialDelay: 1.0,
+            maxDelay: 100.0,
+            multiplier: 1.0,
+            jitterFactor: 0.0
+        )
+        let policy = RetryPolicy(configuration: config)
+        
+        // All delays should be the same (linear)
+        let delay1 = policy.nextDelay()
+        XCTAssertEqual(delay1, 1.0)
+        
+        let delay2 = policy.nextDelay()
+        XCTAssertEqual(delay2, 1.0)
+        
+        let delay3 = policy.nextDelay()
+        XCTAssertEqual(delay3, 1.0)
+    }
+    
+    func testExecuteWithTimeoutSuccess() async throws {
+        let policy = RetryPolicy()
+        
+        let result = try await policy.executeWithTimeout(timeout: 1.0) {
+            return "quick success"
+        }
+        
+        XCTAssertEqual(result, "quick success")
+    }
+    
+    func testConfigurationInitialization() {
+        let config = RetryPolicyConfiguration(
+            initialDelay: 2.0,
+            maxDelay: 60.0,
+            multiplier: 3.0,
+            maxAttempts: 5,
+            jitterFactor: 0.3
+        )
+        
+        XCTAssertEqual(config.initialDelay, 2.0)
+        XCTAssertEqual(config.maxDelay, 60.0)
+        XCTAssertEqual(config.multiplier, 3.0)
+        XCTAssertEqual(config.maxAttempts, 5)
+        XCTAssertEqual(config.jitterFactor, 0.3)
+    }
+    
+    func testInitialState() {
+        let policy = RetryPolicy()
+        let stats = policy.statistics
+        
+        XCTAssertEqual(stats.attempts, 0)
+        XCTAssertEqual(stats.currentDelay, 1.0) // Default initial delay
+        XCTAssertFalse(stats.isRetrying)
+    }
+    
     // MARK: - Helper Types
     
-    enum TestError: Error {
+    enum TestError: Error, Equatable {
         case retryable
         case nonRetryable
     }

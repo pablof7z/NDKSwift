@@ -63,7 +63,7 @@ Located in the [Development](Development/) subdirectory:
 
 ## 📝 Version
 
-This documentation is for NDKSwift v0.7.3 and later.
+This documentation is for NDKSwift v0.7.6 and later.
 NDKSwiftUI documentation covers v0.2.0 and later.
 
 ## 🔧 Running Examples
