@@ -461,17 +461,43 @@ actor NDKDataRequirementManager {
 
     /// Smart filter aggregation that returns multiple filters when needed
     private func aggregateFilters(_ filters: [NDKFilter]) -> [NDKFilter] {
+        NDKLogger.log(.info, category: .subscription, "🔄 [FilterAggregation] Starting aggregation of \(filters.count) filters")
+        
+        // Log individual input filters
+        for (index, filter) in filters.enumerated() {
+            var filterParts: [String] = []
+            if let kinds = filter.kinds { filterParts.append("kinds:\(kinds)") }
+            if let authors = filter.authors { filterParts.append("authors:\(authors.count)") }
+            if let ids = filter.ids { filterParts.append("ids:\(ids.count)") }
+            if let tags = filter.tags, !tags.isEmpty { filterParts.append("tags:\(tags.keys.joined(separator: ","))") }
+            if let since = filter.since { filterParts.append("since:\(since)") }
+            if let until = filter.until { filterParts.append("until:\(until)") }
+            if let limit = filter.limit { filterParts.append("limit:\(limit)") }
+            
+            NDKLogger.log(.debug, category: .subscription, "  Input[\(index + 1)]: \(filterParts.joined(separator: ", "))")
+        }
 
         // Group filters by compatibility
         let filterGroups = groupCompatibleFilters(filters)
+        NDKLogger.log(.info, category: .subscription, "📊 [FilterAggregation] Grouped into \(filterGroups.count) compatible groups")
 
         // Aggregate each group separately
         let aggregated = filterGroups.map { group in
             aggregateSingleGroup(group)
         }
 
+        NDKLogger.log(.info, category: .subscription, "✅ [FilterAggregation] Produced \(aggregated.count) aggregated filters")
         for (index, filter) in aggregated.enumerated() {
-            NDKLogger.log(.trace, category: .subscription, "Group \(index + 1): \(filter.fingerprint)")
+            var filterParts: [String] = []
+            if let kinds = filter.kinds { filterParts.append("kinds:\(kinds)") }
+            if let authors = filter.authors { filterParts.append("authors:\(authors.count)") }
+            if let ids = filter.ids { filterParts.append("ids:\(ids.count)") }
+            if let tags = filter.tags, !tags.isEmpty { filterParts.append("tags:\(tags.keys.joined(separator: ","))") }
+            if let since = filter.since { filterParts.append("since:\(since)") }
+            if let until = filter.until { filterParts.append("until:\(until)") }
+            if let limit = filter.limit { filterParts.append("limit:\(limit)") }
+            
+            NDKLogger.log(.info, category: .subscription, "  Aggregated[\(index + 1)]: \(filterParts.joined(separator: ", ")) [fingerprint: \(filter.fingerprint)]")
         }
 
         return aggregated
