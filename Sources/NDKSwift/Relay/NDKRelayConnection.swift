@@ -355,7 +355,6 @@ public actor NDKRelayConnection {
             while true {
                 let message = try await task.receive()
                 messagesReceived += 1
-                NDKLogger.log(.trace, category: .connection, "📥 Received message #\(messagesReceived) from \(url)")
 
                 switch message {
                 case let .string(json):
@@ -394,11 +393,6 @@ public actor NDKRelayConnection {
             // Log received message
             NDKNetworkLogger.logNetworkReceive(from: url, message: json, parsed: message)
             
-            // Log EVENT messages specifically
-            if case let .event(subscriptionId, event) = message {
-                NDKLogger.log(.info, category: .subscription, "📨 EVENT from \(url): kind \(event.kind), id \(String(event.id.prefix(10))), subscription: \(subscriptionId ?? "none")")
-            }
-
             // Handle OK messages for pending events
             if case let .ok(eventId, accepted, errorMessage) = message {
                 if accepted {

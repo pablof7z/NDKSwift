@@ -6,8 +6,8 @@ public extension NDKFilter {
     /// Creates a filter for user profile metadata (kind:0)
     /// - Parameters:
     ///   - pubkey: The public key of the user
-    ///   - limit: Optional limit for results (default: 1)
-    static func profile(for pubkey: String, limit: Int? = 1) -> NDKFilter {
+    ///   - limit: Optional limit for results (default: nil)
+    static func profile(for pubkey: String, limit: Int? = nil) -> NDKFilter {
         NDKFilter(authors: [pubkey], kinds: [EventKind.metadata], limit: limit)
     }
     
@@ -53,8 +53,8 @@ public extension NDKFilter {
     /// Creates a filter for relay list metadata (kind:10002)
     /// - Parameters:
     ///   - pubkey: The public key of the user
-    ///   - limit: Optional limit for results (default: 1)
-    static func relayList(for pubkey: String, limit: Int? = 1) -> NDKFilter {
+    ///   - limit: Optional limit for results (default: nil)
+    static func relayList(for pubkey: String, limit: Int? = nil) -> NDKFilter {
         NDKFilter(authors: [pubkey], kinds: [EventKind.relayList], limit: limit)
     }
     

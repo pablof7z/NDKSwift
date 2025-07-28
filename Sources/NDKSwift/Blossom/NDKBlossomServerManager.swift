@@ -161,8 +161,7 @@ public class NDKBlossomServerManager: ObservableObject {
             // Fetch user's blossom server list event (kind 10063)
             let filter = NDKFilter(
                 authors: [pubkey],
-                kinds: [EventKind.blossomServerList],
-                limit: 1
+                kinds: [EventKind.blossomServerList]
             )
             
             // Use observe to get the event

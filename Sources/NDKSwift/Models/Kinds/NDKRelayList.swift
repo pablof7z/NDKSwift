@@ -268,7 +268,7 @@ public class NDKRelayList: NDKList {
 public extension NDK {
     /// Fetch the relay list for a specific user
     func fetchRelayList(for user: NDKUser) async throws -> NDKRelayList? {
-        let filter = NDKFilter(authors: [user.pubkey], kinds: [EventKind.relayList], limit: 1)
+        let filter = NDKFilter(authors: [user.pubkey], kinds: [EventKind.relayList])
 
         // Use NDKDataSource with long maxAge for relay lists
         let dataSource = NDKDataSource(

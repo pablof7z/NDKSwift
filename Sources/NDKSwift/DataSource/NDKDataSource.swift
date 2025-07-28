@@ -194,17 +194,13 @@ public final class NDKDataSource<T>: ObservableObject, CacheObserver {
     // MARK: - CacheObserver
 
     public func handleEvent(_ event: NDKEvent) async {
-        NDKLogger.log(.trace, category: .subscription, "🎯 [NDKDataSource] handleEvent called - id: \(event.id.prefix(10)), correlationId: \(correlationId)")
-        
         // Check if we've already processed this event
         guard await !stateManager.isProcessed(event.id) else {
-            NDKLogger.log(.trace, category: .subscription, "⏭️ Skipping duplicate event - id: \(event.id)", correlationId: correlationId)
             return
         }
         await stateManager.markProcessed(event.id)
 
         if let transformed = transform(event) {
-            NDKLogger.log(.debug, category: .subscription, "✅ [NDKDataSource] Event transformed and yielding to stream - id: \(event.id.prefix(10)), correlationId: \(correlationId)")
 
             // Yield to AsyncStream
             eventsContinuation.yield(transformed)
@@ -212,7 +208,6 @@ public final class NDKDataSource<T>: ObservableObject, CacheObserver {
             // Update @Published property on MainActor
             await MainActor.run {
                 data.append(transformed)
-                NDKLogger.log(.trace, category: .subscription, "📈 Data array updated - count: \(self.data.count)", correlationId: self.correlationId)
             }
         } else {
             NDKLogger.log(.debug, category: .subscription, "❌ [NDKDataSource] Transform failed - event not added to data - id: \(event.id.prefix(10)), correlationId: \(correlationId)")
@@ -226,7 +221,6 @@ public final class NDKDataSource<T>: ObservableObject, CacheObserver {
         
         // Also process events directly
         if case let .event(event, relay) = update {
-            NDKLogger.log(.debug, category: .subscription, "🔄 [NDKDataSource] Processing event from relay update - id: \(event.id.prefix(10)), relay: \(relay)")
             await handleEvent(event)
         }
     }

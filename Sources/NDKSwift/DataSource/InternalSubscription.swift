@@ -513,12 +513,9 @@ actor InternalSubscription: Hashable {
 
     /// Handle incoming event
     func handleEvent(_ event: NDKEvent, from relay: RelayProtocol) async {
-        NDKLogger.log(.trace, category: .subscription, "📨 Handling event - id: \(event.id), kind: \(event.kind), from: \(relay.url)")
-
         // Feed event to stream with relay information
         if eventContinuation != nil {
             eventContinuation?.yield((event: event, relay: relay.url))
-            NDKLogger.log(.trace, category: .subscription, "✅ Event yielded to stream")
         } else {
             NDKLogger.log(.warning, category: .subscription, "⚠️ No event continuation available")
         }

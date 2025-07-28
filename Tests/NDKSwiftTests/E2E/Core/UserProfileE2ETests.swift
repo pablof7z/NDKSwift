@@ -93,8 +93,7 @@ final class UserProfileE2ETests: XCTestCase {
         // Fetch profile using a filter
         let profileFilter = NDKFilter(
             authors: [pubkey],
-            kinds: [0], // Metadata kind
-            limit: 1
+            kinds: [0] // Metadata kind
         )
         
         let fetchedProfile = try await fetchProfile(ndk: fetcherNDK, filter: profileFilter, pubkey: pubkey)
@@ -199,8 +198,7 @@ final class UserProfileE2ETests: XCTestCase {
         
         let nilFilter = NDKFilter(
             authors: [nonExistentPubkey],
-            kinds: [0],
-            limit: 1
+            kinds: [0]
         )
         let nilProfile = try await fetchProfile(ndk: fetcherNDK, filter: nilFilter, pubkey: nonExistentPubkey)
         let nilTime = Date()
@@ -259,8 +257,7 @@ final class UserProfileE2ETests: XCTestCase {
         print("[\(timestamp())] Fetching minimal profile...")
         let filter = NDKFilter(
             authors: [pubkey],
-            kinds: [0],
-            limit: 1
+            kinds: [0]
         )
         let fetchedProfile = try await fetchProfile(ndk: ndk, filter: filter, pubkey: pubkey)
         
@@ -305,8 +302,7 @@ final class UserProfileE2ETests: XCTestCase {
         print("[\(timestamp())] Fetching invalid profile...")
         let filter = NDKFilter(
             authors: [pubkey],
-            kinds: [0],
-            limit: 1
+            kinds: [0]
         )
         let fetchedProfile = try await fetchProfile(ndk: ndk, filter: filter, pubkey: pubkey)
         

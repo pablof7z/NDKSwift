@@ -301,7 +301,7 @@ public class NDKContactList: NDKList {
 public extension NDK {
     /// Fetch the contact list for a specific user
     func fetchContactList(for user: NDKUser) async throws -> NDKContactList? {
-        let filter = NDKFilter(authors: [user.pubkey], kinds: [3], limit: 1)
+        let filter = NDKFilter(authors: [user.pubkey], kinds: [3])
 
         // Use NDKDataSource with reasonable maxAge for contact lists
         let dataSource = NDKDataSource(

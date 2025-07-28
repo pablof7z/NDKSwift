@@ -100,8 +100,7 @@ public actor NDKProfileManager {
 
                 let filter = NDKFilter(
                     authors: [pubkey],
-                    kinds: [EventKind.metadata],
-                    limit: 1
+                    kinds: [EventKind.metadata]
                 )
 
                 // Use NDKDataSource for profile updates

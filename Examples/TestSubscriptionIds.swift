@@ -86,7 +86,7 @@ Task {
     print("Test 3: Default subscription ID")
     let defaultSource = NDKDataSource(
         ndk: ndk,
-        filter: NDKFilter(kinds: [0], limit: 1)
+        filter: NDKFilter(kinds: [0])
     )
     print("Created data source with default ID generation\n")
     

@@ -133,8 +133,7 @@ public class NDKSessionData {
         for kind in kinds {
             let cacheFilter = NDKFilter(
                 authors: [pubkey],
-                kinds: [kind],
-                limit: 1
+                kinds: [kind]
             )
 
             // Get the latest event from cache

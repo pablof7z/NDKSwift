@@ -123,15 +123,15 @@ public final class NDKUser: Equatable, Hashable, Sendable {
     /// Fetch user's relay list (NIP-65)
     @discardableResult
     public func fetchRelayList() async throws -> [NDKRelayInfo] {
-        guard let ndk = ndk else {
-            throw NDKError.configurationError(ErrorMessageConstants.Messages.ndkInstanceNotSet)
-        }
+        let ndk = try GuardHelpers.unwrap(
+            self.ndk,
+            error: NDKError.configurationError(ErrorMessageConstants.Messages.ndkInstanceNotSet)
+        )
 
         // Create filter for kind 10002 events
         let filter = NDKFilter(
             authors: [pubkey],
-            kinds: [EventKind.relayList],
-            limit: 1
+            kinds: [EventKind.relayList]
         )
 
         // Fetch the relay list event
@@ -170,15 +170,15 @@ public final class NDKUser: Equatable, Hashable, Sendable {
 
     /// Get users this user follows
     public func follows() async throws -> Set<NDKUser> {
-        guard let ndk = ndk else {
-            throw NDKError.configurationError(ErrorMessageConstants.Messages.ndkInstanceNotSet)
-        }
+        let ndk = try GuardHelpers.unwrap(
+            self.ndk,
+            error: NDKError.configurationError(ErrorMessageConstants.Messages.ndkInstanceNotSet)
+        )
 
         // Create filter for kind 3 events
         let filter = NDKFilter(
             authors: [pubkey],
-            kinds: [EventKind.contacts],
-            limit: 1
+            kinds: [EventKind.contacts]
         )
 
         // Fetch the contact list event
@@ -252,9 +252,10 @@ public final class NDKUser: Equatable, Hashable, Sendable {
     /// - Parameter maxAge: Maximum age before re-verification is needed (default: 24 hours)
     /// - Returns: True if the NIP-05 is verified and belongs to this user
     public func verifyNIP05(maxAge: TimeInterval = TimeConstants.day) async throws -> Bool {
-        guard let ndk = ndk else {
-            throw NDKError.configurationError(ErrorMessageConstants.Messages.ndkInstanceNotSet)
-        }
+        let ndk = try GuardHelpers.unwrap(
+            self.ndk,
+            error: NDKError.configurationError(ErrorMessageConstants.Messages.ndkInstanceNotSet)
+        )
 
         return try await ndk.verifyNIP05(for: self, maxAge: maxAge)
     }
@@ -279,9 +280,10 @@ public final class NDKUser: Equatable, Hashable, Sendable {
     /// Get available payment methods for this user
     /// - Returns: Set of payment methods this user supports
     public func getPaymentMethods() async throws -> Set<NDKPaymentMethod> {
-        guard let ndk = ndk else {
-            throw NDKError.configurationError(ErrorMessageConstants.Messages.ndkInstanceNotSet)
-        }
+        let ndk = try GuardHelpers.unwrap(
+            self.ndk,
+            error: NDKError.configurationError(ErrorMessageConstants.Messages.ndkInstanceNotSet)
+        )
 
         var methods = Set<NDKPaymentMethod>()
 
