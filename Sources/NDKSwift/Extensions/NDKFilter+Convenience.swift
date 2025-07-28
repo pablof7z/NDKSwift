@@ -29,8 +29,8 @@ public extension NDKFilter {
     /// Creates a filter for user's contact list (kind:3)
     /// - Parameters:
     ///   - pubkey: The public key of the user
-    ///   - limit: Optional limit for results (default: 1)
-    static func contactList(for pubkey: String, limit: Int? = 1) -> NDKFilter {
+    ///   - limit: Optional limit for results (default: nil)
+    static func contactList(for pubkey: String, limit: Int? = nil) -> NDKFilter {
         NDKFilter(authors: [pubkey], kinds: [EventKind.contacts], limit: limit)
     }
     
