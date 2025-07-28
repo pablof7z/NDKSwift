@@ -356,7 +356,7 @@ final class NDKSwiftUIComponentsTests: XCTestCase {
         XCTAssertNotNil(eventRichText)
     }
     
-    func testNDKRelativeTimeFormatting() {
+    func testNDKUIRelativeTimeFormatting() {
         // Test relative time formatting
         let now = Date()
         let oneMinuteAgo = now.addingTimeInterval(-60)
@@ -364,10 +364,10 @@ final class NDKSwiftUIComponentsTests: XCTestCase {
         let oneDayAgo = now.addingTimeInterval(-86400)
         let oneWeekAgo = now.addingTimeInterval(-604800)
         
-        let relativeMinute = NDKRelativeTime.format(oneMinuteAgo)
-        let relativeHour = NDKRelativeTime.format(oneHourAgo)
-        let relativeDay = NDKRelativeTime.format(oneDayAgo)
-        let relativeWeek = NDKRelativeTime.format(oneWeekAgo)
+        let relativeMinute = NDKUIRelativeTime.format(Timestamp(oneMinuteAgo.timeIntervalSince1970))
+        let relativeHour = NDKUIRelativeTime.format(Timestamp(oneHourAgo.timeIntervalSince1970))
+        let relativeDay = NDKUIRelativeTime.format(Timestamp(oneDayAgo.timeIntervalSince1970))
+        let relativeWeek = NDKUIRelativeTime.format(Timestamp(oneWeekAgo.timeIntervalSince1970))
         
         XCTAssertFalse(relativeMinute.isEmpty)
         XCTAssertFalse(relativeHour.isEmpty)
@@ -376,7 +376,7 @@ final class NDKSwiftUIComponentsTests: XCTestCase {
         
         // Test edge cases
         let future = now.addingTimeInterval(60)
-        let relativeFuture = NDKRelativeTime.format(future)
+        let relativeFuture = NDKUIRelativeTime.format(Timestamp(future.timeIntervalSince1970))
         XCTAssertFalse(relativeFuture.isEmpty)
     }
 }

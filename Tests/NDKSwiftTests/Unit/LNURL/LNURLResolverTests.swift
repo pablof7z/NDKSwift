@@ -6,7 +6,7 @@ final class LNURLResolverTests: XCTestCase {
     func testLUD16Resolution() async throws {
         // Create mock data fetcher
         let mockFetcher = MockURLDataFetcher()
-        let resolver = LNURLResolver(dataFetcher: mockFetcher)
+        let resolver = LNURLResolver(session: mockFetcher)
         
         // Mock response for LUD16 resolution
         let mockResponse = LNURLPayResponse(
@@ -45,7 +45,7 @@ final class LNURLResolverTests: XCTestCase {
     
     func testNostrPubkeyField() async throws {
         let mockFetcher = MockURLDataFetcher()
-        let resolver = LNURLResolver(dataFetcher: mockFetcher)
+        let resolver = LNURLResolver(session: mockFetcher)
         
         // Mock response with nostrPubkey field
         let mockResponse = LNURLPayResponse(
@@ -97,7 +97,7 @@ final class LNURLResolverTests: XCTestCase {
     
     func testNetworkError() async throws {
         let mockFetcher = MockURLDataFetcher()
-        let resolver = LNURLResolver(dataFetcher: mockFetcher)
+        let resolver = LNURLResolver(session: mockFetcher)
         
         mockFetcher.error = URLError(.notConnectedToInternet)
         
@@ -117,7 +117,7 @@ final class LNURLResolverTests: XCTestCase {
     
     func testInvalidMetadataJSON() async throws {
         let mockFetcher = MockURLDataFetcher()
-        let resolver = LNURLResolver(dataFetcher: mockFetcher)
+        let resolver = LNURLResolver(session: mockFetcher)
         
         let mockResponse = LNURLPayResponse(
             callback: "https://example.com/lnurl-pay/callback",
@@ -157,7 +157,7 @@ final class LNURLResolverTests: XCTestCase {
 
 // MARK: - Mock URL Data Fetcher
 
-class MockURLDataFetcher: URLDataFetching {
+class MockURLDataFetcher: NDKNetworkFetching {
     var data: Data?
     var response: URLResponse?
     var error: Error?

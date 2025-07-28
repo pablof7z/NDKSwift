@@ -14,8 +14,7 @@ final class NIP42AuthenticationIntegrationTests: XCTestCase {
         let authRelayURL = ProcessInfo.processInfo.environment["AUTH_RELAY_URL"] ?? "wss://auth.nostr.wine"
         
         // Create NDK with signer
-        let privateKey = try NDKPrivateKey.generate()
-        let signer = NDKPrivateKeySigner(privateKey: privateKey)
+        let signer = try NDKPrivateKeySigner.generate()
         let ndk = NDK(signer: signer)
         
         // Set up authentication delegate
@@ -51,7 +50,7 @@ final class NIP42AuthenticationIntegrationTests: XCTestCase {
         
         // Create and publish an event
         let event = try await NDKEventBuilder(ndk: ndk)
-            .kind(.textNote)
+            .kind(1)
             .content("NIP-42 authentication test: \(Date())")
             .build(signer: signer)
         
@@ -67,7 +66,7 @@ final class NIP42AuthenticationIntegrationTests: XCTestCase {
             // If auth is required, wait for authentication
             if let ndkError = error as? NDKError,
                case let .publishFailed(_, message) = ndkError,
-               let msg = message?.lowercased(),
+               let msg = message.lowercased(),
                (msg.contains("auth") || msg.contains("restricted")) {
                 
                 print("Authentication required, waiting for auth flow...")
@@ -107,7 +106,7 @@ final class NIP42AuthenticationIntegrationTests: XCTestCase {
         
         // Create test event
         let event = try await NDKEventBuilder(ndk: ndk)
-            .kind(.textNote)
+            .kind(1)
             .content("Test")
             .build(signer: signer)
         
