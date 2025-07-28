@@ -178,7 +178,7 @@ func XCTAssertAsyncCompletes<T>(
     timeout: TimeInterval = 5.0,
     file: StaticString = #filePath,
     line: UInt = #line,
-    operation: () async throws -> T
+    operation: @escaping () async throws -> T
 ) async throws -> T {
     let task = Task {
         try await operation()

@@ -4,6 +4,55 @@ All notable changes to NDKSwift will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.8.1] - 2025-01-28
+
+### Fixed
+- Filter aggregation now properly merges filters with the same structure, matching ndk-core behavior
+- Fixed `canCombineFilters` rejecting filters with disjoint authors/kinds that should be merged
+- Multiple profile queries (e.g., `kinds:[0], authors:["alice"]` + `kinds:[0], authors:["bob"]`) now correctly aggregate into a single filter
+- Removed limit from relay list discovery filters to enable proper aggregation (matching ndk-core behavior)
+
+### Changed
+- Filter compatibility check now based on structure (same keys) rather than value overlap
+- Improved aggregation logging to show group counts and merge operations
+- Relay list queries (kind:10002) no longer include unnecessary limit parameter
+
+## [0.8.0] - 2025-01-28
+
+### Breaking Changes
+- Removed "universal subscriptions" concept that violated NIP-65 outbox model
+- Subscriptions without explicit relays now properly use outbox-based relay selection when enabled
+
+### Changed  
+- `InternalSubscriptionManager` no longer maintains a separate set for "universal" subscriptions
+- When creating subscriptions without explicit relays:
+  - If outbox is enabled: Uses `NDKRelaySelector` for intelligent relay selection based on filter authors
+  - If outbox is disabled: Uses explicit/developer-added relays as fallback
+  - Never broadcasts to all connected relays indiscriminately
+- Subscription replay on relay reconnection now uses efficient O(1) relay-to-subscription mapping
+- `InternalSubscription.start()` now uses fallback relays as a safety net when relay selection fails
+
+### Fixed
+- Subscriptions no longer inefficiently broadcast to all connected relays
+- Proper implementation of NIP-65 outbox model for subscription relay selection
+- Relay selection respects user intent - explicit relay specification always bypasses outbox model
+
+## [0.7.18] - 2025-01-28
+
+### Added
+- Connection error rate limiting to prevent log spam from failing relays
+- `NDKConnectionErrorRateLimiter` actor for managing error log frequency
+- Summary statistics for suppressed connection errors in debug logs
+
+### Changed
+- Connection error logging is now rate-limited to once per 30 seconds per relay/error type
+- Consolidated error logging in `NDKRelayConnection` to reduce duplicate messages
+- Initial connection failures log at `.error` level, retries log at `.warning` level
+
+### Fixed
+- Excessive log noise when relays fail to connect (DNS resolution errors, network issues)
+- Multiple redundant error messages for the same connection failure
+
 ## [0.7.17] - 2025-01-28
 
 ### Added

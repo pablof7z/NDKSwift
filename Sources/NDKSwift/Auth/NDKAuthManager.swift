@@ -59,8 +59,8 @@ public class NDKAuthManager {
         }
     }
 
-    /// Current authentication state
-    public private(set) var authenticationState: AuthenticationState = .unauthenticated {
+    /// Current session state
+    public private(set) var sessionState: SessionState = .noSession {
         didSet {
         }
     }
@@ -85,26 +85,24 @@ public class NDKAuthManager {
     /// Session restoration task to prevent multiple concurrent restorations
     private var restorationTask: Task<Void, Never>?
 
-    // MARK: - Authentication State
+    // MARK: - Session State
 
-    /// Represents the current authentication state
-    public enum AuthenticationState: Equatable {
-        case unauthenticated
-        case authenticating
-        case authenticated
-        case authenticationFailed(Error)
+    /// Represents the current session state
+    public enum SessionState: Equatable {
+        case noSession
+        case loading
+        case active
+        case error(Error)
         case biometricRequired
-        case sessionExpired
 
-        public static func == (lhs: AuthenticationState, rhs: AuthenticationState) -> Bool {
+        public static func == (lhs: SessionState, rhs: SessionState) -> Bool {
             switch (lhs, rhs) {
-            case (.unauthenticated, .unauthenticated),
-                 (.authenticating, .authenticating),
-                 (.authenticated, .authenticated),
-                 (.biometricRequired, .biometricRequired),
-                 (.sessionExpired, .sessionExpired):
+            case (.noSession, .noSession),
+                 (.loading, .loading),
+                 (.active, .active),
+                 (.biometricRequired, .biometricRequired):
                 return true
-            case (.authenticationFailed, .authenticationFailed):
+            case (.error, .error):
                 return true // Simplified comparison for errors
             default:
                 return false
@@ -114,14 +112,26 @@ public class NDKAuthManager {
 
     // MARK: - Computed Properties
 
-    /// Whether user is currently authenticated with an active signer
-    public var isAuthenticated: Bool {
-        authenticationState == .authenticated && activeSession != nil && activeSigner != nil
+    /// Whether there is an active session (read-only or read-write)
+    public var hasActiveSession: Bool {
+        sessionState == .active && activeSession != nil
+    }
+    
+    /// Whether the active session can sign events
+    public var canSign: Bool {
+        guard sessionState == .active,
+              let session = activeSession else { return false }
+        return session.signerType != nil && activeSigner != nil
+    }
+    
+    /// The public key of the active session
+    public var activePubkey: String? {
+        activeSession?.pubkey
     }
 
-    /// Whether authentication is in progress
-    public var isAuthenticating: Bool {
-        authenticationState == .authenticating
+    /// Whether session is being loaded
+    public var isLoading: Bool {
+        sessionState == .loading
     }
 
     /// Whether there are any available sessions
@@ -180,7 +190,7 @@ public class NDKAuthManager {
     /// Called automatically by `initialize()`.
     public func restoreSessions() async {
         do {
-            authenticationState = .authenticating
+            sessionState = .loading
 
             // Load all session identifiers
             let sessionIds = try await keychainManager.getAllSessionIdentifiers()
@@ -209,30 +219,62 @@ public class NDKAuthManager {
                 try await restoreActiveSession(mostRecent)
             } else {
                 // No sessions available
-                authenticationState = .unauthenticated
+                sessionState = .noSession
             }
 
         } catch {
             // Don't show error to user for session restoration failures
-            // Just treat it as unauthenticated
-            authenticationState = .unauthenticated
+            // Just treat it as no session
+            sessionState = .noSession
         }
     }
 
     /// Restore a specific session as the active session
     /// - Parameter session: The session to restore
     private func restoreActiveSession(_ session: NDKSession) async throws {
-        // If this session is already active and authenticated, skip restoration
-        if activeSession?.id == session.id && authenticationState == .authenticated {
+        // If this session is already active, skip restoration
+        if activeSession?.id == session.id && sessionState == .active {
             return
         }
 
         do {
+            // Check if this is a read-only session (no signerType)
+            if session.signerType == nil {
+                // Read-only session - no signer to restore
+                var updatedSession = session
+                updatedSession.markAsActive()
+                updatedSession.updateLastUsed()
+
+                // Update other sessions to inactive
+                availableSessions = availableSessions.map { existingSession in
+                    var updated = existingSession
+                    if updated.id == session.id {
+                        updated = updatedSession
+                    } else {
+                        updated.markAsInactive()
+                    }
+                    return updated
+                }
+
+                activeSession = updatedSession
+                activeSigner = nil
+                sessionState = .active
+
+                // Clear signer on NDK for read-only mode
+                ndk?.signer = nil
+
+                // Save updated session metadata
+                try await saveSessionMetadata(updatedSession)
+
+                NDKLogger.log(.info, category: .auth, "Read-only session restored for user: \(updatedSession.pubkey)")
+                return
+            }
+
             // Check if biometric authentication is required
             if session.requiresBiometric {
                 let biometricSuccess = await authenticateWithBiometrics(reason: "Access your account")
                 if !biometricSuccess {
-                    authenticationState = .biometricRequired
+                    sessionState = .biometricRequired
                     return
                 }
             }
@@ -261,7 +303,7 @@ public class NDKAuthManager {
 
             activeSession = updatedSession
             activeSigner = signer
-            authenticationState = .authenticated
+            sessionState = .active
 
             // Set signer on NDK if available
             ndk?.signer = signer
@@ -371,7 +413,7 @@ public class NDKAuthManager {
         // Immediately activate this session to prevent flash of "Welcome Back"
         activeSession = session
         activeSigner = signer
-        authenticationState = .authenticated
+        sessionState = .active
 
         // Set signer on NDK if available
         ndk?.signer = signer
@@ -394,6 +436,52 @@ public class NDKAuthManager {
 
         return session
     }
+    
+    /// Add a read-only session (no signing capabilities)
+    /// - Parameter user: The NDKUser to create a read-only session for
+    /// - Returns: The created session
+    public func addSession(user: NDKUser) async throws -> NDKSession {
+        // Create read-only session (no signerType)
+        var session = NDKSession(
+            pubkey: user.pubkey,
+            signerType: nil,  // nil indicates read-only
+            requiresBiometric: false,
+            isHardwareBacked: false
+        )
+        
+        // Mark as active and update last used
+        session.markAsActive()
+        session.updateLastUsed()
+        
+        // Validate session
+        try session.validate()
+        
+        // No signer data to store for read-only sessions
+        // Just store session metadata
+        try await saveSessionMetadata(session)
+        
+        // Update other sessions to inactive
+        availableSessions = availableSessions.map { existingSession in
+            var updated = existingSession
+            updated.markAsInactive()
+            return updated
+        }
+        
+        // Add to available sessions
+        availableSessions.append(session)
+        
+        // Immediately activate this session
+        activeSession = session
+        activeSigner = nil  // No signer for read-only
+        sessionState = .active
+        
+        // Clear signer on NDK for read-only mode
+        ndk?.signer = nil
+        
+        NDKLogger.log(.info, category: .auth, "Created read-only session for user: \(user.pubkey)")
+        
+        return session
+    }
 
     /// Switch to a different session
     /// - Parameter session: The session to switch to
@@ -403,10 +491,10 @@ public class NDKAuthManager {
             throw NDKAuthError.sessionNotFound
         }
 
-        // Only set to authenticating if we're not already authenticated with this session
+        // Only set to loading if we're not already active with this session
         // This prevents UI flicker when switching to a just-created session
         if activeSession?.id != session.id {
-            authenticationState = .authenticating
+            sessionState = .loading
 
             // Clear current active state
             activeSigner = nil
@@ -454,7 +542,7 @@ public class NDKAuthManager {
     public func logout() {
         activeSession = nil
         activeSigner = nil
-        authenticationState = .unauthenticated
+        sessionState = .noSession
         ndk?.signer = nil
         
         // Don't modify availableSessions here - they remain in storage

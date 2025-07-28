@@ -22,7 +22,7 @@ await ndk.waitForRelayConnections()
 print("   ✓ Connected")
 
 // Create filter
-let filter = NDKFilter(kinds: [1], limit: 1)
+let filter = NDKFilter(kinds: [1])
 print("\n3. Creating data source with filter...")
 print("   Filter: kinds=\(filter.kinds ?? []), limit=\(filter.limit ?? 0)")
 

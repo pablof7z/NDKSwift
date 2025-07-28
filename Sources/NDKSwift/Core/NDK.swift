@@ -52,8 +52,21 @@ public final class NDK {
     /// Configuration for automatic client tagging (NIP-89)
     public var clientTagConfig: NDKClientTagConfig?
 
+    /// Actor to manage thread-safe access to pending auth events
+    private actor PendingAuthEventsManager {
+        private var pendingAuthEvents: [EventID: NDKRelay] = [:]
+        
+        func setPendingAuthEvent(eventId: EventID, relay: NDKRelay) {
+            pendingAuthEvents[eventId] = relay
+        }
+        
+        func removePendingAuthEvent(for eventId: EventID) -> NDKRelay? {
+            return pendingAuthEvents.removeValue(forKey: eventId)
+        }
+    }
+    
     /// Track pending auth events by event ID to relay
-    private var pendingAuthEvents: [EventID: NDKRelay] = [:]
+    private let pendingAuthEventsManager = PendingAuthEventsManager()
 
     // MARK: - Outbox API
 
@@ -575,7 +588,9 @@ public final class NDK {
 
     func processOKMessage(eventId: EventID, accepted: Bool, message: String?, from relay: RelayProtocol) async {
         // Check if this is an auth event response
-        if let authRelay = pendingAuthEvents.removeValue(forKey: eventId) {
+        let authRelay = await pendingAuthEventsManager.removePendingAuthEvent(for: eventId)
+        
+        if let authRelay = authRelay {
             if accepted {
                 // Authentication successful
                 await authRelay.updateConnectionState(.authenticated)
@@ -666,8 +681,8 @@ public final class NDK {
             let jsonData = try JSONSerialization.data(withJSONObject: authMessage, options: [.withoutEscapingSlashes])
             let jsonString = String(data: jsonData, encoding: .utf8) ?? ""
             
-            // Track pending auth event
-            pendingAuthEvents[authEvent.id] = ndkRelay
+            // Track pending auth event - moved inside try block after authEvent is created
+            await pendingAuthEventsManager.setPendingAuthEvent(eventId: authEvent.id, relay: ndkRelay)
             
             try await relay.send(jsonString)
             
