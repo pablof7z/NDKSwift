@@ -1011,7 +1011,7 @@ public actor NIP60Wallet: NDKPaymentProvider {
                 store: proofs,
                 destroy: [],
                 mint: mintURL,
-                memo: "Receive ecash"
+                memo: StringConstants.Transactions.receiveEcash
             )
             _ = try await update(stateChange: stateChange)
         }

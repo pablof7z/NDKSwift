@@ -231,7 +231,7 @@ public final class NDKUser: Equatable, Hashable, Sendable {
     /// Get shortened public key for display
     public var shortPubkey: String {
         if pubkey.count > 16 {
-            return "\(pubkey.prefix(8))...\(pubkey.suffix(8))"
+            return "\(pubkey.prefix(StringConstants.DisplayFormatting.hexPrefixLength))...\(pubkey.suffix(StringConstants.DisplayFormatting.hexPrefixLength))"
         }
         return pubkey
     }

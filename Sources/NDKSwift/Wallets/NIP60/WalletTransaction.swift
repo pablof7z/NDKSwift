@@ -163,8 +163,8 @@ public enum WalletTransactionType: String, Sendable, CaseIterable {
 
     public var displayName: String {
         switch self {
-        case .mint: return "Lightning Deposit"
-        case .melt: return "Lightning Payment"
+        case .mint: return StringConstants.Transactions.lightningDeposit
+        case .melt: return StringConstants.Transactions.lightningPayment
         case .send: return "Sent Ecash"
         case .receive: return "Received Ecash"
         case .nutzapSent: return "Sent Nutzap"
