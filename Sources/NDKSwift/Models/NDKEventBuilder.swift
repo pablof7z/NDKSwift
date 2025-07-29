@@ -838,8 +838,19 @@ public final class NDKEventBuilder {
             _ = await self.generateContentTags()
         }
 
-        // Calculate event ID
-        let eventId = try calculateEventID()
+        // Create temporary event to calculate ID
+        let tempEvent = NDKEvent(
+            id: "",  // Temporary ID
+            pubkey: pubkey,
+            createdAt: createdAt,
+            kind: kind,
+            tags: tags,
+            content: content,
+            sig: ""  // Temporary signature
+        )
+        
+        // Calculate event ID using NDKEvent's method
+        let eventId = try tempEvent.calculateID()
 
         // Sign the event
         let signature = try await signEvent(eventId: eventId, signer: actualSigner)
@@ -896,29 +907,8 @@ public final class NDKEventBuilder {
 
     // MARK: - Private Helper Methods
 
-    /// Calculate the event ID according to NIP-01
-    private func calculateEventID() throws -> EventID {
-        let serialized = try serializeForID()
-        let data = serialized.data(using: .utf8)!
-        let hash = data.sha256()
-        return hash.hexString
-    }
-
-    /// Serialize event for ID generation according to NIP-01
-    private func serializeForID() throws -> String {
-        // [0, pubkey, created_at, kind, tags, content]
-        let array: [Any] = [
-            0,
-            pubkey,
-            createdAt,
-            kind,
-            tags,
-            content
-        ]
-
-        let data = try JSONSerialization.data(withJSONObject: array, options: [.withoutEscapingSlashes])
-        return String(data: data, encoding: .utf8)!
-    }
+    // Event ID calculation is now delegated to NDKEvent.calculateID()
+    // This ensures a single source of truth for ID generation logic
 
     /// Sign the event using the provided signer
     private func signEvent(eventId: EventID, signer: NDKSigner) async throws -> Signature {

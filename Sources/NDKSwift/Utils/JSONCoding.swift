@@ -5,21 +5,35 @@ public enum JSONCoding {
 
     // MARK: - Encoders
 
-    /// Standard JSON encoder with sorted keys and without escaping slashes
+    /// Standard JSON encoder with sorted keys and without escaping slashes.
+    /// Used for all general JSON encoding needs throughout NDKSwift.
+    /// Configuration:
+    /// - Sorted keys for consistent output
+    /// - No slash escaping for cleaner URLs in JSON
     public static let encoder: JSONEncoder = {
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
         return encoder
     }()
 
-    /// Pretty-printed JSON encoder for debugging
+    /// Pretty-printed JSON encoder for debugging and human-readable output.
+    /// Use this when generating JSON for logs, debug output, or user display.
+    /// Configuration:
+    /// - Pretty printing with indentation
+    /// - Sorted keys for consistent output
+    /// - No slash escaping
     public static let prettyEncoder: JSONEncoder = {
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes]
         return encoder
     }()
 
-    /// Snake-case JSON encoder for NWC and other protocols requiring snake_case
+    /// Snake-case JSON encoder for protocols requiring snake_case keys.
+    /// Primarily used for NWC (Nostr Wallet Connect) compatibility.
+    /// Configuration:
+    /// - Converts camelCase to snake_case
+    /// - Sorted keys for consistent output
+    /// - No slash escaping
     public static let snakeCaseEncoder: JSONEncoder = {
         let encoder = JSONEncoder()
         encoder.keyEncodingStrategy = .convertToSnakeCase
@@ -29,17 +43,24 @@ public enum JSONCoding {
 
     // MARK: - Decoders
 
-    /// Standard JSON decoder
+    /// Standard JSON decoder with default configuration.
+    /// Handles all JSON decoding throughout NDKSwift.
     public static let decoder = JSONDecoder()
 
     // MARK: - Convenience Methods
 
-    /// Encode an object to JSON data
+    /// Encode an object to JSON data using the standard encoder.
+    /// - Parameter value: The encodable object to convert to JSON
+    /// - Returns: JSON data representation
+    /// - Throws: `EncodingError` if encoding fails
     public static func encode<T: Encodable>(_ value: T) throws -> Data {
         try encoder.encode(value)
     }
 
-    /// Encode an object to JSON string
+    /// Encode an object to a JSON string using the standard encoder.
+    /// - Parameter value: The encodable object to convert to JSON
+    /// - Returns: JSON string representation
+    /// - Throws: `NDKError` if encoding fails or UTF-8 conversion fails
     public static func encodeToString<T: Encodable>(_ value: T) throws -> String {
         let data = try encode(value)
         let string = try GuardHelpers.unwrap(
@@ -49,12 +70,22 @@ public enum JSONCoding {
         return string
     }
 
-    /// Decode JSON data to object
+    /// Decode JSON data to an object of the specified type.
+    /// - Parameters:
+    ///   - type: The type to decode to
+    ///   - data: JSON data to decode
+    /// - Returns: Decoded object of type T
+    /// - Throws: `DecodingError` if decoding fails
     public static func decode<T: Decodable>(_ type: T.Type, from data: Data) throws -> T {
         try decoder.decode(type, from: data)
     }
 
-    /// Decode JSON string to object
+    /// Decode a JSON string to an object of the specified type.
+    /// - Parameters:
+    ///   - type: The type to decode to
+    ///   - string: JSON string to decode
+    /// - Returns: Decoded object of type T
+    /// - Throws: `NDKError` if UTF-8 conversion fails, `DecodingError` if decoding fails
     public static func decode<T: Decodable>(_ type: T.Type, from string: String) throws -> T {
         let data = try GuardHelpers.unwrap(
             string.data(using: .utf8),

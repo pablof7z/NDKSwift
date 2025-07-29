@@ -445,4 +445,26 @@ public struct NDKUserProfile: Codable, Sendable {
     public var allAdditionalFields: [String: String] {
         return additionalFields
     }
+    
+    // MARK: - Convenience Initializers
+    
+    /// Initialize from an NDKEvent (Kind 0 metadata event)
+    /// - Parameter event: The metadata event to parse
+    /// - Returns: A user profile if the event is valid and can be parsed, nil otherwise
+    public init?(from event: NDKEvent) {
+        guard event.kind == EventKind.metadata else { return nil }
+        
+        guard let data = event.content.data(using: .utf8) else { return nil }
+        
+        guard let decoded = JSONCoding.safeDecode(NDKUserProfile.self, from: data) else { return nil }
+        
+        self = decoded
+    }
+    
+    /// Create from an NDKEvent (static factory method)
+    /// - Parameter event: The metadata event to parse
+    /// - Returns: A user profile if the event is valid and can be parsed, nil otherwise
+    public static func from(event: NDKEvent) -> NDKUserProfile? {
+        return NDKUserProfile(from: event)
+    }
 }

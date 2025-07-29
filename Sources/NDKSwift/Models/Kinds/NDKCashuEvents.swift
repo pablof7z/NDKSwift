@@ -895,8 +895,8 @@ public struct NDKNutzapEvent: NDKPublishableEvent {
         // Add amount tag
         _ = builder.tag([NostrConstants.TagName.amount, String(totalAmount)])
 
-        // Add unit tag (hardcoded to "sat")
-        _ = builder.tag([NostrConstants.TagName.unit, "sat"])
+        // Add unit tag
+        _ = builder.tag([NostrConstants.TagName.unit, WalletConstants.defaultUnit])
 
         for proof in proofs {
             let proofJSON = try JSONCoding.encodeToString(proof)
@@ -928,7 +928,7 @@ public struct NDKNutzapEvent: NDKPublishableEvent {
         // Create token with proofs grouped by mint
         return CashuSwift.Token(
             proofs: [mintURL: proofs],
-            unit: unit ?? "sat"
+            unit: unit ?? WalletConstants.defaultUnit
         )
     }
 
@@ -947,7 +947,7 @@ public struct NDKNutzapEvent: NDKPublishableEvent {
 
     /// Extract the unit from the nutzap event
     public var unit: String? {
-        return event.tags.firstTagValue(named: NostrConstants.TagName.unit) ?? "sat"
+        return event.tags.firstTagValue(named: NostrConstants.TagName.unit) ?? WalletConstants.defaultUnit
     }
 
     /// Extract the recipient from the p tag

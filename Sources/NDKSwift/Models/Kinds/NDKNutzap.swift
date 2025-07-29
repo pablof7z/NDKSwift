@@ -35,8 +35,8 @@ public struct NDKNutzap {
         // Add amount tag
         tags.append([NostrConstants.TagName.amount, String(totalAmount)])
 
-        // Add unit tag (hardcoded to "sat")
-        tags.append([NostrConstants.TagName.unit, "sat"])
+        // Add unit tag
+        tags.append([NostrConstants.TagName.unit, WalletConstants.defaultUnit])
 
         // Add proof tags
         for proof in proofs {
