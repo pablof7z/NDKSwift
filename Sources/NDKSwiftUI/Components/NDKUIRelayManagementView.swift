@@ -151,7 +151,7 @@ public struct NDKUIRelayManagementView: View {
             try await relayList.sign()
             _ = try await ndk.publishRelayList(relayList)
         } catch {
-            print("Failed to publish relay list: \(error)")
+            NDKLogger.shared.error("Failed to publish relay list", metadata: ["error": "\(error)"])
         }
     }
 }
