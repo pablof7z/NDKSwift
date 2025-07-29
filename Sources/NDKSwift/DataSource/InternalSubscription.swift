@@ -75,7 +75,7 @@ actor InternalSubscriptionManager {
         } else {
             // When relays are not specified, the subscription will use outbox model
             // or fallback relays when started
-            NDKLogger.log(.debug, category: .subscription, "📌 Subscription created without explicit relays - will use outbox model or fallback relays")
+            NDKLogger.log(.debug, category: .subscription, "📌 Subscription created without explicit relays2 - will use outbox model or fallback relays")
         }
         
         NDKLogger.log(.debug, category: .subscription, "📌 Created subscription '\(id)' with fingerprint '\(fp)'")
@@ -98,6 +98,16 @@ actor InternalSubscriptionManager {
                      "   Total relay ID mappings: \(relayIdToFingerprint.count)")
     }
     
+    /// Update relay associations for a subscription (used by outbox model)
+    func updateRelayAssociation(subscription: InternalSubscription, relay: RelayURL) async {
+        var relaySubs = relayToSubscriptions[relay] ?? Set<InternalSubscription>()
+        relaySubs.insert(subscription)
+        relayToSubscriptions[relay] = relaySubs
+        
+        NDKLogger.log(.debug, category: .subscription, 
+                     "🔗 [InternalSubManager] Updated relay association: '\(subscription.id)' → '\(relay)'")
+    }
+    
     /// Close a subscription
     func closeSubscription(id: String) async {
         if let subscription = activeSubscriptions.removeValue(forKey: id) {
@@ -114,15 +124,14 @@ actor InternalSubscriptionManager {
             }
             
             // Remove from relay-based mapping
-            if let specificRelays = subscription.relays {
-                for relayUrl in specificRelays {
-                    if var relaySubs = relayToSubscriptions[relayUrl] {
-                        relaySubs.remove(subscription)
-                        if relaySubs.isEmpty {
-                            relayToSubscriptions.removeValue(forKey: relayUrl)
-                        } else {
-                            relayToSubscriptions[relayUrl] = relaySubs
-                        }
+            // Check all relays since subscription might have been associated dynamically
+            for (relayUrl, var relaySubs) in relayToSubscriptions {
+                if relaySubs.contains(subscription) {
+                    relaySubs.remove(subscription)
+                    if relaySubs.isEmpty {
+                        relayToSubscriptions.removeValue(forKey: relayUrl)
+                    } else {
+                        relayToSubscriptions[relayUrl] = relaySubs
                     }
                 }
             }

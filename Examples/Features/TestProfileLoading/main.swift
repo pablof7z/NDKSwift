@@ -6,9 +6,8 @@ let ndk = NDK(relayUrls: ["wss://relay.primal.net", "wss://relay.damus.io"])
 ndk.debugMode = true
 
 // Set up logger to see what's happening
-NDKLogger.setLogLevel(.trace, for: .subscription)
-NDKLogger.setLogLevel(.debug, for: .relay)
-NDKLogger.setLogLevel(.debug, for: .general)
+NDKLogger.logLevel = .trace
+NDKLogger.enabledCategories = [.subscription, .relay, .general]
 
 let testPubkey = "82341f882b6eabcd2ba7f1ef90aad961cf074af15b9ef44a09f9d2a8fbfbe6a2"
 

@@ -69,6 +69,9 @@ class RelayDemo {
             case .disconnected: "disconnected"
             case .disconnecting: "disconnecting..."
             case .failed(let error): "failed: \(error)"
+            case .authRequired(let challenge): "auth required: \(challenge)"
+            case .authenticating: "authenticating..."
+            case .authenticated: "authenticated"
             }
             
             print("\(status) \(relay.url) - \(state)")

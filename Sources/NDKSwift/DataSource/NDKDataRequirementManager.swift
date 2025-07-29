@@ -209,9 +209,19 @@ actor NDKDataRequirementManager {
             return .outbox(strategy: outboxStrategy)
         }
 
-        // Otherwise use default relays
-        let defaultRelays = await ndk.pool.connectedRelayURLs
-        return .default(relays: defaultRelays)
+        // Otherwise use the app's configured/explicit relays (fallback relays)
+        let explicitRelays = await ndk.pool.explicitRelays()
+        let explicitRelayURLs = Set(explicitRelays.map { $0.url })
+        
+        if explicitRelayURLs.isEmpty {
+            NDKLogger.log(.warning, category: .subscription, 
+                         "⚠️ No relays specified and no explicit/fallback relays configured in the pool. Add relays to the pool before creating subscriptions.")
+        } else {
+            NDKLogger.log(.debug, category: .subscription, 
+                         "📡 Using \(explicitRelayURLs.count) explicit/fallback relays for subscription")
+        }
+        
+        return .default(relays: explicitRelayURLs)
     }
 
     /// Generate a subscription ID for a filter

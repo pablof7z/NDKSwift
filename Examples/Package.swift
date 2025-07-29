@@ -21,11 +21,7 @@ let package = Package(
         .executable(name: "OptimisticPublishingDemo", targets: ["OptimisticPublishingDemo"]),
         // .executable(name: "DebugSubscription", targets: ["DebugSubscription"]),
         .executable(name: "NIP60Wallet", targets: ["NIP60Wallet"]),
-        .executable(name: "DebugOutbox", targets: ["DebugOutbox"]),
         .executable(name: "NIP92MediaDemo", targets: ["NIP92MediaDemo"]),
-        .executable(name: "ProfileCachingDemo", targets: ["ProfileCachingDemo"]),
-        .executable(name: "TestNIP46Publishing", targets: ["TestNIP46Publishing"]),
-        .executable(name: "RawLoggingDemo", targets: ["RawLoggingDemo"]),
         .executable(name: "TestProfileLoading", targets: ["TestProfileLoading"])
     ],
     dependencies: [
@@ -46,42 +42,42 @@ let package = Package(
         .executableTarget(
             name: "RelayCollectionDemo",
             dependencies: [
-                .product(name: "NDKSwift", package: "NDKSwift)
+                .product(name: "NDKSwift", package: "NDKSwift")
             ],
             path: "Features/RelayCollectionDemo"
         ),
         .executableTarget(
             name: "DebugKind0Fetcher",
             dependencies: [
-                .product(name: "NDKSwift", package: "NDKSwift)
+                .product(name: "NDKSwift", package: "NDKSwift")
             ],
             path: "Features/DebugKind0Fetcher"
         ),
         .executableTarget(
             name: "NIP77Demo",
             dependencies: [
-                .product(name: "NDKSwift", package: "NDKSwift-z94ws0")
+                .product(name: "NDKSwift", package: "NDKSwift")
             ],
             path: "Features/NIP77Demo"
         ),
         .executableTarget(
             name: "TestNegentropyProtocol",
             dependencies: [
-                .product(name: "NDKSwift", package: "NDKSwift-z94ws0")
+                .product(name: "NDKSwift", package: "NDKSwift")
             ],
             path: "Features/TestNegentropyProtocol"
         ),
         .executableTarget(
             name: "RealDeclarativeDemo",
             dependencies: [
-                .product(name: "NDKSwift", package: "NDKSwift-z94ws0")
+                .product(name: "NDKSwift", package: "NDKSwift")
             ],
             path: "Features/RealDeclarativeDemo"
         ),
         .executableTarget(
             name: "OptimisticPublishingDemo",
             dependencies: [
-                .product(name: "NDKSwift", package: "NDKSwift-z94ws0")
+                .product(name: "NDKSwift", package: "NDKSwift")
             ],
             path: "Features/OptimisticPublishingDemo"
         ),
@@ -96,54 +92,22 @@ let package = Package(
         .executableTarget(
             name: "NIP60Wallet",
             dependencies: [
-                .product(name: "NDKSwift", package: "NDKSwift-z94ws0")
+                .product(name: "NDKSwift", package: "NDKSwift")
             ],
             path: ".",
             sources: ["NIP60Wallet.swift"]
         ),
         .executableTarget(
-            name: "DebugOutbox",
-            dependencies: [
-                .product(name: "NDKSwift", package: "NDKSwift-z94ws0")
-            ],
-            path: ".",
-            sources: ["DebugOutbox.swift"]
-        ),
-        .executableTarget(
             name: "NIP92MediaDemo",
             dependencies: [
-                .product(name: "NDKSwift", package: "NDKSwift-z94ws0")
+                .product(name: "NDKSwift", package: "NDKSwift")
             ],
             path: "Features/NIP92MediaDemo"
         ),
         .executableTarget(
-            name: "ProfileCachingDemo",
-            dependencies: [
-                .product(name: "NDKSwift", package: "NDKSwift-z94ws0")
-            ],
-            path: ".",
-            sources: ["ProfileCachingDemo.swift"]
-        ),
-        .executableTarget(
-            name: "TestNIP46Publishing",
-            dependencies: [
-                .product(name: "NDKSwift", package: "NDKSwift-z94ws0")
-            ],
-            path: ".",
-            sources: ["TestNIP46Publishing.swift"]
-        ),
-        .executableTarget(
-            name: "RawLoggingDemo",
-            dependencies: [
-                .product(name: "NDKSwift", package: "NDKSwift-z94ws0")
-            ],
-            path: ".",
-            sources: ["RawLoggingDemo.swift"]
-        ),
-        .executableTarget(
             name: "TestProfileLoading",
             dependencies: [
-                .product(name: "NDKSwift", package: "NDKSwift-z94ws0")
+                .product(name: "NDKSwift", package: "NDKSwift")
             ],
             path: "Features/TestProfileLoading"
         )

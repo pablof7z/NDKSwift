@@ -180,6 +180,9 @@ actor DataRequirement {
         // Add subscription to relay using relay-level grouping
         await relay.addSubscription(internalSubscription, filters: [filter])
         
+        // Update the InternalSubscriptionManager's relay mapping for subscription replay
+        await ndk.internalSubscriptionManager.updateRelayAssociation(subscription: internalSubscription, relay: relayURL)
+        
         // Track this relay subscription
         relaySubscriptions[relayURL] = RelaySubscription(relay: relay, filter: filter)
     }
