@@ -103,10 +103,10 @@ if let profile = profile {
     print("Name: \(profile.name ?? "Unknown")")
 }
 
-// Access recent notes
-let events = try await ndk.fetchEvents(
-    NDKFilter(kinds: [1], limit: 10)
-)
+// Stream recent notes
+for await event in ndk.observe(filter: NDKFilter(kinds: [1], limit: 10)).events {
+    print("Note: \(event.content)")
+}
 for event in events {
     print(event.content)
 }
@@ -428,8 +428,10 @@ let ndk = NDK(
     cache: cache
 )
 
-// Queries will check cache first
-let events = try await ndk.fetchEvents(filter, useCache: true)
+// Queries will check cache first (cache is used by default)
+for await event in ndk.observe(filter: filter).events {
+    // Process events from cache and network
+}
 ```
 
 ### 4. Relay Configuration
@@ -551,10 +553,12 @@ let options = NDKSubscriptionOptions(
 
 // Use specific relays for queries
 let fastRelays = Set([relay1, relay2])
-let events = try await ndk.fetchEvents(
-    filter,
+for await event in ndk.observe(
+    filter: filter,
     relays: fastRelays
-)
+).events {
+    print("Event from fast relay: \(event.content)")
+}
 
 // Enable signature verification sampling
 let ndk = NDK(

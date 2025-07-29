@@ -27,7 +27,8 @@ final class NDKAuthErrorHandlerTests: XCTestCase {
     }
     
     func testAnalyzeSignerCreationFailed() {
-        let error = NDKAuthError.signerCreationFailed
+        let underlyingError = NSError(domain: "TestError", code: 1, userInfo: nil)
+        let error = NDKAuthError.signerCreationFailed(underlyingError)
         let errorInfo = NDKAuthErrorHandler.analyze(error)
         
         XCTAssertEqual(errorInfo.title, "Authentication Failed")
@@ -67,7 +68,7 @@ final class NDKAuthErrorHandlerTests: XCTestCase {
     }
     
     func testAnalyzeCorruptedSessionData() {
-        let error = NDKAuthError.corruptedSessionData
+        let error = NDKAuthError.corruptedSessionData(sessionId: "test-session-id")
         let errorInfo = NDKAuthErrorHandler.analyze(error)
         
         XCTAssertEqual(errorInfo.title, "Corrupted Session Data")
@@ -121,7 +122,7 @@ final class NDKAuthErrorHandlerTests: XCTestCase {
     }
     
     func testAnalyzeKeychainAccessControlError() {
-        let error = NDKKeychainError.accessControlError
+        let error = NDKKeychainError.accessControlError(nil)
         let errorInfo = NDKAuthErrorHandler.analyze(error)
         
         XCTAssertEqual(errorInfo.title, "Access Control Error")
@@ -360,21 +361,5 @@ final class NDKAuthErrorHandlerTests: XCTestCase {
         XCTAssertEqual(errorInfo.message, "Custom error message")
         XCTAssertTrue(errorInfo.isRecoverable)
         XCTAssertEqual(errorInfo.suggestedAction, .retry)
-    }
-}
-
-// MARK: - Test Helpers
-
-extension NDKAuthErrorHandler.ErrorInfo.SuggestedAction: Equatable {
-    public static func == (lhs: Self, rhs: Self) -> Bool {
-        switch (lhs, rhs) {
-        case (.retry, .retry),
-             (.removeAccount, .removeAccount),
-             (.reauthenticate, .reauthenticate),
-             (.contactSupport, .contactSupport):
-            return true
-        default:
-            return false
-        }
     }
 }
