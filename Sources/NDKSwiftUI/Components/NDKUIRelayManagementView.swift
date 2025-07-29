@@ -40,9 +40,11 @@ public struct NDKUIRelayManagementView: View {
             }
         }
         .navigationTitle("Relay Management")
+        #if os(iOS)
         .navigationBarTitleDisplayMode(.inline)
-        .onAppear {
-            loadRelays()
+        #endif
+        .task {
+            await loadRelays()
         }
         .sheet(isPresented: $showingAddRelay) {
             NavigationView {
@@ -76,8 +78,8 @@ public struct NDKUIRelayManagementView: View {
         }
     }
     
-    private func loadRelays() {
-        relays = Array(ndk.pool.relays.values)
+    private func loadRelays() async {
+        relays = await ndk.relays
             .sorted { $0.url < $1.url }
     }
     
@@ -111,7 +113,7 @@ public struct NDKUIRelayManagementView: View {
         do {
             let relay = await ndk.addRelayAndConnect(cleanUrl)
             if relay != nil {
-                loadRelays()
+                await loadRelays()
                 
                 // Publish updated relay list
                 await publishRelayList()
@@ -128,7 +130,7 @@ public struct NDKUIRelayManagementView: View {
             defer { isLoading = false }
             
             await ndk.removeRelay(relay.url)
-            loadRelays()
+            await loadRelays()
             
             // Publish updated relay list
             await publishRelayList()
@@ -136,7 +138,7 @@ public struct NDKUIRelayManagementView: View {
     }
     
     private func publishRelayList() async {
-        guard let signer = ndk.signer else { return }
+        guard ndk.signer != nil else { return }
         
         do {
             // Create relay list from current relays
@@ -161,6 +163,9 @@ private struct RelayRow: View {
     let relay: NDKRelay
     let onRemove: () -> Void
     
+    @State private var isConnected = false
+    @State private var relayInfo: NDKRelayInformation?
+    
     var body: some View {
         HStack {
             VStack(alignment: .leading, spacing: 4) {
@@ -171,15 +176,15 @@ private struct RelayRow: View {
                     // Connection status
                     HStack(spacing: 4) {
                         Circle()
-                            .fill(relay.isConnected ? Color.green : Color.red)
+                            .fill(isConnected ? Color.green : Color.red)
                             .frame(width: 8, height: 8)
-                        Text(relay.isConnected ? "Connected" : "Disconnected")
+                        Text(isConnected ? "Connected" : "Disconnected")
                             .font(.caption)
                             .foregroundColor(.secondary)
                     }
                     
                     // Supported NIPs if available
-                    if let supportedNips = relay.info?.supportedNips, !supportedNips.isEmpty {
+                    if let supportedNips = relayInfo?.supportedNips, !supportedNips.isEmpty {
                         Text("NIPs: \(supportedNips.prefix(3).map(String.init).joined(separator: ", "))\(supportedNips.count > 3 ? "..." : "")")
                             .font(.caption)
                             .foregroundColor(.secondary)
@@ -196,6 +201,10 @@ private struct RelayRow: View {
             .buttonStyle(BorderlessButtonStyle())
         }
         .padding(.vertical, 4)
+        .task {
+            isConnected = await relay.isConnected
+            relayInfo = await relay.info
+        }
     }
     
     private func formatRelayUrl(_ url: String) -> String {
@@ -245,9 +254,13 @@ private struct AddRelaySheet: View {
                     
                     TextField("wss://relay.example.com", text: $relayUrl)
                         .textFieldStyle(RoundedBorderTextFieldStyle())
+                        #if os(iOS)
                         .autocapitalization(.none)
                         .disableAutocorrection(true)
                         .keyboardType(.URL)
+                        #else
+                        .disableAutocorrection(true)
+                        #endif
                         .focused($isTextFieldFocused)
                 }
                 .padding(.horizontal)
@@ -289,15 +302,19 @@ private struct AddRelaySheet: View {
                 Spacer(minLength: 40)
             }
         }
-        .navigationBarItems(
-            leading: Button("Cancel") {
-                onCancel()
-            },
-            trailing: Button("Add") {
-                onAdd(relayUrl)
+        .toolbar {
+            ToolbarItem(placement: .cancellationAction) {
+                Button("Cancel") {
+                    onCancel()
+                }
             }
-            .disabled(relayUrl.isEmpty)
-        )
+            ToolbarItem(placement: .confirmationAction) {
+                Button("Add") {
+                    onAdd(relayUrl)
+                }
+                .disabled(relayUrl.isEmpty)
+            }
+        }
         .onAppear {
             isTextFieldFocused = true
         }
