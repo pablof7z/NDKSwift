@@ -6,7 +6,7 @@ final class StartupNutzapRedemptionTests: XCTestCase {
     var ndk: NDK!
     var signer: NDKPrivateKeySigner!
     var wallet: NIP60Wallet!
-    var mockRelay: MockRelay!
+    var mockRelay: MockRelayProtocol!
     
     override func setUp() async throws {
         try await super.setUp()
@@ -16,7 +16,7 @@ final class StartupNutzapRedemptionTests: XCTestCase {
         signer = try NDKPrivateKeySigner(privateKey: privateKey)
         
         // Create NDK with mock relay
-        mockRelay = MockRelay(url: "wss://test.relay")
+        mockRelay = MockRelayProtocol(url: "wss://test.relay")
         ndk = NDK(relayUrls: ["wss://test.relay"], signer: signer)
         
         // Create wallet

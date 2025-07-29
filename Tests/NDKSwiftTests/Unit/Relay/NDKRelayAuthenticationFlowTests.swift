@@ -210,15 +210,13 @@ final class NDKRelayAuthenticationFlowTests: XCTestCase {
         XCTAssertEqual(pendingEvents.count, 1)
     }
     
-    // TODO: Fix this test - MockAuthRelay needs stateStream and updateConnectionState support
-    /*
     func testRelayStateStreamNotifiesAuthenticationChanges() async throws {
         var receivedStates: [NDKRelayConnectionState] = []
         
         let stateTask = Task {
             for await state in mockRelay.stateStream {
-                receivedStates.append(state.connectionState)
-                if case .authenticated = state.connectionState {
+                receivedStates.append(state)
+                if case .authenticated = state {
                     break
                 }
             }
@@ -241,12 +239,11 @@ final class NDKRelayAuthenticationFlowTests: XCTestCase {
         XCTAssertTrue(receivedStates.contains(.authenticating))
         XCTAssertTrue(receivedStates.contains(.authenticated))
     }
-    */
 }
 
 // MARK: - Mock Auth Relay
 
-class MockAuthRelay: MockRelay, @unchecked Sendable {
+class MockAuthRelay: MockRelayProtocol, @unchecked Sendable {
     var shouldRejectWithAuthRequired = false
     var onPublishAttempt: ((NDKEvent) -> Void)?
     
@@ -265,21 +262,24 @@ class MockAuthRelay: MockRelay, @unchecked Sendable {
     }
     
     func simulateConnect() async {
-        // In a real scenario, the connection state would be updated
-        // For testing, we'll track state changes separately
+        await connect()
     }
     
     func simulateAuthChallenge(challenge: String) async {
-        // Trigger the AUTH handler
-        if let ndk = ndk {
-            // In real scenario, NDK would handle auth challenge from relay
+        updateConnectionState(.authRequired(challenge: challenge))
+        if let ndk = ndk, let authDelegate = ndk.authenticationDelegate {
+            let shouldAuth = await authDelegate.relay(self, requiresAuthenticationWithChallenge: challenge)
+            if shouldAuth {
+                updateConnectionState(.authenticating)
+            }
         }
     }
     
     func simulateAuthSuccess() async {
+        updateConnectionState(.authenticated)
         // Trigger retry of pending events
         if let ndk = ndk {
-            // In real scenario, event manager would retry authenticated events
+            await ndk.eventManager.retryPendingAuthEvents(for: url)
         }
     }
 }

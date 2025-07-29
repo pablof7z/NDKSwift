@@ -1,8 +1,9 @@
 import Foundation
+import Combine
 @testable import NDKSwift
 
 /// A mock relay for testing purposes
-class MockRelay: RelayProtocol, @unchecked Sendable {
+class MockRelayProtocol: RelayProtocol, @unchecked Sendable {
     let url: String
     private(set) var connectionState: NDKRelayConnectionState = .disconnected
     weak var ndk: NDK?
@@ -18,17 +19,35 @@ class MockRelay: RelayProtocol, @unchecked Sendable {
     var shouldFailPublish = false
     var publishDelay: TimeInterval = 0
     
+    // State stream support
+    private let stateSubject = PassthroughSubject<NDKRelayConnectionState, Never>()
+    var stateStream: AsyncStream<NDKRelayConnectionState> {
+        AsyncStream { continuation in
+            let cancellable = stateSubject.sink { state in
+                continuation.yield(state)
+            }
+            continuation.onTermination = { _ in
+                _ = cancellable
+            }
+        }
+    }
+    
     init(url: String) {
         self.url = url
     }
     
     func connect() async {
-        connectionState = .connected
+        updateConnectionState(.connected)
     }
     
     func disconnect() async {
-        connectionState = .disconnected
+        updateConnectionState(.disconnected)
         activeSubscriptionIds.removeAll()
+    }
+    
+    func updateConnectionState(_ newState: NDKRelayConnectionState) {
+        connectionState = newState
+        stateSubject.send(newState)
     }
     
     func send(_ message: String) async throws {
