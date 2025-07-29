@@ -1,3 +1,4 @@
+/// Factory methods for creating NDKError instances with consistent messaging
 extension NDKError {
     static func failedTo(_ operation: String, message: String? = nil, underlying: Error? = nil) -> NDKError {
         let fullMessage = message.map { "\(ErrorMessageConstants.failedTo(operation)): \($0)" } ?? ErrorMessageConstants.failedTo(operation)

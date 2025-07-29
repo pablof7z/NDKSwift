@@ -271,7 +271,7 @@ actor NDKRelaySubscriptionGroup {
             await relay.closeSubscription(id: subId)
             
             // Clean up relay ID mapping from InternalSubscriptionManager
-            if let ndk = relay.ndk {
+            if relay.ndk != nil {
                 // Note: We would need to add a method to remove the mapping
                 // For now, the mapping will be cleaned up when the subscription is removed
                 NDKLogger.log(.debug, category: .subscription,

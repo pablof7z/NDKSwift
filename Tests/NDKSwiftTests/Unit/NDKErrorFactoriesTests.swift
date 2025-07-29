@@ -104,4 +104,60 @@ final class NDKErrorFactoriesTests: XCTestCase {
             XCTFail("Expected unknown error")
         }
     }
+    
+    func testValidationError() {
+        let error = NDKError.validationError("Invalid hex format")
+        XCTAssertEqual(error.localizedDescription, "Invalid input: Invalid hex format")
+    }
+    
+    func testConfigurationError() {
+        let error = NDKError.configurationError("Missing API key")
+        XCTAssertEqual(error.localizedDescription, "Not configured: Missing API key")
+    }
+    
+    // MARK: - Wallet Error Factory Tests
+    
+    func testWalletInsufficientBalance() {
+        let errorWithAvailable = NDKError.walletInsufficientBalance(amount: 100, available: 50)
+        XCTAssertEqual(errorWithAvailable.localizedDescription, "Wallet error: Insufficient balance: requested 100 sats, available: 50 sats")
+        
+        let errorWithoutAvailable = NDKError.walletInsufficientBalance(amount: 100)
+        if case .insufficientBalance(let amount) = errorWithoutAvailable {
+            XCTAssertEqual(amount, 100)
+        } else {
+            XCTFail("Expected insufficientBalance error")
+        }
+    }
+    
+    func testWalletMintError() {
+        let error = NDKError.walletMintError("https://mint.test", operation: "swap", details: "timeout")
+        XCTAssertEqual(error.localizedDescription, "Wallet error: Mint https://mint.test swap failed: timeout")
+        
+        let errorWithoutDetails = NDKError.walletMintError("https://mint.test", operation: "connect")
+        XCTAssertEqual(errorWithoutDetails.localizedDescription, "Wallet error: Mint https://mint.test connect failed")
+    }
+    
+    func testWalletPaymentFailed() {
+        let errorWithInvoice = NDKError.walletPaymentFailed(reason: "route not found", invoice: "lnbc123...")
+        XCTAssertEqual(errorWithInvoice.localizedDescription, "Payment failed: Payment failed for invoice lnbc123...: route not found")
+        
+        let errorWithoutInvoice = NDKError.walletPaymentFailed(reason: "insufficient funds")
+        XCTAssertEqual(errorWithoutInvoice.localizedDescription, "Payment failed: Payment failed: insufficient funds")
+    }
+    
+    func testWalletInvalidProof() {
+        let errorWithDetails = NDKError.walletInvalidProof(details: "signature mismatch")
+        XCTAssertEqual(errorWithDetails.localizedDescription, "Invalid proof: signature mismatch")
+        
+        let errorWithoutDetails = NDKError.walletInvalidProof()
+        XCTAssertEqual(errorWithoutDetails.localizedDescription, "Invalid proof")
+    }
+    
+    func testWalletNoMintAvailable() {
+        let errorWithReason = NDKError.walletNoMintAvailable(reason: "all mints offline")
+        XCTAssertEqual(errorWithReason.localizedDescription, "No mint available: all mints offline")
+        
+        let errorWithoutReason = NDKError.walletNoMintAvailable()
+        XCTAssertEqual(errorWithoutReason.localizedDescription, "No mint available")
+    }
 }
