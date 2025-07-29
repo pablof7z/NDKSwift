@@ -110,6 +110,13 @@ This ensures code signing persists across project regenerations.
 - Subscriptions (`NDKSubscription`) filter incoming events
 - Cache adapters intercept events for storage
 
+**Relay-Level Subscription Grouping** (matches ndk-core):
+- Each relay has its own `NDKRelaySubscriptionManager`
+- Subscriptions with the same fingerprint are grouped into `NDKRelaySubscriptionGroup`
+- Groups execute with configurable delays (default 100ms) to batch subscriptions
+- Filter merging happens at execution time on each relay
+- Filters with limits are concatenated, filters without limits have their values merged
+
 **Event Processing Flow**:
 - Events → `NDKSubscriptionManager.processEvent()` → `NDKSubscription.handleEvent()` → Cache
 - Kind 5 deletion events are automatically processed by `NDKSubscriptionManager`
@@ -140,13 +147,24 @@ This ensures code signing persists across project regenerations.
    - Create NDKEvent → Sign with NDKSigner → Publish through NDK → RelayPool broadcasts → Cache stores
 
 2. **Subscription Flow (AsyncSequence)**:
-   - Create NDKFilter → Subscribe through NDK → Returns AsyncSequence → Iterate with for-await → Events arrive → Filter matches → Cache stores → Yield to iterator
+   - Create NDKFilter → Subscribe through NDK → Returns AsyncSequence
+   - DataRequirement manages deduplication and relay selection
+   - InternalSubscription added to relay's subscription manager
+   - Multiple subscriptions with same fingerprint grouped together
+   - Groups execute after delay, merging filters into single REQ
+   - Events arrive → Routed to all subscriptions in group → Cache stores → Yield to iterator
 
 3. **One-Shot Fetch Flow**:
    - Create NDKFilter → Call fetchEvents/fetchEvent → Subscribe with closeOnEose → Collect events → Return when EOSE received
 
 4. **User Profile Loading**:
    - Call fetchProfile() → Creates metadata filter → Fetches events → Parses JSON → Returns NDKUserProfile
+
+**Filter Fingerprinting and Grouping**:
+- Fingerprints based on filter structure (which fields are present)
+- Time constraints (since/until) included in fingerprint
+- closeOnEose subscriptions prefixed with '+' to separate from continuous subscriptions
+- Filters with same fingerprint can be merged at relay level
 
 5. **Blossom File Upload**:
    - Data → Calculate SHA256 → Create auth event → Upload to Blossom → Create file metadata event → Publish to Nostr

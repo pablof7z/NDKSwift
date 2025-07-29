@@ -62,7 +62,7 @@ public class NDK {
 
 2. **Subscribing**:
    ```
-   NDKFilter → Subscription Manager → Relay Pool → WebSocket → Event Stream
+   NDKFilter → Data Requirement → Relay Selection → Relay Subscription Manager → Group & Merge → WebSocket → Event Stream
    ```
 
 3. **Caching**:
@@ -131,6 +131,36 @@ public actor NDKRelayPool {
     }
 }
 ```
+
+### Relay-Level Subscription Grouping
+
+Each relay manages its own subscriptions to optimize network usage:
+
+```swift
+actor NDKRelaySubscriptionManager {
+    // Groups subscriptions with same fingerprint
+    private var subscriptionGroups: [String: NDKRelaySubscriptionGroup] = [:]
+    
+    func addSubscription(_ subscription: InternalSubscription, filters: [NDKFilter]) {
+        let fingerprint = NDKFilterGrouping.filterFingerprint(filters, closeOnEose: subscription.closeOnEose)
+        
+        // Find or create group for this fingerprint
+        if let group = subscriptionGroups[fingerprint] {
+            group.addItem(subscription, filters: filters)
+        } else {
+            // Create new group with delay for batching
+            let group = NDKRelaySubscriptionGroup(relay: relay, fingerprint: fingerprint)
+            group.scheduleExecution(delay: 0.1)  // 100ms default
+        }
+    }
+}
+```
+
+This approach:
+- Merges multiple similar filters into single REQ messages
+- Reduces network overhead and improves relay compatibility
+- Matches the proven architecture from ndk-core
+- Supports different grouping for closeOnEose vs continuous subscriptions
 
 ### Outbox Model
 

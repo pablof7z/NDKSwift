@@ -40,18 +40,16 @@ struct TestPublisher {
         print("✅ Connected to relays")
         print("📝 Publishing test event...")
         
-        // Create test event
-        var event = NDKEvent()
-        event.kind = 1
-        event.content = "Test event from OutboxDebugger at \(Date())"
-        
-        // Sign and publish
-        try await event.sign(using: signer)
-        let results = try await ndk.publish(event)
+        // Create and publish test event using builder pattern
+        let (event, results) = try await ndk.publish { builder in
+            builder
+                .kind(1)
+                .content("Test event from OutboxDebugger at \(Date())")
+        }
         
         print("\n📤 Published to \(results.count) relays:")
-        for result in results {
-            print("   • \(result.relay): \(result.success ? "✅" : "❌")")
+        for relay in results {
+            print("   • \(relay.url): ✅")
         }
         
         print("\n✅ Event published!")

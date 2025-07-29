@@ -21,7 +21,7 @@ The most feature-complete Swift implementation of the Nostr Development Kit. Bui
 - **Offline-First** - Optimistic publishing with automatic retry
 - **Real-time Subscriptions** - Stream events with AsyncSequence
 - **Session Data Management** - Reactive filters that auto-update with follow list changes
-- **Smart Relay Management** - Automatic reconnection and message routing
+- **Smart Relay Management** - Automatic reconnection, message routing, and relay-level subscription grouping
 - **Integrated Payments** - Lightning & Cashu wallets with nutzaps
 - **File Storage** - Blossom protocol for decentralized media
 - **Profile Semantic Caching** - 10x faster profile loading with direct column storage
@@ -55,6 +55,7 @@ ndk.signer = signer
 await ndk.connect()
 
 // Stream real-time notes
+// Multiple subscriptions with similar filters are automatically merged!
 let subscription = ndk.subscribe(filter: NDKFilter(kinds: [1], limit: 50))
 for await note in subscription {
     print("\(note.content)")

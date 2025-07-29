@@ -344,9 +344,11 @@ actor TestableCache: NDKCache {
         }
     }
     
-    func observeEvents(matching filter: NDKFilter, observer: CacheObserver) async -> ObservationHandle {
-        // Return a dummy handle for testing
-        return ObservationHandle { }
+    func observeEvents(matching filter: NDKFilter, includeExisting: Bool) async -> AsyncThrowingStream<[NDKEvent], Error> {
+        // Return an empty stream for testing
+        return AsyncThrowingStream { continuation in
+            continuation.finish()
+        }
     }
     
     func getRelaySources(eventId: String) async -> Set<String> {

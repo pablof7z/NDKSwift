@@ -199,15 +199,15 @@ public protocol NDKCache: Actor {
 
     // MARK: - Reactive Observation
 
-    /// Observe events matching a filter
+    /// Observe events matching a filter with reactive updates
     /// - Parameters:
     ///   - filter: The filter to match events against
-    ///   - observer: The observer to notify of matching events
-    /// - Returns: An observation handle to manage the observation lifecycle
+    ///   - includeExisting: Whether to include existing cached events (default: true)
+    /// - Returns: An AsyncThrowingStream that emits arrays of matching events when the cache changes
     func observeEvents(
         matching filter: NDKFilter,
-        observer: CacheObserver
-    ) async -> ObservationHandle
+        includeExisting: Bool
+    ) async -> AsyncThrowingStream<[NDKEvent], Error>
 
     /// Process incoming event from relay
     /// - Parameters:
@@ -473,15 +473,6 @@ public extension NDKCache {
     }
 
     // MARK: - Default Reactive Observation Implementation
-
-    /// Default implementation that returns a no-op handle
-    func observeEvents(
-        matching filter: NDKFilter,
-        observer: CacheObserver
-    ) async -> ObservationHandle {
-        // Default implementation - cache implementations should override
-        return ObservationHandle { /* no-op */ }
-    }
 
     /// Default implementation that just saves the event
     func processEvent(

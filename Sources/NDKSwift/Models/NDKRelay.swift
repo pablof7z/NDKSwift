@@ -383,6 +383,9 @@ public final class NDKRelay: RelayProtocol, Hashable, Equatable, @unchecked Send
 
     /// Internal state actor that manages all mutable state
     private let stateActor = RelayStateActor()
+    
+    /// Subscription manager for this relay (handles grouping and merging)
+    internal var subscriptionManager: NDKRelaySubscriptionManager?
 
     /// Get the current connection (internal use only)
     internal var connection: NDKRelayConnection? {
@@ -395,6 +398,7 @@ public final class NDKRelay: RelayProtocol, Hashable, Equatable, @unchecked Send
 
     public init(url: RelayURL) {
         self.url = url
+        self.subscriptionManager = NDKRelaySubscriptionManager(relay: self)
     }
 
     // MARK: - Public Properties (Async)
@@ -718,20 +722,35 @@ public final class NDKRelay: RelayProtocol, Hashable, Equatable, @unchecked Send
             await incrementSubscriptionEventCount(id: subId)
         }
 
-        // Route to subscription manager via NDK only
+        // First try to route through relay subscription manager (for grouped subs)
+        if let subId = subscriptionId {
+            NDKLogger.log(.trace, category: .subscription,
+                         "🔄 [Relay] Routing EVENT for subscription '\(subId)' to relay subscription manager")
+            await subscriptionManager?.routeEvent(event, subscriptionId: subId, from: self)
+        }
+        
+        // Also route to NDK for global subscription management
         if let ndk = ndk, let subId = subscriptionId {
+            NDKLogger.log(.trace, category: .subscription,
+                         "🔄 [Relay] Routing EVENT for subscription '\(subId)' to NDK global manager")
             Task { [weak self] in
                 guard let self = self else { return }
                 await ndk.processEvent(event, subscriptionId: subId, from: self)
             }
-        } else {
-            NDKLogger.log(.warning, category: .relay, "⚠️ Cannot route event - ndk: \(ndk != nil), subId: \(subscriptionId != nil)")
+        } else if subscriptionId == nil {
+            NDKLogger.log(.warning, category: .relay, "⚠️ Cannot route event - no subscription ID")
         }
     }
 
     /// Handle EOSE message
     private func handleEOSEMessage(subscriptionId: String) async {
-        // Route to subscription manager via NDK only
+        NDKLogger.log(.debug, category: .subscription,
+                     "🔚 [Relay] Received EOSE for subscription '\(subscriptionId)' on relay \(url)")
+        
+        // Route through relay subscription manager first
+        await subscriptionManager?.routeEOSE(subscriptionId: subscriptionId)
+        
+        // Also route to NDK for global subscription management
         if let ndk = ndk {
             ndk.processEOSE(subscriptionId: subscriptionId, from: self)
         } else {
@@ -840,7 +859,9 @@ extension NDKRelay: NDKRelayConnectionDelegate {
 
             // Fetch relay information
             await fetchRelayInformation()
-            // Note: Subscription replay is handled by InternalSubscriptionManager
+            
+            // Handle relay reconnection for subscription manager
+            await subscriptionManager?.handleRelayReconnection()
         }
     }
 
@@ -849,6 +870,9 @@ extension NDKRelay: NDKRelayConnectionDelegate {
             guard let self = self else { return }
             // Clear all subscriptions when disconnected
             await self.stateActor.clearAllSubscriptions()
+            
+            // Handle relay disconnection for subscription manager
+            await subscriptionManager?.handleRelayDisconnection()
 
             if let error = error {
                 await handleConnectionFailure(error)
@@ -930,6 +954,51 @@ public extension NDKRelay {
     /// Update event count for a subscription (internal use)
     internal func incrementSubscriptionEventCount(id: String) async {
         await stateActor.updateSubscriptionEventCount(id: id)
+    }
+    
+    // MARK: - Relay-Level Subscription Management
+    
+    /// Add a subscription to this relay's subscription manager
+    internal func addSubscription(_ subscription: InternalSubscription, filters: [NDKFilter]) async {
+        await subscriptionManager?.addSubscription(subscription, filters: filters)
+    }
+    
+    /// Remove a subscription from this relay's subscription manager
+    internal func removeSubscription(_ subscription: InternalSubscription) async {
+        await subscriptionManager?.removeSubscription(subscription)
+    }
+    
+    /// Track a subscription group (called by NDKRelaySubscriptionGroup)
+    internal func trackSubscription(_ group: NDKRelaySubscriptionGroup) async {
+        // Track the actual subscription ID that will be sent to relay
+        if let subId = await group.subId {
+            await trackSubscription(id: subId, filters: await group.compileFilters())
+        }
+    }
+    
+    /// Send a subscription request to the relay
+    internal func sendSubscription(id: String, filters: [NDKFilter]) async {
+        do {
+            let req = try NostrMessage.req(subscriptionId: id, filters: filters).serialize()
+            NDKLogger.log(.debug, category: .subscription,
+                         "📤 [Relay] Sending REQ with ID '\(id)' to relay \(url) with \(filters.count) filters")
+            try await send(req)
+        } catch {
+            NDKLogger.log(.error, category: .relay, "Failed to send subscription \(id): \(error)")
+        }
+    }
+    
+    /// Close a subscription on the relay
+    internal func closeSubscription(id: String) async {
+        do {
+            let close = try NostrMessage.close(subscriptionId: id).serialize()
+            NDKLogger.log(.debug, category: .subscription,
+                         "🛑 [Relay] Sending CLOSE for subscription '\(id)' to relay \(url)")
+            try await send(close)
+            await untrackSubscription(id: id)
+        } catch {
+            NDKLogger.log(.error, category: .relay, "Failed to close subscription \(id): \(error)")
+        }
     }
 
     // MARK: - Hashable & Equatable

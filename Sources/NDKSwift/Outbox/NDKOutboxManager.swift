@@ -1,5 +1,11 @@
 import Foundation
 
+/// Represents a relay discovery event
+public struct RelayDiscovery: Sendable {
+    public let authors: Set<String>
+    public let relays: Set<RelayURL>
+}
+
 /// Public-facing outbox manager that provides a simplified API for outbox operations.
 ///
 /// `NDKOutboxManager` implements the NIP-65 outbox model for intelligent relay selection,
@@ -38,13 +44,27 @@ public actor NDKOutboxManager {
         ndk.publishingStrategy
     }
     private let lookupTracker: RelayListLookupTracker
+    
+    // Stream for relay discoveries
+    private var discoveryStream: AsyncStream<RelayDiscovery>?
+    private var discoveryContinuation: AsyncStream<RelayDiscovery>.Continuation?
 
     init(ndk: NDK) {
         self.ndk = ndk
         self.lookupTracker = RelayListLookupTracker()
+        
+        // Set up discovery stream
+        let (stream, continuation) = AsyncStream<RelayDiscovery>.makeStream()
+        self.discoveryStream = stream
+        self.discoveryContinuation = continuation
     }
 
     // MARK: - Public API
+    
+    /// Stream of relay discoveries as they happen
+    public var relayDiscoveries: AsyncStream<RelayDiscovery> {
+        discoveryStream ?? AsyncStream { _ in }
+    }
 
     /// Publishes an event using the outbox model for intelligent relay selection.
     ///
@@ -294,10 +314,12 @@ public actor NDKOutboxManager {
                     }
                 } else {
                     // Has relay info but no relays - still unknown
+                    NDKLogger.log(.debug, category: .outbox, "⚠️ Author \(author.prefix(8)) has relay info but no relays")
                     unknownAuthors.insert(author)
                 }
             } else {
                 // No relay info cached
+                NDKLogger.log(.debug, category: .outbox, "❓ No relay info cached for \(author.prefix(8))")
                 unknownAuthors.insert(author)
 
                 // Check if we should look them up
@@ -432,6 +454,23 @@ public actor NDKOutboxManager {
         )
 
         NDKLogger.log(.info, category: .outbox, "✅ Updated relay info for \(event.pubkey.prefix(StringConstants.DisplayFormatting.hexPrefixLength)): \(readRelays.count) read, \(writeRelays.count) write")
+        
+        // Log specific relays discovered
+        if NDKLogger.logLevel >= .debug {
+            NDKLogger.log(.debug, category: .outbox, "📋 Read relays: \(readRelays.map { $0.url })")
+            NDKLogger.log(.debug, category: .outbox, "📋 Write relays: \(writeRelays.map { $0.url })")
+        }
+        
+        // Emit relay discovery event
+        let allRelays = readRelays.union(writeRelays)
+        if !allRelays.isEmpty {
+            let discovery = RelayDiscovery(
+                authors: Set([event.pubkey]),
+                relays: Set(allRelays.map { $0.url })
+            )
+            NDKLogger.log(.info, category: .outbox, "📡 Emitting relay discovery event for \(event.pubkey.prefix(StringConstants.DisplayFormatting.hexPrefixLength)) with \(allRelays.count) relays")
+            discoveryContinuation?.yield(discovery)
+        }
     }
     
     /// Stop tracking a user for outbox operations

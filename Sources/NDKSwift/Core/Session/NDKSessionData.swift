@@ -164,8 +164,7 @@ public class NDKSessionData {
         // Create filter with 'since' optimization if we have cached events
         var filter = NDKFilter(
             authors: [pubkey],
-            kinds: Array(kinds),
-            limit: kinds.count  // We want the latest of each kind
+            kinds: Array(kinds)
         )
 
         // If we have cached events, only fetch newer ones

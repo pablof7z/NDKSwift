@@ -555,6 +555,9 @@ public final class NDK {
     // MARK: - Internal Methods (for relay communication)
 
     func processEvent(_ event: NDKEvent, subscriptionId: String, from relay: RelayProtocol) async {
+        NDKLogger.log(.trace, category: .subscription,
+                     "🌐 [NDK] Processing event \(event.id.prefix(8))... for subscription '\(subscriptionId)' from relay \(relay.url)")
+        
         // Track that we've seen this event on this relay
         // If this is the first time we see this event, also set it as the source relay
         let seenRelays = await eventTracker.getSeenOnRelays(eventId: event.id)
@@ -574,6 +577,8 @@ public final class NDK {
         // Also process through internal subscription manager
         if let ndkRelay = relay as? NDKRelay {
             // Process through internal subscription manager with correct subscription ID
+            NDKLogger.log(.trace, category: .subscription,
+                         "🔄 [NDK] Forwarding to InternalSubscriptionManager with subscription '\(subscriptionId)'")
             await internalSubscriptionManager.processEvent(event, subscriptionId: subscriptionId, from: ndkRelay)
         } else {
             NDKLogger.log(.warning, category: .event, "⚠️ Relay is not NDKRelay type - cannot route to subscription manager")
