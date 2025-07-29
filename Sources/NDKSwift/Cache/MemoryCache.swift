@@ -16,9 +16,6 @@ public actor MemoryCache: NDKCache {
     // Tombstone cache for deletion events that arrive before the original event
     private var deletionTombstones: [String: Date] = [:]
     private let tombstoneTTL: TimeInterval = NetworkConstants.tombstoneTTL
-
-    // Observer tracking
-    private var observers: [FilterSignature: Set<WeakObserver>] = [:]
     
     // Cleanup task for tombstones
     private var cleanupTask: Task<Void, Never>?
@@ -46,14 +43,7 @@ public actor MemoryCache: NDKCache {
             return
         }
 
-        let eventId = event.id
-        let isNew = events[eventId] == nil
-        events[eventId] = event
-
-        // Notify observers if this is a new event
-        if isNew {
-            await notifyObservers(of: event)
-        }
+        events[event.id] = event
     }
 
     public func getEvent(id: String) async -> NDKEvent? {
@@ -413,8 +403,6 @@ public actor MemoryCache: NDKCache {
 
         // Save the event
         try await saveEvent(event)
-
-        // No need to notify here since saveEvent already does it
     }
 
     /// Process a kind:5 deletion event according to NIP-09
@@ -487,64 +475,28 @@ public actor MemoryCache: NDKCache {
 
     public func observeEvents(
         matching filter: NDKFilter,
-        observer: CacheObserver
-    ) async -> ObservationHandle {
-        let signature = FilterSignature(from: filter)
-        let weakObserver = WeakObserver(observer: observer)
-
-        // Add observer to the set for this filter signature
-        if observers[signature] == nil {
-            observers[signature] = []
-        }
-        observers[signature]?.insert(weakObserver)
-
-        // Deliver existing cached events that match the filter
-        let existingEvents = try? await queryEvents(filter)
-        if let events = existingEvents, !events.isEmpty {
-            for event in events {
-                await observer.handleEvent(event)
-            }
-        }
-
-        // Return handle that removes observer when cancelled
-        return ObservationHandle { [weak self] in
-            await self?.removeObserver(weakObserver, for: signature)
-        }
-    }
-
-    private func removeObserver(_ observer: WeakObserver, for signature: FilterSignature) async {
-        observers[signature]?.remove(observer)
-        if observers[signature]?.isEmpty ?? false {
-            observers.removeValue(forKey: signature)
-        }
-    }
-
-    private func notifyObservers(of event: NDKEvent) async {
-        // Clean up any nil weak references
-        for (signature, observerSet) in observers {
-            observers[signature] = observerSet.filter { $0.observer != nil }
-        }
-
-        // Find all observers whose filters match this event
-        for (signature, observerSet) in observers {
-            // Create filter from signature to check if event matches
-            let filter = NDKFilter(
-                ids: signature.ids,
-                authors: signature.authors,
-                kinds: signature.kinds,
-                tags: signature.tags?.mapValues { Set($0) }
-            )
-
-            // Check if event matches this filter
-            let matches = filter.matches(event: event)
-
-            if matches {
-                // Notify all observers for this filter
-                for weakObserver in observerSet {
-                    if let observer = weakObserver.observer {
-                        await observer.handleEvent(event)
+        includeExisting: Bool = true
+    ) async -> AsyncThrowingStream<[NDKEvent], Error> {
+        // For MemoryCache, we don't have a built-in change notification system
+        // So we'll create a stream that emits existing events and then completes
+        AsyncThrowingStream { continuation in
+            Task {
+                // If includeExisting, emit current matching events
+                if includeExisting {
+                    do {
+                        let existingEvents = try await self.queryEvents(filter)
+                        if !existingEvents.isEmpty {
+                            continuation.yield(existingEvents)
+                        }
+                    } catch {
+                        continuation.finish(throwing: error)
+                        return
                     }
                 }
+                
+                // Since MemoryCache doesn't have change notifications,
+                // we complete the stream after emitting existing events
+                continuation.finish()
             }
         }
     }

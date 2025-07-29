@@ -4,6 +4,58 @@ All notable changes to NDKSwift will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.10.0] - 2025-01-28
+
+### Added
+- Reactive query support in `NDKSQLiteCache` using GRDB's `ValueObservation` API
+  - `observeEvents(matching:includeExisting:)` - Observe changes to events matching a filter
+  - `observeEvent(id:includeExisting:)` - Observe changes to a specific event
+  - `observeProfile(pubkey:includeExisting:)` - Observe changes to a user profile
+  - All observations return `AsyncThrowingStream` for seamless integration with Swift concurrency
+  - Automatic cleanup when streams are terminated
+  - Support for multiple concurrent observers on the same data
+
+### Changed
+- `NDKSQLiteCache` now tracks active database observations and cancels them on deinit
+- Added Combine framework import to support GRDB's reactive features
+
+### Technical
+- Leverages GRDB's efficient `ValueObservation` for minimal overhead
+- Observations automatically deduplicate to reduce unnecessary updates
+- Database queries are optimized to only track relevant changes
+- Thread-safe observation management using Swift actors
+
+## [0.9.0] - 2025-01-28
+
+### Breaking Changes
+- Complete rewrite of subscription grouping to match ndk-core's relay-level architecture
+- Filter aggregation now happens at the relay level, not globally
+- Each relay independently groups and merges subscriptions
+- Removed `NDKFilter` convenience methods that encouraged bad practices with limits
+
+### Added
+- `NDKRelaySubscriptionManager` for per-relay subscription management
+- `NDKRelaySubscriptionGroup` for grouping subscriptions with the same fingerprint
+- `NDKFilterGrouping` utilities ported from ndk-core (mergeFilters, filterFingerprint)
+- Relay discovery stream in `NDKOutboxManager` for dynamic re-subscription
+- Support for "at-least" delay type for subscription batching (100ms default)
+
+### Changed
+- Subscriptions are now grouped per relay instead of globally
+- Filter merging happens at execution time on each relay
+- DataRequirement simplified to focus on deduplication and relay management
+- InternalSubscription no longer sends REQ messages directly
+- Outbox model now properly splits filters by author knowledge
+
+### Fixed
+- Filter aggregation now properly merges filters with the same structure
+- Multiple profile queries now correctly aggregate into single subscriptions per relay
+- Removed limit from relay list discovery to enable proper aggregation
+- Improved subscription efficiency matching ndk-core behavior
+
+### Removed
+- `NDKFilter` convenience methods (profile, textNotes, contactList, etc.) that incorrectly added limits to filters
+
 ## [0.8.1] - 2025-01-28
 
 ### Fixed

@@ -46,8 +46,11 @@ class MockCacheAdapter: NDKCacheAdapter {
     func save(events: [NDKEvent]) async throws {}
     func fetchEvents(filter: NDKFilter, limit: Int?) async throws -> [NDKEvent] { [] }
     func deleteEvent(withId eventId: String) async throws {}
-    func observe(filter: NDKFilter, cachePolicy: NDKCachePolicy, maxAge: TimeInterval?) async -> ObservationHandle {
-        ObservationHandle { }
+    func observeEvents(matching filter: NDKFilter, includeExisting: Bool) async -> AsyncThrowingStream<[NDKEvent], Error> {
+        // Return an empty stream for testing
+        return AsyncThrowingStream { continuation in
+            continuation.finish()
+        }
     }
     func fetchProfile(pubkey: String) async throws -> NDKUserProfile? { nil }
     func saveProfile(_ profile: NDKUserProfile, for pubkey: String) async throws {}

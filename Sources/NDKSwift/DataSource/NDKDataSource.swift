@@ -23,7 +23,7 @@ public enum RelayUpdate {
 
 /// Primary API for declarative data access in NDKSwift
 /// Automatically manages subscriptions, caching, and lifecycle
-public final class NDKDataSource<T>: ObservableObject, CacheObserver {
+public final class NDKDataSource<T>: ObservableObject {
     @Published public private(set) var data: [T] = []
     @Published public private(set) var isLoading: Bool = false
     @Published public private(set) var error: Error?
@@ -155,7 +155,7 @@ public final class NDKDataSource<T>: ObservableObject, CacheObserver {
         relayUpdatesContinuation.finish()
         let handle = requirementHandle
         Task {
-            await handle?.release()
+            await handle?.cancel()
         }
     }
 
@@ -169,9 +169,8 @@ public final class NDKDataSource<T>: ObservableObject, CacheObserver {
         if let requirementManager = ndk.dataRequirementManager {
             NDKLogger.log(.debug, category: .subscription, "✅ Found dataRequirementManager, registering requirement", correlationId: correlationId)
             
-            requirementHandle = await requirementManager.registerRequirement(
+            let (handle, eventStream) = await requirementManager.registerRequirement(
                 filter: filter,
-                observer: self,
                 maxAge: maxAge,
                 cachePolicy: cachePolicy,
                 relays: relays,
@@ -179,6 +178,16 @@ public final class NDKDataSource<T>: ObservableObject, CacheObserver {
                 subscriptionId: subscriptionId,
                 closeOnEose: closeOnEose
             )
+            requirementHandle = handle
+            
+            // Process events from the stream
+            Task { [weak self] in
+                guard let self = self else { return }
+                for await event in eventStream {
+                    await self.handleEvent(event)
+                }
+            }
+            
             NDKLogger.log(.trace, category: .subscription, "✅ Requirement registered with handle", correlationId: correlationId)
         } else {
             // No data requirement manager available
@@ -191,9 +200,9 @@ public final class NDKDataSource<T>: ObservableObject, CacheObserver {
         isLoading = false
     }
 
-    // MARK: - CacheObserver
+    // MARK: - Event Handling
 
-    public func handleEvent(_ event: NDKEvent) async {
+    private func handleEvent(_ event: NDKEvent) async {
         // Check if we've already processed this event
         guard await !stateManager.isProcessed(event.id) else {
             return
@@ -220,7 +229,7 @@ public final class NDKDataSource<T>: ObservableObject, CacheObserver {
         relayUpdatesContinuation.yield(update)
         
         // Also process events directly
-        if case let .event(event, relay) = update {
+        if case let .event(event, _) = update {
             await handleEvent(event)
         }
     }
@@ -233,7 +242,7 @@ public final class NDKDataSource<T>: ObservableObject, CacheObserver {
 
         if let handle = requirementHandle {
             NDKLogger.log(.trace, category: .subscription, "Releasing existing requirement handle", correlationId: correlationId)
-            await handle.release()
+            await handle.cancel()
         }
         requirementHandle = nil
 
@@ -488,7 +497,7 @@ public final class NDKDataSource<T>: ObservableObject, CacheObserver {
 
         // Remove old requirement if exists
         if let handle = requirementHandle {
-            await handle.release()
+            await handle.cancel()
         }
 
         // Update the requirement handle for new filter

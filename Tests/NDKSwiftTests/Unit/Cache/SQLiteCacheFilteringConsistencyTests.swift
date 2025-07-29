@@ -107,14 +107,23 @@ final class SQLiteCacheFilteringConsistencyTests: XCTestCase {
     
     /// Test that observers receive the same events as direct queries
     func testObserverNotificationConsistency() async throws {
-        // Create test observer
-        let observer = MockSQLCacheObserver()
-        
         // Set up filter
         let filter = NDKFilter(authors: ["testauthor"], kinds: [1])
         
         // Start observing
-        let handle = await cache.observeEvents(matching: filter, observer: observer)
+        let eventStream = await cache.observeEvents(matching: filter, includeExisting: false)
+        
+        // Create task to collect events
+        var receivedEvents: [NDKEvent] = []
+        let collectionTask = Task {
+            do {
+                for try await events in eventStream {
+                    receivedEvents.append(contentsOf: events)
+                }
+            } catch {
+                // Stream ended or error occurred
+            }
+        }
         
         // Create and process test event
         let matchingEvent = NDKEvent(
@@ -149,7 +158,7 @@ final class SQLiteCacheFilteringConsistencyTests: XCTestCase {
         let queriedIds = Set(queriedEvents.map { $0.id })
         
         // Get notified events
-        let notifiedIds = await observer.getReceivedEventIds()
+        let notifiedIds = Set(receivedEvents.map { $0.id })
         
         // Should be the same
         XCTAssertEqual(queriedIds, notifiedIds, 
@@ -158,7 +167,7 @@ final class SQLiteCacheFilteringConsistencyTests: XCTestCase {
                       "Observer received: \(notifiedIds)")
         
         // Clean up
-        await handle.cancel()
+        collectionTask.cancel()
     }
     
     /// Test edge cases in filtering
@@ -189,18 +198,6 @@ final class SQLiteCacheFilteringConsistencyTests: XCTestCase {
     }
 }
 
-// Mock observer for testing SQL cache filtering
-actor MockSQLCacheObserver: CacheObserver {
-    private var receivedEvents: [NDKEvent] = []
-    
-    func handleEvent(_ event: NDKEvent) async {
-        receivedEvents.append(event)
-    }
-    
-    func getReceivedEventIds() -> Set<String> {
-        Set(receivedEvents.map { $0.id })
-    }
-}
 
 // Add private extension to access the method for testing
 // NOTE: Commented out to avoid redeclaration error - method is already accessible

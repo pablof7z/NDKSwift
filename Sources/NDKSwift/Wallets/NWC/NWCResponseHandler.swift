@@ -26,7 +26,6 @@ public struct NWCResponseHandler {
         var filter = NDKFilter()
         filter.kinds = [.nostrWalletConnectRes]
         filter.addTagFilter("e", values: [requestId])
-        filter.limit = 1
         NDKLogger.log(.trace, category: .wallet, "[NWC Response] Filter: kinds=\(filter.kinds ?? []), e-tag=\(requestId)")
 
         // Get the connected relays

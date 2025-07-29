@@ -48,7 +48,7 @@ let package = Package(
         ),
         .testTarget(
             name: "NDKSwiftTests",
-            dependencies: ["NDKSwift"]
+            dependencies: ["NDKSwift", "NDKSwiftUI"]
         ),
     ]
 )

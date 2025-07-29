@@ -1,6 +1,7 @@
 import Foundation
 import CashuSwift
 import GRDB
+import Combine
 
 // MARK: - SQLite Constants
 
@@ -19,9 +20,11 @@ public actor NDKSQLiteCache: NDKCache {
     private let dbQueue: DatabaseQueue
     private let dbPath: String
     private let debugMode: Bool
+    
+    // Active observations
+    private var activeObservations: [UUID: DatabaseCancellable] = [:]
 
-    // Cache observation properties
-    private var observers: [FilterSignature: Set<WeakObserver>] = [:]
+    // Relay source tracking
     private var relaySourceTracking: [String: Set<String>] = [:] // eventId -> relay URLs
 
     // Tombstone cache for deletion events that arrive before the original event
@@ -151,6 +154,10 @@ public actor NDKSQLiteCache: NDKCache {
                     """,
                     arguments: [eventId, pubkey, createdAt, kind, content, sig, jsonString]
                 )
+                
+                if self.debugMode {
+                    NDKLogger.log(.info, category: .cache, "💾 Saved event to database - id: \(eventId), kind: \(kind), pubkey: \(pubkey.prefix(8))...")
+                }
 
                 // Save tags
                 try db.execute(sql: "DELETE FROM tags WHERE event_id = ?", arguments: [eventId])
@@ -792,35 +799,6 @@ public actor NDKSQLiteCache: NDKCache {
 
     // MARK: - Reactive Observation
 
-    public func observeEvents(
-        matching filter: NDKFilter,
-        observer: CacheObserver
-    ) async -> ObservationHandle {
-        let signature = FilterSignature(from: filter)
-        let weakObserver = WeakObserver(observer: observer)
-
-        // Add observer to the set for this filter signature
-        if observers[signature] == nil {
-            observers[signature] = []
-        }
-        observers[signature]?.insert(weakObserver)
-
-        // Deliver existing cached events that match the filter
-        let existingEvents = try? await queryEvents(filter)
-        if let events = existingEvents, !events.isEmpty {
-            if debugMode {
-                NDKLogger.log(.debug, category: .cache, "Delivering \(events.count) existing cached events to observer")
-            }
-            for event in events {
-                await observer.handleEvent(event)
-            }
-        }
-
-        // Return handle that removes observer when cancelled
-        return ObservationHandle { [weak self] in
-            await self?.removeObserver(weakObserver, for: signature)
-        }
-    }
 
     public func processEvent(
         _ event: NDKEvent,
@@ -851,18 +829,13 @@ public actor NDKSQLiteCache: NDKCache {
         }
 
         // Check if event already exists
-        let exists = await hasEvent(id: event.id)
+        _ = await hasEvent(id: event.id)
 
         // Save event to database
         try await saveEvent(event)
 
         // Save relay source to database
         try await saveRelaySource(eventId: event.id, relay: relay, subscriptionId: subscriptionId)
-
-        // If event is new, notify observers
-        if !exists {
-            await notifyObservers(of: event)
-        }
     }
 
     public func getRelaySources(eventId: String) async -> Set<String> {
@@ -945,48 +918,6 @@ public actor NDKSQLiteCache: NDKCache {
             }
         } catch {
             NDKLogger.log(.error, category: .cache, "Failed to process deletion event: \(error)")
-        }
-    }
-
-    // MARK: - Private Observer Management
-
-    private func removeObserver(_ observer: WeakObserver, for signature: FilterSignature) {
-        observers[signature]?.remove(observer)
-
-        // Clean up empty sets
-        if observers[signature]?.isEmpty ?? false {
-            observers.removeValue(forKey: signature)
-        }
-    }
-
-    private func notifyObservers(of event: NDKEvent) async {
-        // Clean up any nil weak references
-        for (signature, observerSet) in observers {
-            observers[signature] = observerSet.filter { $0.observer != nil }
-        }
-
-        // Find all observers whose filters match this event
-        for (signature, observerSet) in observers {
-            // Create filter from signature to check if event matches
-            var filter = NDKFilter()
-            filter.kinds = signature.kinds
-            filter.authors = signature.authors
-
-            // Add tag filters if present
-            if let tags = signature.tags {
-                for (tagName, values) in tags {
-                    filter.addTagFilter(tagName, values: values)
-                }
-            }
-
-            if await eventMatchesFilter(event, filter: filter) {
-                // Notify all observers for this filter
-                for weakObserver in observerSet {
-                    if let observer = weakObserver.observer {
-                        await observer.handleEvent(event)
-                    }
-                }
-            }
         }
     }
 
@@ -1325,39 +1256,13 @@ public actor NDKSQLiteCache: NDKCache {
 
     // MARK: - Cleanup Methods
 
-    /// Start periodic cleanup of nil observers and tombstones
+    /// Start periodic cleanup of tombstones
     private func startPeriodicCleanup() async {
         while !Task.isCancelled {
             // Wait for 5 minutes between cleanups
             try? await Task.sleep(nanoseconds: UInt64(NetworkConstants.cleanupInterval * Double(TimeConstants.nanosecondsPerSecond)))
 
-            await cleanupObservers()
             await cleanupTombstones()
-        }
-    }
-
-    /// Clean up nil observers from all filter signatures
-    private func cleanupObservers() async {
-        var emptySignatures: [FilterSignature] = []
-
-        // Clean up nil observers and track empty signatures
-        for (signature, observerSet) in observers {
-            let activeObservers = observerSet.filter { $0.observer != nil }
-
-            if activeObservers.isEmpty {
-                emptySignatures.append(signature)
-            } else {
-                observers[signature] = activeObservers
-            }
-        }
-
-        // Remove empty signatures
-        for signature in emptySignatures {
-            observers.removeValue(forKey: signature)
-        }
-
-        if debugMode && !emptySignatures.isEmpty {
-            NDKLogger.log(.debug, category: .cache, "Cleaned up \(emptySignatures.count) empty observer signatures")
         }
     }
 
@@ -1852,6 +1757,265 @@ public actor NDKSQLiteCache: NDKCache {
 
     deinit {
         cleanupTask?.cancel()
+        // Cancel all active observations
+        for (_, cancellable) in activeObservations {
+            cancellable.cancel()
+        }
+    }
+    
+    // MARK: - Reactive Query Support
+    
+    /// Create a reactive query that emits events when matching data changes in the database
+    /// - Parameters:
+    ///   - filter: The filter to match events against
+    ///   - includeExisting: Whether to emit existing events immediately (default: true)
+    /// - Returns: An AsyncThrowingStream that emits arrays of matching events
+    public func observeEvents(
+        matching filter: NDKFilter,
+        includeExisting: Bool = true
+    ) async -> AsyncThrowingStream<[NDKEvent], Error> {
+        if debugMode {
+            NDKLogger.log(.info, category: .cache, "🚀 observeEvents called with filter: \(filter), includeExisting: \(includeExisting)")
+        }
+        
+        let dbQueue = self.dbQueue
+        let debugMode = self.debugMode
+        
+        return AsyncThrowingStream { continuation in
+            let observationId = UUID()
+            
+            Task {
+                    // Create the observation inline to work around GRDB type constraints
+                    let observation = ValueObservation.tracking { [weak self] db -> [NDKEvent] in
+                        guard let self = self else { return [] }
+                        
+                        var arguments = StatementArguments()
+                        var whereClauses: [String] = []
+                        var joins: [String] = []
+                        var tagIndex = 0
+                        
+                        // Build filter clauses
+                        SQLiteQueryBuilder.buildFilterClauses(
+                            from: filter,
+                            arguments: &arguments,
+                            whereClauses: &whereClauses,
+                            joins: &joins,
+                            tagIndex: &tagIndex
+                        )
+                        
+                        // Build and execute query
+                        let sql = SQLiteQueryBuilder.buildSelectQuery(
+                            joins: joins,
+                            whereClauses: whereClauses,
+                            limit: filter.limit,
+                            orderBy: "e.created_at DESC"
+                        )
+                        
+                        let rows = try Row.fetchAll(db, sql: sql, arguments: arguments)
+                        
+                        return rows.compactMap { row in
+                            self.decodeEventFromRow(row)
+                        }
+                    }
+                    
+                    // Start the observation
+                    let cancellable = observation.start(
+                        in: dbQueue,
+                        onError: { error in
+                            continuation.finish(throwing: error)
+                        },
+                        onChange: { events in
+                            if self.debugMode {
+                                NDKLogger.log(.info, category: .cache, "🔔 GRDB observation triggered: \(events.count) events for filter \(filter)")
+                            }
+                            continuation.yield(events)
+                        }
+                    )
+                    
+                    // Store the cancellable
+                    await self.storeObservation(id: observationId, cancellable: cancellable)
+                    
+                    // If includeExisting, immediately query and emit current events
+                    if includeExisting {
+                        do {
+                            let existingEvents = try await self.queryEvents(filter)
+                            if self.debugMode {
+                                NDKLogger.log(.info, category: .cache, "🔍 Initial query for filter \(filter): found \(existingEvents.count) existing events")
+                            }
+                            if !existingEvents.isEmpty {
+                                continuation.yield(existingEvents)
+                            }
+                        } catch {
+                            if debugMode {
+                                NDKLogger.log(.error, category: .cache, "Failed to fetch existing events: \(error)")
+                            }
+                        }
+                    }
+                    
+                    // Set up cleanup when the stream is terminated
+                    continuation.onTermination = { @Sendable _ in
+                        Task {
+                            await self.removeObservation(id: observationId)
+                        }
+                    }
+            }
+        }
+    }
+    
+    /// Store an active observation
+    private func storeObservation(id: UUID, cancellable: DatabaseCancellable) async {
+        activeObservations[id] = cancellable
+    }
+    
+    /// Remove and cancel an observation
+    private func removeObservation(id: UUID) async {
+        if let cancellable = activeObservations.removeValue(forKey: id) {
+            cancellable.cancel()
+        }
+    }
+    
+    /// Create a reactive query for a single event by ID
+    /// - Parameters:
+    ///   - eventId: The event ID to observe
+    ///   - includeExisting: Whether to emit the existing event immediately (default: true)
+    /// - Returns: An AsyncThrowingStream that emits the event when it changes, or nil if deleted
+    public func observeEvent(
+        id eventId: String,
+        includeExisting: Bool = true
+    ) async -> AsyncThrowingStream<NDKEvent?, Error> {
+        let dbQueue = self.dbQueue
+        
+        return AsyncThrowingStream { continuation in
+            let observationId = UUID()
+            
+            Task {
+                    // Create observation for single event
+                    let observation = ValueObservation.tracking { [weak self] db -> NDKEvent? in
+                        guard let self = self else { return nil }
+                        
+                        if let row = try Row.fetchOne(db, sql: "SELECT json FROM events WHERE id = ?", arguments: [eventId]) {
+                            return self.decodeEventFromRow(row)
+                        }
+                        return nil
+                    }
+                    
+                    // Start the observation
+                    let cancellable = observation.start(
+                        in: dbQueue,
+                        onError: { error in
+                            continuation.finish(throwing: error)
+                        },
+                        onChange: { event in
+                            continuation.yield(event)
+                        }
+                    )
+                    
+                    // Store the cancellable
+                    await self.storeObservation(id: observationId, cancellable: cancellable)
+                    
+                    // If includeExisting, immediately fetch and emit current event
+                    if includeExisting {
+                        if let existingEvent = await self.getEvent(id: eventId) {
+                            continuation.yield(existingEvent)
+                        }
+                    }
+                    
+                    // Set up cleanup
+                    continuation.onTermination = { @Sendable _ in
+                        Task {
+                            await self.removeObservation(id: observationId)
+                        }
+                    }
+            }
+        }
+    }
+    
+    /// Create a reactive query for profile changes
+    /// - Parameters:
+    ///   - pubkey: The public key to observe
+    ///   - includeExisting: Whether to emit the existing profile immediately (default: true)
+    /// - Returns: An AsyncThrowingStream that emits the profile when it changes
+    public func observeProfile(
+        pubkey: String,
+        includeExisting: Bool = true
+    ) async -> AsyncThrowingStream<NDKUserProfile?, Error> {
+        let dbQueue = self.dbQueue
+        
+        return AsyncThrowingStream { continuation in
+            let observationId = UUID()
+            
+            Task {
+                    // Create observation for profile
+                    let observation = ValueObservation.tracking { db -> NDKUserProfile? in
+                        guard let row = try Row.fetchOne(db,
+                            sql: "SELECT name, display_name, about, picture, banner, nip05, lud16, lud06, website, additional_fields, json FROM profiles WHERE pubkey = ?",
+                            arguments: [pubkey]) else {
+                            return nil
+                        }
+                        
+                        // First try to reconstruct from individual fields
+                        if row["name"] != nil || row["display_name"] != nil {
+                            var profile = NDKUserProfile(
+                                name: row["name"] as? String,
+                                displayName: row["display_name"] as? String,
+                                about: row["about"] as? String,
+                                picture: row["picture"] as? String,
+                                banner: row["banner"] as? String,
+                                nip05: row["nip05"] as? String,
+                                lud16: row["lud16"] as? String,
+                                lud06: row["lud06"] as? String,
+                                website: row["website"] as? String
+                            )
+                            
+                            // Decode additional fields
+                            if let additionalFieldsData = row["additional_fields"] as? Data,
+                               let additionalFields = try? PropertyListSerialization.propertyList(from: additionalFieldsData, options: [], format: nil) as? [String: String] {
+                                for (key, value) in additionalFields {
+                                    profile.setAdditionalField(key, value: value)
+                                }
+                            }
+                            
+                            return profile
+                        }
+                        
+                        // Fallback to JSON parsing
+                        if let jsonString = row["json"] as? String,
+                           let jsonData = jsonString.data(using: .utf8) {
+                            return try? JSONCoding.decode(NDKUserProfile.self, from: jsonData)
+                        }
+                        
+                        return nil
+                    }
+                    
+                    // Start the observation
+                    let cancellable = observation.start(
+                        in: dbQueue,
+                        onError: { error in
+                            continuation.finish(throwing: error)
+                        },
+                        onChange: { profile in
+                            continuation.yield(profile)
+                        }
+                    )
+                    
+                    // Store the cancellable
+                    await self.storeObservation(id: observationId, cancellable: cancellable)
+                    
+                    // If includeExisting, immediately fetch and emit current profile
+                    if includeExisting {
+                        if let existingProfile = await self.getProfile(pubkey: pubkey) {
+                            continuation.yield(existingProfile)
+                        }
+                    }
+                    
+                    // Set up cleanup
+                    continuation.onTermination = { @Sendable _ in
+                        Task {
+                            await self.removeObservation(id: observationId)
+                        }
+                    }
+            }
+        }
     }
 }
 
