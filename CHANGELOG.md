@@ -17,6 +17,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added `@preconcurrency` attribute to `NDKDataSourceProtocol` conformances to fix Swift 6 warnings
 - Improved consistency in error logging across SwiftUI components
 
+### Improved
+- Added comprehensive tests for wallet-specific error factories in `NDKErrorFactoriesTests`
+- Cleaned up unnecessary `import Foundation` in `OptionalExtensions.swift`
+- Fixed trailing whitespace in `OpacityConstants.swift`
+- Added documentation header to `NDKErrorFactories.swift` extension
+
 ## [0.10.0] - 2025-01-28
 
 ### Added

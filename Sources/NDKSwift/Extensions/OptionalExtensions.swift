@@ -1,5 +1,3 @@
-import Foundation
-
 /// Extensions for Optional types to provide convenient nil-handling functionality
 ///
 /// These extensions provide common patterns for dealing with optional values,
