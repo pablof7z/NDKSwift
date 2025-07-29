@@ -155,6 +155,8 @@ public final class NDK {
         self.cache = cache ?? MemoryCache()
         self.signatureVerificationConfig = signatureVerificationConfig
         self.signatureVerificationSampler = NDKSignatureVerificationSampler(config: signatureVerificationConfig)
+        
+        // Auth manager is now lazy-initialized on first access from MainActor
 
         // Initialize internal subscription manager (must be early for event routing)
         self.internalSubscriptionManager = InternalSubscriptionManager(ndk: self)

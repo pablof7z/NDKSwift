@@ -2,20 +2,11 @@ import CryptoSwift
 import Foundation
 import secp256k1
 
-/// NIP-04: Encrypted Direct Messages (Deprecated)
+/// NIP-04: Encrypted Direct Messages
 ///
 /// This module implements the NIP-04 encryption standard for Nostr.
-/// Note: NIP-04 is deprecated in favor of NIP-44, which provides better security.
-/// This implementation is maintained for backward compatibility.
-///
-/// Issues with NIP-04:
-/// - No padding (leaks message length)
-/// - Uses AES-CBC which can be vulnerable to padding oracle attacks
-/// - No authenticated encryption
-/// - Weak key derivation
 ///
 /// Specification: https://github.com/nostr-protocol/nips/blob/master/04.md
-@available(*, deprecated, message: "NIP-04 is deprecated due to security issues. Use NIP-44 instead for better security")
 public enum NIP04 {
 
     /// Compute shared secret using ECDH
@@ -198,12 +189,12 @@ public enum NIP04 {
 // MARK: - Convenience Extensions
 
 public extension Crypto {
-    /// Encrypt a message using NIP-04 (deprecated)
+    /// Encrypt a message using NIP-04
     static func nip04Encrypt(message: String, privateKey: PrivateKey, pubkey: PublicKey) throws -> String {
         return try NIP04.encrypt(message: message, privateKey: privateKey, pubkey: pubkey)
     }
 
-    /// Decrypt a message using NIP-04 (deprecated)
+    /// Decrypt a message using NIP-04
     static func nip04Decrypt(encrypted: String, privateKey: PrivateKey, pubkey: PublicKey) throws -> String {
         return try NIP04.decrypt(encrypted: encrypted, privateKey: privateKey, pubkey: pubkey)
     }

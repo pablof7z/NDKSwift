@@ -117,7 +117,7 @@ public enum EventKind {
     public static let recommendRelay = 2
     /// Contact list (NIP-02) - List of pubkeys the user follows
     public static let contacts = 3
-    /// Encrypted direct message (NIP-04, deprecated) - Use NIP-44 instead
+    /// Encrypted direct message (NIP-04)
     public static let encryptedDirectMessage = 4
     /// Event deletion (NIP-09) - Requests deletion of previous events
     public static let deletion = 5

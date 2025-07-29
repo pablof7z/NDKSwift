@@ -7,7 +7,7 @@ import secp256k1
 ///
 /// This module implements the NIP-44 encryption standard for Nostr, providing
 /// end-to-end encrypted messaging with forward secrecy and improved security
-/// over the deprecated NIP-04 standard.
+/// over the NIP-04 standard.
 ///
 /// Key features:
 /// - ChaCha20 encryption with Poly1305 authentication

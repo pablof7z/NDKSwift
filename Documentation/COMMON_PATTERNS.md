@@ -325,24 +325,27 @@ func sendLegacyDM(to recipientPubkey: String, message: String) async throws {
 ### Sending Zaps
 
 ```swift
-// Send a zap (Lightning payment)
-func sendZap(to event: NDKEvent, amount: Int, comment: String? = nil) async throws {
-    // Create zap request
-    let zapRequest = try await ndk.createZapRequest(
-        event: event,
-        amount: amount,
-        comment: comment,
-        relays: ndk.pool.relayUrls()
+// Send a zap using the modern zap manager API
+func sendZap(to event: NDKEvent, amount: Int64, comment: String? = nil) async throws {
+    // The zap manager handles all the complexity internally
+    let result = try await event.zap(
+        with: ndk,
+        amountSats: amount,
+        comment: comment
     )
     
-    // Get payment request from recipient's Lightning address
-    let paymentRequest = try await ndk.fetchZapPaymentRequest(
-        for: event.pubkey,
-        zapRequest: zapRequest
-    )
-    
-    // Present payment UI or handle with wallet
-    try await handleLightningPayment(paymentRequest)
+    // Handle the result based on the zap type
+    switch result {
+    case .lightning(let invoice):
+        // Present Lightning invoice for payment
+        print("Pay Lightning invoice: \(invoice)")
+    case .nutzap(let nutzapResult):
+        // Nutzap completed automatically
+        print("Nutzap sent successfully: \(nutzapResult.eventId)")
+    case .qrCode(let paymentRequest):
+        // Show QR code to user for payment
+        presentQRCode(for: paymentRequest)
+    }
 }
 
 // Monitor zaps on your content

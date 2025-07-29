@@ -19,7 +19,10 @@ final class AuthenticationE2ETests: XCTestCase {
         
         // Clear any existing sessions to ensure clean test environment
         print("[\(timestamp())] Clearing existing sessions...")
-        let authManager = NDKAuthManager.shared
+        // Create a temporary NDK instance just for cleanup
+        let tempNDK = NDK()
+        let authManager = NDKAuthManager(ndk: tempNDK)
+        await authManager.initialize()
         
         // Remove all sessions
         for session in authManager.availableSessions {
@@ -31,7 +34,9 @@ final class AuthenticationE2ETests: XCTestCase {
     
     override func tearDown() async throws {
         // Clean up after test
-        let authManager = NDKAuthManager.shared
+        let tempNDK = NDK()
+        let authManager = NDKAuthManager(ndk: tempNDK)
+        await authManager.initialize()
         for session in authManager.availableSessions {
             try await authManager.removeSession(session)
         }
@@ -54,15 +59,14 @@ final class AuthenticationE2ETests: XCTestCase {
         
         // Step 3: Create session
         print("[\(timestamp())] Creating authentication session...")
-        let authManager = NDKAuthManager.shared
-        authManager.setNDK(ndk)
+        let authManager = NDKAuthManager(ndk: ndk)
+        await authManager.initialize()
         
         let createStart = Date()
         
-        var session = try await authManager.createSession(
-            with: signer,
-            requiresBiometric: false,
-            isHardwareBacked: false
+        var session = try await authManager.addSession(
+            signer,
+            requiresBiometric: false
         )
         
         // Update profile information
@@ -129,12 +133,11 @@ final class AuthenticationE2ETests: XCTestCase {
         print("[\(timestamp())] Restoring session...")
         let restoreStart = Date()
         
-        // Create new auth manager instance and NDK to simulate restart
-        let newAuthManager = NDKAuthManager.shared
+        // Create new NDK instance to simulate restart
         let newNDK = NDK(cache: MemoryCache())
-        newAuthManager.setNDK(newNDK)
+        let newAuthManager = NDKAuthManager(ndk: newNDK)
+        await newAuthManager.initialize()
         
-        // Restore will happen automatically via setNDK
         // Wait a bit for restoration
         try await Task.sleep(nanoseconds: 500_000_000)
         
@@ -182,9 +185,9 @@ final class AuthenticationE2ETests: XCTestCase {
         let testStart = Date()
         print("[\(timestamp())] Starting multi-account management E2E test")
         
-        let authManager = NDKAuthManager.shared
         let ndk = NDK(cache: MemoryCache())
-        authManager.setNDK(ndk)
+        let authManager = NDKAuthManager(ndk: ndk)
+        await authManager.initialize()
         
         // Create multiple accounts
         var sessions: [(session: NDKSession, pubkey: String)] = []
@@ -195,10 +198,9 @@ final class AuthenticationE2ETests: XCTestCase {
             let signer = try NDKPrivateKeySigner.generate()
             let pubkey = try await signer.pubkey
             
-            var session = try await authManager.createSession(
-                with: signer,
-                requiresBiometric: false,
-                isHardwareBacked: false
+            var session = try await authManager.addSession(
+                signer,
+                requiresBiometric: false
             )
             
             // Update profile
@@ -293,18 +295,17 @@ final class AuthenticationE2ETests: XCTestCase {
         let testStart = Date()
         print("[\(timestamp())] Starting session persistence across restarts E2E test")
         
-        let authManager = NDKAuthManager.shared
         var ndk = NDK(cache: MemoryCache())
-        authManager.setNDK(ndk)
+        let authManager = NDKAuthManager(ndk: ndk)
+        await authManager.initialize()
         
         // Create initial session
         let signer = try NDKPrivateKeySigner.generate()
         let pubkey = try await signer.pubkey
         
-        var session = try await authManager.createSession(
-            with: signer,
-            requiresBiometric: false,
-            isHardwareBacked: false
+        var session = try await authManager.addSession(
+            signer,
+            requiresBiometric: false
         )
         
         // Update profile
@@ -338,8 +339,8 @@ final class AuthenticationE2ETests: XCTestCase {
             try await Task.sleep(nanoseconds: 200_000_000) // 0.2 seconds
             
             // Create new auth manager and NDK to simulate full restart
-            let newAuthManager = NDKAuthManager.shared
-            newAuthManager.setNDK(ndk)
+            let newAuthManager = NDKAuthManager(ndk: ndk)
+            await newAuthManager.initialize()
             
             // Wait for automatic restoration
             try await Task.sleep(nanoseconds: 500_000_000)
@@ -382,18 +383,17 @@ final class AuthenticationE2ETests: XCTestCase {
         let testStart = Date()
         print("[\(timestamp())] Starting session update and profile sync E2E test")
         
-        let authManager = NDKAuthManager.shared
         let ndk = NDK(cache: MemoryCache())
-        authManager.setNDK(ndk)
+        let authManager = NDKAuthManager(ndk: ndk)
+        await authManager.initialize()
         
         // Create session
         let signer = try NDKPrivateKeySigner.generate()
         _ = try await signer.pubkey
         
-        var session = try await authManager.createSession(
-            with: signer,
-            requiresBiometric: false,
-            isHardwareBacked: false
+        var session = try await authManager.addSession(
+            signer,
+            requiresBiometric: false
         )
         
         // Set initial profile
@@ -441,8 +441,8 @@ final class AuthenticationE2ETests: XCTestCase {
         try await Task.sleep(nanoseconds: 200_000_000)
         
         // Create new auth manager to simulate restart
-        let newAuthManager = NDKAuthManager.shared
-        newAuthManager.setNDK(ndk)
+        let newAuthManager = NDKAuthManager(ndk: ndk)
+        await newAuthManager.initialize()
         
         // Wait for automatic restoration
         try await Task.sleep(nanoseconds: 500_000_000)
@@ -476,9 +476,9 @@ final class AuthenticationE2ETests: XCTestCase {
         let testStart = Date()
         print("[\(timestamp())] Starting security boundaries E2E test")
         
-        let authManager = NDKAuthManager.shared
         let ndk = NDK(cache: MemoryCache())
-        authManager.setNDK(ndk)
+        let authManager = NDKAuthManager(ndk: ndk)
+        await authManager.initialize()
         
         // Create two separate accounts
         let signer1 = try NDKPrivateKeySigner.generate()
@@ -491,10 +491,9 @@ final class AuthenticationE2ETests: XCTestCase {
         
         print("[\(timestamp())] Creating two separate accounts...")
         
-        let session1 = try await authManager.createSession(
-            with: signer1,
-            requiresBiometric: false,
-            isHardwareBacked: false
+        let session1 = try await authManager.addSession(
+            signer1,
+            requiresBiometric: false
         )
         
         // Update Alice's profile
@@ -511,10 +510,9 @@ final class AuthenticationE2ETests: XCTestCase {
         )
         try await authManager.updateActiveSessionProfile(aliceProfile)
         
-        let session2 = try await authManager.createSession(
-            with: signer2,
-            requiresBiometric: false,
-            isHardwareBacked: false
+        let session2 = try await authManager.addSession(
+            signer2,
+            requiresBiometric: false
         )
         
         // Update Bob's profile

@@ -17,7 +17,8 @@ Welcome to the NDKSwift documentation. This directory contains comprehensive gui
 - [Optimistic Publishing](OPTIMISTIC_PUBLISHING.md) - Fast event publishing with eventual consistency
 
 ### Feature Guides
-- [Authentication Guide](AUTHENTICATION.md) - Complete guide to authentication, sessions, and multi-account support
+- [Authentication Guide](AUTHENTICATION_GUIDE.md) - **NEW: Standardized authentication patterns for NDKSwift apps**
+- [Authentication Reference](AUTHENTICATION.md) - Complete guide to authentication, sessions, and multi-account support
 - [Session Data Management](SESSION_DATA_MANAGEMENT.md) - Reactive filters, follow lists, and web-of-trust
 - [NIP-44 Encryption Guide](NIP44_ENCRYPTION_GUIDE.md) - End-to-end encryption implementation
 - [NIP-77 Implementation](NIP77Implementation.md) - Negentropy protocol for set reconciliation
