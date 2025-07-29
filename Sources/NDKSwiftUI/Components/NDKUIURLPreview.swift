@@ -1,5 +1,11 @@
 import SwiftUI
 import LinkPresentation
+
+#if canImport(UIKit)
+import UIKit
+#elseif canImport(AppKit)
+import AppKit
+#endif
 import NDKSwift
 
 /// A reusable URL preview component that displays rich link previews or embedded images
@@ -41,44 +47,40 @@ public struct NDKUIURLPreview: View {
                 fetchLinkMetadata()
             }
         }
+        #if os(iOS)
         .fullScreenCover(isPresented: $showFullScreenImage) {
             NDKUIFullScreenImage(url: url, isPresented: $showFullScreenImage)
         }
+        #else
+        .sheet(isPresented: $showFullScreenImage) {
+            NDKUIFullScreenImage(url: url, isPresented: $showFullScreenImage)
+        }
+        #endif
     }
     
     // MARK: - Image Preview
     
     private var imagePreview: some View {
-        CachedAsyncImage(url: url) { phase in
-            switch phase {
-            case .empty:
-                ProgressView()
-                    .frame(maxHeight: imageHeight)
-                    .frame(maxWidth: .infinity)
-            case .success(let image):
-                image
-                    .resizable()
-                    .aspectRatio(contentMode: .fit)
-                    .frame(maxWidth: .infinity)
-                    .frame(maxHeight: imageMaxHeight)
-                    .cornerRadius(cornerRadius)
-                    .shadow(color: Color.black.opacity(OpacityConstants.shadow), radius: 8, x: 0, y: 4)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: cornerRadius)
-                            .stroke(Color.ndkBorder, lineWidth: 0.5)
-                    )
-                    .padding(.vertical, 4)
-                    .onTapGesture {
-                        showFullScreenImage = true
-                    }
-            case .failure(_):
-                EmptyView()
-                    .onAppear {
-                        imageLoadFailed = true
-                    }
-            @unknown default:
-                EmptyView()
-            }
+        CachedAsyncImage(url: url) { image in
+            image
+                .resizable()
+                .aspectRatio(contentMode: .fit)
+                .frame(maxWidth: .infinity)
+                .frame(maxHeight: imageMaxHeight)
+                .cornerRadius(cornerRadius)
+                .shadow(color: Color.black.opacity(OpacityConstants.shadow), radius: 8, x: 0, y: 4)
+                .overlay(
+                    RoundedRectangle(cornerRadius: cornerRadius)
+                        .stroke(Color.ndkBorder, lineWidth: 0.5)
+                )
+                .padding(.vertical, 4)
+                .onTapGesture {
+                    showFullScreenImage = true
+                }
+        } placeholder: {
+            ProgressView()
+                .frame(maxHeight: imageHeight)
+                .frame(maxWidth: .infinity)
         }
     }
     
@@ -133,9 +135,13 @@ public struct NDKUIURLPreview: View {
         .background(backgroundColor)
         .cornerRadius(cornerRadius)
         .onTapGesture {
+            #if canImport(UIKit)
             if UIApplication.shared.canOpenURL(url) {
                 UIApplication.shared.open(url)
             }
+            #elseif canImport(AppKit)
+            NSWorkspace.shared.open(url)
+            #endif
         }
     }
     
@@ -301,16 +307,31 @@ private struct LinkPreviewImage: View {
     let imageProvider: NSItemProvider
     let style: NDKUIURLPreview.Style
     
+    #if canImport(UIKit)
     @State private var previewImage: UIImage?
+    #elseif canImport(AppKit)
+    @State private var previewImage: NSImage?
+    #endif
     
     var body: some View {
-        if let image = previewImage {
-            Image(uiImage: image)
-                .resizable()
-                .aspectRatio(contentMode: .fill)
-                .frame(maxHeight: imageHeight)
-                .clipped()
-                .cornerRadius(8)
+        Group {
+            if let image = previewImage {
+                #if canImport(UIKit)
+                Image(uiImage: image)
+                    .resizable()
+                    .aspectRatio(contentMode: .fill)
+                    .frame(maxHeight: imageHeight)
+                    .clipped()
+                    .cornerRadius(8)
+                #elseif canImport(AppKit)
+                Image(nsImage: image)
+                    .resizable()
+                    .aspectRatio(contentMode: .fill)
+                    .frame(maxHeight: imageHeight)
+                    .clipped()
+                    .cornerRadius(8)
+                #endif
+            }
         }
     }
     
@@ -331,10 +352,20 @@ private struct LinkPreviewImage: View {
     
     private func loadImage() {
         imageProvider.loadDataRepresentation(for: .image) { data, error in
-            if let data = data, let image = UIImage(data: data) {
-                Task { @MainActor in
-                    self.previewImage = image
+            if let data = data {
+                #if canImport(UIKit)
+                if let image = UIImage(data: data) {
+                    Task { @MainActor in
+                        self.previewImage = image
+                    }
                 }
+                #elseif canImport(AppKit)
+                if let image = NSImage(data: data) {
+                    Task { @MainActor in
+                        self.previewImage = image
+                    }
+                }
+                #endif
             }
         }
     }
@@ -345,14 +376,27 @@ private struct LinkPreviewImage: View {
 private struct LinkPreviewIcon: View {
     let iconProvider: NSItemProvider
     
+    #if canImport(UIKit)
     @State private var iconImage: UIImage?
+    #elseif canImport(AppKit)
+    @State private var iconImage: NSImage?
+    #endif
     
     var body: some View {
-        if let icon = iconImage {
-            Image(uiImage: icon)
-                .resizable()
-                .frame(width: 24, height: 24)
-                .cornerRadius(4)
+        Group {
+            if let icon = iconImage {
+                #if canImport(UIKit)
+                Image(uiImage: icon)
+                    .resizable()
+                    .frame(width: 24, height: 24)
+                    .cornerRadius(4)
+                #elseif canImport(AppKit)
+                Image(nsImage: icon)
+                    .resizable()
+                    .frame(width: 24, height: 24)
+                    .cornerRadius(4)
+                #endif
+            }
         }
     }
     
@@ -363,10 +407,20 @@ private struct LinkPreviewIcon: View {
     
     private func loadIcon() {
         iconProvider.loadDataRepresentation(for: .image) { data, error in
-            if let data = data, let image = UIImage(data: data) {
-                Task { @MainActor in
-                    self.iconImage = image
+            if let data = data {
+                #if canImport(UIKit)
+                if let image = UIImage(data: data) {
+                    Task { @MainActor in
+                        self.iconImage = image
+                    }
                 }
+                #elseif canImport(AppKit)
+                if let image = NSImage(data: data) {
+                    Task { @MainActor in
+                        self.iconImage = image
+                    }
+                }
+                #endif
             }
         }
     }
@@ -402,33 +456,21 @@ public struct NDKUIFullScreenImage: View {
                 }
             
             // Image
-            CachedAsyncImage(url: url) { phase in
-                switch phase {
-                case .success(let image):
-                    image
-                        .resizable()
-                        .aspectRatio(contentMode: .fit)
-                        .scaleEffect(scale * magnifyBy)
-                        .offset(x: imageOffset.width + dragOffset.width,
-                                y: imageOffset.height + dragOffset.height)
-                        .opacity(imageOpacity)
-                        .gesture(dragGesture)
-                        .gesture(magnificationGesture)
-                        .gesture(doubleTapGesture)
-                        
-                case .empty:
-                    ProgressView()
-                        .progressViewStyle(CircularProgressViewStyle(tint: .white))
-                        .scaleEffect(1.5)
-                        
-                case .failure(_):
-                    Image(systemName: "photo")
-                        .font(.system(size: 60))
-                        .foregroundColor(.gray)
-                        
-                @unknown default:
-                    EmptyView()
-                }
+            CachedAsyncImage(url: url) { image in
+                image
+                    .resizable()
+                    .aspectRatio(contentMode: .fit)
+                    .scaleEffect(scale * magnifyBy)
+                    .offset(x: imageOffset.width + dragOffset.width,
+                            y: imageOffset.height + dragOffset.height)
+                    .opacity(imageOpacity)
+                    .gesture(dragGesture)
+                    .gesture(magnificationGesture)
+                    .gesture(doubleTapGesture)
+            } placeholder: {
+                ProgressView()
+                    .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                    .scaleEffect(1.5)
             }
             
             // Close button
@@ -448,7 +490,9 @@ public struct NDKUIFullScreenImage: View {
             }
             .opacity(imageOpacity)
         }
+        #if os(iOS)
         .statusBarHidden()
+        #endif
         .onAppear {
             withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
                 imageOpacity = 1.0

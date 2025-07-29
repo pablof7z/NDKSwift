@@ -164,13 +164,18 @@ public struct NDKUICurrentUserProfile<Content: View>: View {
         profileTask?.cancel()
         
         guard let ndk = ndk,
-              let currentUser = ndk.signer?.user else { return }
+              let signer = ndk.signer else { return }
         
         profileTask = Task {
-            for await profile in await ndk.profileManager.observe(for: currentUser.pubkey) {
-                await MainActor.run {
-                    self.profile = profile
+            do {
+                let currentUser = try await signer.user()
+                for await profile in await ndk.profileManager.observe(for: currentUser.pubkey) {
+                    await MainActor.run {
+                        self.profile = profile
+                    }
                 }
+            } catch {
+                NDKLogger.log(.error, category: .general, "[NDKUIProfileLoader] Failed to get current user: \(error)")
             }
         }
     }
@@ -278,7 +283,7 @@ public struct NDKUINip05Badge: View {
         
         verificationTask = Task {
             do {
-                let isValid = try await ndk.verifyNip05(identifier: identifier, pubkey: pubkey)
+                let isValid = try await ndk.nip05Manager.verify(identifier: identifier, expectedPubkey: pubkey)
                 await MainActor.run {
                     self.verificationStatus = isValid ? .verified(identifier) : .failed
                 }

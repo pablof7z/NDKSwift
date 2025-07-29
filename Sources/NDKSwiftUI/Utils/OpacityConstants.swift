@@ -37,4 +37,13 @@ public enum OpacityConstants {
 
     /// Heavy opacity (70%) - alias for secondary
     public static let heavy = 0.7
+    
+    /// Light background opacity (15%) - for light background overlays
+    public static let lightBackground = 0.15
+    
+    /// Dimmed opacity (40%) - for dimmed overlays
+    public static let dimmed = 0.4
+    
+    /// Shadow opacity (10%) - for shadow effects
+    public static let shadow = 0.1
 }

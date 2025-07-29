@@ -60,6 +60,12 @@ public struct NDKUIConnectionStatusBadge: View {
             return .orange
         case .failed:
             return .red
+        case .authRequired:
+            return .yellow
+        case .authenticating:
+            return .orange
+        case .authenticated:
+            return .green
         @unknown default:
             return .gray
         }
@@ -77,6 +83,12 @@ public struct NDKUIConnectionStatusBadge: View {
             return "Disconnecting"
         case .failed:
             return "Failed"
+        case .authRequired:
+            return "Auth Required"
+        case .authenticating:
+            return "Authenticating"
+        case .authenticated:
+            return "Authenticated"
         @unknown default:
             return "Unknown"
         }
@@ -357,7 +369,7 @@ struct NDKUIRelayStatusViews_Previews: PreviewProvider {
         VStack(spacing: 20) {
             NDKUIConnectionStatusBadge(state: .connected, style: .full)
             NDKUIConnectionStatusBadge(state: .connecting, style: .compact)
-            NDKUIConnectionStatusBadge(state: .failed, style: .text)
+            NDKUIConnectionStatusBadge(state: .failed("Connection error"), style: .text)
             
             NDKUIRelayRowView(
                 url: "wss://relay.damus.io",

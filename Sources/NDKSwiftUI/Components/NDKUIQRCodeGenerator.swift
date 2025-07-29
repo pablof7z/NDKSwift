@@ -205,7 +205,9 @@ public struct NDKUIQRCodeDisplayView: View {
                 Spacer()
             }
             .navigationTitle(title)
+            #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
+            #endif
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Done") { isPresented = false }

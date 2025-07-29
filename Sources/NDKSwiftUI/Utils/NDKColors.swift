@@ -49,4 +49,18 @@ extension Color {
         return Color.gray.opacity(OpacityConstants.semiOpaque)
         #endif
     }
+
+    /// Accent color for interactive elements and highlights
+    static var ndkAccent: Color {
+        Color.accentColor
+    }
+    
+    /// Border color for UI elements
+    static var ndkBorder: Color {
+        #if canImport(UIKit)
+        return Color(UIColor.separator).opacity(0.3)
+        #else
+        return Color.gray.opacity(0.2)
+        #endif
+    }
 }

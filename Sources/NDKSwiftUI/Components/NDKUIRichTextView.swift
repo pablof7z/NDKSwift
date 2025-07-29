@@ -153,9 +153,6 @@ public struct NDKUIRichTextView: View {
             return Text(text)
                 .foregroundColor(.ndkAccent)
                 .fontWeight(mentionFontWeight)
-                .onTapGesture {
-                    onMentionTapped?(pubkey)
-                }
             
         case .npubMention(let npub):
             // Try to get pubkey and load profile
@@ -165,9 +162,6 @@ public struct NDKUIRichTextView: View {
                 return Text(text)
                     .foregroundColor(.ndkAccent)
                     .fontWeight(mentionFontWeight)
-                    .onTapGesture {
-                        onMentionTapped?(pubkey)
-                    }
             } else {
                 return Text("@\(String(npub.prefix(16)))...")
                     .foregroundColor(.ndkAccent)
@@ -184,33 +178,21 @@ public struct NDKUIRichTextView: View {
             return Text("📝 \(String(eventId.prefix(8)))...")
                 .foregroundColor(.ndkAccent)
                 .underline()
-                .onTapGesture {
-                    onEventTapped?(eventId)
-                }
             
         case .noteMention(let note):
             return Text("📝 \(String(note.prefix(16)))...")
                 .foregroundColor(.ndkAccent)
                 .underline()
-                .onTapGesture {
-                    onEventTapped?(note)
-                }
             
         case .neventMention(let nevent):
             return Text("📝 \(String(nevent.prefix(16)))...")
                 .foregroundColor(.ndkAccent)
                 .underline()
-                .onTapGesture {
-                    onEventTapped?(nevent)
-                }
             
         case .hashtag(let tag):
             return Text("#\(tag)")
                 .foregroundColor(.ndkAccent)
                 .fontWeight(hashtagFontWeight)
-                .onTapGesture {
-                    onHashtagTapped?(tag)
-                }
             
         case .url(let url):
             // Don't render image URLs as text if we're showing previews
@@ -220,9 +202,6 @@ public struct NDKUIRichTextView: View {
                 return Text(url.absoluteString)
                     .foregroundColor(.ndkAccent)
                     .underline()
-                    .onTapGesture {
-                        onLinkTapped?(url)
-                    }
             }
         }
     }
