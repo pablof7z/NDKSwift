@@ -32,7 +32,7 @@ import Combine
 /// }
 /// ```
 @MainActor
-public final class NDKProfileDataSource: ObservableObject, NDKDataSourceProtocol {
+public final class NDKProfileDataSource: ObservableObject, @preconcurrency NDKDataSourceProtocol {
 
     // MARK: - Published Properties
 

@@ -1,6 +1,7 @@
 import SwiftUI
 import CoreImage
 import CoreImage.CIFilterBuiltins
+import NDKSwift
 #if os(iOS)
 import UIKit
 #elseif os(macOS)
@@ -17,7 +18,7 @@ public struct NDKUIQRCodeGenerator {
     #if os(iOS)
     public static func generate(from string: String, scale: CGFloat = 10) -> UIImage? {
         guard let data = string.data(using: .utf8) else { 
-            print("NDKUIQRCodeGenerator: Failed to convert string to UTF8 data")
+            NDKLogger.shared.error("[NDKUIQRCodeGenerator] Failed to convert string to UTF8 data")
             return nil 
         }
         
@@ -34,7 +35,7 @@ public struct NDKUIQRCodeGenerator {
         filter.correctionLevel = correctionLevel
         
         guard let outputImage = filter.outputImage else { 
-            print("NDKUIQRCodeGenerator: CIFilter failed to generate output image")
+            NDKLogger.shared.error("[NDKUIQRCodeGenerator] CIFilter failed to generate output image")
             return nil 
         }
         
@@ -43,7 +44,7 @@ public struct NDKUIQRCodeGenerator {
         
         let context = CIContext()
         guard let cgImage = context.createCGImage(scaledImage, from: scaledImage.extent) else { 
-            print("NDKUIQRCodeGenerator: Failed to create CGImage from CIImage")
+            NDKLogger.shared.error("[NDKUIQRCodeGenerator] Failed to create CGImage from CIImage")
             return nil 
         }
         
@@ -52,7 +53,7 @@ public struct NDKUIQRCodeGenerator {
     #else
     public static func generate(from string: String, scale: CGFloat = 10) -> NSImage? {
         guard let data = string.data(using: .utf8) else { 
-            print("NDKUIQRCodeGenerator: Failed to convert string to UTF8 data")
+            NDKLogger.shared.error("[NDKUIQRCodeGenerator] Failed to convert string to UTF8 data")
             return nil 
         }
         
@@ -69,7 +70,7 @@ public struct NDKUIQRCodeGenerator {
         filter.correctionLevel = correctionLevel
         
         guard let outputImage = filter.outputImage else { 
-            print("NDKUIQRCodeGenerator: CIFilter failed to generate output image")
+            NDKLogger.shared.error("[NDKUIQRCodeGenerator] CIFilter failed to generate output image")
             return nil 
         }
         

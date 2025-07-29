@@ -4,6 +4,19 @@ All notable changes to NDKSwift will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+- Fixed compilation error in `NDKNostrManager` where non-existent profile manager methods were being called
+- Replaced print statements with proper logging using `NDKLogger` in SwiftUI components:
+  - `NDKUIRelayManagementView` - Now logs relay list publishing errors properly
+  - `CachedAsyncImage` - Now logs cache hits/misses and download status
+  - `NDKUIQRCodeGenerator` - Now logs QR code generation errors
+
+### Changed
+- Added `@preconcurrency` attribute to `NDKDataSourceProtocol` conformances to fix Swift 6 warnings
+- Improved consistency in error logging across SwiftUI components
+
 ## [0.10.0] - 2025-01-28
 
 ### Added
