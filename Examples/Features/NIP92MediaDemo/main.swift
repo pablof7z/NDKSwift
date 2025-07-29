@@ -32,23 +32,18 @@ struct NIP92MediaDemo {
         print()
         
         // Example 2: Manual imeta tag with additional metadata
-        print("2. Manual imeta tag with metadata:")
+        print("2. Manual imeta tag with metadata (currently only basic auto-extraction):")
         let event2 = try await NDKEventBuilder(ndk: ndk)
             .content("My vacation photo: https://example.com/vacation.jpg")
-            .imetaTag(url: "https://example.com/vacation.jpg") { imeta in
-                imeta.alt = "Beautiful sunset at the beach in Costa Rica"
-                imeta.dim = "3024x4032"
-                imeta.m = "image/jpeg"
-                imeta.blurhash = "eVF$^OI:${M{o#*0-nNFxakD-?xVM}WEWB%iNKxvR-oetmo#R-aen$"
-            }
             .kind(EventKind.textNote)
             .build()
         
         print("Event content: \(event2.content)")
-        print("Generated imeta tags:")
+        print("Generated imeta tags (basic auto-extraction only):")
         for tag in event2.tags where tag.first == "imeta" {
             print("  \(tag)")
         }
+        print("Note: Manual imeta metadata (.imetaTag method) is not yet implemented")
         print()
         
         // Example 3: Disable automatic extraction
@@ -63,21 +58,18 @@ struct NIP92MediaDemo {
         print()
         
         // Example 4: Mix automatic and manual
-        print("4. Mix automatic extraction with manual enhancement:")
+        print("4. Mix automatic extraction with manual enhancement (auto-extraction only):")
         let event4 = try await NDKEventBuilder(ndk: ndk)
             .content("Photos: https://example.com/photo1.jpg and https://example.com/photo2.jpg")
-            .imetaTag(url: "https://example.com/photo1.jpg") { imeta in
-                imeta.alt = "First photo with custom description"
-                imeta.dim = "1920x1080"
-            }
             .kind(EventKind.textNote)
             .build()
         
         print("Event content: \(event4.content)")
-        print("Generated imeta tags:")
+        print("Generated imeta tags (auto-extraction only):")
         for tag in event4.tags where tag.first == "imeta" {
             print("  \(tag)")
         }
+        print("Note: Manual enhancement of specific URLs is not yet implemented")
         print()
         
         // Example 5: Blossom integration with automatic metadata extraction
@@ -96,12 +88,11 @@ struct NIP92MediaDemo {
         
         let event5 = try await NDKEventBuilder(ndk: ndk)
             .content("Just uploaded this photo: \(blossomUpload.url)")
-            .imetaTag(from: blossomUpload) // Includes all metadata automatically
             .kind(EventKind.textNote)
             .build()
         
         print("Event content: \(event5.content)")
-        print("Generated imeta tags (includes auto-extracted blurhash and dimensions):")
+        print("Generated imeta tags (basic auto-extraction - no Blossom integration yet):")
         for tag in event5.tags where tag.first == "imeta" {
             print("  \(tag)")
         }
@@ -141,26 +132,20 @@ struct NIP92MediaDemo {
         }
         print()
         
-        // Example 7: Pre-configured imeta tag
-        print("7. Pre-configured imeta tag:")
-        var customImeta = NDKImetaTag()
-        customImeta.url = "https://example.com/custom.jpg"
-        customImeta.alt = "Custom configured image"
-        customImeta.m = "image/jpeg"
-        customImeta.dim = "800x600"
-        customImeta.fallback = ["https://backup1.com/custom.jpg", "https://backup2.com/custom.jpg"]
+        // Example 7: Pre-configured imeta tag (showing what API will look like)
+        print("7. Pre-configured imeta tag (currently only auto-extraction):")
         
         let event7 = try await NDKEventBuilder(ndk: ndk)
             .content("Image with fallback URLs: https://example.com/custom.jpg")
-            .imetaTag(customImeta)
             .kind(EventKind.textNote)
             .build()
         
         print("Event content: \(event7.content)")
-        print("Generated imeta tags:")
+        print("Generated imeta tags (basic auto-extraction):")
         for tag in event7.tags where tag.first == "imeta" {
             print("  \(tag)")
         }
+        print("Note: Pre-configured imeta tag methods are not yet implemented")
         
         print("\nDemo completed!")
     }
