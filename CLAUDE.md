@@ -92,23 +92,23 @@ This ensures code signing persists across project regenerations.
 
 ### Core Architecture Patterns
 
-1. **Protocol-Oriented Design**: The codebase heavily uses protocols (NDKSigner, NDKCacheAdapter, NDKWallet) to allow multiple implementations and testing flexibility.
+1. **Protocol-Oriented Design**: The codebase heavily uses protocols (NDKSigner, NDKCache, NDKWallet) to allow multiple implementations and testing flexibility.
 
-2. **Actor-Based Concurrency**: Key components like NDKRelayPool, and BlossomClient use Swift actors for thread-safe state management. This requires understanding Swift's async/await patterns.
+2. **Actor-Based Concurrency**: Key components like NDKPool, NDKOutboxManager, and BlossomClient use Swift actors for thread-safe state management. This requires understanding Swift's async/await patterns.
 
 3. **Event-Driven Architecture**: The system revolves around NDKEvent objects that flow through relays, subscriptions, and caches. Events are immutable once signed.
 
-4. **Relay Pool Pattern**: Multiple relay connections are managed by NDKRelayPool, which handles automatic reconnection, relay selection, and message routing.
+4. **Relay Pool Pattern**: Multiple relay connections are managed by NDKPool, which handles automatic reconnection, relay selection, and message routing.
 
-5. **AsyncSequence-Based Subscriptions**: Subscriptions use Swift's AsyncSequence protocol for modern, composable event streaming that integrates naturally with async/await.
+5. **AsyncStream-Based Subscriptions**: Subscriptions use Swift's AsyncStream for modern, composable event streaming that integrates naturally with async/await.
 
 ### Key Architectural Components
 
 **NDK Core Flow**:
-- `NDK` → `NDKRelayPool` → `NDKRelayConnection` → WebSocket
+- `NDK` → `NDKPool` → `NDKRelayConnection` → WebSocket
 - Events flow bidirectionally through this chain
-- Subscriptions (`NDKSubscription`) filter incoming events
-- Cache adapters intercept events for storage
+- Subscriptions filter incoming events through NDKDataSource
+- Cache interceptors store events in NDKSQLiteCache
 
 **Relay-Level Subscription Grouping** (matches ndk-core):
 - Each relay has its own `NDKRelaySubscriptionManager`
@@ -131,9 +131,10 @@ This ensures code signing persists across project regenerations.
 - Signers are async to support future remote signing (NIP-46)
 
 **Cache System**:
-- `NDKCacheAdapter` protocol allows pluggable storage
-- `NDKInMemoryCache` for temporary storage
-- Caches handle both events and user profiles
+- `NDKCache` protocol allows pluggable storage
+- `NDKSQLiteCache` for persistent storage with migrations
+- `MemoryCache` for in-memory caching with LRU eviction
+- Caches handle events, profiles, and wallet data
 
 **Blossom Integration**:
 - `BlossomClient` handles file upload/download
@@ -183,8 +184,9 @@ This ensures code signing persists across project regenerations.
 - Event IDs are lowercase hex strings
 - All public keys are hex encoded (not npub)
 - Relay URLs are normalized using URLNormalizer (adds trailing slashes, strips auth, removes www, etc. - matches ndk-core)
-- File-based cache uses JSON for human readability
+- SQLite cache uses GRDB.swift for persistent storage
 - Blossom support is implemented as an extension to NDK core
+- JSON encoding/decoding should always use JSONCoding utility for consistency
 
 ## Subscription API Design
 
@@ -248,9 +250,13 @@ swift run --package-path Examples FileCacheDemo
 swift run --package-path Examples BlossomDemo
 ```
 
-UUIDs are stupid and should never be used in the context of nostr.
+## Important Development Principles
 
-- Unless otherwise specified, backward compatibility is not necessary (but deprecation warnings are helpful)
+- Prefer clean code over backward compatibility - avoid leaving code that needs refactoring later
+- Use deprecation warnings when changing APIs to guide users
+- Always use NDKLogger for logging instead of print statements in production code
+- Centralize JSON operations through JSONCoding utility for consistency
+- Follow the "never wait, always stream" pattern for data operations
 
 ## Claude Memories
 

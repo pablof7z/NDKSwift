@@ -337,11 +337,9 @@ private class FollowState: ObservableObject {
         }
 
         // Update state
-        await MainActor.run {
-            self.currentContactList = contacts
-            self.currentContactListEvent = latestEvent
-            self.isFollowing = contacts.contains(self.targetPubkey)
-        }
+        self.currentContactList = contacts
+        self.currentContactListEvent = latestEvent
+        self.isFollowing = contacts.contains(self.targetPubkey)
     }
 
     func toggleFollow(ndk: NDK) async {
