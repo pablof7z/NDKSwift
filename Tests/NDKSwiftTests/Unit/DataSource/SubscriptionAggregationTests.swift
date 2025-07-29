@@ -28,8 +28,8 @@ struct FilterSignature: Equatable {
     let tags: [String: [String]]?
     
     init(from filter: NDKFilter) {
-        // Store actual filter tags for test access
-        self.tags = filter.tags
+        // Store actual filter tags for test access, converting Set to Array
+        self.tags = filter.tags?.mapValues { Array($0) }
         
         // Create a more detailed signature including tag values
         var components: [String] = []

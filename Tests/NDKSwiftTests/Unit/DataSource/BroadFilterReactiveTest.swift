@@ -67,17 +67,19 @@ final class BroadFilterReactiveTest: XCTestCase {
         try await Task.sleep(nanoseconds: 100_000_000) // 0.1 seconds
         
         // Create events from both authors
-        let event1 = NDKEvent(content: "Event from author1", kind: 1)
-        event1.pubkey = author1
-        event1.id = "event1_\(UUID().uuidString)"
-        event1.createdAt = Timestamp(Date().timeIntervalSince1970)
-        event1.sig = "sig1"
+        let event1 = EventTestFactory.createEvent(
+            kind: 1,
+            content: "Event from author1",
+            pubkey: author1,
+            id: "event1_\(UUID().uuidString)"
+        )
         
-        let event2 = NDKEvent(content: "Event from author2", kind: 1)
-        event2.pubkey = author2
-        event2.id = "event2_\(UUID().uuidString)"
-        event2.createdAt = Timestamp(Date().timeIntervalSince1970)
-        event2.sig = "sig2"
+        let event2 = EventTestFactory.createEvent(
+            kind: 1,
+            content: "Event from author2",
+            pubkey: author2,
+            id: "event2_\(UUID().uuidString)"
+        )
         
         // Process events through the internal subscription system
         let mockRelay = MockRelay(url: "wss://test.relay/")
@@ -177,17 +179,19 @@ final class BroadFilterReactiveTest: XCTestCase {
         try await Task.sleep(nanoseconds: 100_000_000) // 0.1 seconds
         
         // Create test events
-        let kind1Event = NDKEvent(content: "Kind 1 event", kind: 1)
-        kind1Event.pubkey = testAuthor
-        kind1Event.id = "kind1_\(UUID().uuidString)"
-        kind1Event.createdAt = Timestamp(Date().timeIntervalSince1970)
-        kind1Event.sig = "sig1"
+        let kind1Event = EventTestFactory.createEvent(
+            kind: 1,
+            content: "Kind 1 event",
+            pubkey: testAuthor,
+            id: "kind1_\(UUID().uuidString)"
+        )
         
-        let kind4Event = NDKEvent(content: "Kind 4 event", kind: 4)
-        kind4Event.pubkey = testAuthor
-        kind4Event.id = "kind4_\(UUID().uuidString)"
-        kind4Event.createdAt = Timestamp(Date().timeIntervalSince1970)
-        kind4Event.sig = "sig4"
+        let kind4Event = EventTestFactory.createEvent(
+            kind: 4,
+            content: "Kind 4 event",
+            pubkey: testAuthor,
+            id: "kind4_\(UUID().uuidString)"
+        )
         
         // Process events
         let mockRelay = MockRelay(url: "wss://test.relay/")

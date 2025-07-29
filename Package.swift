@@ -51,7 +51,7 @@ let package = Package(
         ),
         .testTarget(
             name: "NDKSwiftTests",
-            dependencies: ["NDKSwift", "NDKSwiftUI"],
+            dependencies: ["NDKSwift"],
             resources: [
                 .process("Integration/README_OutboxTests.md")
             ]

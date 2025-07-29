@@ -13,7 +13,7 @@ final class NDKAuthErrorHandlerTests: XCTestCase {
         XCTAssertEqual(errorInfo.title, "No Active Session")
         XCTAssertEqual(errorInfo.message, "Please sign in to continue.")
         XCTAssertTrue(errorInfo.isRecoverable)
-        XCTAssertEqual(errorInfo.suggestedAction, .reauthenticate)
+        XCTAssertEqual(errorInfo.suggestedAction, NDKAuthErrorHandler.ErrorInfo.SuggestedAction.reauthenticate)
     }
     
     func testAnalyzeSessionNotFound() {
@@ -23,7 +23,7 @@ final class NDKAuthErrorHandlerTests: XCTestCase {
         XCTAssertEqual(errorInfo.title, "Session Not Found")
         XCTAssertEqual(errorInfo.message, "The requested session could not be found. It may have been deleted.")
         XCTAssertTrue(errorInfo.isRecoverable)
-        XCTAssertEqual(errorInfo.suggestedAction, .reauthenticate)
+        XCTAssertEqual(errorInfo.suggestedAction, NDKAuthErrorHandler.ErrorInfo.SuggestedAction.reauthenticate)
     }
     
     func testAnalyzeSignerCreationFailed() {
@@ -34,7 +34,7 @@ final class NDKAuthErrorHandlerTests: XCTestCase {
         XCTAssertEqual(errorInfo.title, "Authentication Failed")
         XCTAssertEqual(errorInfo.message, "Unable to create authentication credentials. Please try again.")
         XCTAssertTrue(errorInfo.isRecoverable)
-        XCTAssertEqual(errorInfo.suggestedAction, .retry)
+        XCTAssertEqual(errorInfo.suggestedAction, NDKAuthErrorHandler.ErrorInfo.SuggestedAction.retry)
     }
     
     func testAnalyzeBiometricAuthenticationFailed() {
@@ -44,7 +44,7 @@ final class NDKAuthErrorHandlerTests: XCTestCase {
         XCTAssertEqual(errorInfo.title, "Biometric Authentication Failed")
         XCTAssertEqual(errorInfo.message, "Unable to verify your identity. Please try again or use your passcode.")
         XCTAssertTrue(errorInfo.isRecoverable)
-        XCTAssertEqual(errorInfo.suggestedAction, .retry)
+        XCTAssertEqual(errorInfo.suggestedAction, NDKAuthErrorHandler.ErrorInfo.SuggestedAction.retry)
     }
     
     func testAnalyzeInvalidSession() {
@@ -54,7 +54,7 @@ final class NDKAuthErrorHandlerTests: XCTestCase {
         XCTAssertEqual(errorInfo.title, "Invalid Session")
         XCTAssertEqual(errorInfo.message, "Your session is no longer valid. Please sign in again.")
         XCTAssertTrue(errorInfo.isRecoverable)
-        XCTAssertEqual(errorInfo.suggestedAction, .reauthenticate)
+        XCTAssertEqual(errorInfo.suggestedAction, NDKAuthErrorHandler.ErrorInfo.SuggestedAction.reauthenticate)
     }
     
     func testAnalyzeSessionExpired() {
@@ -64,7 +64,7 @@ final class NDKAuthErrorHandlerTests: XCTestCase {
         XCTAssertEqual(errorInfo.title, "Session Expired")
         XCTAssertEqual(errorInfo.message, "Your session has expired for security reasons. Please sign in again.")
         XCTAssertTrue(errorInfo.isRecoverable)
-        XCTAssertEqual(errorInfo.suggestedAction, .reauthenticate)
+        XCTAssertEqual(errorInfo.suggestedAction, NDKAuthErrorHandler.ErrorInfo.SuggestedAction.reauthenticate)
     }
     
     func testAnalyzeCorruptedSessionData() {
@@ -74,7 +74,7 @@ final class NDKAuthErrorHandlerTests: XCTestCase {
         XCTAssertEqual(errorInfo.title, "Corrupted Session Data")
         XCTAssertEqual(errorInfo.message, "The data for this account appears to be corrupted and cannot be recovered. The account will need to be re-added.")
         XCTAssertFalse(errorInfo.isRecoverable)
-        XCTAssertEqual(errorInfo.suggestedAction, .removeAccount)
+        XCTAssertEqual(errorInfo.suggestedAction, NDKAuthErrorHandler.ErrorInfo.SuggestedAction.removeAccount)
     }
     
     func testAnalyzeKeychainErrorWithinAuthError() {
@@ -86,7 +86,7 @@ final class NDKAuthErrorHandlerTests: XCTestCase {
         XCTAssertEqual(errorInfo.title, "Credentials Not Found")
         XCTAssertEqual(errorInfo.message, "Your saved credentials could not be found. Please sign in again.")
         XCTAssertTrue(errorInfo.isRecoverable)
-        XCTAssertEqual(errorInfo.suggestedAction, .reauthenticate)
+        XCTAssertEqual(errorInfo.suggestedAction, NDKAuthErrorHandler.ErrorInfo.SuggestedAction.reauthenticate)
     }
     
     // MARK: - NDKKeychainError Tests
@@ -98,7 +98,7 @@ final class NDKAuthErrorHandlerTests: XCTestCase {
         XCTAssertEqual(errorInfo.title, "Storage Error")
         XCTAssertEqual(errorInfo.message, "Failed to save credentials securely (code: -25299). Please try again.")
         XCTAssertTrue(errorInfo.isRecoverable)
-        XCTAssertEqual(errorInfo.suggestedAction, .retry)
+        XCTAssertEqual(errorInfo.suggestedAction, NDKAuthErrorHandler.ErrorInfo.SuggestedAction.retry)
     }
     
     func testAnalyzeKeychainRetrievalError() {
@@ -108,7 +108,7 @@ final class NDKAuthErrorHandlerTests: XCTestCase {
         XCTAssertEqual(errorInfo.title, "Retrieval Error")
         XCTAssertEqual(errorInfo.message, "Failed to retrieve credentials (code: -25300). Please sign in again.")
         XCTAssertTrue(errorInfo.isRecoverable)
-        XCTAssertEqual(errorInfo.suggestedAction, .reauthenticate)
+        XCTAssertEqual(errorInfo.suggestedAction, NDKAuthErrorHandler.ErrorInfo.SuggestedAction.reauthenticate)
     }
     
     func testAnalyzeKeychainDeletionError() {
@@ -118,17 +118,17 @@ final class NDKAuthErrorHandlerTests: XCTestCase {
         XCTAssertEqual(errorInfo.title, "Deletion Error")
         XCTAssertEqual(errorInfo.message, "Failed to remove credentials (code: -25244). Please try again.")
         XCTAssertTrue(errorInfo.isRecoverable)
-        XCTAssertEqual(errorInfo.suggestedAction, .retry)
+        XCTAssertEqual(errorInfo.suggestedAction, NDKAuthErrorHandler.ErrorInfo.SuggestedAction.retry)
     }
     
     func testAnalyzeKeychainAccessControlError() {
-        let error = NDKKeychainError.accessControlError(nil)
+        let error = NDKKeychainError.accessControlError(error: nil)
         let errorInfo = NDKAuthErrorHandler.analyze(error)
         
         XCTAssertEqual(errorInfo.title, "Access Control Error")
         XCTAssertEqual(errorInfo.message, "Unable to configure secure access. Please try again.")
         XCTAssertTrue(errorInfo.isRecoverable)
-        XCTAssertEqual(errorInfo.suggestedAction, .retry)
+        XCTAssertEqual(errorInfo.suggestedAction, NDKAuthErrorHandler.ErrorInfo.SuggestedAction.retry)
     }
     
     func testAnalyzeKeychainItemNotFound() {
@@ -138,7 +138,7 @@ final class NDKAuthErrorHandlerTests: XCTestCase {
         XCTAssertEqual(errorInfo.title, "Credentials Not Found")
         XCTAssertEqual(errorInfo.message, "Your saved credentials could not be found. Please sign in again.")
         XCTAssertTrue(errorInfo.isRecoverable)
-        XCTAssertEqual(errorInfo.suggestedAction, .reauthenticate)
+        XCTAssertEqual(errorInfo.suggestedAction, NDKAuthErrorHandler.ErrorInfo.SuggestedAction.reauthenticate)
     }
     
     func testAnalyzeKeychainInvalidData() {
@@ -148,7 +148,7 @@ final class NDKAuthErrorHandlerTests: XCTestCase {
         XCTAssertEqual(errorInfo.title, "Invalid Credentials")
         XCTAssertEqual(errorInfo.message, "The stored credentials are invalid. Please sign in again.")
         XCTAssertTrue(errorInfo.isRecoverable)
-        XCTAssertEqual(errorInfo.suggestedAction, .reauthenticate)
+        XCTAssertEqual(errorInfo.suggestedAction, NDKAuthErrorHandler.ErrorInfo.SuggestedAction.reauthenticate)
     }
     
     func testAnalyzeKeychainUserCancelled() {
@@ -168,7 +168,7 @@ final class NDKAuthErrorHandlerTests: XCTestCase {
         XCTAssertEqual(errorInfo.title, "Authentication Failed")
         XCTAssertEqual(errorInfo.message, "Unable to access secure storage. Please try again.")
         XCTAssertTrue(errorInfo.isRecoverable)
-        XCTAssertEqual(errorInfo.suggestedAction, .retry)
+        XCTAssertEqual(errorInfo.suggestedAction, NDKAuthErrorHandler.ErrorInfo.SuggestedAction.retry)
     }
     
     func testAnalyzeKeychainBiometricNotAvailable() {
@@ -201,7 +201,7 @@ final class NDKAuthErrorHandlerTests: XCTestCase {
         XCTAssertEqual(errorInfo.title, "Authentication Failed")
         XCTAssertEqual(errorInfo.message, "Face ID or Touch ID authentication failed. Please try again.")
         XCTAssertTrue(errorInfo.isRecoverable)
-        XCTAssertEqual(errorInfo.suggestedAction, .retry)
+        XCTAssertEqual(errorInfo.suggestedAction, NDKAuthErrorHandler.ErrorInfo.SuggestedAction.retry)
     }
     
     func testAnalyzeLAErrorUserCancel() {
@@ -231,7 +231,7 @@ final class NDKAuthErrorHandlerTests: XCTestCase {
         XCTAssertEqual(errorInfo.title, "Authentication Interrupted")
         XCTAssertEqual(errorInfo.message, "Authentication was cancelled by the system. Please try again.")
         XCTAssertTrue(errorInfo.isRecoverable)
-        XCTAssertEqual(errorInfo.suggestedAction, .retry)
+        XCTAssertEqual(errorInfo.suggestedAction, NDKAuthErrorHandler.ErrorInfo.SuggestedAction.retry)
     }
     
     func testAnalyzeLAErrorPasscodeNotSet() {
@@ -284,7 +284,7 @@ final class NDKAuthErrorHandlerTests: XCTestCase {
         XCTAssertEqual(errorInfo.title, "No Internet Connection")
         XCTAssertEqual(errorInfo.message, "Please check your internet connection and try again.")
         XCTAssertTrue(errorInfo.isRecoverable)
-        XCTAssertEqual(errorInfo.suggestedAction, .retry)
+        XCTAssertEqual(errorInfo.suggestedAction, NDKAuthErrorHandler.ErrorInfo.SuggestedAction.retry)
     }
     
     func testAnalyzeURLErrorTimedOut() {
@@ -294,7 +294,7 @@ final class NDKAuthErrorHandlerTests: XCTestCase {
         XCTAssertEqual(errorInfo.title, "Request Timed Out")
         XCTAssertEqual(errorInfo.message, "The request took too long. Please try again.")
         XCTAssertTrue(errorInfo.isRecoverable)
-        XCTAssertEqual(errorInfo.suggestedAction, .retry)
+        XCTAssertEqual(errorInfo.suggestedAction, NDKAuthErrorHandler.ErrorInfo.SuggestedAction.retry)
     }
     
     func testAnalyzeURLErrorCannotFindHost() {
@@ -304,7 +304,7 @@ final class NDKAuthErrorHandlerTests: XCTestCase {
         XCTAssertEqual(errorInfo.title, "Connection Failed")
         XCTAssertEqual(errorInfo.message, "Unable to connect to the server. Please try again later.")
         XCTAssertTrue(errorInfo.isRecoverable)
-        XCTAssertEqual(errorInfo.suggestedAction, .retry)
+        XCTAssertEqual(errorInfo.suggestedAction, NDKAuthErrorHandler.ErrorInfo.SuggestedAction.retry)
     }
     
     func testAnalyzeURLErrorCannotConnectToHost() {
@@ -314,7 +314,7 @@ final class NDKAuthErrorHandlerTests: XCTestCase {
         XCTAssertEqual(errorInfo.title, "Connection Failed")
         XCTAssertEqual(errorInfo.message, "Unable to connect to the server. Please try again later.")
         XCTAssertTrue(errorInfo.isRecoverable)
-        XCTAssertEqual(errorInfo.suggestedAction, .retry)
+        XCTAssertEqual(errorInfo.suggestedAction, NDKAuthErrorHandler.ErrorInfo.SuggestedAction.retry)
     }
     
     func testAnalyzeURLErrorGeneric() {
@@ -324,7 +324,7 @@ final class NDKAuthErrorHandlerTests: XCTestCase {
         XCTAssertEqual(errorInfo.title, "Network Error")
         XCTAssertEqual(errorInfo.message, "A network error occurred. Please try again.")
         XCTAssertTrue(errorInfo.isRecoverable)
-        XCTAssertEqual(errorInfo.suggestedAction, .retry)
+        XCTAssertEqual(errorInfo.suggestedAction, NDKAuthErrorHandler.ErrorInfo.SuggestedAction.retry)
     }
     
     // MARK: - Other Error Tests
@@ -345,7 +345,7 @@ final class NDKAuthErrorHandlerTests: XCTestCase {
             XCTAssertEqual(errorInfo.title, "Data Corruption")
             XCTAssertEqual(errorInfo.message, "The session data appears to be corrupted. The account will need to be re-added.")
             XCTAssertFalse(errorInfo.isRecoverable)
-            XCTAssertEqual(errorInfo.suggestedAction, .removeAccount)
+            XCTAssertEqual(errorInfo.suggestedAction, NDKAuthErrorHandler.ErrorInfo.SuggestedAction.removeAccount)
         }
     }
     
@@ -360,6 +360,6 @@ final class NDKAuthErrorHandlerTests: XCTestCase {
         XCTAssertEqual(errorInfo.title, "Authentication Error")
         XCTAssertEqual(errorInfo.message, "Custom error message")
         XCTAssertTrue(errorInfo.isRecoverable)
-        XCTAssertEqual(errorInfo.suggestedAction, .retry)
+        XCTAssertEqual(errorInfo.suggestedAction, NDKAuthErrorHandler.ErrorInfo.SuggestedAction.retry)
     }
 }

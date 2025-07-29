@@ -162,7 +162,7 @@ try await authManager.updateActiveSessionProfile(profile)
 
 ```swift
 // Remove a session
-try await authManager.deleteSession(session)
+try await authManager.removeSession(session)
 
 // Or logout and clear active session
 authManager.logout()
@@ -182,7 +182,7 @@ func performCompleteLogout() async {
     
     // Delete all sessions from keychain
     for session in authManager.availableSessions {
-        try? await authManager.deleteSession(session)
+        try? await authManager.removeSession(session)
     }
     
     // Clear memory state
@@ -192,7 +192,7 @@ func performCompleteLogout() async {
 // Alternative: Delete only the active session
 func logoutCurrentUser() async {
     if let activeSession = authManager.activeSession {
-        try? await authManager.deleteSession(activeSession)
+        try? await authManager.removeSession(activeSession)
     }
     authManager.logout()
 }

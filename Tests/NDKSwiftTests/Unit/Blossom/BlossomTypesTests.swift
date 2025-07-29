@@ -87,7 +87,7 @@ final class BlossomTypesTests: XCTestCase {
     
     func testBlossomAuthCreation() async throws {
         let ndk = NDK()
-        let signer = MockSigner()
+        let signer = MockNDKSigner()
         
         // Test upload auth
         let uploadAuth = try await BlossomAuth.createUploadAuth(
@@ -109,7 +109,7 @@ final class BlossomTypesTests: XCTestCase {
     
     func testBlossomAuthDeleteCreation() async throws {
         let ndk = NDK()
-        let signer = MockSigner()
+        let signer = MockNDKSigner()
         
         let deleteAuth = try await BlossomAuth.createDeleteAuth(
             sha256: "deletehash",
@@ -126,7 +126,7 @@ final class BlossomTypesTests: XCTestCase {
     
     func testBlossomAuthListCreation() async throws {
         let ndk = NDK()
-        let signer = MockSigner()
+        let signer = MockNDKSigner()
         
         let since = Date().addingTimeInterval(-3600)
         let until = Date()
@@ -146,7 +146,7 @@ final class BlossomTypesTests: XCTestCase {
     
     func testBlossomAuthHeaderValue() async throws {
         let ndk = NDK()
-        let signer = MockSigner()
+        let signer = MockNDKSigner()
         
         let auth = try await BlossomAuth.createUploadAuth(
             sha256: "testhash",

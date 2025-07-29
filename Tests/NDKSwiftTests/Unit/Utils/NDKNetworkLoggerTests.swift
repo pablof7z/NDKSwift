@@ -5,13 +5,13 @@ final class NDKNetworkLoggerTests: XCTestCase {
     
     override func setUp() {
         super.setUp()
-        NDKLogger.isEnabled = true
+        NDKLogger.logLevel = .trace // Enable logging
         NDKLogger.logNetworkTraffic = true
     }
     
     override func tearDown() {
         NDKLogger.logHandler = nil
-        NDKLogger.isEnabled = false
+        NDKLogger.logLevel = .off // Disable logging
         NDKLogger.logNetworkTraffic = false
         super.tearDown()
     }
@@ -88,7 +88,7 @@ final class NDKNetworkLoggerTests: XCTestCase {
             capturedOutput = output
         }
         
-        NDKLogger.isEnabled = false
+        NDKLogger.logLevel = .off
         
         let testURL = URL(string: "wss://relay.example.com")!
         let message = "[\"REQ\",\"sub123\",{\"kinds\":[1]}]"
@@ -104,7 +104,7 @@ final class NDKNetworkLoggerTests: XCTestCase {
             capturedOutput = output
         }
         
-        let event = try! NDKEvent(kind: 1, content: "Hello, world!")
+        let event = EventTestFactory.createEvent(kind: 1, content: "Hello, world!")
         let message = NostrMessage.event(subscriptionId: "sub123", event: event)
         
         NDKNetworkLogger.logParsedMessage(message)
@@ -122,7 +122,7 @@ final class NDKNetworkLoggerTests: XCTestCase {
             capturedOutput = output
         }
         
-        let filter = NDKFilter(kinds: [1, 3], limit: 10, since: Timestamp(1000), until: Timestamp(2000))
+        let filter = NDKFilter(kinds: [1, 3], since: Timestamp(1000), until: Timestamp(2000), limit: 10)
         let message = NostrMessage.req(subscriptionId: "sub123", filters: [filter])
         
         NDKNetworkLogger.logParsedMessage(message)
@@ -142,7 +142,7 @@ final class NDKNetworkLoggerTests: XCTestCase {
             capturedOutput = output
         }
         
-        let message = NostrMessage.ok(eventId: "event123", accepted: true, errorMessage: "Event published successfully")
+        let message = NostrMessage.ok(eventId: "event123", accepted: true, message: "Event published successfully")
         
         NDKNetworkLogger.logParsedMessage(message)
         
@@ -175,7 +175,7 @@ final class NDKNetworkLoggerTests: XCTestCase {
         }
         
         let longContent = String(repeating: "A", count: 150)
-        let event = try! NDKEvent(kind: 1, content: longContent)
+        let event = EventTestFactory.createEvent(kind: 1, content: longContent)
         let message = NostrMessage.event(subscriptionId: nil, event: event)
         
         NDKNetworkLogger.logParsedMessage(message)

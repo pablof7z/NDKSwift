@@ -66,11 +66,14 @@ final class CacheOnlyReactiveTest: XCTestCase {
         try await Task.sleep(nanoseconds: 100_000_000) // 0.1 seconds
         
         // Create and process event through internal subscription system
-        let event = NDKEvent(content: "Test reactive system", kind: 1)
-        event.pubkey = testAuthor
-        event.id = "test_event_\(UUID().uuidString)"
-        event.createdAt = Timestamp(Date().timeIntervalSince1970)
-        event.sig = "test_signature"
+        let event = EventTestFactory.createEvent(
+            kind: 1,
+            content: "Test reactive system",
+            tags: [],
+            pubkey: testAuthor,
+            createdAt: Timestamp(Date().timeIntervalSince1970),
+            id: "test_event_\(UUID().uuidString)"
+        )
         
         // Simulate event arriving from relay
         let mockRelay = MockRelay(url: "wss://test.relay/")
@@ -152,11 +155,14 @@ final class CacheOnlyReactiveTest: XCTestCase {
         try await Task.sleep(nanoseconds: 100_000_000) // 0.1 seconds
         
         // Create and process event
-        let event = NDKEvent(content: "Shared event test", kind: 1)
-        event.pubkey = testAuthor
-        event.id = "shared_event_\(UUID().uuidString)"
-        event.createdAt = Timestamp(Date().timeIntervalSince1970)
-        event.sig = "test_signature"
+        let event = EventTestFactory.createEvent(
+            kind: 1,
+            content: "Shared event test",
+            tags: [],
+            pubkey: testAuthor,
+            createdAt: Timestamp(Date().timeIntervalSince1970),
+            id: "shared_event_\(UUID().uuidString)"
+        )
         
         // Process through network subscription
         let mockRelay = MockRelay(url: "wss://test.relay/")

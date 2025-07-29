@@ -197,7 +197,7 @@ func logout() {
         
         // 2. Delete ALL sessions from keychain - this is critical!
         for session in ndkAuthManager.availableSessions {
-            try? await ndkAuthManager.deleteSession(session)
+            try? await ndkAuthManager.removeSession(session)
         }
     }
     
@@ -212,7 +212,7 @@ func logout() {
 func logoutCurrentUser() {
     Task {
         if let activeSession = ndkAuthManager.activeSession {
-            try? await ndkAuthManager.deleteSession(activeSession)
+            try? await ndkAuthManager.removeSession(activeSession)
         }
     }
     ndkAuthManager.logout()

@@ -11,7 +11,7 @@ final class NDKProfileManagerTests: NDKTestCase {
         try await super.setUp()
         cache = MemoryCache()
         ndk = NDK(relayUrls: [], cache: cache)
-        sut = NDKProfileManager(ndk: ndk, cache: cache)
+        sut = NDKProfileManager(ndk: ndk)
     }
     
     override func tearDown() async throws {
@@ -39,7 +39,7 @@ final class NDKProfileManagerTests: NDKTestCase {
         )
         
         // Cache the profile
-        await cache.saveProfile(profile, for: pubkey)
+        try await cache.saveProfile(profile, pubkey: pubkey)
         
         // When
         let loadedProfile = await sut.loadProfile(for: pubkey)
@@ -85,7 +85,7 @@ final class NDKProfileManagerTests: NDKTestCase {
         await sut.saveProfile(profile, for: pubkey)
         
         // Then
-        let cachedProfile = await cache.getProfile(for: pubkey)
+        let cachedProfile = await cache.getProfile(pubkey: pubkey)
         XCTAssertNotNil(cachedProfile)
         XCTAssertEqual(cachedProfile?.name, profile.name)
         XCTAssertEqual(cachedProfile?.displayName, profile.displayName)
@@ -108,7 +108,7 @@ final class NDKProfileManagerTests: NDKTestCase {
             lud06: nil,
             website: nil
         )
-        await cache.saveProfile(originalProfile, for: pubkey)
+        try await cache.saveProfile(originalProfile, pubkey: pubkey)
         
         let updatedProfile = NDKUserProfile(
             name: "Updated Name",
@@ -126,7 +126,7 @@ final class NDKProfileManagerTests: NDKTestCase {
         await sut.saveProfile(updatedProfile, for: pubkey)
         
         // Then
-        let cachedProfile = await cache.getProfile(for: pubkey)
+        let cachedProfile = await cache.getProfile(pubkey: pubkey)
         XCTAssertEqual(cachedProfile?.name, updatedProfile.name)
         XCTAssertEqual(cachedProfile?.displayName, updatedProfile.displayName)
         XCTAssertEqual(cachedProfile?.about, updatedProfile.about)
@@ -147,7 +147,7 @@ final class NDKProfileManagerTests: NDKTestCase {
         
         // Cache all profiles
         for (pubkey, profile) in profiles {
-            await cache.saveProfile(profile, for: pubkey)
+            try await cache.saveProfile(profile, pubkey: pubkey)
         }
         
         // When
@@ -178,7 +178,7 @@ final class NDKProfileManagerTests: NDKTestCase {
         await sut.processProfileEvent(event)
         
         // Then
-        let cachedProfile = await cache.getProfile(for: pubkey)
+        let cachedProfile = await cache.getProfile(pubkey: pubkey)
         XCTAssertNotNil(cachedProfile)
         XCTAssertEqual(cachedProfile?.name, "Event User")
         XCTAssertEqual(cachedProfile?.about, "From event")
@@ -194,7 +194,7 @@ final class NDKProfileManagerTests: NDKTestCase {
         await sut.processProfileEvent(event)
         
         // Then
-        let cachedProfile = await cache.getProfile(for: pubkey)
+        let cachedProfile = await cache.getProfile(pubkey: pubkey)
         XCTAssertNil(cachedProfile)
     }
     
@@ -251,7 +251,7 @@ final class NDKProfileManagerTests: NDKTestCase {
                 lud06: nil,
                 website: nil
             )
-            await cache.saveProfile(profile, for: pubkey)
+            try await cache.saveProfile(profile, pubkey: pubkey)
         }
         
         // When/Then - Measure loading performance

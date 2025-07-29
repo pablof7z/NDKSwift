@@ -61,10 +61,14 @@ final class NIP17PrivateMessagesE2ETests: XCTestCase {
         // Bob fetches gift wrapped messages
         let filter = NDKFilter(
             kinds: [EventKind.giftWrap],
-            tags: ["p": [bobPubkey]]
+            tags: ["p": Set([bobPubkey])]
         )
         
-        let receivedEvents = try await ndk.fetchEvents(filter)
+        let dataSource = ndk.observe(filter: filter, maxAge: 0, closeOnEose: true)
+        var receivedEvents: [NDKEvent] = []
+        for await event in dataSource.events {
+            receivedEvents.append(event)
+        }
         
         // Find our message
         let ourMessage = receivedEvents.first { event in
@@ -111,7 +115,7 @@ final class NIP17PrivateMessagesE2ETests: XCTestCase {
         
         // Publish all wrapped events
         for (_, event) in wrappedEvents.events {
-            _ = try await ndk.publish(event: event)
+            _ = try await ndk.publish(event)
         }
         
         try await Task.sleep(nanoseconds: TimeConstants.nanosecondsPerMillisecond * 500) // 0.5 seconds
@@ -119,10 +123,14 @@ final class NIP17PrivateMessagesE2ETests: XCTestCase {
         // Bob fetches and unwraps his copy
         let bobFilter = NDKFilter(
             kinds: [EventKind.giftWrap],
-            tags: ["p": [bobPubkey]]
+            tags: ["p": Set([bobPubkey])]
         )
         
-        let bobEvents = try await ndk.fetchEvents(bobFilter)
+        let bobDataSource = ndk.observe(filter: bobFilter, maxAge: 0, closeOnEose: true)
+        var bobEvents: [NDKEvent] = []
+        for await event in bobDataSource.events {
+            bobEvents.append(event)
+        }
         let bobWrapped = bobEvents.first { event in
             wrappedEvents.events[bobPubkey]?.id == event.id
         }
@@ -176,7 +184,7 @@ final class NIP17PrivateMessagesE2ETests: XCTestCase {
             recipient: NIP17Recipient(pubkey: alicePubkey)
         )
         
-        _ = try await ndk.publish(event: wrappedReply)
+        _ = try await ndk.publish(wrappedReply)
     }
     
     func testFileMessage() async throws {
@@ -210,7 +218,7 @@ final class NIP17PrivateMessagesE2ETests: XCTestCase {
             recipient: NIP17Recipient(pubkey: bobPubkey)
         )
         
-        _ = try await ndk.publish(event: wrapped)
+        _ = try await ndk.publish(wrapped)
         
         // Bob unwraps and verifies
         let unwrapped = try await NIP17.unwrapEvent(wrapped, recipientSigner: bob)

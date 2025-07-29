@@ -54,12 +54,12 @@ final class NDKDataSourceTests: NDKTestCase {
         try await Task.sleep(nanoseconds: 100_000_000) // 0.1s
         
         // Simulate receiving event through cache
-        await cache.processEvent(event, from: "wss://test.relay", subscriptionId: "test")
+        try await cache.processEvent(event, from: "wss://test.relay", subscriptionId: "test")
         
         // Wait for event
         let receivedEvent = await consumeTask.value
         XCTAssertNotNil(receivedEvent)
-        XCTAssertEqual(receivedEvent?.id, event.id)
+        XCTAssertEqual(receivedEvent.id, event.id)
     }
     
     // MARK: - AsyncSequence Tests
@@ -93,7 +93,7 @@ final class NDKDataSourceTests: NDKTestCase {
         
         // Simulate receiving events
         for event in events {
-            await cache.processEvent(event, from: "wss://test.relay", subscriptionId: "test")
+            try await cache.processEvent(event, from: "wss://test.relay", subscriptionId: "test")
         }
         
         let receivedEvents = await consumeTask.value
@@ -126,8 +126,8 @@ final class NDKDataSourceTests: NDKTestCase {
         try await Task.sleep(nanoseconds: 100_000_000)
         
         // Send both events to cache
-        await cache.processEvent(matchingEvent, from: "wss://test.relay", subscriptionId: "test")
-        await cache.processEvent(nonMatchingEvent, from: "wss://test.relay", subscriptionId: "test")
+        try await cache.processEvent(matchingEvent, from: "wss://test.relay", subscriptionId: "test")
+        try await cache.processEvent(nonMatchingEvent, from: "wss://test.relay", subscriptionId: "test")
         
         // Wait for processing
         try await Task.sleep(nanoseconds: 200_000_000) // 0.2s
@@ -214,7 +214,7 @@ final class NDKDataSourceTests: NDKTestCase {
         
         // Send events
         for event in events {
-            await cache.processEvent(event, from: "wss://test.relay", subscriptionId: "test")
+            try await cache.processEvent(event, from: "wss://test.relay", subscriptionId: "test")
         }
         
         let collectedEvents = await collectTask.value
@@ -238,7 +238,7 @@ final class NDKDataSourceTests: NDKTestCase {
         try await Task.sleep(nanoseconds: 100_000_000)
         
         // Send event
-        await cache.processEvent(event, from: "wss://test.relay", subscriptionId: "test")
+        try await cache.processEvent(event, from: "wss://test.relay", subscriptionId: "test")
         
         let firstEvent = await firstTask.value
         XCTAssertNotNil(firstEvent)
@@ -280,8 +280,8 @@ final class NDKDataSourceTests: NDKTestCase {
         try await Task.sleep(nanoseconds: 100_000_000)
         
         // Send events
-        await cache.processEvent(kind1Event, from: "wss://test.relay", subscriptionId: "test")
-        await cache.processEvent(kind2Event, from: "wss://test.relay", subscriptionId: "test")
+        try await cache.processEvent(kind1Event, from: "wss://test.relay", subscriptionId: "test")
+        try await cache.processEvent(kind2Event, from: "wss://test.relay", subscriptionId: "test")
         
         // Wait for processing
         try await Task.sleep(nanoseconds: 200_000_000)
@@ -344,7 +344,7 @@ final class NDKDataSourceTests: NDKTestCase {
         try await Task.sleep(nanoseconds: 100_000_000)
         
         // Send event
-        await cache.processEvent(event, from: "wss://test.relay", subscriptionId: "test")
+        try await cache.processEvent(event, from: "wss://test.relay", subscriptionId: "test")
         
         let content = await consumeTask.value
         XCTAssertEqual(content, "Hello, world!")

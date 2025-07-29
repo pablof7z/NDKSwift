@@ -23,7 +23,7 @@ final class AuthenticationE2ETests: XCTestCase {
         
         // Remove all sessions
         for session in authManager.availableSessions {
-            try await authManager.deleteSession(session)
+            try await authManager.removeSession(session)
         }
         
         print("[\(timestamp())] Test environment cleaned")
@@ -33,7 +33,7 @@ final class AuthenticationE2ETests: XCTestCase {
         // Clean up after test
         let authManager = NDKAuthManager.shared
         for session in authManager.availableSessions {
-            try await authManager.deleteSession(session)
+            try await authManager.removeSession(session)
         }
         
         try await super.tearDown()
@@ -260,7 +260,7 @@ final class AuthenticationE2ETests: XCTestCase {
         print("[\(timestamp())] Testing session deletion...")
         let sessionToDelete = sessions[1].session
         
-        try await authManager.deleteSession(sessionToDelete)
+        try await authManager.removeSession(sessionToDelete)
         
         // Verify deletion
         XCTAssertEqual(authManager.availableSessions.count, accountCount - 1)
@@ -280,7 +280,7 @@ final class AuthenticationE2ETests: XCTestCase {
         // Test clearing all sessions
         print("[\(timestamp())] Testing clear all sessions...")
         for session in authManager.availableSessions {
-            try await authManager.deleteSession(session)
+            try await authManager.removeSession(session)
         }
         
         XCTAssertEqual(authManager.availableSessions.count, 0)
@@ -565,7 +565,7 @@ final class AuthenticationE2ETests: XCTestCase {
         
         // Test that deleting one session doesn't affect the other
         print("[\(timestamp())] Testing session independence...")
-        try await authManager.deleteSession(session1)
+        try await authManager.removeSession(session1)
         
         // Session 2 should still exist and be active
         XCTAssertEqual(authManager.activeSession?.id, session2.id)

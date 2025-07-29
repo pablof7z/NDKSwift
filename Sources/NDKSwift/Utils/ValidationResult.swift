@@ -230,7 +230,7 @@ public extension ValidationUtils {
         return validateLength(
             content,
             fieldName: "Event content",
-            max: NostrConstants.EventLimits.maxContentLength
+            max: 65536 // 64KB - standard Nostr content limit
         )
     }
 }

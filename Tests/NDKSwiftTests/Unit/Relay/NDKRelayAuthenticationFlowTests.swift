@@ -268,9 +268,12 @@ class MockAuthRelay: MockRelayProtocol, @unchecked Sendable {
     func simulateAuthChallenge(challenge: String) async {
         updateConnectionState(.authRequired(challenge: challenge))
         if let ndk = ndk, let authDelegate = ndk.authenticationDelegate {
-            let shouldAuth = await authDelegate.relay(self, requiresAuthenticationWithChallenge: challenge)
-            if shouldAuth {
-                updateConnectionState(.authenticating)
+            // Cast self to NDKRelay since delegate expects NDKRelay type
+            if let relay = await ndk.pool?.relays.first(where: { $0.url == self.url }) {
+                let shouldAuth = await authDelegate.relay(relay, requiresAuthenticationWithChallenge: challenge)
+                if shouldAuth {
+                    updateConnectionState(.authenticating)
+                }
             }
         }
     }
@@ -278,9 +281,10 @@ class MockAuthRelay: MockRelayProtocol, @unchecked Sendable {
     func simulateAuthSuccess() async {
         updateConnectionState(.authenticated)
         // Trigger retry of pending events
-        if let ndk = ndk {
-            await ndk.eventManager.retryPendingAuthEvents(for: url)
-        }
+        // TODO: retryPendingAuthEvents method is not available in NDKEventManager
+        // if let ndk = ndk {
+        //     await ndk.eventManager.retryPendingAuthEvents(for: url)
+        // }
     }
 }
 

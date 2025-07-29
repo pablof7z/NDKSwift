@@ -526,18 +526,13 @@ final class CacheObservationIntegrationTests: XCTestCase {
         kind: UInt32 = 1,
         content: String
     ) -> NDKEvent {
-        var event = NDKEvent(
-            id: id ?? "",
+        return EventTestFactory.createEvent(
+            kind: Int(kind),
+            content: content,
+            tags: [],
             pubkey: author,
             createdAt: Timestamp.now,
-            kind: Int(kind),
-            tags: [],
-            content: content,
-            sig: "mock-signature"
+            id: id
         )
-        if id == nil {
-            event.id = event.calculateId()
-        }
-        return event
     }
 }

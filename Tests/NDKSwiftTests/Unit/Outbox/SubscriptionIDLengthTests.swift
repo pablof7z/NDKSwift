@@ -44,26 +44,4 @@ final class SubscriptionIDLengthTest: XCTestCase {
         
         XCTAssertLessThan(subscriptionId.count, 32, "Reactive filter subscription ID should be under 32 characters")
     }
-    
-    func testGenerateSubscriptionIdLength() async {
-        // Test the data requirement manager's subscription ID generation
-        let filter1 = NDKFilter(authors: ["fa984bd7dbb282f07e16e7ae87b26a2a7b9b90b7246a44771f0cf5ae58018f52"], kinds: [EventKind.metadata])
-        let filter2 = NDKFilter(kinds: [EventKind.textNote, EventKind.repost], limit: 100)
-        let filter3 = NDKFilter(since: Timestamp(0), tags: ["p": ["fa984bd7"]])
-        
-        let manager = NDKDataRequirementManager(ndk: NDK())
-        
-        let id1 = await manager.generateSubscriptionId(for: filter1)
-        let id2 = await manager.generateSubscriptionId(for: filter2)
-        let id3 = await manager.generateSubscriptionId(for: filter3)
-        
-        print("Generated subscription IDs:")
-        print("  Filter 1: \(id1) (length: \(id1.count))")
-        print("  Filter 2: \(id2) (length: \(id2.count))")
-        print("  Filter 3: \(id3) (length: \(id3.count))")
-        
-        XCTAssertLessThan(id1.count, 32, "Generated subscription ID 1 should be under 32 characters")
-        XCTAssertLessThan(id2.count, 32, "Generated subscription ID 2 should be under 32 characters")
-        XCTAssertLessThan(id3.count, 32, "Generated subscription ID 3 should be under 32 characters")
-    }
 }

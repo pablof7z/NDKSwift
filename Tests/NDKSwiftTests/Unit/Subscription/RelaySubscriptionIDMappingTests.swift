@@ -41,11 +41,12 @@ final class RelaySubscriptionIDMappingTests: XCTestCase {
         let mockRelay = MockRelay(url: "wss://test.relay/")
         
         // Create a test event
-        let event = NDKEvent(content: "Test event", kind: 1)
-        event.pubkey = "fa984bd7"
-        event.id = "test_event_id"
-        event.createdAt = Timestamp(Date().timeIntervalSince1970)
-        event.sig = "test_signature"
+        let event = EventTestFactory.createEvent(
+            kind: 1,
+            content: "Test event",
+            pubkey: "fa984bd7",
+            id: "test_event_id"
+        )
         
         // Track events received by the subscription
         var receivedEvents: [NDKEvent] = []
@@ -101,11 +102,12 @@ final class RelaySubscriptionIDMappingTests: XCTestCase {
         }
         
         // Create test event
-        let event = NDKEvent(content: "Reactive test", kind: 1)
-        event.pubkey = "author1"
-        event.id = "reactive_event_id"
-        event.createdAt = Timestamp(Date().timeIntervalSince1970)
-        event.sig = "test_signature"
+        let event = EventTestFactory.createEvent(
+            kind: 1,
+            content: "Reactive test",
+            pubkey: "author1",
+            id: "reactive_event_id"
+        )
         
         // Process event with relay-generated ID
         let mockRelay = MockRelay(url: "wss://relay1.com/")
@@ -139,10 +141,11 @@ final class RelaySubscriptionIDMappingTests: XCTestCase {
         await manager.closeSubscription(id: "test-sub")
         
         // Try to process an event with the old relay ID
-        let event = NDKEvent(content: "Should be ignored", kind: 1)
-        event.id = "ignored_event"
-        event.createdAt = Timestamp(Date().timeIntervalSince1970)
-        event.sig = "test_signature"
+        let event = EventTestFactory.createEvent(
+            kind: 1,
+            content: "Should be ignored",
+            id: "ignored_event"
+        )
         
         let mockRelay = MockRelay(url: "wss://test.relay/")
         

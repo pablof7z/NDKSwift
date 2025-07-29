@@ -117,6 +117,11 @@ public class NDKAuthManager {
         sessionState == .active && activeSession != nil
     }
     
+    /// Whether the user is authenticated (alias for hasActiveSession)
+    public var isAuthenticated: Bool {
+        hasActiveSession
+    }
+    
     /// Whether the active session can sign events
     public var canSign: Bool {
         guard sessionState == .active,
@@ -523,21 +528,6 @@ public class NDKAuthManager {
         NDKLogger.log(.info, category: .auth, "Deleted session for user: \(session.pubkey)")
     }
 
-    /// Clear all sessions from storage and logout
-    public func clearAllSessions() async throws {
-        // Delete all sessions from keychain
-        for session in availableSessions {
-            try await keychainManager.deleteSignerData(identifier: session.id)
-            try await keychainManager.deleteSessionMetadata(identifier: session.id)
-        }
-        
-        // Clear available sessions
-        availableSessions = []
-        
-        // Then logout
-        logout()
-    }
-    
     /// Logout from the current session (only clears active state, doesn't remove from storage)
     public func logout() {
         activeSession = nil
@@ -548,38 +538,7 @@ public class NDKAuthManager {
         // Don't modify availableSessions here - they remain in storage
     }
     
-    /// Completely delete the current session and logout
-    /// 
-    /// This method performs a complete logout by:
-    /// - Deleting signer data from keychain
-    /// - Deleting session metadata from keychain
-    /// - Clearing all in-memory state
-    /// - Removing the session from available sessions
-    ///
-    /// Use this when you want to completely remove the user's session,
-    /// such as when they explicitly choose "Delete Account" or "Remove Session".
-    public func deleteCurrentSessionAndLogout() async throws {
-        guard let session = activeSession else {
-            throw NDKAuthError.noActiveSession
-        }
-        
-        // Delete from keychain
-        try await keychainManager.deleteSignerData(identifier: session.id)
-        try await keychainManager.deleteSessionMetadata(identifier: session.id)
-        
-        // Remove from available sessions
-        availableSessions.removeAll { $0.id == session.id }
-        
-        // Clear active state
-        activeSession = nil
-        activeSigner = nil
-        sessionState = .noSession
-        ndk?.signer = nil
-        
-        NDKLogger.log(.info, category: .auth, "Deleted and logged out from session: \(session.pubkey)")
-    }
-    
-    /// Delete all sessions and completely logout
+    /// Remove all sessions from storage and logout
     /// 
     /// This method performs a complete cleanup by:
     /// - Deleting all signer data from keychain
@@ -588,7 +547,7 @@ public class NDKAuthManager {
     /// - Removing all available sessions
     ///
     /// Use this for complete app reset or when switching between environments.
-    public func deleteAllSessionsAndLogout() async throws {
+    public func removeAllSessions() async throws {
         // Delete all sessions from keychain
         for session in availableSessions {
             do {
@@ -607,7 +566,13 @@ public class NDKAuthManager {
         sessionState = .noSession
         ndk?.signer = nil
         
-        NDKLogger.log(.info, category: .auth, "Deleted all sessions and logged out")
+        NDKLogger.log(.info, category: .auth, "Removed all sessions and logged out")
+    }
+    
+    /// Clear all sessions from storage and logout
+    /// - Note: This is an alias for `removeAllSessions()` for backward compatibility
+    public func clearAllSessions() async throws {
+        try await removeAllSessions()
     }
 
     // MARK: - Biometric Authentication
@@ -691,13 +656,6 @@ extension NDKAuthManager {
     ) async throws -> NDKSession {
         // Call the new method, ignoring isHardwareBacked parameter
         return try await addSession(signer, requiresBiometric: requiresBiometric)
-    }
-    
-    /// Deletes a session
-    /// - Parameter session: The session to delete
-    @available(*, deprecated, renamed: "removeSession", message: "Use removeSession instead")
-    public func deleteSession(_ session: NDKSession) async throws {
-        try await removeSession(session)
     }
 }
 

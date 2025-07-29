@@ -3,14 +3,14 @@ import XCTest
 
 final class NDKRelayListManagerTests: XCTestCase {
     var ndk: NDK!
-    var mockCache: MockCache!
+    var mockCache: MemoryCache!
     var manager: NDKRelayListManager!
     let defaultRelays = ["wss://relay1.example.com", "wss://relay2.example.com"]
     let appIdentifier = "test.app"
     
     override func setUp() async throws {
         try await super.setUp()
-        mockCache = MockCache()
+        mockCache = MemoryCache()
         ndk = NDK(cache: mockCache)
         manager = NDKRelayListManager(
             ndk: ndk,
@@ -168,50 +168,6 @@ final class NDKRelayListManagerTests: XCTestCase {
         // For now, just verify error property exists
         XCTAssertNil(manager.error)
     }
-}
-
-// MARK: - Mock Cache
-
-private class MockCache: NDKCache {
-    var events: [String: NDKEvent] = [:]
-    
-    func saveEvent(_ event: NDKEvent) async throws {
-        events[event.id ?? ""] = event
-    }
-    
-    func getEvent(byId id: String) async throws -> NDKEvent? {
-        return events[id]
-    }
-    
-    func getEvents(filter: NDKFilter, limit: Int?) async throws -> [NDKEvent] {
-        return Array(events.values)
-    }
-    
-    func deleteEvent(_ eventId: String) async throws {
-        events.removeValue(forKey: eventId)
-    }
-    
-    func deleteAllEvents() async throws {
-        events.removeAll()
-    }
-    
-    func saveProfile(_ profile: NDKUser) async throws {}
-    
-    func getProfile(pubkey: String) async throws -> NDKUser? {
-        return nil
-    }
-    
-    func getProfiles(pubkeys: Set<String>) async throws -> [String: NDKUser] {
-        return [:]
-    }
-    
-    func updateLastFetch(for pubkey: String) async throws {}
-    
-    func startTransaction() async throws {}
-    
-    func commitTransaction() async throws {}
-    
-    func rollbackTransaction() async throws {}
 }
 
 // MARK: - Helper Extensions
