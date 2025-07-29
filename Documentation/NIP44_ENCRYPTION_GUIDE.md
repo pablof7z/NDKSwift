@@ -139,7 +139,7 @@ If you're migrating from NIP-04, here are the key differences:
 let schemes = await signer.encryptionEnabled()
 // Returns: [.nip04, .nip44]
 
-// NIP-04 (deprecated)
+// NIP-04
 let nip04Encrypted = try await signer.encrypt(
     recipient: recipient,
     value: message,

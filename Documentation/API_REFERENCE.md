@@ -606,8 +606,6 @@ public func pay(
     tags: [[String]]? = nil
 ) async throws -> NDKPaymentConfirmation
 
-// Get payment methods
-public func getPaymentMethods() async throws -> Set<NDKPaymentMethod>
 ```
 
 ### NDKUserProfile

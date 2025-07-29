@@ -4,7 +4,14 @@ All notable changes to NDKSwift will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.9.0] - 2025-01-29
+
+### Added
+- Added `currentUser` computed property to `NDKAuthManager` for easier access to current user
+- Added automatic session restoration when `setNDK()` is called on `NDKAuthManager`
+- Added comprehensive Authentication Guide with standardized patterns for app developers
+- Added examples showing how to observe auth changes using `@Observable` and `withObservationTracking`
+- Added new `AUTHENTICATION_GUIDE.md` with detailed examples and best practices
 
 ### Fixed
 - Fixed compilation error in `NDKNostrManager` where non-existent profile manager methods were being called
@@ -16,12 +23,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - Added `@preconcurrency` attribute to `NDKDataSourceProtocol` conformances to fix Swift 6 warnings
 - Improved consistency in error logging across SwiftUI components
+- Major refactoring of authentication system for cleaner API and better maintainability
+- Simplified `NDKAuthManager` by removing redundant methods and improving clarity
+- Updated documentation to reflect new authentication patterns
+
+### Removed
+- Removed `NDKNostrManager` class (unused and redundant)
+- Removed deprecated methods from `NDKUser` class
+- Removed unused payment-related methods from `NDKZapManager`
+- Removed redundant wallet context methods from `NDKPaymentProvider`
 
 ### Improved
 - Added comprehensive tests for wallet-specific error factories in `NDKErrorFactoriesTests`
 - Cleaned up unnecessary `import Foundation` in `OptionalExtensions.swift`
 - Fixed trailing whitespace in `OpacityConstants.swift`
 - Added documentation header to `NDKErrorFactories.swift` extension
+- Significantly improved test coverage for authentication flows
 
 ## [0.10.0] - 2025-01-28
 

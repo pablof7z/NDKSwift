@@ -40,10 +40,10 @@ import LocalAuthentication
 @MainActor
 public class NDKAuthManager {
 
-    // MARK: - Shared Instance
-
-    /// Shared authentication manager instance
-    public static let shared = NDKAuthManager()
+    // MARK: - Properties
+    
+    /// The NDK instance this auth manager is managing
+    private let ndk: NDK
 
     // MARK: - Observable State
 
@@ -80,7 +80,6 @@ public class NDKAuthManager {
 
     private let keychainManager: NDKKeychainManager
     private let signerRegistry: NDKSignerRegistry
-    private var ndk: NDK?
 
     /// Session restoration task to prevent multiple concurrent restorations
     private var restorationTask: Task<Void, Never>?
@@ -146,27 +145,15 @@ public class NDKAuthManager {
 
     // MARK: - Initialization
 
-    private init() {
+    public init(ndk: NDK) {
+        self.ndk = ndk
         self.keychainManager = NDKKeychainManager()
         self.signerRegistry = NDKSignerRegistry.shared
 
         // Check biometric availability
         updateBiometricAvailability()
-
-        // Don't restore session until NDK is set
-        // Session restoration will be triggered by setNDK or manually
     }
 
-    /// Set the NDK instance for signer operations
-    /// - Parameter ndk: The NDK instance to use
-    public func setNDK(_ ndk: NDK) {
-        self.ndk = ndk
-
-        // If we have an active signer, set it on NDK
-        if let activeSigner = activeSigner {
-            ndk.signer = activeSigner
-        }
-    }
 
     // MARK: - Session Management
 
@@ -266,7 +253,7 @@ public class NDKAuthManager {
                 sessionState = .active
 
                 // Clear signer on NDK for read-only mode
-                ndk?.signer = nil
+                ndk.signer = nil
 
                 // Save updated session metadata
                 try await saveSessionMetadata(updatedSession)
@@ -311,7 +298,7 @@ public class NDKAuthManager {
             sessionState = .active
 
             // Set signer on NDK if available
-            ndk?.signer = signer
+            ndk.signer = signer
 
             // Don't initialize session data here - let the app call startSession()
             // This avoids duplicate subscriptions
@@ -421,11 +408,10 @@ public class NDKAuthManager {
         sessionState = .active
 
         // Set signer on NDK if available
-        ndk?.signer = signer
+        ndk.signer = signer
         
-        // Start NDK session immediately if NDK is available
-        if let ndk = ndk {
-            do {
+        // Start NDK session immediately
+        do {
                 _ = try await ndk.startSession(
                     signer: signer,
                     config: NDKSessionConfiguration(
@@ -437,7 +423,6 @@ public class NDKAuthManager {
                 // Log error but don't fail the session creation
                 NDKLogger.log(.warning, category: .auth, "Failed to start NDK session: \(error)")
             }
-        }
 
         return session
     }
@@ -481,7 +466,7 @@ public class NDKAuthManager {
         sessionState = .active
         
         // Clear signer on NDK for read-only mode
-        ndk?.signer = nil
+        ndk.signer = nil
         
         NDKLogger.log(.info, category: .auth, "Created read-only session for user: \(user.pubkey)")
         
@@ -503,7 +488,7 @@ public class NDKAuthManager {
 
             // Clear current active state
             activeSigner = nil
-            ndk?.signer = nil
+            ndk.signer = nil
         }
 
         // Restore the selected session
@@ -533,7 +518,7 @@ public class NDKAuthManager {
         activeSession = nil
         activeSigner = nil
         sessionState = .noSession
-        ndk?.signer = nil
+        ndk.signer = nil
         
         // Don't modify availableSessions here - they remain in storage
     }
@@ -564,7 +549,7 @@ public class NDKAuthManager {
         activeSession = nil
         activeSigner = nil
         sessionState = .noSession
-        ndk?.signer = nil
+        ndk.signer = nil
         
         NDKLogger.log(.info, category: .auth, "Removed all sessions and logged out")
     }
@@ -639,25 +624,6 @@ public class NDKAuthManager {
     }
 }
 
-// MARK: - Deprecated APIs for Backward Compatibility
-
-extension NDKAuthManager {
-    /// Creates a new session with a signer
-    /// - Parameters:
-    ///   - signer: The signer for this session
-    ///   - requiresBiometric: Whether biometric auth is required
-    ///   - isHardwareBacked: Whether the signer uses secure enclave (ignored, now auto-detected)
-    /// - Returns: The created session
-    @available(*, deprecated, renamed: "addSession(_:requiresBiometric:)", message: "Use addSession(_:requiresBiometric:) instead. The isHardwareBacked parameter is now automatically determined based on the signer type.")
-    public func createSession(
-        with signer: any NDKSigner,
-        requiresBiometric: Bool = false,
-        isHardwareBacked: Bool = false
-    ) async throws -> NDKSession {
-        // Call the new method, ignoring isHardwareBacked parameter
-        return try await addSession(signer, requiresBiometric: requiresBiometric)
-    }
-}
 
 // MARK: - Authentication Errors
 

@@ -3,13 +3,6 @@ import CashuSwift
 
 // Payment types are now unified in ZapTypes.swift
 
-// MARK: - Payment Methods
-
-/// Payment methods supported by wallets
-public enum NDKPaymentMethod: String {
-    case lightning = "nip57"
-    case nutzap = "nip61"
-}
 
 /// Cashu-specific proof request implementation
 public struct CashuProofRequest: PaymentRequest {

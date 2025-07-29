@@ -24,27 +24,24 @@ import NDKSwift
 
 @main
 struct MyApp: App {
-    @State private var authManager = NDKAuthManager.shared
     @State private var ndk = NDK(relayUrls: ["wss://relay.damus.io"])
     
     var body: some Scene {
         WindowGroup {
             ContentView()
-                .environment(authManager)
                 .environment(\.ndk, ndk)
                 .task {
-                    authManager.setNDK(ndk)
-                    await authManager.initialize()  // Restores previous session
+                    await ndk.auth.initialize()  // Restores previous session
                 }
         }
     }
 }
 
 struct ContentView: View {
-    @Environment(NDKAuthManager.self) private var authManager
+    @Environment(\.ndk) private var ndk
     
     var body: some View {
-        if authManager.isAuthenticated {
+        if ndk.auth.isAuthenticated {
             MainAppView()
         } else {
             LoginView()
@@ -73,8 +70,8 @@ The `initialize()` method automatically:
 ### Accessing the Manager
 
 ```swift
-// Get the shared instance
-let authManager = NDKAuthManager.shared
+// Access through NDK instance
+let authManager = ndk.auth
 
 // Check authentication status
 if authManager.isAuthenticated {
@@ -425,8 +422,8 @@ struct MyView: View {
 
 If sessions aren't persisting across app launches:
 
-1. Ensure you're not creating a new `NDKAuthManager` instance each time
-2. Use the shared instance: `NDKAuthManager.shared`
+1. Ensure you're accessing auth through the same NDK instance
+2. Use `ndk.auth` consistently
 3. Check for Keychain access errors in logs
 
 ### Biometric Authentication Fails
@@ -460,7 +457,6 @@ import NDKSwift
 
 @main
 struct NostrApp: App {
-    @State private var authManager = NDKAuthManager.shared
     @State private var ndk = NDK(relayUrls: [
         "wss://relay.damus.io",
         "wss://relay.primal.net"
@@ -469,11 +465,9 @@ struct NostrApp: App {
     var body: some Scene {
         WindowGroup {
             ContentView()
-                .environment(authManager)
                 .environment(\.ndk, ndk)
                 .task {
-                    authManager.setNDK(ndk)
-                    await authManager.initialize()  // Restore sessions
+                    await ndk.auth.initialize()  // Restore sessions
                     await ndk.connect()
                 }
         }

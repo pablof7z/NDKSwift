@@ -2,7 +2,7 @@ import XCTest
 @testable import NDKSwift
 
 /// End-to-end tests for encrypted direct message exchange
-/// Tests both NIP-04 (deprecated) and NIP-44 encryption standards
+/// Tests both NIP-04 and NIP-44 encryption standards
 final class EncryptedDME2ETests: XCTestCase {
     let relayURLs = RelayConstants.testRelays
     

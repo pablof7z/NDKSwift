@@ -277,53 +277,6 @@ public final class NDKUser: Equatable, Hashable, Sendable {
         throw NDKError.failedTo("route payment", message: "Not yet implemented")
     }
 
-    /// Get available payment methods for this user
-    /// - Returns: Set of payment methods this user supports
-    public func getPaymentMethods() async throws -> Set<NDKPaymentMethod> {
-        let ndk = try GuardHelpers.unwrap(
-            self.ndk,
-            error: NDKError.configurationError(ErrorMessageConstants.Messages.ndkInstanceNotSet)
-        )
-
-        var methods = Set<NDKPaymentMethod>()
-
-        // IMPORTANT: Always batch multiple kinds in a single filter!
-        // NEVER make sequential requests for different event kinds - that's network inefficient
-        // NDKFilter accepts arrays specifically to enable batching
-        let filter = NDKFilter(
-            authors: [pubkey],
-            kinds: [EventKind.metadata, EventKind.nutzapPreferences]  // Fetch BOTH in one request
-        )
-
-        // Use NDKDataSource with reasonable maxAge for payment methods
-        let dataSource = NDKDataSource(
-            ndk: ndk,
-            filter: filter,
-            maxAge: 5 * TimeConstants.minute // 5 minutes - payment methods don't change often
-        )
-
-        // Collect all profile events
-        let events = await dataSource.collect(timeout: NetworkConstants.timeoutDataCollectionLong)
-
-        for event in events {
-            switch event.kind {
-            case EventKind.metadata:
-                // Check for Lightning support (lud06/lud16)
-                if let profileData = JSONCoding.safeDecode(NDKUserProfile.self, from: event.content) {
-                    if profileData.lud06 != nil || profileData.lud16 != nil {
-                        methods.insert(.lightning)
-                    }
-                }
-            case EventKind.nutzapPreferences:
-                // User has nutzap preference announcement
-                methods.insert(.nutzap)
-            default:
-                break
-            }
-        }
-
-        return methods
-    }
 }
 
 /// User profile metadata (kind 0)

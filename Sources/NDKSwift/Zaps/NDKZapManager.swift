@@ -462,73 +462,6 @@ public actor NDKZapManager {
         }
     }
 
-    /// Fetch zaps for an event or user (blocking approach)
-    ///
-    /// ⚠️ **WARNING**: This blocks until all zaps are received. Consider using `subscribeToZaps` instead
-    /// for reactive UIs that should update as zaps arrive.
-    ///
-    /// Use this only when you need all zaps before proceeding (e.g., calculating totals for a static report).
-    public func fetchZaps(
-        for event: NDKEvent? = nil,
-        user: NDKUser? = nil
-    ) async throws -> [ZapInfo] {
-        var kinds = [EventKind.zapReceipt]
-        kinds.append(EventKind.nutzap)
-
-        var filter = NDKFilter()
-        filter.kinds = kinds
-
-        if let event = event {
-            let eventId = event.id
-            filter.addTagFilter("e", values: [eventId])
-        } else if let user = user {
-            filter.addTagFilter("p", values: [user.pubkey])
-        } else {
-            throw NDKError.missingRequired("event or user")
-        }
-
-        // Use NDKDataSource for fetching zaps
-        let dataSource = NDKDataSource(
-            ndk: ndk,
-            filter: filter,
-            maxAge: TimeConstants.minute * 5 // 5 minutes - zaps are fairly static once created
-        )
-
-        // Collect all zap events
-        let events = await dataSource.collect(timeout: NetworkConstants.timeoutDataCollectionLong)
-
-        var zaps: [ZapInfo] = []
-
-        for event in events {
-            let eventKind = event.kind
-            if eventKind == EventKind.zapReceipt {
-                let receipt = NDKZapReceipt(event: event)
-                if let zapInfo = try? await validateAndParseZapReceipt(receipt) {
-                    zaps.append(zapInfo)
-                }
-            } else if eventKind == EventKind.nutzap {
-                let nutzap = NDKNutzap(event: event)
-                let totalAmount = nutzap.totalAmount
-                let recipientPubkey = nutzap.recipientPubkey
-                let comment = nutzap.comment
-                let createdAt = event.createdAt
-                let eventPubkey = event.pubkey
-
-                zaps.append(ZapInfo(
-                    type: .nutzap,
-                    amountSats: totalAmount,
-                    sender: eventPubkey,
-                    recipient: recipientPubkey ?? "",
-                    comment: comment,
-                    timestamp: Date(nostrTimestamp: createdAt),
-                    event: event
-                ))
-            }
-        }
-
-        // Sort by timestamp descending
-        return zaps.sorted { $0.timestamp > $1.timestamp }
-    }
 
     // MARK: - Private Methods
 
@@ -698,16 +631,6 @@ extension NDKUser {
         )
     }
 
-    /// Fetch zaps sent to this user
-    public func fetchZaps() async throws -> [ZapInfo] {
-        guard let ndk = self.ndk else {
-            throw NDKError.notConfigured(ErrorMessageConstants.Messages.ndkNotAvailable)
-        }
-
-        return try await ndk.zapManager.fetchZaps(
-            user: self
-        )
-    }
 }
 
 // MARK: - Event Extension
@@ -731,10 +654,4 @@ extension NDKEvent {
         )
     }
 
-    /// Fetch zaps for this event (requires NDK instance)
-    public func fetchZaps(with ndk: NDK) async throws -> [ZapInfo] {
-        return try await ndk.zapManager.fetchZaps(
-            for: self
-        )
-    }
 }

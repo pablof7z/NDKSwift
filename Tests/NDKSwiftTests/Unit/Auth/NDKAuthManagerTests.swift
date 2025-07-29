@@ -13,9 +13,9 @@ final class NDKAuthManagerTests: XCTestCase {
         let cache = MemoryCache()
         ndk = NDK(cache: cache)
         
-        // Create fresh auth manager
-        authManager = NDKAuthManager.shared
-        authManager.setNDK(ndk)
+        // Get auth manager from NDK instance
+        authManager = NDKAuthManager(ndk: ndk)
+        await authManager.initialize()
         
         // Clear any existing sessions by logging out
         authManager.logout()

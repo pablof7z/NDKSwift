@@ -3,7 +3,7 @@ import Foundation
 /// Common encryption protocols and types for NDKSwift
 ///
 /// This module provides unified interfaces for encryption functionality
-/// in Nostr applications, supporting both NIP-04 (deprecated) and NIP-44
+/// in Nostr applications, supporting both NIP-04 and NIP-44
 /// encryption standards.
 
 /// Protocol for Nostr encryption implementations
@@ -46,7 +46,7 @@ public enum NDKEncryptionError: LocalizedError {
     }
 }
 
-/// NIP-04 encryption implementation (deprecated)
+/// NIP-04 encryption implementation
 public struct NIP04Encryption: NDKEncryption {
     public init() {}
 
