@@ -1,7 +1,44 @@
 import SwiftUI
 import NDKSwift
 
-/// A SwiftUI component that renders markdown content with Nostr entity parsing
+/// A SwiftUI component that renders markdown content with Nostr entity parsing.
+///
+/// This view provides rich text rendering with support for:
+/// - Standard markdown formatting (headers, bold, italic, code, etc.)
+/// - Nostr-specific entities (mentions, hashtags, event references)
+/// - Interactive elements with customizable tap handlers
+/// - Configurable styling through `MarkdownConfiguration`
+///
+/// ## Features
+/// - Full markdown syntax support
+/// - Automatic parsing of Nostr entities (npub, note, nevent, etc.)
+/// - Clickable mentions, hashtags, and links
+/// - Code block syntax highlighting
+/// - Customizable colors, fonts, and spacing
+/// - Accessibility support
+///
+/// ## Usage
+/// ```swift
+/// NDKUIMarkdownRenderer(
+///     "Hello **world**! Check out #nostr and @npub1...",
+///     ndk: ndk
+/// )
+/// .onMentionTap { pubkey in
+///     // Handle mention tap
+/// }
+/// .onHashtagTap { hashtag in
+///     // Handle hashtag tap
+/// }
+/// .markdownConfiguration(.compact) // Use preset configuration
+/// ```
+///
+/// ## Customization
+/// Use the view modifiers to customize appearance and behavior:
+/// - `.markdownConfiguration(_:)` - Apply a configuration preset
+/// - `.onMentionTap(_:)` - Handle mention taps
+/// - `.onHashtagTap(_:)` - Handle hashtag taps
+/// - `.onLinkTap(_:)` - Handle URL taps
+/// - `.onNostrEntityTap(_:)` - Handle Nostr entity taps
 public struct NDKUIMarkdownRenderer: View {
     let content: String
     let ndk: NDK
@@ -18,6 +55,11 @@ public struct NDKUIMarkdownRenderer: View {
     var onLinkTap: ((URL) -> Void)?
     var onNostrEntityTap: ((ContentEntity) -> Void)?
 
+    /// Creates a markdown renderer for Nostr content.
+    ///
+    /// - Parameters:
+    ///   - content: The markdown/text content to render. Can include Nostr entities.
+    ///   - ndk: The NDK instance for resolving Nostr entities and profiles.
     public init(
         _ content: String,
         ndk: NDK
@@ -42,12 +84,16 @@ public struct NDKUIMarkdownRenderer: View {
 
     // MARK: - Private Methods
 
+    /// Parses the content to extract Nostr entities and normalize the text.
+    /// This separates Nostr-specific parsing from markdown parsing.
     func parseContent() {
         let result = ContentParser.parseContent(content)
         self.parsedEntities = result.entities
         self.normalizedContent = result.normalizedContent
     }
 
+    /// Computes the markdown blocks to render from the normalized content.
+    /// This is computed on demand to ensure we have the latest parsed content.
     var renderableBlocks: [MarkdownBlock] {
         MarkdownParser.parse(normalizedContent)
     }

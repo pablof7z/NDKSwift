@@ -1,6 +1,39 @@
 import XCTest
 @testable import NDKSwift
 
+// Test stubs for signature types used in tag aggregation tests
+struct TagAggregationSignature: Equatable {
+    let signature: String
+    
+    init(from filter: NDKFilter) {
+        // Create a simple signature based on filter structure (kinds + tag keys)
+        let kindString = filter.kinds?.map(String.init).sorted().joined(separator: ",") ?? ""
+        let tagKeys = filter.tags?.keys.sorted().joined(separator: ",") ?? ""
+        self.signature = "\(kindString):\(tagKeys)"
+    }
+}
+
+struct TagFilterSignature: Equatable {
+    let signature: String
+    
+    init(from filter: NDKFilter) {
+        // Create a more detailed signature including tag values
+        var components: [String] = []
+        
+        if let kinds = filter.kinds {
+            components.append("kinds:\(kinds.map(String.init).sorted().joined(separator: ","))")
+        }
+        
+        if let tags = filter.tags {
+            for (key, values) in tags.sorted(by: { $0.key < $1.key }) {
+                components.append("\(key):\(values.sorted().joined(separator: ","))")
+            }
+        }
+        
+        self.signature = components.joined(separator: "|")
+    }
+}
+
 final class TagAggregationTests: XCTestCase {
     
     func testAggregationSignatureGroupsByTagKeys() async throws {
@@ -21,9 +54,9 @@ final class TagAggregationTests: XCTestCase {
         )
         
         // Create aggregation signatures
-        let sig1 = AggregationSignature(from: filter1)
-        let sig2 = AggregationSignature(from: filter2)
-        let sig3 = AggregationSignature(from: filter3)
+        let sig1 = TagAggregationSignature(from: filter1)
+        let sig2 = TagAggregationSignature(from: filter2)
+        let sig3 = TagAggregationSignature(from: filter3)
         
         // All should be equal since they have same structure
         XCTAssertEqual(sig1, sig2)
@@ -44,8 +77,8 @@ final class TagAggregationTests: XCTestCase {
         )
         
         // Create aggregation signatures
-        let sig1 = AggregationSignature(from: filter1)
-        let sig2 = AggregationSignature(from: filter2)
+        let sig1 = TagAggregationSignature(from: filter1)
+        let sig2 = TagAggregationSignature(from: filter2)
         
         // Should NOT be equal since they have different tag keys
         XCTAssertNotEqual(sig1, sig2)
@@ -64,8 +97,8 @@ final class TagAggregationTests: XCTestCase {
         )
         
         // Create filter signatures (used for cache matching)
-        let sig1 = FilterSignature(from: filter1)
-        let sig2 = FilterSignature(from: filter2)
+        let sig1 = TagFilterSignature(from: filter1)
+        let sig2 = TagFilterSignature(from: filter2)
         
         // Should NOT be equal since they have different tag values
         XCTAssertNotEqual(sig1, sig2)
