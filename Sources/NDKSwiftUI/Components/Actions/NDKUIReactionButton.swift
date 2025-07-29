@@ -301,11 +301,9 @@ private class ReactionState: ObservableObject {
         }
 
         // Update state
-        await MainActor.run {
-            self.count = totalCount
-            self.isReacted = userReacted
-            self.reactionEventId = userReactionEventId
-        }
+        self.count = totalCount
+        self.isReacted = userReacted
+        self.reactionEventId = userReactionEventId
     }
 
     func toggleReaction(ndk: NDK, event: NDKEvent) async {

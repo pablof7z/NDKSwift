@@ -294,15 +294,14 @@ public struct NWCResponseHandler {
                         )
 
                         // Parse as notification
-                        guard let data = decrypted.data(using: .utf8),
-                              let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+                        guard let json = try? JSONCoding.parseDictionary(from: decrypted),
                               let notificationType = json["notification_type"] as? String,
-                              let notificationData = json["notification"] else {
+                              let notificationData = json["notification"] as? [String: Any] else {
                             continue
                         }
 
                         // Convert notification data back to JSON for parsing
-                        let paymentNotification = try JSONCoding.decodeFromDictionary(PaymentNotification.self, from: notificationData as! [String: Any])
+                        let paymentNotification = try JSONCoding.decodeFromDictionary(PaymentNotification.self, from: notificationData)
 
                         let notification = NWCNotification(
                             notificationType: notificationType,

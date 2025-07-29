@@ -547,12 +547,74 @@ public class NDKAuthManager {
         
         // Don't modify availableSessions here - they remain in storage
     }
+    
+    /// Completely delete the current session and logout
+    /// 
+    /// This method performs a complete logout by:
+    /// - Deleting signer data from keychain
+    /// - Deleting session metadata from keychain
+    /// - Clearing all in-memory state
+    /// - Removing the session from available sessions
+    ///
+    /// Use this when you want to completely remove the user's session,
+    /// such as when they explicitly choose "Delete Account" or "Remove Session".
+    public func deleteCurrentSessionAndLogout() async throws {
+        guard let session = activeSession else {
+            throw NDKAuthError.noActiveSession
+        }
+        
+        // Delete from keychain
+        try await keychainManager.deleteSignerData(identifier: session.id)
+        try await keychainManager.deleteSessionMetadata(identifier: session.id)
+        
+        // Remove from available sessions
+        availableSessions.removeAll { $0.id == session.id }
+        
+        // Clear active state
+        activeSession = nil
+        activeSigner = nil
+        sessionState = .noSession
+        ndk?.signer = nil
+        
+        NDKLogger.log(.info, category: .auth, "Deleted and logged out from session: \(session.pubkey)")
+    }
+    
+    /// Delete all sessions and completely logout
+    /// 
+    /// This method performs a complete cleanup by:
+    /// - Deleting all signer data from keychain
+    /// - Deleting all session metadata from keychain  
+    /// - Clearing all in-memory state
+    /// - Removing all available sessions
+    ///
+    /// Use this for complete app reset or when switching between environments.
+    public func deleteAllSessionsAndLogout() async throws {
+        // Delete all sessions from keychain
+        for session in availableSessions {
+            do {
+                try await keychainManager.deleteSignerData(identifier: session.id)
+                try await keychainManager.deleteSessionMetadata(identifier: session.id)
+            } catch {
+                // Log but continue with other deletions
+                NDKLogger.log(.error, category: .auth, "Failed to delete session \(session.id): \(error)")
+            }
+        }
+        
+        // Clear all state
+        availableSessions = []
+        activeSession = nil
+        activeSigner = nil
+        sessionState = .noSession
+        ndk?.signer = nil
+        
+        NDKLogger.log(.info, category: .auth, "Deleted all sessions and logged out")
+    }
 
     // MARK: - Biometric Authentication
 
     /// Update biometric availability
     private func updateBiometricAvailability() {
-        Task { @MainActor in
+        Task {
             biometricAuthAvailable = await keychainManager.isBiometricAuthenticationAvailable()
             #if !os(watchOS)
             biometricType = await keychainManager.getBiometricType()

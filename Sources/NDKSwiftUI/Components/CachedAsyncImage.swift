@@ -107,7 +107,7 @@ private class ImageLoader: ObservableObject {
         
         // Check memory cache first
         if let cachedImage = Self.imageCache.getFromMemory(url: url) {
-            NDKLogger.shared.debug("[CachedAsyncImage] Memory cache HIT", metadata: ["file": "\(url.lastPathComponent)"])
+            NDKLogger.log(.debug, category: .cache, "[CachedAsyncImage] Memory cache HIT: \(url.lastPathComponent)")
             #if canImport(UIKit)
             self.image = Image(uiImage: cachedImage)
             #elseif canImport(AppKit)
@@ -119,7 +119,7 @@ private class ImageLoader: ObservableObject {
         // Check disk cache
         Task {
             if let diskImage = await Self.imageCache.getFromDisk(url: url) {
-                NDKLogger.shared.debug("[CachedAsyncImage] Disk cache HIT", metadata: ["file": "\(url.lastPathComponent)"])
+                NDKLogger.log(.debug, category: .cache, "[CachedAsyncImage] Disk cache HIT: \(url.lastPathComponent)")
                 await MainActor.run {
                     #if canImport(UIKit)
                     self.image = Image(uiImage: diskImage)
@@ -130,7 +130,7 @@ private class ImageLoader: ObservableObject {
                 return
             }
             
-            NDKLogger.shared.debug("[CachedAsyncImage] Cache MISS, downloading", metadata: ["file": "\(url.lastPathComponent)"])
+            NDKLogger.log(.debug, category: .cache, "[CachedAsyncImage] Cache MISS, downloading: \(url.lastPathComponent)")
             
             // Download if not cached
             await downloadImage(from: url)
@@ -146,7 +146,7 @@ private class ImageLoader: ObservableObject {
             
             // Cache the image
             await Self.imageCache.store(image: uiImage, for: url)
-            NDKLogger.shared.debug("[CachedAsyncImage] Downloaded and cached", metadata: ["file": "\(url.lastPathComponent)"])
+            NDKLogger.log(.debug, category: .cache, "[CachedAsyncImage] Downloaded and cached: \(url.lastPathComponent)")
             
             await MainActor.run {
                 self.image = Image(uiImage: uiImage)
@@ -156,14 +156,14 @@ private class ImageLoader: ObservableObject {
             
             // Cache the image
             await Self.imageCache.store(image: nsImage, for: url)
-            NDKLogger.shared.debug("[CachedAsyncImage] Downloaded and cached", metadata: ["file": "\(url.lastPathComponent)"])
+            NDKLogger.log(.debug, category: .cache, "[CachedAsyncImage] Downloaded and cached: \(url.lastPathComponent)")
             
             await MainActor.run {
                 self.image = Image(nsImage: nsImage)
             }
             #endif
         } catch {
-            NDKLogger.shared.error("[CachedAsyncImage] Failed to download", metadata: ["file": "\(url.lastPathComponent)", "error": "\(error)"])
+            NDKLogger.log(.error, category: .cache, "[CachedAsyncImage] Failed to download \(url.lastPathComponent): \(error)")
         }
     }
 }
