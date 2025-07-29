@@ -58,12 +58,12 @@ Located in the [Development](Development/) subdirectory:
 - **New to NDKSwift?** Start with the [Getting Started Guide](GETTING_STARTED.md)
 - **Looking for specific APIs?** Check the [API Reference](API_REFERENCE.md)
 - **Building SwiftUI apps?** See the [NDKSwiftUI Reference](NDKSWIFTUI_REFERENCE.md)
-- **Need code examples?** Browse the [Examples](EXAMPLES.md)
+- **Need code examples?** Browse the [Examples](../Examples/)
 - **Want to understand the internals?** Read the [Architecture Overview](ARCHITECTURE.md)
 
 ## 📝 Version
 
-This documentation is for NDKSwift v0.7.6 and later.
+This documentation is for NDKSwift v0.10.0 and later.
 NDKSwiftUI documentation covers v0.2.0 and later.
 
 ## 🔧 Running Examples
