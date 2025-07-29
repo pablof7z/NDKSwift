@@ -65,7 +65,7 @@ struct TestLNURL {
         let event = NDKEvent(
             id: "mock123",
             pubkey: "mockprovider456", 
-            createdAt: Timestamp(Date().timeIntervalSince1970),
+            createdAt: Timestamp.now,
             kind: 9735,
             tags: [
                 ["p", "recipient789"],

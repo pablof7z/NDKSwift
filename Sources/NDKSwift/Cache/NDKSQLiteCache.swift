@@ -1491,7 +1491,7 @@ public actor NDKSQLiteCache: NDKCache {
                         NIP05VerificationStatus.verified.rawValue,
                         Timestamp.from(Date()),
                         Timestamp.from(Date()),
-                        Int64(Date().timeIntervalSince1970)
+                        Timestamp.now
                     ])
                 }
 

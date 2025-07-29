@@ -25,11 +25,11 @@ public class NDKLightningZapProtocol: NDKZapProtocol {
     public let type = ZapType.lightning
 
     private let ndk: NDK
-    private let urlSession: URLSession
+    private let networkClient: NDKNetworkClient
 
-    public init(ndk: NDK, urlSession: URLSession = .shared) {
+    public init(ndk: NDK, networkClient: NDKNetworkClient? = nil) {
         self.ndk = ndk
-        self.urlSession = urlSession
+        self.networkClient = networkClient ?? NDKNetworkClient()
     }
 
     public func canZap(recipientInfo: RecipientZapInfo) -> Bool {
@@ -271,12 +271,7 @@ public class NDKLightningZapProtocol: NDKZapProtocol {
         var request = URLRequest(url: url)
         request.httpMethod = HTTPConstants.methodGet
 
-        let (data, response) = try await urlSession.data(for: request)
-
-        guard let httpResponse = response as? HTTPURLResponse,
-              (200...299).contains(httpResponse.statusCode) else {
-            throw ZapError.invalidLNURL(ErrorMessageConstants.failedTo("fetch LNURL metadata"))
-        }
+        let (data, _) = try await networkClient.fetchAndValidateData(for: request)
 
         // Parse response
         struct LNURLResponse: Codable {
@@ -338,12 +333,7 @@ public class NDKLightningZapProtocol: NDKZapProtocol {
         var request = URLRequest(url: url)
         request.httpMethod = HTTPConstants.methodGet
 
-        let (data, response) = try await urlSession.data(for: request)
-
-        guard let httpResponse = response as? HTTPURLResponse,
-              (200...299).contains(httpResponse.statusCode) else {
-            throw ZapError.invoiceFetchFailed("HTTP error")
-        }
+        let (data, _) = try await networkClient.fetchAndValidateData(for: request)
 
         // Parse response
         struct InvoiceResponse: Codable {

@@ -18,7 +18,7 @@ let testEvents = [
     NDKEvent(
         id: "test1",
         pubkey: "pubkey1",
-        createdAt: Timestamp(Date().timeIntervalSince1970 - 100),
+        createdAt: Timestamp.now - 100,
         kind: 1,
         tags: [],
         content: "Hello from cache!",
@@ -27,7 +27,7 @@ let testEvents = [
     NDKEvent(
         id: "test2",
         pubkey: "pubkey1",
-        createdAt: Timestamp(Date().timeIntervalSince1970 - 50),
+        createdAt: Timestamp.now - 50,
         kind: 1,
         tags: [],
         content: "Another cached message",

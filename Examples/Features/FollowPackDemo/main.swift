@@ -34,7 +34,7 @@ print("\n📦 Creating a new follow pack...")
 let followPack = try await NDKFollowPackBuilder(ndk: ndk)
     .title("Bitcoin Developers")
     .description("A curated list of Bitcoin Core developers and contributors")
-    .identifier("bitcoin-devs-\(Int(Date().timeIntervalSince1970))")
+    .identifier("bitcoin-devs-\(Timestamp.now)")
     .pubkeys([
         "82341f882b6eabcd2ba7f1ef90aad961cf074af15b9ef44a09f9d2a8fbfbe6a2",  // jack
         "3bf0c63fcb93463407af97a5e5ee64fa883d107ef9e558472c4eb9aaaefa459d",  // fiatjaf
