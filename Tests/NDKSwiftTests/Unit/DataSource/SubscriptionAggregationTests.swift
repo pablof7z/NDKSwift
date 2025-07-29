@@ -1,6 +1,53 @@
 import XCTest
 @testable import NDKSwift
 
+// Test stubs for signature types used in subscription aggregation tests
+struct AggregationSignature: Equatable {
+    let signature: String
+    let kinds: [Int]?
+    let tagKeys: [String]?
+    let authors: [String]?
+    let ids: [String]?
+    
+    init(from filter: NDKFilter) {
+        // Store actual filter properties for test access
+        self.kinds = filter.kinds
+        self.tagKeys = filter.tags?.keys.sorted()
+        self.authors = filter.authors
+        self.ids = filter.ids
+        
+        // Create a simple signature based on filter structure (kinds + tag keys)
+        let kindString = filter.kinds?.map(String.init).sorted().joined(separator: ",") ?? ""
+        let tagKeys = filter.tags?.keys.sorted().joined(separator: ",") ?? ""
+        self.signature = "\(kindString):\(tagKeys)"
+    }
+}
+
+struct FilterSignature: Equatable {
+    let signature: String
+    let tags: [String: [String]]?
+    
+    init(from filter: NDKFilter) {
+        // Store actual filter tags for test access
+        self.tags = filter.tags
+        
+        // Create a more detailed signature including tag values
+        var components: [String] = []
+        
+        if let kinds = filter.kinds {
+            components.append("kinds:\(kinds.map(String.init).sorted().joined(separator: ","))")
+        }
+        
+        if let tags = filter.tags {
+            for (key, values) in tags.sorted(by: { $0.key < $1.key }) {
+                components.append("\(key):\(values.sorted().joined(separator: ","))")
+            }
+        }
+        
+        self.signature = components.joined(separator: "|")
+    }
+}
+
 final class SubscriptionAggregationTests: XCTestCase {
     
     func testAggregationSignatureGroupsByStructure() async throws {

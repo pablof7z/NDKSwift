@@ -7,7 +7,46 @@ import UIKit
 import AppKit
 #endif
 
-/// A drop-in replacement for AsyncImage with persistent disk and memory caching
+/// A drop-in replacement for AsyncImage with persistent disk and memory caching.
+///
+/// This view provides automatic image caching both in memory and on disk,
+/// reducing network requests and improving app performance. It's designed
+/// to be a seamless replacement for SwiftUI's AsyncImage.
+///
+/// ## Features
+/// - Automatic memory caching for recently viewed images
+/// - Persistent disk caching across app launches
+/// - Seamless URL changes with automatic reloading
+/// - Customizable content and placeholder views
+/// - Thread-safe cache operations
+///
+/// ## Usage
+/// ```swift
+/// // Basic usage with system placeholder
+/// CachedAsyncImage(url: imageURL) { image in
+///     image
+///         .resizable()
+///         .aspectRatio(contentMode: .fit)
+/// } placeholder: {
+///     ProgressView()
+/// }
+///
+/// // With custom placeholder
+/// CachedAsyncImage(url: profileURL) { image in
+///     image
+///         .resizable()
+///         .clipShape(Circle())
+/// } placeholder: {
+///     Image(systemName: "person.circle.fill")
+///         .foregroundColor(.gray)
+/// }
+/// ```
+///
+/// ## Performance Notes
+/// - Images are cached using their URL as the key
+/// - Memory cache is automatically managed based on system memory pressure
+/// - Disk cache persists across app launches and has configurable size limits
+/// - Cache lookups are performed in order: memory → disk → network
 public struct CachedAsyncImage<Content: View, Placeholder: View>: View {
     private let url: URL?
     private let content: (Image) -> Content
@@ -15,6 +54,12 @@ public struct CachedAsyncImage<Content: View, Placeholder: View>: View {
     
     @StateObject private var loader = ImageLoader()
     
+    /// Creates a cached async image view.
+    ///
+    /// - Parameters:
+    ///   - url: The URL of the image to load. Pass nil to clear the current image.
+    ///   - content: A closure that returns the view to display when the image loads successfully.
+    ///   - placeholder: A closure that returns the view to display while the image is loading or if it fails to load.
     public init(
         url: URL?,
         @ViewBuilder content: @escaping (Image) -> Content,
@@ -42,7 +87,11 @@ public struct CachedAsyncImage<Content: View, Placeholder: View>: View {
     }
 }
 
-/// Manages image loading and caching
+/// Manages image loading and caching.
+///
+/// This class handles the asynchronous loading of images from URLs,
+/// checking both memory and disk caches before downloading from the network.
+/// It publishes the loaded image for SwiftUI to display.
 private class ImageLoader: ObservableObject {
     @Published var image: Image?
     

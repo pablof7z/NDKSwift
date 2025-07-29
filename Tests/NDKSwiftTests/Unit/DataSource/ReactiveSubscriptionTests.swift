@@ -58,11 +58,15 @@ final class ReactiveSubscriptionTests: XCTestCase {
         try await Task.sleep(nanoseconds: 100_000_000) // 0.1 seconds
         
         // Create test event
-        let event = NDKEvent(content: "Test reactive behavior", kind: 1)
-        event.pubkey = testAuthor
-        event.id = "test_reactive_event_\(UUID().uuidString)"
-        event.createdAt = Timestamp(Date().timeIntervalSince1970)
-        event.sig = "test_signature"
+        let event = NDKEvent(
+            id: "test_reactive_event_\(UUID().uuidString)",
+            pubkey: testAuthor,
+            createdAt: Timestamp(Date().timeIntervalSince1970),
+            kind: 1,
+            tags: [],
+            content: "Test reactive behavior",
+            sig: "test_signature"
+        )
         
         // Process event through the internal subscription system
         // This simulates what happens when an event arrives from a relay
@@ -132,11 +136,15 @@ final class ReactiveSubscriptionTests: XCTestCase {
         try await Task.sleep(nanoseconds: 100_000_000) // 0.1 seconds
         
         // Simulate event from initial relay
-        let event1 = NDKEvent(content: "Event from initial relay", kind: 1)
-        event1.pubkey = testAuthor
-        event1.id = "initial_relay_event"
-        event1.createdAt = Timestamp(Date().timeIntervalSince1970)
-        event1.sig = "test_signature"
+        let event1 = NDKEvent(
+            id: "initial_relay_event",
+            pubkey: testAuthor,
+            createdAt: Timestamp(Date().timeIntervalSince1970),
+            kind: 1,
+            tags: [],
+            content: "Event from initial relay",
+            sig: "test_signature1"
+        )
         
         try await cache.saveEvent(event1)
         
@@ -156,11 +164,15 @@ final class ReactiveSubscriptionTests: XCTestCase {
         }
         
         // Simulate event from newly discovered relay
-        let event2 = NDKEvent(content: "Event from discovered relay", kind: 1)
-        event2.pubkey = testAuthor
-        event2.id = "discovered_relay_event"
-        event2.createdAt = Timestamp(Date().timeIntervalSince1970)
-        event2.sig = "test_signature"
+        let event2 = NDKEvent(
+            id: "discovered_relay_event",
+            pubkey: testAuthor,
+            createdAt: Timestamp(Date().timeIntervalSince1970),
+            kind: 1,
+            tags: [],
+            content: "Event from discovered relay",
+            sig: "test_signature2"
+        )
         
         try await cache.saveEvent(event2)
         
