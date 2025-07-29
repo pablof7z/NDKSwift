@@ -7,20 +7,6 @@ public extension Array {
     }
 }
 
-// MARK: - Async Operations
-
-public extension Array {
-    /// Filter array asynchronously
-    func asyncFilter(_ isIncluded: (Element) async -> Bool) async -> [Element] {
-        var result: [Element] = []
-        for element in self {
-            if await isIncluded(element) {
-                result.append(element)
-            }
-        }
-        return result
-    }
-}
 
 // MARK: - NDKEvent Convenience
 
@@ -72,11 +58,6 @@ public extension Array where Element == NDKEvent {
         return self.sorted(by: { $0.createdAt > $1.createdAt })
     }
 
-    /// Returns events sorted by createdAt in ascending order (oldest first)
-    /// - Returns: Array of events sorted from oldest to newest
-    func sortedByAge() -> [NDKEvent] {
-        return self.sorted(by: { $0.createdAt < $1.createdAt })
-    }
 }
 
 // MARK: - Array Mutation Extensions
@@ -97,54 +78,3 @@ public extension Array {
     }
 }
 
-public extension Array where Element: Equatable {
-    /// Remove all occurrences of the specified value
-    /// - Parameter value: The value to remove from the array
-    mutating func removeAll(value: Element) {
-        removeAll { $0 == value }
-    }
-}
-
-// MARK: - Array Utilities
-
-public extension Array {
-    /// Split array into chunks of specified size
-    /// - Parameter size: The size of each chunk
-    /// - Returns: Array of arrays, each containing at most `size` elements
-    ///
-    /// Example:
-    /// ```swift
-    /// let numbers = [1, 2, 3, 4, 5, 6, 7]
-    /// let chunks = numbers.chunked(size: 3)
-    /// // Result: [[1, 2, 3], [4, 5, 6], [7]]
-    /// ```
-    func chunked(size: Int) -> [[Element]] {
-        guard size > 0 else { return [] }
-        return stride(from: 0, to: count, by: size).map {
-            Array(self[$0..<Swift.min($0 + size, count)])
-        }
-    }
-}
-
-public extension Array where Element: Hashable {
-    /// Returns an array with duplicate elements removed while preserving order
-    /// - Returns: Array containing only unique elements in their original order
-    ///
-    /// Example:
-    /// ```swift
-    /// let numbers = [1, 2, 3, 2, 4, 3, 5]
-    /// let unique = numbers.unique()
-    /// // Result: [1, 2, 3, 4, 5]
-    /// ```
-    func unique() -> [Element] {
-        var seen = Set<Element>()
-        return filter { element in
-            if seen.contains(element) {
-                return false
-            } else {
-                seen.insert(element)
-                return true
-            }
-        }
-    }
-}
