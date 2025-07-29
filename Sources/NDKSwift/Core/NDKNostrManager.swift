@@ -292,15 +292,10 @@ open class NDKNostrManager: ObservableObject {
     
     /// Check if a relay URL is valid
     public static func isValidRelayURL(_ urlString: String) -> Bool {
-        var cleanUrl = urlString.trimmingCharacters(in: .whitespacesAndNewlines)
-        
-        // Add wss:// if no scheme
-        if !cleanUrl.hasPrefix("ws://") && !cleanUrl.hasPrefix("wss://") {
-            cleanUrl = "wss://\(cleanUrl)"
-        }
+        let cleanUrl = RelayConstants.WebSocketScheme.ensureWebSocketScheme(urlString)
         
         // Validate URL
-        guard let url = URL(string: cleanUrl),
+        guard let url = URLUtils.safeURL(cleanUrl),
               let scheme = url.scheme,
               ["ws", "wss"].contains(scheme),
               url.host != nil else {
@@ -312,13 +307,6 @@ open class NDKNostrManager: ObservableObject {
     
     /// Clean and normalize a relay URL
     public static func normalizeRelayURL(_ urlString: String) -> String {
-        var cleanUrl = urlString.trimmingCharacters(in: .whitespacesAndNewlines)
-        
-        // Add wss:// if no scheme
-        if !cleanUrl.hasPrefix("ws://") && !cleanUrl.hasPrefix("wss://") {
-            cleanUrl = "wss://\(cleanUrl)"
-        }
-        
-        return cleanUrl
+        return RelayConstants.WebSocketScheme.ensureWebSocketScheme(urlString)
     }
 }

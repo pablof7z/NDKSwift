@@ -49,7 +49,7 @@ public enum Payment {
         for mintURL in viableMintURLs {
             do {
                 // Get mint with cached keysets
-                guard let mintUrl = URL(string: mintURL) else {
+                guard let mintUrl = URLUtils.safeURL(mintURL) else {
                     NDKLogger.log(.error, category: .wallet, "\(ErrorMessageConstants.invalid("mint URL")): \(mintURL)")
                     continue
                 }

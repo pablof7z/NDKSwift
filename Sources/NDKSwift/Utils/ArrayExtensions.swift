@@ -7,6 +7,22 @@ public extension Array {
     }
 }
 
+// MARK: - Async Extensions
+
+public extension Array {
+    /// Asynchronously filter array elements
+    /// - Parameter isIncluded: An async closure that returns true if the element should be included
+    /// - Returns: A new array containing only elements where isIncluded returns true
+    func asyncFilter(_ isIncluded: (Element) async -> Bool) async -> [Element] {
+        var result: [Element] = []
+        for element in self {
+            if await isIncluded(element) {
+                result.append(element)
+            }
+        }
+        return result
+    }
+}
 
 // MARK: - NDKEvent Convenience
 

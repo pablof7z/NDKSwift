@@ -79,8 +79,8 @@ actor WalletPaymentRouter {
             }
 
             // Perform the transfer
-            guard let sourceURL = URL(string: sourceMint),
-                  let targetURL = URL(string: targetMint) else {
+            guard let sourceURL = URLUtils.safeURL(sourceMint),
+                  let targetURL = URLUtils.safeURL(targetMint) else {
                 throw NDKError.invalidRequest(ErrorMessageConstants.invalid("mint URLs for transfer"))
             }
 
@@ -125,9 +125,9 @@ actor WalletPaymentRouter {
         let mintUsed: URL
         switch paymentRoute {
         case .direct(let mint):
-            mintUsed = URL(string: mint) ?? nutzapRequest.acceptedMints[0]
+            mintUsed = URLUtils.safeURL(mint) ?? nutzapRequest.acceptedMints[0]
         case .crossMint(_, let targetMint, _):
-            mintUsed = URL(string: targetMint) ?? nutzapRequest.acceptedMints[0]
+            mintUsed = URLUtils.safeURL(targetMint) ?? nutzapRequest.acceptedMints[0]
         case .impossible:
             mintUsed = nutzapRequest.acceptedMints[0]
         }

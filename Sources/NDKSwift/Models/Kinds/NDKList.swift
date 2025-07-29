@@ -332,7 +332,7 @@ public class NDKList {
 
             let tagToRemove = publicItemTags[index]
             // Remove by comparing tag content since we can't use object identity
-            tags.removeAll(value: tagToRemove)
+            tags.removeAll { $0 == tagToRemove }
         }
 
         // Update timestamp
