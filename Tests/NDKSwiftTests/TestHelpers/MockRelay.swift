@@ -2,6 +2,9 @@ import Foundation
 import Combine
 @testable import NDKSwift
 
+/// Type alias for backward compatibility
+typealias MockRelay = MockRelayProtocol
+
 /// A mock relay for testing purposes
 class MockRelayProtocol: RelayProtocol, @unchecked Sendable {
     let url: String

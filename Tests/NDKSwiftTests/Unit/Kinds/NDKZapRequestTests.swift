@@ -8,13 +8,9 @@ final class NDKZapRequestTests: XCTestCase {
     
     override func setUp() async throws {
         try await super.setUp()
-        ndk = NDK()
-        signer = try NDKPrivateKeySigner(privateKey: "test-private-key")
-        ndk.signer = signer
-        
-        // Set up mock relay
-        mockRelay = MockRelay()
-        await ndk.relayPool.addRelay(mockRelay)
+        signer = try NDKPrivateKeySigner.generate()
+        ndk = NDKTestFactory.createNDK(signer: signer)
+        mockRelay = MockRelay(url: "wss://test.relay.com")
     }
     
     override func tearDown() async throws {
