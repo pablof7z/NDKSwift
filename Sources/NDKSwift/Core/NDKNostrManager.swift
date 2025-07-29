@@ -1,5 +1,5 @@
 import Foundation
-import SwiftUI
+import Combine
 
 /// A base class providing common Nostr management functionality for apps
 /// This reduces duplication across apps while allowing customization
