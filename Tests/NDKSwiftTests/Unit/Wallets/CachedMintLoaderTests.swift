@@ -25,14 +25,16 @@ final class CachedMintLoaderTests: XCTestCase {
     
     func testLoadMintWithFreshCache() async throws {
         // Given
-        let testKeysets = [
-            CashuSwift.Keyset(
-                id: "test-keyset-1",
-                unit: "sat",
-                keys: [:],
-                inputFeePpk: 0
-            )
-        ]
+        let keysetJSON = """
+        {
+            "id": "test-keyset-1",
+            "unit": "sat",
+            "keys": {},
+            "input_fee_ppk": 0
+        }
+        """
+        let testKeyset = try JSONCoding.decode(CashuSwift.Keyset.self, from: keysetJSON)
+        let testKeysets = [testKeyset]
         mockCache.mockKeysets[testMintURL.absoluteString] = testKeysets
         mockCache.mockKeysetsLastUpdated[testMintURL.absoluteString] = Date()
         
@@ -47,14 +49,16 @@ final class CachedMintLoaderTests: XCTestCase {
     
     func testLoadMintWithStaleCache() async throws {
         // Given
-        let oldKeysets = [
-            CashuSwift.Keyset(
-                id: "old-keyset",
-                unit: "sat",
-                keys: [:],
-                inputFeePpk: 0
-            )
-        ]
+        let keysetJSON = """
+        {
+            "id": "old-keyset",
+            "unit": "sat",
+            "keys": {},
+            "input_fee_ppk": 0
+        }
+        """
+        let testKeyset = try JSONCoding.decode(CashuSwift.Keyset.self, from: keysetJSON)
+        let oldKeysets = [testKeyset]
         mockCache.mockKeysets[testMintURL.absoluteString] = oldKeysets
         // Set last updated to 2 days ago (beyond keyset max age)
         mockCache.mockKeysetsLastUpdated[testMintURL.absoluteString] = Date().addingTimeInterval(-172800)
@@ -70,14 +74,16 @@ final class CachedMintLoaderTests: XCTestCase {
     
     func testLoadMintWithForceRefresh() async throws {
         // Given
-        let cachedKeysets = [
-            CashuSwift.Keyset(
-                id: "cached-keyset",
-                unit: "sat",
-                keys: [:],
-                inputFeePpk: 0
-            )
-        ]
+        let keysetJSON = """
+        {
+            "id": "cached-keyset",
+            "unit": "sat",
+            "keys": {},
+            "input_fee_ppk": 0
+        }
+        """
+        let testKeyset = try JSONCoding.decode(CashuSwift.Keyset.self, from: keysetJSON)
+        let cachedKeysets = [testKeyset]
         mockCache.mockKeysets[testMintURL.absoluteString] = cachedKeysets
         mockCache.mockKeysetsLastUpdated[testMintURL.absoluteString] = Date()
         
@@ -135,12 +141,15 @@ final class CachedMintLoaderTests: XCTestCase {
     
     func testGetKeysetById() async throws {
         // Given
-        let testKeyset = CashuSwift.Keyset(
-            id: "test-keyset-123",
-            unit: "sat",
-            keys: [:],
-            inputFeePpk: 0
-        )
+        let keysetJSON = """
+        {
+            "id": "test-keyset-123",
+            "unit": "sat",
+            "keys": {},
+            "input_fee_ppk": 0
+        }
+        """
+        let testKeyset = try JSONCoding.decode(CashuSwift.Keyset.self, from: keysetJSON)
         mockCache.mockKeysetsById["test-keyset-123"] = testKeyset
         
         // When
@@ -183,6 +192,13 @@ actor MockNDKCache: NDKCache {
     
     // Cache management
     func clear() async throws {}
+    
+    // Observation
+    func observeEvents(matching filter: NDKFilter, includeExisting: Bool = true) async -> AsyncThrowingStream<[NDKEvent], any Error> {
+        AsyncThrowingStream { continuation in
+            continuation.finish()
+        }
+    }
     
     // Mint cache operations - custom implementation for testing
     func getKeysets(mintUrl: String) async -> [CashuSwift.Keyset] {

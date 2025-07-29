@@ -177,6 +177,30 @@ try event.sign(with: signer)
 
 **Examples**: Check out the [Examples](Examples/) directory for runnable demos
 
+## 🧪 Testing
+
+NDKSwift has comprehensive test coverage including unit tests, integration tests, and end-to-end tests.
+
+### Running Tests
+
+```bash
+# Run all tests
+swift test
+
+# Run specific test suite
+swift test --filter NDKSwiftTests
+
+# Run with verbose output
+swift test --verbose
+```
+
+### Test Coverage
+
+- **Unit Tests**: Core functionality, models, and utilities
+- **Integration Tests**: Relay connections, caching, and data flow
+- **E2E Tests**: Complete user workflows including authentication, publishing, and subscriptions
+- **Performance Tests**: Large-scale subscription handling and cache performance
+
 ## 🛠 Requirements
 
 - iOS 13.0+ / macOS 10.15+ / tvOS 13.0+ / watchOS 6.0+

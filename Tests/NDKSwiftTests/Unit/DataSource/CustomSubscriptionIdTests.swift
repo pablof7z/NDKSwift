@@ -134,7 +134,7 @@ final class CustomSubscriptionIdTests: XCTestCase {
 }
 
 // Mock relay that captures sent messages
-class MockRelayWithCapture: MockRelay, @unchecked Sendable {
+class MockRelayWithCapture: MockRelayProtocol, @unchecked Sendable {
     var capturedMessages: [String] = []
     
     override func send(_ message: String) async throws {
