@@ -26,14 +26,19 @@ final class NDKBlossomServerManagerTests: XCTestCase {
         XCTAssertEqual(info.paidMessage, "Requires payment")
     }
     
-    func testServerInfoFromEvent() throws {
+    func testServerInfoFromEvent() {
         // Create a mock event with proper Blossom server tags
-        let event = try NDKEvent(content: "Test Blossom Server Description", kind: 36363, tags: [
-            ["d", "https://blossom.test.com"],
-            ["name", "Test Blossom"],
-            ["paid", "Payment required for uploads"],
-            ["whitelist", "Whitelisted users only"]
-        ])
+        let event = NDKEvent(
+            kind: 36363,
+            content: "Test Blossom Server Description",
+            tags: [
+                ["d", "https://blossom.test.com"],
+                ["name", "Test Blossom"],
+                ["paid", "Payment required for uploads"],
+                ["whitelist", "Whitelisted users only"]
+            ],
+            pubkey: "test-pubkey"
+        )
         
         let info = NDKBlossomServerInfo(from: event)
         
@@ -46,7 +51,7 @@ final class NDKBlossomServerManagerTests: XCTestCase {
         XCTAssertEqual(info.whitelistMessage, "Whitelisted users only")
     }
     
-    func testServerNameExtraction() throws {
+    func testServerNameExtraction() {
         // Test various URL formats
         let testCases = [
             ("https://blossom.example.com", "blossom.example.com"),
@@ -58,10 +63,15 @@ final class NDKBlossomServerManagerTests: XCTestCase {
         ]
         
         for (url, expectedName) in testCases {
-            let event = try NDKEvent(content: "", kind: 36363, tags: [
-                ["d", url]
-                // No name tag, should extract from URL
-            ])
+            let event = NDKEvent(
+                kind: 36363,
+                content: "",
+                tags: [
+                    ["d", url]
+                    // No name tag, should extract from URL
+                ],
+                pubkey: "test-pubkey"
+            )
             
             let info = NDKBlossomServerInfo(from: event)
             XCTAssertEqual(info.name, expectedName, "Failed for URL: \(url)")
@@ -142,11 +152,16 @@ final class NDKBlossomServerManagerTests: XCTestCase {
         XCTAssertEqual(set.count, 1)
     }
     
-    func testServerInfoWithEmptyTags() throws {
+    func testServerInfoWithEmptyTags() {
         // Test event with minimal tags
-        let event = try NDKEvent(content: "Minimal server", kind: 36363, tags: [
-            ["d", "https://minimal.example.com"]
-        ])
+        let event = NDKEvent(
+            kind: 36363,
+            content: "Minimal server",
+            tags: [
+                ["d", "https://minimal.example.com"]
+            ],
+            pubkey: "test-pubkey"
+        )
         
         let info = NDKBlossomServerInfo(from: event)
         
@@ -159,15 +174,20 @@ final class NDKBlossomServerManagerTests: XCTestCase {
         XCTAssertNil(info.whitelistMessage)
     }
     
-    func testServerInfoWithMalformedTags() throws {
+    func testServerInfoWithMalformedTags() {
         // Test event with malformed tags
-        let event = try NDKEvent(content: "Test", kind: 36363, tags: [
-            ["d", "https://test.com"],
-            ["name"], // Missing value
-            ["paid"], // No message
-            ["whitelist"], // No message
-            ["unknown", "value"] // Unknown tag
-        ])
+        let event = NDKEvent(
+            kind: 36363,
+            content: "Test",
+            tags: [
+                ["d", "https://test.com"],
+                ["name"], // Missing value
+                ["paid"], // No message
+                ["whitelist"], // No message
+                ["unknown", "value"] // Unknown tag
+            ],
+            pubkey: "test-pubkey"
+        )
         
         let info = NDKBlossomServerInfo(from: event)
         

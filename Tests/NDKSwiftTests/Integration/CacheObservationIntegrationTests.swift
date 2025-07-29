@@ -275,7 +275,7 @@ final class CacheObservationIntegrationTests: XCTestCase {
             kinds: [1],
             limit: 10
         )
-        let specificDataSource = ndk.observe(
+        _ = ndk.observe(
             filter: specificFilter,
             cachePolicy: .networkOnly
         )
@@ -527,14 +527,17 @@ final class CacheObservationIntegrationTests: XCTestCase {
         content: String
     ) -> NDKEvent {
         var event = NDKEvent(
+            id: id ?? "",
             pubkey: author,
-            createdAt: Timestamp(date: Date()),
-            kind: kind,
+            createdAt: Timestamp.now,
+            kind: Int(kind),
             tags: [],
-            content: content
+            content: content,
+            sig: "mock-signature"
         )
-        event.id = id ?? event.calculateId()
-        event.sig = "mock-signature"
+        if id == nil {
+            event.id = event.calculateId()
+        }
         return event
     }
 }

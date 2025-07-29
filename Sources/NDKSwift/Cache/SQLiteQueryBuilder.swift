@@ -81,7 +81,7 @@ struct SQLiteQueryBuilder {
                         }
                     }
 
-                    whereClauses.append("(" + tagConditions.joined(separator: " AND ") + ")")
+                    whereClauses.append("(\(tagConditions.joined(separator: " AND ")))")
                 }
             }
         }
