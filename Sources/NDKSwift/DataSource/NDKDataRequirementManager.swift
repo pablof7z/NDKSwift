@@ -360,7 +360,7 @@ actor NDKDataRequirementManager {
                 // Create enhanced requirement for this specific relay
                 // This follows the outbox model: create a new requirement for discovered relays
                 let enhancedRequirementId = UUID()
-                let (enhancedRequirement, enhancedEventStream) = await createRequirement(
+                let (enhancedRequirement, _) = await createRequirement(
                     filter: enhancedFilter,
                     maxAge: 0, // Enhanced requirements are live subscriptions
                     cachePolicy: .networkOnly, // Fetch fresh data from discovered relays
