@@ -38,10 +38,12 @@ final class NDKFilterFingerprintTests: XCTestCase {
             ids: ["id1"],
             authors: ["pubkey1"],
             kinds: [1],
+            events: nil,
+            pubkeys: nil,
             since: 1000,
             until: 2000,
-            tags: ["p": Set(["pubkey2"])],
-            limit: 100
+            limit: 100,
+            tags: ["p": Set(["pubkey2"])]
         )
         // Properties sorted alphabetically, with since/until including values
         XCTAssertEqual(filter.toFingerprint(), "authors-ids-kinds-limit-since:1000-tags-until:2000")
@@ -109,7 +111,7 @@ final class NDKFilterFingerprintTests: XCTestCase {
     func testMultipleFiltersArrayFingerprint() {
         let filter1 = NDKFilter(kinds: [1])
         let filter2 = NDKFilter(authors: ["pubkey1"])
-        let filter3 = NDKFilter(kinds: [3], authors: ["pubkey2"])
+        let filter3 = NDKFilter(authors: ["pubkey2"], kinds: [3])
         
         let filters = [filter1, filter2, filter3]
         
@@ -118,7 +120,7 @@ final class NDKFilterFingerprintTests: XCTestCase {
     }
     
     func testCloseOnEosePrefix() {
-        let filter = NDKFilter(kinds: [1], authors: ["pubkey1"])
+        let filter = NDKFilter(authors: ["pubkey1"], kinds: [1])
         let filters = [filter]
         
         let withoutClose = filters.toFingerprint(closeOnEose: false)
@@ -177,13 +179,7 @@ final class NDKFilterFingerprintTests: XCTestCase {
     
     func testFilterWithNilValues() {
         let filter = NDKFilter()
-        filter.ids = nil
-        filter.authors = nil
-        filter.kinds = nil
-        filter.since = nil
-        filter.until = nil
-        filter.tags = nil
-        filter.limit = nil
+        // All properties are already nil by default in empty constructor
         
         XCTAssertEqual(filter.toFingerprint(), "")
     }

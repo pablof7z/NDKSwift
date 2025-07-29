@@ -131,8 +131,8 @@ public enum LoggingHelpers {
 public extension NDKLogger {
     /// Log a method entry with consistent formatting
     static func logMethodEntry(
-        _ level: LogLevel = .trace,
-        category: LogCategory,
+        _ level: NDKLogLevel = .trace,
+        category: NDKLogCategory,
         className: String,
         methodName: String,
         parameters: [String: Any]? = nil
@@ -143,8 +143,8 @@ public extension NDKLogger {
     
     /// Log a method result with consistent formatting
     static func logMethodResult(
-        _ level: LogLevel = .debug,
-        category: LogCategory,
+        _ level: NDKLogLevel = .debug,
+        category: NDKLogCategory,
         className: String,
         methodName: String,
         result: String
@@ -155,7 +155,7 @@ public extension NDKLogger {
     
     /// Log an error with consistent formatting
     static func logError(
-        category: LogCategory,
+        category: NDKLogCategory,
         className: String,
         methodName: String,
         error: Error,
@@ -167,7 +167,7 @@ public extension NDKLogger {
     
     /// Log timing information with consistent formatting
     static func logTiming(
-        category: LogCategory,
+        category: NDKLogCategory,
         className: String,
         methodName: String,
         duration: TimeInterval,

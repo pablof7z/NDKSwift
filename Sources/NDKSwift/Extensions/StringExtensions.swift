@@ -71,6 +71,34 @@ public extension String {
     var normalizedRelayURL: String {
         URLNormalizer.tryNormalizeRelayUrl(self) ?? self
     }
+    
+    /// Formats a relay URL for display by removing the WebSocket scheme prefix and trailing slash
+    var formattedRelayURL: String {
+        var formatted = self
+        
+        // Remove WebSocket scheme prefix
+        if formatted.hasPrefix("wss://") {
+            formatted = String(formatted.dropFirst(6))
+        } else if formatted.hasPrefix("ws://") {
+            formatted = String(formatted.dropFirst(5))
+        }
+        
+        // Remove trailing slash
+        if formatted.hasSuffix("/") {
+            formatted = String(formatted.dropLast())
+        }
+        
+        return formatted
+    }
+    
+    /// Truncates a relay URL for compact display
+    func truncatedRelayURL(maxLength: Int = 25) -> String {
+        let formatted = self.formattedRelayURL
+        if formatted.count > maxLength {
+            return String(formatted.prefix(maxLength - 3)) + "..."
+        }
+        return formatted
+    }
 }
 
 // MARK: - Collection Extensions

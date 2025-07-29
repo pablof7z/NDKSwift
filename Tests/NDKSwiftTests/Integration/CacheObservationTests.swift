@@ -190,18 +190,12 @@ final class CacheObservationTests: XCTestCase {
         kind: UInt32 = 1,
         content: String = "Test content"
     ) throws -> NDKEvent {
-        var event = NDKEvent(
-            pubkey: author,
-            createdAt: Timestamp(date: Date()),
-            kind: kind,
+        return EventTestFactory.createEvent(
+            kind: Int(kind),
+            content: content,
             tags: [],
-            content: content
+            pubkey: author,
+            createdAt: Timestamp.now
         )
-        
-        // Create a mock signature
-        event.id = event.calculateId()
-        event.sig = String(repeating: "0", count: 128) // Mock signature
-        
-        return event
     }
 }

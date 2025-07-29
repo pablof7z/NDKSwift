@@ -62,7 +62,7 @@ class MockRelayProtocol: RelayProtocol, @unchecked Sendable {
     }
     
     func removeSubscription(byId id: String) async {
-        activeSubscriptionIds.removeAll(value: id)
+        activeSubscriptionIds.removeAll { $0 == id }
     }
     
     func getSignatureStats() async -> NDKRelaySignatureStats {

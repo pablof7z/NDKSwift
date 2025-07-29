@@ -53,13 +53,13 @@ final class NDKSQLiteCacheReactiveTests: XCTestCase {
         }
         
         // Add some events
-        let event1 = try createTextNote(content: "First note")
+        let event1 = try await createTextNote(content: "First note")
         try await cache.saveEvent(event1)
         
         // Small delay to ensure observation picks it up
         try await Task.sleep(nanoseconds: 100_000_000) // 0.1 seconds
         
-        let event2 = try createTextNote(content: "Second note")
+        let event2 = try await createTextNote(content: "Second note")
         try await cache.saveEvent(event2)
         
         // Wait for expectations
@@ -71,7 +71,7 @@ final class NDKSQLiteCacheReactiveTests: XCTestCase {
     
     func testObserveSingleEvent() async throws {
         // Create and save an event
-        let event = try createTextNote(content: "Observable event")
+        let event = try await createTextNote(content: "Observable event")
         try await cache.saveEvent(event)
         
         // Start observing the specific event
@@ -100,9 +100,8 @@ final class NDKSQLiteCacheReactiveTests: XCTestCase {
         // Update the event
         try await Task.sleep(nanoseconds: 100_000_000) // 0.1 seconds
         
-        var updatedEvent = event
-        updatedEvent.content = "Updated content"
-        updatedEvent.createdAt = Timestamp.now
+        // Create a new event with updated content (events are immutable)
+        let updatedEvent = try await createTextNote(content: "Updated content")
         try await cache.saveEvent(updatedEvent)
         
         // Wait for expectations
@@ -118,7 +117,7 @@ final class NDKSQLiteCacheReactiveTests: XCTestCase {
     }
     
     func testObserveProfile() async throws {
-        let pubkey = signer.publicKey.hex
+        let pubkey = try await signer.pubkey
         
         // Start observing before profile exists
         let profileStream = await cache.observeProfile(pubkey: pubkey, includeExisting: true)
@@ -230,7 +229,7 @@ final class NDKSQLiteCacheReactiveTests: XCTestCase {
         
         // Add an event
         try await Task.sleep(nanoseconds: 100_000_000) // 0.1 seconds
-        let event = try createTextNote(content: "Test for multiple observers")
+        let event = try await createTextNote(content: "Test for multiple observers")
         try await cache.saveEvent(event)
         
         // Both observers should receive the event
@@ -241,12 +240,11 @@ final class NDKSQLiteCacheReactiveTests: XCTestCase {
     }
     
     // Helper to create test events
-    private func createTextNote(content: String) throws -> NDKEvent {
-        return try NDKEvent(
-            kind: 1,
-            content: content,
-            publicKey: signer.publicKey,
-            signedBy: signer
-        )
+    private func createTextNote(content: String) async throws -> NDKEvent {
+        let ndk = NDK(relayUrls: [], signer: signer)
+        return try await NDKEventBuilder(ndk: ndk)
+            .kind(1)
+            .content(content)
+            .build()
     }
 }

@@ -101,7 +101,8 @@ final class NDKFollowPackTests: XCTestCase {
         let imeta = NDKImetaTag(url: imetaURL)
         
         // Create event with both image and imeta tags
-        let event = try await createTestEvent(
+        let event = EventTestFactory.createEvent(
+            kind: EventKind.followPack,
             tags: [
                 ["image", "https://fallback.com/image.png"],
                 ImetaUtils.imetaTagToTag(imeta)
@@ -159,7 +160,8 @@ final class NDKFollowPackTests: XCTestCase {
     }
     
     func testContainsPubkey() async throws {
-        let event = try await createTestEvent(
+        let event = EventTestFactory.createEvent(
+            kind: EventKind.followPack,
             tags: [
                 ["p", "pk1"],
                 ["p", "pk2"]
@@ -195,7 +197,7 @@ final class NDKFollowPackTests: XCTestCase {
     }
     
     func testFromEvent() async throws {
-        let event = try await createTestEvent(
+        let event = EventTestFactory.createEvent(
             kind: EventKind.mediaFollowPack,
             content: "Media content",
             tags: [
@@ -223,7 +225,8 @@ final class NDKFollowPackTests: XCTestCase {
     // MARK: - Edge Cases
     
     func testMalformedTags() async throws {
-        let event = try await createTestEvent(
+        let event = EventTestFactory.createEvent(
+            kind: EventKind.followPack,
             tags: [
                 ["p"],  // Missing pubkey
                 ["title"],  // Missing value

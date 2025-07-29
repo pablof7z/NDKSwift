@@ -37,15 +37,11 @@ final class SimpleCacheObservationTest: XCTestCase {
         
         // Now save a kind:1 event to the cache
         print("💾 Saving a kind:1 event to cache...")
-        let testEvent = NDKEvent(
-            pubkey: "test-author-12345",
-            createdAt: Timestamp(date: Date()),
+        let testEvent = EventTestFactory.createEvent(
             kind: 1,
-            tags: [],
-            content: "Hello from test!"
+            content: "Hello from test!",
+            pubkey: "test-author-12345"
         )
-        testEvent.id = testEvent.calculateId()
-        testEvent.sig = String(repeating: "0", count: 128) // Mock signature
         
         try await cache.saveEvent(testEvent)
         print("✅ Event saved to cache")
