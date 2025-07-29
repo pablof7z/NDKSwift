@@ -51,12 +51,12 @@ public struct NDKContactEntry {
 /// Provides contact management with petnames and relay hints
 public class NDKContactList: NDKList {
     /// Contact list kind (3)
-    public static let kind = 3
+    public static let kind = EventKind.contacts
 
     /// Initialize a new contact list
     public override init(ndk: NDK? = nil) {
         super.init(ndk: ndk)
-        self.kind = 3
+        self.kind = EventKind.contacts
     }
 
     /// Create an NDKContactList from an existing NDKEvent
@@ -253,7 +253,7 @@ public class NDKContactList: NDKList {
     }
 
     /// Create a filter to fetch events from all contacts
-    public func createContactFilter(kinds: [Int] = [1], since: Timestamp? = nil, until: Timestamp? = nil, limit: Int? = nil) -> NDKFilter {
+    public func createContactFilter(kinds: [Int] = [EventKind.textNote], since: Timestamp? = nil, until: Timestamp? = nil, limit: Int? = nil) -> NDKFilter {
         var filter = NDKFilter(authors: contactPubkeys, kinds: kinds)
         filter.since = since
         filter.until = until
@@ -301,7 +301,7 @@ public class NDKContactList: NDKList {
 public extension NDK {
     /// Fetch the contact list for a specific user
     func fetchContactList(for user: NDKUser) async throws -> NDKContactList? {
-        let filter = NDKFilter(authors: [user.pubkey], kinds: [3])
+        let filter = NDKFilter(authors: [user.pubkey], kinds: [EventKind.contacts])
 
         // Use NDKDataSource with reasonable maxAge for contact lists
         let dataSource = NDKDataSource(

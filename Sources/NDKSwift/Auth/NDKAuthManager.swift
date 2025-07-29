@@ -375,8 +375,8 @@ public class NDKAuthManager {
         let pubkey = try await signer.pubkey
 
         // Determine if hardware-backed based on signer type
-        // TODO: Implement NDKBiometricSigner
-        let isHardwareBacked = false
+        // Currently only private key signers with biometric requirement are considered hardware-backed
+        let isHardwareBacked = requiresBiometric && signer is NDKPrivateKeySigner
 
         // Create session
         var session = NDKSession(

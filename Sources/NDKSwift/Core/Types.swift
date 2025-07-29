@@ -1,5 +1,22 @@
 import Foundation
 
+/// Core type definitions and constants used throughout the NDKSwift framework.
+///
+/// This file defines fundamental types, constants, and enumerations that form the basis
+/// of the Nostr protocol implementation. It includes:
+/// - Type aliases for cryptographic keys and identifiers
+/// - Time-related constants and utilities
+/// - Event kinds as defined in various NIPs
+/// - Common tag types and metadata structures
+///
+/// ## Type Safety
+/// Type aliases like `PublicKey`, `PrivateKey`, and `EventID` provide semantic meaning
+/// while maintaining type safety. They are all String types but clearly indicate their purpose.
+///
+/// ## Constants Organization
+/// Constants are grouped into logical enums to provide namespacing and prevent pollution
+/// of the global scope.
+
 /// 32-byte lowercase hex-encoded public key
 public typealias PublicKey = String
 
@@ -120,36 +137,60 @@ public enum EventKind {
     public static let channelMessage = 42
 
     // MARK: - Extended Events (1000-9999)
+    /// File metadata event (NIP-94) - Contains metadata for files stored on external servers
     public static let fileMetadata = 1063
-    public static let genericReply = 1111  // NIP-22 comment
-    public static let report = 1984  // NIP-56 Report
+    /// Generic reply/comment event (NIP-22) - Used for commenting on any addressable content
+    public static let genericReply = 1111
+    /// Report event (NIP-56) - For reporting inappropriate content or users
+    public static let report = 1984
 
     // MARK: - NIP-60 Cashu Events
-    public static let cashuWalletBackup = 375  // Wallet backup event (NIP-60)
+    /// Cashu wallet backup event (NIP-60) - Encrypted backup of wallet proofs and state
+    public static let cashuWalletBackup = 375
+    /// Cashu quote event - Contains mint quotes for token operations
     public static let cashuQuote = 7374
-    public static let cashuToken = 7375  // Token event (NIP-60)
-    public static let cashuSpendingHistory = 7376  // Spending history (NIP-60)
+    /// Cashu token event (NIP-60) - Contains ecash tokens for transfer
+    public static let cashuToken = 7375
+    /// Cashu spending history (NIP-60) - Records of spent tokens for recovery
+    public static let cashuSpendingHistory = 7376
+    /// Nutzap event (NIP-61) - Ecash-based zap payments
     public static let nutzap = 9321
-    public static let cashuWalletConfig = 17375  // Wallet configuration (NIP-60)
+    /// Cashu wallet configuration (NIP-60) - User preferences and settings for Cashu wallets
+    public static let cashuWalletConfig = 17375
 
     // MARK: - Zap Events
+    /// Zap request event (NIP-57) - Request for a Lightning payment to a user
     public static let zapRequest = 9734
+    /// Zap receipt event (NIP-57) - Proof of a completed Lightning payment
     public static let zap = 9735
-    public static let zapReceipt = 9735  // Alias for clarity
+    /// Alias for zap event for clarity in different contexts
+    public static let zapReceipt = 9735
 
     // MARK: - List Events (10000-19999)
+    /// Mute list (NIP-51) - List of users, threads, or words to mute
     public static let muteList = 10000
+    /// Pin list (NIP-51) - List of events pinned by the user
     public static let pinList = 10001
+    /// Relay list (NIP-65) - User's preferred relays for reading and writing
     public static let relayList = 10002
+    /// Bookmark list (NIP-51) - List of bookmarked events
     public static let bookmarkList = 10003
+    /// Communities list (NIP-51) - List of communities the user is interested in
     public static let communitiesList = 10004
+    /// Public chats list (NIP-51) - List of public chat channels
     public static let publicChatsList = 10005
+    /// Blocked relays list (NIP-51) - Relays the user wants to avoid
     public static let blockedRelays = 10006
+    /// Search relays list (NIP-51) - Specialized relays for search operations
     public static let searchRelays = 10007
+    /// Interest list (NIP-51) - Topics or hashtags of interest
     public static let interestList = 10015
+    /// User emoji list (NIP-51) - Custom emoji reactions available to the user
     public static let userEmojiList = 10030
+    /// Cashu mint list (NIP-60) - List of trusted Cashu mints
     public static let cashuMintList = 10019
-    public static let nutzapPreferences = 10019  // Alias for NIP-61
+    /// Nutzap preferences (NIP-61) - Alias for cashuMintList when used for nutzap configuration
+    public static let nutzapPreferences = 10019
     public static let blockedMints = 10020
 
     // MARK: - Authentication Events (20000-29999)
