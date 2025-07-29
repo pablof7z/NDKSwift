@@ -205,7 +205,7 @@ public actor NDKProfileManager {
     private func updateCache(pubkey: PublicKey, profile: NDKUserProfile) {
         // Remove old entry if exists
         if profileCache[pubkey] != nil {
-            cacheOrder.removeAll(value: pubkey)
+            cacheOrder.removeAll { $0 == pubkey }
         }
 
         // Add new entry
@@ -223,7 +223,7 @@ public actor NDKProfileManager {
 
     private func updateCacheOrder(for pubkey: PublicKey) {
         // Move to end (most recently used)
-        cacheOrder.removeAll(value: pubkey)
+        cacheOrder.removeAll { $0 == pubkey }
         cacheOrder.append(pubkey)
     }
 

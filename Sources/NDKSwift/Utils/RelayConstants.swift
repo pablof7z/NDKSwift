@@ -19,6 +19,17 @@ public enum RelayConstants {
             let lowercased = url.lowercased()
             return lowercased.hasPrefix(secure) || lowercased.hasPrefix(insecure)
         }
+        
+        /// Add WebSocket scheme to URL if missing
+        /// - Parameter url: The URL string to process
+        /// - Returns: URL with WebSocket scheme added if it was missing
+        public static func ensureWebSocketScheme(_ url: String) -> String {
+            let trimmed = url.trimmed
+            if !isWebSocketURL(trimmed) {
+                return secure + trimmed
+            }
+            return trimmed
+        }
     }
 
     // MARK: - Popular Public Relays

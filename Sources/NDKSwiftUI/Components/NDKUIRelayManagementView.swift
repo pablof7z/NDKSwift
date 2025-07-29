@@ -87,16 +87,11 @@ public struct NDKUIRelayManagementView: View {
         isLoading = true
         defer { isLoading = false }
         
-        // Clean up URL
-        var cleanUrl = urlString.trimmingCharacters(in: .whitespacesAndNewlines)
-        
-        // Add wss:// if no scheme
-        if !cleanUrl.hasPrefix("ws://") && !cleanUrl.hasPrefix("wss://") {
-            cleanUrl = "wss://\(cleanUrl)"
-        }
+        // Clean up URL and ensure WebSocket scheme
+        let cleanUrl = RelayConstants.WebSocketScheme.ensureWebSocketScheme(urlString)
         
         // Validate URL
-        guard URL(string: cleanUrl) != nil else {
+        guard URLUtils.safeURL(cleanUrl) != nil else {
             errorMessage = "Invalid relay URL"
             showingError = true
             return
@@ -209,11 +204,13 @@ private struct RelayRow: View {
     
     private func formatRelayUrl(_ url: String) -> String {
         var formatted = url
-        if formatted.hasPrefix("wss://") {
-            formatted = String(formatted.dropFirst(6))
-        } else if formatted.hasPrefix("ws://") {
-            formatted = String(formatted.dropFirst(5))
+        // Remove WebSocket scheme prefix for display
+        if formatted.hasPrefix(RelayConstants.WebSocketScheme.secure) {
+            formatted = String(formatted.dropFirst(RelayConstants.WebSocketScheme.secure.count))
+        } else if formatted.hasPrefix(RelayConstants.WebSocketScheme.insecure) {
+            formatted = String(formatted.dropFirst(RelayConstants.WebSocketScheme.insecure.count))
         }
+        // Remove trailing slash
         if formatted.hasSuffix("/") {
             formatted = String(formatted.dropLast())
         }

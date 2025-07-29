@@ -324,7 +324,7 @@ public actor NIP60Wallet: NDKPaymentProvider {
             // Remove mints that are no longer in the configuration
             let mintsToRemove = previousMints.subtracting(configuredMints)
             for mintURL in mintsToRemove {
-                guard let url = URL(string: mintURL) else { continue }
+                guard let url = URLUtils.safeURL(mintURL) else { continue }
                 _ = await mints.removeMint(url: url)
                 NDKLogger.log(.debug, category: .wallet, "🗑 Removed mint no longer in config: \(mintURL)")
             }
@@ -333,7 +333,7 @@ public actor NIP60Wallet: NDKPaymentProvider {
             var successfullyAddedMints = Set<String>()
 
             for mintURL in mintURLs {
-                guard let url = URL(string: mintURL) else {
+                guard let url = URLUtils.safeURL(mintURL) else {
                     NDKLogger.log(.debug, category: .wallet, "⚠️ Invalid mint URL: \(mintURL)")
                     continue
                 }
@@ -415,7 +415,7 @@ public actor NIP60Wallet: NDKPaymentProvider {
         blacklistLastFetched = Date()
 
         // Remove the mint from wallet if it exists
-        if let url = URL(string: mintURL) {
+        if let url = URLUtils.safeURL(mintURL) {
             _ = await mints.removeMint(url: url)
         }
 
@@ -448,7 +448,7 @@ public actor NIP60Wallet: NDKPaymentProvider {
             for mintURL in newlyBlacklisted {
                 if currentMints.contains(mintURL) {
                     NDKLogger.log(.warning, category: .wallet, "Removing newly blacklisted mint from wallet: \(mintURL)")
-                    if let url = URL(string: mintURL) {
+                    if let url = URLUtils.safeURL(mintURL) {
                         _ = await mints.removeMint(url: url)
                     }
                 }

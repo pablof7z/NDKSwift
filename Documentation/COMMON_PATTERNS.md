@@ -23,9 +23,9 @@ This guide provides practical examples and best practices for common tasks in ND
 // Create NDK with auto-reconnecting relay pool
 let ndk = NDK(
     relayUrls: [
-        "wss://relay.damus.io",
-        "wss://relay.primal.net",
-        "wss://nos.lol"
+        RelayConstants.damus,        // "wss://relay.damus.io"
+        RelayConstants.primal,       // "wss://relay.primal.net"
+        RelayConstants.nosLol        // "wss://nos.lol"
     ],
     cache: NDKSQLiteCache(dbName: "myapp.db")  // Persistent cache
 )
@@ -742,6 +742,72 @@ struct UserProfileView: View {
         }
     }
 }
+```
+
+## URL Handling
+
+### Working with Relay URLs
+
+```swift
+// Use URLUtils for safe URL creation
+let relayUrl = "relay.example.com"
+if let url = URLUtils.safeURL(relayUrl) {
+    // Valid URL
+} else {
+    // Invalid URL
+}
+
+// Or use validateURL for throwing version
+do {
+    let url = try URLUtils.validateURL(relayUrl)
+    // Use URL
+} catch {
+    // Handle invalid URL error
+}
+
+// Ensure WebSocket scheme is present
+let cleanUrl = RelayConstants.WebSocketScheme.ensureWebSocketScheme("relay.example.com")
+// Returns: "wss://relay.example.com"
+
+// Check if URL has WebSocket scheme
+if RelayConstants.WebSocketScheme.isWebSocketURL(urlString) {
+    // URL has ws:// or wss:// scheme
+}
+
+// Use built-in relay constants
+let popularRelays = [
+    RelayConstants.damus,
+    RelayConstants.nostrBand,
+    RelayConstants.primal
+]
+
+// Or use pre-configured sets
+let relays = RelayConstants.defaultRelays  // Common relay set
+let extendedRelays = RelayConstants.extendedRelays  // Broader reach
+```
+
+### String Extensions for Common Operations
+
+```swift
+// Trim whitespace and newlines
+let cleaned = userInput.trimmed
+
+// Check if string has content after trimming
+if userInput.hasContent {
+    // String has non-whitespace content
+}
+
+// Normalize string (trim + lowercase)
+let normalized = relayUrl.normalized
+
+// Check WebSocket URL directly on string
+if urlString.isWebSocketURL {
+    // String is a WebSocket URL
+}
+
+// Normalize relay URLs  
+let normalizedRelay = "RELAY.EXAMPLE.COM".normalizedRelayURL
+// Returns: "wss://relay.example.com"
 ```
 
 ## Best Practices

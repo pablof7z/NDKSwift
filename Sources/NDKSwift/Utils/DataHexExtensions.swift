@@ -8,7 +8,7 @@ public extension Data {
     /// Initialize Data from hex string
     /// - Parameter hexString: Hex string to convert (supports "0x" prefix and odd-length strings)
     init?(hexString: String) {
-        var hex = hexString.trimmingCharacters(in: .whitespacesAndNewlines)
+        var hex = hexString.trimmed
         
         // Remove 0x prefix if present
         if hex.hasPrefix("0x") {

@@ -161,7 +161,7 @@ actor LRUCache<Key: Hashable, Value> {
     /// - Note: This operation is O(n) in the worst case. For better performance with very large caches,
     ///         consider using a doubly linked list with a hash map of nodes.
     private func removeFromAccessOrder(_ key: Key) {
-        accessOrder.removeAll(value: key)
+        accessOrder.removeAll { $0 == key }
     }
 
     private func evictOldest() {

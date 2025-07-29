@@ -147,7 +147,7 @@ public actor MintManager {
     public func requestMintQuote(amount: Int64, mintURL: String) async throws -> CashuSwift.Bolt11.MintQuote {
         // Always ensure mint is properly loaded with keysets
         let url = try GuardHelpers.unwrap(
-            URL(string: mintURL),
+            URLUtils.safeURL(mintURL),
             error: NDKError.invalidURL("\(ErrorMessageConstants.invalid("mint URL")): \(mintURL)")
         )
 

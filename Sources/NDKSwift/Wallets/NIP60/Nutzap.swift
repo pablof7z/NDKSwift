@@ -49,7 +49,7 @@ public enum Nutzap {
         var lastError: Error?
         for mintURL in viableMintURLs {
             // Load mint dynamically
-            guard let mintUrl = URL(string: mintURL) else {
+            guard let mintUrl = URLUtils.safeURL(mintURL) else {
                 NDKLogger.log(.error, category: .wallet, "\(ErrorMessageConstants.invalid("mint URL")): \(mintURL)")
                 continue
             }
@@ -306,7 +306,7 @@ public enum Nutzap {
         // Process proofs by mint
         for mintURL in mintURLs {
             // Load mint dynamically
-            guard let mintUrl = URL(string: mintURL) else {
+            guard let mintUrl = URLUtils.safeURL(mintURL) else {
                 NDKLogger.log(.error, category: .wallet, "\(ErrorMessageConstants.invalid("mint URL in nutzap")): \(mintURL)")
                 continue
             }
