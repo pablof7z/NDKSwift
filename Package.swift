@@ -38,6 +38,9 @@ let package = Package(
                 .product(name: "secp256k1", package: "swift-secp256k1"),
                 .product(name: "GRDB", package: "GRDB.swift"),
                 .product(name: "CashuSwift", package: "CashuSwift"),
+            ],
+            resources: [
+                .process("Wallets/Common/README.md")
             ]
         ),
         .target(
@@ -48,7 +51,10 @@ let package = Package(
         ),
         .testTarget(
             name: "NDKSwiftTests",
-            dependencies: ["NDKSwift", "NDKSwiftUI"]
+            dependencies: ["NDKSwift", "NDKSwiftUI"],
+            resources: [
+                .process("Integration/README_OutboxTests.md")
+            ]
         ),
     ]
 )
