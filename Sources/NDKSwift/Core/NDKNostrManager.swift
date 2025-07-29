@@ -35,9 +35,9 @@ open class NDKNostrManager: ObservableObject {
         )
     }
     
-    /// Key for storing user-added relays (override for app-specific key)
-    open var userRelaysKey: String {
-        "UserAddedRelays"
+    /// Key for storing app-added relays (override for app-specific key)
+    open var appRelaysKey: String {
+        "AppAddedRelays"
     }
     
     // MARK: - Private Properties
@@ -95,6 +95,10 @@ open class NDKNostrManager: ObservableObject {
             zapManager = NDKZapManager(ndk: ndk)
             NDKLogger.log(.info, category: .general, "[\(type(of: self))] Zap manager initialized")
             
+            // Initialize auth manager to restore sessions
+            NDKLogger.log(.info, category: .general, "[\(type(of: self))] Initializing auth manager for session restoration")
+            await NDKAuthManager.shared.initialize()
+            
             // If authenticated after restore, initialize user data
             if NDKAuthManager.shared.hasActiveSession {
                 if let signer = NDKAuthManager.shared.activeSigner {
@@ -151,25 +155,34 @@ open class NDKNostrManager: ObservableObject {
         }
     }
     
-    /// Get all relays (default + user added)
+    /// Get all relays (default + app added)
     open func getAllRelays() -> [String] {
-        let userRelays = UserDefaults.standard.stringArray(forKey: userRelaysKey) ?? []
-        return Array(Set(defaultRelays + userRelays))
+        let appRelays = UserDefaults.standard.stringArray(forKey: appRelaysKey) ?? []
+        return Array(Set(defaultRelays + appRelays))
     }
     
-    /// Get user-added relays
-    public var userAddedRelays: [String] {
-        UserDefaults.standard.stringArray(forKey: userRelaysKey) ?? []
+    /// Get app-added relays
+    public var appAddedRelays: [String] {
+        UserDefaults.standard.stringArray(forKey: appRelaysKey) ?? []
     }
     
-    /// Add a user relay
-    public func addUserRelay(_ relayURL: String) async {
+    /// Add an app relay
+    /// 
+    /// Adds a relay to this app's connection pool. This relay will be connected to
+    /// whenever the app launches, in addition to the default relays.
+    /// 
+    /// **Important**: This does NOT modify the user's NIP-65 relay list. The relay
+    /// is only stored locally for this app and won't affect the user's relay
+    /// preferences in other Nostr clients.
+    /// 
+    /// - Parameter relayURL: The WebSocket URL of the relay to add (e.g., "wss://relay.example.com")
+    public func addAppRelay(_ relayURL: String) async {
         guard let ndk = ndk else { return }
         
-        var userRelays = userAddedRelays
-        if !userRelays.contains(relayURL) && !defaultRelays.contains(relayURL) {
-            userRelays.append(relayURL)
-            UserDefaults.standard.set(userRelays, forKey: userRelaysKey)
+        var appRelays = appAddedRelays
+        if !appRelays.contains(relayURL) && !defaultRelays.contains(relayURL) {
+            appRelays.append(relayURL)
+            UserDefaults.standard.set(appRelays, forKey: appRelaysKey)
             
             // Add to NDK and connect
             let relay = await ndk.addRelayAndConnect(relayURL)
@@ -179,13 +192,22 @@ open class NDKNostrManager: ObservableObject {
         }
     }
     
-    /// Remove a user relay
-    public func removeUserRelay(_ relayURL: String) async {
+    /// Remove an app relay
+    /// 
+    /// Removes a relay from this app's connection pool. The relay will be disconnected
+    /// and won't be connected to on future app launches.
+    /// 
+    /// **Important**: This does NOT modify the user's NIP-65 relay list. It only
+    /// removes the relay from this app's local storage.
+    /// 
+    /// - Parameter relayURL: The WebSocket URL of the relay to remove
+    /// - Note: Default relays cannot be removed using this method
+    public func removeAppRelay(_ relayURL: String) async {
         guard let ndk = ndk else { return }
         
-        var userRelays = userAddedRelays
-        userRelays.removeAll { $0 == relayURL }
-        UserDefaults.standard.set(userRelays, forKey: userRelaysKey)
+        var appRelays = appAddedRelays
+        appRelays.removeAll { $0 == relayURL }
+        UserDefaults.standard.set(appRelays, forKey: appRelaysKey)
         
         // Don't remove if it's a default relay
         if !defaultRelays.contains(relayURL) {
@@ -228,9 +250,8 @@ open class NDKNostrManager: ObservableObject {
     public func createNewAccount(displayName: String, about: String? = nil, picture: String? = nil) async throws -> NDKSession {
         guard let ndk = ndk else { throw NDKError.notConfigured("NDK not initialized") }
         
-        // Generate new private key
-        let privateKey = Crypto.generatePrivateKey()
-        let signer = try NDKPrivateKeySigner(privateKey: privateKey)
+        // Generate new private key signer
+        let signer = try NDKPrivateKeySigner.generate()
         
         // Create session via NDKAuthManager
         let session = try await NDKAuthManager.shared.addSession(
@@ -286,27 +307,5 @@ open class NDKNostrManager: ObservableObject {
                 self.currentUserProfile = profile
             }
         }
-    }
-    
-    // MARK: - Helpers
-    
-    /// Check if a relay URL is valid
-    public static func isValidRelayURL(_ urlString: String) -> Bool {
-        let cleanUrl = RelayConstants.WebSocketScheme.ensureWebSocketScheme(urlString)
-        
-        // Validate URL
-        guard let url = URLUtils.safeURL(cleanUrl),
-              let scheme = url.scheme,
-              ["ws", "wss"].contains(scheme),
-              url.host != nil else {
-            return false
-        }
-        
-        return true
-    }
-    
-    /// Clean and normalize a relay URL
-    public static func normalizeRelayURL(_ urlString: String) -> String {
-        return RelayConstants.WebSocketScheme.ensureWebSocketScheme(urlString)
     }
 }

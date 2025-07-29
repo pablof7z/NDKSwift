@@ -35,7 +35,7 @@ let package = Package(
         .executableTarget(
             name: "GettingStarted",
             dependencies: [
-                .product(name: "NDKSwift", package: "NDKSwift-z94ws0")
+                .product(name: "NDKSwift", package: "NDKSwift")
             ],
             path: "GettingStarted",
             sources: ["main.swift", "Example01_ConnectToRelay.swift", "Example02_PublishEvent.swift", "Example03_Subscribe.swift", "Example03_1_SimpleObserver.swift", "Example03_2_GroupedSubscriptions.swift", "Example04_UserProfile.swift", "Example05_EncryptedMessages.swift", "Example06_OutboxModel.swift", "Example07_MultipleObservers.swift", "Example08_PublishWithNIP46.swift", "Example09_NutzapsAndHistory.swift"],
@@ -46,14 +46,14 @@ let package = Package(
         .executableTarget(
             name: "RelayCollectionDemo",
             dependencies: [
-                .product(name: "NDKSwift", package: "NDKSwift-z94ws0")
+                .product(name: "NDKSwift", package: "NDKSwift)
             ],
             path: "Features/RelayCollectionDemo"
         ),
         .executableTarget(
             name: "DebugKind0Fetcher",
             dependencies: [
-                .product(name: "NDKSwift", package: "NDKSwift-z94ws0")
+                .product(name: "NDKSwift", package: "NDKSwift)
             ],
             path: "Features/DebugKind0Fetcher"
         ),
