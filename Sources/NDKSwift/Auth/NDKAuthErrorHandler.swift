@@ -12,7 +12,7 @@ public struct NDKAuthErrorHandler {
         public let isRecoverable: Bool
         public let suggestedAction: SuggestedAction?
 
-        public enum SuggestedAction {
+        public enum SuggestedAction: Equatable {
             case retry
             case removeAccount
             case reauthenticate

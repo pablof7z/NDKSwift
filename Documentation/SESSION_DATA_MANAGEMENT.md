@@ -220,11 +220,15 @@ for await event in ndk.observe(filter) {
 
 ### One-Time Fetch
 
-Use `fetchEvents()` for one-time queries:
+To collect events once, use `observe()` with a collection pattern:
 
 ```swift
-let events = try await ndk.fetchEvents(filter)
-print("Fetched \(events.count) events")
+var events: [NDKEvent] = []
+for await event in ndk.observe(filter: filter).events {
+    events.append(event)
+    // Break after collecting enough events or a timeout
+}
+print("Collected \(events.count) events")
 ```
 
 ## Subscription Management

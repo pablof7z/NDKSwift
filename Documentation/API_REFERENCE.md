@@ -518,9 +518,11 @@ for await note in ndk.observe(filter: notesFilter).events {
     print(note.content)
 }
 
-// Get reactions to an event
+// Stream reactions to an event
 let reactionsFilter = NDKFilter.reactions(to: eventId)
-let reactions = await ndk.fetchEvents(with: reactionsFilter)
+for await reaction in ndk.observe(filter: reactionsFilter).events {
+    print("Reaction: \(reaction.content)")
+}
 ```
 
 ### NDKDataSourceOptions
