@@ -32,7 +32,7 @@ actor NDKRelaySelector {
         let pTags = event.pTags
         
         // For events with <10 p-tags, include their relays per NIP-65
-        if pTags.count < 10 {
+        if pTags.count < ProtocolConstants.maxPTagsForOutboxModel {
             allPubkeys.append(contentsOf: pTags)
         }
         
@@ -321,7 +321,7 @@ actor NDKRelaySelector {
 
         // Extract from p tags (mentioned users) - NIP-65 outbox model
         let pTags = event.pTags
-        if purpose == .publishing && pTags.count < 10 {
+        if purpose == .publishing && pTags.count < ProtocolConstants.maxPTagsForOutboxModel {
             // For events with less than 10 p-tags, apply NIP-65 outbox model:
             // Send to read relays of each tagged user
             for pubkey in pTags {

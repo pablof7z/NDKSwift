@@ -122,7 +122,7 @@ Task {
                 picture: "https://example.com/user\(i).jpg"
             )
             testProfile.setAdditionalField("index", value: "\(i)")
-            testProfile.setAdditionalField("timestamp", value: "\(Date().timeIntervalSince1970)")
+            testProfile.setAdditionalField("timestamp", value: "\(Timestamp.now)")
             
             try await cache.saveProfile(testProfile, pubkey: "test_user_\(i)")
         }

@@ -487,14 +487,14 @@ extension NDKFilter: CustomStringConvertible {
         }
 
         if let authors = authors {
-            let authorPrefixes = authors.prefix(3).map { String($0.prefix(8)) }.joined(separator: ",")
-            let suffix = authors.count > 3 ? "..." : ""
+            let authorPrefixes = authors.prefix(ProtocolConstants.maxFilterDescriptionItems).map { String($0.prefix(8)) }.joined(separator: ",")
+            let suffix = authors.count > ProtocolConstants.maxFilterDescriptionItems ? "..." : ""
             parts.append("authors:\(authorPrefixes)\(suffix)")
         }
 
         if let ids = ids {
-            let idPrefixes = ids.prefix(3).map { String($0.prefix(8)) }.joined(separator: ",")
-            let suffix = ids.count > 3 ? "..." : ""
+            let idPrefixes = ids.prefix(ProtocolConstants.maxFilterDescriptionItems).map { String($0.prefix(8)) }.joined(separator: ",")
+            let suffix = ids.count > ProtocolConstants.maxFilterDescriptionItems ? "..." : ""
             parts.append("ids:\(idPrefixes)\(suffix)")
         }
 
@@ -512,8 +512,8 @@ extension NDKFilter: CustomStringConvertible {
 
         if !tagFilters.isEmpty {
             let tagParts = tagFilters.map { key, values in
-                let valuePrefixes = values.prefix(2).map { String($0.prefix(8)) }.joined(separator: ",")
-                let suffix = values.count > 2 ? "..." : ""
+                let valuePrefixes = values.prefix(ProtocolConstants.maxTagValuesInDescription).map { String($0.prefix(8)) }.joined(separator: ",")
+                let suffix = values.count > ProtocolConstants.maxTagValuesInDescription ? "..." : ""
                 return "\(key):\(valuePrefixes)\(suffix)"
             }
             parts.append(contentsOf: tagParts)

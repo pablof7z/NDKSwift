@@ -230,7 +230,7 @@ public final class NDKUser: Equatable, Hashable, Sendable {
 
     /// Get shortened public key for display
     public var shortPubkey: String {
-        if pubkey.count > 16 {
+        if pubkey.count > ProtocolConstants.maxPubkeyDisplayLength {
             return StringFormatHelpers.truncateHex(pubkey, prefixLength: StringConstants.DisplayFormatting.hexPrefixLength, suffixLength: StringConstants.DisplayFormatting.hexPrefixLength)
         }
         return pubkey
