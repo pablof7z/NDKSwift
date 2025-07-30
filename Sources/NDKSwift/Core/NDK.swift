@@ -101,6 +101,9 @@ public final class NDK {
 
     /// Initial relay URLs to add after construction
     private var initialRelayUrls: [RelayURL] = []
+    
+    /// Track whether connect() has been called
+    private var hasConnected = false
 
     // MARK: - Lazy Internal Components
 
@@ -272,15 +275,25 @@ public final class NDK {
 
     /// Add a relay to the pool (async version)
     @discardableResult
-    public func addRelay(_ url: RelayURL) async -> NDKRelay {
-        await pool.addRelay(url)
+    public func addRelay(_ url: RelayURL, origin: NDKRelayOrigin = .explicit) async -> NDKRelay {
+        let relay = await pool.addRelay(url, origin: origin)
+        
+        if hasConnected {
+            // Auto-connect the relay since connect() has already been called
+            NDKLogger.log(.info, category: .relay, "Auto-connecting relay \(url) since connect() has been called")
+            do {
+                try await relay.connect()
+            } catch {
+                NDKLogger.log(.error, category: .relay, "Failed to auto-connect relay \(url): \(error)")
+            }
+        } else {
+            // Warn that the relay won't be connected until connect() is called
+            NDKLogger.log(.warning, category: .relay, "⚠️ Relay \(url) added but not connected. Call connect() to establish connections to all relays.")
+        }
+        
+        return relay
     }
 
-    /// Add a relay to the pool and connect to it
-    @discardableResult
-    public func addRelayAndConnect(_ url: RelayURL) async -> NDKRelay? {
-        await pool.addRelayAndConnect(url: url)
-    }
 
     /// Remove a relay from the pool
     public func removeRelay(_ url: RelayURL) async {
@@ -343,6 +356,9 @@ public final class NDK {
 
         NDKLogger.log(.info, category: .relay, "Connecting to all relays in pool")
         await pool.connectAll()
+        
+        // Mark that connect has been called
+        hasConnected = true
     }
 
     /// Disconnect from all relays
@@ -754,6 +770,19 @@ public final class NDK {
     /// Get a specific relay - primarily for internal use
     internal func getRelay(for url: RelayURL) async -> NDKRelay? {
         await pool.getRelay(for: url)
+    }
+    
+    /// Get the authors that caused us to connect to each relay through the outbox model
+    /// - Returns: Dictionary mapping relay URLs to the authors whose relay lists included them
+    public func getRelayAuthorMapping() async -> [RelayURL: [String]] {
+        await pool.getRelayAuthorMapping()
+    }
+    
+    /// Get the authors that caused us to connect to a specific relay
+    /// - Parameter url: The relay URL to check
+    /// - Returns: Array of author pubkeys that caused this relay connection (empty for explicit relays)
+    public func getAuthorsForRelay(_ url: RelayURL) async -> [String] {
+        await pool.getAuthorsForRelay(url)
     }
 
     // MARK: - NIP-77 Support

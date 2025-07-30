@@ -40,6 +40,88 @@ When relay information is not cached, the system:
 2. Triggers background discovery to fetch relay lists from the network
 3. Updates active operations when relay information is discovered
 
+### Critical Implementation Detail: Relay Role Separation
+
+**Outbox Relays vs Data Relays**:
+- **Outbox relays** (configured in `outboxConfig.outboxRelays`): Used ONLY for fetching relay lists (kind:10002). Never receive data queries.
+- **Explicit relays** (app's configured relays): Used as fallback for data queries when author relay info is unknown
+- **Author relays** (discovered from 10002): The actual relays where authors publish
+
+**Relay Counting for Enhancement**:
+When determining if more relays are needed during dynamic enhancement:
+1. Count only relays that are actively serving the specific authors in question
+2. Don't count relays that are serving other authors in a mixed filter
+3. If a fallback relay is also in the author's relay list, it counts as serving that author
+
+**Example Flow**:
+```
+Initial State:
+- Request: kind:1 for author 3f68dede
+- No relay info cached
+- Send query to explicit relay (primal.net) as fallback
+- Trigger discovery on outbox relays (purplepag.es, nostr.band)
+
+Discovery:
+- Fetch kind:10002 from outbox relays
+- Find author uses [primal.net, f7z.io, damus.io]
+
+Enhancement Decision:
+- Count: primal.net already serves author (1 relay)
+- Target: 2 relays per author
+- Need: 1 more relay
+- Action: Connect to f7z.io and create new subscription
+
+Result:
+- Author's events now flow from both primal.net and f7z.io
+- damus.io available if needed later
+```
+
+This ensures proper relay selection without over-connecting or missing author-specific relays.
+
+## Relay Origin Tracking
+
+NDKSwift tracks why each relay was added to the pool, which is especially useful for understanding outbox model behavior:
+
+### Relay Origins
+
+Each relay has an origin that explains why it was connected:
+- `.explicit`: Relay added directly by the application
+- `.outboxConfig`: Relay configured as an outbox relay for discovery
+- `.outbox(authorPubkey: String)`: Relay discovered through an author's relay list
+
+### Tracking Author Connections
+
+You can query which authors caused specific relay connections:
+
+```swift
+// Get all relay->author mappings
+let mapping = await ndk.getRelayAuthorMapping()
+for (relay, authors) in mapping {
+    if !authors.isEmpty {
+        print("Relay \(relay) was connected because of authors: \(authors)")
+    }
+}
+
+// Check a specific relay
+let authors = await ndk.getAuthorsForRelay("wss://f7z.io/")
+if !authors.isEmpty {
+    print("Connected to f7z.io because of: \(authors)")
+}
+```
+
+This is useful for:
+- Debugging relay connections
+- Understanding relay usage patterns
+- Optimizing relay selection
+- Building relay management UIs
+
+Example output:
+```
+Relay wss://relay.primal.net/ was connected because of authors: []  // Explicit relay
+Relay wss://purplepag.es/ was connected because of authors: []      // Outbox config relay
+Relay wss://f7z.io/ was connected because of authors: ["3f68dede..."] // Discovered via outbox
+```
+
 ### 2. Subscription Handling
 
 When creating a subscription without explicit relays:

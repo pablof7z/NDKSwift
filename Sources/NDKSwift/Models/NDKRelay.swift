@@ -6,8 +6,6 @@ public enum NDKRelayOrigin: Codable, Equatable, Sendable {
     case explicit
     /// Discovered through outbox model (from another user's relay list)
     case outbox(authorPubkey: String) // pubkey whose relay list led to discovery
-    /// Added as a fallback relay
-    case fallback
     /// Added from NDKOutboxConfig for relay list queries
     case outboxConfig
 }
@@ -426,7 +424,7 @@ public final class NDKRelay: RelayProtocol, Hashable, Equatable, @unchecked Send
     ///
     /// - `.explicit`: Added by developer during initialization or via addRelay()
     /// - `.outbox`: Discovered through another user's relay list
-    /// - `.fallback`: Added as a fallback relay
+    /// - `.outboxConfig`: Added from NDKOutboxConfig for relay list queries
     public var origin: NDKRelayOrigin {
         get async {
             await stateActor.getOrigin()
@@ -717,6 +715,12 @@ public final class NDKRelay: RelayProtocol, Hashable, Equatable, @unchecked Send
 
     /// Handle EVENT message
     private func handleEventMessage(_ event: NDKEvent, subscriptionId: String?) async {
+        // Log the raw event for debugging
+        NDKLogger.log(.debug, category: .relay, "📨 [EVENT] Received event on \(url) - ID: \(event.id), Kind: \(event.kind), Author: \(event.pubkey.prefix(8)), SubID: \(subscriptionId ?? "none")")
+        if event.kind == EventKind.relayList {
+            NDKLogger.log(.info, category: .relay, "📋 [10002] Relay list event - Tags: \(event.tags)")
+        }
+        
         // Update subscription event count
         if let subId = subscriptionId {
             await incrementSubscriptionEventCount(id: subId)
@@ -980,8 +984,9 @@ public extension NDKRelay {
     internal func sendSubscription(id: String, filters: [NDKFilter]) async {
         do {
             let req = try NostrMessage.req(subscriptionId: id, filters: filters).serialize()
+            let filterDescriptions = filters.map { $0.description }.joined(separator: ", ")
             NDKLogger.log(.debug, category: .subscription,
-                         "📤 [Relay] Sending REQ with ID '\(id)' to relay \(url) with \(filters.count) filters")
+                         "📤 [Relay] Sending REQ with ID '\(id)' to relay \(url) with \(filters.count) filters: \(filterDescriptions)")
             try await send(req)
         } catch {
             NDKLogger.log(.error, category: .relay, "Failed to send subscription \(id): \(error)")

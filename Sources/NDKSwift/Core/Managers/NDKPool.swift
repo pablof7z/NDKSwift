@@ -283,6 +283,38 @@ public actor NDKPool {
             return state == .connected || state == .authenticated
         }
     }
+    
+    /// Get the authors that caused us to connect to a specific relay
+    public func getAuthorsForRelay(_ url: RelayURL) async -> [String] {
+        let normalizedUrl = url.normalizedRelayURL
+        guard let relay = relayMap[normalizedUrl] else { return [] }
+        
+        let origin = await relay.origin
+        switch origin {
+        case .outbox(let authorPubkey):
+            return [authorPubkey]
+        case .explicit, .outboxConfig:
+            return []
+        }
+    }
+    
+    /// Get a mapping of relays to the authors that caused us to connect to them
+    public func getRelayAuthorMapping() async -> [RelayURL: [String]] {
+        var mapping: [RelayURL: [String]] = [:]
+        
+        for (url, relay) in relayMap {
+            let origin = await relay.origin
+            switch origin {
+            case .outbox(let authorPubkey):
+                mapping[url] = [authorPubkey]
+            case .explicit, .outboxConfig:
+                // These relays weren't added because of specific authors
+                mapping[url] = []
+            }
+        }
+        
+        return mapping
+    }
 
     /// Get connected relay URLs
     public var connectedRelayURLs: Set<RelayURL> {
